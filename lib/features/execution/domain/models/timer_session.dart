@@ -1,9 +1,27 @@
 import '../../../../core/validation/model_validators.dart';
 
+enum TimerSessionTargetType {
+  task,
+  block,
+}
+
+extension TimerSessionTargetTypeStorage on TimerSessionTargetType {
+  String get storageValue => name;
+
+  static TimerSessionTargetType fromStorage(String? raw) {
+    return TimerSessionTargetType.values.firstWhere(
+      (e) => e.name == raw,
+      orElse: () => TimerSessionTargetType.task,
+    );
+  }
+}
+
 class TimerSession {
   const TimerSession({
     required this.id,
-    required this.taskId,
+    this.targetType = TimerSessionTargetType.task,
+    this.taskId,
+    this.blockId,
     required this.startedAtMs,
     required this.endedAtMs,
     required this.elapsedSeconds,
@@ -12,7 +30,9 @@ class TimerSession {
   });
 
   final String id;
-  final String taskId;
+  final TimerSessionTargetType targetType;
+  final String? taskId;
+  final String? blockId;
   final int startedAtMs;
   final int? endedAtMs;
   final int elapsedSeconds;
@@ -21,7 +41,14 @@ class TimerSession {
 
   void validate() {
     ModelValidators.requireNotBlank(id, 'timerSession.id');
-    ModelValidators.requireNotBlank(taskId, 'timerSession.taskId');
+    switch (targetType) {
+      case TimerSessionTargetType.task:
+        ModelValidators.requireNotBlank(taskId ?? '', 'timerSession.taskId');
+        break;
+      case TimerSessionTargetType.block:
+        ModelValidators.requireNotBlank(blockId ?? '', 'timerSession.blockId');
+        break;
+    }
     ModelValidators.requireRange(
       value: elapsedSeconds,
       min: 0,
@@ -32,7 +59,9 @@ class TimerSession {
 
   Map<String, dynamic> toMap() => {
     'id': id,
-    'taskId': taskId,
+    'targetType': targetType.storageValue,
+    if (taskId != null) 'taskId': taskId,
+    if (blockId != null) 'blockId': blockId,
     'startedAtMs': startedAtMs,
     'endedAtMs': endedAtMs,
     'elapsedSeconds': elapsedSeconds,
@@ -41,12 +70,14 @@ class TimerSession {
   };
 
   static TimerSession fromMap(Map<String, dynamic> map) => TimerSession(
-    id: map['id'] as String,
-    taskId: map['taskId'] as String,
-    startedAtMs: map['startedAtMs'] as int,
-    endedAtMs: map['endedAtMs'] as int?,
-    elapsedSeconds: map['elapsedSeconds'] as int,
-    createdAtMs: map['createdAtMs'] as int,
-    updatedAtMs: map['updatedAtMs'] as int,
+    id: map['id'] as String? ?? '',
+    targetType: TimerSessionTargetTypeStorage.fromStorage(map['targetType'] as String?),
+    taskId: map['taskId'] as String?,
+    blockId: map['blockId'] as String?,
+    startedAtMs: (map['startedAtMs'] as num?)?.toInt() ?? 0,
+    endedAtMs: (map['endedAtMs'] as num?)?.toInt(),
+    elapsedSeconds: (map['elapsedSeconds'] as num?)?.toInt() ?? 0,
+    createdAtMs: (map['createdAtMs'] as num?)?.toInt() ?? 0,
+    updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
   );
 }

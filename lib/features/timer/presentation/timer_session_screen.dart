@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
 import '../../execution/domain/task_timer_engine.dart';
+import '../../execution/domain/models/timer_session.dart';
 import '../../scoring/application/scoring_controller.dart';
 import '../../scoring/presentation/score_task_dialog.dart';
 
@@ -18,6 +21,9 @@ class TimerSessionScreen extends ConsumerWidget {
     final running = execState.phase == ExecutionPhase.inProgress;
     final paused = execState.phase == ExecutionPhase.paused;
     final elapsed = execState.elapsed;
+    final activeLabel = execState.targetType == TimerSessionTargetType.task
+        ? execState.taskLabel
+        : execState.blockLabel;
     final mins = elapsed.inMinutes.remainder(60).toString().padLeft(2, '0');
     final secs = elapsed.inSeconds.remainder(60).toString().padLeft(2, '0');
     final hrs = elapsed.inHours;
@@ -68,7 +74,7 @@ class TimerSessionScreen extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
-                execState.taskLabel,
+                activeLabel,
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 34, fontStyle: FontStyle.italic),
               ),
@@ -89,7 +95,15 @@ class TimerSessionScreen extends ConsumerWidget {
                       } else if (paused) {
                         ctrl.resume();
                       } else {
+                        final wasNotStarted = execState.phase == ExecutionPhase.notStarted;
                         ctrl.start();
+                        if (wasNotStarted &&
+                            execState.targetType == TimerSessionTargetType.task &&
+                            execState.taskId.isNotEmpty) {
+                          unawaited(
+                            ref.read(reminderSyncServiceProvider).markTaskStarted(execState.taskId),
+                          );
+                        }
                       }
                     },
                     icon: Icon(running ? Icons.pause_circle_outline : Icons.play_arrow_rounded),
@@ -109,9 +123,15 @@ class TimerSessionScreen extends ConsumerWidget {
                         : () async {
                             await ctrl.stopAndPersist();
                             if (!context.mounted) return;
+                            if (execState.targetType == TimerSessionTargetType.block) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Block timer session saved.')),
+                              );
+                              return;
+                            }
                             final result = await ScoreTaskDialog.show(
                               context,
-                              taskTitle: execState.taskLabel,
+                              taskTitle: activeLabel,
                             );
                             if (!context.mounted || result == null) return;
                             await ref

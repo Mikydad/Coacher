@@ -9,6 +9,7 @@ import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
 import '../../planning/domain/models/block.dart';
 import '../../planning/domain/models/routine.dart';
+import '../../planning/domain/models/routine_mode.dart';
 import '../../planning/domain/models/task_item.dart';
 import '../application/plan_tomorrow_providers.dart';
 
@@ -85,6 +86,8 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
           title: r.title,
           dateKey: r.dateKey,
           orderIndex: i,
+          modeId: r.modeId,
+          mode: r.mode,
           createdAtMs: r.createdAtMs,
           updatedAtMs: now,
         ),
@@ -130,6 +133,8 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
         title: name,
         dateKey: DateKeys.tomorrowKey(),
         orderIndex: nextIndex,
+        modeId: 'flexible',
+        mode: RoutineMode.flexible,
         createdAtMs: now,
         updatedAtMs: now,
       ),
@@ -191,6 +196,9 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
         category: t.category,
         planDateKey: DateKeys.tomorrowKey(),
         notes: t.notes,
+        sequenceIndex: t.sequenceIndex,
+        strictModeRequired: t.strictModeRequired,
+        modeRefId: t.modeRefId,
       ),
     );
     invalidateTaskListProviders(ref);
@@ -406,6 +414,26 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
         title: newTitle,
         dateKey: r.dateKey,
         orderIndex: r.orderIndex,
+        modeId: r.modeId,
+        mode: r.mode,
+        createdAtMs: r.createdAtMs,
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+    ref.invalidate(tomorrowRoutineSlotsProvider);
+  }
+
+  Future<void> _setMode(RoutineMode mode) async {
+    final repo = ref.read(planningRepositoryProvider);
+    final r = widget.routine;
+    await repo.upsertRoutine(
+      Routine(
+        id: r.id,
+        title: r.title,
+        dateKey: r.dateKey,
+        orderIndex: r.orderIndex,
+        modeId: mode.name,
+        mode: mode,
         createdAtMs: r.createdAtMs,
         updatedAtMs: DateTime.now().millisecondsSinceEpoch,
       ),
@@ -540,6 +568,9 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
           category: t.category,
           planDateKey: t.planDateKey,
           notes: t.notes,
+          sequenceIndex: t.sequenceIndex,
+          strictModeRequired: t.strictModeRequired,
+          modeRefId: t.modeRefId,
         ),
       );
     }
@@ -641,7 +672,7 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
                   ),
                   Expanded(
                     child: Text(
-                      widget.routine.title,
+                      '${widget.routine.title} (${widget.routine.mode.name})',
                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                     ),
                   ),
@@ -665,9 +696,17 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
                       if (!mounted) return;
                       if (v == 'rename') _rename();
                       if (v == 'delete') _delete(rows);
+                      if (v == 'mode_flexible') _setMode(RoutineMode.flexible);
+                      if (v == 'mode_disciplined') _setMode(RoutineMode.disciplined);
+                      if (v == 'mode_extreme') _setMode(RoutineMode.extreme);
                     },
                     itemBuilder: (_) => const [
                       PopupMenuItem(value: 'rename', child: Text('Rename')),
+                      PopupMenuDivider(),
+                      PopupMenuItem(value: 'mode_flexible', child: Text('Mode: Flexible')),
+                      PopupMenuItem(value: 'mode_disciplined', child: Text('Mode: Disciplined')),
+                      PopupMenuItem(value: 'mode_extreme', child: Text('Mode: Extreme')),
+                      PopupMenuDivider(),
                       PopupMenuItem(
                         value: 'delete',
                         child: Text('Delete', style: TextStyle(color: Colors.redAccent)),

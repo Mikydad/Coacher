@@ -7,10 +7,12 @@ import 'core/bootstrap/app_bootstrap.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await AppBootstrap.initialize();
+  final container = ProviderContainer();
+  await AppBootstrap.initialize(container);
   runApp(
-    const ProviderScope(
-      child: AppLifecycleTaskRefresh(
+    UncontrolledProviderScope(
+      container: container,
+      child: const AppLifecycleTaskRefresh(
         child: CoachForLifeApp(),
       ),
     ),
