@@ -4,13 +4,14 @@ import '../firebase/firestore_client.dart';
 import '../notifications/local_notifications_service.dart';
 import '../offline/offline_store.dart';
 import '../sync/sync_service.dart';
+import '../../features/planning/application/routine_mode_policy_resolver.dart';
 import '../../features/planning/data/planning_repository.dart';
 import '../../features/execution/application/execution_controller.dart';
 import '../../features/execution/data/execution_repository.dart';
 import '../../features/execution/data/timer_runtime_cache.dart';
-import '../../features/execution/domain/task_timer_engine.dart';
 import '../../features/scoring/application/scoring_controller.dart';
 import '../../features/scoring/data/scoring_repository.dart';
+import '../../features/goals/application/goal_reminder_sync_service.dart';
 import '../../features/reminders/application/reminder_sync_service.dart';
 import '../../features/reminders/data/reminder_cache_store.dart';
 import '../../features/reminders/data/reminder_repository.dart';
@@ -24,6 +25,9 @@ final syncServiceProvider = Provider<SyncService>((ref) => SyncService.instance)
 
 final planningRepositoryProvider = Provider<PlanningRepository>(
   (ref) => FirestorePlanningRepository(ref.read(firestoreClientProvider)),
+);
+final routineModePolicyResolverProvider = Provider<RoutineModePolicyResolver>(
+  (ref) => const RoutineModePolicyResolver(),
 );
 
 final executionRepositoryProvider = Provider<ExecutionRepository>(
@@ -55,6 +59,10 @@ final reminderSyncServiceProvider = Provider<ReminderSyncService>(
   (ref) => ReminderSyncService(
     repository: ref.read(reminderRepositoryProvider),
     cacheStore: ref.read(reminderCacheStoreProvider),
-    notifications: ref.read(localNotificationsServiceProvider),
+    notifications: LocalReminderNotificationsPort(ref.read(localNotificationsServiceProvider)),
   ),
+);
+
+final goalReminderSyncServiceProvider = Provider<GoalReminderSyncService>(
+  (ref) => GoalReminderSyncService(notifications: ref.read(localNotificationsServiceProvider)),
 );

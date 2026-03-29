@@ -20,4 +20,16 @@ class DateKeys {
     final tmr = DateTime(base.year, base.month, base.day).add(const Duration(days: 1));
     return yyyymmdd(tmr);
   }
+
+  /// Parses [yyyymmdd] output (`yyyy-MM-dd`) as a **local** calendar date at midnight.
+  static DateTime parseLocalDateKey(String key) {
+    final parts = key.split('-');
+    if (parts.length != 3) {
+      throw FormatException('Expected yyyy-MM-dd, got: $key');
+    }
+    final y = int.parse(parts[0]);
+    final m = int.parse(parts[1]);
+    final d = int.parse(parts[2]);
+    return DateTime(y, m, d);
+  }
 }

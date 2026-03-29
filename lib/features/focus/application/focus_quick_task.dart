@@ -35,6 +35,27 @@ Future<void> persistQuickPlannedTaskForToday(
       ? 0
       : existing.map((t) => t.orderIndex).reduce((a, b) => a > b ? a : b) + 1;
 
+  String modeRefId = 'flexible';
+  try {
+    final routines = await planning.getRoutinesForDate(today, getOptions: server);
+    for (final r in routines) {
+      if (r.id == day.routineId) {
+        modeRefId = r.modeId;
+        break;
+      }
+    }
+  } catch (_) {
+    try {
+      final routines = await planning.getRoutinesForDate(today);
+      for (final r in routines) {
+        if (r.id == day.routineId) {
+          modeRefId = r.modeId;
+          break;
+        }
+      }
+    } catch (_) {}
+  }
+
   final now = DateTime.now().millisecondsSinceEpoch;
   final task = PlannedTask(
     id: StableId.generate('task'),
@@ -50,6 +71,7 @@ Future<void> persistQuickPlannedTaskForToday(
     createdAtMs: now,
     updatedAtMs: now,
     planDateKey: today,
+    modeRefId: modeRefId,
   );
   await planning.upsertTask(task);
 }

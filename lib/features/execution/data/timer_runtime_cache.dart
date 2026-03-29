@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
 import '../domain/task_timer_engine.dart';
+import '../domain/models/timer_session.dart';
 
 class TimerRuntimeCache {
   const TimerRuntimeCache();
@@ -14,14 +15,20 @@ class TimerRuntimeCache {
   }
 
   Future<void> save({
+    required TimerSessionTargetType targetType,
     required String taskId,
+    required String blockId,
+    required String label,
     required ExecutionPhase phase,
     required Duration elapsed,
     DateTime? runningSince,
   }) async {
     final file = await _file();
     final payload = <String, dynamic>{
+      'targetType': targetType.storageValue,
       'taskId': taskId,
+      'blockId': blockId,
+      'label': label,
       'phase': phase.name,
       'elapsedMs': elapsed.inMilliseconds,
       'runningSinceMs': runningSince?.millisecondsSinceEpoch,

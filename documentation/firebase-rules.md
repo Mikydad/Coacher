@@ -17,4 +17,5 @@ service cloud.firestore {
 ## Notes
 - The app signs in with Firebase Anonymous Auth on startup.
 - Data paths are now under `users/{request.auth.uid}/...`.
+- **Goals** live at `users/{uid}/goals/{goalId}` with subcollections `actions`, `milestones`, `checkIns`. The rule above already covers them via `{document=**}`.
 - If you need to debug quickly, do not use wide-open rules in production.

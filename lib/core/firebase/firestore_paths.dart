@@ -17,4 +17,17 @@ class FirestorePaths {
   static String get timerSessions => '$userRoot/timerSessions';
   static String get taskScores => '$userRoot/taskScores';
   static String get reminders => '$userRoot/reminders';
+  static String get routineModes => '$userRoot/routineModes';
+  static String get flowTransitionEvents => '$userRoot/flowTransitionEvents';
+  static String get accountabilityLogs => '$userRoot/accountabilityLogs';
+
+  static String get goals => '$userRoot/goals';
+
+  static String goalDocument(String goalId) => '$goals/$goalId';
+
+  static String goalActions(String goalId) => '${goalDocument(goalId)}/actions';
+
+  static String goalMilestones(String goalId) => '${goalDocument(goalId)}/milestones';
+
+  static String goalCheckIns(String goalId) => '${goalDocument(goalId)}/checkIns';
 }

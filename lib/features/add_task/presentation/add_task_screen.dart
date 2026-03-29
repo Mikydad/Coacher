@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
+import '../../planning/application/effective_task_mode.dart';
 import '../../planning/application/planned_task_providers.dart';
+import '../../planning/domain/models/routine.dart';
+import '../../planning/data/planning_repository.dart';
 import '../../planning/domain/add_task_duration.dart';
 import '../../planning/domain/models/task_item.dart';
 import '../../reminders/domain/models/reminder_config.dart';
@@ -52,6 +55,8 @@ class AddTaskScreen extends ConsumerStatefulWidget {
 
 class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
   static const _categoryOptions = ['Study', 'Fitness', 'Work', 'Personal', 'Planning'];
+  static const _modeChoiceIds = ['flexible', 'disciplined', 'extreme'];
+  static const _modeLabels = ['Flexible', 'Disciplined', 'Extreme'];
 
   final _controller = TextEditingController();
   final _notesController = TextEditingController();
@@ -62,6 +67,12 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
   DateTime _reminderTime = DateTime.now().add(const Duration(minutes: 10));
   bool _saving = false;
   bool _loaded = false;
+
+  /// Execution mode id: `flexible` | `disciplined` | `extreme`.
+  String _modeRefId = 'flexible';
+  bool _strictModeRequired = false;
+  /// When false, new-task save may inherit [Routine.modeId] for the target routine.
+  bool _modeUserCustomized = false;
 
   PlannedTask? _loadedTask;
   String? _existingReminderId;
@@ -84,6 +95,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadEdit());
     } else {
       _loaded = true;
+      if (widget.slotArgs != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _seedModeFromRoutineSlot());
+      }
     }
   }
 
@@ -103,6 +117,57 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
     }
     final rd = DateTime(_reminderTime.year, _reminderTime.month, _reminderTime.day);
     return DateKeys.yyyymmdd(rd);
+  }
+
+  Future<void> _seedModeFromRoutineSlot() async {
+    if (_isEdit || widget.slotArgs == null || _modeUserCustomized || !mounted) return;
+    try {
+      final planning = ref.read(planningRepositoryProvider);
+      final routines = await planning.getRoutinesForDate(widget.slotArgs!.dateKey);
+      for (final r in routines) {
+        if (r.id == widget.slotArgs!.routineId) {
+          if (!mounted || _modeUserCustomized) return;
+          setState(() => _modeRefId = r.modeId);
+          return;
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<String> _effectiveModeRefIdForSave({
+    required PlanningRepository planning,
+    required String routineId,
+    required String planDateKey,
+    required String blockId,
+  }) async {
+    Routine? routine;
+    try {
+      final routines = await planning.getRoutinesForDate(planDateKey);
+      for (final r in routines) {
+        if (r.id == routineId) {
+          routine = r;
+          break;
+        }
+      }
+    } catch (_) {}
+
+    final explicit = (!_isEdit && !_modeUserCustomized) ? null : _modeRefId;
+    final task = PlannedTask(
+      id: '',
+      routineId: routineId,
+      blockId: blockId,
+      title: '',
+      durationMinutes: 1,
+      priority: 3,
+      orderIndex: 0,
+      reminderEnabled: false,
+      reminderTimeIso: null,
+      status: TaskStatus.notStarted,
+      createdAtMs: 0,
+      updatedAtMs: 0,
+      modeRefId: explicit,
+    );
+    return EffectiveTaskMode.effectiveModeRefId(task: task, routine: routine);
   }
 
   Future<void> _loadEdit() async {
@@ -146,6 +211,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
           _existingReminderId = reminders.first.id;
           _reminderCreatedAtMs = reminders.first.createdAtMs;
         }
+        _modeRefId = loaded.modeRefId?.trim().isNotEmpty == true ? loaded.modeRefId! : 'flexible';
+        _strictModeRequired = loaded.strictModeRequired;
+        _modeUserCustomized = false;
         _loaded = true;
       });
     } catch (e) {
@@ -156,7 +224,24 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
     }
   }
 
-  Future<void> _persistReminder(String taskId) async {
+  Future<void> _persistReminder({
+    required String taskId,
+    required String routineId,
+    required String blockId,
+    required String modeRefId,
+  }) async {
+    var blockUrgency = 50;
+    try {
+      final planning = ref.read(planningRepositoryProvider);
+      final blocks = await planning.getBlocks(routineId);
+      for (final b in blocks) {
+        if (b.id == blockId) {
+          blockUrgency = b.urgencyScore;
+          break;
+        }
+      }
+    } catch (_) {}
+
     final now = DateTime.now().millisecondsSinceEpoch;
     final createdAt = _reminderCreatedAtMs ?? now;
     final reminder = ReminderConfig(
@@ -164,6 +249,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
       taskId: taskId,
       enabled: _reminder,
       scheduledAtIso: _reminder ? _reminderTime.toIso8601String() : null,
+      modeRefId: modeRefId,
+      blockUrgencyScore: blockUrgency,
       createdAtMs: createdAt,
       updatedAtMs: now,
     );
@@ -180,6 +267,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
     required int orderIndex,
     required int createdAtMs,
     required String planDateKey,
+    required String modeRefId,
   }) {
     return PlannedTask(
       id: id,
@@ -197,6 +285,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
       category: _category,
       planDateKey: planDateKey,
       notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      sequenceIndex: _loadedTask?.sequenceIndex,
+      strictModeRequired: _strictModeRequired,
+      modeRefId: modeRefId,
     );
   }
 
@@ -261,6 +352,13 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
         }
       }
 
+      final modeRefId = await _effectiveModeRefIdForSave(
+        planning: planning,
+        routineId: routineId,
+        planDateKey: planKey,
+        blockId: blockId,
+      );
+
       final task = _buildPlannedTask(
         id: taskId,
         routineId: routineId,
@@ -269,10 +367,16 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
         orderIndex: orderIndex,
         createdAtMs: createdAtMs,
         planDateKey: planKey,
+        modeRefId: modeRefId,
       );
 
       await planning.upsertTask(task);
-      await _persistReminder(taskId);
+      await _persistReminder(
+        taskId: taskId,
+        routineId: routineId,
+        blockId: blockId,
+        modeRefId: modeRefId,
+      );
       invalidateTaskListProviders(ref);
 
       if (mounted) Navigator.pop(context);
@@ -325,6 +429,38 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
                         ),
                       )
                       .toList(),
+                ),
+                const SizedBox(height: 24),
+                const Text('EXECUTION MODE', style: TextStyle(letterSpacing: 2, color: Colors.white70)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (var i = 0; i < _modeChoiceIds.length; i++)
+                      ChoiceChip(
+                        label: Text(_modeLabels[i]),
+                        selected: _modeRefId == _modeChoiceIds[i],
+                        onSelected: (_) => setState(() {
+                          _modeUserCustomized = true;
+                          _modeRefId = _modeChoiceIds[i];
+                        }),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Overrides the slot default for this task only. Uses the slot mode for new tasks until you pick another.',
+                  style: TextStyle(color: Colors.white38, fontSize: 12),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Strict for this task'),
+                  subtitle: const Text(
+                    'Stricter checks (e.g. timer / overrides) even if the slot is Flexible.',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  value: _strictModeRequired,
+                  onChanged: (v) => setState(() => _strictModeRequired = v),
                 ),
                 const SizedBox(height: 24),
                 const Text('TEMPORAL DEPTH', style: TextStyle(letterSpacing: 2, color: Colors.white70)),

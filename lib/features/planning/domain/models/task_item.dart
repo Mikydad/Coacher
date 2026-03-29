@@ -2,6 +2,13 @@ import '../../../../core/validation/model_validators.dart';
 
 enum TaskStatus { notStarted, inProgress, completed, partial }
 
+TaskStatus _taskStatusFromStorage(String? raw) {
+  for (final v in TaskStatus.values) {
+    if (v.name == raw) return v;
+  }
+  return TaskStatus.notStarted;
+}
+
 class PlannedTask {
   const PlannedTask({
     required this.id,
@@ -21,6 +28,9 @@ class PlannedTask {
     /// other days must ignore the task even if path data is inconsistent.
     this.planDateKey,
     this.notes,
+    this.sequenceIndex,
+    this.strictModeRequired = false,
+    this.modeRefId,
   });
 
   final String id;
@@ -39,6 +49,12 @@ class PlannedTask {
   final String? category;
   final String? planDateKey;
   final String? notes;
+  /// Optional user-defined order inside block (used by V2 sequence flow).
+  final int? sequenceIndex;
+  /// Whether strict mode policy should be enforced for this task.
+  final bool strictModeRequired;
+  /// Optional policy/mode config id reference used during execution.
+  final String? modeRefId;
 
   void validate() {
     ModelValidators.requireNotBlank(id, 'task.id');
@@ -57,6 +73,9 @@ class PlannedTask {
       max: 5,
       fieldName: 'task.priority',
     );
+    if (sequenceIndex != null && sequenceIndex! < 0) {
+      throw ArgumentError('task.sequenceIndex must be >= 0');
+    }
   }
 
   Map<String, dynamic> toMap() => {
@@ -75,23 +94,29 @@ class PlannedTask {
     if (category != null) 'category': category,
     if (planDateKey != null) 'planDateKey': planDateKey,
     if (notes != null) 'notes': notes,
+    if (sequenceIndex != null) 'sequenceIndex': sequenceIndex,
+    'strictModeRequired': strictModeRequired,
+    if (modeRefId != null) 'modeRefId': modeRefId,
   };
 
   static PlannedTask fromMap(Map<String, dynamic> map) => PlannedTask(
-    id: map['id'] as String,
-    routineId: map['routineId'] as String,
-    blockId: map['blockId'] as String,
-    title: map['title'] as String,
-    durationMinutes: map['durationMinutes'] as int,
-    priority: map['priority'] as int,
-    orderIndex: map['orderIndex'] as int,
-    reminderEnabled: map['reminderEnabled'] as bool,
+    id: map['id'] as String? ?? '',
+    routineId: map['routineId'] as String? ?? '',
+    blockId: map['blockId'] as String? ?? '',
+    title: map['title'] as String? ?? 'Untitled Task',
+    durationMinutes: (map['durationMinutes'] as num?)?.toInt() ?? 25,
+    priority: (map['priority'] as num?)?.toInt() ?? 3,
+    orderIndex: (map['orderIndex'] as num?)?.toInt() ?? 0,
+    reminderEnabled: map['reminderEnabled'] as bool? ?? false,
     reminderTimeIso: map['reminderTimeIso'] as String?,
-    status: TaskStatus.values.byName(map['status'] as String),
-    createdAtMs: map['createdAtMs'] as int,
-    updatedAtMs: map['updatedAtMs'] as int,
+    status: _taskStatusFromStorage(map['status'] as String?),
+    createdAtMs: (map['createdAtMs'] as num?)?.toInt() ?? 0,
+    updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
     category: map['category'] as String?,
     planDateKey: map['planDateKey'] as String?,
     notes: map['notes'] as String?,
+    sequenceIndex: (map['sequenceIndex'] as num?)?.toInt(),
+    strictModeRequired: map['strictModeRequired'] as bool? ?? false,
+    modeRefId: map['modeRefId'] as String?,
   );
 }
