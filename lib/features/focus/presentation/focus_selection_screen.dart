@@ -7,10 +7,25 @@ import '../../planning/application/planned_task_providers.dart';
 import '../application/focus_quick_task.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 
+class FocusLaunchArgs {
+  const FocusLaunchArgs({
+    required this.taskId,
+    required this.taskLabel,
+    this.autoOpenTimer = false,
+    this.autoStartDelaySeconds = 10,
+  });
+
+  final String taskId;
+  final String taskLabel;
+  final bool autoOpenTimer;
+  final int autoStartDelaySeconds;
+}
+
 class FocusSelectionScreen extends ConsumerStatefulWidget {
-  const FocusSelectionScreen({super.key});
+  const FocusSelectionScreen({super.key, this.launchArgs});
 
   static const routeName = '/focus';
+  final FocusLaunchArgs? launchArgs;
 
   @override
   ConsumerState<FocusSelectionScreen> createState() =>
@@ -20,6 +35,33 @@ class FocusSelectionScreen extends ConsumerStatefulWidget {
 class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
   final _quickController = TextEditingController();
   bool _quickBusy = false;
+  bool _didHandleLaunchArgs = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || _didHandleLaunchArgs) return;
+      final args = widget.launchArgs;
+      if (args == null) return;
+      _didHandleLaunchArgs = true;
+      if (args.taskId.isNotEmpty) {
+        ref.read(activeExecutionTaskIdProvider.notifier).state = args.taskId;
+        ref.read(activeExecutionTaskLabelProvider.notifier).state = args.taskLabel;
+        ref.read(executionControllerProvider.notifier).setTask(
+          id: args.taskId,
+          label: args.taskLabel,
+        );
+      }
+      if (args.autoOpenTimer && mounted) {
+        await Navigator.pushNamed(
+          context,
+          TimerSessionScreen.routeName,
+          arguments: TimerLaunchArgs(autoStartDelaySeconds: args.autoStartDelaySeconds),
+        );
+      }
+    });
+  }
 
   @override
   void dispose() {

@@ -48,6 +48,12 @@
   - [x] **1.6.3** Call on task complete if reminder should clear (align with product: complete = started+done).
   - [x] **1.6.4** Optional: `onDidReceiveNotificationResponse` in `LocalNotificationsService` to open app + stop/snooze — only if timeboxed.
 
+- [x] **1.6.5** Auto-repeat cadence (no user action)
+  - [x] Flexible: one-shot by default (repeat only on explicit snooze).
+  - [x] Disciplined: 3 nudges in first 10m, then 3 nudges over next 30m, then hourly.
+  - [x] Extreme: 3 nudges in first 10m, then 5 nudges over next 30m, then hourly × 5.
+  - [x] Notification body tap opens timer with 10s auto-start countdown + cancel; start is still explicit/cancellable.
+
 - [x] **1.7** Tests
   - [x] **1.7.1** Unit: `PlannedTask.toMap` / `fromMap` preserves `modeRefId` + `strictModeRequired`.
   - [ ] **1.7.2** Widget or integration: save task with disciplined mode → Firestore mock / repository sees correct payload.

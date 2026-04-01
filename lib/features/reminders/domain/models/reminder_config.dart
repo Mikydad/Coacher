@@ -4,6 +4,7 @@ class ReminderConfig {
   const ReminderConfig({
     required this.id,
     required this.taskId,
+    this.taskTitle,
     required this.enabled,
     required this.scheduledAtIso,
     this.modeRefId,
@@ -19,6 +20,7 @@ class ReminderConfig {
 
   final String id;
   final String taskId;
+  final String? taskTitle;
   final bool enabled;
   final String? scheduledAtIso;
   final String? modeRefId;
@@ -39,6 +41,7 @@ class ReminderConfig {
   Map<String, dynamic> toMap() => {
     'id': id,
     'taskId': taskId,
+    if (taskTitle != null) 'taskTitle': taskTitle,
     'enabled': enabled,
     'scheduledAtIso': scheduledAtIso,
     if (modeRefId != null) 'modeRefId': modeRefId,
@@ -55,6 +58,7 @@ class ReminderConfig {
   static ReminderConfig fromMap(Map<String, dynamic> map) => ReminderConfig(
     id: map['id'] as String,
     taskId: map['taskId'] as String,
+    taskTitle: map['taskTitle'] as String?,
     enabled: map['enabled'] as bool? ?? false,
     scheduledAtIso: map['scheduledAtIso'] as String?,
     modeRefId: map['modeRefId'] as String?,
@@ -71,6 +75,7 @@ class ReminderConfig {
   ReminderConfig copyWith({
     bool? enabled,
     String? scheduledAtIso,
+    String? taskTitle,
     String? modeRefId,
     int? blockUrgencyScore,
     bool? pendingAction,
@@ -83,6 +88,7 @@ class ReminderConfig {
     return ReminderConfig(
       id: id,
       taskId: taskId,
+      taskTitle: taskTitle ?? this.taskTitle,
       enabled: enabled ?? this.enabled,
       scheduledAtIso: scheduledAtIso ?? this.scheduledAtIso,
       modeRefId: modeRefId ?? this.modeRefId,
