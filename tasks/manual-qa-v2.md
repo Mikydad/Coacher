@@ -20,6 +20,8 @@
 - [ ] Export JSON and CSV and verify clipboard contents are well-formed.
 
 ## iOS Notification Behavior
+- [ ] Extreme/Disciplined no-action flow: after first reminder, verify automatic follow-up nudges continue without tapping Snooze (disciplined: 3 in 10m + 3 in next 30m + hourly; extreme: 3 in 10m + 5 in next 30m + hourly x5).
+- [ ] Reminder body tap opens Timer screen with 10s auto-start countdown and a visible Cancel action; cancel keeps timer not-started.
 - [ ] Grant notifications, create reminder, force-close app, relaunch, verify reminders re-schedule.
 - [ ] Trigger stale pending reminder and verify adaptive future schedule recovery.
 - [ ] Snooze repeatedly in Disciplined/Extreme and verify interval shortens as escalation increases.

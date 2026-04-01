@@ -46,4 +46,26 @@ void main() {
     );
     expect(step.enableNonEssentialActionGate, isFalse);
   });
+
+  test('disciplined auto-repeat schedule is staged then hourly', () {
+    final cadence = AdaptiveReminderPolicy.cadenceFor(
+      modeRefId: 'disciplined',
+      blockUrgencyScore: 50,
+    );
+    final offsets = AdaptiveReminderPolicy.autoRepeatOffsets(cadence);
+    expect(offsets.take(3).toList(), [3, 6, 10]);
+    expect(offsets.skip(3).take(3).toList(), [20, 30, 40]);
+    expect(offsets[6], 100);
+  });
+
+  test('extreme auto-repeat schedule matches configured windows', () {
+    final cadence = AdaptiveReminderPolicy.cadenceFor(
+      modeRefId: 'extreme',
+      blockUrgencyScore: 90,
+    );
+    final offsets = AdaptiveReminderPolicy.autoRepeatOffsets(cadence);
+    expect(offsets.take(3).toList(), [3, 6, 10]);
+    expect(offsets.skip(3).take(5).toList(), [16, 22, 28, 34, 40]);
+    expect(offsets.skip(8).take(5).toList(), [100, 160, 220, 280, 340]);
+  });
 }

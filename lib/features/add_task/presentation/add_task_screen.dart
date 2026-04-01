@@ -226,6 +226,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
 
   Future<void> _persistReminder({
     required String taskId,
+    required String taskTitle,
     required String routineId,
     required String blockId,
     required String modeRefId,
@@ -247,6 +248,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
     final reminder = ReminderConfig(
       id: _existingReminderId ?? StableId.generate('reminder'),
       taskId: taskId,
+      taskTitle: taskTitle,
       enabled: _reminder,
       scheduledAtIso: _reminder ? _reminderTime.toIso8601String() : null,
       modeRefId: modeRefId,
@@ -373,6 +375,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
       await planning.upsertTask(task);
       await _persistReminder(
         taskId: taskId,
+        taskTitle: title,
         routineId: routineId,
         blockId: blockId,
         modeRefId: modeRefId,

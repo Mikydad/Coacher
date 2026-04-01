@@ -32,11 +32,11 @@ class LocalNotificationsService {
     Future<void> Function(NotificationResponse response) onResponse,
   ) async {
     if (_appLaunchNotificationHandled) return;
-    _appLaunchNotificationHandled = true;
     final details = await _plugin.getNotificationAppLaunchDetails();
     if (details?.didNotificationLaunchApp != true) return;
     final response = details!.notificationResponse;
     if (response == null) return;
+    _appLaunchNotificationHandled = true;
     await onResponse(response);
   }
 
@@ -88,7 +88,8 @@ class LocalNotificationsService {
 
   Future<void> cancelAll() => _plugin.cancelAll();
 
-  int idFromTaskId(String taskId) => taskId.hashCode.abs() % 2147483647;
+  int idFromTaskId(String taskId, {int slot = 0}) =>
+      ('task:$taskId:$slot').hashCode.abs() % 2147483647;
 
   /// Distinct from [idFromTaskId] to reduce id collisions between modules.
   int idFromGoalId(String goalId) => (goalId.hashCode ^ 0x474f414c).abs() % 2147483647;

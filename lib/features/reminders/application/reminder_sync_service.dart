@@ -8,7 +8,7 @@ import '../domain/models/reminder_config.dart';
 
 abstract class ReminderNotificationsPort {
   Future<bool> requestPermissionsIfNeeded();
-  int idFromTaskId(String taskId);
+  int idFromTaskId(String taskId, {int slot});
   Future<void> cancel(int id);
   Future<void> schedule({
     required int id,
@@ -27,7 +27,7 @@ class LocalReminderNotificationsPort implements ReminderNotificationsPort {
   Future<void> cancel(int id) => _inner.cancel(id);
 
   @override
-  int idFromTaskId(String taskId) => _inner.idFromTaskId(taskId);
+  int idFromTaskId(String taskId, {int slot = 0}) => _inner.idFromTaskId(taskId, slot: slot);
 
   @override
   Future<bool> requestPermissionsIfNeeded() => _inner.requestPermissionsIfNeeded();
@@ -126,9 +126,15 @@ class ReminderSyncService {
     reminders[i] = updated;
     await _cacheStore.save(reminders);
     await _upsertQuietly(updated);
-    await _notifications.cancel(_notifications.idFromTaskId(taskId));
+    await _cancelReminderSlots(taskId);
     if (keepEnabled) {
       await _applyReminders(reminders);
+    }
+  }
+
+  Future<void> _cancelReminderSlots(String taskId) async {
+    for (var slot = 0; slot < 64; slot++) {
+      await _notifications.cancel(_notifications.idFromTaskId(taskId, slot: slot));
     }
   }
 
@@ -142,60 +148,99 @@ class ReminderSyncService {
 
   Future<void> _applyReminders(List<ReminderConfig> reminders) async {
     for (final reminder in reminders) {
-      final id = _notifications.idFromTaskId(reminder.taskId);
-      await _notifications.cancel(id);
+      await _cancelReminderSlots(reminder.taskId);
       if (!reminder.enabled) continue;
-      final when = _nextReminderTime(reminder);
-      if (when == null) continue;
-      debugPrint(
-        'Scheduling reminder: task=${reminder.taskId} at=$when notifId=$id escalation=${reminder.escalationLevel}',
-      );
-      try {
-        await _notifications.schedule(
-          id: id,
-          title: 'Task Reminder',
-          body: _bodyForReminder(reminder),
-          when: when,
-          payload: 'task:${Uri.encodeComponent(reminder.taskId)}',
+      final times = _nextReminderTimes(reminder);
+      for (var slot = 0; slot < times.length; slot++) {
+        final when = times[slot];
+        final id = _notifications.idFromTaskId(reminder.taskId, slot: slot);
+        debugPrint(
+          'Scheduling reminder: task=${reminder.taskId} at=$when notifId=$id escalation=${reminder.escalationLevel}',
         );
-      } catch (e, st) {
-        debugPrint('Reminder schedule failed: task=${reminder.taskId} error=$e');
-        debugPrint('$st');
+        try {
+          await _notifications.schedule(
+            id: id,
+            title: _titleForReminder(reminder),
+            body: _bodyForReminder(reminder, slot: slot),
+            when: when,
+            payload: 'task:${Uri.encodeComponent(reminder.taskId)}',
+          );
+        } catch (e, st) {
+          debugPrint('Reminder schedule failed: task=${reminder.taskId} error=$e');
+          debugPrint('$st');
+        }
       }
     }
   }
 
-  DateTime? _nextReminderTime(ReminderConfig reminder) {
+  List<DateTime> _nextReminderTimes(ReminderConfig reminder) {
     final now = _now();
+    final cadence = AdaptiveReminderPolicy.cadenceFor(
+      modeRefId: reminder.modeRefId,
+      blockUrgencyScore: reminder.blockUrgencyScore,
+    );
+
+    if (reminder.pendingAction) {
+      final preferred = reminder.nextPromptAtIso;
+      final parsed = preferred == null ? null : DateTime.tryParse(preferred);
+      if (parsed != null && parsed.isAfter(now)) return [parsed];
+      final nextAt = now.add(Duration(minutes: cadence.initialSnoozeMinutes));
+      return [nextAt];
+    }
+
     final preferred = reminder.pendingAction ? reminder.nextPromptAtIso : reminder.scheduledAtIso;
     final parsed = preferred == null ? null : DateTime.tryParse(preferred);
-    if (parsed != null && parsed.isAfter(now)) return parsed;
+    if (parsed == null) return const [];
+    final out = <DateTime>[];
+    if (parsed.isAfter(now)) {
+      out.add(parsed);
+    }
+    if (!cadence.autoRepeatEnabled) return out;
 
-    // Stale schedule recovery: if action is pending, compute a new adaptive prompt.
-    if (!reminder.pendingAction) return parsed;
-    final cadence = AdaptiveReminderPolicy.cadenceFor(
-      modeRefId: reminder.modeRefId,
-      blockUrgencyScore: reminder.blockUrgencyScore,
-    );
-    return now.add(Duration(minutes: cadence.initialSnoozeMinutes));
+    final offsets = AdaptiveReminderPolicy.autoRepeatOffsets(cadence);
+    for (final offset in offsets) {
+      final t = parsed.add(Duration(minutes: offset));
+      if (t.isAfter(now)) out.add(t);
+      if (out.length >= cadence.maxFutureNudges) break;
+    }
+    return out;
   }
 
-  String _bodyForReminder(ReminderConfig reminder) {
+  String _titleForReminder(ReminderConfig reminder) {
+    final title = reminder.taskTitle?.trim();
+    if (title == null || title.isEmpty) return 'Task Reminder';
+    return title;
+  }
+
+  String _bodyForReminder(ReminderConfig reminder, {int slot = 0}) {
     final cadence = AdaptiveReminderPolicy.cadenceFor(
       modeRefId: reminder.modeRefId,
       blockUrgencyScore: reminder.blockUrgencyScore,
     );
+    final currentLevel = reminder.pendingAction
+        ? reminder.escalationLevel
+        : slot.clamp(0, cadence.maxEscalationLevel);
     final step = AdaptiveReminderPolicy.nextStep(
       cadence: cadence,
-      currentEscalationLevel: reminder.escalationLevel,
+      currentEscalationLevel: currentLevel,
       emergencyBypass: reminder.emergencyBypass,
     );
     if (step.enableNonEssentialActionGate) {
+      final title = reminder.taskTitle?.trim();
+      if (title != null && title.isNotEmpty) {
+        return 'Action needed for "$title": start now or submit a logical reason.';
+      }
       return 'Action needed: start now or submit a logical reason to continue.';
     }
     if (step.requireAppOpenNudge) {
+      final title = reminder.taskTitle?.trim();
+      if (title != null && title.isNotEmpty) {
+        return 'Please open Coach for Life: start "$title" or provide a logical reason.';
+      }
       return 'Please open Coach for Life: start this task or provide a logical reason.';
     }
+    final title = reminder.taskTitle?.trim();
+    if (title != null && title.isNotEmpty) return 'Time to start "$title".';
     return 'Time to start your planned task.';
   }
 }

@@ -57,8 +57,18 @@ class CoachForLifeApp extends StatelessWidget {
         },
         TasksHubScreen.routeName: (_) => const TasksHubScreen(),
         FirebaseTestScreen.routeName: (_) => const FirebaseTestScreen(),
-        FocusSelectionScreen.routeName: (_) => const FocusSelectionScreen(),
-        TimerSessionScreen.routeName: (_) => const TimerSessionScreen(),
+        FocusSelectionScreen.routeName: (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          return FocusSelectionScreen(
+            launchArgs: args is FocusLaunchArgs ? args : null,
+          );
+        },
+        TimerSessionScreen.routeName: (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          return TimerSessionScreen(
+            launchArgs: args is TimerLaunchArgs ? args : null,
+          );
+        },
       },
     );
   }

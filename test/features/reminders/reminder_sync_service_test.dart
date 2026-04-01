@@ -40,7 +40,8 @@ class _FakeNotifications implements ReminderNotificationsPort {
   }
 
   @override
-  int idFromTaskId(String taskId) => taskId.hashCode.abs() % 2147483647;
+  int idFromTaskId(String taskId, {int slot = 0}) =>
+      ('task:$taskId:$slot').hashCode.abs() % 2147483647;
 
   @override
   Future<bool> requestPermissionsIfNeeded() async => true;
@@ -95,6 +96,7 @@ void main() {
 
     await service.scheduleFromCache();
     expect(notifications.scheduled, isNotEmpty);
+    expect(notifications.scheduled.length, 1);
     expect(notifications.scheduled.first.when.isAfter(now), isTrue);
   });
 
@@ -116,5 +118,55 @@ void main() {
     await service.markLogicalReasonProvided('t1');
     expect(cache.data.first.pendingAction, isFalse);
     expect(cache.data.first.enabled, isFalse);
+  });
+
+  test('disciplined auto-repeat schedules multiple future nudges', () async {
+    final now = DateTime(2026, 3, 24, 10, 0);
+    final repo = _FakeReminderRepository();
+    final cache = _FakeReminderCacheStore()
+      ..data = [
+        _reminder(
+          now: now,
+          pendingAction: false,
+          modeRefId: 'disciplined',
+          escalationLevel: 0,
+        ),
+      ];
+    final notifications = _FakeNotifications();
+    final service = ReminderSyncService(
+      repository: repo,
+      cacheStore: cache,
+      notifications: notifications,
+      now: () => now,
+    );
+
+    await service.scheduleFromCache();
+    expect(notifications.scheduled.length, greaterThanOrEqualTo(6));
+  });
+
+  test('flexible remains one-shot when unresolved', () async {
+    final now = DateTime(2026, 3, 24, 10, 0);
+    final repo = _FakeReminderRepository();
+    final cache = _FakeReminderCacheStore()
+      ..data = [
+        _reminder(
+          now: now,
+          pendingAction: false,
+          modeRefId: 'flexible',
+          escalationLevel: 0,
+        ).copyWith(
+          scheduledAtIso: now.add(const Duration(minutes: 5)).toIso8601String(),
+        ),
+      ];
+    final notifications = _FakeNotifications();
+    final service = ReminderSyncService(
+      repository: repo,
+      cacheStore: cache,
+      notifications: notifications,
+      now: () => now,
+    );
+
+    await service.scheduleFromCache();
+    expect(notifications.scheduled.length, 1);
   });
 }

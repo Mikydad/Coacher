@@ -31,14 +31,16 @@ class _AppLifecycleTaskRefreshState extends ConsumerState<AppLifecycleTaskRefres
     _lastTodayKey = DateKeys.todayKey();
     _dayCheckTimer = Timer.periodic(const Duration(minutes: 1), (_) => _invalidateIfDayChanged());
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final container = ProviderScope.containerOf(context);
-      unawaited(
-        LocalNotificationsService.instance.drainLaunchNotificationResponse(
-          (response) => handleNotificationResponse(response, container),
-        ),
-      );
+      unawaited(_drainLaunchNotificationResponse());
     });
+  }
+
+  Future<void> _drainLaunchNotificationResponse() async {
+    if (!mounted) return;
+    final container = ProviderScope.containerOf(context);
+    await LocalNotificationsService.instance.drainLaunchNotificationResponse(
+      (response) => handleNotificationResponse(response, container),
+    );
   }
 
   @override
@@ -62,6 +64,7 @@ class _AppLifecycleTaskRefreshState extends ConsumerState<AppLifecycleTaskRefres
     if (state == AppLifecycleState.resumed) {
       invalidateTaskListProviders(ref);
       _lastTodayKey = DateKeys.todayKey();
+      unawaited(_drainLaunchNotificationResponse());
     }
   }
 

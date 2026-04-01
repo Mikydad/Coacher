@@ -4,18 +4,81 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../execution/application/execution_controller.dart';
 import '../../execution/domain/task_timer_engine.dart';
 import '../../execution/domain/models/timer_session.dart';
 import '../../scoring/application/scoring_controller.dart';
 import '../../scoring/presentation/score_task_dialog.dart';
 
-class TimerSessionScreen extends ConsumerWidget {
-  const TimerSessionScreen({super.key});
+class TimerLaunchArgs {
+  const TimerLaunchArgs({this.autoStartDelaySeconds});
+
+  final int? autoStartDelaySeconds;
+}
+
+class TimerSessionScreen extends ConsumerStatefulWidget {
+  const TimerSessionScreen({super.key, this.launchArgs});
 
   static const routeName = '/timer';
 
+  final TimerLaunchArgs? launchArgs;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TimerSessionScreen> createState() => _TimerSessionScreenState();
+}
+
+class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
+  Timer? _autoStartTicker;
+  int? _remainingAutoStartSeconds;
+  bool _autoStartCancelled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final secs = widget.launchArgs?.autoStartDelaySeconds;
+    if (secs != null && secs > 0) {
+      _remainingAutoStartSeconds = secs;
+      _autoStartTicker = Timer.periodic(const Duration(seconds: 1), (t) {
+        final execState = ref.read(executionControllerProvider);
+        if (_autoStartCancelled || execState.phase != ExecutionPhase.notStarted) {
+          t.cancel();
+          return;
+        }
+        final next = (_remainingAutoStartSeconds ?? 0) - 1;
+        if (next <= 0) {
+          t.cancel();
+          _startSession(ref.read(executionControllerProvider));
+          return;
+        }
+        if (mounted) {
+          setState(() => _remainingAutoStartSeconds = next);
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _autoStartTicker?.cancel();
+    super.dispose();
+  }
+
+  void _startSession(ExecutionState execState) {
+    final ctrl = ref.read(executionControllerProvider.notifier);
+    if (execState.phase != ExecutionPhase.notStarted) return;
+    ctrl.start();
+    if (execState.targetType == TimerSessionTargetType.task && execState.taskId.isNotEmpty) {
+      unawaited(ref.read(reminderSyncServiceProvider).markTaskStarted(execState.taskId));
+    }
+    if (mounted) {
+      setState(() {
+        _remainingAutoStartSeconds = null;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final execState = ref.watch(executionControllerProvider);
     final ctrl = ref.read(executionControllerProvider.notifier);
     final running = execState.phase == ExecutionPhase.inProgress;
@@ -28,6 +91,9 @@ class TimerSessionScreen extends ConsumerWidget {
     final secs = elapsed.inSeconds.remainder(60).toString().padLeft(2, '0');
     final hrs = elapsed.inHours;
     final timerText = hrs > 0 ? '${hrs.toString().padLeft(2, '0')}:$mins:$secs' : '$mins:$secs';
+
+    final showAutoStart =
+        execState.phase == ExecutionPhase.notStarted && !_autoStartCancelled && (_remainingAutoStartSeconds ?? 0) > 0;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Quittr')),
@@ -79,6 +145,38 @@ class TimerSessionScreen extends ConsumerWidget {
                 style: const TextStyle(fontSize: 34, fontStyle: FontStyle.italic),
               ),
             ),
+            if (showAutoStart) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1F2026),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Auto-starting in ${_remainingAutoStartSeconds}s',
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        _autoStartTicker?.cancel();
+                        setState(() {
+                          _autoStartCancelled = true;
+                          _remainingAutoStartSeconds = null;
+                        });
+                      },
+                      child: const Text('Cancel'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const Spacer(),
             Row(
               children: [
@@ -95,15 +193,9 @@ class TimerSessionScreen extends ConsumerWidget {
                       } else if (paused) {
                         ctrl.resume();
                       } else {
-                        final wasNotStarted = execState.phase == ExecutionPhase.notStarted;
-                        ctrl.start();
-                        if (wasNotStarted &&
-                            execState.targetType == TimerSessionTargetType.task &&
-                            execState.taskId.isNotEmpty) {
-                          unawaited(
-                            ref.read(reminderSyncServiceProvider).markTaskStarted(execState.taskId),
-                          );
-                        }
+                        _autoStartTicker?.cancel();
+                        _remainingAutoStartSeconds = null;
+                        _startSession(execState);
                       }
                     },
                     icon: Icon(running ? Icons.pause_circle_outline : Icons.play_arrow_rounded),
