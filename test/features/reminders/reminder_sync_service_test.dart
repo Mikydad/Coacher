@@ -1,32 +1,37 @@
 import 'package:coach_for_life/features/reminders/application/reminder_sync_service.dart';
-import 'package:coach_for_life/features/reminders/data/reminder_cache_store.dart';
 import 'package:coach_for_life/features/reminders/data/reminder_repository.dart';
 import 'package:coach_for_life/features/reminders/domain/models/reminder_config.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeReminderRepository implements ReminderRepository {
-  final Map<String, ReminderConfig> _byTask = {};
+  final List<ReminderConfig> _all = [];
+
+  void seed(Iterable<ReminderConfig> items) {
+    _all
+      ..clear()
+      ..addAll(items);
+  }
+
+  @override
+  Future<List<ReminderConfig>> listAllReminders() async => List<ReminderConfig>.from(_all);
 
   @override
   Future<List<ReminderConfig>> getRemindersForTasks(List<String> taskIds) async {
-    return taskIds.map((id) => _byTask[id]).whereType<ReminderConfig>().toList();
+    final idSet = taskIds.toSet();
+    return _all.where((r) => idSet.contains(r.taskId)).toList();
   }
+
+  @override
+  Future<void> hydrateFromRemoteForTasks(List<String> taskIds) async {}
 
   @override
   Future<void> upsertReminder(ReminderConfig reminder) async {
-    _byTask[reminder.taskId] = reminder;
-  }
-}
-
-class _FakeReminderCacheStore extends ReminderCacheStore {
-  List<ReminderConfig> data = const [];
-
-  @override
-  Future<List<ReminderConfig>> load() async => data;
-
-  @override
-  Future<void> save(List<ReminderConfig> reminders) async {
-    data = List<ReminderConfig>.from(reminders);
+    final i = _all.indexWhere((r) => r.id == reminder.id);
+    if (i >= 0) {
+      _all[i] = reminder;
+    } else {
+      _all.add(reminder);
+    }
   }
 }
 
@@ -84,12 +89,10 @@ ReminderConfig _reminder({
 void main() {
   test('stale pending schedule recovers to future adaptive time', () async {
     final now = DateTime(2026, 3, 24, 10, 0);
-    final repo = _FakeReminderRepository();
-    final cache = _FakeReminderCacheStore()..data = [_reminder(now: now)];
+    final repo = _FakeReminderRepository()..seed([_reminder(now: now)]);
     final notifications = _FakeNotifications();
     final service = ReminderSyncService(
       repository: repo,
-      cacheStore: cache,
       notifications: notifications,
       now: () => now,
     );
@@ -102,40 +105,36 @@ void main() {
 
   test('reminders stop only when task started or logical reason provided', () async {
     final now = DateTime(2026, 3, 24, 10, 0);
-    final repo = _FakeReminderRepository();
-    final cache = _FakeReminderCacheStore()..data = [_reminder(now: now)];
+    final repo = _FakeReminderRepository()..seed([_reminder(now: now)]);
     final notifications = _FakeNotifications();
     final service = ReminderSyncService(
       repository: repo,
-      cacheStore: cache,
       notifications: notifications,
       now: () => now,
     );
 
     await service.requestSnooze('t1');
-    expect(cache.data.first.pendingAction, isTrue);
+    expect((await repo.listAllReminders()).first.pendingAction, isTrue);
 
     await service.markLogicalReasonProvided('t1');
-    expect(cache.data.first.pendingAction, isFalse);
-    expect(cache.data.first.enabled, isFalse);
+    expect((await repo.listAllReminders()).first.pendingAction, isFalse);
+    expect((await repo.listAllReminders()).first.enabled, isFalse);
   });
 
   test('disciplined auto-repeat schedules multiple future nudges', () async {
     final now = DateTime(2026, 3, 24, 10, 0);
-    final repo = _FakeReminderRepository();
-    final cache = _FakeReminderCacheStore()
-      ..data = [
+    final repo = _FakeReminderRepository()
+      ..seed([
         _reminder(
           now: now,
           pendingAction: false,
           modeRefId: 'disciplined',
           escalationLevel: 0,
         ),
-      ];
+      ]);
     final notifications = _FakeNotifications();
     final service = ReminderSyncService(
       repository: repo,
-      cacheStore: cache,
       notifications: notifications,
       now: () => now,
     );
@@ -146,9 +145,8 @@ void main() {
 
   test('flexible remains one-shot when unresolved', () async {
     final now = DateTime(2026, 3, 24, 10, 0);
-    final repo = _FakeReminderRepository();
-    final cache = _FakeReminderCacheStore()
-      ..data = [
+    final repo = _FakeReminderRepository()
+      ..seed([
         _reminder(
           now: now,
           pendingAction: false,
@@ -157,11 +155,10 @@ void main() {
         ).copyWith(
           scheduledAtIso: now.add(const Duration(minutes: 5)).toIso8601String(),
         ),
-      ];
+      ]);
     final notifications = _FakeNotifications();
     final service = ReminderSyncService(
       repository: repo,
-      cacheStore: cache,
       notifications: notifications,
       now: () => now,
     );

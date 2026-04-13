@@ -4,7 +4,6 @@ import 'package:coach_for_life/features/execution/data/timer_runtime_cache.dart'
 import 'package:coach_for_life/features/execution/domain/models/timer_session.dart';
 import 'package:coach_for_life/features/execution/domain/task_timer_engine.dart';
 import 'package:coach_for_life/features/reminders/application/reminder_sync_service.dart';
-import 'package:coach_for_life/features/reminders/data/reminder_cache_store.dart';
 import 'package:coach_for_life/features/reminders/data/reminder_repository.dart';
 import 'package:coach_for_life/features/reminders/domain/models/reminder_config.dart';
 import 'package:coach_for_life/features/timer/presentation/timer_session_screen.dart';
@@ -53,7 +52,13 @@ class _FakeTimerRuntimeCache extends TimerRuntimeCache {
 
 class _FakeReminderRepository implements ReminderRepository {
   @override
+  Future<List<ReminderConfig>> listAllReminders() async => const [];
+
+  @override
   Future<List<ReminderConfig>> getRemindersForTasks(List<String> taskIds) async => const [];
+
+  @override
+  Future<void> hydrateFromRemoteForTasks(List<String> taskIds) async {}
 
   @override
   Future<void> upsertReminder(ReminderConfig reminder) async {}
@@ -90,7 +95,6 @@ void main() {
 
     final reminderSync = ReminderSyncService(
       repository: _FakeReminderRepository(),
-      cacheStore: const ReminderCacheStore(),
       notifications: _FakeReminderNotifications(),
     );
 
