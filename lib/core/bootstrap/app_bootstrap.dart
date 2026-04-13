@@ -10,7 +10,7 @@ import '../firebase/firestore_client.dart';
 import '../notifications/local_notifications_service.dart';
 import '../offline/offline_store.dart';
 import '../sync/sync_service.dart';
-import '../../features/goals/data/goals_repository.dart';
+import '../../features/goals/application/goals_providers.dart';
 import '../../features/planning/application/accountability_retention_worker.dart';
 import '../../features/planning/data/planning_repository.dart';
 
@@ -18,6 +18,9 @@ class AppBootstrap {
   const AppBootstrap._();
 
   static Future<void> initialize(ProviderContainer container) async {
+    // TEMP debug for notification-tap investigation.
+    // ignore: avoid_print
+    print('[NotifTap] bootstrap initialize start');
     await FirebaseInitializer.initialize();
     await AuthInitializer.ensureSignedIn();
     await LocalNotificationsService.instance.initialize(
@@ -25,11 +28,17 @@ class AppBootstrap {
         unawaited(handleNotificationResponse(response, container));
       },
     );
+    // Handle cold-start notification taps as early as possible. Navigation may
+    // be deferred and flushed later when navigator is available.
+    await LocalNotificationsService.instance.drainLaunchNotificationResponse(
+      (response) => handleNotificationResponse(response, container),
+    );
+    // ignore: avoid_print
+    print('[NotifTap] bootstrap launch-drain done');
     await OfflineStore.instance.initialize();
     await SyncService.instance.initialize();
     await container.read(reminderSyncServiceProvider).scheduleFromCache();
-    final goalsRepo = FirestoreGoalsRepository(FirestoreClient());
-    final goals = await goalsRepo.fetchGoalsOnce();
+    final goals = await container.read(goalsRepositoryProvider).fetchGoalsOnce();
     await container.read(goalReminderSyncServiceProvider).applyForGoals(goals);
     final planningRepo = FirestorePlanningRepository(FirestoreClient());
     await AccountabilityRetentionWorker(planningRepo.pruneOldAccountabilityLogs).run(retentionDays: 30);

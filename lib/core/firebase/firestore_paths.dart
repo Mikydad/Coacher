@@ -1,12 +1,18 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import '../config/app_config.dart';
 
 class FirestorePaths {
   const FirestorePaths._();
 
-  static String get _activeUid =>
-      FirebaseAuth.instance.currentUser?.uid ?? AppConfig.localUserId;
+  /// When Firebase is not initialized (e.g. VM unit tests), use [AppConfig.localUserId].
+  static String get _activeUid {
+    if (Firebase.apps.isEmpty) {
+      return AppConfig.localUserId;
+    }
+    return FirebaseAuth.instance.currentUser?.uid ?? AppConfig.localUserId;
+  }
 
   static String get userRoot => 'users/$_activeUid';
   static String get routines => '$userRoot/routines';

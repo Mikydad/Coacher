@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/notifications/local_notifications_service.dart';
+import '../core/sync/sync_service.dart';
 import '../core/utils/date_keys.dart';
 import '../features/planning/application/planned_task_providers.dart';
 import 'notification_response_handler.dart';
@@ -41,6 +42,7 @@ class _AppLifecycleTaskRefreshState extends ConsumerState<AppLifecycleTaskRefres
     await LocalNotificationsService.instance.drainLaunchNotificationResponse(
       (response) => handleNotificationResponse(response, container),
     );
+    flushPendingNotificationNavigationIntent();
   }
 
   @override
@@ -64,7 +66,11 @@ class _AppLifecycleTaskRefreshState extends ConsumerState<AppLifecycleTaskRefres
     if (state == AppLifecycleState.resumed) {
       invalidateTaskListProviders(ref);
       _lastTodayKey = DateKeys.todayKey();
+      unawaited(SyncService.instance.syncFromRemote());
       unawaited(_drainLaunchNotificationResponse());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        flushPendingNotificationNavigationIntent();
+      });
     }
   }
 
