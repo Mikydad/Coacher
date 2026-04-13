@@ -77,9 +77,49 @@ This file tracks implementation/runtime errors encountered during development of
 - **Fix applied**: Query by `dateKey` only, then sort by `orderIndex` in Dart (`planning_repository.dart`).
 - **Status**: Resolved
 
+## 11) Notification tap only resumes app (no Focus / wrong timing)
+- **Where**: iOS device or simulator; cold start or background.
+- **Error / symptom**: App comes to foreground but Dart never logs handling of the tap; or navigator pushes fail silently because `Navigator` is not ready.
+- **Root cause**: (1) Pending route not replayed after first frame / after seed gate. (2) On iOS, `UNUserNotificationCenter` delegate not set, so interaction callbacks do not reach the expected pipeline. (3) Launch notification response consumed too late or not correlated with `taskId`.
+- **Fix applied**:
+  - Queue **pending notification intent** in `SharedPreferences` and **`flushPendingNotificationNavigationIntent()`** from lifecycle, bootstrap, and `FirstLaunchGate` when the UI is ready (`lib/app/notification_response_handler.dart`, `lib/app/app_lifecycle_task_refresh.dart`, `lib/app/first_launch_gate.dart`).
+  - **Early drain** of launch notification response after plugin init (`lib/core/bootstrap/app_bootstrap.dart`, `lib/core/notifications/local_notifications_service.dart`).
+  - Persist **`notification_task_id_index_v1`** (`notificationId` → `taskId`) on schedule/cancel.
+  - iOS: set **`UNUserNotificationCenter.current().delegate`** in `AppDelegate` (`ios/Runner/AppDelegate.swift`).
+- **Status**: Resolved (reopen if a specific iOS version or notification category still skips Dart)
+
+## 12) Unknown task id when handling `NotificationResponse`
+- **Where**: `notification_response_handler` / reminder lookup.
+- **Error / symptom**: Tap handled but cannot resolve which task to open.
+- **Root cause**: Plugin provides `id` (notification id) but payload parsing alone is insufficient; legacy reminder scans miss edge cases.
+- **Fix applied**: Maintain persisted map in `LocalNotificationsService` (`notification_task_id_index_v1`); handler uses **`taskIdForNotificationId`** before falling back to legacy scan.
+- **Status**: Resolved
+
+## 13) VM tests: Firestore paths without Firebase init
+- **Where**: `flutter test` for repositories using `FirestorePaths`.
+- **Error / symptom**: Firebase default app errors or inconsistent `users/...` paths.
+- **Root cause**: `Firebase.apps` empty in VM tests.
+- **Fix applied**: `FirestorePaths._activeUid` falls back to **`AppConfig.localUserId`** when no Firebase app exists (`lib/core/firebase/firestore_paths.dart`).
+- **Status**: Resolved
+
+## 14) VM tests: `SyncService` queue persistence / `path_provider`
+- **Where**: Isar repository tests, stream provider tests.
+- **Error / symptom**: Test failures or flakes when sync queue writes to disk.
+- **Root cause**: Queue persistence uses app directories not set up in lightweight VM tests.
+- **Fix applied**: **`SyncService.debugSkipQueuePersistenceForTests`** toggled in test `setUp`/`tearDown` where appropriate.
+- **Status**: Resolved
+
+## 15) Isar native library / test runner download
+- **Where**: `flutter test` on clean machine or CI.
+- **Error / symptom**: Isar core download blocked or tests fail to open Isar.
+- **Root cause**: Headless/test binding may restrict network; Isar needs native `libisar` available.
+- **Fix applied**: Documented in `documentation/isar-local-first-and-notification-routing.md` (section 4); repo-root **`libisar.dylib`** is gitignored; use Isar’s recommended test initialization for your environment.
+- **Status**: Documented / environment-dependent
+
 ---
 
 ## How to use this log
 - Add each new error immediately after it appears.
 - Include: **where**, **error text**, **root cause**, **fix**, **status**.
 - If an error returns, update status to `Reopened` and append what changed.
+- For the **Isar + notification routing** arc (architecture, diagrams, file index), see `documentation/isar-local-first-and-notification-routing.md`.
