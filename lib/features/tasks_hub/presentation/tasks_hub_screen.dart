@@ -75,7 +75,7 @@ class TasksHubScreen extends ConsumerWidget {
             tooltip: 'What next',
             icon: const Icon(Icons.play_circle_outline),
             onPressed: () async {
-              final rows = await ref.read(todayAllTasksRowsProvider.future);
+              final rows = await readFreshTodayPlannedRows(ref);
               final next = NextTaskRanker.chooseNext(rows);
               if (!context.mounted) return;
               if (next == null || next.task.status == TaskStatus.completed) {
@@ -107,7 +107,7 @@ class TasksHubScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async {
           invalidateTaskListProviders(ref);
-          await ref.read(todayAllTasksRowsProvider.future);
+          await readFreshTodayPlannedRows(ref);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),

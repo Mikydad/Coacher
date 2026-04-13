@@ -4,6 +4,7 @@ import '../../../core/di/providers.dart';
 import '../../../core/utils/date_keys.dart';
 import 'goal_period_helpers.dart';
 import '../data/goals_repository.dart';
+import '../data/isar_goals_repository.dart';
 import '../domain/models/goal_action.dart';
 import '../domain/models/goal_check_in.dart';
 import '../domain/models/goal_enums.dart';
@@ -11,7 +12,7 @@ import '../domain/models/goal_milestone.dart';
 import '../domain/models/user_goal.dart';
 
 final goalsRepositoryProvider = Provider<GoalsRepository>(
-  (ref) => FirestoreGoalsRepository(ref.read(firestoreClientProvider)),
+  (ref) => IsarGoalsRepository(FirestoreGoalsRepository(ref.read(firestoreClientProvider))),
 );
 
 /// Raw stream of all goals for the signed-in user (ordered by `updatedAtMs` desc).

@@ -13,17 +13,13 @@ import '../../planning/domain/models/routine_mode.dart';
 import '../../planning/domain/models/task_item.dart';
 
 abstract class PlanningRepository {
-  /// [getOptions] e.g. [GetOptions(source: Source.server)] avoids stale offline cache.
-  Future<List<Routine>> getRoutinesForDate(
-    String dateKey, {
-    GetOptions? getOptions,
-  });
+  Future<List<Routine>> getRoutinesForDate(String dateKey);
   Future<void> upsertRoutine(Routine routine);
   Future<void> deleteRoutine(String routineId);
   Future<List<RoutineModeConfig>> getRoutineModeConfigs({GetOptions? getOptions});
   Future<void> upsertRoutineModeConfig(RoutineModeConfig config);
 
-  Future<List<TaskBlock>> getBlocks(String routineId, {GetOptions? getOptions});
+  Future<List<TaskBlock>> getBlocks(String routineId);
   Future<void> upsertBlock(TaskBlock block);
   Future<void> deleteBlock({
     required String routineId,
@@ -33,7 +29,6 @@ abstract class PlanningRepository {
   Future<List<PlannedTask>> getTasks({
     required String routineId,
     required String blockId,
-    GetOptions? getOptions,
   });
   Future<void> upsertTask(PlannedTask task);
   Future<void> deleteTask({
@@ -58,10 +53,7 @@ abstract class PlanningRepository {
   Future<String> exportAccountabilityLogs({String format = 'json'});
 
   /// Ensures a [Routine] for [dateKey] and a default [TaskBlock] exist; returns their ids.
-  Future<({String routineId, String blockId})> ensureDefaultDayPlan(
-    String dateKey, {
-    GetOptions? getOptions,
-  });
+  Future<({String routineId, String blockId})> ensureDefaultDayPlan(String dateKey);
 }
 
 class FirestorePlanningRepository implements PlanningRepository {
@@ -146,25 +138,19 @@ class FirestorePlanningRepository implements PlanningRepository {
   }
 
   @override
-  Future<List<TaskBlock>> getBlocks(
-    String routineId, {
-    GetOptions? getOptions,
-  }) async {
+  Future<List<TaskBlock>> getBlocks(String routineId) async {
     final path = FirestorePaths.blocks(routineId);
     final q = FirebaseFirestore.instance.collection(path).orderBy('orderIndex');
-    final snap = getOptions != null ? await q.get(getOptions) : await q.get();
+    final snap = await q.get();
     return snap.docs.map((d) => TaskBlock.fromMap(d.data())).toList();
   }
 
   @override
-  Future<List<Routine>> getRoutinesForDate(
-    String dateKey, {
-    GetOptions? getOptions,
-  }) async {
+  Future<List<Routine>> getRoutinesForDate(String dateKey) async {
     final routines = _client.userCollection('routines');
     // Single-field filter only — avoids composite index (dateKey + orderIndex).
     final q = routines.where('dateKey', isEqualTo: dateKey);
-    final snap = getOptions != null ? await q.get(getOptions) : await q.get();
+    final snap = await q.get();
     final list = snap.docs.map((d) => Routine.fromMap(d.data())).toList()
       ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
     return list;
@@ -174,11 +160,10 @@ class FirestorePlanningRepository implements PlanningRepository {
   Future<List<PlannedTask>> getTasks({
     required String routineId,
     required String blockId,
-    GetOptions? getOptions,
   }) async {
     final path = FirestorePaths.tasks(routineId, blockId);
     final q = FirebaseFirestore.instance.collection(path).orderBy('orderIndex');
-    final snap = getOptions != null ? await q.get(getOptions) : await q.get();
+    final snap = await q.get();
     return snap.docs.map((d) => PlannedTask.fromMap(d.data())).toList();
   }
 
@@ -349,12 +334,9 @@ class FirestorePlanningRepository implements PlanningRepository {
   }
 
   @override
-  Future<({String routineId, String blockId})> ensureDefaultDayPlan(
-    String dateKey, {
-    GetOptions? getOptions,
-  }) async {
+  Future<({String routineId, String blockId})> ensureDefaultDayPlan(String dateKey) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    final routines = await getRoutinesForDate(dateKey, getOptions: getOptions);
+    final routines = await getRoutinesForDate(dateKey);
     late final String routineId;
     if (routines.isEmpty) {
       routineId = StableId.generate('routine');
@@ -372,7 +354,7 @@ class FirestorePlanningRepository implements PlanningRepository {
       routineId = routines.first.id;
     }
 
-    final blocks = await getBlocks(routineId, getOptions: getOptions);
+    final blocks = await getBlocks(routineId);
     late final String blockId;
     if (blocks.isEmpty) {
       blockId = StableId.generate('block');

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -49,6 +51,7 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Quittr'),
         actions: [
+          const _SyncFromCloudAction(),
           IconButton(
             tooltip: 'Accountability history',
             onPressed: () => Navigator.pushNamed(context, AccountabilityHistoryScreen.routeName),
@@ -836,6 +839,69 @@ class _NeonCard extends StatelessWidget {
   }
 }
 
+class _SyncFromCloudAction extends StatefulWidget {
+  const _SyncFromCloudAction();
+
+  @override
+  State<_SyncFromCloudAction> createState() => _SyncFromCloudActionState();
+}
+
+class _SyncFromCloudActionState extends State<_SyncFromCloudAction> {
+  late bool _wasSyncing;
+
+  @override
+  void initState() {
+    super.initState();
+    final n = SyncService.instance.isSyncingFromRemote;
+    _wasSyncing = n.value;
+    n.addListener(_onSyncingChanged);
+  }
+
+  @override
+  void dispose() {
+    SyncService.instance.isSyncingFromRemote.removeListener(_onSyncingChanged);
+    super.dispose();
+  }
+
+  void _onSyncingChanged() {
+    final syncing = SyncService.instance.isSyncingFromRemote.value;
+    if (_wasSyncing && !syncing && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Updated from cloud'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+    _wasSyncing = syncing;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: SyncService.instance.isSyncingFromRemote,
+      builder: (context, syncing, _) {
+        if (syncing) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        }
+        return IconButton(
+          tooltip: 'Sync from cloud',
+          onPressed: () => unawaited(SyncService.instance.syncFromRemote(force: true)),
+          icon: const Icon(Icons.sync),
+        );
+      },
+    );
+  }
+}
+
 Future<Routine?> _routineForPlannedRow(WidgetRef ref, PlannedTaskRow row) async {
   final planning = ref.read(planningRepositoryProvider);
   try {
@@ -932,7 +998,7 @@ Future<void> _completeTaskFromHome(BuildContext context, WidgetRef ref, PlannedT
     final prev = ref.read(scoredTaskStatusesProvider);
     ref.read(scoredTaskStatusesProvider.notifier).state = {...prev, t.id: 100};
     invalidateTaskListProviders(ref);
-    final rows = await ref.read(todayAllTasksRowsProvider.future);
+    final rows = await readFreshTodayPlannedRows(ref);
     if (!context.mounted) return;
     await _promptStartNextTask(context, ref, rows, completedTaskId: t.id);
   } catch (e) {

@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
@@ -7,7 +6,6 @@ import '../../../core/utils/stable_id.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/domain/models/block.dart';
 import '../../planning/domain/models/routine.dart';
-import '../../planning/domain/models/task_item.dart';
 
 /// All routine slots for tomorrow, sorted by [Routine.orderIndex].
 /// Creates the default Morning / Afternoon / Night slots if none exist yet.
@@ -15,18 +13,7 @@ final tomorrowRoutineSlotsProvider = FutureProvider<List<Routine>>((ref) async {
   final repo = ref.read(planningRepositoryProvider);
   final tomorrow = DateKeys.tomorrowKey();
 
-  // Check cache first — avoids recreating defaults when invalidated right after creation.
-  List<Routine> routines = await repo.getRoutinesForDate(tomorrow);
-
-  // If cache says empty, try server to confirm.
-  if (routines.isEmpty) {
-    const server = GetOptions(source: Source.server);
-    try {
-      routines = await repo.getRoutinesForDate(tomorrow, getOptions: server);
-    } catch (_) {
-      // Stay offline — routines already set from cache above.
-    }
-  }
+  var routines = await repo.getRoutinesForDate(tomorrow);
 
   if (routines.isEmpty) {
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -70,27 +57,15 @@ final tomorrowTasksForRoutineProvider =
     FutureProvider.family<List<PlannedTaskRow>, String>((ref, routineId) async {
   final repo = ref.read(planningRepositoryProvider);
   final tomorrow = DateKeys.tomorrowKey();
-  const server = GetOptions(source: Source.server);
 
-  List<TaskBlock> blocks;
-  try {
-    blocks = await repo.getBlocks(routineId, getOptions: server);
-  } catch (_) {
-    blocks = await repo.getBlocks(routineId);
-  }
+  final blocks = await repo.getBlocks(routineId);
 
   final rows = <PlannedTaskRow>[];
   for (final block in blocks) {
-    List<PlannedTask> tasks;
-    try {
-      tasks = await repo.getTasks(
-        routineId: routineId,
-        blockId: block.id,
-        getOptions: server,
-      );
-    } catch (_) {
-      tasks = await repo.getTasks(routineId: routineId, blockId: block.id);
-    }
+    final tasks = await repo.getTasks(
+      routineId: routineId,
+      blockId: block.id,
+    );
     for (final task in tasks) {
       rows.add(
         PlannedTaskRow(

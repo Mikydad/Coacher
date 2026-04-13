@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/notifications/local_notifications_service.dart';
 import 'adaptive_reminder_policy.dart';
-import '../data/reminder_cache_store.dart';
 import '../data/reminder_repository.dart';
 import '../domain/models/reminder_config.dart';
 
@@ -51,29 +50,26 @@ class LocalReminderNotificationsPort implements ReminderNotificationsPort {
 class ReminderSyncService {
   ReminderSyncService({
     required ReminderRepository repository,
-    required ReminderCacheStore cacheStore,
     required ReminderNotificationsPort notifications,
     DateTime Function()? now,
   }) : _repository = repository,
-       _cacheStore = cacheStore,
        _notifications = notifications,
        _now = now ?? DateTime.now;
 
   final ReminderRepository _repository;
-  final ReminderCacheStore _cacheStore;
   final ReminderNotificationsPort _notifications;
   final DateTime Function() _now;
 
   Future<bool> ensurePermissions() => _notifications.requestPermissionsIfNeeded();
 
   Future<void> syncForTaskIds(List<String> taskIds) async {
-    final reminders = await _repository.getRemindersForTasks(taskIds);
-    await _cacheStore.save(reminders);
+    await _repository.hydrateFromRemoteForTasks(taskIds);
+    final reminders = await _repository.listAllReminders();
     await _applyReminders(reminders);
   }
 
   Future<void> scheduleFromCache() async {
-    final reminders = await _cacheStore.load();
+    final reminders = await _repository.listAllReminders();
     await _applyReminders(reminders);
   }
 
@@ -82,7 +78,7 @@ class ReminderSyncService {
   Future<void> markLogicalReasonProvided(String taskId) => _resolveReminder(taskId, keepEnabled: false);
 
   Future<void> requestSnooze(String taskId, {bool emergencyBypass = false}) async {
-    final reminders = await _cacheStore.load();
+    final reminders = await _repository.listAllReminders();
     final i = reminders.indexWhere((r) => r.taskId == taskId);
     if (i < 0) return;
     final current = reminders[i];
@@ -106,13 +102,12 @@ class ReminderSyncService {
       updatedAtMs: _now().millisecondsSinceEpoch,
     );
     reminders[i] = updated;
-    await _cacheStore.save(reminders);
     await _upsertQuietly(updated);
-    await _applyReminders(reminders);
+    await _applyReminders(await _repository.listAllReminders());
   }
 
   Future<void> _resolveReminder(String taskId, {required bool keepEnabled}) async {
-    final reminders = await _cacheStore.load();
+    final reminders = await _repository.listAllReminders();
     final i = reminders.indexWhere((r) => r.taskId == taskId);
     if (i < 0) return;
     final updated = reminders[i].copyWith(
@@ -124,11 +119,10 @@ class ReminderSyncService {
       updatedAtMs: _now().millisecondsSinceEpoch,
     );
     reminders[i] = updated;
-    await _cacheStore.save(reminders);
     await _upsertQuietly(updated);
     await _cancelReminderSlots(taskId);
     if (keepEnabled) {
-      await _applyReminders(reminders);
+      await _applyReminders(await _repository.listAllReminders());
     }
   }
 

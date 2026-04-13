@@ -1,5 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
+import '../../../core/utils/date_keys.dart';
 import '../data/planning_repository.dart';
 import '../domain/models/task_item.dart';
 
@@ -22,31 +21,20 @@ class PlannedTaskRow {
 ///
 /// When [enforceTaskPlanDate] is true, skips tasks whose [PlannedTask.planDateKey]
 /// is non-null and differs from [dateKey] (stale path / migration safety).
-///
-/// [firestoreGetOptions]: pass [GetOptions(source: Source.server)] so Focus/Home
-/// match the server and avoid stale offline cache mixing days.
 Future<List<PlannedTaskRow>> collectTasksForDateKey(
   PlanningRepository repo,
   String dateKey, {
   bool enforceTaskPlanDate = false,
-  GetOptions? firestoreGetOptions,
 }) async {
   final rows = <PlannedTaskRow>[];
-  final routines = await repo.getRoutinesForDate(
-    dateKey,
-    getOptions: firestoreGetOptions,
-  );
+  final routines = await repo.getRoutinesForDate(dateKey);
   for (final routine in routines) {
     if (routine.dateKey != dateKey) continue;
-    final blocks = await repo.getBlocks(
-      routine.id,
-      getOptions: firestoreGetOptions,
-    );
+    final blocks = await repo.getBlocks(routine.id);
     for (final block in blocks) {
       final tasks = await repo.getTasks(
         routineId: routine.id,
         blockId: block.id,
-        getOptions: firestoreGetOptions,
       );
       for (final task in tasks) {
         if (enforceTaskPlanDate) {
@@ -72,27 +60,26 @@ Future<List<PlannedTaskRow>> collectTasksForDateKey(
   return rows;
 }
 
-/// Tries a server read first (fresh truth), then falls back to default cache behavior if offline.
+/// Alias for callers that previously preferred a server-first read; local-first uses the same path.
 Future<List<PlannedTaskRow>> collectTasksForDateKeyPreferServer(
   PlanningRepository repo,
   String dateKey, {
   bool enforceTaskPlanDate = false,
-}) async {
-  const server = GetOptions(source: Source.server);
-  try {
-    return await collectTasksForDateKey(
-      repo,
-      dateKey,
-      enforceTaskPlanDate: enforceTaskPlanDate,
-      firestoreGetOptions: server,
-    );
-  } catch (_) {
-    return await collectTasksForDateKey(
-      repo,
-      dateKey,
-      enforceTaskPlanDate: enforceTaskPlanDate,
-    );
-  }
+}) {
+  return collectTasksForDateKey(
+    repo,
+    dateKey,
+    enforceTaskPlanDate: enforceTaskPlanDate,
+  );
+}
+
+/// Fresh read from local store (same as stream content); use after writes instead of [StreamProvider.future].
+Future<List<PlannedTaskRow>> collectTodayPlannedRows(PlanningRepository repo) {
+  return collectTasksForDateKeyPreferServer(
+    repo,
+    DateKeys.todayKey(),
+    enforceTaskPlanDate: true,
+  );
 }
 
 bool taskIsOpenForHub(PlannedTask task) {
