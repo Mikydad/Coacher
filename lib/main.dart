@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/app.dart';
 import 'app/app_lifecycle_task_refresh.dart';
+import 'app/first_launch_gate.dart';
 import 'core/bootstrap/app_bootstrap.dart';
 
 Future<void> main() async {
@@ -12,8 +13,10 @@ Future<void> main() async {
   runApp(
     UncontrolledProviderScope(
       container: container,
-      child: const AppLifecycleTaskRefresh(
-        child: CoachForLifeApp(),
+      child: const FirstLaunchGate(
+        child: AppLifecycleTaskRefresh(
+          child: CoachForLifeApp(),
+        ),
       ),
     ),
   );
