@@ -6,9 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/sync/sync_service.dart';
 import '../../../core/utils/stable_id.dart';
-import '../../planning/application/extension_policy.dart';
-import '../../planning/application/next_task_ranker.dart';
+import '../../execution/domain/models/timer_session.dart';
+import '../../execution/domain/task_timer_engine.dart';
 import '../../planning/application/override_rules.dart';
+import '../../planning/application/auto_next_task_flow.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
 import '../../planning/domain/models/accountability_log.dart';
@@ -32,7 +33,6 @@ import '../../goals/presentation/goal_selection_screen.dart';
 import '../../plan_tomorrow/presentation/plan_tomorrow_screen.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 
-enum _NextTaskDecision { startNow, extraTime, moveWithReason }
 enum _PlansChangedAction { reshuffle, defer, skip }
 
 class HomeScreen extends ConsumerWidget {
@@ -46,6 +46,10 @@ class HomeScreen extends ConsumerWidget {
     final tasksAsync = ref.watch(todayAllTasksRowsProvider);
     final todaysGoalsAsync = ref.watch(todaysActiveGoalsProvider);
     final flowSnapshotAsync = ref.watch(homeFlowSnapshotProvider);
+    final execState = ref.watch(executionControllerProvider);
+    final hasRunningFocusTask = execState.targetType == TimerSessionTargetType.task &&
+        execState.taskId.isNotEmpty &&
+        (execState.phase == ExecutionPhase.inProgress || execState.phase == ExecutionPhase.paused);
 
     return Scaffold(
       appBar: AppBar(
@@ -96,7 +100,19 @@ class HomeScreen extends ConsumerWidget {
                 child: _ActionCircle(
                   icon: Icons.bolt,
                   label: 'START FOCUS',
-                  onTap: () => Navigator.pushNamed(context, FocusSelectionScreen.routeName),
+                  onTap: () => Navigator.pushNamed(
+                    context,
+                    FocusSelectionScreen.routeName,
+                    arguments: hasRunningFocusTask
+                        ? FocusLaunchArgs(
+                            taskId: execState.taskId,
+                            taskLabel: execState.taskLabel,
+                            taskDurationMinutes: execState.targetDurationMinutes,
+                            autoOpenTimer: true,
+                            autoStartDelaySeconds: 10,
+                          )
+                        : null,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -669,6 +685,7 @@ Future<void> _openPlansChangedFlow(
       id: StableId.generate('flowev'),
       taskId: t.id,
       type: FlowTransitionType.moveWithReason,
+      planChangeIntent: PlanChangeIntent.logical,
       reasonCategory: reason.reason,
       reasonNote: '[${action.name}] ${reason.note}',
       createdAtMs: now,
@@ -963,7 +980,9 @@ Future<void> _completeTaskFromHome(BuildContext context, WidgetRef ref, PlannedT
       if (start == true && context.mounted) {
         ref.read(activeExecutionTaskIdProvider.notifier).state = t.id;
         ref.read(activeExecutionTaskLabelProvider.notifier).state = t.title;
-        ref.read(executionControllerProvider.notifier).setTask(id: t.id, label: t.title);
+        ref
+            .read(executionControllerProvider.notifier)
+            .setTask(id: t.id, label: t.title, durationMinutes: t.durationMinutes);
         await Navigator.pushNamed(context, TimerSessionScreen.routeName);
       }
       return;
@@ -998,360 +1017,18 @@ Future<void> _completeTaskFromHome(BuildContext context, WidgetRef ref, PlannedT
     final prev = ref.read(scoredTaskStatusesProvider);
     ref.read(scoredTaskStatusesProvider.notifier).state = {...prev, t.id: 100};
     invalidateTaskListProviders(ref);
-    final rows = await readFreshTodayPlannedRows(ref);
     if (!context.mounted) return;
-    await _promptStartNextTask(context, ref, rows, completedTaskId: t.id);
+    await runAutoNextTaskFlow(
+      context,
+      ref,
+      completedTaskId: t.id,
+      completionPercent: 100,
+    );
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not complete: $e')));
     }
   }
-}
-
-Future<void> _promptStartNextTask(
-  BuildContext context,
-  WidgetRef ref,
-  List<PlannedTaskRow> rows, {
-  required String completedTaskId,
-}) async {
-  final candidates = rows.where((r) => r.task.id != completedTaskId).toList();
-  final next = NextTaskRanker.chooseNext(candidates, preferUserSequence: true);
-  if (next == null) return;
-  final decision = await showDialog<_NextTaskDecision>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Start next task?'),
-      content: Text('Next up: ${next.task.title}'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, _NextTaskDecision.moveWithReason),
-          child: const Text('Move to later'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, _NextTaskDecision.extraTime),
-          child: const Text('Need extra time'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(ctx, _NextTaskDecision.startNow),
-          child: const Text('Start now'),
-        ),
-      ],
-    ),
-  );
-  if (!context.mounted || decision == null) return;
-  switch (decision) {
-    case _NextTaskDecision.startNow:
-      await ref.read(planningRepositoryProvider).logFlowTransitionEvent(
-        FlowTransitionEvent(
-          id: StableId.generate('flowev'),
-          taskId: next.task.id,
-          type: FlowTransitionType.startNow,
-          createdAtMs: DateTime.now().millisecondsSinceEpoch,
-        ),
-      );
-      if (!context.mounted) return;
-      ref.read(activeExecutionTaskIdProvider.notifier).state = next.task.id;
-      ref.read(activeExecutionTaskLabelProvider.notifier).state = next.task.title;
-      ref.read(executionControllerProvider.notifier).setTask(
-        id: next.task.id,
-        label: next.task.title,
-      );
-      await Navigator.pushNamed(context, TimerSessionScreen.routeName);
-      return;
-    case _NextTaskDecision.extraTime:
-      await _handleExtraTime(context, ref, completedTaskId: completedTaskId, rows: rows);
-      return;
-    case _NextTaskDecision.moveWithReason:
-      await _handleMoveWithReason(context, ref, row: next);
-      return;
-  }
-}
-
-Future<void> _handleExtraTime(
-  BuildContext context,
-  WidgetRef ref, {
-  required String completedTaskId,
-  required List<PlannedTaskRow> rows,
-}) async {
-  PlannedTaskRow? completedRow;
-  for (final r in rows) {
-    if (r.task.id == completedTaskId) {
-      completedRow = r;
-      break;
-    }
-  }
-  if (completedRow == null) return;
-  final t = completedRow.task;
-  final planning = ref.read(planningRepositoryProvider);
-  final blocks = await planning.getBlocks(completedRow.routineId);
-  var urgency = 50;
-  for (final b in blocks) {
-    if (b.id == completedRow.blockId) {
-      urgency = b.urgencyScore;
-      break;
-    }
-  }
-  final routineForPolicy = await _routineForPlannedRow(ref, completedRow);
-  if (!context.mounted) return;
-  final policy = ExtensionPolicy.forTask(
-    task: t,
-    resolver: ref.read(routineModePolicyResolverProvider),
-    blockUrgencyScore: urgency,
-    routine: routineForPolicy,
-  );
-  if (!context.mounted) return;
-  final extension = await _promptExtensionRequest(
-    context,
-    allowedMaxMinutes: policy.allowedMaxMinutes,
-    requireReason: policy.requiresReason,
-    requireReflection: policy.requiresReflectionPrompt,
-  );
-  if (extension == null) return;
-  final extraMinutes = extension.minutes;
-  final updated = PlannedTask(
-    id: t.id,
-    routineId: t.routineId,
-    blockId: t.blockId,
-    title: t.title,
-    durationMinutes: (t.durationMinutes + extraMinutes).clamp(1, 24 * 60),
-    priority: t.priority,
-    orderIndex: t.orderIndex,
-    reminderEnabled: t.reminderEnabled,
-    reminderTimeIso: t.reminderTimeIso,
-    status: TaskStatus.inProgress,
-    createdAtMs: t.createdAtMs,
-    updatedAtMs: DateTime.now().millisecondsSinceEpoch,
-    category: t.category,
-    planDateKey: t.planDateKey ?? completedRow.dateKey,
-    notes: _appendExtraTimeNote(
-      existing: t.notes,
-      extraMinutes: extraMinutes,
-      reason: extension.reason,
-      reflection: extension.reflection,
-    ),
-    sequenceIndex: t.sequenceIndex,
-    strictModeRequired: t.strictModeRequired,
-    modeRefId: t.modeRefId,
-  );
-  await planning.upsertTask(updated);
-  await planning.logFlowTransitionEvent(
-    FlowTransitionEvent(
-      id: StableId.generate('flowev'),
-      taskId: t.id,
-      type: FlowTransitionType.extraTime,
-      reasonNote: '[+${extraMinutes}m] ${extension.reason}${extension.reflection == null ? '' : ' | ${extension.reflection}'}',
-      createdAtMs: DateTime.now().millisecondsSinceEpoch,
-    ),
-  );
-  await ref.read(reminderSyncServiceProvider).markLogicalReasonProvided(t.id);
-  final prev = ref.read(scoredTaskStatusesProvider);
-  final nextScores = Map<String, int>.from(prev)..remove(t.id);
-  ref.read(scoredTaskStatusesProvider.notifier).state = nextScores;
-  invalidateTaskListProviders(ref);
-  if (!context.mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('Added $extraMinutes minutes and moved task back to in progress.')),
-  );
-}
-
-Future<({int minutes, String reason, String? reflection})?> _promptExtensionRequest(
-  BuildContext context, {
-  required int allowedMaxMinutes,
-  required bool requireReason,
-  required bool requireReflection,
-}) async {
-  final options = [15, 30, 45, 60].where((m) => m <= allowedMaxMinutes).toList();
-  if (options.isEmpty) return null;
-  var selectedMinutes = options.first;
-  final reasonCtrl = TextEditingController();
-  final reflectionCtrl = TextEditingController();
-  String? errorText;
-  final result = await showDialog<({int minutes, String reason, String? reflection})>(
-    context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setState) => AlertDialog(
-        title: const Text('Request extra time'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            DropdownButtonFormField<int>(
-              initialValue: selectedMinutes,
-              items: [
-                for (final m in options) DropdownMenuItem(value: m, child: Text('+$m minutes')),
-              ],
-              onChanged: (v) => setState(() => selectedMinutes = v ?? options.first),
-              decoration: InputDecoration(labelText: 'Allowed (max +$allowedMaxMinutes min)'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: reasonCtrl,
-              maxLines: 2,
-              decoration: InputDecoration(
-                labelText: requireReason ? 'Reason (required)' : 'Reason',
-                hintText: 'Why do you need more time?',
-              ),
-            ),
-            if (requireReflection) ...[
-              const SizedBox(height: 10),
-              TextField(
-                controller: reflectionCtrl,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'What did you promise yourself? (required)',
-                  hintText: 'Short commitment reminder to stay aligned.',
-                ),
-              ),
-            ],
-            if (errorText != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(errorText!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
-              ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              final reason = reasonCtrl.text.trim();
-              final reflection = reflectionCtrl.text.trim();
-              if (requireReason && reason.isEmpty) {
-                setState(() => errorText = 'Reason is required.');
-                return;
-              }
-              if (requireReflection && reflection.isEmpty) {
-                setState(() => errorText = 'Reflection is required.');
-                return;
-              }
-              Navigator.pop(
-                ctx,
-                (
-                  minutes: selectedMinutes,
-                  reason: reason.isEmpty ? 'No reason provided' : reason,
-                  reflection: reflection.isEmpty ? null : reflection,
-                ),
-              );
-            },
-            child: const Text('Approve extension'),
-          ),
-        ],
-      ),
-    ),
-  );
-  reasonCtrl.dispose();
-  reflectionCtrl.dispose();
-  return result;
-}
-
-Future<void> _handleMoveWithReason(
-  BuildContext context,
-  WidgetRef ref, {
-  required PlannedTaskRow row,
-}) async {
-  final reasons = OverrideReasonCategory.values;
-  OverrideReasonCategory selectedReason = reasons.first;
-  final noteCtrl = TextEditingController();
-  String? errorText;
-  final choice = await showDialog<({OverrideReasonCategory reason, String note})>(
-    context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setState) {
-        return AlertDialog(
-          title: const Text('Move task with reason'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<OverrideReasonCategory>(
-                initialValue: selectedReason,
-                items: [
-                  for (final r in reasons)
-                    DropdownMenuItem(value: r, child: Text(r.label)),
-                ],
-                onChanged: (v) => setState(() => selectedReason = v ?? reasons.first),
-                decoration: const InputDecoration(labelText: 'Reason category'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: noteCtrl,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Logical reason (1-2 sentences)',
-                  hintText: 'Explain why this move is the best decision now.',
-                ),
-              ),
-              if (errorText != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(errorText!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
-                ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () {
-                final note = noteCtrl.text.trim();
-                try {
-                  FlowTransitionEvent.validateReasonNote(note);
-                } catch (_) {
-                  setState(() => errorText = 'Give a clear reason in 1-2 sentences.');
-                  return;
-                }
-                Navigator.pop(ctx, (reason: selectedReason, note: note));
-              },
-              child: const Text('Move task'),
-            ),
-          ],
-        );
-      },
-    ),
-  );
-  noteCtrl.dispose();
-  if (choice == null) return;
-
-  final t = row.task;
-  final planning = ref.read(planningRepositoryProvider);
-  final moved = PlannedTask(
-    id: t.id,
-    routineId: t.routineId,
-    blockId: t.blockId,
-    title: t.title,
-    durationMinutes: t.durationMinutes,
-    priority: t.priority,
-    orderIndex: t.orderIndex,
-    reminderEnabled: t.reminderEnabled,
-    reminderTimeIso: t.reminderTimeIso,
-    status: t.status,
-    createdAtMs: t.createdAtMs,
-    updatedAtMs: DateTime.now().millisecondsSinceEpoch,
-    category: t.category,
-    planDateKey: t.planDateKey ?? row.dateKey,
-    notes: _appendMoveReason(
-      existing: t.notes,
-      reason: choice.reason,
-      explanation: choice.note,
-    ),
-    sequenceIndex: (t.sequenceIndex ?? t.orderIndex) + 1000,
-    strictModeRequired: t.strictModeRequired,
-    modeRefId: t.modeRefId,
-  );
-  await planning.upsertTask(moved);
-  await planning.logFlowTransitionEvent(
-    FlowTransitionEvent(
-      id: StableId.generate('flowev'),
-      taskId: t.id,
-      type: FlowTransitionType.moveWithReason,
-      reasonCategory: choice.reason,
-      reasonNote: choice.note,
-      createdAtMs: DateTime.now().millisecondsSinceEpoch,
-    ),
-  );
-  await ref.read(reminderSyncServiceProvider).markLogicalReasonProvided(t.id);
-  invalidateTaskListProviders(ref);
-  if (!context.mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('Moved "${t.title}" to later: ${choice.reason.label}.')),
-  );
 }
 
 String _appendMoveReason({
@@ -1361,19 +1038,6 @@ String _appendMoveReason({
 }) {
   final stamp = DateTime.now().toIso8601String();
   final entry = '[Moved $stamp] ${reason.label}: $explanation';
-  if (existing == null || existing.trim().isEmpty) return entry;
-  return '$existing\n$entry';
-}
-
-String _appendExtraTimeNote({
-  required String? existing,
-  required int extraMinutes,
-  required String reason,
-  required String? reflection,
-}) {
-  final stamp = DateTime.now().toIso8601String();
-  final reflectPart = reflection == null ? '' : ' | Reflection: $reflection';
-  final entry = '[ExtraTime $stamp] +${extraMinutes}m | Reason: $reason$reflectPart';
   if (existing == null || existing.trim().isEmpty) return entry;
   return '$existing\n$entry';
 }

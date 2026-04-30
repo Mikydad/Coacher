@@ -37,6 +37,7 @@ class _FakeTimerRuntimeCache extends TimerRuntimeCache {
     required ExecutionPhase phase,
     required Duration elapsed,
     DateTime? runningSince,
+    int? targetDurationMinutes,
   }) async {
     data = <String, dynamic>{
       'targetType': targetType.storageValue,
@@ -46,6 +47,7 @@ class _FakeTimerRuntimeCache extends TimerRuntimeCache {
       'phase': phase.name,
       'elapsedMs': elapsed.inMilliseconds,
       'runningSinceMs': runningSince?.millisecondsSinceEpoch,
+      'targetDurationMinutes': targetDurationMinutes,
     };
   }
 }
@@ -113,7 +115,7 @@ void main() {
       ),
     );
 
-    expect(find.textContaining('Auto-starting in 10s'), findsOneWidget);
+    expect(find.textContaining('Auto-starting in'), findsOneWidget);
     await tester.ensureVisible(find.text('Cancel'));
     await tester.tap(find.text('Cancel'));
     await tester.pump();

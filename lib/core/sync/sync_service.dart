@@ -16,6 +16,9 @@ class SyncService {
 
   static final SyncService instance = SyncService._();
 
+  /// Firestore → Isar pull; avoids an indefinite white "loading" gate if the network stalls.
+  static const Duration remotePullTimeout = Duration(seconds: 60);
+
   /// Injected clock for debounce tests; cleared after tests.
   @visibleForTesting
   static DateTime Function()? debugClockForTests;
@@ -91,7 +94,13 @@ class SyncService {
       if (debugRemotePullForTests != null) {
         await debugRemotePullForTests!(isar);
       } else {
-        await RemoteIsarMerge(isar).run();
+        await RemoteIsarMerge(isar).run().timeout(
+              remotePullTimeout,
+              onTimeout: () => throw TimeoutException(
+                'RemoteIsarMerge exceeded ${remotePullTimeout.inSeconds}s',
+                remotePullTimeout,
+              ),
+            );
       }
     } catch (e, st) {
       debugPrint('syncFromRemote failed: $e\n$st');

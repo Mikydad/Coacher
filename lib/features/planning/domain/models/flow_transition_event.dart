@@ -13,6 +13,22 @@ enum OverrideReasonCategory {
   scheduleConflict,
 }
 
+enum PlanChangeIntent {
+  feeling,
+  logical,
+}
+
+extension PlanChangeIntentStorage on PlanChangeIntent {
+  String get storageValue => name;
+
+  static PlanChangeIntent fromStorage(String? raw) {
+    return PlanChangeIntent.values.firstWhere(
+      (e) => e.name == raw,
+      orElse: () => PlanChangeIntent.logical,
+    );
+  }
+}
+
 extension OverrideReasonCategoryStorage on OverrideReasonCategory {
   String get storageValue => name;
 
@@ -53,6 +69,7 @@ class FlowTransitionEvent {
     required this.id,
     required this.taskId,
     required this.type,
+    this.planChangeIntent,
     this.reasonCategory,
     this.reasonNote,
     required this.createdAtMs,
@@ -61,6 +78,7 @@ class FlowTransitionEvent {
   final String id;
   final String taskId;
   final FlowTransitionType type;
+  final PlanChangeIntent? planChangeIntent;
   final OverrideReasonCategory? reasonCategory;
   final String? reasonNote;
   final int createdAtMs;
@@ -94,10 +112,15 @@ class FlowTransitionEvent {
     return 1;
   }
 
+  PlanChangeIntent? get _effectiveIntent {
+    return planChangeIntent ?? (reasonCategory == null ? null : PlanChangeIntent.logical);
+  }
+
   Map<String, dynamic> toMap() => {
     'id': id,
     'taskId': taskId,
     'type': type.storageValue,
+    if (_effectiveIntent != null) 'planChangeIntent': _effectiveIntent!.storageValue,
     if (reasonCategory != null) 'reasonCategory': reasonCategory!.storageValue,
     if (reasonNote != null) 'reasonNote': reasonNote,
     'createdAtMs': createdAtMs,
