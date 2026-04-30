@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
 import '../../execution/application/execution_day_loader.dart';
+import '../../execution/domain/models/timer_session.dart';
+import '../../execution/domain/task_timer_engine.dart';
 import '../../planning/application/planned_task_providers.dart';
 import '../application/focus_quick_task.dart';
 import '../../timer/presentation/timer_session_screen.dart';
@@ -11,12 +13,14 @@ class FocusLaunchArgs {
   const FocusLaunchArgs({
     required this.taskId,
     required this.taskLabel,
+    this.taskDurationMinutes,
     this.autoOpenTimer = false,
     this.autoStartDelaySeconds = 10,
   });
 
   final String taskId;
   final String taskLabel;
+  final int? taskDurationMinutes;
   final bool autoOpenTimer;
   final int autoStartDelaySeconds;
 }
@@ -43,22 +47,37 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted || _didHandleLaunchArgs) return;
       final args = widget.launchArgs;
-      if (args == null) return;
-      _didHandleLaunchArgs = true;
-      if (args.taskId.isNotEmpty) {
-        ref.read(activeExecutionTaskIdProvider.notifier).state = args.taskId;
-        ref.read(activeExecutionTaskLabelProvider.notifier).state = args.taskLabel;
-        ref.read(executionControllerProvider.notifier).setTask(
-          id: args.taskId,
-          label: args.taskLabel,
-        );
+      if (args != null) {
+        _didHandleLaunchArgs = true;
+        if (args.taskId.isNotEmpty) {
+          ref.read(activeExecutionTaskIdProvider.notifier).state = args.taskId;
+          ref.read(activeExecutionTaskLabelProvider.notifier).state = args.taskLabel;
+          ref.read(executionControllerProvider.notifier).setTask(
+            id: args.taskId,
+            label: args.taskLabel,
+            durationMinutes: args.taskDurationMinutes,
+          );
+        }
+        if (args.autoOpenTimer && mounted) {
+          await Navigator.pushNamed(
+            context,
+            TimerSessionScreen.routeName,
+            arguments: TimerLaunchArgs(autoStartDelaySeconds: args.autoStartDelaySeconds),
+          );
+        }
+        return;
       }
-      if (args.autoOpenTimer && mounted) {
-        await Navigator.pushNamed(
-          context,
-          TimerSessionScreen.routeName,
-          arguments: TimerLaunchArgs(autoStartDelaySeconds: args.autoStartDelaySeconds),
-        );
+
+      final exec = ref.read(executionControllerProvider);
+      final hasRunningTask = exec.targetType == TimerSessionTargetType.task &&
+          exec.taskId.isNotEmpty &&
+          (exec.phase == ExecutionPhase.inProgress || exec.phase == ExecutionPhase.paused);
+      if (!hasRunningTask) return;
+      _didHandleLaunchArgs = true;
+      ref.read(activeExecutionTaskIdProvider.notifier).state = exec.taskId;
+      ref.read(activeExecutionTaskLabelProvider.notifier).state = exec.taskLabel;
+      if (mounted) {
+        await Navigator.pushNamed(context, TimerSessionScreen.routeName);
       }
     });
   }
@@ -98,6 +117,10 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
   Widget build(BuildContext context) {
     final selectedTask = ref.watch(activeExecutionTaskLabelProvider);
     final taskList = ref.watch(executionDayTasksProvider);
+    final execState = ref.watch(executionControllerProvider);
+    final hasRunningTask = execState.targetType == TimerSessionTargetType.task &&
+        execState.taskId.isNotEmpty &&
+        (execState.phase == ExecutionPhase.inProgress || execState.phase == ExecutionPhase.paused);
 
     return Scaffold(
       appBar: AppBar(
@@ -155,6 +178,17 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
                         subtitle: '${task.durationMinutes}m target',
                         selected: selectedTask == task.title,
                         onTap: () {
+                          if (hasRunningTask && execState.taskId != task.id) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Task "${execState.taskLabel}" is already running. '
+                                  'Finish or stop it before switching focus.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
                           ref
                                   .read(activeExecutionTaskIdProvider.notifier)
                                   .state =
@@ -165,7 +199,11 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
                               .title;
                           ref
                               .read(executionControllerProvider.notifier)
-                              .setTask(id: task.id, label: task.title);
+                              .setTask(
+                                id: task.id,
+                                label: task.title,
+                                durationMinutes: task.durationMinutes,
+                              );
                         },
                       ),
                     ),
@@ -211,13 +249,14 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
           FilledButton(
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(60),
-              backgroundColor: const Color(0xFFB7FF00),
-              foregroundColor: Colors.black,
+              backgroundColor: hasRunningTask
+                  ? const Color(0xFF2B2D31)
+                  : const Color(0xFFB7FF00),
+              foregroundColor: hasRunningTask ? Colors.white : Colors.black,
             ),
-            onPressed: () =>
-                Navigator.pushNamed(context, TimerSessionScreen.routeName),
-            child: const Text(
-              'Start Focus',
+            onPressed: () => Navigator.pushNamed(context, TimerSessionScreen.routeName),
+            child: Text(
+              hasRunningTask ? 'Running Focus' : 'Start Focus',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
           ),

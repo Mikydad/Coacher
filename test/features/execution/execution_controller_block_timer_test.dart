@@ -36,6 +36,7 @@ class _FakeTimerRuntimeCache extends TimerRuntimeCache {
     required phase,
     required Duration elapsed,
     DateTime? runningSince,
+    int? targetDurationMinutes,
   }) async {
     _data = {
       'targetType': targetType.storageValue,
@@ -45,6 +46,7 @@ class _FakeTimerRuntimeCache extends TimerRuntimeCache {
       'phase': phase.name,
       'elapsedMs': elapsed.inMilliseconds,
       'runningSinceMs': runningSince?.millisecondsSinceEpoch,
+      'targetDurationMinutes': targetDurationMinutes,
     };
   }
 

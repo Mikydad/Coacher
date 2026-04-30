@@ -99,7 +99,6 @@
 				5DF2505D5E8EA2780412291D /* Pods-RunnerTests.release.xcconfig */,
 				CC5C3D1A9A0E2F4A8960B40D /* Pods-RunnerTests.profile.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -329,20 +328,6 @@
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin";
 		};
-		F7A2E8B91CF90200004384FD /* Mark Flutter output for Xcode clean */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-			);
-			name = "Mark Flutter output for Xcode clean";
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# Flutter uses CONFIGURATION_BUILD_DIR under the project build/ tree.\n# Without this xattr, Xcode fails Clean Build Folder with:\n# \"not created by the build system and it is not a subfolder of derived data\".\nif [ -n \"${CONFIGURATION_BUILD_DIR}\" ] && [ -d \"${CONFIGURATION_BUILD_DIR}\" ]; then\n  xattr -w com.apple.xcode.CreatedByBuildSystem true \"${CONFIGURATION_BUILD_DIR}\" 2>/dev/null || true\nfi\n";
-		};
 		961BDD49B87E2EEFE4B5B65C /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -379,6 +364,20 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
+		};
+		F7A2E8B91CF90200004384FD /* Mark Flutter output for Xcode clean */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Mark Flutter output for Xcode clean";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Flutter uses CONFIGURATION_BUILD_DIR under the project build/ tree.\n# Without this xattr, Xcode fails Clean Build Folder with:\n# \"not created by the build system and it is not a subfolder of derived data\".\nif [ -n \"${CONFIGURATION_BUILD_DIR}\" ] && [ -d \"${CONFIGURATION_BUILD_DIR}\" ]; then\n  xattr -w com.apple.xcode.CreatedByBuildSystem true \"${CONFIGURATION_BUILD_DIR}\" 2>/dev/null || true\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -497,7 +496,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.coachForLife;
+				PRODUCT_BUNDLE_IDENTIFIER = com.milkesa.coachForLife;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -680,7 +679,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.coachForLife;
+				PRODUCT_BUNDLE_IDENTIFIER = com.milkesa.coachForLife;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -703,7 +702,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.coachForLife;
+				PRODUCT_BUNDLE_IDENTIFIER = com.milkesa.coachForLife;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;

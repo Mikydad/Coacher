@@ -18,6 +18,7 @@ class ExecutionState {
     required this.phase,
     required this.elapsed,
     required this.readyToScore,
+    required this.targetDurationMinutes,
   });
 
   final TimerSessionTargetType targetType;
@@ -28,6 +29,7 @@ class ExecutionState {
   final ExecutionPhase phase;
   final Duration elapsed;
   final bool readyToScore;
+  final int? targetDurationMinutes;
 
   ExecutionState copyWith({
     TimerSessionTargetType? targetType,
@@ -38,6 +40,8 @@ class ExecutionState {
     ExecutionPhase? phase,
     Duration? elapsed,
     bool? readyToScore,
+    int? targetDurationMinutes,
+    bool clearTargetDurationMinutes = false,
   }) {
     return ExecutionState(
       targetType: targetType ?? this.targetType,
@@ -48,6 +52,9 @@ class ExecutionState {
       phase: phase ?? this.phase,
       elapsed: elapsed ?? this.elapsed,
       readyToScore: readyToScore ?? this.readyToScore,
+      targetDurationMinutes: clearTargetDurationMinutes
+          ? null
+          : targetDurationMinutes ?? this.targetDurationMinutes,
     );
   }
 }
@@ -69,6 +76,7 @@ class ExecutionController extends StateNotifier<ExecutionState> {
            phase: ExecutionPhase.notStarted,
            elapsed: Duration.zero,
            readyToScore: false,
+          targetDurationMinutes: null,
          ),
        ) {
     _sub = _engine.stream.listen((snapshot) {
@@ -84,6 +92,7 @@ class ExecutionController extends StateNotifier<ExecutionState> {
           phase: snapshot.phase,
           elapsed: snapshot.elapsed,
           runningSince: snapshot.phase == ExecutionPhase.inProgress ? DateTime.now() : null,
+          targetDurationMinutes: state.targetDurationMinutes,
         ),
       );
     });
@@ -103,8 +112,6 @@ class ExecutionController extends StateNotifier<ExecutionState> {
     );
     final taskId = data['taskId'] as String?;
     final blockId = data['blockId'] as String?;
-    if (targetType == TimerSessionTargetType.task && taskId != state.taskId) return;
-    if (targetType == TimerSessionTargetType.block && blockId != state.blockId) return;
     final phaseName = data['phase'] as String?;
     if (phaseName == null) return;
     final phase = ExecutionPhase.values.byName(phaseName);
@@ -120,6 +127,7 @@ class ExecutionController extends StateNotifier<ExecutionState> {
       blockLabel: targetType == TimerSessionTargetType.block
           ? (data['label'] as String? ?? state.blockLabel)
           : state.blockLabel,
+      targetDurationMinutes: (data['targetDurationMinutes'] as num?)?.toInt(),
     );
     _engine.restore(
       phase: phase,
@@ -130,12 +138,23 @@ class ExecutionController extends StateNotifier<ExecutionState> {
     );
   }
 
-  void setTask({required String id, required String label}) {
+  void setTask({required String id, required String label, int? durationMinutes}) {
+    final sameRunningTask = state.targetType == TimerSessionTargetType.task &&
+        state.taskId == id &&
+        (state.phase == ExecutionPhase.inProgress || state.phase == ExecutionPhase.paused);
+    if (sameRunningTask) {
+      state = state.copyWith(
+        taskLabel: label,
+        targetDurationMinutes: durationMinutes,
+      );
+      return;
+    }
     state = state.copyWith(
       targetType: TimerSessionTargetType.task,
       taskId: id,
       taskLabel: label,
       readyToScore: false,
+      targetDurationMinutes: durationMinutes,
     );
     _engine.restore(phase: ExecutionPhase.notStarted, elapsed: Duration.zero);
   }
@@ -146,6 +165,7 @@ class ExecutionController extends StateNotifier<ExecutionState> {
       blockId: id,
       blockLabel: label,
       readyToScore: false,
+      clearTargetDurationMinutes: true,
     );
     _engine.restore(phase: ExecutionPhase.notStarted, elapsed: Duration.zero);
   }

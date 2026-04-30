@@ -22,22 +22,29 @@ class _PendingRouteIntent {
     this.goalId,
     this.taskId,
     this.taskLabel,
+    this.taskDurationMinutes,
   });
 
   const _PendingRouteIntent.goal(String goalId)
     : this._(routeName: GoalDetailScreen.routeName, goalId: goalId);
 
-  const _PendingRouteIntent.focus({required String taskId, required String taskLabel})
+  const _PendingRouteIntent.focus({
+    required String taskId,
+    required String taskLabel,
+    int? taskDurationMinutes,
+  })
     : this._(
         routeName: FocusSelectionScreen.routeName,
         taskId: taskId,
         taskLabel: taskLabel,
+        taskDurationMinutes: taskDurationMinutes,
       );
 
   final String routeName;
   final String? goalId;
   final String? taskId;
   final String? taskLabel;
+  final int? taskDurationMinutes;
 
   Object? get arguments {
     if (routeName == GoalDetailScreen.routeName) return goalId;
@@ -47,6 +54,7 @@ class _PendingRouteIntent {
       return FocusLaunchArgs(
         taskId: id,
         taskLabel: taskLabel ?? 'Task',
+        taskDurationMinutes: taskDurationMinutes,
         autoOpenTimer: true,
         autoStartDelaySeconds: 10,
       );
@@ -59,6 +67,7 @@ class _PendingRouteIntent {
     if (goalId != null) 'goalId': goalId,
     if (taskId != null) 'taskId': taskId,
     if (taskLabel != null) 'taskLabel': taskLabel,
+    if (taskDurationMinutes != null) 'taskDurationMinutes': taskDurationMinutes,
   };
 
   static _PendingRouteIntent? fromJson(Map<String, dynamic> map) {
@@ -75,9 +84,11 @@ class _PendingRouteIntent {
       final taskId = map['taskId'];
       if (taskId is! String || taskId.isEmpty) return null;
       final taskLabel = map['taskLabel'];
+      final taskDurationMinutes = (map['taskDurationMinutes'] as num?)?.toInt();
       return _PendingRouteIntent.focus(
         taskId: taskId,
         taskLabel: taskLabel is String && taskLabel.isNotEmpty ? taskLabel : 'Task',
+        taskDurationMinutes: taskDurationMinutes,
       );
     }
     return null;
@@ -210,11 +221,13 @@ Future<void> handleNotificationResponse(
   }
 
   var label = 'Task';
+  int? durationMinutes;
   try {
     final rows = await collectTodayPlannedRows(container.read(planningRepositoryProvider));
     for (final r in rows) {
       if (r.task.id == taskId) {
         label = r.task.title;
+        durationMinutes = r.task.durationMinutes;
         break;
       }
     }
@@ -223,18 +236,29 @@ Future<void> handleNotificationResponse(
 
   container.read(activeExecutionTaskIdProvider.notifier).state = taskId;
   container.read(activeExecutionTaskLabelProvider.notifier).state = label;
-  container.read(executionControllerProvider.notifier).setTask(id: taskId, label: label);
+  container.read(executionControllerProvider.notifier).setTask(
+    id: taskId,
+    label: label,
+    durationMinutes: durationMinutes,
+  );
   debugPrint('[NotifTap] execution state primed for taskId=$taskId');
 
   final launch = FocusLaunchArgs(
     taskId: taskId,
     taskLabel: label,
+    taskDurationMinutes: durationMinutes,
     autoOpenTimer: true,
     autoStartDelaySeconds: 10,
   );
   WidgetsBinding.instance.addPostFrameCallback((_) async {
     if (!_pushNowIfReady(FocusSelectionScreen.routeName, arguments: launch)) {
-      _queuePendingIntent(_PendingRouteIntent.focus(taskId: taskId, taskLabel: label));
+      _queuePendingIntent(
+        _PendingRouteIntent.focus(
+          taskId: taskId,
+          taskLabel: label,
+          taskDurationMinutes: durationMinutes,
+        ),
+      );
     } else {
       debugPrint('[NotifTap] focus route pushed immediately for taskId=$taskId');
     }

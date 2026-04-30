@@ -22,6 +22,7 @@ class TimerRuntimeCache {
     required ExecutionPhase phase,
     required Duration elapsed,
     DateTime? runningSince,
+    int? targetDurationMinutes,
   }) async {
     final file = await _file();
     final payload = <String, dynamic>{
@@ -32,6 +33,7 @@ class TimerRuntimeCache {
       'phase': phase.name,
       'elapsedMs': elapsed.inMilliseconds,
       'runningSinceMs': runningSince?.millisecondsSinceEpoch,
+      'targetDurationMinutes': targetDurationMinutes,
     };
     await file.writeAsString(jsonEncode(payload), flush: true);
   }
