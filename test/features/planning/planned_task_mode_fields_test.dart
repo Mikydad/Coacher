@@ -1,10 +1,7 @@
 import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-PlannedTask _sample({
-  String? modeRefId,
-  bool strictModeRequired = false,
-}) {
+PlannedTask _sample({String? modeRefId, bool strictModeRequired = false, bool isHabitAnchor = false}) {
   return PlannedTask(
     id: 't1',
     routineId: 'r1',
@@ -18,6 +15,7 @@ PlannedTask _sample({
     status: TaskStatus.notStarted,
     createdAtMs: 1,
     updatedAtMs: 2,
+    isHabitAnchor: isHabitAnchor,
     strictModeRequired: strictModeRequired,
     modeRefId: modeRefId,
   );
@@ -25,10 +23,15 @@ PlannedTask _sample({
 
 void main() {
   test('toMap / fromMap round-trip preserves modeRefId and strictModeRequired', () {
-    final original = _sample(modeRefId: 'disciplined', strictModeRequired: true);
+    final original = _sample(
+      modeRefId: 'disciplined',
+      strictModeRequired: true,
+      isHabitAnchor: true,
+    );
     final restored = PlannedTask.fromMap(original.toMap());
     expect(restored.modeRefId, 'disciplined');
     expect(restored.strictModeRequired, isTrue);
+    expect(restored.isHabitAnchor, isTrue);
   });
 
   test('fromMap defaults for missing mode fields', () {
@@ -47,5 +50,6 @@ void main() {
     });
     expect(t.modeRefId, isNull);
     expect(t.strictModeRequired, isFalse);
+    expect(t.isHabitAnchor, isFalse);
   });
 }

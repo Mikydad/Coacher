@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../analytics/application/analytics_event_logger.dart';
+import '../../analytics/domain/models/analytics_event.dart';
 import '../../execution/application/execution_day_loader.dart';
 import '../../execution/domain/models/timer_session.dart';
 import '../../execution/domain/task_timer_engine.dart';
@@ -204,6 +206,15 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
                                 label: task.title,
                                 durationMinutes: task.durationMinutes,
                               );
+                          fireAndForgetAnalyticsEvent(
+                            ref,
+                            type: AnalyticsEventType.taskStarted,
+                            entityId: task.id,
+                            entityKind: 'task',
+                            sourceSurface: 'focus_selection',
+                            idempotencyKey:
+                                'task_started_focus_${task.id}_${DateTime.now().millisecondsSinceEpoch}',
+                          );
                         },
                       ),
                     ),

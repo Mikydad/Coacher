@@ -10,12 +10,37 @@ import '../../../core/utils/date_keys.dart';
 import '../../execution/application/execution_day_loader.dart';
 import '../data/planning_repository.dart';
 import '../domain/models/task_item.dart';
-import 'next_task_ranker.dart';
 import 'planned_task_collect.dart';
+import 'task_prioritizer.dart';
 
 /// One-shot today rows after a mutation (avoids stale [StreamProvider.future]).
 Future<List<PlannedTaskRow>> readFreshTodayPlannedRows(WidgetRef ref) {
   return collectTodayPlannedRows(ref.read(planningRepositoryProvider));
+}
+
+Future<Map<String, int>> _readBlockUrgencyByRoutineIds(
+  PlanningRepository repo,
+  Iterable<PlannedTaskRow> rows,
+) async {
+  final map = <String, int>{};
+  final routineIds = <String>{};
+  for (final row in rows) {
+    routineIds.add(row.routineId);
+  }
+  for (final routineId in routineIds) {
+    final blocks = await repo.getBlocks(routineId);
+    for (final b in blocks) {
+      map[b.id] = b.urgencyScore;
+    }
+  }
+  return map;
+}
+
+Future<List<PrioritizedTaskRow>> readFreshTodayPrioritizedRows(WidgetRef ref) async {
+  final repo = ref.read(planningRepositoryProvider);
+  final rows = await collectTodayPlannedRows(repo);
+  final urgencyByBlock = await _readBlockUrgencyByRoutineIds(repo, rows);
+  return prioritizePlannedTasks(rows, blockUrgencyById: urgencyByBlock);
 }
 
 Future<HomeFlowSnapshot> _computeHomeFlowSnapshot(PlanningRepository repo) async {
@@ -25,10 +50,12 @@ Future<HomeFlowSnapshot> _computeHomeFlowSnapshot(PlanningRepository repo) async
   final routines = await repo.getRoutinesForDate(dateKey);
   var blockLabel = 'No active block';
   final openRows = <PlannedTaskRow>[];
+  final blockUrgencyById = <String, int>{};
 
   for (final r in routines) {
     final blocks = await repo.getBlocks(r.id);
     for (final b in blocks) {
+      blockUrgencyById[b.id] = b.urgencyScore;
       final start = b.startMinutesFromMidnight ?? 0;
       final end = b.endMinutesFromMidnight ?? 1439;
       final inWindow = minutes >= start && minutes <= end;
@@ -50,7 +77,11 @@ Future<HomeFlowSnapshot> _computeHomeFlowSnapshot(PlanningRepository repo) async
       }
     }
   }
-  final next = NextTaskRanker.chooseNext(openRows);
+  final prioritized = prioritizePlannedTasks(
+    openRows,
+    blockUrgencyById: blockUrgencyById,
+  );
+  final next = prioritized.isEmpty ? null : prioritized.first.row;
   return HomeFlowSnapshot(
     currentBlockLabel: blockLabel,
     openTaskCount: openRows.length,
@@ -70,8 +101,13 @@ Stream<List<PlannedTaskRow>> _todayRowsWatchStream(Ref ref) {
   Future<void> emit() async {
     try {
       final rows = await collectTodayPlannedRows(repo);
+      final urgencyByBlock = await _readBlockUrgencyByRoutineIds(repo, rows);
+      final prioritized = prioritizePlannedTasks(
+        rows,
+        blockUrgencyById: urgencyByBlock,
+      );
       if (!controller.isClosed) {
-        controller.add(rows);
+        controller.add(prioritized.map((p) => p.row).toList());
       }
     } catch (e, st) {
       if (!controller.isClosed) {

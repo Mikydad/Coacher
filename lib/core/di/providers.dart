@@ -13,6 +13,8 @@ import '../../features/execution/data/timer_runtime_cache.dart';
 import '../../features/scoring/application/scoring_controller.dart';
 import '../../features/scoring/data/scoring_repository.dart';
 import '../../features/goals/application/goal_reminder_sync_service.dart';
+import '../../features/analytics/data/analytics_repository.dart';
+import '../../features/analytics/data/isar_analytics_repository.dart';
 import '../../features/reminders/application/reminder_sync_service.dart';
 import '../../features/reminders/data/isar_reminder_repository.dart';
 import '../../features/reminders/data/reminder_cache_store.dart';
@@ -72,3 +74,7 @@ final reminderSyncServiceProvider = Provider<ReminderSyncService>(
 final goalReminderSyncServiceProvider = Provider<GoalReminderSyncService>(
   (ref) => GoalReminderSyncService(notifications: ref.read(localNotificationsServiceProvider)),
 );
+
+final analyticsRepositoryProvider = Provider<AnalyticsRepository>((ref) {
+  return IsarAnalyticsRepository(FirestoreAnalyticsRepository());
+});

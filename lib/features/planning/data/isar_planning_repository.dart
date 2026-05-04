@@ -275,6 +275,7 @@ class IsarPlanningRepository implements PlanningRepository {
       planDateKey: task.planDateKey,
       notes: task.notes,
       sequenceIndex: task.sequenceIndex,
+      isHabitAnchor: task.isHabitAnchor,
       strictModeRequired: task.strictModeRequired,
       modeRefId: task.modeRefId,
     );

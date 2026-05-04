@@ -4,10 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../add_task/presentation/add_task_screen.dart';
+import '../../analytics/application/analytics_event_logger.dart';
+import '../../analytics/domain/models/analytics_event.dart';
 import '../../planning/application/auto_next_task_flow.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
-import '../../planning/application/next_task_ranker.dart';
 import '../../planning/domain/models/accountability_log.dart';
 import '../../planning/domain/models/flow_transition_event.dart';
 import '../../planning/domain/models/task_item.dart';
@@ -33,9 +34,32 @@ PlannedTask _hubTaskWithOrderIndex(PlannedTaskRow row, int orderIndex) {
     planDateKey: t.planDateKey ?? row.dateKey,
     notes: t.notes,
     sequenceIndex: orderIndex,
+    isHabitAnchor: t.isHabitAnchor,
     strictModeRequired: t.strictModeRequired,
     modeRefId: t.modeRefId,
   );
+}
+
+enum _HubReorderLayer { habitAnchor, overdueScheduled, upcomingScheduled, flexible }
+
+_HubReorderLayer _layerForHubRow(PlannedTaskRow row, DateTime now) {
+  if (row.task.isHabitAnchor) {
+    return _HubReorderLayer.habitAnchor;
+  }
+  final iso = row.task.reminderTimeIso;
+  if (iso == null || iso.trim().isEmpty) {
+    return _HubReorderLayer.flexible;
+  }
+  final parsed = DateTime.tryParse(iso)?.toLocal();
+  if (parsed == null ||
+      parsed.year != now.year ||
+      parsed.month != now.month ||
+      parsed.day != now.day) {
+    return _HubReorderLayer.flexible;
+  }
+  return parsed.isBefore(now)
+      ? _HubReorderLayer.overdueScheduled
+      : _HubReorderLayer.upcomingScheduled;
 }
 
 class TasksHubScreen extends ConsumerWidget {
@@ -76,15 +100,15 @@ class TasksHubScreen extends ConsumerWidget {
             tooltip: 'What next',
             icon: const Icon(Icons.play_circle_outline),
             onPressed: () async {
-              final rows = await readFreshTodayPlannedRows(ref);
-              final next = NextTaskRanker.chooseNext(rows);
+              final prioritized = await readFreshTodayPrioritizedRows(ref);
               if (!context.mounted) return;
-              if (next == null || next.task.status == TaskStatus.completed) {
+              if (prioritized.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('No open tasks available.')),
                 );
                 return;
               }
+              final next = prioritized.first.row;
               ref.read(activeExecutionTaskIdProvider.notifier).state = next.task.id;
               ref.read(activeExecutionTaskLabelProvider.notifier).state = next.task.title;
               await Navigator.pushNamed(
@@ -132,6 +156,26 @@ class TasksHubScreen extends ConsumerWidget {
                     buildDefaultDragHandles: true,
                     onReorder: (oldIndex, newIndex) async {
                       if (newIndex > oldIndex) newIndex--;
+                      final now = DateTime.now();
+                      final moved = rows[oldIndex];
+                      final movedLayer = _layerForHubRow(moved, now);
+                      final base = List<PlannedTaskRow>.from(rows)..removeAt(oldIndex);
+                      if (base.isNotEmpty) {
+                        final anchorIndex = newIndex.clamp(0, base.length - 1);
+                        final anchor = base[anchorIndex];
+                        final anchorLayer = _layerForHubRow(anchor, now);
+                        if (movedLayer != anchorLayer) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Reorder is allowed only within the same section (Habit Anchors, Overdue, Upcoming, or Flexible).',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+                      }
                       final copy = List<PlannedTaskRow>.from(rows);
                       final item = copy.removeAt(oldIndex);
                       copy.insert(newIndex, item);
@@ -228,9 +272,19 @@ Future<void> _completeFromHub(BuildContext context, WidgetRef ref, PlannedTaskRo
       planDateKey: t.planDateKey,
       notes: t.notes,
       sequenceIndex: t.sequenceIndex,
+      isHabitAnchor: t.isHabitAnchor,
       strictModeRequired: t.strictModeRequired,
       modeRefId: t.modeRefId,
     ),
+  );
+  fireAndForgetAnalyticsEvent(
+    ref,
+    type: AnalyticsEventType.taskCompleted,
+    entityId: t.id,
+    entityKind: 'task',
+    sourceSurface: 'tasks_hub',
+    idempotencyKey: 'task_completed_hub_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
+    modeRefId: t.modeRefId,
   );
   await ref.read(reminderSyncServiceProvider).markTaskStarted(t.id);
   invalidateTaskListProviders(ref);
