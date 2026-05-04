@@ -29,6 +29,7 @@ class PlannedTask {
     this.planDateKey,
     this.notes,
     this.sequenceIndex,
+    this.isHabitAnchor = false,
     this.strictModeRequired = false,
     this.modeRefId,
   });
@@ -51,6 +52,8 @@ class PlannedTask {
   final String? notes;
   /// Optional user-defined order inside block (used by V2 sequence flow).
   final int? sequenceIndex;
+  /// If true, this task behaves as a stable habit anchor in priority/overlap checks.
+  final bool isHabitAnchor;
   /// Whether strict mode policy should be enforced for this task.
   final bool strictModeRequired;
   /// Optional policy/mode config id reference used during execution.
@@ -95,6 +98,7 @@ class PlannedTask {
     if (planDateKey != null) 'planDateKey': planDateKey,
     if (notes != null) 'notes': notes,
     if (sequenceIndex != null) 'sequenceIndex': sequenceIndex,
+    'isHabitAnchor': isHabitAnchor,
     'strictModeRequired': strictModeRequired,
     if (modeRefId != null) 'modeRefId': modeRefId,
   };
@@ -116,6 +120,7 @@ class PlannedTask {
     planDateKey: map['planDateKey'] as String?,
     notes: map['notes'] as String?,
     sequenceIndex: (map['sequenceIndex'] as num?)?.toInt(),
+    isHabitAnchor: map['isHabitAnchor'] as bool? ?? false,
     strictModeRequired: map['strictModeRequired'] as bool? ?? false,
     modeRefId: map['modeRefId'] as String?,
   );

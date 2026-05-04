@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../planning/application/planned_task_collect.dart';
+import '../../planning/application/task_prioritizer.dart';
 import '../../planning/domain/models/task_item.dart';
 
 class ExecutionTaskItem {
@@ -29,9 +30,25 @@ final executionDayTasksProvider = FutureProvider<List<ExecutionTaskItem>>((
     DateKeys.todayKey(),
     enforceTaskPlanDate: true,
   );
+  final blockUrgencyById = <String, int>{};
+  final routinesById = <String>{};
+  for (final row in rows) {
+    routinesById.add(row.routineId);
+  }
+  for (final routineId in routinesById) {
+    final blocks = await planningRepo.getBlocks(routineId);
+    for (final b in blocks) {
+      blockUrgencyById[b.id] = b.urgencyScore;
+    }
+  }
+  final prioritized = prioritizePlannedTasks(
+    rows,
+    blockUrgencyById: blockUrgencyById,
+  );
 
   final items = <ExecutionTaskItem>[];
-  for (final row in rows) {
+  for (final prioritizedRow in prioritized) {
+    final row = prioritizedRow.row;
     final task = row.task;
     if (task.status == TaskStatus.notStarted ||
         task.status == TaskStatus.inProgress ||

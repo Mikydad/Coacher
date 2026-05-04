@@ -37,73 +37,78 @@ const IsarTaskSchema = CollectionSchema(
       name: r'durationMinutes',
       type: IsarType.long,
     ),
-    r'modeRefId': PropertySchema(
+    r'isHabitAnchor': PropertySchema(
       id: 4,
+      name: r'isHabitAnchor',
+      type: IsarType.bool,
+    ),
+    r'modeRefId': PropertySchema(
+      id: 5,
       name: r'modeRefId',
       type: IsarType.string,
     ),
     r'notes': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'notes',
       type: IsarType.string,
     ),
     r'orderIndex': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'orderIndex',
       type: IsarType.long,
     ),
     r'planDateKey': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'planDateKey',
       type: IsarType.string,
     ),
     r'priority': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'priority',
       type: IsarType.long,
     ),
     r'reminderEnabled': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'reminderEnabled',
       type: IsarType.bool,
     ),
     r'reminderTimeIso': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'reminderTimeIso',
       type: IsarType.string,
     ),
     r'routineId': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'routineId',
       type: IsarType.string,
     ),
     r'sequenceIndex': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'sequenceIndex',
       type: IsarType.long,
     ),
     r'statusName': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'statusName',
       type: IsarType.string,
     ),
     r'strictModeRequired': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'strictModeRequired',
       type: IsarType.bool,
     ),
     r'taskId': PropertySchema(
-      id: 15,
+      id: 16,
       name: r'taskId',
       type: IsarType.string,
     ),
     r'title': PropertySchema(
-      id: 16,
+      id: 17,
       name: r'title',
       type: IsarType.string,
     ),
     r'updatedAtMs': PropertySchema(
-      id: 17,
+      id: 18,
       name: r'updatedAtMs',
       type: IsarType.long,
     )
@@ -242,20 +247,21 @@ void _isarTaskSerialize(
   writer.writeString(offsets[1], object.category);
   writer.writeLong(offsets[2], object.createdAtMs);
   writer.writeLong(offsets[3], object.durationMinutes);
-  writer.writeString(offsets[4], object.modeRefId);
-  writer.writeString(offsets[5], object.notes);
-  writer.writeLong(offsets[6], object.orderIndex);
-  writer.writeString(offsets[7], object.planDateKey);
-  writer.writeLong(offsets[8], object.priority);
-  writer.writeBool(offsets[9], object.reminderEnabled);
-  writer.writeString(offsets[10], object.reminderTimeIso);
-  writer.writeString(offsets[11], object.routineId);
-  writer.writeLong(offsets[12], object.sequenceIndex);
-  writer.writeString(offsets[13], object.statusName);
-  writer.writeBool(offsets[14], object.strictModeRequired);
-  writer.writeString(offsets[15], object.taskId);
-  writer.writeString(offsets[16], object.title);
-  writer.writeLong(offsets[17], object.updatedAtMs);
+  writer.writeBool(offsets[4], object.isHabitAnchor);
+  writer.writeString(offsets[5], object.modeRefId);
+  writer.writeString(offsets[6], object.notes);
+  writer.writeLong(offsets[7], object.orderIndex);
+  writer.writeString(offsets[8], object.planDateKey);
+  writer.writeLong(offsets[9], object.priority);
+  writer.writeBool(offsets[10], object.reminderEnabled);
+  writer.writeString(offsets[11], object.reminderTimeIso);
+  writer.writeString(offsets[12], object.routineId);
+  writer.writeLong(offsets[13], object.sequenceIndex);
+  writer.writeString(offsets[14], object.statusName);
+  writer.writeBool(offsets[15], object.strictModeRequired);
+  writer.writeString(offsets[16], object.taskId);
+  writer.writeString(offsets[17], object.title);
+  writer.writeLong(offsets[18], object.updatedAtMs);
 }
 
 IsarTask _isarTaskDeserialize(
@@ -270,20 +276,21 @@ IsarTask _isarTaskDeserialize(
   object.createdAtMs = reader.readLong(offsets[2]);
   object.durationMinutes = reader.readLong(offsets[3]);
   object.id = id;
-  object.modeRefId = reader.readStringOrNull(offsets[4]);
-  object.notes = reader.readStringOrNull(offsets[5]);
-  object.orderIndex = reader.readLong(offsets[6]);
-  object.planDateKey = reader.readStringOrNull(offsets[7]);
-  object.priority = reader.readLong(offsets[8]);
-  object.reminderEnabled = reader.readBool(offsets[9]);
-  object.reminderTimeIso = reader.readStringOrNull(offsets[10]);
-  object.routineId = reader.readString(offsets[11]);
-  object.sequenceIndex = reader.readLongOrNull(offsets[12]);
-  object.statusName = reader.readString(offsets[13]);
-  object.strictModeRequired = reader.readBool(offsets[14]);
-  object.taskId = reader.readString(offsets[15]);
-  object.title = reader.readString(offsets[16]);
-  object.updatedAtMs = reader.readLong(offsets[17]);
+  object.isHabitAnchor = reader.readBool(offsets[4]);
+  object.modeRefId = reader.readStringOrNull(offsets[5]);
+  object.notes = reader.readStringOrNull(offsets[6]);
+  object.orderIndex = reader.readLong(offsets[7]);
+  object.planDateKey = reader.readStringOrNull(offsets[8]);
+  object.priority = reader.readLong(offsets[9]);
+  object.reminderEnabled = reader.readBool(offsets[10]);
+  object.reminderTimeIso = reader.readStringOrNull(offsets[11]);
+  object.routineId = reader.readString(offsets[12]);
+  object.sequenceIndex = reader.readLongOrNull(offsets[13]);
+  object.statusName = reader.readString(offsets[14]);
+  object.strictModeRequired = reader.readBool(offsets[15]);
+  object.taskId = reader.readString(offsets[16]);
+  object.title = reader.readString(offsets[17]);
+  object.updatedAtMs = reader.readLong(offsets[18]);
   return object;
 }
 
@@ -303,32 +310,34 @@ P _isarTaskDeserializeProp<P>(
     case 3:
       return (reader.readLong(offset)) as P;
     case 4:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 5:
       return (reader.readStringOrNull(offset)) as P;
     case 6:
-      return (reader.readLong(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 7:
-      return (reader.readStringOrNull(offset)) as P;
-    case 8:
       return (reader.readLong(offset)) as P;
-    case 9:
-      return (reader.readBool(offset)) as P;
-    case 10:
+    case 8:
       return (reader.readStringOrNull(offset)) as P;
-    case 11:
-      return (reader.readString(offset)) as P;
-    case 12:
-      return (reader.readLongOrNull(offset)) as P;
-    case 13:
-      return (reader.readString(offset)) as P;
-    case 14:
+    case 9:
+      return (reader.readLong(offset)) as P;
+    case 10:
       return (reader.readBool(offset)) as P;
-    case 15:
+    case 11:
+      return (reader.readStringOrNull(offset)) as P;
+    case 12:
       return (reader.readString(offset)) as P;
+    case 13:
+      return (reader.readLongOrNull(offset)) as P;
+    case 14:
+      return (reader.readString(offset)) as P;
+    case 15:
+      return (reader.readBool(offset)) as P;
     case 16:
       return (reader.readString(offset)) as P;
     case 17:
+      return (reader.readString(offset)) as P;
+    case 18:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1210,6 +1219,16 @@ extension IsarTaskQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterFilterCondition> isHabitAnchorEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isHabitAnchor',
+        value: value,
       ));
     });
   }
@@ -2640,6 +2659,18 @@ extension IsarTaskQuerySortBy on QueryBuilder<IsarTask, IsarTask, QSortBy> {
     });
   }
 
+  QueryBuilder<IsarTask, IsarTask, QAfterSortBy> sortByIsHabitAnchor() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isHabitAnchor', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterSortBy> sortByIsHabitAnchorDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isHabitAnchor', Sort.desc);
+    });
+  }
+
   QueryBuilder<IsarTask, IsarTask, QAfterSortBy> sortByModeRefId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'modeRefId', Sort.asc);
@@ -2872,6 +2903,18 @@ extension IsarTaskQuerySortThenBy
     });
   }
 
+  QueryBuilder<IsarTask, IsarTask, QAfterSortBy> thenByIsHabitAnchor() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isHabitAnchor', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterSortBy> thenByIsHabitAnchorDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isHabitAnchor', Sort.desc);
+    });
+  }
+
   QueryBuilder<IsarTask, IsarTask, QAfterSortBy> thenByModeRefId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'modeRefId', Sort.asc);
@@ -3070,6 +3113,12 @@ extension IsarTaskQueryWhereDistinct
     });
   }
 
+  QueryBuilder<IsarTask, IsarTask, QDistinct> distinctByIsHabitAnchor() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isHabitAnchor');
+    });
+  }
+
   QueryBuilder<IsarTask, IsarTask, QDistinct> distinctByModeRefId(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -3193,6 +3242,12 @@ extension IsarTaskQueryProperty
   QueryBuilder<IsarTask, int, QQueryOperations> durationMinutesProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'durationMinutes');
+    });
+  }
+
+  QueryBuilder<IsarTask, bool, QQueryOperations> isHabitAnchorProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isHabitAnchor');
     });
   }
 

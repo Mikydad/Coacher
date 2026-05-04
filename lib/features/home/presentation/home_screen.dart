@@ -12,6 +12,9 @@ import '../../planning/application/override_rules.dart';
 import '../../planning/application/auto_next_task_flow.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
+import '../../analytics/application/analytics_event_logger.dart';
+import '../../analytics/application/daily_analytics_providers.dart';
+import '../../analytics/domain/models/analytics_event.dart';
 import '../../planning/domain/models/accountability_log.dart';
 import '../../planning/domain/models/flow_transition_event.dart';
 import '../../planning/domain/models/block.dart';
@@ -31,6 +34,7 @@ import '../../goals/presentation/goal_detail_screen.dart';
 import '../../goals/presentation/goal_editor_screen.dart';
 import '../../goals/presentation/goal_selection_screen.dart';
 import '../../plan_tomorrow/presentation/plan_tomorrow_screen.dart';
+import '../../analytics/presentation/analytics_progress_screen.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 
 enum _PlansChangedAction { reshuffle, defer, skip }
@@ -46,10 +50,13 @@ class HomeScreen extends ConsumerWidget {
     final tasksAsync = ref.watch(todayAllTasksRowsProvider);
     final todaysGoalsAsync = ref.watch(todaysActiveGoalsProvider);
     final flowSnapshotAsync = ref.watch(homeFlowSnapshotProvider);
+    final analyticsBundleAsync = ref.watch(analyticsPeriodBundleProvider);
     final execState = ref.watch(executionControllerProvider);
-    final hasRunningFocusTask = execState.targetType == TimerSessionTargetType.task &&
+    final hasRunningFocusTask =
+        execState.targetType == TimerSessionTargetType.task &&
         execState.taskId.isNotEmpty &&
-        (execState.phase == ExecutionPhase.inProgress || execState.phase == ExecutionPhase.paused);
+        (execState.phase == ExecutionPhase.inProgress ||
+            execState.phase == ExecutionPhase.paused);
 
     return Scaffold(
       appBar: AppBar(
@@ -58,41 +65,22 @@ class HomeScreen extends ConsumerWidget {
           const _SyncFromCloudAction(),
           IconButton(
             tooltip: 'Accountability history',
-            onPressed: () => Navigator.pushNamed(context, AccountabilityHistoryScreen.routeName),
+            onPressed: () => Navigator.pushNamed(
+              context,
+              AccountabilityHistoryScreen.routeName,
+            ),
             icon: const Icon(Icons.history),
           ),
-          const Padding(padding: EdgeInsets.only(right: 16), child: Icon(Icons.notifications_none)),
+          const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: Icon(Icons.notifications_none),
+          ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _NeonCard(
-            child: Column(
-              children: [
-                const SizedBox(height: 8),
-                const Text('7', style: TextStyle(fontSize: 52, fontWeight: FontWeight.bold)),
-                const Text('DAY STREAK', style: TextStyle(letterSpacing: 2, color: Colors.white70)),
-                const SizedBox(height: 12),
-                const Text("Today's Progress", style: TextStyle(color: Colors.white70)),
-                const SizedBox(height: 6),
-                tasksAsync.when(
-                  data: (rows) {
-                    final completed = _completedForRows(rows, scores);
-                    final partial = _partialForRows(rows, scores);
-                    final doneCount = completed + partial;
-                    return Text(
-                      '$doneCount / ${rows.length} Tasks',
-                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
-                    );
-                  },
-                  loading: () => const Text('…', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700)),
-                  error: (Object? error, StackTrace? stackTrace) =>
-                      const Text('—', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700)),
-                ),
-              ],
-            ),
-          ),
+          const _HomeTopAnalyticsCard(),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -107,7 +95,8 @@ class HomeScreen extends ConsumerWidget {
                         ? FocusLaunchArgs(
                             taskId: execState.taskId,
                             taskLabel: execState.taskLabel,
-                            taskDurationMinutes: execState.targetDurationMinutes,
+                            taskDurationMinutes:
+                                execState.targetDurationMinutes,
                             autoOpenTimer: true,
                             autoStartDelaySeconds: 10,
                           )
@@ -120,7 +109,8 @@ class HomeScreen extends ConsumerWidget {
                 child: _ActionCircle(
                   icon: Icons.add,
                   label: 'ADD TASK',
-                  onTap: () => Navigator.pushNamed(context, AddTaskScreen.routeName),
+                  onTap: () =>
+                      Navigator.pushNamed(context, AddTaskScreen.routeName),
                 ),
               ),
               const SizedBox(width: 12),
@@ -128,18 +118,16 @@ class HomeScreen extends ConsumerWidget {
                 child: _ActionCircle(
                   icon: Icons.calendar_today,
                   label: 'PLAN\nTOMORROW',
-                  onTap: () => Navigator.pushNamed(context, PlanTomorrowScreen.routeName),
+                  onTap: () => Navigator.pushNamed(
+                    context,
+                    PlanTomorrowScreen.routeName,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
-          const Text('DAILY DISCIPLINE', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: const LinearProgressIndicator(value: 0.6, minHeight: 8),
-          ),
+          const _DailyDisciplineSection(),
           const SizedBox(height: 24),
           _NeonCard(
             child: flowSnapshotAsync.when(
@@ -148,12 +136,18 @@ class HomeScreen extends ConsumerWidget {
                 children: [
                   const Text(
                     'Flow now',
-                    style: TextStyle(color: Color(0xFF00E6FF), fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      color: Color(0xFF00E6FF),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Current block: ${flow.currentBlockLabel}',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -165,15 +159,25 @@ class HomeScreen extends ConsumerWidget {
                     FilledButton.icon(
                       onPressed: () {
                         final next = flow.nextTaskRow!.task;
-                        ref.read(activeExecutionTaskIdProvider.notifier).state = next.id;
-                        ref.read(activeExecutionTaskLabelProvider.notifier).state = next.title;
-                        Navigator.pushNamed(context, TimerSessionScreen.routeName);
+                        ref.read(activeExecutionTaskIdProvider.notifier).state =
+                            next.id;
+                        ref
+                                .read(activeExecutionTaskLabelProvider.notifier)
+                                .state =
+                            next.title;
+                        Navigator.pushNamed(
+                          context,
+                          TimerSessionScreen.routeName,
+                        );
                       },
                       icon: const Icon(Icons.play_arrow),
                       label: Text('What next: ${flow.nextTaskRow!.task.title}'),
                     )
                   else
-                    const Text('No next task suggestion yet.', style: TextStyle(color: Colors.white54)),
+                    const Text(
+                      'No next task suggestion yet.',
+                      style: TextStyle(color: Colors.white54),
+                    ),
                 ],
               ),
               loading: () => const Padding(
@@ -188,7 +192,13 @@ class HomeScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
-                Text('COACH INSIGHTS', style: TextStyle(color: Color(0xFF00E6FF), fontWeight: FontWeight.w700)),
+                Text(
+                  'COACH INSIGHTS',
+                  style: TextStyle(
+                    color: Color(0xFF00E6FF),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 SizedBox(height: 8),
                 Text(
                   "\"You've stayed focused for 4 hours today. That's 20% higher than your average.\"",
@@ -203,16 +213,29 @@ class HomeScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 InkWell(
-                  onTap: () => Navigator.pushNamed(context, TasksHubScreen.routeName),
+                  onTap: () =>
+                      Navigator.pushNamed(context, TasksHubScreen.routeName),
                   borderRadius: BorderRadius.circular(8),
                   child: Row(
                     children: [
                       const Expanded(
-                        child: Text("Today's Tasks", style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700)),
+                        child: Text(
+                          "Today's Tasks",
+                          style: TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.chevron_right, color: Colors.white54),
-                        onPressed: () => Navigator.pushNamed(context, TasksHubScreen.routeName),
+                        icon: const Icon(
+                          Icons.chevron_right,
+                          color: Colors.white54,
+                        ),
+                        onPressed: () => Navigator.pushNamed(
+                          context,
+                          TasksHubScreen.routeName,
+                        ),
                       ),
                     ],
                   ),
@@ -232,8 +255,11 @@ class HomeScreen extends ConsumerWidget {
                           _TaskItem(
                             title: row.task.title,
                             subtitle: _homeTaskSubtitle(row, scores),
-                            done: row.task.status == TaskStatus.completed || scores[row.task.id] == 100,
-                            partial: row.task.status != TaskStatus.completed &&
+                            done:
+                                row.task.status == TaskStatus.completed ||
+                                scores[row.task.id] == 100,
+                            partial:
+                                row.task.status != TaskStatus.completed &&
                                 scores[row.task.id] != null &&
                                 scores[row.task.id]! < 100,
                             onCheckedChange: (checked) {
@@ -243,7 +269,8 @@ class HomeScreen extends ConsumerWidget {
                                 _uncompleteTaskFromHome(context, ref, row);
                               }
                             },
-                            onPlansChanged: () => _openPlansChangedFlow(context, ref, row),
+                            onPlansChanged: () =>
+                                _openPlansChangedFlow(context, ref, row),
                           ),
                       ],
                     );
@@ -266,19 +293,31 @@ class HomeScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 InkWell(
-                  onTap: () => Navigator.pushNamed(context, GoalSelectionScreen.routeName),
+                  onTap: () => Navigator.pushNamed(
+                    context,
+                    GoalSelectionScreen.routeName,
+                  ),
                   borderRadius: BorderRadius.circular(8),
                   child: Row(
                     children: [
                       const Expanded(
                         child: Text(
                           "Today's goals",
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.chevron_right, color: Colors.white54),
-                        onPressed: () => Navigator.pushNamed(context, GoalSelectionScreen.routeName),
+                        icon: const Icon(
+                          Icons.chevron_right,
+                          color: Colors.white54,
+                        ),
+                        onPressed: () => Navigator.pushNamed(
+                          context,
+                          GoalSelectionScreen.routeName,
+                        ),
                       ),
                     ],
                   ),
@@ -301,10 +340,19 @@ class HomeScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 8),
                           TextButton.icon(
-                            onPressed: () => Navigator.pushNamed(context, GoalEditorScreen.routeName),
-                            icon: const Icon(Icons.add, size: 20, color: Color(0xFFB7FF00)),
+                            onPressed: () => Navigator.pushNamed(
+                              context,
+                              GoalEditorScreen.routeName,
+                            ),
+                            icon: const Icon(
+                              Icons.add,
+                              size: 20,
+                              color: Color(0xFFB7FF00),
+                            ),
                             label: const Text('Create a goal'),
-                            style: TextButton.styleFrom(foregroundColor: const Color(0xFFB7FF00)),
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFFB7FF00),
+                            ),
                           ),
                         ],
                       );
@@ -315,14 +363,24 @@ class HomeScreen extends ConsumerWidget {
                           _TodayGoalTile(
                             title: g.title,
                             subtitle: _homeGoalSubtitle(g),
-                            onTap: () => Navigator.pushNamed(context, GoalDetailScreen.routeName, arguments: g.id),
+                            onTap: () => Navigator.pushNamed(
+                              context,
+                              GoalDetailScreen.routeName,
+                              arguments: g.id,
+                            ),
                           ),
                       ],
                     );
                   },
                   loading: () => const Padding(
                     padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Center(child: SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2))),
+                    child: Center(
+                      child: SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
                   ),
                   error: (_, _) => Text(
                     'Could not load goals.',
@@ -330,6 +388,49 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _NeonCard(
+            child: analyticsBundleAsync.when(
+              data: (bundle) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'COACHING INSIGHTS',
+                    style: TextStyle(
+                      color: Color(0xFF00E6FF),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Goals/Habits today: ${(bundle.goalHabitDay.weightedCompletionRate * 100).round()}%',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tasks today: ${(bundle.taskDay.weightedCompletionRate * 100).round()}%',
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'This week: Goals/Habits ${(bundle.goalHabitWeek.weightedCompletionRate * 100).round()}% · Tasks ${(bundle.taskWeek.weightedCompletionRate * 100).round()}%',
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                ],
+              ),
+              loading: () => const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (_, _) => const Text(
+                'Could not load analytics insights.',
+                style: TextStyle(color: Colors.white54),
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -346,13 +447,16 @@ class HomeScreen extends ConsumerWidget {
               'Completed: … • Partial: …',
               style: TextStyle(color: Colors.white70),
             ),
-            error: (Object? error, StackTrace? stackTrace) => const SizedBox.shrink(),
+            error: (Object? error, StackTrace? stackTrace) =>
+                const SizedBox.shrink(),
           ),
           const SizedBox(height: 4),
           ValueListenableBuilder<int>(
             valueListenable: SyncService.instance.pendingCount,
             builder: (context, pending, _) => Text(
-              pending > 0 ? 'Pending sync operations: $pending' : 'All changes synced',
+              pending > 0
+                  ? 'Pending sync operations: $pending'
+                  : 'All changes synced',
               style: const TextStyle(color: Colors.white54),
             ),
           ),
@@ -364,11 +468,15 @@ class HomeScreen extends ConsumerWidget {
               minimumSize: const Size.fromHeight(56),
             ),
             onPressed: () {},
-            child: const Text("I'M DISTRACTED", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              "I'M DISTRACTED",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
           const SizedBox(height: 10),
           OutlinedButton(
-            onPressed: () => Navigator.pushNamed(context, FirebaseTestScreen.routeName),
+            onPressed: () =>
+                Navigator.pushNamed(context, FirebaseTestScreen.routeName),
             child: const Text('Open Firebase Test Screen'),
           ),
         ],
@@ -377,13 +485,23 @@ class HomeScreen extends ConsumerWidget {
         currentIndex: 0,
         type: BottomNavigationBarType.fixed,
         onTap: (index) {
-          if (index == 1) Navigator.pushNamed(context, GoalSelectionScreen.routeName);
-          if (index == 2) Navigator.pushNamed(context, FocusSelectionScreen.routeName);
+          if (index == 1) {
+            Navigator.pushNamed(context, GoalSelectionScreen.routeName);
+          }
+          if (index == 2) {
+            Navigator.pushNamed(context, AnalyticsProgressScreen.routeName);
+          }
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.track_changes), label: 'Goals'),
-          BottomNavigationBarItem(icon: Icon(Icons.trending_up), label: 'Progress'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.track_changes),
+            label: 'Goals',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.trending_up),
+            label: 'Progress',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'Community'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
@@ -392,8 +510,124 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
+class _HomeTopAnalyticsCard extends ConsumerWidget {
+  const _HomeTopAnalyticsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bundleAsync = ref.watch(analyticsPeriodBundleProvider);
+    return _NeonCard(
+      child: bundleAsync.when(
+        data: (bundle) => Column(
+          children: [
+            const SizedBox(height: 8),
+            Text(
+              '${bundle.goalHabitWeek.currentStreakDays}',
+              style: const TextStyle(fontSize: 52, fontWeight: FontWeight.bold),
+            ),
+            const Text(
+              'DAY STREAK',
+              style: TextStyle(letterSpacing: 2, color: Colors.white70),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              "Today's Progress",
+              style: TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${(bundle.goalHabitDay.weightedCompletionRate * 100).round()}% Goals/Habits',
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+        loading: () => const Padding(
+          padding: EdgeInsets.symmetric(vertical: 18),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+        error: (_, _) => const Column(
+          children: [
+            SizedBox(height: 8),
+            Text(
+              '0',
+              style: TextStyle(fontSize: 52, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              'DAY STREAK',
+              style: TextStyle(letterSpacing: 2, color: Colors.white70),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DailyDisciplineSection extends ConsumerWidget {
+  const _DailyDisciplineSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bundleAsync = ref.watch(analyticsPeriodBundleProvider);
+    return bundleAsync.when(
+      data: (bundle) {
+        final clamped = bundle.goalHabitWeek.weightedCompletionRate.clamp(
+          0.0,
+          1.0,
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'WEEKLY DISCIPLINE ${(clamped * 100).round()}%',
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(value: clamped, minHeight: 8),
+            ),
+          ],
+        );
+      },
+      loading: () => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'WEEKLY DISCIPLINE',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.all(Radius.circular(999)),
+            child: LinearProgressIndicator(value: 0, minHeight: 8),
+          ),
+        ],
+      ),
+      error: (_, _) => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'WEEKLY DISCIPLINE',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.all(Radius.circular(999)),
+            child: LinearProgressIndicator(value: 0, minHeight: 8),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ActionCircle extends StatelessWidget {
-  const _ActionCircle({required this.icon, required this.label, required this.onTap});
+  const _ActionCircle({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String label;
@@ -415,7 +649,11 @@ class _ActionCircle extends StatelessWidget {
           children: [
             Icon(icon, color: const Color(0xFFB7FF00)),
             const SizedBox(height: 8),
-            Text(label, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700)),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ],
         ),
       ),
@@ -424,7 +662,11 @@ class _ActionCircle extends StatelessWidget {
 }
 
 class _TodayGoalTile extends StatelessWidget {
-  const _TodayGoalTile({required this.title, required this.subtitle, required this.onTap});
+  const _TodayGoalTile({
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
 
   final String title;
   final String subtitle;
@@ -440,15 +682,28 @@ class _TodayGoalTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.track_changes_outlined, color: Color(0xFFB7FF00), size: 22),
+            const Icon(
+              Icons.track_changes_outlined,
+              color: Color(0xFFB7FF00),
+              size: 22,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(subtitle, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: Colors.white38, fontSize: 12),
+                  ),
                 ],
               ),
             ),
@@ -461,7 +716,9 @@ class _TodayGoalTile extends StatelessWidget {
 }
 
 String _homeGoalSubtitle(UserGoal g) {
-  final unit = g.measurementKind == MeasurementKind.custom && (g.customLabel?.isNotEmpty ?? false)
+  final unit =
+      g.measurementKind == MeasurementKind.custom &&
+          (g.customLabel?.isNotEmpty ?? false)
       ? g.customLabel!
       : g.measurementKind.displayLabel().toLowerCase();
   final suffix = switch ((g.periodMode, g.horizon)) {
@@ -470,8 +727,9 @@ String _homeGoalSubtitle(UserGoal g) {
     (_, GoalHorizon.monthly) => 'per day (in this month)',
     (_, GoalHorizon.daily) => 'per day',
   };
-  final value =
-      g.targetValue == g.targetValue.roundToDouble() ? g.targetValue.toInt().toString() : g.targetValue.toString();
+  final value = g.targetValue == g.targetValue.roundToDouble()
+      ? g.targetValue.toInt().toString()
+      : g.targetValue.toString();
   return '${GoalCategories.label(g.categoryId)} · $value $unit ($suffix)';
 }
 
@@ -514,7 +772,10 @@ class _TaskItem extends StatelessWidget {
       ),
       subtitle: subtitle == null
           ? null
-          : Text(subtitle!, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+          : Text(
+              subtitle!,
+              style: const TextStyle(color: Colors.white38, fontSize: 12),
+            ),
       trailing: IconButton(
         tooltip: 'Plans Changed?',
         icon: const Icon(Icons.swap_horiz, color: Colors.white54),
@@ -557,7 +818,10 @@ Future<void> _openPlansChangedFlow(
   if (!context.mounted) return;
   final routineForPolicy = await _routineForPlannedRow(ref, row);
   if (!context.mounted) return;
-  if (OverrideRules.requiresStrictOverrideConfirm(row.task, routine: routineForPolicy)) {
+  if (OverrideRules.requiresStrictOverrideConfirm(
+    row.task,
+    routine: routineForPolicy,
+  )) {
     final ok = await _confirmStrictOverride(context, row.task, action);
     if (ok != true) return;
   }
@@ -589,6 +853,7 @@ Future<void> _openPlansChangedFlow(
           explanation: '[Reshuffle] ${reason.note}',
         ),
         sequenceIndex: (t.sequenceIndex ?? t.orderIndex) + 100,
+        isHabitAnchor: t.isHabitAnchor,
         strictModeRequired: t.strictModeRequired,
         modeRefId: t.modeRefId,
       );
@@ -606,7 +871,9 @@ Future<void> _openPlansChangedFlow(
         priority: t.priority,
         orderIndex: t.orderIndex,
         reminderEnabled: t.reminderEnabled,
-        reminderTimeIso: t.reminderEnabled ? deferTime.toIso8601String() : t.reminderTimeIso,
+        reminderTimeIso: t.reminderEnabled
+            ? deferTime.toIso8601String()
+            : t.reminderTimeIso,
         status: TaskStatus.notStarted,
         createdAtMs: t.createdAtMs,
         updatedAtMs: now,
@@ -618,10 +885,22 @@ Future<void> _openPlansChangedFlow(
           explanation: '[Defer] ${reason.note}',
         ),
         sequenceIndex: (t.sequenceIndex ?? t.orderIndex) + 500,
+        isHabitAnchor: t.isHabitAnchor,
         strictModeRequired: t.strictModeRequired,
         modeRefId: t.modeRefId,
       );
       await planning.upsertTask(deferred);
+      fireAndForgetAnalyticsEvent(
+        ref,
+        type: AnalyticsEventType.taskDeferred,
+        entityId: t.id,
+        entityKind: 'task',
+        sourceSurface: 'home',
+        idempotencyKey:
+            'task_deferred_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
+        modeRefId: t.modeRefId,
+        reason: reason.note,
+      );
       nextUrgencyDelta = 20;
       break;
     case _PlansChangedAction.skip:
@@ -646,6 +925,7 @@ Future<void> _openPlansChangedFlow(
           explanation: '[Skip] ${reason.note}',
         ),
         sequenceIndex: t.sequenceIndex,
+        isHabitAnchor: t.isHabitAnchor,
         strictModeRequired: t.strictModeRequired,
         modeRefId: t.modeRefId,
       );
@@ -663,7 +943,10 @@ Future<void> _openPlansChangedFlow(
     }
   }
   if (currentBlock != null) {
-    final adjusted = (currentBlock.urgencyScore + nextUrgencyDelta).clamp(0, 100);
+    final adjusted = (currentBlock.urgencyScore + nextUrgencyDelta).clamp(
+      0,
+      100,
+    );
     await planning.upsertBlock(
       TaskBlock(
         id: currentBlock.id,
@@ -712,7 +995,9 @@ Future<void> _openPlansChangedFlow(
   invalidateTaskListProviders(ref);
   if (!context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('Updated "${t.title}" with ${action.name} decision.')),
+    SnackBar(
+      content: Text('Updated "${t.title}" with ${action.name} decision.'),
+    ),
   );
 }
 
@@ -744,19 +1029,23 @@ Future<bool?> _confirmStrictOverride(
             const SizedBox(height: 8),
             TextField(
               controller: confirmCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Type CONFIRM',
-              ),
+              decoration: const InputDecoration(labelText: 'Type CONFIRM'),
             ),
             if (errorText != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Text(errorText!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+                child: Text(
+                  errorText!,
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                ),
               ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () {
               if (!OverrideRules.isStrictConfirmInputValid(confirmCtrl.text)) {
@@ -782,57 +1071,73 @@ Future<({OverrideReasonCategory reason, String note})?> _promptOverrideReason(
   OverrideReasonCategory selectedReason = reasons.first;
   final noteCtrl = TextEditingController();
   String? errorText;
-  final choice = await showDialog<({OverrideReasonCategory reason, String note})>(
-    context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setState) => AlertDialog(
-        title: const Text('Why are plans changing?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            DropdownButtonFormField<OverrideReasonCategory>(
-              initialValue: selectedReason,
-              items: [
-                for (final r in reasons) DropdownMenuItem(value: r, child: Text(r.label)),
+  final choice =
+      await showDialog<({OverrideReasonCategory reason, String note})>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setState) => AlertDialog(
+            title: const Text('Why are plans changing?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<OverrideReasonCategory>(
+                  initialValue: selectedReason,
+                  items: [
+                    for (final r in reasons)
+                      DropdownMenuItem(value: r, child: Text(r.label)),
+                  ],
+                  onChanged: (v) =>
+                      setState(() => selectedReason = v ?? reasons.first),
+                  decoration: const InputDecoration(
+                    labelText: 'Reason category',
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: noteCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Logical reason (1-2 sentences)',
+                    hintText: 'Explain clearly why this is the best move now.',
+                  ),
+                ),
+                if (errorText != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      errorText!,
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
               ],
-              onChanged: (v) => setState(() => selectedReason = v ?? reasons.first),
-              decoration: const InputDecoration(labelText: 'Reason category'),
             ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: noteCtrl,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Logical reason (1-2 sentences)',
-                hintText: 'Explain clearly why this is the best move now.',
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
               ),
-            ),
-            if (errorText != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(errorText!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+              FilledButton(
+                onPressed: () {
+                  final note = noteCtrl.text.trim();
+                  try {
+                    FlowTransitionEvent.validateReasonNote(note);
+                  } catch (_) {
+                    setState(
+                      () => errorText = 'Give a clear reason in 1-2 sentences.',
+                    );
+                    return;
+                  }
+                  Navigator.pop(ctx, (reason: selectedReason, note: note));
+                },
+                child: const Text('Continue'),
               ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              final note = noteCtrl.text.trim();
-              try {
-                FlowTransitionEvent.validateReasonNote(note);
-              } catch (_) {
-                setState(() => errorText = 'Give a clear reason in 1-2 sentences.');
-                return;
-              }
-              Navigator.pop(ctx, (reason: selectedReason, note: note));
-            },
-            child: const Text('Continue'),
+            ],
           ),
-        ],
-      ),
-    ),
-  );
+        ),
+      );
   noteCtrl.dispose();
   return choice;
 }
@@ -911,7 +1216,8 @@ class _SyncFromCloudActionState extends State<_SyncFromCloudAction> {
         }
         return IconButton(
           tooltip: 'Sync from cloud',
-          onPressed: () => unawaited(SyncService.instance.syncFromRemote(force: true)),
+          onPressed: () =>
+              unawaited(SyncService.instance.syncFromRemote(force: true)),
           icon: const Icon(Icons.sync),
         );
       },
@@ -919,7 +1225,10 @@ class _SyncFromCloudActionState extends State<_SyncFromCloudAction> {
   }
 }
 
-Future<Routine?> _routineForPlannedRow(WidgetRef ref, PlannedTaskRow row) async {
+Future<Routine?> _routineForPlannedRow(
+  WidgetRef ref,
+  PlannedTaskRow row,
+) async {
   final planning = ref.read(planningRepositoryProvider);
   try {
     final routines = await planning.getRoutinesForDate(row.dateKey);
@@ -940,7 +1249,9 @@ String? _homeTaskSubtitle(PlannedTaskRow row, Map<String, int> scores) {
 int _completedForRows(List<PlannedTaskRow> rows, Map<String, int> scores) {
   var n = 0;
   for (final row in rows) {
-    if (row.task.status == TaskStatus.completed || scores[row.task.id] == 100) n++;
+    if (row.task.status == TaskStatus.completed || scores[row.task.id] == 100) {
+      n++;
+    }
   }
   return n;
 }
@@ -955,12 +1266,18 @@ int _partialForRows(List<PlannedTaskRow> rows, Map<String, int> scores) {
   return n;
 }
 
-Future<void> _completeTaskFromHome(BuildContext context, WidgetRef ref, PlannedTaskRow row) async {
+Future<void> _completeTaskFromHome(
+  BuildContext context,
+  WidgetRef ref,
+  PlannedTaskRow row,
+) async {
   final t = row.task;
   final routineForPolicy = await _routineForPlannedRow(ref, row);
   if (!context.mounted) return;
   if (OverrideRules.requiresMandatoryTimer(t, routine: routineForPolicy)) {
-    final sessions = await ref.read(executionRepositoryProvider).getSessionsForTask(t.id);
+    final sessions = await ref
+        .read(executionRepositoryProvider)
+        .getSessionsForTask(t.id);
     final ok = OverrideRules.hasSatisfiedMandatoryTimer(sessions);
     if (!ok) {
       if (!context.mounted) return;
@@ -972,8 +1289,14 @@ Future<void> _completeTaskFromHome(BuildContext context, WidgetRef ref, PlannedT
             'This task requires a completed timer session before marking done.\n\nTask: ${t.title}',
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Start timer')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Start timer'),
+            ),
           ],
         ),
       );
@@ -982,7 +1305,11 @@ Future<void> _completeTaskFromHome(BuildContext context, WidgetRef ref, PlannedT
         ref.read(activeExecutionTaskLabelProvider.notifier).state = t.title;
         ref
             .read(executionControllerProvider.notifier)
-            .setTask(id: t.id, label: t.title, durationMinutes: t.durationMinutes);
+            .setTask(
+              id: t.id,
+              label: t.title,
+              durationMinutes: t.durationMinutes,
+            );
         await Navigator.pushNamed(context, TimerSessionScreen.routeName);
       }
       return;
@@ -1007,13 +1334,26 @@ Future<void> _completeTaskFromHome(BuildContext context, WidgetRef ref, PlannedT
     planDateKey: t.planDateKey ?? row.dateKey,
     notes: t.notes,
     sequenceIndex: t.sequenceIndex,
+    isHabitAnchor: t.isHabitAnchor,
     strictModeRequired: t.strictModeRequired,
     modeRefId: t.modeRefId,
   );
   try {
     await planning.upsertTask(updated);
+    fireAndForgetAnalyticsEvent(
+      ref,
+      type: AnalyticsEventType.taskCompleted,
+      entityId: t.id,
+      entityKind: 'task',
+      sourceSurface: 'home',
+      idempotencyKey:
+          'task_completed_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
+      modeRefId: t.modeRefId,
+    );
     await ref.read(reminderSyncServiceProvider).markTaskStarted(t.id);
-    await ref.read(scoringControllerProvider).submit(taskId: t.id, completionPercent: 100);
+    await ref
+        .read(scoringControllerProvider)
+        .submit(taskId: t.id, completionPercent: 100);
     final prev = ref.read(scoredTaskStatusesProvider);
     ref.read(scoredTaskStatusesProvider.notifier).state = {...prev, t.id: 100};
     invalidateTaskListProviders(ref);
@@ -1026,7 +1366,9 @@ Future<void> _completeTaskFromHome(BuildContext context, WidgetRef ref, PlannedT
     );
   } catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not complete: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not complete: $e')));
     }
   }
 }
@@ -1042,7 +1384,11 @@ String _appendMoveReason({
   return '$existing\n$entry';
 }
 
-Future<void> _uncompleteTaskFromHome(BuildContext context, WidgetRef ref, PlannedTaskRow row) async {
+Future<void> _uncompleteTaskFromHome(
+  BuildContext context,
+  WidgetRef ref,
+  PlannedTaskRow row,
+) async {
   final t = row.task;
   final scoreMap = ref.read(scoredTaskStatusesProvider);
   final isDone = t.status == TaskStatus.completed || scoreMap[t.id] == 100;
@@ -1067,6 +1413,7 @@ Future<void> _uncompleteTaskFromHome(BuildContext context, WidgetRef ref, Planne
     planDateKey: t.planDateKey ?? row.dateKey,
     notes: t.notes,
     sequenceIndex: t.sequenceIndex,
+    isHabitAnchor: t.isHabitAnchor,
     strictModeRequired: t.strictModeRequired,
     modeRefId: t.modeRefId,
   );
@@ -1078,7 +1425,9 @@ Future<void> _uncompleteTaskFromHome(BuildContext context, WidgetRef ref, Planne
     invalidateTaskListProviders(ref);
   } catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not update task: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not update task: $e')));
     }
   }
 }

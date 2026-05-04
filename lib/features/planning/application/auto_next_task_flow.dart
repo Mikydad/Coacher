@@ -3,17 +3,32 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/utils/stable_id.dart';
+import '../../analytics/application/analytics_event_logger.dart';
+import '../../analytics/domain/models/analytics_event.dart';
 import '../../planning/domain/models/flow_transition_event.dart';
 import '../../planning/domain/models/routine.dart';
 import '../../planning/domain/models/task_item.dart';
 import '../../focus/presentation/focus_selection_screen.dart';
+import '../../reminders/domain/models/reminder_config.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 import 'extension_policy.dart';
-import 'next_task_ranker.dart';
+import 'habit_anchor_aggregator.dart';
 import 'planned_task_collect.dart';
 import 'planned_task_providers.dart';
+import 'task_prioritizer.dart';
 
 enum NextTaskDecision { startNow, extraTime, moveWithReason }
+
+PlannedTaskRow? pickNextAutoTaskFromPrioritized(
+  Iterable<PrioritizedTaskRow> prioritized, {
+  required String completedTaskId,
+}) {
+  for (final item in prioritized) {
+    if (item.row.task.id == completedTaskId) continue;
+    return item.row;
+  }
+  return null;
+}
 
 Future<void> runAutoNextTaskFlow(
   BuildContext context,
@@ -22,16 +37,36 @@ Future<void> runAutoNextTaskFlow(
   required int completionPercent,
 }) async {
   if (completionPercent != 100) return;
-  final rows = await readFreshTodayPlannedRows(ref);
+  final prioritized = await readFreshTodayPrioritizedRows(ref);
   if (!context.mounted) return;
-  final candidates = rows.where((r) => r.task.id != completedTaskId).toList();
-  final next = NextTaskRanker.chooseNext(candidates, preferUserSequence: true);
+  final next = pickNextAutoTaskFromPrioritized(
+    prioritized,
+    completedTaskId: completedTaskId,
+  );
   if (next == null) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Great work. No next task available right now.')),
     );
     return;
   }
+  final selectedNext = next;
+  String? conflictNotice;
+  final anchors = await readHabitAnchorsForDate(ref, dateKey: selectedNext.dateKey);
+  if (!context.mounted) return;
+  final now = DateTime.now();
+  final overlaps = findOverlappingHabitAnchorsForTask(
+    selectedNext.task,
+    anchors,
+    ignoredTaskId: selectedNext.task.id,
+  ).where((a) => a.startLocal.isAfter(now)).toList();
+  if (overlaps.isNotEmpty) {
+    final first = overlaps.first;
+    final time = TimeOfDay.fromDateTime(first.startLocal).format(context);
+    conflictNotice = overlaps.length == 1
+        ? 'Heads up: overlaps upcoming habit "${first.label}" at $time.'
+        : 'Heads up: overlaps ${overlaps.length} upcoming habit anchors.';
+  }
+  final conflictText = conflictNotice;
   final decision = await showDialog<NextTaskDecision>(
     context: context,
     barrierDismissible: false,
@@ -39,7 +74,20 @@ Future<void> runAutoNextTaskFlow(
       canPop: false,
       child: AlertDialog(
         title: const Text('Start next task?'),
-        content: Text('Next up: ${next.task.title}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Next up: ${selectedNext.task.title}'),
+            if (conflictText != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                conflictText,
+                style: const TextStyle(fontSize: 12, color: Colors.amberAccent),
+              ),
+            ],
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, NextTaskDecision.moveWithReason),
@@ -63,18 +111,27 @@ Future<void> runAutoNextTaskFlow(
       await ref.read(planningRepositoryProvider).logFlowTransitionEvent(
         FlowTransitionEvent(
           id: StableId.generate('flowev'),
-          taskId: next.task.id,
+          taskId: selectedNext.task.id,
           type: FlowTransitionType.startNow,
           createdAtMs: DateTime.now().millisecondsSinceEpoch,
         ),
       );
       if (!context.mounted) return;
-      ref.read(activeExecutionTaskIdProvider.notifier).state = next.task.id;
-      ref.read(activeExecutionTaskLabelProvider.notifier).state = next.task.title;
+      fireAndForgetAnalyticsEvent(
+        ref,
+        type: AnalyticsEventType.autoNextStarted,
+        entityId: selectedNext.task.id,
+        entityKind: 'task',
+        sourceSurface: 'auto_next',
+        idempotencyKey: 'auto_next_started_${selectedNext.task.id}_${DateTime.now().millisecondsSinceEpoch}',
+        modeRefId: selectedNext.task.modeRefId,
+      );
+      ref.read(activeExecutionTaskIdProvider.notifier).state = selectedNext.task.id;
+      ref.read(activeExecutionTaskLabelProvider.notifier).state = selectedNext.task.title;
       ref.read(executionControllerProvider.notifier).setTask(
-        id: next.task.id,
-        label: next.task.title,
-        durationMinutes: next.task.durationMinutes,
+        id: selectedNext.task.id,
+        label: selectedNext.task.title,
+        durationMinutes: selectedNext.task.durationMinutes,
       );
       await Navigator.pushNamed(
         context,
@@ -83,14 +140,14 @@ Future<void> runAutoNextTaskFlow(
       );
       return;
     case NextTaskDecision.extraTime:
-      final handled = await _handleExtraTime(context, ref, row: next);
+      final handled = await _handleExtraTime(context, ref, row: selectedNext);
       if (!context.mounted) return;
       if (handled) {
         await _returnToFocusList(context);
       }
       return;
     case NextTaskDecision.moveWithReason:
-      final handled = await _handleMoveWithReason(context, ref, row: next);
+      final handled = await _handleMoveWithReason(context, ref, row: selectedNext);
       if (!context.mounted) return;
       if (handled) {
         await _returnToFocusList(context);
@@ -164,6 +221,7 @@ Future<bool> _handleExtraTime(
       reflection: extension.reflection,
     ),
     sequenceIndex: t.sequenceIndex,
+    isHabitAnchor: t.isHabitAnchor,
     strictModeRequired: t.strictModeRequired,
     modeRefId: t.modeRefId,
   );
@@ -179,11 +237,15 @@ Future<bool> _handleExtraTime(
       createdAtMs: DateTime.now().millisecondsSinceEpoch,
     ),
   );
-  await ref.read(reminderSyncServiceProvider).markLogicalReasonProvided(row.task.id);
+  await _scheduleExtensionReminder(
+    ref,
+    row: row,
+    minutesFromNow: extraMinutes,
+  );
   invalidateTaskListProviders(ref);
   if (!context.mounted) return false;
   ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('Added $extraMinutes minutes to "${row.task.title}".')),
+    SnackBar(content: Text('Added $extraMinutes minutes and scheduled a reminder.')),
   );
   return true;
 }
@@ -202,80 +264,91 @@ Future<({int minutes, String reason, String? reflection})?> _promptExtensionRequ
   String? errorText;
   final result = await showDialog<({int minutes, String reason, String? reflection})>(
     context: context,
+    barrierDismissible: false,
     builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setState) => AlertDialog(
-        title: const Text('Request extra time'),
-        content: SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(ctx).size.height * 0.6,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<int>(
-                  initialValue: selectedMinutes,
-                  items: [
-                    for (final m in options) DropdownMenuItem(value: m, child: Text('+$m minutes')),
-                  ],
-                  onChanged: (v) => setState(() => selectedMinutes = v ?? options.first),
-                  decoration: InputDecoration(labelText: 'Allowed (max +$allowedMaxMinutes min)'),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  maxLines: 2,
-                  onChanged: (v) => reasonText = v,
-                  decoration: InputDecoration(
-                    labelText: requireReason ? 'Reason (required)' : 'Reason',
-                    hintText: 'Why do you need more time?',
+      builder: (ctx, setState) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: const Text('Request extra time'),
+          content: SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.6,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Extension requires a clear reason. Choose extra minutes and explain why.',
+                      style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.3),
+                    ),
                   ),
-                ),
-                if (requireReflection) ...[
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<int>(
+                    initialValue: selectedMinutes,
+                    items: [
+                      for (final m in options) DropdownMenuItem(value: m, child: Text('+$m minutes')),
+                    ],
+                    onChanged: (v) => setState(() => selectedMinutes = v ?? options.first),
+                    decoration: InputDecoration(labelText: 'Allowed (max +$allowedMaxMinutes min)'),
+                  ),
                   const SizedBox(height: 10),
                   TextField(
                     maxLines: 2,
-                    onChanged: (v) => reflectionText = v,
-                    decoration: const InputDecoration(
-                      labelText: 'What did you promise yourself? (required)',
-                      hintText: 'Short commitment reminder to stay aligned.',
+                    onChanged: (v) => reasonText = v,
+                    decoration: InputDecoration(
+                      labelText: requireReason ? 'Reason (required)' : 'Reason',
+                      hintText: 'Why do you need more time?',
                     ),
                   ),
+                  if (requireReflection) ...[
+                    const SizedBox(height: 10),
+                    TextField(
+                      maxLines: 2,
+                      onChanged: (v) => reflectionText = v,
+                      decoration: const InputDecoration(
+                        labelText: 'What did you promise yourself? (required)',
+                        hintText: 'Short commitment reminder to stay aligned.',
+                      ),
+                    ),
+                  ],
+                  if (errorText != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(errorText!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+                    ),
                 ],
-                if (errorText != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(errorText!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
-                  ),
-              ],
+              ),
             ),
           ),
+          actions: [
+            FilledButton(
+              onPressed: () {
+                final reason = reasonText.trim();
+                final reflection = reflectionText.trim();
+                if (requireReason && reason.isEmpty) {
+                  setState(() => errorText = 'Reason is required.');
+                  return;
+                }
+                if (requireReflection && reflection.isEmpty) {
+                  setState(() => errorText = 'Reflection is required.');
+                  return;
+                }
+                Navigator.pop(
+                  ctx,
+                  (
+                    minutes: selectedMinutes,
+                    reason: reason.isEmpty ? 'No reason provided' : reason,
+                    reflection: reflection.isEmpty ? null : reflection,
+                  ),
+                );
+              },
+              child: const Text('Approve extension'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              final reason = reasonText.trim();
-              final reflection = reflectionText.trim();
-              if (requireReason && reason.isEmpty) {
-                setState(() => errorText = 'Reason is required.');
-                return;
-              }
-              if (requireReflection && reflection.isEmpty) {
-                setState(() => errorText = 'Reflection is required.');
-                return;
-              }
-              Navigator.pop(
-                ctx,
-                (
-                  minutes: selectedMinutes,
-                  reason: reason.isEmpty ? 'No reason provided' : reason,
-                  reflection: reflection.isEmpty ? null : reflection,
-                ),
-              );
-            },
-            child: const Text('Approve extension'),
-          ),
-        ],
       ),
     ),
   );
@@ -376,6 +449,7 @@ Future<bool> _handleMoveWithReason(
       explanation: choice.note,
     ),
     sequenceIndex: (t.sequenceIndex ?? t.orderIndex) + 1000,
+    isHabitAnchor: t.isHabitAnchor,
     strictModeRequired: t.strictModeRequired,
     modeRefId: t.modeRefId,
   );
@@ -430,4 +504,50 @@ Future<void> _returnToFocusList(BuildContext context) async {
     FocusSelectionScreen.routeName,
     (route) => route.settings.name == FocusSelectionScreen.routeName,
   );
+}
+
+Future<void> _scheduleExtensionReminder(
+  WidgetRef ref, {
+  required PlannedTaskRow row,
+  required int minutesFromNow,
+}) async {
+  final now = DateTime.now();
+  final when = now.add(Duration(minutes: minutesFromNow)).toIso8601String();
+  final repo = ref.read(reminderRepositoryProvider);
+  final existing = await repo.listAllReminders();
+  ReminderConfig? current;
+  for (final reminder in existing) {
+    if (reminder.taskId == row.task.id) {
+      current = reminder;
+      break;
+    }
+  }
+
+  final upsert = current == null
+      ? ReminderConfig(
+          id: StableId.generate('reminder'),
+          taskId: row.task.id,
+          taskTitle: row.task.title,
+          enabled: true,
+          scheduledAtIso: when,
+          modeRefId: row.task.modeRefId,
+          blockUrgencyScore: 50,
+          pendingAction: false,
+          escalationLevel: 0,
+          emergencyBypass: false,
+          createdAtMs: now.millisecondsSinceEpoch,
+          updatedAtMs: now.millisecondsSinceEpoch,
+        )
+      : current.copyWith(
+          taskTitle: row.task.title,
+          enabled: true,
+          scheduledAtIso: when,
+          pendingAction: false,
+          escalationLevel: 0,
+          emergencyBypass: false,
+          nextPromptAtIso: null,
+          updatedAtMs: now.millisecondsSinceEpoch,
+        );
+  await repo.upsertReminder(upsert);
+  await ref.read(reminderSyncServiceProvider).scheduleFromCache();
 }

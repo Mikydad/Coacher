@@ -72,19 +72,22 @@ class _FirstLaunchGateState extends State<FirstLaunchGate> {
     if (!_ready) {
       // Default [Material] uses a light surface — reads as a "blank white screen"
       // with a tiny spinner. Match the app shell so launch reads as intentional loading.
-      return Material(
-        color: const Color(0xFF050806),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(color: Color(0xFFB7FF00)),
-              const SizedBox(height: 20),
-              const Text(
-                'Loading your plan…',
-                style: TextStyle(color: Colors.white70, fontSize: 15),
-              ),
-            ],
+      return const Directionality(
+        textDirection: TextDirection.ltr,
+        child: Material(
+          color: Color(0xFF050806),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: Color(0xFFB7FF00)),
+                SizedBox(height: 20),
+                Text(
+                  'Loading your plan…',
+                  style: TextStyle(color: Colors.white70, fontSize: 15),
+                ),
+              ],
+            ),
           ),
         ),
       );

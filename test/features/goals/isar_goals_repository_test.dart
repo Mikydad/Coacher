@@ -23,7 +23,7 @@ UserGoal _sampleGoal({required String id, required int updatedAtMs}) {
     targetValue: 60,
     intensity: 3,
     periodStartMs: 0,
-    periodEndMs: 10_000,
+    periodEndMs: 10000,
     reminderEnabled: false,
     createdAtMs: 1,
     updatedAtMs: updatedAtMs,

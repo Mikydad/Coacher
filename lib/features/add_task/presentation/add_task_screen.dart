@@ -5,7 +5,10 @@ import '../../../core/di/providers.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../planning/application/effective_task_mode.dart';
+import '../../planning/application/habit_anchor_aggregator.dart';
 import '../../planning/application/planned_task_providers.dart';
+import '../../analytics/application/analytics_event_logger.dart';
+import '../../analytics/domain/models/analytics_event.dart';
 import '../../planning/domain/models/routine.dart';
 import '../../planning/data/planning_repository.dart';
 import '../../planning/domain/add_task_duration.dart';
@@ -64,6 +67,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
   String? _category;
   bool _reminder = false;
   bool _focusSession = true;
+  bool _isHabitAnchor = false;
   DateTime _reminderTime = DateTime.now().add(const Duration(minutes: 10));
   bool _saving = false;
   bool _loaded = false;
@@ -213,6 +217,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
         }
         _modeRefId = loaded.modeRefId?.trim().isNotEmpty == true ? loaded.modeRefId! : 'flexible';
         _strictModeRequired = loaded.strictModeRequired;
+        _isHabitAnchor = loaded.isHabitAnchor;
         _modeUserCustomized = false;
         _loaded = true;
       });
@@ -288,9 +293,78 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
       planDateKey: planDateKey,
       notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       sequenceIndex: _loadedTask?.sequenceIndex,
+      isHabitAnchor: _isHabitAnchor,
       strictModeRequired: _strictModeRequired,
       modeRefId: modeRefId,
     );
+  }
+
+  Future<bool> _confirmOverlapIfNeeded(PlannedTask task, String planDateKey) async {
+    if (!task.reminderEnabled || task.reminderTimeIso == null) return true;
+    final anchors = await readHabitAnchorsForDate(ref, dateKey: planDateKey);
+    if (!mounted) return false;
+    final conflicts = findOverlappingHabitAnchorsForTask(
+      task,
+      anchors,
+      ignoredTaskId: _isEdit ? task.id : null,
+    );
+    if (conflicts.isEmpty) return true;
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Overlaps habit time'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'This task overlaps one or more habit anchors. Are you sure you want to continue?',
+            ),
+            const SizedBox(height: 10),
+            for (final c in conflicts.take(3))
+              Text(
+                '• ${c.label} (${_timeLabel(c.startLocal)}-${_timeLabel(c.endLocal)})'
+                ' ${c.source == HabitAnchorSource.goal ? '[Goal]' : '[Task Habit]'}',
+                style: const TextStyle(fontSize: 12, color: Colors.white70),
+              ),
+            if (conflicts.length > 3)
+              Text(
+                '• +${conflicts.length - 3} more',
+                style: const TextStyle(fontSize: 12, color: Colors.white54),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Change time'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Save anyway'),
+          ),
+        ],
+      ),
+    );
+    if (proceed == true) {
+      fireAndForgetAnalyticsEvent(
+        ref,
+        type: AnalyticsEventType.overlapOverride,
+        entityId: task.id,
+        entityKind: 'task',
+        sourceSurface: _isEdit ? 'add_task_edit' : 'add_task_create',
+        idempotencyKey:
+            'overlap_override_${task.id}_${task.reminderTimeIso ?? 'na'}_${conflicts.length}',
+        modeRefId: task.modeRefId,
+        reason: 'save_anyway_after_overlap_warning',
+      );
+    }
+    return proceed == true;
+  }
+
+  String _timeLabel(DateTime dt) {
+    final tod = TimeOfDay.fromDateTime(dt);
+    return tod.format(context);
   }
 
   Future<void> _onSave() async {
@@ -371,6 +445,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
         planDateKey: planKey,
         modeRefId: modeRefId,
       );
+      final proceed = await _confirmOverlapIfNeeded(task, planKey);
+      if (!proceed) return;
 
       await planning.upsertTask(task);
       await _persistReminder(
@@ -432,6 +508,16 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
                         ),
                       )
                       .toList(),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Habit Anchor'),
+                  subtitle: const Text(
+                    'Treat this as a stable habit time with top scheduling priority.',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  value: _isHabitAnchor,
+                  onChanged: (v) => setState(() => _isHabitAnchor = v),
                 ),
                 const SizedBox(height: 24),
                 const Text('EXECUTION MODE', style: TextStyle(letterSpacing: 2, color: Colors.white70)),

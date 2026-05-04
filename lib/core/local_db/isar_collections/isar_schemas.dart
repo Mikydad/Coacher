@@ -1,3 +1,5 @@
+import 'isar_analytics_event.dart';
+import 'isar_analytics_stats.dart';
 import 'isar_block.dart';
 import 'isar_goal.dart';
 import 'isar_reminder.dart';
@@ -9,6 +11,8 @@ const isarSchemaList = [
   IsarRoutineSchema,
   IsarBlockSchema,
   IsarTaskSchema,
+  IsarAnalyticsEventSchema,
+  IsarAnalyticsStatsSchema,
   IsarReminderSchema,
   IsarGoalSchema,
 ];

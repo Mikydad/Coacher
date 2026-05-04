@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
+import '../../analytics/application/analytics_event_logger.dart';
+import '../../analytics/application/daily_analytics_providers.dart';
+import '../../analytics/domain/models/analytics_event.dart';
 import '../application/goal_intensity_mode.dart';
 import '../application/goal_period_helpers.dart';
 import '../application/goals_providers.dart';
@@ -22,7 +25,9 @@ class GoalDetailScreen extends ConsumerWidget {
   static const routeName = '/goals/detail';
 
   String _targetLine(UserGoal g) {
-    final unit = g.measurementKind == MeasurementKind.custom && (g.customLabel?.isNotEmpty ?? false)
+    final unit =
+        g.measurementKind == MeasurementKind.custom &&
+            (g.customLabel?.isNotEmpty ?? false)
         ? g.customLabel!
         : g.measurementKind.displayLabel().toLowerCase();
     final suffix = switch (g.horizon) {
@@ -63,12 +68,21 @@ class GoalDetailScreen extends ConsumerWidget {
         final g = bundle.goal;
         final todayKey = DateKeys.todayKey();
         final inPeriod = GoalPeriodHelpers.isDateKeyInPeriod(g, todayKey);
-        final elapsed = GoalPeriodHelpers.daysElapsedInPeriodThrough(g, DateTime.now());
+        final elapsed = GoalPeriodHelpers.daysElapsedInPeriodThrough(
+          g,
+          DateTime.now(),
+        );
         final totalDays = GoalPeriodHelpers.totalCalendarDaysInPeriod(g);
         final metInPeriod = bundle.checkIns
-            .where((c) => c.metCommitment && GoalPeriodHelpers.isDateKeyInPeriod(g, c.dateKey))
+            .where(
+              (c) =>
+                  c.metCommitment &&
+                  GoalPeriodHelpers.isDateKeyInPeriod(g, c.dateKey),
+            )
             .length;
-        final doneMilestones = bundle.milestones.where((m) => m.completed).length;
+        final doneMilestones = bundle.milestones
+            .where((m) => m.completed)
+            .length;
         final totalMilestones = bundle.milestones.length;
         GoalCheckIn? todayCheckIn;
         for (final c in bundle.checkIns) {
@@ -88,7 +102,10 @@ class GoalDetailScreen extends ConsumerWidget {
                   const PopupMenuItem(value: 'edit', child: Text('Edit')),
                   if (g.status == GoalStatus.active) ...[
                     const PopupMenuItem(value: 'pause', child: Text('Pause')),
-                    const PopupMenuItem(value: 'complete', child: Text('Mark complete')),
+                    const PopupMenuItem(
+                      value: 'complete',
+                      child: Text('Mark complete'),
+                    ),
                   ],
                   if (g.status != GoalStatus.active)
                     const PopupMenuItem(value: 'reopen', child: Text('Reopen')),
@@ -117,8 +134,8 @@ class GoalDetailScreen extends ConsumerWidget {
                       g.status == GoalStatus.active
                           ? 'Active'
                           : g.status == GoalStatus.paused
-                              ? 'Paused'
-                              : 'Completed',
+                          ? 'Paused'
+                          : 'Completed',
                     ),
                   ),
                 ],
@@ -126,20 +143,37 @@ class GoalDetailScreen extends ConsumerWidget {
               const SizedBox(height: 12),
               Text(
                 GoalPeriodHelpers.formatPeriodSummary(g),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 4),
-              Text(_targetLine(g), style: const TextStyle(color: Colors.white70)),
+              Text(
+                _targetLine(g),
+                style: const TextStyle(color: Colors.white70),
+              ),
               const SizedBox(height: 20),
               if (g.status == GoalStatus.active && inPeriod) ...[
                 Text(
-                  todayCheckIn?.metCommitment == true ? 'You marked today done.' : 'Did you meet your commitment today?',
+                  todayCheckIn?.metCommitment == true
+                      ? 'You marked today done.'
+                      : 'Did you meet your commitment today?',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 FilledButton.tonal(
-                  onPressed: () => _toggleToday(context, ref, g, todayCheckIn?.metCommitment == true),
-                  child: Text(todayCheckIn?.metCommitment == true ? 'Undo today' : 'I did it today'),
+                  onPressed: () => _toggleToday(
+                    context,
+                    ref,
+                    g,
+                    todayCheckIn?.metCommitment == true,
+                  ),
+                  child: Text(
+                    todayCheckIn?.metCommitment == true
+                        ? 'Undo today'
+                        : 'I did it today',
+                  ),
                 ),
                 const SizedBox(height: 20),
               ],
@@ -156,12 +190,17 @@ class GoalDetailScreen extends ConsumerWidget {
                   style: const TextStyle(color: Colors.white70),
                 ),
                 LinearProgressIndicator(
-                  value: totalMilestones == 0 ? 0 : doneMilestones / totalMilestones,
+                  value: totalMilestones == 0
+                      ? 0
+                      : doneMilestones / totalMilestones,
                   minHeight: 6,
                 ),
                 const SizedBox(height: 16),
               ],
-              const Text('Actions', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+              const Text(
+                'Actions',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+              ),
               const SizedBox(height: 8),
               for (final a in bundle.actions)
                 ListTile(
@@ -172,7 +211,10 @@ class GoalDetailScreen extends ConsumerWidget {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  const Text('Milestones', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                  const Text(
+                    'Milestones',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                  ),
                   const Spacer(),
                   TextButton.icon(
                     onPressed: () => _addMilestoneDialog(context, ref, g.id),
@@ -182,7 +224,10 @@ class GoalDetailScreen extends ConsumerWidget {
                 ],
               ),
               if (bundle.milestones.isEmpty)
-                const Text('No milestones yet.', style: TextStyle(color: Colors.white54))
+                const Text(
+                  'No milestones yet.',
+                  style: TextStyle(color: Colors.white54),
+                )
               else
                 ...bundle.milestones.map(
                   (m) => _MilestoneTile(goalId: g.id, milestone: m),
@@ -194,7 +239,12 @@ class GoalDetailScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _toggleToday(BuildContext context, WidgetRef ref, UserGoal g, bool currentlyMet) async {
+  Future<void> _toggleToday(
+    BuildContext context,
+    WidgetRef ref,
+    UserGoal g,
+    bool currentlyMet,
+  ) async {
     final repo = ref.read(goalsRepositoryProvider);
     final todayKey = DateKeys.todayKey();
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -207,15 +257,35 @@ class GoalDetailScreen extends ConsumerWidget {
           updatedAtMs: now,
         ),
       );
+      fireAndForgetAnalyticsEvent(
+        ref,
+        type: !currentlyMet
+            ? AnalyticsEventType.habitCompleted
+            : AnalyticsEventType.habitSkipped,
+        entityId: g.id,
+        entityKind: 'habit',
+        sourceSurface: 'goal_detail',
+        idempotencyKey:
+            '${!currentlyMet ? 'habit_completed' : 'habit_skipped'}_${g.id}_$todayKey',
+      );
       invalidateGoals(ref, goalId: g.id);
+      ref.invalidate(dailyGoalHabitAnalyticsProvider(todayKey));
+      ref.invalidate(analyticsPeriodBundleProvider);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not update: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not update: $e')));
       }
     }
   }
 
-  Future<void> _onMenu(BuildContext context, WidgetRef ref, UserGoal g, String value) async {
+  Future<void> _onMenu(
+    BuildContext context,
+    WidgetRef ref,
+    UserGoal g,
+    String value,
+  ) async {
     final repo = ref.read(goalsRepositoryProvider);
     final now = DateTime.now().millisecondsSinceEpoch;
     switch (value) {
@@ -251,10 +321,18 @@ class GoalDetailScreen extends ConsumerWidget {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Delete goal?'),
-            content: Text('Remove “${g.title}” and all its actions, milestones, and check-ins?'),
+            content: Text(
+              'Remove “${g.title}” and all its actions, milestones, and check-ins?',
+            ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Delete'),
+              ),
             ],
           ),
         );
@@ -268,7 +346,11 @@ class GoalDetailScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _addMilestoneDialog(BuildContext context, WidgetRef ref, String gid) async {
+  Future<void> _addMilestoneDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String gid,
+  ) async {
     final ctrl = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
@@ -281,8 +363,14 @@ class GoalDetailScreen extends ConsumerWidget {
           onSubmitted: (_) => Navigator.pop(ctx, true),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Add')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Add'),
+          ),
         ],
       ),
     );
@@ -292,7 +380,9 @@ class GoalDetailScreen extends ConsumerWidget {
     if (title.isEmpty) return;
     final repo = ref.read(goalsRepositoryProvider);
     final existing = await repo.getMilestones(gid);
-    final nextIndex = existing.isEmpty ? 0 : existing.map((m) => m.orderIndex).reduce((a, b) => a > b ? a : b) + 1;
+    final nextIndex = existing.isEmpty
+        ? 0
+        : existing.map((m) => m.orderIndex).reduce((a, b) => a > b ? a : b) + 1;
     await repo.upsertMilestone(
       GoalMilestone(
         id: StableId.generate('gm'),
@@ -340,13 +430,21 @@ class _MilestoneTile extends ConsumerWidget {
               builder: (ctx) => AlertDialog(
                 title: const Text('Remove milestone?'),
                 actions: [
-                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                  FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Remove')),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Remove'),
+                  ),
                 ],
               ),
             );
             if (ok == true && context.mounted) {
-              await ref.read(goalsRepositoryProvider).deleteMilestone(goalId: goalId, milestoneId: milestone.id);
+              await ref
+                  .read(goalsRepositoryProvider)
+                  .deleteMilestone(goalId: goalId, milestoneId: milestone.id);
               invalidateGoals(ref, goalId: goalId);
             }
           },

@@ -28,6 +28,8 @@ class FirestorePaths {
   static String get accountabilityLogs => '$userRoot/accountabilityLogs';
 
   static String get goals => '$userRoot/goals';
+  static String get analyticsEvents => '$userRoot/analytics_events';
+  static String get analyticsStats => '$userRoot/analytics_stats';
 
   static String goalDocument(String goalId) => '$goals/$goalId';
 

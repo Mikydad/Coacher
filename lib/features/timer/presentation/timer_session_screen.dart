@@ -11,6 +11,8 @@ import '../../planning/application/auto_next_task_flow.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
 import '../../planning/domain/models/task_item.dart';
+import '../../analytics/application/analytics_event_logger.dart';
+import '../../analytics/domain/models/analytics_event.dart';
 import '../../scoring/application/scoring_controller.dart';
 import '../../scoring/presentation/score_task_dialog.dart';
 
@@ -46,7 +48,8 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
       _remainingAutoStartSeconds = secs;
       _autoStartTicker = Timer.periodic(const Duration(seconds: 1), (t) {
         final execState = ref.read(executionControllerProvider);
-        if (_autoStartCancelled || execState.phase != ExecutionPhase.notStarted) {
+        if (_autoStartCancelled ||
+            execState.phase != ExecutionPhase.notStarted) {
           t.cancel();
           return;
         }
@@ -73,8 +76,11 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
     final ctrl = ref.read(executionControllerProvider.notifier);
     if (execState.phase != ExecutionPhase.notStarted) return;
     ctrl.start();
-    if (execState.targetType == TimerSessionTargetType.task && execState.taskId.isNotEmpty) {
-      unawaited(ref.read(reminderSyncServiceProvider).markTaskStarted(execState.taskId));
+    if (execState.targetType == TimerSessionTargetType.task &&
+        execState.taskId.isNotEmpty) {
+      unawaited(
+        ref.read(reminderSyncServiceProvider).markTaskStarted(execState.taskId),
+      );
     }
     if (mounted) {
       setState(() {
@@ -88,7 +94,9 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
     required String activeLabel,
   }) async {
     final ctrl = ref.read(executionControllerProvider.notifier);
-    if (_isHandlingStopFlow || execState.phase == ExecutionPhase.notStarted) return;
+    if (_isHandlingStopFlow || execState.phase == ExecutionPhase.notStarted) {
+      return;
+    }
     if (mounted) {
       setState(() => _isHandlingStopFlow = true);
     } else {
@@ -115,6 +123,18 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
             completionPercent: result.completionPercent,
             reason: result.reason,
           );
+      fireAndForgetAnalyticsEvent(
+        ref,
+        type: result.completionPercent >= 100
+            ? AnalyticsEventType.taskCompleted
+            : AnalyticsEventType.taskDeferred,
+        entityId: execState.taskId,
+        entityKind: 'task',
+        sourceSurface: 'timer_session',
+        idempotencyKey:
+            '${result.completionPercent >= 100 ? 'task_completed' : 'task_deferred'}_${execState.taskId}_${DateTime.now().millisecondsSinceEpoch}',
+        reason: result.reason,
+      );
       await _syncTaskStatusFromScore(
         taskId: execState.taskId,
         completionPercent: result.completionPercent,
@@ -165,7 +185,9 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
     }
     if (row == null) return;
     final t = row.task;
-    final nextStatus = completionPercent >= 100 ? TaskStatus.completed : TaskStatus.partial;
+    final nextStatus = completionPercent >= 100
+        ? TaskStatus.completed
+        : TaskStatus.partial;
     if (t.status == nextStatus) return;
     final updated = PlannedTask(
       id: t.id,
@@ -184,6 +206,7 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
       planDateKey: t.planDateKey ?? row.dateKey,
       notes: t.notes,
       sequenceIndex: t.sequenceIndex,
+      isHabitAnchor: t.isHabitAnchor,
       strictModeRequired: t.strictModeRequired,
       modeRefId: t.modeRefId,
     );
@@ -204,16 +227,24 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
     final mins = elapsed.inMinutes.remainder(60).toString().padLeft(2, '0');
     final secs = elapsed.inSeconds.remainder(60).toString().padLeft(2, '0');
     final hrs = elapsed.inHours;
-    final timerText = hrs > 0 ? '${hrs.toString().padLeft(2, '0')}:$mins:$secs' : '$mins:$secs';
+    final timerText = hrs > 0
+        ? '${hrs.toString().padLeft(2, '0')}:$mins:$secs'
+        : '$mins:$secs';
 
     final showAutoStart =
-        execState.phase == ExecutionPhase.notStarted && !_autoStartCancelled && (_remainingAutoStartSeconds ?? 0) > 0;
-    final targetDuration = execState.targetType == TimerSessionTargetType.task &&
+        execState.phase == ExecutionPhase.notStarted &&
+        !_autoStartCancelled &&
+        (_remainingAutoStartSeconds ?? 0) > 0;
+    final targetDuration =
+        execState.targetType == TimerSessionTargetType.task &&
             execState.targetDurationMinutes != null
         ? Duration(minutes: execState.targetDurationMinutes!)
         : null;
     final shouldAutoStop =
-        running && targetDuration != null && elapsed >= targetDuration && !_isHandlingStopFlow;
+        running &&
+        targetDuration != null &&
+        elapsed >= targetDuration &&
+        !_isHandlingStopFlow;
     if (shouldAutoStop && !_autoStopQueued) {
       _autoStopQueued = true;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -232,13 +263,21 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
           builder: (context, constraints) => SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight - 40),
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight - 40,
+              ),
               child: Column(
                 children: [
                   const SizedBox(height: 24),
-                  const Text('PHASE', style: TextStyle(letterSpacing: 3, color: Colors.white70)),
+                  const Text(
+                    'PHASE',
+                    style: TextStyle(letterSpacing: 3, color: Colors.white70),
+                  ),
                   const SizedBox(height: 8),
-                  const Text('Deep Focus', style: TextStyle(fontSize: 54, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Deep Focus',
+                    style: TextStyle(fontSize: 54, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 30),
                   Container(
                     width: double.infinity,
@@ -246,25 +285,45 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                     decoration: BoxDecoration(
                       color: const Color(0xFF0B0D10),
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFF00E6FF).withValues(alpha: 0.4)),
+                      border: Border.all(
+                        color: const Color(0xFF00E6FF).withValues(alpha: 0.4),
+                      ),
                     ),
                     child: Column(
                       children: [
-                        Text(timerText, style: const TextStyle(fontSize: 86, fontWeight: FontWeight.w500)),
+                        Text(
+                          timerText,
+                          style: const TextStyle(
+                            fontSize: 86,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFF1F2026),
                             borderRadius: BorderRadius.circular(999),
                           ),
-                          child: Text(running ? 'FOCUS ACTIVE' : paused ? 'PAUSED' : 'READY'),
+                          child: Text(
+                            running
+                                ? 'FOCUS ACTIVE'
+                                : paused
+                                ? 'PAUSED'
+                                : 'READY',
+                          ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 26),
-                  const Text('Currently engaged in', style: TextStyle(color: Colors.white70)),
+                  const Text(
+                    'Currently engaged in',
+                    style: TextStyle(color: Colors.white70),
+                  ),
                   const SizedBox(height: 8),
                   Container(
                     width: double.infinity,
@@ -276,14 +335,20 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                     child: Text(
                       activeLabel,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 34, fontStyle: FontStyle.italic),
+                      style: const TextStyle(
+                        fontSize: 34,
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
                   ),
                   if (showAutoStart) ...[
                     const SizedBox(height: 12),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF1F2026),
                         borderRadius: BorderRadius.circular(12),
@@ -318,8 +383,12 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                         child: FilledButton.icon(
                           style: FilledButton.styleFrom(
                             minimumSize: const Size.fromHeight(60),
-                            backgroundColor: running ? const Color(0xFF2B2D31) : const Color(0xFFB7FF00),
-                            foregroundColor: running ? Colors.white : Colors.black,
+                            backgroundColor: running
+                                ? const Color(0xFF2B2D31)
+                                : const Color(0xFFB7FF00),
+                            foregroundColor: running
+                                ? Colors.white
+                                : Colors.black,
                           ),
                           onPressed: () {
                             if (running) {
@@ -332,8 +401,18 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                               _startSession(execState);
                             }
                           },
-                          icon: Icon(running ? Icons.pause_circle_outline : Icons.play_arrow_rounded),
-                          label: Text(running ? 'Pause' : paused ? 'Resume' : 'Start'),
+                          icon: Icon(
+                            running
+                                ? Icons.pause_circle_outline
+                                : Icons.play_arrow_rounded,
+                          ),
+                          label: Text(
+                            running
+                                ? 'Pause'
+                                : paused
+                                ? 'Resume'
+                                : 'Start',
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -344,11 +423,18 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                             backgroundColor: const Color(0xFF2B2D31),
                             foregroundColor: Colors.white,
                           ),
-                          onPressed: execState.phase == ExecutionPhase.notStarted || _isHandlingStopFlow
+                          onPressed:
+                              execState.phase == ExecutionPhase.notStarted ||
+                                  _isHandlingStopFlow
                               ? null
-                              : () => _handleStopFlow(execState: execState, activeLabel: activeLabel),
+                              : () => _handleStopFlow(
+                                  execState: execState,
+                                  activeLabel: activeLabel,
+                                ),
                           icon: const Icon(Icons.stop_circle_outlined),
-                          label: Text(_isHandlingStopFlow ? 'Saving...' : 'Stop'),
+                          label: Text(
+                            _isHandlingStopFlow ? 'Saving...' : 'Stop',
+                          ),
                         ),
                       ),
                     ],

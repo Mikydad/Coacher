@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:isar/isar.dart';
 
 import '../../features/goals/domain/models/user_goal.dart';
+import '../../features/analytics/domain/models/analytics_event.dart';
+import '../../features/analytics/domain/models/analytics_stats_cache.dart';
 import '../../features/planning/domain/models/block.dart';
 import '../../features/planning/domain/models/routine.dart';
 import '../../features/planning/domain/models/task_item.dart';
@@ -11,6 +13,8 @@ import '../../features/reminders/domain/models/reminder_config.dart';
 import '../firebase/firestore_client.dart';
 import '../firebase/firestore_paths.dart';
 import '../local_db/isar_collections/isar_block.dart';
+import '../local_db/isar_collections/isar_analytics_event.dart';
+import '../local_db/isar_collections/isar_analytics_stats.dart';
 import '../local_db/isar_collections/isar_goal.dart';
 import '../local_db/isar_collections/isar_reminder.dart';
 import '../local_db/isar_collections/isar_routine.dart';
@@ -39,6 +43,7 @@ class RemoteIsarMerge {
     await _pullRoutinesBlocksTasks();
     await _pullReminders();
     await _pullGoals();
+    await _pullAnalytics();
     debugPrint('RemoteIsarMerge: pull finished');
   }
 
@@ -117,6 +122,32 @@ class RemoteIsarMerge {
     }
   }
 
+  Future<void> _pullAnalytics() async {
+    final eventsSnap = await FirebaseFirestore.instance.collection(FirestorePaths.analyticsEvents).get();
+    for (final doc in eventsSnap.docs) {
+      try {
+        final m = Map<String, dynamic>.from(doc.data());
+        m['id'] = _docFieldId(doc, m);
+        final event = AnalyticsEvent.fromMap(m);
+        await _mergeAnalyticsEvent(event);
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip analytics event ${doc.id}: $e\n$st');
+      }
+    }
+
+    final statsSnap = await FirebaseFirestore.instance.collection(FirestorePaths.analyticsStats).get();
+    for (final doc in statsSnap.docs) {
+      try {
+        final m = Map<String, dynamic>.from(doc.data());
+        m['id'] = _docFieldId(doc, m);
+        final stats = AnalyticsStatsCache.fromMap(m);
+        await _mergeAnalyticsStats(stats);
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip analytics stats ${doc.id}: $e\n$st');
+      }
+    }
+  }
+
   Future<void> _mergeRoutine(Routine incoming) async {
     final existing = await _isar.isarRoutines.filter().routineIdEqualTo(incoming.id).findFirst();
     if (!shouldApplyRemoteUpdatedAt(
@@ -168,6 +199,32 @@ class RemoteIsarMerge {
     }
     await _isar.writeTxn(() async {
       await _isar.isarGoals.putByGoalId(IsarGoal.fromDomain(incoming));
+    });
+  }
+
+  Future<void> _mergeAnalyticsEvent(AnalyticsEvent incoming) async {
+    final existing = await _isar.isarAnalyticsEvents.filter().eventIdEqualTo(incoming.id).findFirst();
+    if (!shouldApplyRemoteUpdatedAt(
+      localUpdatedAtMs: existing?.updatedAtMs,
+      remoteUpdatedAtMs: incoming.updatedAtMs,
+    )) {
+      return;
+    }
+    await _isar.writeTxn(() async {
+      await _isar.isarAnalyticsEvents.putByEventId(IsarAnalyticsEvent.fromDomain(incoming));
+    });
+  }
+
+  Future<void> _mergeAnalyticsStats(AnalyticsStatsCache incoming) async {
+    final existing = await _isar.isarAnalyticsStats.filter().statsIdEqualTo(incoming.id).findFirst();
+    if (!shouldApplyRemoteUpdatedAt(
+      localUpdatedAtMs: existing?.updatedAtMs,
+      remoteUpdatedAtMs: incoming.updatedAtMs,
+    )) {
+      return;
+    }
+    await _isar.writeTxn(() async {
+      await _isar.isarAnalyticsStats.putByStatsId(IsarAnalyticsStats.fromDomain(incoming));
     });
   }
 }

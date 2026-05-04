@@ -34,6 +34,7 @@ class IsarTask {
   String? category;
   String? notes;
   int? sequenceIndex;
+  bool isHabitAnchor = false;
   late bool strictModeRequired;
   String? modeRefId;
 
@@ -55,6 +56,7 @@ class IsarTask {
       ..category = t.category
       ..notes = t.notes
       ..sequenceIndex = t.sequenceIndex
+      ..isHabitAnchor = t.isHabitAnchor
       ..strictModeRequired = t.strictModeRequired
       ..modeRefId = t.modeRefId;
   }
@@ -77,6 +79,7 @@ class IsarTask {
       planDateKey: planDateKey,
       notes: notes,
       sequenceIndex: sequenceIndex,
+      isHabitAnchor: isHabitAnchor,
       strictModeRequired: strictModeRequired,
       modeRefId: modeRefId,
     );
