@@ -20,6 +20,8 @@ class AnalyticsPeriodBundle {
     required this.taskWeek,
     required this.goalHabitMonth,
     required this.taskMonth,
+    this.goalHabitWeekSeries = const [],
+    this.taskWeekSeries = const [],
   });
 
   final DailyAnalyticsSnapshot goalHabitDay;
@@ -28,6 +30,8 @@ class AnalyticsPeriodBundle {
   final RollupAnalyticsSnapshot taskWeek;
   final RollupAnalyticsSnapshot goalHabitMonth;
   final RollupAnalyticsSnapshot taskMonth;
+  final List<double> goalHabitWeekSeries;
+  final List<double> taskWeekSeries;
 }
 
 String _statsId({required String scopeType, required String dateKey}) =>
@@ -237,5 +241,11 @@ final analyticsPeriodBundleProvider = FutureProvider<AnalyticsPeriodBundle>((
       now: now,
     ),
     taskMonth: rollupDailyAnalytics(snapshots: monthTaskRange, now: now),
+    goalHabitWeekSeries: weekGoalHabitRange
+        .map((d) => d.weightedCompletionRate.clamp(0.0, 1.0))
+        .toList(),
+    taskWeekSeries: weekTaskRange
+        .map((d) => d.weightedCompletionRate.clamp(0.0, 1.0))
+        .toList(),
   );
 });

@@ -510,37 +510,174 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _HomeTopAnalyticsCard extends ConsumerWidget {
+class _HomeTopAnalyticsCard extends ConsumerStatefulWidget {
   const _HomeTopAnalyticsCard();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_HomeTopAnalyticsCard> createState() =>
+      _HomeTopAnalyticsCardState();
+}
+
+class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
+    with TickerProviderStateMixin {
+  late final AnimationController _introController;
+  late final AnimationController _milestonePopController;
+  late final Animation<double> _introCurve;
+  late final Animation<double> _sparklineCurve;
+  late final Animation<double> _popScale;
+
+  bool _introPlayed = false;
+  int? _previousStreak;
+
+  @override
+  void initState() {
+    super.initState();
+    _introController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 850),
+    );
+    _milestonePopController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+    );
+    _introCurve = CurvedAnimation(
+      parent: _introController,
+      curve: Curves.easeOutCubic,
+    );
+    _sparklineCurve = CurvedAnimation(
+      parent: _introController,
+      curve: const Interval(0.35, 1.0, curve: Curves.easeOutCubic),
+    );
+    _popScale = Tween<double>(begin: 1.0, end: 1.12).animate(
+      CurvedAnimation(
+        parent: _milestonePopController,
+        curve: Curves.easeOutBack,
+        reverseCurve: Curves.easeInOut,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _introController.dispose();
+    _milestonePopController.dispose();
+    super.dispose();
+  }
+
+  Color _scoreAccent(int scorePercent) {
+    if (scorePercent >= 80) return const Color(0xFFB7FF00);
+    if (scorePercent >= 50) return const Color(0xFFFFD54F);
+    return const Color(0xFFFF6D4E);
+  }
+
+  void _handleMilestones({required int streak, required int scorePercent}) {
+    if (!_introPlayed) {
+      _introPlayed = true;
+      _previousStreak = streak;
+      _introController.forward(from: 0);
+      return;
+    }
+    if (_previousStreak != null && streak > _previousStreak!) {
+      _milestonePopController
+          .forward(from: 0)
+          .then((_) => _milestonePopController.reverse());
+    }
+    _previousStreak = streak;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final bundleAsync = ref.watch(analyticsPeriodBundleProvider);
     return _NeonCard(
       child: bundleAsync.when(
-        data: (bundle) => Column(
-          children: [
-            const SizedBox(height: 8),
-            Text(
-              '${bundle.goalHabitWeek.currentStreakDays}',
-              style: const TextStyle(fontSize: 52, fontWeight: FontWeight.bold),
-            ),
-            const Text(
-              'DAY STREAK',
-              style: TextStyle(letterSpacing: 2, color: Colors.white70),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              "Today's Progress",
-              style: TextStyle(color: Colors.white70),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '${(bundle.goalHabitDay.weightedCompletionRate * 100).round()}% Goals/Habits',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-            ),
-          ],
-        ),
+        data: (bundle) {
+          final streak = bundle.goalHabitWeek.currentStreakDays;
+          final scorePercent =
+              (bundle.goalHabitDay.weightedCompletionRate * 100).round();
+          _handleMilestones(streak: streak, scorePercent: scorePercent);
+          return AnimatedBuilder(
+            animation: Listenable.merge([
+              _introController,
+              _milestonePopController,
+            ]),
+            builder: (context, _) {
+              final introValue = _introController.isAnimating
+                  ? _introCurve.value
+                  : 1.0;
+              final displayStreak = _introController.isAnimating
+                  ? (streak * introValue).round()
+                  : streak;
+              final displayScore = _introController.isAnimating
+                  ? (scorePercent * introValue).round()
+                  : scorePercent;
+              final sparkProgress = _introController.isAnimating
+                  ? _sparklineCurve.value
+                  : 1.0;
+              return Column(
+                children: [
+                  const SizedBox(height: 8),
+                  Transform.scale(
+                    scale: _popScale.value,
+                    child: Text(
+                      '$displayStreak',
+                      style: const TextStyle(
+                        fontSize: 52,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const Text(
+                    'DAY STREAK',
+                    style: TextStyle(letterSpacing: 2, color: Colors.white70),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    "Today's Progress",
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 6),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 320),
+                    curve: Curves.easeOutCubic,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      color: _scoreAccent(scorePercent).withAlpha(24),
+                      border: Border.all(
+                        color: _scoreAccent(scorePercent).withAlpha(110),
+                      ),
+                    ),
+                    child: Text(
+                      '$displayScore% Goals/Habits',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: _scoreAccent(scorePercent),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '7-day trend',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  _MiniSparkline(
+                    valuesA: bundle.goalHabitWeekSeries,
+                    valuesB: bundle.taskWeekSeries,
+                    drawProgress: sparkProgress,
+                  ),
+                ],
+              );
+            },
+          );
+        },
         loading: () => const Padding(
           padding: EdgeInsets.symmetric(vertical: 18),
           child: Center(child: CircularProgressIndicator()),
@@ -619,6 +756,123 @@ class _DailyDisciplineSection extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+class _MiniSparkline extends StatelessWidget {
+  const _MiniSparkline({
+    required this.valuesA,
+    required this.valuesB,
+    this.drawProgress = 1.0,
+  });
+
+  final List<double> valuesA;
+  final List<double> valuesB;
+  final double drawProgress;
+
+  @override
+  Widget build(BuildContext context) {
+    final a = valuesA.length >= 7
+        ? valuesA.sublist(valuesA.length - 7)
+        : [...List<double>.filled(7 - valuesA.length, 0), ...valuesA];
+    final b = valuesB.length >= 7
+        ? valuesB.sublist(valuesB.length - 7)
+        : [...List<double>.filled(7 - valuesB.length, 0), ...valuesB];
+    return SizedBox(
+      height: 44,
+      child: CustomPaint(
+        painter: _SparklinePainter(
+          a: a,
+          b: b,
+          drawProgress: drawProgress.clamp(0.0, 1.0),
+        ),
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+class _SparklinePainter extends CustomPainter {
+  _SparklinePainter({
+    required this.a,
+    required this.b,
+    required this.drawProgress,
+  });
+
+  final List<double> a;
+  final List<double> b;
+  final double drawProgress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final base = Paint()
+      ..color = const Color(0x33FFFFFF)
+      ..strokeWidth = 1;
+    canvas.drawLine(
+      Offset(0, size.height),
+      Offset(size.width, size.height),
+      base,
+    );
+
+    _drawSeries(canvas, size, a, const Color(0xFFB7FF00), drawProgress);
+    _drawSeries(canvas, size, b, const Color(0xFF00E6FF), drawProgress);
+  }
+
+  void _drawSeries(
+    Canvas canvas,
+    Size size,
+    List<double> values,
+    Color color,
+    double progress,
+  ) {
+    if (values.isEmpty) return;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    final path = Path();
+    final maxPoint = (values.length - 1) * progress;
+    final fullPoints = maxPoint.floor();
+    for (var i = 0; i <= fullPoints && i < values.length; i++) {
+      final x = values.length == 1
+          ? 0.0
+          : (size.width * i / (values.length - 1));
+      final y = size.height - (values[i].clamp(0.0, 1.0) * size.height);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    final hasFractional = fullPoints < values.length - 1;
+    if (hasFractional) {
+      final t = maxPoint - fullPoints;
+      final i0 = fullPoints;
+      final i1 = fullPoints + 1;
+      final x0 = values.length == 1
+          ? 0.0
+          : (size.width * i0 / (values.length - 1));
+      final y0 = size.height - (values[i0].clamp(0.0, 1.0) * size.height);
+      final x1 = values.length == 1
+          ? 0.0
+          : (size.width * i1 / (values.length - 1));
+      final y1 = size.height - (values[i1].clamp(0.0, 1.0) * size.height);
+      final xf = x0 + (x1 - x0) * t;
+      final yf = y0 + (y1 - y0) * t;
+      if (fullPoints == 0 && progress <= 0.0001) {
+        path.moveTo(x0, y0);
+      }
+      path.lineTo(xf, yf);
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SparklinePainter oldDelegate) {
+    return oldDelegate.a != a ||
+        oldDelegate.b != b ||
+        oldDelegate.drawProgress != drawProgress;
   }
 }
 
