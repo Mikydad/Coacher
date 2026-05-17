@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../application/ai_summary_providers.dart';
+import '../application/delivery_providers.dart';
+import '../application/focus_providers.dart';
 import '../application/daily_analytics_engine.dart';
 import '../application/daily_analytics_providers.dart';
+import '../application/insight_generation_providers.dart';
+import 'coaching_focus_card.dart';
+import 'coaching_insight_copy.dart';
+import '../domain/models/ai_summary_response.dart';
+import '../domain/models/delivery_decision.dart';
+import '../domain/models/generated_insight.dart';
 
 class AnalyticsProgressScreen extends ConsumerStatefulWidget {
   const AnalyticsProgressScreen({super.key});
@@ -74,11 +83,54 @@ class _AnalyticsProgressScreenState
   @override
   Widget build(BuildContext context) {
     final bundleAsync = ref.watch(analyticsPeriodBundleProvider);
+    final progressDecisionAsync = ref.watch(layer4TodayProgressDecisionProvider);
+    final insightsAsync = ref.watch(layer3TodayDeliveryInsightsProvider);
+    final layer3RunAsync = ref.watch(layer3TodayRunMetadataProvider);
+    final layer4RunAsync = ref.watch(layer4TodayRunMetadataProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Progress')),
+      appBar: AppBar(
+        title: const Text('Progress'),
+        actions: [
+          IconButton(
+            tooltip: 'Test AI coaching summary',
+            onPressed: () => _testAiSummary(context, ref),
+            icon: const Icon(Icons.auto_awesome),
+          ),
+          IconButton(
+            tooltip: 'Recompute insights now',
+            onPressed: () async {
+              ref.invalidate(layer34RecomputeNowProvider);
+              final result = await ref.read(layer34RecomputeNowProvider.future);
+              // Also run Focus Engine (Layer 4 focus selector) after pipeline.
+              ref.invalidate(recomputeCoachingFocusProvider);
+              await ref.read(recomputeCoachingFocusProvider.future);
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Recomputed (L1:${result.layer1Refreshed ? 'ok' : 'fail'}, '
+                    'L2:${result.layer2Refreshed ? 'ok' : 'fail'}, '
+                    'L2c:${result.layer2CanonicalPatternsEmitted}, Focus:ok)',
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          _ProgressDeliveryCard(
+            decisionAsync: progressDecisionAsync,
+            insightsAsync: insightsAsync,
+            layer3RunAsync: layer3RunAsync,
+            layer4RunAsync: layer4RunAsync,
+          ),
+          const SizedBox(height: 12),
+          const ProgressCoachingFocusCard(),
+          const SizedBox(height: 12),
           bundleAsync.when(
             data: (bundle) => Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,6 +189,45 @@ class _AnalyticsProgressScreenState
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _testAiSummary(BuildContext context, WidgetRef ref) async {
+    // Force bypass of cache by invalidating the recompute provider first.
+    ref.invalidate(recomputeAiSummaryProvider);
+
+    // Show loading snackbar immediately.
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Calling AI coaching summarizer…'),
+        duration: Duration(seconds: 30),
+      ),
+    );
+
+    try {
+      final response = await ref.read(recomputeAiSummaryProvider.future);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      _showAiResultSheet(context, response);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('AI test failed: $e')),
+      );
+    }
+  }
+
+  void _showAiResultSheet(BuildContext context, AiSummaryResponse response) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF111317),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _AiResultSheet(response: response),
     );
   }
 
@@ -241,6 +332,125 @@ class _ScopeCard extends StatelessWidget {
             text: 'Weighted priority model: P1=5, P2=4, P3=3, P4=2, P5=1',
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ProgressDeliveryCard extends StatelessWidget {
+  const _ProgressDeliveryCard({
+    required this.decisionAsync,
+    required this.insightsAsync,
+    required this.layer3RunAsync,
+    required this.layer4RunAsync,
+  });
+
+  final AsyncValue<DeliveryDecision?> decisionAsync;
+  final AsyncValue<List<GeneratedInsight>> insightsAsync;
+  final AsyncValue<Layer3RunMetadata> layer3RunAsync;
+  final AsyncValue<Layer4RunMetadata> layer4RunAsync;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ProgressCard(
+      child: decisionAsync.when(
+        data: (decision) {
+          final insights = insightsAsync.valueOrNull ?? const <GeneratedInsight>[];
+          final byId = <String, GeneratedInsight>{
+            for (final item in insights) item.insightId: item,
+          };
+          final primary = decision?.selectedPrimaryInsightId == null
+              ? null
+              : byId[decision!.selectedPrimaryInsightId!];
+          final secondary = decision?.selectedSecondaryInsightId == null
+              ? null
+              : byId[decision!.selectedSecondaryInsightId!];
+          if (primary == null) {
+            final reasons = (decision?.decisionReasonCodes ?? const <DeliveryReasonCode>[])
+                .map((code) => code.name)
+                .join(', ');
+            final layer3 = layer3RunAsync.valueOrNull;
+            final layer4 = layer4RunAsync.valueOrNull;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Progress Coaching',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'No delivery selected for Progress right now.',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'L3 emitted: ${layer3?.insightsEmitted ?? 0} · '
+                  'L4 decisions: ${layer4?.decisionsAvailable ?? 0}',
+                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+                if (reasons.isNotEmpty)
+                  Text(
+                    'Reason: $reasons',
+                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+              ],
+            );
+          }
+          final caption = coachingDetailCaption(primary);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Progress Coaching',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                primary.message,
+                style: const TextStyle(fontSize: 16, color: Colors.white),
+              ),
+              if (caption != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  caption,
+                  style: const TextStyle(color: Colors.white54, fontSize: 13, height: 1.35),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Text(
+                'Priority ${primary.priority.name.toUpperCase()} · Confidence ${(primary.confidence * 100).round()}%',
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+              if (secondary != null &&
+                  shouldShowSecondaryInsight(primary: primary, secondary: secondary)) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Also consider: ${secondary.message}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ],
+            ],
+          );
+        },
+        loading: () => const SizedBox(
+          height: 42,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+        error: (_, _) => const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Progress Coaching',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'No delivery selected for Progress right now.',
+              style: TextStyle(color: Colors.white70),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -542,6 +752,206 @@ class _StatChip extends StatelessWidget {
       child: Text(
         '$label: $value',
         style: const TextStyle(fontSize: 12, color: Colors.white70),
+      ),
+    );
+  }
+}
+
+// ─── AI test result bottom sheet ──────────────────────────────────────────────
+
+class _AiResultSheet extends StatelessWidget {
+  const _AiResultSheet({required this.response});
+  final AiSummaryResponse response;
+
+  @override
+  Widget build(BuildContext context) {
+    final sourceLabel = response.isFallback ? 'DETERMINISTIC FALLBACK' : 'AI RESPONSE';
+    final sourceColor = response.isFallback
+        ? const Color(0xFFFFD54F)
+        : const Color(0xFFB7FF00);
+    final validColor = response.isValid
+        ? const Color(0xFFB7FF00)
+        : const Color(0xFFFF6D4E);
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      builder: (_, controller) => ListView(
+        controller: controller,
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: sourceColor.withAlpha(30),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: sourceColor.withAlpha(120)),
+                ),
+                child: Text(
+                  sourceLabel,
+                  style: TextStyle(
+                    color: sourceColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: validColor.withAlpha(30),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: validColor.withAlpha(120)),
+                ),
+                child: Text(
+                  response.isValid ? 'VALID' : response.validationOutcome.name.toUpperCase(),
+                  style: TextStyle(
+                    color: validColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Daily summary
+          _SheetSection(
+            label: 'DAILY SUMMARY',
+            child: Text(
+              response.dailySummary.isEmpty ? '(empty)' : response.dailySummary,
+              style: const TextStyle(fontSize: 16, height: 1.5, color: Colors.white),
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Recommendation
+          _SheetSection(
+            label: 'RECOMMENDATION',
+            child: Text(
+              response.mainRecommendation.isEmpty
+                  ? '(empty)'
+                  : response.mainRecommendation,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFFB7FF00),
+                height: 1.4,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Metadata row
+          _SheetSection(
+            label: 'METADATA',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _MetaRow('Framing', response.framing.name),
+                _MetaRow('Tone', response.tone.name),
+                _MetaRow('Summary type', response.summaryType.name),
+                _MetaRow('Prompt version', response.promptVersion),
+                _MetaRow('Focus ID', response.focusId),
+                _MetaRow(
+                  'Generated',
+                  response.generatedAtMs == 0
+                      ? '—'
+                      : DateTime.fromMillisecondsSinceEpoch(response.generatedAtMs)
+                          .toLocal()
+                          .toString()
+                          .substring(0, 19),
+                ),
+                if (response.metadata.containsKey('fallbackReason'))
+                  _MetaRow(
+                    'Fallback reason',
+                    response.metadata['fallbackReason'] as String? ?? '—',
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetSection extends StatelessWidget {
+  const _SheetSection({required this.label, required this.child});
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF00E6FF),
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 6),
+        child,
+      ],
+    );
+  }
+}
+
+class _MetaRow extends StatelessWidget {
+  const _MetaRow(this.label, this.value);
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: const TextStyle(color: Colors.white38, fontSize: 12),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,8 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
-
+import '../../../core/storage/app_storage_dir.dart';
 import '../domain/models/reminder_config.dart';
 
 @Deprecated('Reminders are stored in Isar; this JSON file cache is no longer used by the app.')
@@ -10,7 +9,7 @@ class ReminderCacheStore {
   const ReminderCacheStore();
 
   Future<File> _file() async {
-    final dir = await getApplicationDocumentsDirectory();
+    final dir = await getAppStorageDirectory();
     return File('${dir.path}/reminder_cache.json');
   }
 

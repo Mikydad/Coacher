@@ -5,6 +5,7 @@ import '../../../core/di/providers.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../add_task/presentation/add_task_screen.dart';
 import '../../analytics/application/analytics_event_logger.dart';
+import '../../analytics/application/delivery_providers.dart';
 import '../../analytics/domain/models/analytics_event.dart';
 import '../../planning/application/auto_next_task_flow.dart';
 import '../../planning/application/planned_task_collect.dart';
@@ -288,6 +289,7 @@ Future<void> _completeFromHub(BuildContext context, WidgetRef ref, PlannedTaskRo
   );
   await ref.read(reminderSyncServiceProvider).markTaskStarted(t.id);
   invalidateTaskListProviders(ref);
+  invalidateTodayCoachingDelivery(ref);
   if (!context.mounted) return;
   await runAutoNextTaskFlow(
     context,

@@ -6,6 +6,7 @@ import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/application/daily_analytics_providers.dart';
+import '../../analytics/application/delivery_providers.dart';
 import '../../analytics/domain/models/analytics_event.dart';
 import '../application/goal_intensity_mode.dart';
 import '../application/goal_period_helpers.dart';
@@ -308,6 +309,7 @@ class GoalDetailScreen extends ConsumerWidget {
         final done = g.copyWith(status: GoalStatus.completed, updatedAtMs: now);
         await repo.upsertGoal(done);
         await ref.read(goalReminderSyncServiceProvider).applyForGoal(done);
+        await clearEntityCoachingCachesForGoal(ref, done.id);
         invalidateGoals(ref, goalId: g.id);
         return;
       case 'reopen':
@@ -339,6 +341,7 @@ class GoalDetailScreen extends ConsumerWidget {
         if (ok == true && context.mounted) {
           await ref.read(goalReminderSyncServiceProvider).cancelForGoal(g.id);
           await repo.deleteGoal(g.id);
+          await clearEntityCoachingCachesForGoal(ref, g.id);
           invalidateGoals(ref, goalId: g.id);
           if (context.mounted) Navigator.pop(context);
         }
@@ -351,33 +354,12 @@ class GoalDetailScreen extends ConsumerWidget {
     WidgetRef ref,
     String gid,
   ) async {
-    final ctrl = TextEditingController();
-    final ok = await showDialog<bool>(
+    final title = await showDialog<String?>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('New milestone'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'e.g. Finish lesson 1'),
-          onSubmitted: (_) => Navigator.pop(ctx, true),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Add'),
-          ),
-        ],
-      ),
+      builder: (ctx) => const _NewMilestoneDialog(),
     );
-    final title = ctrl.text.trim();
-    ctrl.dispose();
-    if (ok != true || !context.mounted) return;
-    if (title.isEmpty) return;
+    if (!context.mounted) return;
+    if (title == null || title.trim().isEmpty) return;
     final repo = ref.read(goalsRepositoryProvider);
     final existing = await repo.getMilestones(gid);
     final nextIndex = existing.isEmpty
@@ -387,12 +369,60 @@ class GoalDetailScreen extends ConsumerWidget {
       GoalMilestone(
         id: StableId.generate('gm'),
         goalId: gid,
-        title: title,
+        title: title.trim(),
         completed: false,
         orderIndex: nextIndex,
       ),
     );
     invalidateGoals(ref, goalId: gid);
+  }
+}
+
+/// Owns [TextEditingController] for the milestone title so it is disposed only
+/// after the dialog route is finished (avoids TextField use-after-dispose).
+class _NewMilestoneDialog extends StatefulWidget {
+  const _NewMilestoneDialog();
+
+  @override
+  State<_NewMilestoneDialog> createState() => _NewMilestoneDialogState();
+}
+
+class _NewMilestoneDialogState extends State<_NewMilestoneDialog> {
+  final TextEditingController _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final t = _ctrl.text.trim();
+    if (t.isEmpty) return;
+    Navigator.pop<String?>(context, t);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('New milestone'),
+      content: TextField(
+        controller: _ctrl,
+        autofocus: true,
+        decoration: const InputDecoration(hintText: 'e.g. Finish lesson 1'),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop<String?>(context, null),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: _submit,
+          child: const Text('Add'),
+        ),
+      ],
+    );
   }
 }
 

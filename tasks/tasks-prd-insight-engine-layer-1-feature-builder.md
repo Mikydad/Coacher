@@ -23,66 +23,66 @@
 
 ## Tasks
 
-- [ ] 1.0 Define Layer 1 feature contract and schema versioning
-  - [ ] 1.1 Define canonical `BehaviorFeatureObject` structure with all required sections (`timeMetrics`, `streakMetrics`, `effortMetrics`, `goalMetrics`, `contextFeatures`).
-  - [ ] 1.2 Define `entityKind` mapping rules (`task | habit | goal`) across existing models.
-  - [ ] 1.3 Add feature schema/version constant and compatibility read strategy.
-  - [ ] 1.4 Add null-safe defaults policy for sparse data cases.
+- [x] 1.0 Define Layer 1 feature contract and schema versioning
+  - [x] 1.1 Define canonical `BehaviorFeatureObject` structure with all required sections (`timeMetrics`, `streakMetrics`, `effortMetrics`, `goalMetrics`, `contextFeatures`).
+  - [x] 1.2 Define `entityKind` mapping rules (`task | habit | goal`) across existing models.
+  - [x] 1.3 Add feature schema/version constant and compatibility read strategy.
+  - [x] 1.4 Add null-safe defaults policy for sparse data cases.
 
-- [ ] 2.0 Implement input adapters for all required data sources
-  - [ ] 2.1 Build event adapter to collect entity-scoped event history (7d/30d windows + needed historical streak range).
-  - [ ] 2.2 Build task adapter for priority, schedule, status, planned duration, habit-anchor context.
-  - [ ] 2.3 Build goal/habit adapter for targets, expected progress, check-ins, and milestone progress.
-  - [ ] 2.4 Build analytics-cache adapter (read-only helper) for any reusable precomputed values.
-  - [ ] 2.5 Normalize all timestamps/date keys under one canonical timezone/day-boundary utility.
+- [x] 2.0 Implement input adapters for all required data sources
+  - [x] 2.1 Build event adapter to collect entity-scoped event history (7d/30d windows + needed historical streak range).
+  - [x] 2.2 Build task adapter for priority, schedule, status, planned duration, habit-anchor context.
+  - [x] 2.3 Build goal/habit adapter for targets, expected progress, check-ins, and milestone progress.
+  - [x] 2.4 Build analytics-cache adapter (read-only helper) for any reusable precomputed values.
+  - [x] 2.5 Normalize all timestamps/date keys under one canonical timezone/day-boundary utility.
 
-- [ ] 3.0 Implement core metric calculators (deterministic pure functions)
-  - [ ] 3.1 Implement completion metrics: `completionRate7d`, `completionRate30d`.
-  - [ ] 3.2 Implement lateness metrics: `lateRate`, `avgDelayMinutes` (with explicit late rule).
-  - [ ] 3.3 Implement streak metrics: `currentStreak`, `longestStreak`, `missedLast2Days`, `missedCount7d`.
-  - [ ] 3.4 Implement effort metrics: `avgSnoozeCount`, `avgSessionDuration`, `plannedVsActualRatio`.
-  - [ ] 3.5 Implement goal metrics: `progress`, `expectedProgress`, `gap`.
-  - [ ] 3.6 Implement context metrics: `bestTimeBlock`, `isHabitAnchor`, `priority`.
+- [x] 3.0 Implement core metric calculators (deterministic pure functions)
+  - [x] 3.1 Implement completion metrics: `completionRate7d`, `completionRate30d`.
+  - [x] 3.2 Implement lateness metrics: `lateRate`, `avgDelayMinutes` (with explicit late rule).
+  - [x] 3.3 Implement streak metrics: `currentStreak`, `longestStreak`, `missedLast2Days`, `missedCount7d`.
+  - [x] 3.4 Implement effort metrics: `avgSnoozeCount`, `avgSessionDuration`, `plannedVsActualRatio`.
+  - [x] 3.5 Implement goal metrics: `progress`, `expectedProgress`, `gap`.
+  - [x] 3.6 Implement context metrics: `bestTimeBlock`, `isHabitAnchor`, `priority`.
 
-- [ ] 4.0 Build entity-level feature assembly pipeline
-  - [ ] 4.1 Create per-entity assembler that composes all calculators into one `BehaviorFeatureObject`.
-  - [ ] 4.2 Ensure assembler is deterministic for unchanged input sets.
-  - [ ] 4.3 Add scoped builders for each entity category (task, habit, goal).
-  - [ ] 4.4 Add validation guardrails for invalid/missing IDs and malformed timestamps.
+- [x] 4.0 Build entity-level feature assembly pipeline
+  - [x] 4.1 Create per-entity assembler that composes all calculators into one `BehaviorFeatureObject`.
+  - [x] 4.2 Ensure assembler is deterministic for unchanged input sets.
+  - [x] 4.3 Add scoped builders for each entity category (task, habit, goal).
+  - [x] 4.4 Add validation guardrails for invalid/missing IDs and malformed timestamps.
 
-- [ ] 5.0 Implement batch compute orchestrator
-  - [ ] 5.1 Build user-level batch runner that computes features for all in-scope entities in one pass.
-  - [ ] 5.2 Add date-window metadata and compute timestamp to each output.
-  - [ ] 5.3 Optimize lookup strategy to avoid repeated per-entity source queries inside same batch.
-  - [ ] 5.4 Add lightweight compute telemetry (count, elapsed, failures) for debug visibility.
+- [x] 5.0 Implement batch compute orchestrator
+  - [x] 5.1 Build user-level batch runner that computes features for all in-scope entities in one pass.
+  - [x] 5.2 Add date-window metadata and compute timestamp to each output.
+  - [x] 5.3 Optimize lookup strategy to avoid repeated per-entity source queries inside same batch.
+  - [x] 5.4 Add lightweight compute telemetry (count, elapsed, failures) for debug visibility.
 
-- [ ] 6.0 Add Isar persistence for Layer 1 feature cache
-  - [ ] 6.1 Create Isar collection/entity for `BehaviorFeatureObject` cache records.
-  - [ ] 6.2 Add repository methods: upsert single, bulk upsert, fetch by entity, fetch by kind, fetch all.
-  - [ ] 6.3 Persist schema version + compute metadata with each record.
-  - [ ] 6.4 Add migration-safe behavior for schema version mismatch reads.
+- [x] 6.0 Add Isar persistence for Layer 1 feature cache
+  - [x] 6.1 Create Isar collection/entity for `BehaviorFeatureObject` cache records.
+  - [x] 6.2 Add repository methods: upsert single, bulk upsert, fetch by entity, fetch by kind, fetch all.
+  - [x] 6.3 Persist schema version + compute metadata with each record.
+  - [x] 6.4 Add migration-safe behavior for schema version mismatch reads.
 
-- [ ] 7.0 Implement hybrid recompute strategy
-  - [ ] 7.1 Wire event-driven recompute for touched entities after relevant behavior mutations.
-  - [ ] 7.2 Implement daily full-refresh job to recompute all entities.
-  - [ ] 7.3 Add idempotent scheduling/debounce guardrails to prevent recompute storms.
-  - [ ] 7.4 Ensure recompute failures degrade safely without blocking user flows.
+- [x] 7.0 Implement hybrid recompute strategy
+  - [x] 7.1 Wire event-driven recompute for touched entities after relevant behavior mutations.
+  - [x] 7.2 Implement daily full-refresh job to recompute all entities.
+  - [x] 7.3 Add idempotent scheduling/debounce guardrails to prevent recompute storms.
+  - [x] 7.4 Ensure recompute failures degrade safely without blocking user flows.
 
-- [ ] 8.0 Expose read APIs/providers for downstream layers
-  - [ ] 8.1 Add provider/API to fetch single entity feature object.
-  - [ ] 8.2 Add provider/API to fetch scoped lists by `entityKind` and date window.
-  - [ ] 8.3 Add provider/API to expose compute metadata (`lastComputedAt`, version).
-  - [ ] 8.4 Ensure provider invalidation/update behavior is correct for touched-entity recompute paths.
+- [x] 8.0 Expose read APIs/providers for downstream layers
+  - [x] 8.1 Add provider/API to fetch single entity feature object.
+  - [x] 8.2 Add provider/API to fetch scoped lists by `entityKind` and date window.
+  - [x] 8.3 Add provider/API to expose compute metadata (`lastComputedAt`, version).
+  - [x] 8.4 Ensure provider invalidation/update behavior is correct for touched-entity recompute paths.
 
-- [ ] 9.0 Testing and deterministic validation
-  - [ ] 9.1 Unit tests for each metric calculator with normal and edge cases.
-  - [ ] 9.2 Unit tests for day-boundary/timezone behavior (including DST-sensitive scenarios).
-  - [ ] 9.3 Unit tests for sparse/empty histories and default handling.
-  - [ ] 9.4 Unit tests for batch orchestrator determinism (same input -> same output).
-  - [ ] 9.5 Persistence tests for Isar upsert/read/version handling.
-  - [ ] 9.6 Provider tests for event-triggered recompute and daily refresh paths.
-  - [ ] 9.7 Run `flutter analyze` and resolve newly introduced diagnostics.
-  - [ ] 9.8 Run focused analytics tests, then full `flutter test`.
+- [x] 9.0 Testing and deterministic validation
+  - [x] 9.1 Unit tests for each metric calculator with normal and edge cases.
+  - [x] 9.2 Unit tests for day-boundary/timezone behavior (including DST-sensitive scenarios).
+  - [x] 9.3 Unit tests for sparse/empty histories and default handling.
+  - [x] 9.4 Unit tests for batch orchestrator determinism (same input -> same output).
+  - [x] 9.5 Persistence tests for Isar upsert/read/version handling.
+  - [x] 9.6 Provider tests for event-triggered recompute and daily refresh paths.
+  - [x] 9.7 Run `flutter analyze` and resolve newly introduced diagnostics.
+  - [x] 9.8 Run focused analytics tests, then full `flutter test`.
 
 - [ ] 10.0 Manual QA and acceptance gates
   - [ ] 10.1 Verify feature cache updates immediately after task complete/defer/session events.

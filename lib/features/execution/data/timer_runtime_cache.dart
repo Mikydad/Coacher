@@ -1,8 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
-
+import '../../../core/storage/app_storage_dir.dart';
 import '../domain/task_timer_engine.dart';
 import '../domain/models/timer_session.dart';
 
@@ -10,7 +9,7 @@ class TimerRuntimeCache {
   const TimerRuntimeCache();
 
   Future<File> _file() async {
-    final dir = await getApplicationDocumentsDirectory();
+    final dir = await getAppStorageDirectory();
     return File('${dir.path}/timer_runtime.json');
   }
 

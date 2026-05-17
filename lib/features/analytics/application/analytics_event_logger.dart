@@ -6,6 +6,7 @@ import '../../../core/di/providers.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
 import '../domain/models/analytics_event.dart';
+import 'feature_builder_recompute_service.dart';
 
 Future<void> logAnalyticsEvent(
   WidgetRef ref, {
@@ -34,6 +35,11 @@ Future<void> logAnalyticsEvent(
     updatedAtMs: ts.millisecondsSinceEpoch,
   );
   await ref.read(analyticsRepositoryProvider).logEvent(event);
+  unawaited(
+    ref
+        .read(featureBuilderRecomputeServiceProvider)
+        .onAnalyticsEventLogged(event),
+  );
 }
 
 void fireAndForgetAnalyticsEvent(

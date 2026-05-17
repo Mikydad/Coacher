@@ -1,15 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
-
+import '../storage/app_storage_dir.dart';
 import 'offline_operation.dart';
 
 class OfflineSyncQueue {
   const OfflineSyncQueue();
 
   Future<File> _file() async {
-    final dir = await getApplicationDocumentsDirectory();
+    final dir = await getAppStorageDirectory();
     return File('${dir.path}/offline_sync_queue.json');
   }
 
