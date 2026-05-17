@@ -18,6 +18,6 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Quittr'), findsOneWidget);
-    expect(find.textContaining("Today's Progress"), findsOneWidget);
+    expect(find.text('Progress'), findsOneWidget);
   });
 }

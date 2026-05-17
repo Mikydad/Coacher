@@ -10,6 +10,7 @@ import '../../execution/domain/task_timer_engine.dart';
 import '../../planning/application/planned_task_providers.dart';
 import '../application/focus_quick_task.dart';
 import '../../timer/presentation/timer_session_screen.dart';
+import '../../home/presentation/quittr_app_bar_title.dart';
 
 class FocusLaunchArgs {
   const FocusLaunchArgs({
@@ -126,7 +127,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Quittr'),
+        title: const QuittrAppBarTitle(),
         actions: [
           IconButton(
             tooltip: 'Refresh list',

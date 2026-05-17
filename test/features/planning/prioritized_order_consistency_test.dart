@@ -55,6 +55,7 @@ void main() {
     final today = DateKeys.todayKey();
     final ids = await repo.ensureDefaultDayPlan(today);
     final now = DateTime.now();
+    final stableReference = DateTime(now.year, now.month, now.day, 12);
 
     await repo.upsertTask(
       PlannedTask(
@@ -66,7 +67,9 @@ void main() {
         priority: 2,
         orderIndex: 2,
         reminderEnabled: true,
-        reminderTimeIso: now.add(const Duration(minutes: 20)).toIso8601String(),
+        reminderTimeIso: stableReference
+            .add(const Duration(minutes: 20))
+            .toIso8601String(),
         status: TaskStatus.notStarted,
         createdAtMs: 1,
         updatedAtMs: 1,
@@ -83,7 +86,9 @@ void main() {
         priority: 3,
         orderIndex: 3,
         reminderEnabled: true,
-        reminderTimeIso: now.subtract(const Duration(minutes: 20)).toIso8601String(),
+        reminderTimeIso: stableReference
+            .subtract(const Duration(minutes: 20))
+            .toIso8601String(),
         status: TaskStatus.notStarted,
         createdAtMs: 1,
         updatedAtMs: 1,

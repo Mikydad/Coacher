@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:isar/isar.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../local_db/isar_collections/isar_schemas.dart';
+import '../storage/app_storage_dir.dart';
 
 class OfflineStore {
   OfflineStore._();
@@ -24,7 +24,7 @@ class OfflineStore {
 
   Future<void> initialize() async {
     if (_isar != null) return;
-    final dir = await getApplicationDocumentsDirectory();
+    final dir = await getAppStorageDirectory();
     _isar = await Isar.open(
       isarSchemaList,
       directory: dir.path,

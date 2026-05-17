@@ -14,7 +14,11 @@ import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
 import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/application/daily_analytics_providers.dart';
+import '../../analytics/application/delivery_providers.dart';
+import '../../analytics/application/insight_generation_providers.dart';
+import '../../analytics/presentation/coaching_focus_card.dart';
 import '../../analytics/domain/models/analytics_event.dart';
+import '../../analytics/domain/models/generated_insight.dart';
 import '../../planning/domain/models/accountability_log.dart';
 import '../../planning/domain/models/flow_transition_event.dart';
 import '../../planning/domain/models/block.dart';
@@ -36,6 +40,7 @@ import '../../goals/presentation/goal_selection_screen.dart';
 import '../../plan_tomorrow/presentation/plan_tomorrow_screen.dart';
 import '../../analytics/presentation/analytics_progress_screen.dart';
 import '../../timer/presentation/timer_session_screen.dart';
+import 'quittr_app_bar_title.dart';
 
 enum _PlansChangedAction { reshuffle, defer, skip }
 
@@ -60,7 +65,7 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Quittr'),
+        title: const QuittrAppBarTitle(),
         actions: [
           const _SyncFromCloudAction(),
           IconButton(
@@ -80,6 +85,7 @@ class HomeScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          const _Layer4NotificationDispatchBridge(),
           const _HomeTopAnalyticsCard(),
           const SizedBox(height: 16),
           Row(
@@ -188,25 +194,7 @@ class HomeScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 24),
-          _NeonCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'COACH INSIGHTS',
-                  style: TextStyle(
-                    color: Color(0xFF00E6FF),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  "\"You've stayed focused for 4 hours today. That's 20% higher than your average.\"",
-                  style: TextStyle(fontSize: 20, fontStyle: FontStyle.italic),
-                ),
-              ],
-            ),
-          ),
+          const HomeCoachingFocusCard(),
           const SizedBox(height: 24),
           _NeonCard(
             child: Column(
@@ -789,6 +777,64 @@ class _MiniSparkline extends StatelessWidget {
         child: const SizedBox.expand(),
       ),
     );
+  }
+}
+
+
+class _Layer4NotificationDispatchBridge extends ConsumerStatefulWidget {
+  const _Layer4NotificationDispatchBridge();
+
+  @override
+  ConsumerState<_Layer4NotificationDispatchBridge> createState() =>
+      _Layer4NotificationDispatchBridgeState();
+}
+
+class _Layer4NotificationDispatchBridgeState
+    extends ConsumerState<_Layer4NotificationDispatchBridge> {
+  String? _lastPrimaryInsightId;
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<AsyncValue<Layer4NotificationDecisionViewModel>>(
+      layer4TodayNotificationDecisionProvider,
+      (previous, next) async {
+        final vm = next.valueOrNull;
+        if (vm == null) return;
+        final primaryId = vm.primaryInsightId;
+        final notifications = ref.read(localNotificationsServiceProvider);
+        final notificationId = primaryId == null
+            ? null
+            : ('layer4:$primaryId').hashCode.abs() % 2147483647;
+        if (!vm.isEligible || primaryId == null || primaryId.trim().isEmpty) {
+          final lastId = _lastPrimaryInsightId;
+          if (lastId != null && lastId.isNotEmpty) {
+            final oldNotificationId =
+                ('layer4:$lastId').hashCode.abs() % 2147483647;
+            await notifications.cancel(oldNotificationId);
+          }
+          _lastPrimaryInsightId = null;
+          return;
+        }
+        if (_lastPrimaryInsightId == primaryId) return;
+        final insights = ref.read(layer3TodayDeliveryInsightsProvider).valueOrNull ??
+            const <GeneratedInsight>[];
+        final selected = insights.where((item) => item.insightId == primaryId).toList();
+        final body = selected.isEmpty
+            ? 'You have a coaching insight ready.'
+            : selected.first.message;
+        final granted = await notifications.requestPermissionsIfNeeded();
+        if (!granted || notificationId == null) return;
+        await notifications.schedule(
+          id: notificationId,
+          title: 'Coach Insight Ready',
+          body: body,
+          when: DateTime.now().add(const Duration(minutes: 1)),
+          payload: 'layer4:$primaryId',
+        );
+        _lastPrimaryInsightId = primaryId;
+      },
+    );
+    return const SizedBox.shrink();
   }
 }
 
@@ -1611,6 +1657,7 @@ Future<void> _completeTaskFromHome(
     final prev = ref.read(scoredTaskStatusesProvider);
     ref.read(scoredTaskStatusesProvider.notifier).state = {...prev, t.id: 100};
     invalidateTaskListProviders(ref);
+    invalidateTodayCoachingDelivery(ref);
     if (!context.mounted) return;
     await runAutoNextTaskFlow(
       context,

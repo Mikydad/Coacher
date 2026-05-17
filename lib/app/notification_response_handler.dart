@@ -7,13 +7,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/di/providers.dart';
+import '../features/analytics/presentation/analytics_progress_screen.dart';
 import '../features/focus/presentation/focus_selection_screen.dart';
+import '../features/goals/application/goals_providers.dart';
 import '../features/goals/presentation/goal_detail_screen.dart';
 import '../features/planning/application/planned_task_collect.dart';
 import 'app_navigator.dart';
 
 const _taskPayloadPrefix = 'task:';
 const _goalPayloadPrefix = 'goal:';
+const _layer4PayloadPrefix = 'layer4:';
 const _pendingNotificationIntentPrefsKey = 'pending_notification_intent_v1';
 
 class _PendingRouteIntent {
@@ -27,6 +30,9 @@ class _PendingRouteIntent {
 
   const _PendingRouteIntent.goal(String goalId)
     : this._(routeName: GoalDetailScreen.routeName, goalId: goalId);
+
+  const _PendingRouteIntent.progress()
+    : this._(routeName: AnalyticsProgressScreen.routeName);
 
   const _PendingRouteIntent.focus({
     required String taskId,
@@ -48,6 +54,7 @@ class _PendingRouteIntent {
 
   Object? get arguments {
     if (routeName == GoalDetailScreen.routeName) return goalId;
+    if (routeName == AnalyticsProgressScreen.routeName) return null;
     if (routeName == FocusSelectionScreen.routeName) {
       final id = taskId;
       if (id == null || id.isEmpty) return null;
@@ -79,6 +86,9 @@ class _PendingRouteIntent {
         return _PendingRouteIntent.goal(goalId);
       }
       return null;
+    }
+    if (routeName == AnalyticsProgressScreen.routeName) {
+      return const _PendingRouteIntent.progress();
     }
     if (routeName == FocusSelectionScreen.routeName) {
       final taskId = map['taskId'];
@@ -201,8 +211,13 @@ Future<void> handleNotificationResponse(
     return;
   }
 
+  if (raw.startsWith(_layer4PayloadPrefix)) {
+    await _handleLayer4InsightTap(raw, container);
+    return;
+  }
+
   if (!raw.startsWith(_taskPayloadPrefix)) {
-    debugPrint('[NotifTap] payload not task/goal -> ignore');
+    debugPrint('[NotifTap] payload not task/goal/layer4 -> ignore');
     return;
   }
   final taskId = Uri.decodeComponent(raw.substring(_taskPayloadPrefix.length));
@@ -261,6 +276,41 @@ Future<void> handleNotificationResponse(
       );
     } else {
       debugPrint('[NotifTap] focus route pushed immediately for taskId=$taskId');
+    }
+  });
+}
+
+/// Coaching insight notifications use payload `layer4:` + [GeneratedInsight.insightId].
+Future<void> _handleLayer4InsightTap(
+  String raw,
+  ProviderContainer container,
+) async {
+  final insightId = raw.substring(_layer4PayloadPrefix.length);
+  debugPrint('[NotifTap] layer4 insightId=$insightId');
+  final parts = insightId.split('::');
+  if (parts.length >= 2 && parts[0] == 'entity') {
+    final entityId = parts[1].trim();
+    if (entityId.isNotEmpty) {
+      try {
+        final goal = await container.read(goalsRepositoryProvider).getGoal(entityId);
+        if (goal != null) {
+          debugPrint('[NotifTap] layer4 -> goal detail goalId=$entityId');
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!_pushNowIfReady(GoalDetailScreen.routeName, arguments: entityId)) {
+              _queuePendingIntent(_PendingRouteIntent.goal(entityId));
+            }
+          });
+          return;
+        }
+      } catch (e) {
+        debugPrint('[NotifTap] layer4 goal lookup failed: $e');
+      }
+    }
+  }
+  debugPrint('[NotifTap] layer4 -> Progress (coaching)');
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!_pushNowIfReady(AnalyticsProgressScreen.routeName)) {
+      _queuePendingIntent(const _PendingRouteIntent.progress());
     }
   });
 }

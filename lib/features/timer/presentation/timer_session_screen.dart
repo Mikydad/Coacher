@@ -15,6 +15,7 @@ import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/domain/models/analytics_event.dart';
 import '../../scoring/application/scoring_controller.dart';
 import '../../scoring/presentation/score_task_dialog.dart';
+import '../../home/presentation/quittr_app_bar_title.dart';
 
 class TimerLaunchArgs {
   const TimerLaunchArgs({this.autoStartDelaySeconds});
@@ -257,7 +258,7 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Quittr')),
+      appBar: AppBar(title: const QuittrAppBarTitle()),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) => SingleChildScrollView(

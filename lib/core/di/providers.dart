@@ -13,7 +13,12 @@ import '../../features/execution/data/timer_runtime_cache.dart';
 import '../../features/scoring/application/scoring_controller.dart';
 import '../../features/scoring/data/scoring_repository.dart';
 import '../../features/goals/application/goal_reminder_sync_service.dart';
+import '../../features/analytics/data/ai_summary_repository.dart';
 import '../../features/analytics/data/analytics_repository.dart';
+import '../../features/analytics/data/delivery_repository.dart';
+import '../../features/analytics/data/feature_cache_repository.dart';
+import '../../features/analytics/data/focus_repository.dart';
+import '../../features/analytics/data/insight_cache_repository.dart';
 import '../../features/analytics/data/isar_analytics_repository.dart';
 import '../../features/reminders/application/reminder_sync_service.dart';
 import '../../features/reminders/data/isar_reminder_repository.dart';
@@ -77,4 +82,24 @@ final goalReminderSyncServiceProvider = Provider<GoalReminderSyncService>(
 
 final analyticsRepositoryProvider = Provider<AnalyticsRepository>((ref) {
   return IsarAnalyticsRepository(FirestoreAnalyticsRepository());
+});
+
+final featureCacheRepositoryProvider = Provider<FeatureCacheRepository>((ref) {
+  return IsarFeatureCacheRepository();
+});
+
+final insightCacheRepositoryProvider = Provider<InsightCacheRepository>((ref) {
+  return IsarInsightCacheRepository();
+});
+
+final deliveryRepositoryProvider = Provider<DeliveryRepository>((ref) {
+  return IsarDeliveryRepository();
+});
+
+final focusRepositoryProvider = Provider<FocusRepository>((ref) {
+  return IsarFocusRepository();
+});
+
+final aiSummaryRepositoryProvider = Provider<AiSummaryRepository>((ref) {
+  return IsarAiSummaryRepository();
 });
