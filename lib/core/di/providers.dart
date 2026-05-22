@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../firebase/firestore_client.dart';
@@ -20,10 +21,14 @@ import '../../features/analytics/data/feature_cache_repository.dart';
 import '../../features/analytics/data/focus_repository.dart';
 import '../../features/analytics/data/insight_cache_repository.dart';
 import '../../features/analytics/data/isar_analytics_repository.dart';
+import '../../features/reminders/application/attention_orchestrator_providers.dart';
 import '../../features/reminders/application/reminder_sync_service.dart';
 import '../../features/reminders/data/isar_reminder_repository.dart';
 import '../../features/reminders/data/reminder_cache_store.dart';
 import '../../features/reminders/data/reminder_repository.dart';
+import '../../features/ai_assistant/data/ai_interaction_history_repository.dart';
+import '../../features/community/application/circle_providers.dart';
+import '../../features/community/application/user_circle_membership_service.dart';
 
 final firestoreClientProvider = Provider<FirestoreClient>((ref) => FirestoreClient());
 final localNotificationsServiceProvider = Provider<LocalNotificationsService>(
@@ -72,7 +77,10 @@ final reminderCacheStoreProvider = Provider<ReminderCacheStore>((ref) => const R
 final reminderSyncServiceProvider = Provider<ReminderSyncService>(
   (ref) => ReminderSyncService(
     repository: ref.read(reminderRepositoryProvider),
-    notifications: LocalReminderNotificationsPort(ref.read(localNotificationsServiceProvider)),
+    notifications: LocalReminderNotificationsPort(
+      ref.read(localNotificationsServiceProvider),
+    ),
+    orchestratorService: ref.read(attentionOrchestratorServiceProvider),
   ),
 );
 
@@ -102,4 +110,24 @@ final focusRepositoryProvider = Provider<FocusRepository>((ref) {
 
 final aiSummaryRepositoryProvider = Provider<AiSummaryRepository>((ref) {
   return IsarAiSummaryRepository();
+});
+
+// ── AI Assistant ─────────────────────────────────────────────────────────────
+
+final aiInteractionHistoryRepositoryProvider =
+    Provider<AiInteractionHistoryRepository>(
+  (ref) => AiInteractionHistoryRepository(ref.read(offlineStoreProvider)),
+);
+
+// ── Community / Accountability Circles ───────────────────────────────────────
+
+final userCircleMembershipServiceProvider =
+    Provider<UserCircleMembershipService>((ref) {
+  return UserCircleMembershipService(
+    memberRepo: ref.read(circleMemberRepositoryProvider),
+    circleRepo: ref.read(circleRepositoryProvider),
+    currentUserId: () => FirebaseAuth.instance.currentUser?.uid ?? '',
+    currentDisplayName: () =>
+        FirebaseAuth.instance.currentUser?.displayName ?? 'User',
+  );
 });

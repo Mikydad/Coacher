@@ -16,6 +16,7 @@ import '../../analytics/domain/models/analytics_event.dart';
 import '../../scoring/application/scoring_controller.dart';
 import '../../scoring/presentation/score_task_dialog.dart';
 import '../../home/presentation/quittr_app_bar_title.dart';
+import '../../time_blocks/application/time_block_providers.dart';
 
 class TimerLaunchArgs {
   const TimerLaunchArgs({this.autoStartDelaySeconds});
@@ -140,6 +141,11 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
         taskId: execState.taskId,
         completionPercent: result.completionPercent,
       );
+
+      // Phase A — check for reclaimed time on full completion.
+      if (result.completionPercent >= 100) {
+        await _checkReclaimedTime(execState.taskId);
+      }
       final prev = ref.read(scoredTaskStatusesProvider);
       ref.read(scoredTaskStatusesProvider.notifier).state = {
         ...prev,
@@ -169,6 +175,55 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
       } else {
         _isHandlingStopFlow = false;
       }
+    }
+  }
+
+  Future<void> _checkReclaimedTime(String taskId) async {
+    try {
+      final service = ref.read(reclaimedTimeServiceProvider);
+      final window = await service.checkEarlyCompletion(entityId: taskId);
+      if (window == null || !mounted) return;
+
+      // Log analytics event for any reclaimed time ≥ 1 min.
+      fireAndForgetAnalyticsEvent(
+        ref,
+        type: AnalyticsEventType.reclaimedTimeGenerated,
+        entityId: taskId,
+        entityKind: 'task',
+        sourceSurface: 'timer_session',
+        idempotencyKey: 'reclaimed_${taskId}_${window.createdAtMs}',
+        reason: '${window.durationMinutes}min_reclaimed',
+      );
+
+      // Show suggestion snackbar only when ≥ 10 minutes freed.
+      if (window.durationMinutes >= 10 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'You freed up ${window.durationMinutes} minutes. '
+              'Want to tackle something from your list?',
+            ),
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(
+              label: 'View tasks',
+              onPressed: () {
+                fireAndForgetAnalyticsEvent(
+                  ref,
+                  type: AnalyticsEventType.reclaimedTimeUsed,
+                  entityId: taskId,
+                  entityKind: 'task',
+                  sourceSurface: 'timer_session_snackbar',
+                  idempotencyKey:
+                      'reclaimed_used_${taskId}_${window.createdAtMs}',
+                );
+                if (mounted) Navigator.popUntil(context, (r) => r.isFirst);
+              },
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      // Non-fatal — reclaimed time is a passive suggestion.
     }
   }
 

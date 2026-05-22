@@ -1,3 +1,4 @@
+import '../../coaching/domain/models/enforcement_mode.dart';
 import '../../planning/domain/models/routine_mode.dart';
 
 class ReminderRepeatStage {
@@ -57,11 +58,19 @@ class EscalationDecision {
 }
 
 abstract final class AdaptiveReminderPolicy {
+  /// Returns a [ReminderCadence] for the given enforcement intensity.
+  ///
+  /// [enforcementMode] takes precedence over [modeRefId] when provided
+  /// (FR-D-24). If only [modeRefId] is supplied, it is parsed as before
+  /// for backward compatibility with existing callers.
   static ReminderCadence cadenceFor({
     required String? modeRefId,
     required int blockUrgencyScore,
+    EnforcementMode? enforcementMode,
   }) {
-    final mode = _modeFromRef(modeRefId);
+    final mode = enforcementMode != null
+        ? _modeFromEnforcement(enforcementMode)
+        : _modeFromRef(modeRefId);
     final urgency = blockUrgencyScore.clamp(0, 100);
     switch (mode) {
       case RoutineMode.extreme:
@@ -211,5 +220,18 @@ abstract final class AdaptiveReminderPolicy {
     if (raw == 'disciplined') return RoutineMode.disciplined;
     if (raw == 'extreme') return RoutineMode.extreme;
     return RoutineMode.flexible;
+  }
+
+  /// Maps [EnforcementMode] → [RoutineMode] for cadence resolution.
+  // ignore: deprecated_member_use_from_same_package
+  static RoutineMode _modeFromEnforcement(EnforcementMode mode) {
+    return switch (mode) {
+      // ignore: deprecated_member_use_from_same_package
+      EnforcementMode.flexible => RoutineMode.flexible,
+      // ignore: deprecated_member_use_from_same_package
+      EnforcementMode.disciplined => RoutineMode.disciplined,
+      // ignore: deprecated_member_use_from_same_package
+      EnforcementMode.extreme => RoutineMode.extreme,
+    };
   }
 }

@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Coach AI uses the microphone so you can give voice commands to manage your tasks and schedule.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Coach AI converts your voice into text so you can manage tasks and goals hands-free.</string>
 </dict>
 </plist>

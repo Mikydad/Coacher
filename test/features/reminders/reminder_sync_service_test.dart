@@ -1,7 +1,20 @@
+import 'package:coach_for_life/features/analytics/data/focus_repository.dart';
+import 'package:coach_for_life/features/analytics/domain/models/analytics_event.dart';
+import 'package:coach_for_life/features/analytics/domain/models/current_coaching_focus.dart';
+import 'package:coach_for_life/features/context_override/data/context_override_repository.dart';
+import 'package:coach_for_life/features/context_override/domain/models/user_attention_state.dart';
+import 'package:coach_for_life/features/reminders/application/attention_orchestrator_service.dart';
 import 'package:coach_for_life/features/reminders/application/reminder_sync_service.dart';
 import 'package:coach_for_life/features/reminders/data/reminder_repository.dart';
+import 'package:coach_for_life/features/reminders/domain/models/attention_decision.dart';
 import 'package:coach_for_life/features/reminders/domain/models/reminder_config.dart';
+import 'package:coach_for_life/features/reminders/domain/models/reminder_intent.dart';
+import 'package:coach_for_life/features/reminders/domain/models/reminder_type.dart';
+import 'package:coach_for_life/core/notifications/local_notifications_service.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+// ── Fakes ────────────────────────────────────────────────────────────────────
 
 class _FakeReminderRepository implements ReminderRepository {
   final List<ReminderConfig> _all = [];
@@ -13,10 +26,13 @@ class _FakeReminderRepository implements ReminderRepository {
   }
 
   @override
-  Future<List<ReminderConfig>> listAllReminders() async => List<ReminderConfig>.from(_all);
+  Future<List<ReminderConfig>> listAllReminders() async =>
+      List<ReminderConfig>.from(_all);
 
   @override
-  Future<List<ReminderConfig>> getRemindersForTasks(List<String> taskIds) async {
+  Future<List<ReminderConfig>> getRemindersForTasks(
+    List<String> taskIds,
+  ) async {
     final idSet = taskIds.toSet();
     return _all.where((r) => idSet.contains(r.taskId)).toList();
   }
@@ -36,13 +52,10 @@ class _FakeReminderRepository implements ReminderRepository {
 }
 
 class _FakeNotifications implements ReminderNotificationsPort {
-  final scheduled = <({int id, DateTime when, String body})>[];
   final cancelled = <int>[];
 
   @override
-  Future<void> cancel(int id) async {
-    cancelled.add(id);
-  }
+  Future<void> cancel(int id) async => cancelled.add(id);
 
   @override
   int idFromTaskId(String taskId, {int slot = 0}) =>
@@ -58,112 +71,210 @@ class _FakeNotifications implements ReminderNotificationsPort {
     required String body,
     required DateTime when,
     String? payload,
-  }) async {
-    scheduled.add((id: id, when: when, body: body));
+  }) async {}
+}
+
+/// Stub orchestrator that records evaluated intents without touching Isar/OS.
+class _FakeOrchestratorService extends AttentionOrchestratorService {
+  _FakeOrchestratorService()
+    : super(
+        contextOverrideRepository: _NoOpOverrideRepo(),
+        focusRepository: _NoOpFocusRepo(),
+        reminderRepository: _NoOpReminderRepo(),
+        notifications: LocalNotificationsService.instance,
+        logEvent: _noOpLog,
+      );
+
+  final List<ReminderIntent> evaluated = [];
+  final List<String> cancelled = [];
+
+  @override
+  Future<AttentionDecision> evaluate(ReminderIntent intent) async {
+    evaluated.add(intent);
+    return AttentionDecision.approved(
+      intentId: intent.id,
+      deliverAt: intent.proposedAt,
+    );
+  }
+
+  @override
+  Future<void> cancelForEntity(String entityId) async {
+    cancelled.add(entityId);
   }
 }
+
+Future<void> _noOpLog({
+  required AnalyticsEventType type,
+  required String entityId,
+  required String entityKind,
+  required String sourceSurface,
+  required String idempotencyKey,
+  String? reason,
+}) async {}
+
+class _NoOpOverrideRepo implements ContextOverrideRepository {
+  @override
+  Future<UserAttentionState?> getAttentionState() async => null;
+  @override
+  Future<void> upsertAttentionState(UserAttentionState state) async {}
+  @override
+  Stream<UserAttentionState?> watchAttentionState() => const Stream.empty();
+}
+
+class _NoOpFocusRepo implements FocusRepository {
+  @override
+  Future<CurrentCoachingFocus?> getActiveFocus() async => null;
+  @override
+  Future<void> upsertFocus(CurrentCoachingFocus focus) async {}
+  @override
+  Future<List<CurrentCoachingFocus>> getRecentFocusHistory({
+    int limit = 150,
+  }) async => const [];
+  @override
+  Future<void> transitionFocus({
+    required String focusId,
+    required FocusLifecycleState newState,
+    int? resolvedAtMs,
+    FocusReplacementReason? replacementReason,
+  }) async {}
+  @override
+  Future<void> archiveStaleFocus({required int nowMs}) async {}
+}
+
+class _NoOpReminderRepo implements ReminderRepository {
+  @override
+  Future<List<ReminderConfig>> listAllReminders() async => const [];
+  @override
+  Future<List<ReminderConfig>> getRemindersForTasks(
+    List<String> taskIds,
+  ) async => const [];
+  @override
+  Future<void> hydrateFromRemoteForTasks(List<String> taskIds) async {}
+  @override
+  Future<void> upsertReminder(ReminderConfig reminder) async {}
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 ReminderConfig _reminder({
   required DateTime now,
   bool pendingAction = true,
   String modeRefId = 'disciplined',
   int escalationLevel = 1,
+  String? taskTitle = 'Test Task',
 }) {
   return ReminderConfig(
     id: 'r1',
     taskId: 't1',
+    taskTitle: taskTitle,
     enabled: true,
-    scheduledAtIso: now.subtract(const Duration(minutes: 30)).toIso8601String(),
+    scheduledAtIso:
+        now.subtract(const Duration(minutes: 30)).toIso8601String(),
     modeRefId: modeRefId,
     blockUrgencyScore: 90,
     pendingAction: pendingAction,
     escalationLevel: escalationLevel,
     emergencyBypass: false,
     lastTriggeredAtMs: null,
-    nextPromptAtIso: now.subtract(const Duration(minutes: 10)).toIso8601String(),
+    nextPromptAtIso:
+        now.subtract(const Duration(minutes: 10)).toIso8601String(),
     createdAtMs: now.millisecondsSinceEpoch,
     updatedAtMs: now.millisecondsSinceEpoch,
   );
 }
 
+ReminderSyncService _makeService(
+  _FakeReminderRepository repo,
+  _FakeOrchestratorService orchestrator,
+  DateTime now,
+) {
+  return ReminderSyncService(
+    repository: repo,
+    notifications: _FakeNotifications(),
+    orchestratorService: orchestrator,
+    now: () => now,
+  );
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
 void main() {
-  test('stale pending schedule recovers to future adaptive time', () async {
+  test('scheduleFromCache produces exactly one evaluated intent per enabled reminder', () async {
     final now = DateTime(2026, 3, 24, 10, 0);
     final repo = _FakeReminderRepository()..seed([_reminder(now: now)]);
-    final notifications = _FakeNotifications();
-    final service = ReminderSyncService(
-      repository: repo,
-      notifications: notifications,
-      now: () => now,
-    );
+    final orchestrator = _FakeOrchestratorService();
+    final service = _makeService(repo, orchestrator, now);
 
     await service.scheduleFromCache();
-    expect(notifications.scheduled, isNotEmpty);
-    expect(notifications.scheduled.length, 1);
-    expect(notifications.scheduled.first.when.isAfter(now), isTrue);
+
+    expect(orchestrator.evaluated.length, 1);
+    expect(orchestrator.evaluated.first.entityId, 't1');
+    expect(orchestrator.evaluated.first.proposedAt.isAfter(now), isTrue);
   });
 
-  test('reminders stop only when task started or logical reason provided', () async {
+  test('disabled reminder is not evaluated', () async {
+    final now = DateTime(2026, 3, 24, 10, 0);
+    final repo = _FakeReminderRepository()
+      ..seed([_reminder(now: now).copyWith(enabled: false)]);
+    final orchestrator = _FakeOrchestratorService();
+    final service = _makeService(repo, orchestrator, now);
+
+    await service.scheduleFromCache();
+
+    expect(orchestrator.evaluated, isEmpty);
+  });
+
+  test('cancelForEntity is called once per reminder during applyReminders', () async {
     final now = DateTime(2026, 3, 24, 10, 0);
     final repo = _FakeReminderRepository()..seed([_reminder(now: now)]);
-    final notifications = _FakeNotifications();
-    final service = ReminderSyncService(
-      repository: repo,
-      notifications: notifications,
-      now: () => now,
-    );
+    final orchestrator = _FakeOrchestratorService();
+    final service = _makeService(repo, orchestrator, now);
+
+    await service.scheduleFromCache();
+
+    // cancelForEntity called once (before evaluate) — not 64 times.
+    expect(orchestrator.cancelled.where((id) => id == 't1').length, 1);
+  });
+
+  test('requestSnooze produces a followUp ReminderIntent', () async {
+    final now = DateTime(2026, 3, 24, 10, 0);
+    final repo = _FakeReminderRepository()..seed([_reminder(now: now)]);
+    final orchestrator = _FakeOrchestratorService();
+    final service = _makeService(repo, orchestrator, now);
 
     await service.requestSnooze('t1');
-    expect((await repo.listAllReminders()).first.pendingAction, isTrue);
+
+    expect(orchestrator.evaluated.length, 1);
+    expect(
+      orchestrator.evaluated.first.reminderType,
+      ReminderType.followUp,
+    );
+    expect(orchestrator.evaluated.first.entityId, 't1');
+  });
+
+  test('markLogicalReasonProvided disables the reminder and cancels entity', () async {
+    final now = DateTime(2026, 3, 24, 10, 0);
+    final repo = _FakeReminderRepository()..seed([_reminder(now: now)]);
+    final orchestrator = _FakeOrchestratorService();
+    final service = _makeService(repo, orchestrator, now);
 
     await service.markLogicalReasonProvided('t1');
-    expect((await repo.listAllReminders()).first.pendingAction, isFalse);
-    expect((await repo.listAllReminders()).first.enabled, isFalse);
+
+    final reminders = await repo.listAllReminders();
+    expect(reminders.first.enabled, isFalse);
+    expect(reminders.first.pendingAction, isFalse);
+    expect(orchestrator.cancelled, contains('t1'));
   });
 
-  test('disciplined auto-repeat schedules multiple future nudges', () async {
+  test('reminder without taskTitle is skipped (no intent produced)', () async {
     final now = DateTime(2026, 3, 24, 10, 0);
     final repo = _FakeReminderRepository()
-      ..seed([
-        _reminder(
-          now: now,
-          pendingAction: false,
-          modeRefId: 'disciplined',
-          escalationLevel: 0,
-        ),
-      ]);
-    final notifications = _FakeNotifications();
-    final service = ReminderSyncService(
-      repository: repo,
-      notifications: notifications,
-      now: () => now,
-    );
+      ..seed([_reminder(now: now, taskTitle: null)]);
+    final orchestrator = _FakeOrchestratorService();
+    final service = _makeService(repo, orchestrator, now);
 
     await service.scheduleFromCache();
-    expect(notifications.scheduled.length, greaterThanOrEqualTo(6));
-  });
 
-  test('flexible remains one-shot when unresolved', () async {
-    final now = DateTime(2026, 3, 24, 10, 0);
-    final repo = _FakeReminderRepository()
-      ..seed([
-        _reminder(
-          now: now,
-          pendingAction: false,
-          modeRefId: 'flexible',
-          escalationLevel: 0,
-        ).copyWith(
-          scheduledAtIso: now.add(const Duration(minutes: 5)).toIso8601String(),
-        ),
-      ]);
-    final notifications = _FakeNotifications();
-    final service = ReminderSyncService(
-      repository: repo,
-      notifications: notifications,
-      now: () => now,
-    );
-
-    await service.scheduleFromCache();
-    expect(notifications.scheduled.length, 1);
+    expect(orchestrator.evaluated, isEmpty);
   });
 }

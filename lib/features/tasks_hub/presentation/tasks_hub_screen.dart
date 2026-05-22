@@ -14,6 +14,7 @@ import '../../planning/domain/models/accountability_log.dart';
 import '../../planning/domain/models/flow_transition_event.dart';
 import '../../planning/domain/models/task_item.dart';
 import '../../scoring/application/scoring_controller.dart';
+import '../../time_blocks/application/time_block_providers.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 
 PlannedTask _hubTaskWithOrderIndex(PlannedTaskRow row, int orderIndex) {
@@ -388,6 +389,10 @@ Future<void> confirmDeletePlannedTask(BuildContext context, WidgetRef ref, Plann
         blockId: row.blockId,
         taskId: row.task.id,
       );
+  // Phase A — remove the time block when the task is deleted.
+  await ref
+      .read(timeBlockSyncServiceProvider)
+      .removeBlockForEntity(row.task.id);
   invalidateTaskListProviders(ref);
 }
 

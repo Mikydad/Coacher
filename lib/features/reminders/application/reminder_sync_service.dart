@@ -1,14 +1,24 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/notifications/local_notifications_service.dart';
+import '../../../core/utils/stable_id.dart';
 import 'adaptive_reminder_policy.dart';
+import 'attention_orchestrator_service.dart';
+import 'interruption_level_resolver.dart';
 import '../data/reminder_repository.dart';
 import '../domain/models/reminder_config.dart';
+import '../domain/models/reminder_intent.dart';
+import '../domain/models/reminder_type.dart';
+
+// ─── Notifications port (kept for permissions + cancel) ───────────────────────
 
 abstract class ReminderNotificationsPort {
   Future<bool> requestPermissionsIfNeeded();
   int idFromTaskId(String taskId, {int slot});
   Future<void> cancel(int id);
+
+  /// Retained for callers that still need a direct schedule path (e.g. goal
+  /// reminders). For task/habit reminders, use [AttentionOrchestratorService].
   Future<void> schedule({
     required int id,
     required String title,
@@ -26,10 +36,12 @@ class LocalReminderNotificationsPort implements ReminderNotificationsPort {
   Future<void> cancel(int id) => _inner.cancel(id);
 
   @override
-  int idFromTaskId(String taskId, {int slot = 0}) => _inner.idFromTaskId(taskId, slot: slot);
+  int idFromTaskId(String taskId, {int slot = 0}) =>
+      _inner.idFromTaskId(taskId, slot: slot);
 
   @override
-  Future<bool> requestPermissionsIfNeeded() => _inner.requestPermissionsIfNeeded();
+  Future<bool> requestPermissionsIfNeeded() =>
+      _inner.requestPermissionsIfNeeded();
 
   @override
   Future<void> schedule({
@@ -47,20 +59,41 @@ class LocalReminderNotificationsPort implements ReminderNotificationsPort {
   );
 }
 
+/// Maximum tail follow-ups for extreme mode after [ReminderCadence.maxEscalationLevel]
+/// is reached. Replaces the old pre-scheduled tailRepeatCount: 5.
+const int kExtremeMaxTailFollowUps = 3;
+
+// ─── ReminderSyncService (adapter role) ───────────────────────────────────────
+
+/// Owns [ReminderConfig] persistence and cadence policy.
+/// Produces [ReminderIntent]s for the **next** meaningful fire time only
+/// and passes them to [AttentionOrchestratorService] for evaluation.
+///
+/// After Phase C:
+///   - No longer calls [LocalNotificationsService.schedule] directly.
+///   - Replaces the 64-slot cancel loop with a single cancel via
+///     [AttentionOrchestratorService.cancelForEntity].
 class ReminderSyncService {
   ReminderSyncService({
     required ReminderRepository repository,
     required ReminderNotificationsPort notifications,
+    required AttentionOrchestratorService orchestratorService,
     DateTime Function()? now,
   }) : _repository = repository,
        _notifications = notifications,
+       _orchestrator = orchestratorService,
        _now = now ?? DateTime.now;
 
   final ReminderRepository _repository;
+  // Kept for: requestPermissionsIfNeeded, and goal-reminder direct scheduling.
   final ReminderNotificationsPort _notifications;
+  final AttentionOrchestratorService _orchestrator;
   final DateTime Function() _now;
 
-  Future<bool> ensurePermissions() => _notifications.requestPermissionsIfNeeded();
+  Future<bool> ensurePermissions() =>
+      _notifications.requestPermissionsIfNeeded();
+
+  // ── Public sync methods ───────────────────────────────────────────────────
 
   Future<void> syncForTaskIds(List<String> taskIds) async {
     await _repository.hydrateFromRemoteForTasks(taskIds);
@@ -73,11 +106,18 @@ class ReminderSyncService {
     await _applyReminders(reminders);
   }
 
-  Future<void> markTaskStarted(String taskId) => _resolveReminder(taskId, keepEnabled: false);
+  Future<void> markTaskStarted(String taskId) =>
+      _resolveReminder(taskId, keepEnabled: false);
 
-  Future<void> markLogicalReasonProvided(String taskId) => _resolveReminder(taskId, keepEnabled: false);
+  Future<void> markLogicalReasonProvided(String taskId) =>
+      _resolveReminder(taskId, keepEnabled: false);
 
-  Future<void> requestSnooze(String taskId, {bool emergencyBypass = false}) async {
+  /// Produces a follow-up [ReminderIntent] and passes it through the
+  /// orchestrator pipeline (replaces the old direct-schedule snooze path).
+  Future<void> requestSnooze(
+    String taskId, {
+    bool emergencyBypass = false,
+  }) async {
     final reminders = await _repository.listAllReminders();
     final i = reminders.indexWhere((r) => r.taskId == taskId);
     if (i < 0) return;
@@ -101,12 +141,25 @@ class ReminderSyncService {
       nextPromptAtIso: nextAt.toIso8601String(),
       updatedAtMs: _now().millisecondsSinceEpoch,
     );
-    reminders[i] = updated;
     await _upsertQuietly(updated);
-    await _applyReminders(await _repository.listAllReminders());
+
+    // Produce a follow-up intent and route through the orchestrator.
+    final intent = _intentFromConfig(
+      updated,
+      proposedAt: nextAt,
+      reminderType: ReminderType.followUp,
+    );
+    if (intent != null) {
+      await _orchestrator.evaluate(intent);
+    }
   }
 
-  Future<void> _resolveReminder(String taskId, {required bool keepEnabled}) async {
+  // ── Private helpers ───────────────────────────────────────────────────────
+
+  Future<void> _resolveReminder(
+    String taskId, {
+    required bool keepEnabled,
+  }) async {
     final reminders = await _repository.listAllReminders();
     final i = reminders.indexWhere((r) => r.taskId == taskId);
     if (i < 0) return;
@@ -118,17 +171,11 @@ class ReminderSyncService {
       lastTriggeredAtMs: _now().millisecondsSinceEpoch,
       updatedAtMs: _now().millisecondsSinceEpoch,
     );
-    reminders[i] = updated;
     await _upsertQuietly(updated);
-    await _cancelReminderSlots(taskId);
+    // Replace the 64-slot loop with a single cancel via the orchestrator.
+    await _orchestrator.cancelForEntity(taskId);
     if (keepEnabled) {
       await _applyReminders(await _repository.listAllReminders());
-    }
-  }
-
-  Future<void> _cancelReminderSlots(String taskId) async {
-    for (var slot = 0; slot < 64; slot++) {
-      await _notifications.cancel(_notifications.idFromTaskId(taskId, slot: slot));
     }
   }
 
@@ -136,38 +183,48 @@ class ReminderSyncService {
     try {
       await _repository.upsertReminder(reminder);
     } catch (e) {
-      debugPrint('Reminder upsert failed (non-fatal): task=${reminder.taskId} error=$e');
+      debugPrint(
+        'Reminder upsert failed (non-fatal): '
+        'task=${reminder.taskId} error=$e',
+      );
     }
   }
 
+  /// Produces a single [ReminderIntent] per enabled reminder and passes it
+  /// through [AttentionOrchestratorService.evaluate].
+  /// No direct [LocalNotificationsService.schedule] calls here.
   Future<void> _applyReminders(List<ReminderConfig> reminders) async {
     for (final reminder in reminders) {
-      await _cancelReminderSlots(reminder.taskId);
+      // Cancel the current active slot (single cancel, not 64-slot loop).
+      await _orchestrator.cancelForEntity(reminder.taskId);
       if (!reminder.enabled) continue;
-      final times = _nextReminderTimes(reminder);
-      for (var slot = 0; slot < times.length; slot++) {
-        final when = times[slot];
-        final id = _notifications.idFromTaskId(reminder.taskId, slot: slot);
-        debugPrint(
-          'Scheduling reminder: task=${reminder.taskId} at=$when notifId=$id escalation=${reminder.escalationLevel}',
-        );
-        try {
-          await _notifications.schedule(
-            id: id,
-            title: _titleForReminder(reminder),
-            body: _bodyForReminder(reminder, slot: slot),
-            when: when,
-            payload: 'task:${Uri.encodeComponent(reminder.taskId)}',
-          );
-        } catch (e, st) {
-          debugPrint('Reminder schedule failed: task=${reminder.taskId} error=$e');
-          debugPrint('$st');
-        }
-      }
+
+      final nextAt = _nextReminderTime(reminder);
+      if (nextAt == null) continue;
+
+      final intent = _intentFromConfig(
+        reminder,
+        proposedAt: nextAt,
+        reminderType: reminder.pendingAction
+            ? ReminderType.followUp
+            : ReminderType.scheduled,
+      );
+      if (intent == null) continue;
+
+      debugPrint(
+        '[ReminderSync] evaluating intent: '
+        'task=${reminder.taskId} at=$nextAt escalation=${reminder.escalationLevel}',
+      );
+      await _orchestrator.evaluate(intent);
     }
   }
 
-  List<DateTime> _nextReminderTimes(ReminderConfig reminder) {
+  /// Returns the single next fire time for [reminder], or null if none.
+  ///
+  /// For extreme mode: reactive escalation only — no pre-computed chain.
+  /// Once [escalationLevel] >= [ReminderCadence.maxEscalationLevel], the
+  /// tail phase is capped at [kExtremeMaxTailFollowUps] additional follow-ups.
+  DateTime? _nextReminderTime(ReminderConfig reminder) {
     final now = _now();
     final cadence = AdaptiveReminderPolicy.cadenceFor(
       modeRefId: reminder.modeRefId,
@@ -177,64 +234,103 @@ class ReminderSyncService {
     if (reminder.pendingAction) {
       final preferred = reminder.nextPromptAtIso;
       final parsed = preferred == null ? null : DateTime.tryParse(preferred);
-      if (parsed != null && parsed.isAfter(now)) return [parsed];
-      final nextAt = now.add(Duration(minutes: cadence.initialSnoozeMinutes));
-      return [nextAt];
+      if (parsed != null && parsed.isAfter(now)) return parsed;
+
+      // Extreme tail phase cap: count how many tail follow-ups have already
+      // fired (escalation levels beyond maxEscalationLevel).
+      final isExtremeMode =
+          (reminder.modeRefId ?? '').toLowerCase() == 'extreme';
+      if (isExtremeMode &&
+          reminder.escalationLevel > cadence.maxEscalationLevel) {
+        final tailCount =
+            reminder.escalationLevel - cadence.maxEscalationLevel;
+        if (tailCount >= kExtremeMaxTailFollowUps) {
+          // Tail phase exhausted — stop scheduling follow-ups.
+          return null;
+        }
+        // Tail phase: follow up every 60 minutes (reactive, not pre-computed).
+        return now.add(const Duration(minutes: 60));
+      }
+
+      return now.add(Duration(minutes: cadence.initialSnoozeMinutes));
     }
 
-    final preferred = reminder.pendingAction ? reminder.nextPromptAtIso : reminder.scheduledAtIso;
-    final parsed = preferred == null ? null : DateTime.tryParse(preferred);
-    if (parsed == null) return const [];
-    final out = <DateTime>[];
-    if (parsed.isAfter(now)) {
-      out.add(parsed);
-    }
-    if (!cadence.autoRepeatEnabled) return out;
-
-    final offsets = AdaptiveReminderPolicy.autoRepeatOffsets(cadence);
-    for (final offset in offsets) {
-      final t = parsed.add(Duration(minutes: offset));
-      if (t.isAfter(now)) out.add(t);
-      if (out.length >= cadence.maxFutureNudges) break;
-    }
-    return out;
+    final parsed = reminder.scheduledAtIso == null
+        ? null
+        : DateTime.tryParse(reminder.scheduledAtIso!);
+    if (parsed == null) return null;
+    return parsed.isAfter(now) ? parsed : null;
   }
 
-  String _titleForReminder(ReminderConfig reminder) {
+  /// Builds a [ReminderIntent] from a [ReminderConfig].
+  /// Returns null if the config is insufficient to produce a valid intent.
+  ReminderIntent? _intentFromConfig(
+    ReminderConfig config, {
+    required DateTime proposedAt,
+    required ReminderType reminderType,
+  }) {
+    final title = config.taskTitle?.trim();
+    if (title == null || title.isEmpty) return null;
+
+    final level = InterruptionLevelResolver.resolve(
+      enforcementMode: config.modeRefId ?? 'flexible',
+      escalationLevel: config.escalationLevel,
+      emergencyBypass: config.emergencyBypass,
+    );
+
+    return ReminderIntent(
+      id: StableId.generate('ri_${config.taskId}'),
+      entityId: config.taskId,
+      entityKind: 'task',
+      entityTitle: title,
+      proposedAt: proposedAt,
+      importance: config.blockUrgencyScore.clamp(0, 100),
+      interruptionLevel: level,
+      enforcementMode: config.modeRefId ?? 'flexible',
+      escalationLevel: config.escalationLevel,
+      reminderType: reminderType,
+      sourceReason: reminderType == ReminderType.followUp
+          ? 'snooze_followup'
+          : 'scheduled',
+      createdAtMs: _now().millisecondsSinceEpoch,
+    );
+  }
+
+  // ── Title / body helpers (retained for goal reminders & debug) ────────────
+
+  String titleForReminder(ReminderConfig reminder) {
     final title = reminder.taskTitle?.trim();
     if (title == null || title.isEmpty) return 'Task Reminder';
     return title;
   }
 
-  String _bodyForReminder(ReminderConfig reminder, {int slot = 0}) {
+  String bodyForReminder(ReminderConfig reminder) {
     final cadence = AdaptiveReminderPolicy.cadenceFor(
       modeRefId: reminder.modeRefId,
       blockUrgencyScore: reminder.blockUrgencyScore,
     );
-    final currentLevel = reminder.pendingAction
-        ? reminder.escalationLevel
-        : slot.clamp(0, cadence.maxEscalationLevel);
     final step = AdaptiveReminderPolicy.nextStep(
       cadence: cadence,
-      currentEscalationLevel: currentLevel,
+      currentEscalationLevel: reminder.escalationLevel,
       emergencyBypass: reminder.emergencyBypass,
     );
     if (step.enableNonEssentialActionGate) {
-      final title = reminder.taskTitle?.trim();
-      if (title != null && title.isNotEmpty) {
-        return 'Action needed for "$title": start now or submit a logical reason.';
+      final t = reminder.taskTitle?.trim();
+      if (t != null && t.isNotEmpty) {
+        return 'Action needed for "$t": start now or submit a logical reason.';
       }
       return 'Action needed: start now or submit a logical reason to continue.';
     }
     if (step.requireAppOpenNudge) {
-      final title = reminder.taskTitle?.trim();
-      if (title != null && title.isNotEmpty) {
-        return 'Please open Coach for Life: start "$title" or provide a logical reason.';
+      final t = reminder.taskTitle?.trim();
+      if (t != null && t.isNotEmpty) {
+        return 'Please open Coach for Life: start "$t" or provide a logical reason.';
       }
       return 'Please open Coach for Life: start this task or provide a logical reason.';
     }
-    final title = reminder.taskTitle?.trim();
-    if (title != null && title.isNotEmpty) return 'Time to start "$title".';
+    final t = reminder.taskTitle?.trim();
+    if (t != null && t.isNotEmpty) return 'Time to start "$t".';
     return 'Time to start your planned task.';
   }
 }
+

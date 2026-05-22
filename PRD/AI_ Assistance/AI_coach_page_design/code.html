@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Quittr AI Assistant</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-primary": "#4c6800",
+                        "on-secondary-container": "#e8fbff",
+                        "on-primary": "#4b6600",
+                        "background": "#0e0e0e",
+                        "on-background": "#ffffff",
+                        "secondary-fixed": "#26e6ff",
+                        "on-tertiary-fixed-variant": "#695e00",
+                        "surface-container-low": "#131313",
+                        "tertiary-container": "#fde74f",
+                        "tertiary-dim": "#eed942",
+                        "surface-container-highest": "#262626",
+                        "on-secondary": "#004d57",
+                        "surface-tint": "#eaffb8",
+                        "secondary-dim": "#00d4ec",
+                        "on-tertiary-container": "#5e5400",
+                        "outline": "#777575",
+                        "on-tertiary": "#685c00",
+                        "on-surface-variant": "#adaaaa",
+                        "on-surface": "#ffffff",
+                        "surface-container-lowest": "#000000",
+                        "on-secondary-fixed-variant": "#005964",
+                        "on-error": "#450900",
+                        "on-error-container": "#ffd2c8",
+                        "surface-dim": "#0e0e0e",
+                        "inverse-on-surface": "#565554",
+                        "error-container": "#b92902",
+                        "tertiary": "#fff4c1",
+                        "primary-fixed-dim": "#b2ed00",
+                        "secondary-fixed-dim": "#00d7f0",
+                        "tertiary-fixed-dim": "#eed942",
+                        "on-tertiary-fixed": "#4a4100",
+                        "primary-fixed": "#befc00",
+                        "primary-container": "#befc00",
+                        "on-primary-container": "#445d00",
+                        "primary-dim": "#b2ed00",
+                        "outline-variant": "#494847",
+                        "surface-container-high": "#201f1f",
+                        "surface-bright": "#2c2c2c",
+                        "surface": "#0e0e0e",
+                        "secondary": "#00e3fd",
+                        "surface-variant": "#262626",
+                        "primary": "#eaffb8",
+                        "error-dim": "#d53d18",
+                        "on-secondary-fixed": "#003a42",
+                        "secondary-container": "#006875",
+                        "on-primary-fixed": "#354900",
+                        "surface-container": "#1a1919",
+                        "error": "#ff7351",
+                        "on-primary-fixed-variant": "#4c6800",
+                        "tertiary-fixed": "#fde74f",
+                        "inverse-surface": "#fcf8f8"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "display": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .pulse-glow {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; filter: drop-shadow(0 0 8px rgba(178, 237, 0, 0.6)); }
+            50% { opacity: .7; filter: drop-shadow(0 0 2px rgba(178, 237, 0, 0.2)); }
+        }
+        .waveform-bar {
+            animation: wave 1.2s ease-in-out infinite;
+        }
+        @keyframes wave {
+            0%, 100% { height: 8px; }
+            50% { height: 24px; }
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen pb-24">
+<!-- Top App Bar (Shared Component) -->
+<header class="sticky top-0 z-50 flex items-center justify-between px-6 py-4 bg-surface/80 backdrop-blur-md">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface">menu</span>
+<h1 class="text-xl font-extrabold tracking-tighter uppercase text-on-surface">Quittr</h1>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface">notifications</span>
+</div>
+</header>
+<main class="max-w-xl mx-auto px-6 pt-8 space-y-10">
+<!-- 1. Header Section -->
+<section class="space-y-2">
+<div class="flex items-center justify-between">
+<h2 class="text-3xl font-extrabold tracking-tight text-primary">Coach AI</h2>
+<div class="flex items-center gap-2 px-3 py-1 bg-primary/10 rounded-full border border-primary/20">
+<span class="w-2 h-2 rounded-full bg-primary pulse-glow"></span>
+<span class="text-[10px] font-bold tracking-widest uppercase text-primary">Ready</span>
+</div>
+</div>
+<p class="text-on-surface-variant text-sm font-medium leading-relaxed">
+                Tell me what you want and I'll organize it for you.
+            </p>
+</section>
+<!-- 2. Command Input Card Section -->
+<section class="relative">
+<div class="bg-surface-container-high rounded-xl p-4 shadow-2xl space-y-4 border border-outline-variant/10">
+<div class="flex items-start gap-4">
+<div class="flex-1">
+<textarea class="w-full bg-transparent border-none focus:ring-0 text-on-surface text-lg font-medium placeholder:text-on-surface-variant/40 resize-none" placeholder="Plan a workout tomorrow..." rows="2"></textarea>
+</div>
+</div>
+<!-- Waveform Mockup -->
+<div class="flex items-end justify-center gap-1 h-8 opacity-40">
+<div class="waveform-bar w-1 bg-secondary rounded-full" style="animation-delay: 0.1s; height: 27px;"></div>
+<div class="waveform-bar w-1 bg-secondary rounded-full" style="animation-delay: 0.3s; height: 18px;"></div>
+<div class="waveform-bar w-1 bg-primary rounded-full" style="animation-delay: 0.5s; height: 8px;"></div>
+<div class="waveform-bar w-1 bg-secondary rounded-full" style="animation-delay: 0.2s; height: 27px;"></div>
+<div class="waveform-bar w-1 bg-secondary rounded-full" style="animation-delay: 0.4s; height: 23px;"></div>
+</div>
+<div class="flex items-center justify-between pt-2">
+<button class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center text-secondary hover:bg-surface-bright transition-all">
+<span class="material-symbols-outlined">mic</span>
+</button>
+<button class="px-8 py-3 bg-primary-container text-on-primary-container rounded-full font-bold text-sm tracking-wide flex items-center gap-2 hover:scale-105 transition-transform active:scale-95">
+                        SEND
+                        <span class="material-symbols-outlined text-sm">send</span>
+</button>
+</div>
+</div>
+</section>
+<!-- 3. Quick Directives -->
+<section class="space-y-4">
+<h3 class="text-xs font-bold tracking-[0.2em] uppercase text-on-surface-variant px-1">Quick Directives</h3>
+<div class="flex overflow-x-auto gap-3 no-scrollbar pb-2">
+<button class="flex-shrink-0 px-5 py-2.5 bg-surface-container-low rounded-full border border-outline-variant/20 text-xs font-bold text-on-surface hover:bg-surface-container-high transition-colors">Add task</button>
+<button class="flex-shrink-0 px-5 py-2.5 bg-surface-container-low rounded-full border border-outline-variant/20 text-xs font-bold text-on-surface hover:bg-surface-container-high transition-colors">Create goal</button>
+<button class="flex-shrink-0 px-5 py-2.5 bg-surface-container-low rounded-full border border-outline-variant/20 text-xs font-bold text-on-surface hover:bg-surface-container-high transition-colors">Move schedule</button>
+<button class="flex-shrink-0 px-5 py-2.5 bg-surface-container-low rounded-full border border-outline-variant/20 text-xs font-bold text-on-surface hover:bg-surface-container-high transition-colors">Focus mode</button>
+<button class="flex-shrink-0 px-5 py-2.5 bg-surface-container-low rounded-full border border-outline-variant/20 text-xs font-bold text-on-surface hover:bg-surface-container-high transition-colors">Meeting mode</button>
+</div>
+</section>
+<!-- 4. Suggested Prompts -->
+<section class="space-y-4">
+<h3 class="text-xs font-bold tracking-[0.2em] uppercase text-on-surface-variant px-1">Suggested Prompts</h3>
+<div class="grid grid-cols-1 gap-3">
+<button class="flex items-center justify-between p-5 bg-surface-container-low rounded-xl text-left border border-outline-variant/10 hover:border-secondary/40 transition-all group">
+<span class="text-sm font-medium text-on-surface-variant group-hover:text-on-surface">"Add a workout at 5AM"</span>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-secondary text-sm">arrow_outward</span>
+</button>
+<button class="flex items-center justify-between p-5 bg-surface-container-low rounded-xl text-left border border-outline-variant/10 hover:border-secondary/40 transition-all group">
+<span class="text-sm font-medium text-on-surface-variant group-hover:text-on-surface">"Move my study session tomorrow"</span>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-secondary text-sm">arrow_outward</span>
+</button>
+</div>
+</section>
+<!-- 5. Planned Changes Preview (Intent Summary) -->
+<section class="space-y-4">
+<h3 class="text-xs font-bold tracking-[0.2em] uppercase text-on-surface-variant px-1">Planned Changes Preview</h3>
+<div class="bg-surface-container rounded-2xl p-6 border border-primary/20 relative overflow-hidden">
+<div class="absolute top-0 right-0 p-4 opacity-10">
+<span class="material-symbols-outlined text-6xl">list_alt</span>
+</div>
+<div class="space-y-4 relative z-10">
+<div class="flex items-center gap-3">
+<span class="text-primary font-bold">➕</span>
+<p class="text-sm font-medium text-on-surface">Add Morning Workout (5:00 AM)</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-primary font-bold">➕</span>
+<p class="text-sm font-medium text-on-surface">New Meeting: Strategy Sync</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-error font-bold text-lg leading-none">−</span>
+<p class="text-sm font-medium text-on-surface">Remove 2 overdue tasks</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-secondary font-bold">🔕</span>
+<p class="text-sm font-medium text-on-surface">Enable Focus Mode (10:00 - 12:00)</p>
+</div>
+<!-- Warning Box -->
+<div class="mt-4 p-3 bg-error/10 border border-error/30 rounded-lg flex items-start gap-3">
+<span class="material-symbols-outlined text-error text-lg">warning</span>
+<p class="text-xs font-semibold text-error leading-tight uppercase tracking-wide">Conflict: Workout overlaps with commute</p>
+</div>
+</div>
+</div>
+</section>
+<!-- 6. Action Buttons -->
+<section class="flex flex-col gap-4 pt-6">
+<button class="w-full py-5 bg-primary text-on-primary font-black rounded-full tracking-widest text-sm hover:brightness-110 active:scale-[0.98] transition-all">
+                CONFIRM CHANGES
+            </button>
+<div class="flex gap-4">
+<button class="flex-1 py-4 border border-outline-variant/30 text-on-surface font-bold rounded-full text-xs uppercase tracking-widest hover:bg-surface-container-high transition-colors">
+                    Edit Plan
+                </button>
+<button class="flex-1 py-4 border border-error/30 text-error font-bold rounded-full text-xs uppercase tracking-widest hover:bg-error-container/10 transition-colors">
+                    Cancel
+                </button>
+</div>
+</section>
+</main>
+<!-- 7. Bottom Nav (Shared Component) -->
+<nav class="fixed bottom-0 left-0 right-0 z-50 bg-surface-container-lowest/95 backdrop-blur-xl px-4 py-3 flex items-center justify-around md:hidden">
+<div class="flex flex-col items-center gap-1 text-on-surface-variant group cursor-pointer">
+<span class="material-symbols-outlined">home</span>
+<span class="text-[10px] font-bold tracking-tighter uppercase">Home</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-primary-fixed-dim group cursor-pointer">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">psychology</span>
+<span class="text-[10px] font-bold tracking-tighter uppercase">Coach</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-on-surface-variant group cursor-pointer">
+<span class="material-symbols-outlined">insights</span>
+<span class="text-[10px] font-bold tracking-tighter uppercase">Progress</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-on-surface-variant group cursor-pointer">
+<span class="material-symbols-outlined">groups</span>
+<span class="text-[10px] font-bold tracking-tighter uppercase">Community</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-on-surface-variant group cursor-pointer">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] font-bold tracking-tighter uppercase">Profile</span>
+</div>
+</nav>
+<script>
+        // Micro-interaction for the voice bars
+        const bars = document.querySelectorAll('.waveform-bar');
+        setInterval(() => {
+            bars.forEach(bar => {
+                const randomHeight = Math.floor(Math.random() * 24) + 8;
+                bar.style.height = `${randomHeight}px`;
+            });
+        }, 150);
+
+        // Simple button active states feedback
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.classList.add('scale-95');
+                setTimeout(() => this.classList.remove('scale-95'), 100);
+            });
+        });
+    </script>
+</body></html>

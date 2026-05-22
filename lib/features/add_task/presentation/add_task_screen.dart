@@ -14,6 +14,10 @@ import '../../planning/data/planning_repository.dart';
 import '../../planning/domain/add_task_duration.dart';
 import '../../planning/domain/models/task_item.dart';
 import '../../reminders/domain/models/reminder_config.dart';
+import '../../goals/application/goals_providers.dart';
+import '../../time_blocks/application/time_block_providers.dart';
+import '../../time_blocks/domain/models/time_conflict.dart';
+import '../../time_blocks/presentation/conflict_bottom_sheet.dart';
 
 class AddTaskEditArgs {
   const AddTaskEditArgs({
@@ -60,6 +64,11 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
   static const _categoryOptions = ['Study', 'Fitness', 'Work', 'Personal', 'Planning'];
   static const _modeChoiceIds = ['flexible', 'disciplined', 'extreme'];
   static const _modeLabels = ['Flexible', 'Disciplined', 'Extreme'];
+  static const _modeDescriptions = [
+    'Reminders are gentle. Missing a day is okay.',
+    'Hold me accountable. Streaks matter.',
+    'No excuses. Follow up until I act.',
+  ];
 
   final _controller = TextEditingController();
   final _notesController = TextEditingController();
@@ -77,6 +86,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
   bool _strictModeRequired = false;
   /// When false, new-task save may inherit [Routine.modeId] for the target routine.
   bool _modeUserCustomized = false;
+
+  /// Whether this task occupies a fixed (rigid) time slot.
+  bool _isRigid = false;
 
   PlannedTask? _loadedTask;
   String? _existingReminderId;
@@ -218,6 +230,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
         _modeRefId = loaded.modeRefId?.trim().isNotEmpty == true ? loaded.modeRefId! : 'flexible';
         _strictModeRequired = loaded.strictModeRequired;
         _isHabitAnchor = loaded.isHabitAnchor;
+        // Phase A: _isRigid defaults to false; no field on PlannedTask yet.
         _modeUserCustomized = false;
         _loaded = true;
       });
@@ -367,6 +380,117 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
     return tod.format(context);
   }
 
+  // ─── Phase A: time block helpers ──────────────────────────────────────────
+
+  Future<bool> _checkTimeBlockConflicts(PlannedTask task) async {
+    final reminderIso = task.reminderTimeIso;
+    if (reminderIso == null) return true;
+    final startAt = DateTime.tryParse(reminderIso);
+    if (startAt == null) return true;
+
+    final service = ref.read(timeBlockSyncServiceProvider);
+    final proposed = service.deriveBlock(
+      entityId: task.id,
+      entityKind: 'task',
+      startAt: startAt,
+      durationMinutes: task.durationMinutes,
+      modeRefId: task.modeRefId,
+      isRigid: _isRigid,
+    );
+    if (proposed == null) return true;
+
+    // Build a merged entityId → title map so that conflicting goal and task
+    // blocks are shown with a human-readable name in the conflict UI.
+    final goalTitles = ref.read(goalTitleMapProvider);
+    final taskRows = ref.read(todayAllTasksRowsProvider).valueOrNull ?? [];
+    final taskTitles = {for (final r in taskRows) r.task.id: r.task.title};
+    final entityTitles = {...taskTitles, ...goalTitles};
+
+    final result = await service.checkConflicts(proposed, entityTitles: entityTitles);
+    if (!result.hasConflicts) {
+      // Still log overlapCreated = false (no event needed — clean save).
+      return true;
+    }
+
+    if (!mounted) return false;
+
+    // Minor conflicts: show inline banner only (no bottom sheet).
+    if (result.worstSeverity == ConflictSeverity.minor) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Minor time overlap with ${result.conflicts.first.conflictingEntityTitle}. '
+            'Saved anyway.',
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      _logOverlapCreated(task, overridden: true);
+      return true;
+    }
+
+    // Moderate / severe: show full conflict bottom sheet.
+    final action = await ConflictBottomSheet.show(
+      context: context,
+      conflicts: result.conflicts,
+    );
+
+    switch (action) {
+      case ConflictAction.saveAnyway:
+        _logOverlapCreated(task, overridden: true);
+        fireAndForgetAnalyticsEvent(
+          ref,
+          type: AnalyticsEventType.overlapOverridden,
+          entityId: task.id,
+          entityKind: 'task',
+          sourceSurface: _isEdit ? 'add_task_edit' : 'add_task_create',
+          idempotencyKey: 'overlap_overridden_${task.id}_${DateTime.now().millisecondsSinceEpoch}',
+          modeRefId: task.modeRefId,
+        );
+        return true;
+      case ConflictAction.adjustTime:
+      case ConflictAction.shortenDuration:
+      case null:
+        return false;
+    }
+  }
+
+  Future<void> _syncTimeBlock(PlannedTask task) async {
+    final reminderIso = task.reminderTimeIso;
+    if (reminderIso == null) {
+      await ref.read(timeBlockSyncServiceProvider).removeBlockForEntity(task.id);
+      return;
+    }
+    final startAt = DateTime.tryParse(reminderIso);
+    if (startAt == null) return;
+
+    final service = ref.read(timeBlockSyncServiceProvider);
+    final block = service.deriveBlock(
+      entityId: task.id,
+      entityKind: 'task',
+      startAt: startAt,
+      durationMinutes: task.durationMinutes,
+      modeRefId: task.modeRefId,
+      isRigid: _isRigid,
+    );
+    if (block != null) {
+      await service.syncBlock(block);
+    }
+  }
+
+  void _logOverlapCreated(PlannedTask task, {required bool overridden}) {
+    fireAndForgetAnalyticsEvent(
+      ref,
+      type: AnalyticsEventType.overlapCreated,
+      entityId: task.id,
+      entityKind: 'task',
+      sourceSurface: _isEdit ? 'add_task_edit' : 'add_task_create',
+      idempotencyKey: 'overlap_created_${task.id}_${DateTime.now().millisecondsSinceEpoch}',
+      modeRefId: task.modeRefId,
+      reason: overridden ? 'override' : 'detected',
+    );
+  }
+
   Future<void> _onSave() async {
     if (_saving || (_isEdit && !_loaded)) return;
     setState(() => _saving = true);
@@ -448,7 +572,15 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
       final proceed = await _confirmOverlapIfNeeded(task, planKey);
       if (!proceed) return;
 
+      // Phase A — time block conflict check.
+      final tbProceed = await _checkTimeBlockConflicts(task);
+      if (!tbProceed) return;
+
       await planning.upsertTask(task);
+
+      // Phase A — sync time block after successful save.
+      await _syncTimeBlock(task);
+
       await _persistReminder(
         taskId: taskId,
         taskTitle: title,
@@ -520,25 +652,31 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
                   onChanged: (v) => setState(() => _isHabitAnchor = v),
                 ),
                 const SizedBox(height: 24),
-                const Text('EXECUTION MODE', style: TextStyle(letterSpacing: 2, color: Colors.white70)),
+                const Text(
+                  'ENFORCEMENT MODE',
+                  style: TextStyle(letterSpacing: 2, color: Colors.white70),
+                ),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
+                Column(
                   children: [
-                    for (var i = 0; i < _modeChoiceIds.length; i++)
-                      ChoiceChip(
-                        label: Text(_modeLabels[i]),
-                        selected: _modeRefId == _modeChoiceIds[i],
-                        onSelected: (_) => setState(() {
+                    for (var i = 0; i < _modeChoiceIds.length; i++) ...[
+                      _EnforcementModeOption(
+                        label: _modeLabels[i],
+                        description: _modeDescriptions[i],
+                        isSelected: _modeRefId == _modeChoiceIds[i],
+                        onTap: () => setState(() {
                           _modeUserCustomized = true;
                           _modeRefId = _modeChoiceIds[i];
                         }),
                       ),
+                      if (i < _modeChoiceIds.length - 1)
+                        const SizedBox(height: 6),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Overrides the slot default for this task only. Uses the slot mode for new tasks until you pick another.',
+                  'Per-task setting. Overrides the slot default for this task only.',
                   style: TextStyle(color: Colors.white38, fontSize: 12),
                 ),
                 SwitchListTile(
@@ -550,6 +688,16 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
                   ),
                   value: _strictModeRequired,
                   onChanged: (v) => setState(() => _strictModeRequired = v),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Fixed time slot'),
+                  subtitle: const Text(
+                    'Marks this as a hard block. Conflicts with other tasks will be flagged more strongly.',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  value: _isRigid,
+                  onChanged: (v) => setState(() => _isRigid = v),
                 ),
                 const SizedBox(height: 24),
                 const Text('TEMPORAL DEPTH', style: TextStyle(letterSpacing: 2, color: Colors.white70)),
@@ -664,6 +812,92 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
                 ),
               ],
             ),
+    );
+  }
+}
+
+// ─── Enforcement mode option tile ─────────────────────────────────────────────
+
+class _EnforcementModeOption extends StatelessWidget {
+  const _EnforcementModeOption({
+    required this.label,
+    required this.description,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final String description;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF6C63FF).withAlpha(30)
+              : Colors.white.withAlpha(7),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF6C63FF)
+                : Colors.white.withAlpha(18),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 18,
+              height: 18,
+              margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected
+                    ? const Color(0xFF6C63FF)
+                    : Colors.transparent,
+                border: Border.all(
+                  color: isSelected
+                      ? const Color(0xFF6C63FF)
+                      : Colors.white38,
+                  width: 2,
+                ),
+              ),
+              child: isSelected
+                  ? const Icon(Icons.check, size: 11, color: Colors.white)
+                  : null,
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    description,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white54,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

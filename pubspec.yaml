@@ -46,6 +46,9 @@ dependencies:
   shared_preferences: ^2.5.3
   http: ^1.6.0
   firebase_remote_config: ^5.5.0
+  image_picker: ^1.2.2
+  firebase_storage: ^12.4.10
+  speech_to_text: ^7.4.0
 
 dev_dependencies:
   flutter_test:
@@ -59,6 +62,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   isar_generator: ^3.1.0+1
   build_runner: ^2.4.13
+  fake_cloud_firestore: ^3.1.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

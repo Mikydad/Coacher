@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary-container": "#befc00",
+              "on-primary-fixed": "#354900",
+              "primary-dim": "#b2ed00",
+              "secondary-fixed-dim": "#00d7f0",
+              "background": "#0e0e0e",
+              "inverse-on-surface": "#565554",
+              "tertiary-dim": "#eed942",
+              "primary-fixed-dim": "#b2ed00",
+              "surface-container-high": "#201f1f",
+              "tertiary": "#fff4c1",
+              "tertiary-fixed-dim": "#eed942",
+              "secondary-fixed": "#26e6ff",
+              "surface-tint": "#eaffb8",
+              "surface-container": "#1a1919",
+              "on-primary": "#4b6600",
+              "secondary": "#00e3fd",
+              "surface-container-lowest": "#000000",
+              "on-tertiary-fixed": "#4a4100",
+              "on-secondary-container": "#e8fbff",
+              "error-container": "#b92902",
+              "tertiary-fixed": "#fde74f",
+              "on-secondary-fixed-variant": "#005964",
+              "on-tertiary": "#685c00",
+              "on-tertiary-fixed-variant": "#695e00",
+              "on-secondary": "#004d57",
+              "inverse-primary": "#4c6800",
+              "outline-variant": "#494847",
+              "on-error-container": "#ffd2c8",
+              "on-tertiary-container": "#5e5400",
+              "primary": "#eaffb8",
+              "surface-container-highest": "#262626",
+              "error": "#ff7351",
+              "secondary-container": "#006875",
+              "surface-dim": "#0e0e0e",
+              "surface-container-low": "#131313",
+              "error-dim": "#d53d18",
+              "tertiary-container": "#fde74f",
+              "surface-variant": "#262626",
+              "on-surface-variant": "#adaaaa",
+              "on-primary-fixed-variant": "#4c6800",
+              "primary-fixed": "#befc00",
+              "on-error": "#450900",
+              "outline": "#777575",
+              "on-background": "#ffffff",
+              "surface-bright": "#2c2c2c",
+              "on-secondary-fixed": "#003a42",
+              "on-primary-container": "#445d00",
+              "inverse-surface": "#fcf8f8",
+              "surface": "#0e0e0e",
+              "secondary-dim": "#00d4ec",
+              "on-surface": "#ffffff"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #0e0e0e; color: #ffffff; -webkit-font-smoothing: antialiased; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-card { background: rgba(38, 38, 38, 0.6); backdrop-filter: blur(20px); }
+        .streak-glow { box-shadow: 0 0 20px rgba(192, 255, 0, 0.3); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .active-ring { outline: 2px solid #befc00; outline-offset: -2px; }
+    </style>
+</head>
+<body class="bg-background text-on-surface min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="sticky top-0 z-50 flex items-center justify-between px-6 py-4 bg-background/80 backdrop-blur-md">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface" data-icon="menu">menu</span>
+<h1 class="text-xl font-semibold tracking-tight">Quittr</h1>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface" data-icon="notifications">notifications</span>
+</div>
+</header>
+<main class="max-w-2xl mx-auto px-6 pt-4 space-y-10">
+<!-- Profile Hero Section -->
+<section class="relative">
+<div class="grid grid-cols-12 gap-4">
+<div class="col-span-12 lg:col-span-8 bg-surface-container-high p-8 rounded-xl flex items-center gap-6 overflow-hidden relative">
+<div class="absolute -right-8 -top-8 w-32 h-32 bg-primary/10 rounded-full blur-3xl"></div>
+<div class="relative">
+<img alt="User Profile" class="w-24 h-24 rounded-full object-cover border-2 border-primary-dim/20 p-1" data-alt="Close up portrait of a determined man" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBc3X4Sn5PNWoxNdDgF4GcklqNKzI3HjWriHt-otBiPRx-Swaxj1ofJHI3GByokfp9A0af0KS6trzrl-r5jTm0tBRGs_fvwafRYxUqeGOS1NFnHKQTMPyp-nZpjhZI2dv7rLRQfILMgkabuVNo_ZOWKExwYZlCleO9XEn8r3tv5x2_ooTsWUALgToR6Y9a1rPRsgPbtjn6urvdElE529Wo8jfz-D9EAni1R5VWHFW0-bbeYSA43Hjc4ACKGKZe6Sx43Vn552GmU_BU"/>
+<div class="absolute -bottom-1 -right-1 bg-primary text-on-primary-fixed p-1 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-xs" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+</div>
+<div>
+<span class="inline-block px-2 py-0.5 bg-primary/10 text-primary text-[0.625rem] font-bold tracking-[0.1em] uppercase rounded border border-primary/20 mb-2">Pro Athlete</span>
+<h2 class="text-2xl font-bold tracking-tight mb-2">Marcus Vance</h2>
+<button class="flex items-center gap-2 text-primary-dim text-sm font-medium">
+                            Edit Profile <span class="material-symbols-outlined text-sm">north_east</span>
+</button>
+</div>
+</div>
+<!-- Streak Card -->
+<div class="col-span-12 lg:col-span-4 bg-primary-container p-6 rounded-xl flex flex-col justify-between streak-glow">
+<span class="material-symbols-outlined text-on-primary-container" data-icon="local_fire_department" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+<div>
+<p class="text-4xl font-bold text-on-primary-container leading-none">42</p>
+<p class="text-[0.6875rem] font-bold uppercase tracking-wider text-on-primary-container opacity-70">DAY STREAK</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Discipline Mode Selection -->
+<section class="space-y-4">
+<h3 class="text-sm font-bold uppercase tracking-[0.2em] text-on-surface-variant px-1">Discipline Modes</h3>
+<div class="grid grid-cols-1 gap-3">
+<!-- Flexible -->
+<div class="group bg-surface-container-low p-5 rounded-lg border border-transparent hover:bg-surface-container-high transition-all flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined">waves</span>
+</div>
+<div class="flex-1">
+<h4 class="font-semibold text-sm">Flexible</h4>
+<p class="text-xs text-on-surface-variant">Lighter tracking with grace periods for busy schedules.</p>
+</div>
+</div>
+<!-- Disciplined (Active) -->
+<div class="group bg-primary-container/5 active-ring p-5 rounded-lg border border-primary-dim/20 transition-all flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-primary-dim flex items-center justify-center text-on-primary-fixed">
+<span class="material-symbols-outlined">bolt</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-center mb-1">
+<h4 class="font-semibold text-primary">Disciplined</h4>
+<span class="text-[0.625rem] bg-primary text-on-primary-fixed px-2 py-0.5 rounded-full font-bold">ACTIVE</span>
+</div>
+<p class="text-xs text-on-surface-variant">Standard high-performance tracking with consistent check-ins.</p>
+</div>
+</div>
+<!-- Extreme -->
+<div class="group bg-surface-container-low p-5 rounded-lg border border-transparent hover:bg-surface-container-high transition-all flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center text-error">
+<span class="material-symbols-outlined">shield_with_heart</span>
+</div>
+<div class="flex-1">
+<h4 class="font-semibold text-sm">Extreme</h4>
+<p class="text-xs text-on-surface-variant">Uncompromising accountability. Partners notified on any slip-up.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Coach Tone Section -->
+<section class="space-y-4">
+<div class="px-1">
+<h3 class="text-sm font-bold uppercase tracking-[0.2em] text-on-surface-variant mb-1">Coach Tone</h3>
+<p class="text-xs text-on-surface-variant/70">Adjust how your AI coach communicates with you.</p>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div class="bg-surface-container-low p-4 rounded-xl border border-transparent hover:border-primary-dim/20 cursor-pointer transition-all">
+<p class="text-sm font-semibold mb-1">Balanced</p>
+<p class="text-[0.625rem] text-on-surface-variant">Empathetic and steady</p>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl border border-transparent hover:border-primary-dim/20 cursor-pointer transition-all">
+<p class="text-sm font-semibold mb-1 text-secondary">Flexible</p>
+<p class="text-[0.625rem] text-on-surface-variant">Encouraging and light</p>
+</div>
+<div class="bg-primary-container/10 active-ring p-4 rounded-xl border border-primary-dim/30 cursor-pointer transition-all">
+<p class="text-sm font-semibold mb-1 text-primary">Disciplined</p>
+<p class="text-[0.625rem] text-on-surface-variant">Direct and focused</p>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl border border-transparent hover:border-primary-dim/20 cursor-pointer transition-all">
+<p class="text-sm font-semibold mb-1 text-error">Intense</p>
+<p class="text-[0.625rem] text-on-surface-variant">Radical honesty only</p>
+</div>
+</div>
+</section>
+<!-- Technical Metadata (Settings List) -->
+<section class="space-y-2">
+<h3 class="text-sm font-bold uppercase tracking-[0.2em] text-on-surface-variant px-1 mb-4">Core Optimization</h3>
+<div class="bg-surface-container-low rounded-xl overflow-hidden">
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-high transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">account_circle</span>
+<div>
+<p class="font-medium text-sm">Account Settings</p>
+<p class="text-[0.6875rem] text-on-surface-variant">Security, Privacy &amp; Data</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-sm">chevron_right</span>
+</div>
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-high transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">notifications_active</span>
+<div>
+<p class="font-medium text-sm">Notifications</p>
+<p class="text-[0.6875rem] text-on-surface-variant">Sound, Haptics &amp; Push</p>
+</div>
+</div>
+<div class="w-10 h-5 bg-primary-dim rounded-full flex items-center px-1">
+<div class="w-3.5 h-3.5 bg-on-primary-fixed rounded-full ml-auto"></div>
+</div>
+</div>
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-high transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">alarm_on</span>
+<div>
+<p class="font-medium text-sm">Reminder Settings</p>
+<p class="text-[0.6875rem] text-on-surface-variant">Adaptive daily triggers</p>
+</div>
+</div>
+<span class="text-xs text-primary font-medium">8:00 AM</span>
+</div>
+</div>
+</section>
+<!-- Log Out & Actions -->
+<section class="pt-6 space-y-4">
+<button class="w-full bg-surface-container-highest text-error font-semibold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-error/10 transition-colors">
+<span class="material-symbols-outlined text-sm">logout</span>
+                Log Out
+            </button>
+<p class="text-center text-[0.625rem] text-on-surface-variant tracking-[0.25em] uppercase opacity-50">Quittr v4.0.2 Build 2024.X</p>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-xl border-t border-outline-variant/10 px-4 py-3 z-50">
+<div class="max-w-2xl mx-auto flex justify-between items-center">
+<div class="flex flex-col items-center gap-1 cursor-pointer">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="home">home</span>
+<span class="text-[0.625rem] font-medium text-on-surface-variant">Home</span>
+</div>
+<div class="flex flex-col items-center gap-1 cursor-pointer">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="psychology">psychology</span>
+<span class="text-[0.625rem] font-medium text-on-surface-variant">Coach</span>
+</div>
+<div class="flex flex-col items-center gap-1 cursor-pointer">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="leaderboard">leaderboard</span>
+<span class="text-[0.625rem] font-medium text-on-surface-variant">Progress</span>
+</div>
+<div class="flex flex-col items-center gap-1 cursor-pointer">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="group">group</span>
+<span class="text-[0.625rem] font-medium text-on-surface-variant">Community</span>
+</div>
+<div class="flex flex-col items-center gap-1 cursor-pointer">
+<span class="material-symbols-outlined text-primary-dim" data-icon="person" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="text-[0.625rem] font-medium text-primary-dim">Profile</span>
+</div>
+</div>
+</nav>
+</body></html>

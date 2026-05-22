@@ -14,6 +14,8 @@ class ReminderConfig {
     this.emergencyBypass = false,
     this.lastTriggeredAtMs,
     this.nextPromptAtIso,
+    this.activeNotificationId,
+    this.evaluationTrace = const [],
     required this.createdAtMs,
     required this.updatedAtMs,
   });
@@ -30,6 +32,17 @@ class ReminderConfig {
   final bool emergencyBypass;
   final int? lastTriggeredAtMs;
   final String? nextPromptAtIso;
+
+  /// The OS notification ID currently scheduled for this entity.
+  /// Null when no notification is active. Used by [AttentionOrchestratorService]
+  /// for single-cancel across app restarts (in-memory map is primary; this is
+  /// the persistence fallback added in Phase C).
+  final int? activeNotificationId;
+
+  /// Ordered human-readable trace entries from escalation decisions.
+  /// Appended by [AttentionOrchestratorService] for explainability/debug.
+  final List<String> evaluationTrace;
+
   final int createdAtMs;
   final int updatedAtMs;
 
@@ -51,26 +64,37 @@ class ReminderConfig {
     'emergencyBypass': emergencyBypass,
     if (lastTriggeredAtMs != null) 'lastTriggeredAtMs': lastTriggeredAtMs,
     if (nextPromptAtIso != null) 'nextPromptAtIso': nextPromptAtIso,
+    if (activeNotificationId != null)
+      'activeNotificationId': activeNotificationId,
+    if (evaluationTrace.isNotEmpty) 'evaluationTrace': evaluationTrace,
     'createdAtMs': createdAtMs,
     'updatedAtMs': updatedAtMs,
   };
 
-  static ReminderConfig fromMap(Map<String, dynamic> map) => ReminderConfig(
-    id: map['id'] as String,
-    taskId: map['taskId'] as String,
-    taskTitle: map['taskTitle'] as String?,
-    enabled: map['enabled'] as bool? ?? false,
-    scheduledAtIso: map['scheduledAtIso'] as String?,
-    modeRefId: map['modeRefId'] as String?,
-    blockUrgencyScore: (map['blockUrgencyScore'] as num?)?.toInt() ?? 50,
-    pendingAction: map['pendingAction'] as bool? ?? false,
-    escalationLevel: (map['escalationLevel'] as num?)?.toInt() ?? 0,
-    emergencyBypass: map['emergencyBypass'] as bool? ?? false,
-    lastTriggeredAtMs: (map['lastTriggeredAtMs'] as num?)?.toInt(),
-    nextPromptAtIso: map['nextPromptAtIso'] as String?,
-    createdAtMs: map['createdAtMs'] as int,
-    updatedAtMs: map['updatedAtMs'] as int,
-  );
+  static ReminderConfig fromMap(Map<String, dynamic> map) {
+    final rawTrace = map['evaluationTrace'];
+    final trace = rawTrace is List
+        ? rawTrace.whereType<String>().toList(growable: false)
+        : const <String>[];
+    return ReminderConfig(
+      id: map['id'] as String,
+      taskId: map['taskId'] as String,
+      taskTitle: map['taskTitle'] as String?,
+      enabled: map['enabled'] as bool? ?? false,
+      scheduledAtIso: map['scheduledAtIso'] as String?,
+      modeRefId: map['modeRefId'] as String?,
+      blockUrgencyScore: (map['blockUrgencyScore'] as num?)?.toInt() ?? 50,
+      pendingAction: map['pendingAction'] as bool? ?? false,
+      escalationLevel: (map['escalationLevel'] as num?)?.toInt() ?? 0,
+      emergencyBypass: map['emergencyBypass'] as bool? ?? false,
+      lastTriggeredAtMs: (map['lastTriggeredAtMs'] as num?)?.toInt(),
+      nextPromptAtIso: map['nextPromptAtIso'] as String?,
+      activeNotificationId: (map['activeNotificationId'] as num?)?.toInt(),
+      evaluationTrace: trace,
+      createdAtMs: map['createdAtMs'] as int,
+      updatedAtMs: map['updatedAtMs'] as int,
+    );
+  }
 
   ReminderConfig copyWith({
     bool? enabled,
@@ -83,6 +107,8 @@ class ReminderConfig {
     bool? emergencyBypass,
     int? lastTriggeredAtMs,
     String? nextPromptAtIso,
+    int? activeNotificationId,
+    List<String>? evaluationTrace,
     int? updatedAtMs,
   }) {
     return ReminderConfig(
@@ -98,6 +124,8 @@ class ReminderConfig {
       emergencyBypass: emergencyBypass ?? this.emergencyBypass,
       lastTriggeredAtMs: lastTriggeredAtMs ?? this.lastTriggeredAtMs,
       nextPromptAtIso: nextPromptAtIso ?? this.nextPromptAtIso,
+      activeNotificationId: activeNotificationId ?? this.activeNotificationId,
+      evaluationTrace: evaluationTrace ?? this.evaluationTrace,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     );

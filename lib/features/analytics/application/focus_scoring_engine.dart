@@ -1,3 +1,5 @@
+import '../../../features/coaching/application/enforcement_mode_policy.dart';
+import '../../../features/coaching/domain/models/enforcement_mode.dart';
 import '../domain/models/current_coaching_focus.dart';
 import '../domain/models/detected_behavior_pattern.dart';
 import '../domain/models/generated_insight.dart';
@@ -27,9 +29,13 @@ const kFocusScoringWeights = FocusScoringWeights();
 // ─── Sub-score helpers ───────────────────────────────────────────────────────
 
 /// 0–1 how time-sensitive the coaching action is.
+///
+/// [enforcementMode] applies the FR-D-17 urgency multiplier:
+/// flexible ×0.8 / disciplined ×1.0 / extreme ×1.3.
 double computeUrgencyScore({
   required GeneratedInsight insight,
   required FocusRealtimeContext ctx,
+  EnforcementMode enforcementMode = EnforcementMode.disciplined,
 }) {
   // Base from Phase 3 insight urgency.
   var score = insight.urgency;
@@ -44,6 +50,9 @@ double computeUrgencyScore({
   if (ctx.isInFocusSession) {
     score *= 0.4;
   }
+
+  // Apply enforcement mode urgency multiplier (FR-D-17).
+  score *= EnforcementModePolicy.urgencyMultiplier(enforcementMode);
 
   return score.clamp(0.0, 1.0);
 }
@@ -184,6 +193,7 @@ FocusScoreBreakdown computeFocusScoreBreakdown(
   final urgency = computeUrgencyScore(
     insight: candidate.insight,
     ctx: candidate.realtimeContext,
+    enforcementMode: candidate.enforcementMode,
   );
   final momentum = computeMomentumScore(
     insight: candidate.insight,

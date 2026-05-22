@@ -10,6 +10,25 @@ enum AnalyticsEventType {
   taskDeferred,
   overlapOverride,
   autoNextStarted,
+  // Phase A — time block signals
+  overlapCreated,
+  overlapOverridden,
+  reclaimedTimeGenerated,
+  reclaimedTimeUsed,
+  // Phase C — notification fatigue signals
+  notificationDelivered,
+  notificationOpened,
+  notificationDismissed,
+  notificationIgnored,
+  reminderSuppressed,
+  repeatedSnoozePattern,
+  // AI Operating Layer
+  aiCommandSubmitted,
+  aiCommandExecuted,
+  aiCommandCanceled,
+  aiFollowupQuestionAsked,
+  aiSuggestionAccepted,
+  aiSuggestionRejected,
 }
 
 class AnalyticsEvent {

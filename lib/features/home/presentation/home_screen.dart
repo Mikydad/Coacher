@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,6 +40,12 @@ import '../../goals/presentation/goal_editor_screen.dart';
 import '../../goals/presentation/goal_selection_screen.dart';
 import '../../plan_tomorrow/presentation/plan_tomorrow_screen.dart';
 import '../../analytics/presentation/analytics_progress_screen.dart';
+import '../../community/presentation/community_screen.dart';
+import '../../context_override/presentation/active_override_banner.dart';
+import '../../context_override/presentation/context_override_quick_activate_sheet.dart';
+import '../../context_override/presentation/post_override_review_card.dart';
+import '../../profile/presentation/profile_screen.dart';
+import '../../settings/presentation/settings_screen.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 import 'quittr_app_bar_title.dart';
 
@@ -64,6 +71,8 @@ class HomeScreen extends ConsumerWidget {
             execState.phase == ExecutionPhase.paused);
 
     return Scaffold(
+      floatingActionButton: _CoachAiFab(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       appBar: AppBar(
         title: const QuittrAppBarTitle(),
         actions: [
@@ -75,6 +84,12 @@ class HomeScreen extends ConsumerWidget {
               AccountabilityHistoryScreen.routeName,
             ),
             icon: const Icon(Icons.history),
+          ),
+          IconButton(
+            tooltip: 'Settings',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () =>
+                Navigator.pushNamed(context, SettingsScreen.routeName),
           ),
           const Padding(
             padding: EdgeInsets.only(right: 16),
@@ -130,9 +145,19 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _ActionCircle(
+                  icon: Icons.do_not_disturb_on_outlined,
+                  label: 'SET\nMODE',
+                  onTap: () => showContextOverrideQuickActivateSheet(context),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
+          const ActiveOverrideBanner(),
+          const PostOverrideReviewCard(),
           const _DailyDisciplineSection(),
           const SizedBox(height: 24),
           _NeonCard(
@@ -469,30 +494,24 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0,
-        type: BottomNavigationBarType.fixed,
+      bottomNavigationBar: _ObsidianBottomNav(
         onTap: (index) {
           if (index == 1) {
-            Navigator.pushNamed(context, GoalSelectionScreen.routeName);
+            Navigator.pushNamed(context, '/coach');
           }
           if (index == 2) {
+            Navigator.pushNamed(context, GoalSelectionScreen.routeName);
+          }
+          if (index == 3) {
             Navigator.pushNamed(context, AnalyticsProgressScreen.routeName);
           }
+          if (index == 4) {
+            Navigator.pushNamed(context, CommunityScreen.routeName);
+          }
+          if (index == 5) {
+            Navigator.pushNamed(context, ProfileScreen.routeName);
+          }
         },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.track_changes),
-            label: 'Goals',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.trending_up),
-            label: 'Progress',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'Community'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
       ),
     );
   }
@@ -1730,5 +1749,118 @@ Future<void> _uncompleteTaskFromHome(
         context,
       ).showSnackBar(SnackBar(content: Text('Could not update task: $e')));
     }
+  }
+}
+
+// ─── Obsidian Pulse bottom nav ────────────────────────────────────────────────
+
+// ─── Coach AI FAB ─────────────────────────────────────────────────────────────
+
+class _CoachAiFab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return ClipOval(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: GestureDetector(
+          onTap: () => Navigator.pushNamed(context, '/coach'),
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: const Color(0xFF262626).withValues(alpha: 0.85),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFFEAFFB8).withValues(alpha: 0.25),
+              ),
+            ),
+            child: const Icon(
+              Icons.auto_awesome_rounded,
+              color: Color(0xFFEAFFB8),
+              size: 24,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Bottom nav ───────────────────────────────────────────────────────────────
+
+class _ObsidianBottomNav extends StatelessWidget {
+  const _ObsidianBottomNav({required this.onTap});
+
+  final void Function(int index) onTap;
+
+  static const _items = [
+    (icon: Icons.home_rounded, label: 'Home'),
+    (icon: Icons.auto_awesome_rounded, label: 'Coach'),
+    (icon: Icons.track_changes_rounded, label: 'Goals'),
+    (icon: Icons.leaderboard_rounded, label: 'Progress'),
+    (icon: Icons.group_rounded, label: 'Community'),
+    (icon: Icons.person_rounded, label: 'Profile'),
+  ];
+
+  // Profile tab (index 4) is considered "active" when this widget is on HomeScreen.
+  // We highlight nothing by default since Home is the current screen — but per
+  // design, the Profile icon uses primary-dim when selected. We keep Home
+  // unlit since all items from HomeScreen push on top; none stays selected.
+  static const _kSurface = Color(0xFF0E0E0E);
+  static const _kVariant = Color(0xFFADAAAA);
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          color: _kSurface.withValues(alpha: 0.8),
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.06),
+                ),
+              ),
+            ),
+            padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + bottomPadding),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(_items.length, (i) {
+                final item = _items[i];
+                return GestureDetector(
+                  onTap: () => onTap(i),
+                  behavior: HitTestBehavior.opaque,
+                  child: SizedBox(
+                    width: 56,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          item.icon,
+                          size: 24,
+                          color: _kVariant,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item.label,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: _kVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
