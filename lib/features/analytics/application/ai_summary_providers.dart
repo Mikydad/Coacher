@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/ai/ai_remote_config_service.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/local_db/isar_collections/isar_ai_summary.dart';
+import '../../coaching/application/coaching_style_providers.dart';
 import '../domain/models/ai_summary_response.dart';
 import '../domain/models/coaching_ai_payload.dart';
 import '../domain/models/current_coaching_focus.dart';
@@ -144,6 +145,9 @@ final recomputeAiSummaryProvider = FutureProvider<AiSummaryResponse>((
     if (cached != null) return cached;
   }
 
+  // Resolve the user's current coaching style (defaults to balanced).
+  final coachingStyle = ref.read(activeCoachingStyleProvider);
+
   // Assemble payload.
   final deliveryContext = AiDeliveryContext(
     timingProfile: timingProfile.name,
@@ -154,6 +158,7 @@ final recomputeAiSummaryProvider = FutureProvider<AiSummaryResponse>((
     focus: focus,
     primaryInsightType: primaryInsightType,
     deliveryContext: deliveryContext,
+    coachingStyle: coachingStyle,
     secondaryInsightType: _findSecondaryInsightType(insights, focus),
   );
 

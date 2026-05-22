@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/utils/date_keys.dart';
+import '../../../features/time_blocks/application/time_block_providers.dart';
+import 'goal_block_sync_service.dart';
 import 'goal_period_helpers.dart';
 import '../data/goals_repository.dart';
 import '../data/isar_goals_repository.dart';
@@ -108,6 +110,25 @@ final goalDetailProvider = FutureProvider.family<GoalDetailBundle?, String>((ref
     milestones: milestones,
     checkIns: checkIns,
   );
+});
+
+/// Provides [GoalBlockSyncService] for writing/removing goal time blocks.
+final goalBlockSyncServiceProvider = Provider<GoalBlockSyncService>((ref) {
+  return GoalBlockSyncService(
+    timeBlockSyncService: ref.read(timeBlockSyncServiceProvider),
+  );
+});
+
+/// Maps goal id → title for all known goals.
+///
+/// Used by the conflict detection UI so that overlapping goal blocks are
+/// shown with a human-readable name instead of a raw UUID.
+final goalTitleMapProvider = Provider<Map<String, String>>((ref) {
+  final async = ref.watch(goalsStreamProvider);
+  return async.whenOrNull(
+        data: (list) => {for (final g in list) g.id: g.title},
+      ) ??
+      const {};
 });
 
 void invalidateGoals(WidgetRef ref, {String? goalId}) {

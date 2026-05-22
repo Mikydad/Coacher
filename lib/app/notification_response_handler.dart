@@ -8,10 +8,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/di/providers.dart';
 import '../features/analytics/presentation/analytics_progress_screen.dart';
+import '../features/community/presentation/circle_detail_screen.dart';
 import '../features/focus/presentation/focus_selection_screen.dart';
 import '../features/goals/application/goals_providers.dart';
 import '../features/goals/presentation/goal_detail_screen.dart';
 import '../features/planning/application/planned_task_collect.dart';
+import '../features/reminders/application/attention_orchestrator_providers.dart';
+import '../features/reminders/domain/models/notification_interaction_type.dart';
 import 'app_navigator.dart';
 
 const _taskPayloadPrefix = 'task:';
@@ -216,8 +219,23 @@ Future<void> handleNotificationResponse(
     return;
   }
 
+  // Circle deep link — appended in Phase 4 (do not modify cases above).
+  if (raw.startsWith('circle:')) {
+    final circleId = raw.substring('circle:'.length);
+    if (circleId.isNotEmpty) {
+      debugPrint('[NotifTap] circle tap circleId=$circleId');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _pushNowIfReady(
+          CircleDetailScreen.routeName,
+          arguments: circleId,
+        );
+      });
+    }
+    return;
+  }
+
   if (!raw.startsWith(_taskPayloadPrefix)) {
-    debugPrint('[NotifTap] payload not task/goal/layer4 -> ignore');
+    debugPrint('[NotifTap] payload not task/goal/layer4/circle -> ignore');
     return;
   }
   final taskId = Uri.decodeComponent(raw.substring(_taskPayloadPrefix.length));
@@ -228,12 +246,28 @@ Future<void> handleNotificationResponse(
   debugPrint('[NotifTap] task tap taskId=$taskId');
 
   final sync = container.read(reminderSyncServiceProvider);
+  final orchestrator = container.read(attentionOrchestratorServiceProvider);
 
   if (response.actionId == 'snooze') {
     debugPrint('[NotifTap] snooze action for task=$taskId');
+    // Record snooze interaction (logs analytics + detects repeated snooze pattern).
+    unawaited(
+      orchestrator.onInteractionReceived(
+        taskId,
+        NotificationInteractionType.snoozed,
+      ),
+    );
     await sync.requestSnooze(taskId);
     return;
   }
+
+  // Tap = opened interaction.
+  unawaited(
+    orchestrator.onInteractionReceived(
+      taskId,
+      NotificationInteractionType.opened,
+    ),
+  );
 
   var label = 'Task';
   int? durationMinutes;
@@ -329,13 +363,15 @@ Future<String?> _payloadFromNotificationId(
       return 'task:${Uri.encodeComponent(indexedTaskId)}';
     }
     debugPrint('[NotifTap] id-map miss notificationId=$id, trying reminder scan');
-    final reminders = await container.read(reminderRepositoryProvider).listAllReminders();
+    final reminders =
+        await container.read(reminderRepositoryProvider).listAllReminders();
+    // After Phase C each entity has at most 1 active OS notification (slot 0).
     for (final r in reminders) {
-      for (var slot = 0; slot < 64; slot++) {
-        if (notifications.idFromTaskId(r.taskId, slot: slot) == id) {
-          debugPrint('[NotifTap] reminder-scan hit notificationId=$id -> taskId=${r.taskId}');
-          return 'task:${Uri.encodeComponent(r.taskId)}';
-        }
+      if (notifications.idFromTaskId(r.taskId, slot: 0) == id) {
+        debugPrint(
+          '[NotifTap] reminder-scan hit notificationId=$id -> taskId=${r.taskId}',
+        );
+        return 'task:${Uri.encodeComponent(r.taskId)}';
       }
     }
     debugPrint('Notification fallback: no reminder matched notificationId=$id');

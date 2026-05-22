@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/notifications/local_notifications_service.dart';
 import '../core/sync/sync_service.dart';
 import '../core/utils/date_keys.dart';
+import '../features/context_override/application/context_override_expiry_poller.dart';
 import '../features/planning/application/planned_task_providers.dart';
+import '../features/reminders/application/attention_orchestrator_providers.dart';
 import 'notification_response_handler.dart';
 
 /// Invalidates task-list providers when the app resumes and when the local calendar day changes
@@ -68,6 +70,12 @@ class _AppLifecycleTaskRefreshState extends ConsumerState<AppLifecycleTaskRefres
       _lastTodayKey = DateKeys.todayKey();
       unawaited(SyncService.instance.syncFromRemote());
       unawaited(_drainLaunchNotificationResponse());
+      // Check whether any active context override has expired.
+      unawaited(ref.read(contextOverrideExpiryPollerProvider).checkNow());
+      // Check for notifications that were delivered but never interacted with.
+      unawaited(
+        ref.read(attentionOrchestratorServiceProvider).checkIgnoredTimeouts(),
+      );
       WidgetsBinding.instance.addPostFrameCallback((_) {
         flushPendingNotificationNavigationIntent();
       });

@@ -303,6 +303,7 @@ class GoalDetailScreen extends ConsumerWidget {
         final paused = g.copyWith(status: GoalStatus.paused, updatedAtMs: now);
         await repo.upsertGoal(paused);
         await ref.read(goalReminderSyncServiceProvider).applyForGoal(paused);
+        await ref.read(goalBlockSyncServiceProvider).removeBlockForGoal(g.id);
         invalidateGoals(ref, goalId: g.id);
         return;
       case 'complete':
@@ -310,12 +311,16 @@ class GoalDetailScreen extends ConsumerWidget {
         await repo.upsertGoal(done);
         await ref.read(goalReminderSyncServiceProvider).applyForGoal(done);
         await clearEntityCoachingCachesForGoal(ref, done.id);
+        await ref.read(goalBlockSyncServiceProvider).removeBlockForGoal(g.id);
         invalidateGoals(ref, goalId: g.id);
         return;
       case 'reopen':
         final active = g.copyWith(status: GoalStatus.active, updatedAtMs: now);
         await repo.upsertGoal(active);
         await ref.read(goalReminderSyncServiceProvider).applyForGoal(active);
+        await ref
+            .read(goalBlockSyncServiceProvider)
+            .syncBlockForGoal(active, DateTime.now());
         invalidateGoals(ref, goalId: g.id);
         return;
       case 'delete':
@@ -342,6 +347,7 @@ class GoalDetailScreen extends ConsumerWidget {
           await ref.read(goalReminderSyncServiceProvider).cancelForGoal(g.id);
           await repo.deleteGoal(g.id);
           await clearEntityCoachingCachesForGoal(ref, g.id);
+          await ref.read(goalBlockSyncServiceProvider).removeBlockForGoal(g.id);
           invalidateGoals(ref, goalId: g.id);
           if (context.mounted) Navigator.pop(context);
         }

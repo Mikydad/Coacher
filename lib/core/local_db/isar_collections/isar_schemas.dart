@@ -1,3 +1,6 @@
+import 'isar_activity_feed_cache.dart';
+import 'isar_ai_interaction_history.dart';
+import 'isar_ai_pulse_cache.dart';
 import 'isar_ai_summary.dart';
 import 'isar_analytics_event.dart';
 import 'isar_analytics_stats.dart';
@@ -10,7 +13,11 @@ import 'isar_generated_insight.dart';
 import 'isar_goal.dart';
 import 'isar_reminder.dart';
 import 'isar_routine.dart';
+import 'isar_scheduled_time_block.dart';
 import 'isar_task.dart';
+import 'isar_user_attention_state.dart';
+import 'isar_user_coaching_profile.dart';
+import 'isar_user_profile_preference.dart';
 
 /// All Isar collection schemas for [OfflineStore].
 const isarSchemaList = [
@@ -27,4 +34,11 @@ const isarSchemaList = [
   IsarGeneratedInsightSchema,
   IsarReminderSchema,
   IsarGoalSchema,
+  IsarScheduledTimeBlockSchema,
+  IsarUserAttentionStateSchema,
+  IsarUserCoachingProfileSchema,
+  IsarUserProfilePreferenceSchema,
+  IsarActivityFeedCacheSchema,
+  IsarAiPulseCacheSchema,
+  IsarAiInteractionHistorySchema,
 ];

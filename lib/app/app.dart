@@ -12,6 +12,15 @@ import '../features/goals/presentation/goals_archive_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/plan_tomorrow/presentation/plan_tomorrow_screen.dart';
 import '../features/planning/presentation/accountability_history_screen.dart';
+import '../features/coaching/presentation/coaching_style_selection_screen.dart';
+import '../features/community/presentation/circle_create_screen.dart';
+import '../features/community/presentation/circle_detail_screen.dart';
+import '../features/community/presentation/circle_discovery_screen.dart';
+import '../features/ai_assistant/presentation/ai_assistant_screen.dart';
+import '../features/community/presentation/community_screen.dart';
+import '../features/profile/presentation/default_enforcement_mode_selection_screen.dart';
+import '../features/profile/presentation/profile_screen.dart';
+import '../features/settings/presentation/settings_screen.dart';
 import '../features/tasks_hub/presentation/tasks_hub_screen.dart';
 import '../features/timer/presentation/timer_session_screen.dart';
 
@@ -73,6 +82,28 @@ class CoachForLifeApp extends StatelessWidget {
           return TimerSessionScreen(
             launchArgs: args is TimerLaunchArgs ? args : null,
           );
+        },
+        SettingsScreen.routeName: (_) => const SettingsScreen(),
+        ProfileScreen.routeName: (_) => const ProfileScreen(),
+        DefaultEnforcementModeSelectionScreen.routeName: (_) =>
+            const DefaultEnforcementModeSelectionScreen(),
+        CoachingStyleSelectionScreen.routeName: (_) =>
+            const CoachingStyleSelectionScreen(),
+        // ── Coach AI ──────────────────────────────────────────────────────
+        AiAssistantScreen.routeName: (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          return AiAssistantScreen(
+            key: args is CoachRouteArgs ? null : null,
+          );
+        },
+        // ── Community / Accountability Circles ────────────────────────────
+        CommunityScreen.routeName: (_) => const CommunityScreen(),
+        CircleCreateScreen.routeName: (_) => const CircleCreateScreen(),
+        CircleDiscoveryScreen.routeName: (_) => const CircleDiscoveryScreen(),
+        CircleDetailScreen.routeName: (context) {
+          final id =
+              ModalRoute.of(context)?.settings.arguments as String? ?? '';
+          return CircleDetailScreen(circleId: id);
         },
       },
     );

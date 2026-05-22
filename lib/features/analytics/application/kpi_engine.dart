@@ -45,6 +45,16 @@ HabitKpiSnapshot computeHabitKpisFromEvents(
       case AnalyticsEventType.taskDeferred:
       case AnalyticsEventType.overlapOverride:
       case AnalyticsEventType.autoNextStarted:
+      case AnalyticsEventType.overlapCreated:
+      case AnalyticsEventType.overlapOverridden:
+      case AnalyticsEventType.reclaimedTimeGenerated:
+      case AnalyticsEventType.reclaimedTimeUsed:
+      case AnalyticsEventType.notificationDelivered:
+      case AnalyticsEventType.notificationOpened:
+      case AnalyticsEventType.notificationDismissed:
+      case AnalyticsEventType.notificationIgnored:
+      case AnalyticsEventType.reminderSuppressed:
+      case AnalyticsEventType.repeatedSnoozePattern:
         break;
     }
   }

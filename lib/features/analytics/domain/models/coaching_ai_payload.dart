@@ -1,3 +1,4 @@
+import '../../../coaching/domain/models/coaching_style.dart';
 import 'current_coaching_focus.dart';
 import 'generated_insight.dart';
 
@@ -34,38 +35,67 @@ CoachingFraming coachingFramingFromStorage(String? raw) {
   return CoachingFraming.consistency;
 }
 
-/// Derive the appropriate [CoachingFraming] from the focus reason and focus score.
-/// Deterministic — same inputs always produce the same framing.
+/// Derive the appropriate [CoachingFraming] from the focus reason, scores,
+/// and the user's global [CoachingStyle].
+///
+/// The matrix for style-sensitive reasons (FR-D-12):
+///
+/// | FocusReason                  | supportive     | balanced       | disciplined    | intense        |
+/// |------------------------------|---------------|----------------|----------------|----------------|
+/// | imminentStreakRisk           | recovery       | protection     | protection     | protection     |
+/// | highestMomentumLeverage      | momentum       | momentum       | momentum       | momentum       |
+/// | bestRecoveryOpportunity      | recovery       | recovery       | recovery       | stabilization  |
+/// | goalDriftDetected            | recovery       | stabilization  | stabilization  | protection     |
+/// | consistencyBreakdownAlert    | stabilization  | stabilization  | protection     | protection     |
+///
+/// All other reasons use the existing logic unchanged.
 CoachingFraming deriveCoachingFraming({
   required FocusReason focusReason,
   required double focusScore,
   required double urgencyScore,
+  CoachingStyle coachingStyle = CoachingStyle.balanced,
 }) {
   switch (focusReason) {
     case FocusReason.imminentStreakRisk:
-    case FocusReason.consistencyBreakdownAlert:
-      return CoachingFraming.protection;
-
-    case FocusReason.bestRecoveryOpportunity:
-      return CoachingFraming.recovery;
+      return switch (coachingStyle) {
+        CoachingStyle.supportive => CoachingFraming.recovery,
+        _ => CoachingFraming.protection,
+      };
 
     case FocusReason.highestMomentumLeverage:
     case FocusReason.reinforcingActiveStreak:
       return CoachingFraming.momentum;
 
-    case FocusReason.globalOverloadSignal:
+    case FocusReason.bestRecoveryOpportunity:
+      return switch (coachingStyle) {
+        CoachingStyle.intense => CoachingFraming.stabilization,
+        _ => CoachingFraming.recovery,
+      };
+
     case FocusReason.goalDriftDetected:
+      return switch (coachingStyle) {
+        CoachingStyle.supportive => CoachingFraming.recovery,
+        CoachingStyle.intense => CoachingFraming.protection,
+        _ => CoachingFraming.stabilization,
+      };
+
+    case FocusReason.consistencyBreakdownAlert:
+      return switch (coachingStyle) {
+        CoachingStyle.disciplined || CoachingStyle.intense =>
+          CoachingFraming.protection,
+        _ => CoachingFraming.stabilization,
+      };
+
+    case FocusReason.globalOverloadSignal:
       return CoachingFraming.stabilization;
 
     case FocusReason.overdueItemCritical:
-      // High urgency overdue → protect; moderate → recover
       return urgencyScore >= 0.6
           ? CoachingFraming.protection
           : CoachingFraming.recovery;
 
     case FocusReason.scheduledWindowActive:
     case FocusReason.timingOpportunity:
-      // Good timing + strong score → momentum; otherwise consistency
       return focusScore >= 0.65
           ? CoachingFraming.momentum
           : CoachingFraming.consistency;
@@ -214,11 +244,15 @@ class CoachingAiPayload {
     required this.deliveryContext,
     required this.generatedAtMs,
     required this.promptVersion,
+    this.coachingStyle = CoachingStyle.balanced,
     this.secondaryInsightType,
   });
 
   final String focusId;
   final String focusReason;
+
+  /// The user's global coaching style — shapes AI tone and framing language.
+  final CoachingStyle coachingStyle;
 
   /// Deterministic framing — defines the psychological lens the AI must use.
   final CoachingFraming framing;
@@ -263,6 +297,7 @@ class CoachingAiPayload {
     'focusReason': focusReason,
     'framing': framing.name,
     'summaryType': summaryType.name,
+    'coachingStyle': coachingStyle.toStorage(),
     'primaryInsightType': primaryInsightType,
     if (secondaryInsightType != null) 'secondaryInsightType': secondaryInsightType,
     'focusScore': focusScore.clamp(0.0, 1.0),
@@ -281,6 +316,7 @@ class CoachingAiPayload {
     required CurrentCoachingFocus focus,
     required InsightType primaryInsightType,
     required AiDeliveryContext deliveryContext,
+    CoachingStyle coachingStyle = CoachingStyle.balanced,
     InsightType? secondaryInsightType,
     String promptVersion = kCoachingAiPromptVersion,
   }) {
@@ -288,6 +324,7 @@ class CoachingAiPayload {
       focusReason: focus.focusReason,
       focusScore: focus.focusScore,
       urgencyScore: focus.scoreBreakdown.urgencyScore,
+      coachingStyle: coachingStyle,
     );
     final summaryType = deriveSummaryType(
       framing: framing,
@@ -298,6 +335,7 @@ class CoachingAiPayload {
       focusReason: focus.focusReason.name,
       framing: framing,
       summaryType: summaryType,
+      coachingStyle: coachingStyle,
       primaryInsightType: primaryInsightType.name,
       secondaryInsightType: secondaryInsightType?.name,
       focusScore: focus.focusScore,

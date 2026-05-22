@@ -1,0 +1,121 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper functions ──────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isUser(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Uses exists() (cheaper than get()) to check circle membership
+    function isCircleMember(circleId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid));
+    }
+
+    // Reads circle doc once to check moderatorIds list
+    function isCircleModerator(circleId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/circles/$(circleId)).data.moderatorIds.hasAny([request.auth.uid]);
+    }
+
+    // ─── Users ─────────────────────────────────────────────────────────────
+    // Users can read/write their own document and ALL subcollections
+    // (routines, blocks, tasks, reminders, goals, analytics, circleIds, etc.)
+
+    match /users/{uid} {
+      allow read, write: if isUser(uid);
+
+      match /{document=**} {
+        allow read, write: if isUser(uid);
+      }
+    }
+
+    // ─── Circles ───────────────────────────────────────────────────────────
+
+    match /circles/{circleId} {
+
+      // Any signed-in user can read circles (needed for search/browse)
+      allow read: if isSignedIn();
+
+      // Any signed-in user can create — creatorId must match their uid
+      allow create: if isSignedIn()
+        && request.resource.data.creatorId == request.auth.uid;
+
+      // Only moderators can update circle metadata
+      allow update: if isCircleModerator(circleId);
+
+      // Only the creator can delete
+      allow delete: if isCircleModerator(circleId)
+        && get(/databases/$(database)/documents/circles/$(circleId)).data.creatorId == request.auth.uid;
+
+      // ── Members ──────────────────────────────────────────────────────────
+      match /members/{memberId} {
+        // Members can read the member list; anyone signed in can read for discovery
+        allow read: if isSignedIn();
+
+        // A user can create their own membership doc (join / creator self-add)
+        allow create: if isSignedIn() && memberId == request.auth.uid;
+
+        // Moderators can approve/update; the member themselves can update their own doc
+        allow update: if isCircleModerator(circleId) || isUser(memberId);
+
+        // Moderators or the member themselves can remove
+        allow delete: if isCircleModerator(circleId) || isUser(memberId);
+      }
+
+      // ── Messages ─────────────────────────────────────────────────────────
+      match /messages/{messageId} {
+        allow read: if isCircleMember(circleId);
+        allow create: if isCircleMember(circleId)
+          && request.resource.data.senderId == request.auth.uid;
+        allow update: if isCircleMember(circleId);
+        allow delete: if isCircleMember(circleId)
+          && (resource.data.senderId == request.auth.uid || isCircleModerator(circleId));
+      }
+
+      // ── Activity feed ─────────────────────────────────────────────────────
+      match /activityFeed/{itemId} {
+        allow read: if isCircleMember(circleId);
+        allow create: if isSignedIn();
+        allow update, delete: if false;
+      }
+
+      // ── Weekly commitments ────────────────────────────────────────────────
+      match /weeklyCommitments/{commitmentId} {
+        allow read, write: if isCircleMember(circleId);
+      }
+
+      // ── Challenges ────────────────────────────────────────────────────────
+      match /challenges/{challengeId} {
+        allow read: if isCircleMember(circleId);
+        allow create: if isCircleMember(circleId)
+          && request.resource.data.creatorId == request.auth.uid;
+        allow update: if isCircleMember(circleId);
+        allow delete: if isCircleModerator(circleId);
+
+        match /votes/{userId} {
+          allow read: if isCircleMember(circleId);
+          allow write: if isUser(userId) && isCircleMember(circleId);
+        }
+      }
+
+      // ── AI Pulse ──────────────────────────────────────────────────────────
+      match /aiPulse/{pulseId} {
+        allow read: if isCircleMember(circleId);
+        allow write: if isCircleModerator(circleId);
+      }
+
+      // ── Removal votes ─────────────────────────────────────────────────────
+      match /removalVotes/{voteId} {
+        allow read, write: if isCircleModerator(circleId);
+      }
+    }
+  }
+}

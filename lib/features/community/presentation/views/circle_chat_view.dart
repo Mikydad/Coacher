@@ -1,0 +1,756 @@
+import 'dart:io';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../../../core/utils/stable_id.dart';
+import '../../application/circle_providers.dart';
+import '../../domain/models/circle_enums.dart';
+import '../../domain/models/circle_message.dart';
+
+const _kPresetEmojis = ['🔥', '💪', '👏', '✅', '😅', '❤️'];
+
+const _kProofCategories = [
+  'Workout',
+  'Study',
+  'Meal',
+  'Milestone',
+  'Goal Progress',
+];
+
+class CircleChatView extends ConsumerStatefulWidget {
+  const CircleChatView({super.key, required this.circleId});
+
+  final String circleId;
+
+  @override
+  ConsumerState<CircleChatView> createState() => _CircleChatViewState();
+}
+
+class _CircleChatViewState extends ConsumerState<CircleChatView> {
+  final _textController = TextEditingController();
+  final _scrollController = ScrollController();
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendText() async {
+    final text = _textController.text.trim();
+    if (text.isEmpty) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() => _sending = true);
+    _textController.clear();
+
+    try {
+      final msg = CircleMessage(
+        id: StableId.generate('msg'),
+        circleId: widget.circleId,
+        senderId: user.uid,
+        senderDisplayName: user.displayName ?? 'User',
+        type: MessageType.text,
+        content: text,
+        createdAtMs: DateTime.now().millisecondsSinceEpoch,
+      );
+      await ref
+          .read(circleMessageRepositoryProvider)
+          .sendMessage(msg);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to send message.')),
+        );
+        _textController.text = text; // restore on failure
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _pickAndSendImage() async {
+    final category = await _showProofCategorySheet();
+    if (category == null || !mounted) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+      maxWidth: 1080,
+    );
+    if (picked == null || !mounted) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() => _sending = true);
+    try {
+      final file = File(picked.path);
+      final ext = picked.path.split('.').last;
+      final ref = FirebaseStorage.instance.ref(
+        'circles/${widget.circleId}/proofs/${StableId.generate('proof')}.$ext',
+      );
+      await ref.putFile(file);
+      final url = await ref.getDownloadURL();
+
+      final msg = CircleMessage(
+        id: StableId.generate('msg'),
+        circleId: widget.circleId,
+        senderId: user.uid,
+        senderDisplayName: user.displayName ?? 'User',
+        type: MessageType.image,
+        content: category, // store proof category as content
+        imageUrl: url,
+        createdAtMs: DateTime.now().millisecondsSinceEpoch,
+      );
+      await this.ref.read(circleMessageRepositoryProvider).sendMessage(msg);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to upload image.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<String?> _showProofCategorySheet() {
+    return showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF14171C),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Proof category',
+                style: TextStyle(
+                  color: Color(0xFFF0F4FF),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ..._kProofCategories.map(
+                (cat) => ListTile(
+                  title: Text(
+                    cat,
+                    style: const TextStyle(color: Color(0xFFF0F4FF)),
+                  ),
+                  onTap: () => Navigator.pop(ctx, cat),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _toggleReaction(
+      CircleMessage message, String emoji) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final current = Map<String, List<String>>.from(
+      message.reactions.map(
+        (k, v) => MapEntry(k, List<String>.from(v)),
+      ),
+    );
+
+    final users = current[emoji] ?? [];
+    if (users.contains(uid)) {
+      users.remove(uid);
+      if (users.isEmpty) current.remove(emoji);
+    } else {
+      users.add(uid);
+      current[emoji] = users;
+    }
+
+    await ref
+        .read(circleMessageRepositoryProvider)
+        .updateReactions(widget.circleId, message.id, current);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final messagesAsync =
+        ref.watch(circleMessagesProvider(widget.circleId));
+
+    return Column(
+      children: [
+        Expanded(
+          child: messagesAsync.when(
+            loading: () => const Center(
+              child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
+            ),
+            error: (_, __) => const Center(
+              child: Text(
+                'Could not load messages.',
+                style: TextStyle(color: Color(0xFF8A8FA8)),
+              ),
+            ),
+            data: (messages) {
+              if (messages.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'No messages yet.\nSay hello to your circle!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF8A8FA8),
+                      fontSize: 15,
+                    ),
+                  ),
+                );
+              }
+              return ListView.builder(
+                controller: _scrollController,
+                reverse: true,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                itemCount: messages.length,
+                itemBuilder: (_, i) {
+                  final msg = messages[i];
+                  if (msg.type == MessageType.systemEvent) {
+                    return _SystemEventPill(msg.content ?? '');
+                  }
+                  if (msg.type == MessageType.image) {
+                    return _ImageMessageBubble(
+                      message: msg,
+                      onReaction: (emoji) => _toggleReaction(msg, emoji),
+                    );
+                  }
+                  return _TextMessageBubble(
+                    message: msg,
+                    onReaction: (emoji) => _toggleReaction(msg, emoji),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        _InputBar(
+          controller: _textController,
+          sending: _sending,
+          onSend: _sendText,
+          onPickImage: _pickAndSendImage,
+        ),
+      ],
+    );
+  }
+}
+
+// ── Message bubbles ───────────────────────────────────────────────────────────
+
+class _TextMessageBubble extends StatelessWidget {
+  const _TextMessageBubble({
+    required this.message,
+    required this.onReaction,
+  });
+
+  final CircleMessage message;
+  final ValueChanged<String> onReaction;
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final isMe = message.senderId == uid;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: GestureDetector(
+        onLongPress: () => _showEmojiBar(context),
+        child: Row(
+          mainAxisAlignment:
+              isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (!isMe) ...[
+              _AvatarInitial(
+                name: message.senderDisplayName,
+                userId: message.senderId,
+              ),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Column(
+                crossAxisAlignment: isMe
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
+                children: [
+                  if (!isMe)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2, left: 4),
+                      child: Text(
+                        message.senderDisplayName,
+                        style: const TextStyle(
+                          color: Color(0xFF8A8FA8),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isMe
+                          ? const Color(0xFFB7FF00).withOpacity(0.15)
+                          : const Color(0xFF1C2029),
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(16),
+                        topRight: const Radius.circular(16),
+                        bottomLeft:
+                            Radius.circular(isMe ? 16 : 4),
+                        bottomRight:
+                            Radius.circular(isMe ? 4 : 16),
+                      ),
+                    ),
+                    child: Text(
+                      message.content ?? '',
+                      style: const TextStyle(
+                        color: Color(0xFFF0F4FF),
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      _formatTime(message.createdAtMs),
+                      style: const TextStyle(
+                        color: Color(0xFF8A8FA8),
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                  if (message.reactions.isNotEmpty)
+                    _ReactionRow(
+                      reactions: message.reactions,
+                      onReaction: onReaction,
+                    ),
+                ],
+              ),
+            ),
+            if (isMe) const SizedBox(width: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEmojiBar(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF1C2029),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => _EmojiReactionBar(onReaction: onReaction),
+    );
+  }
+}
+
+class _ImageMessageBubble extends StatelessWidget {
+  const _ImageMessageBubble({
+    required this.message,
+    required this.onReaction,
+  });
+
+  final CircleMessage message;
+  final ValueChanged<String> onReaction;
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final isMe = message.senderId == uid;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: GestureDetector(
+        onLongPress: () => showModalBottomSheet<void>(
+          context: context,
+          backgroundColor: const Color(0xFF1C2029),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          builder: (_) => _EmojiReactionBar(onReaction: onReaction),
+        ),
+        child: Row(
+          mainAxisAlignment:
+              isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (!isMe) ...[
+              _AvatarInitial(
+                name: message.senderDisplayName,
+                userId: message.senderId,
+              ),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Column(
+                crossAxisAlignment: isMe
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
+                children: [
+                  if (!isMe)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2, left: 4),
+                      child: Text(
+                        message.senderDisplayName,
+                        style: const TextStyle(
+                          color: Color(0xFF8A8FA8),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      children: [
+                        if (message.imageUrl != null)
+                          Image.network(
+                            message.imageUrl!,
+                            width: 220,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 220,
+                              height: 140,
+                              color: const Color(0xFF1C2029),
+                              child: const Icon(Icons.broken_image_rounded,
+                                  color: Color(0xFF8A8FA8)),
+                            ),
+                          ),
+                        if (message.content != null &&
+                            message.content!.isNotEmpty)
+                          Positioned(
+                            bottom: 8,
+                            left: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.6),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                message.content!,
+                                style: const TextStyle(
+                                  color: Color(0xFFB7FF00),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      _formatTime(message.createdAtMs),
+                      style: const TextStyle(
+                        color: Color(0xFF8A8FA8),
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                  if (message.reactions.isNotEmpty)
+                    _ReactionRow(
+                      reactions: message.reactions,
+                      onReaction: onReaction,
+                    ),
+                ],
+              ),
+            ),
+            if (isMe) const SizedBox(width: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SystemEventPill extends StatelessWidget {
+  const _SystemEventPill(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C2029),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: Color(0xFF8A8FA8),
+              fontSize: 12,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Reactions ─────────────────────────────────────────────────────────────────
+
+class _ReactionRow extends StatelessWidget {
+  const _ReactionRow({
+    required this.reactions,
+    required this.onReaction,
+  });
+
+  final Map<String, List<String>> reactions;
+  final ValueChanged<String> onReaction;
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, left: 4),
+      child: Wrap(
+        spacing: 4,
+        children: reactions.entries.map((e) {
+          final reacted = uid != null && e.value.contains(uid);
+          return GestureDetector(
+            onTap: () => onReaction(e.key),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: reacted
+                    ? const Color(0xFFB7FF00).withOpacity(0.2)
+                    : const Color(0xFF1C2029),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: reacted
+                      ? const Color(0xFFB7FF00).withOpacity(0.4)
+                      : Colors.transparent,
+                ),
+              ),
+              child: Text(
+                '${e.key} ${e.value.length}',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _EmojiReactionBar extends StatelessWidget {
+  const _EmojiReactionBar({required this.onReaction});
+  final ValueChanged<String> onReaction;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: _kPresetEmojis
+              .map(
+                (e) => GestureDetector(
+                  onTap: () {
+                    Navigator.pop(context);
+                    onReaction(e);
+                  },
+                  child: Text(e, style: const TextStyle(fontSize: 28)),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Input bar ─────────────────────────────────────────────────────────────────
+
+class _InputBar extends StatelessWidget {
+  const _InputBar({
+    required this.controller,
+    required this.sending,
+    required this.onSend,
+    required this.onPickImage,
+  });
+
+  final TextEditingController controller;
+  final bool sending;
+  final VoidCallback onSend;
+  final VoidCallback onPickImage;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF14171C),
+        border: Border(
+          top: BorderSide(color: Colors.white.withOpacity(0.06)),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            // Image picker button
+            IconButton(
+              icon: const Icon(Icons.add_photo_alternate_outlined),
+              color: const Color(0xFF8A8FA8),
+              onPressed: sending ? null : onPickImage,
+            ),
+            // Text field
+            Expanded(
+              child: TextField(
+                controller: controller,
+                style: const TextStyle(color: Color(0xFFF0F4FF)),
+                maxLines: 4,
+                minLines: 1,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  hintText: 'Message your circle…',
+                  hintStyle: const TextStyle(color: Color(0xFF8A8FA8)),
+                  filled: true,
+                  fillColor: const Color(0xFF1C2029),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Send button
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (_, value, __) {
+                final canSend = value.text.trim().isNotEmpty && !sending;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  child: IconButton(
+                    icon: sending
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFFB7FF00),
+                            ),
+                          )
+                        : Icon(
+                            Icons.send_rounded,
+                            color: canSend
+                                ? const Color(0xFFB7FF00)
+                                : const Color(0xFF8A8FA8),
+                          ),
+                    onPressed: canSend ? onSend : null,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+class _AvatarInitial extends StatelessWidget {
+  const _AvatarInitial({required this.name, required this.userId});
+  final String name;
+  final String userId;
+
+  static const _colors = [
+    Color(0xFFB7FF00),
+    Color(0xFF00CFFF),
+    Color(0xFFFF8C42),
+    Color(0xFFFF4D9E),
+    Color(0xFF7B61FF),
+    Color(0xFF00FF9F),
+    Color(0xFFFFD600),
+    Color(0xFFFF4D4D),
+  ];
+
+  Color get _color => _colors[userId.hashCode.abs() % _colors.length];
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    return CircleAvatar(
+      radius: 16,
+      backgroundColor: _color.withOpacity(0.2),
+      child: Text(
+        initial,
+        style: TextStyle(
+          color: _color,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+String _formatTime(int ms) {
+  final dt = DateTime.fromMillisecondsSinceEpoch(ms);
+  final now = DateTime.now();
+  final diff = now.difference(dt);
+
+  if (diff.inMinutes < 1) return 'now';
+  if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+  if (diff.inDays < 1) {
+    final h = dt.hour.toString().padLeft(2, '0');
+    final m = dt.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+  return '${dt.day}/${dt.month}';
+}

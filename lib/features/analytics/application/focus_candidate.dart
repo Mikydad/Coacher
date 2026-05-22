@@ -1,3 +1,4 @@
+import '../../../features/coaching/domain/models/enforcement_mode.dart';
 import '../domain/models/detected_behavior_pattern.dart';
 import '../domain/models/generated_insight.dart';
 import 'layer4_delivery_policy.dart';
@@ -42,16 +43,22 @@ class FocusRealtimeContext {
 // ─── Focus candidate ─────────────────────────────────────────────────────────
 
 /// A single evaluated candidate fed into [FocusScoringEngine].
-/// Bundles an insight with its supporting patterns and current realtime context
-/// so the scoring engine has one clean input type — extensible for Phase 5.
+/// Bundles an insight with its supporting patterns, current realtime context,
+/// and the entity's [EnforcementMode] for urgency weighting.
 class FocusCandidate {
   const FocusCandidate({
     required this.insight,
     required this.supportingPatterns,
     required this.realtimeContext,
+    this.enforcementMode = EnforcementMode.disciplined,
   });
 
   final GeneratedInsight insight;
   final List<DetectedBehaviorPattern> supportingPatterns;
   final FocusRealtimeContext realtimeContext;
+
+  /// Per-entity enforcement intensity — used to weight urgency in scoring.
+  /// Defaults to [EnforcementMode.disciplined] (×1.0 — no change) when
+  /// the entity has no explicit mode configured.
+  final EnforcementMode enforcementMode;
 }

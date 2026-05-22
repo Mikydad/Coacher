@@ -1,0 +1,11 @@
+1st. when the trimer starts in the focus mode, it should stop at the end of the timer, for examples if the task time is 15minutes it should stop when the task reaches this time, now it continues counting until the user stops manually.
+
+2nd. if you start the timer in the focus mode and back to home, the timer disappears and if you look in the focus mode again, it's starting from zero, but when you click on the focus mode and there was a timer running for the task already, it should just open the timer already running so you don't lose your progress.
+
+3rd. when the task in the focus mode is done, it should be removed from the focus page and should be counted as done. 
+
+4th. similiar to the 2nd problem, let's say I opened the focus mode and it should open the task being runned in the timer right, right now if you click the back button it backs to the focus mode page and shows the list of the tasks there but it's showing as a new not as a running, let's says there's task 1,2,3 and 1 is done, and now you're running task 2 and it starts the timer and is counting when you click back button on the timer page, it goes back to the focus page where the lists of tasks are there and there's gonna be all the 3 tasks and it shows start focus as a new the prevously running task 2 is not there. and after sometime, you're gonna get a notification from the app that you should start on the task or provide a logical reason so this shows it's not being marked as started or inprogress.
+
+5th. on the tasks list the tasks priority should be based on the time of the tasks created for examples, if task 1 is running at 2.10 and ends on 2.25 and there's task 2 with no time and there's task 3 at 2.25 - the task 3 should run, don't you think?
+
+6th. on the today's tasks page even though on the home page task one is marked as done, but when you click on the today's task and open the page, it shouws not started but it's done so this should also update and if it's in progress it should show in progresss.

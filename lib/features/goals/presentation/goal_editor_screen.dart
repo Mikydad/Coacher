@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/utils/stable_id.dart';
+import '../../time_blocks/application/time_block_providers.dart';
+import '../../time_blocks/domain/models/time_conflict.dart';
+import '../../time_blocks/presentation/conflict_bottom_sheet.dart';
 import '../application/goal_intensity_mode.dart';
 import '../application/goal_period_helpers.dart';
 import '../application/goals_providers.dart';
@@ -135,6 +138,66 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> {
     }
   }
 
+  // ─── Time block helpers ──────────────────────────────────────────────────
+
+  /// Runs a conflict check against the proposed goal time block.
+  ///
+  /// Returns true if the save can proceed; false if the user cancelled.
+  Future<bool> _checkGoalTimeBlockConflicts(UserGoal goal) async {
+    final blockSvc = ref.read(goalBlockSyncServiceProvider);
+    final today = DateTime.now();
+    final proposed = blockSvc.deriveBlockForGoal(goal, today);
+    if (proposed == null) return true;
+
+    // Build title map: goal titles so conflicting blocks show readable names.
+    // Task titles from todayAllTasksRowsProvider are not imported here; the
+    // goal title map alone is sufficient since tasks already appear with titles
+    // when tasks check against goals via AddTaskScreen.
+    final entityTitles = ref.read(goalTitleMapProvider);
+
+    final tbSvc = ref.read(timeBlockSyncServiceProvider);
+    final checkResult = await tbSvc.checkConflicts(
+      proposed,
+      entityTitles: entityTitles,
+    );
+
+    if (!checkResult.hasConflicts) return true;
+    if (!mounted) return false;
+
+    if (checkResult.worstSeverity == ConflictSeverity.minor) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Minor time overlap with '
+            '${checkResult.conflicts.first.conflictingEntityTitle}. '
+            'Saved anyway.',
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return true;
+    }
+
+    final action = await ConflictBottomSheet.show(
+      context: context,
+      conflicts: checkResult.conflicts,
+    );
+
+    switch (action) {
+      case ConflictAction.saveAnyway:
+        return true;
+      case ConflictAction.adjustTime:
+      case ConflictAction.shortenDuration:
+      case null:
+        return false;
+    }
+  }
+
+  Future<void> _syncGoalBlock(UserGoal goal) async {
+    final today = DateTime.now();
+    await ref.read(goalBlockSyncServiceProvider).syncBlockForGoal(goal, today);
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     int? durationDayCount;
@@ -193,6 +256,15 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> {
         createdAtMs: existing?.createdAtMs ?? now,
         updatedAtMs: now,
       );
+
+      // Time block conflict check — must happen before persisting so the user
+      // can cancel without any state being committed.
+      final canProceed = await _checkGoalTimeBlockConflicts(goal);
+      if (!canProceed) {
+        if (mounted) setState(() => _saving = false);
+        return;
+      }
+
       await repo.upsertGoal(goal);
 
       if (widget.goalId != null) {
@@ -216,6 +288,9 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> {
       if (!mounted) return;
       invalidateGoals(ref, goalId: goalId);
       await ref.read(goalReminderSyncServiceProvider).applyForGoal(goal);
+
+      // Sync goal time block after all data is committed.
+      if (mounted) await _syncGoalBlock(goal);
       if (!mounted) return;
       Navigator.pop(context);
     } catch (e) {

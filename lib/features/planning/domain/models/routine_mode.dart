@@ -1,4 +1,13 @@
 /// Base routine execution modes for V2 structured flow.
+///
+/// @deprecated Use [CoachingStyle] (global, user-level) or [EnforcementMode]
+/// (per-entity) instead. [RoutineMode] will be removed in a future release.
+/// Migration helpers are available via `RoutineModeAdapter`.
+@Deprecated(
+  'Use CoachingStyle (global) or EnforcementMode (per-entity). '
+  'RoutineMode will be removed in a future release. '
+  'See RoutineModeAdapter for migration helpers.',
+)
 enum RoutineMode {
   flexible,
   disciplined,

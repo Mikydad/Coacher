@@ -38,4 +38,33 @@ class FirestorePaths {
   static String goalMilestones(String goalId) => '${goalDocument(goalId)}/milestones';
 
   static String goalCheckIns(String goalId) => '${goalDocument(goalId)}/checkIns';
+
+  // ── Community / Accountability Circles ──────────────────────────────────────
+
+  static String get circles => 'circles';
+  static String circleDoc(String circleId) => 'circles/$circleId';
+  static String circleMembers(String circleId) => 'circles/$circleId/members';
+  static String circleMemberDoc(String circleId, String userId) =>
+      'circles/$circleId/members/$userId';
+  static String circleMessages(String circleId) => 'circles/$circleId/messages';
+  static String circleActivityFeed(String circleId) =>
+      'circles/$circleId/activityFeed';
+  static String userCircleIds(String uid) => 'users/$uid/circleIds';
+  static String userCircleIdDoc(String uid, String circleId) =>
+      'users/$uid/circleIds/$circleId';
+  static String circleWeeklyCommitments(String circleId) =>
+      'circles/$circleId/weeklyCommitments';
+  static String circleChallenges(String circleId) =>
+      'circles/$circleId/challenges';
+  static String challengeDoc(String circleId, String challengeId) =>
+      'circles/$circleId/challenges/$challengeId';
+  static String challengeVotes(String circleId, String challengeId) =>
+      'circles/$circleId/challenges/$challengeId/votes';
+  static String circleRemovalVotes(String circleId) =>
+      'circles/$circleId/removalVotes';
+  static String circleAiPulse(String circleId) => 'circles/$circleId/aiPulse';
+  static String userCircleNotifPrefs(String uid) =>
+      'users/$uid/circleNotifPrefs';
+  static String userCircleNotifPrefsDoc(String uid, String circleId) =>
+      'users/$uid/circleNotifPrefs/$circleId';
 }

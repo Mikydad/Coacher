@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../coaching/domain/models/coaching_style.dart';
 import '../domain/models/ai_summary_response.dart';
 import '../domain/models/coaching_ai_payload.dart';
 
@@ -120,12 +121,14 @@ class OpenAiCoachingClient implements CoachingAiClient {
 
     final framingName = payload.framing.name;
     final toneName = expectedToneForFraming(payload.framing).name;
+    final styleInstruction = _styleInstruction(payload.coachingStyle);
 
     return '''
 You are a precision behavioral coaching assistant. Your role is to transform structured behavioral data into a brief, psychologically coherent coaching message.
 
 FRAMING RULE: Apply "$framingName" framing.$framingGuidance
 TONE RULE: Use "$toneName" tone.$toneGuidance$notifMode
+STYLE RULE: $styleInstruction
 
 OUTPUT RULES:
 - dailySummary: max $maxSummary words. Factual, behavioral, no fluff.
@@ -221,6 +224,20 @@ Generate the coaching summary.
       case CoachingTone.informative:
         return ' Calm, factual, matter-of-fact.';
     }
+  }
+
+  /// Returns the style instruction appended to the system prompt (FR-D-14).
+  String _styleInstruction(CoachingStyle style) {
+    return switch (style) {
+      CoachingStyle.supportive =>
+        'Be warm and encouraging. Avoid guilt framing. Focus on small wins.',
+      CoachingStyle.balanced =>
+        'Be clear and friendly. Present facts and suggest action without pressure.',
+      CoachingStyle.disciplined =>
+        'Be direct. The user values accountability. State what\'s expected clearly.',
+      CoachingStyle.intense =>
+        'Be assertive. The user has high standards for themselves. Don\'t soften the message.',
+    };
   }
 }
 
