@@ -44,14 +44,11 @@ import '../../goals/domain/models/goal_enums.dart';
 import '../../goals/domain/models/user_goal.dart';
 import '../../goals/presentation/goal_detail_screen.dart';
 import '../../goals/presentation/goal_editor_screen.dart';
-import '../../goals/presentation/goal_selection_screen.dart';
 import '../../plan_tomorrow/presentation/plan_tomorrow_screen.dart';
-import '../../analytics/presentation/analytics_progress_screen.dart';
-import '../../community/presentation/community_screen.dart';
+import '../../../app/application/main_tab_navigation.dart';
 import '../../context_override/presentation/active_override_banner.dart';
 import '../../context_override/presentation/context_override_quick_activate_sheet.dart';
 import '../../context_override/presentation/post_override_review_card.dart';
-import '../../profile/presentation/profile_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 import 'quittr_app_bar_title.dart';
@@ -122,7 +119,8 @@ class HomeScreen extends ConsumerWidget {
               Expanded(
                 child: _ActionCircle(
                   icon: Icons.bolt,
-                  label: 'START FOCUS',
+                  label: 'Focus',
+                  tooltip: 'Start focus',
                   onTap: () => Navigator.pushNamed(
                     context,
                     FocusSelectionScreen.routeName,
@@ -139,31 +137,34 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: _ActionCircle(
                   icon: Icons.add,
-                  label: 'ADD TASK',
+                  label: 'Add',
+                  tooltip: 'Add task',
                   onTap: () =>
                       Navigator.pushNamed(context, AddTaskScreen.routeName),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: _ActionCircle(
                   icon: Icons.calendar_today,
-                  label: 'PLAN\nTOMORROW',
+                  label: 'Plan',
+                  tooltip: 'Plan tomorrow',
                   onTap: () => Navigator.pushNamed(
                     context,
                     PlanTomorrowScreen.routeName,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: _ActionCircle(
                   icon: Icons.do_not_disturb_on_outlined,
-                  label: 'SET\nMODE',
+                  label: 'Mode',
+                  tooltip: 'Set mode',
                   onTap: () => showContextOverrideQuickActivateSheet(context),
                 ),
               ),
@@ -279,9 +280,10 @@ class HomeScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 InkWell(
-                  onTap: () => Navigator.pushNamed(
+                  onTap: () => navigateToMainTab(
                     context,
-                    GoalSelectionScreen.routeName,
+                    ref,
+                    index: MainTabIndex.goals,
                   ),
                   borderRadius: BorderRadius.circular(8),
                   child: Row(
@@ -300,9 +302,10 @@ class HomeScreen extends ConsumerWidget {
                           Icons.chevron_right,
                           color: Colors.white54,
                         ),
-                        onPressed: () => Navigator.pushNamed(
+                        onPressed: () => navigateToMainTab(
                           context,
-                          GoalSelectionScreen.routeName,
+                          ref,
+                          index: MainTabIndex.goals,
                         ),
                       ),
                     ],
@@ -363,9 +366,10 @@ class HomeScreen extends ConsumerWidget {
                             label: remaining == 1
                                 ? '1 more goal'
                                 : '$remaining more goals',
-                            onTap: () => Navigator.pushNamed(
+                            onTap: () => navigateToMainTab(
                               context,
-                              GoalSelectionScreen.routeName,
+                              ref,
+                              index: MainTabIndex.goals,
                             ),
                           ),
                       ],
@@ -480,25 +484,6 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      bottomNavigationBar: _ObsidianBottomNav(
-        onTap: (index) {
-          if (index == 1) {
-            Navigator.pushNamed(context, '/coach');
-          }
-          if (index == 2) {
-            Navigator.pushNamed(context, GoalSelectionScreen.routeName);
-          }
-          if (index == 3) {
-            Navigator.pushNamed(context, AnalyticsProgressScreen.routeName);
-          }
-          if (index == 4) {
-            Navigator.pushNamed(context, CommunityScreen.routeName);
-          }
-          if (index == 5) {
-            Navigator.pushNamed(context, ProfileScreen.routeName);
-          }
-        },
-      ),
     );
   }
 }
@@ -532,10 +517,11 @@ void _maybeTriggerMorningBrief(BuildContext context, WidgetRef ref) {
           action: SnackBarAction(
             label: 'Open',
             textColor: const Color(0xFFB2ED00),
-            onPressed: () => Navigator.pushNamed(
+            onPressed: () => navigateToMainTab(
               context,
-              '/coach',
-              arguments: const CoachRouteArgs(
+              ref,
+              index: MainTabIndex.coach,
+              coachArgs: const CoachRouteArgs(
                 openSuggestionsPanel: true,
                 preDraftedText: 'Give me a quick plan for today',
               ),
@@ -626,6 +612,7 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
   Widget build(BuildContext context) {
     final bundleAsync = ref.watch(analyticsPeriodBundleProvider);
     return _NeonCard(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: bundleAsync.when(
         data: (bundle) {
           final streak = bundle.goalHabitWeek.currentStreakDays;
@@ -650,85 +637,131 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
               final sparkProgress = _introController.isAnimating
                   ? _sparklineCurve.value
                   : 1.0;
-              return Column(
-                children: [
-                  const SizedBox(height: 8),
-                  Transform.scale(
-                    scale: _popScale.value,
-                    child: Text(
-                      '$displayStreak',
-                      style: const TextStyle(
-                        fontSize: 52,
-                        fontWeight: FontWeight.bold,
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => navigateToMainTab(
+                    context,
+                    ref,
+                    index: MainTabIndex.progress,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 4),
+                      Center(
+                        child: Transform.scale(
+                          scale: _popScale.value,
+                          alignment: Alignment.center,
+                          child: Column(
+                            children: [
+                              Text(
+                                '$displayStreak',
+                                style: const TextStyle(
+                                  fontSize: 68,
+                                  height: 1,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              const Text(
+                                'day streak',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  letterSpacing: 1.2,
+                                  color: Colors.white54,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const Text(
-                    'DAY STREAK',
-                    style: TextStyle(letterSpacing: 2, color: Colors.white70),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    "Today's Progress",
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                  const SizedBox(height: 6),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 320),
-                    curve: Curves.easeOutCubic,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(999),
-                      color: _scoreAccent(scorePercent).withAlpha(24),
-                      border: Border.all(
-                        color: _scoreAccent(scorePercent).withAlpha(110),
+                      const SizedBox(height: 10),
+                      Center(
+                        child: Column(
+                          children: [
+                            const Text(
+                              "Today's Progress",
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.white70,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 320),
+                              curve: Curves.easeOutCubic,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(999),
+                                color: _scoreAccent(scorePercent).withAlpha(24),
+                                border: Border.all(
+                                  color: _scoreAccent(scorePercent)
+                                      .withAlpha(110),
+                                ),
+                              ),
+                              child: Text(
+                                '$displayScore% Goals/Habits',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  height: 1.1,
+                                  fontWeight: FontWeight.w700,
+                                  color: _scoreAccent(scorePercent),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      '$displayScore% Goals/Habits',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: _scoreAccent(scorePercent),
+                      const SizedBox(height: 9),
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '7-day trend',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      _MiniSparkline(
+                        valuesA: bundle.goalHabitWeekSeries,
+                        valuesB: bundle.taskWeekSeries,
+                        drawProgress: sparkProgress,
+                        height: 40,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      '7-day trend',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  _MiniSparkline(
-                    valuesA: bundle.goalHabitWeekSeries,
-                    valuesB: bundle.taskWeekSeries,
-                    drawProgress: sparkProgress,
-                  ),
-                ],
+                ),
               );
             },
           );
         },
         loading: () => const Padding(
-          padding: EdgeInsets.symmetric(vertical: 18),
-          child: Center(child: CircularProgressIndicator()),
+          padding: EdgeInsets.symmetric(vertical: 16),
+          child: Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
         ),
         error: (_, _) => const Column(
           children: [
-            SizedBox(height: 8),
+            SizedBox(height: 4),
             Text(
               '0',
-              style: TextStyle(fontSize: 52, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 68, fontWeight: FontWeight.w700),
             ),
             Text(
-              'DAY STREAK',
-              style: TextStyle(letterSpacing: 2, color: Colors.white70),
+              'day streak',
+              style: TextStyle(fontSize: 11, color: Colors.white54),
             ),
           ],
         ),
@@ -801,11 +834,13 @@ class _MiniSparkline extends StatelessWidget {
     required this.valuesA,
     required this.valuesB,
     this.drawProgress = 1.0,
+    this.height = 44,
   });
 
   final List<double> valuesA;
   final List<double> valuesB;
   final double drawProgress;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -816,7 +851,7 @@ class _MiniSparkline extends StatelessWidget {
         ? valuesB.sublist(valuesB.length - 7)
         : [...List<double>.filled(7 - valuesB.length, 0), ...valuesB];
     return SizedBox(
-      height: 44,
+      height: height,
       child: CustomPaint(
         painter: _SparklinePainter(
           a: a,
@@ -976,34 +1011,57 @@ class _ActionCircle extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.tooltip,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final String? tooltip;
+
+  static const _kLabelStyle = TextStyle(
+    fontSize: 10,
+    fontWeight: FontWeight.w600,
+    height: 1.1,
+    letterSpacing: 0.15,
+    color: Color(0xFFADAAAA),
+  );
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: Ink(
-        height: 108,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1C1F),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: const Color(0xFFB7FF00)),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ],
+    return Tooltip(
+      message: tooltip ?? label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Ink(
+          height: 72,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1C1F),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white10),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: const Color(0xFFB7FF00), size: 22),
+              const SizedBox(height: 4),
+              SizedBox(
+                width: double.infinity,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: _kLabelStyle,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1904,14 +1962,15 @@ Future<({OverrideReasonCategory reason, String note})?> _promptOverrideReason(
 }
 
 class _NeonCard extends StatelessWidget {
-  const _NeonCard({required this.child});
+  const _NeonCard({required this.child, this.padding});
 
   final Widget child;
+  final EdgeInsetsGeometry? padding;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: padding ?? const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF111317),
         borderRadius: BorderRadius.circular(22),
@@ -2194,18 +2253,20 @@ Future<void> _uncompleteTaskFromHome(
   }
 }
 
-// ─── Obsidian Pulse bottom nav ────────────────────────────────────────────────
-
 // ─── Coach AI FAB ─────────────────────────────────────────────────────────────
 
-class _CoachAiFab extends StatelessWidget {
+class _CoachAiFab extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return ClipOval(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: GestureDetector(
-          onTap: () => Navigator.pushNamed(context, '/coach'),
+          onTap: () => navigateToMainTab(
+            context,
+            ref,
+            index: MainTabIndex.coach,
+          ),
           child: Container(
             width: 56,
             height: 56,
@@ -2228,104 +2289,3 @@ class _CoachAiFab extends StatelessWidget {
   }
 }
 
-// ─── Bottom nav ───────────────────────────────────────────────────────────────
-
-class _ObsidianBottomNav extends ConsumerWidget {
-  const _ObsidianBottomNav({required this.onTap});
-
-  final void Function(int index) onTap;
-
-  static const _items = [
-    (icon: Icons.home_rounded, label: 'Home'),
-    (icon: Icons.auto_awesome_rounded, label: 'Coach'),
-    (icon: Icons.track_changes_rounded, label: 'Goals'),
-    (icon: Icons.leaderboard_rounded, label: 'Progress'),
-    (icon: Icons.group_rounded, label: 'Community'),
-    (icon: Icons.person_rounded, label: 'Profile'),
-  ];
-
-  static const _kSurface = Color(0xFF0E0E0E);
-  static const _kVariant = Color(0xFFADAAAA);
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Show red badge on Coach tab when there is a pending blocked plan
-    final aiServiceAsync = ref.watch(resolvedAiAssistantProvider);
-    final hasBlockedPlan = aiServiceAsync.whenOrNull(
-          data: (svc) => svc.pendingPlan?.isBlockedByContext == true,
-        ) ??
-        false;
-
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          color: _kSurface.withValues(alpha: 0.8),
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.06),
-                ),
-              ),
-            ),
-            padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + bottomPadding),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(_items.length, (i) {
-                final item = _items[i];
-                // Coach tab (index 1) gets a badge when there's a blocked plan
-                final showBadge = i == 1 && hasBlockedPlan;
-                return GestureDetector(
-                  onTap: () => onTap(i),
-                  behavior: HitTestBehavior.opaque,
-                  child: SizedBox(
-                    width: 56,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Icon(
-                              item.icon,
-                              size: 24,
-                              color: _kVariant,
-                            ),
-                            if (showBadge)
-                              Positioned(
-                                right: -3,
-                                top: -3,
-                                child: Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.redAccent,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          item.label,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            color: _kVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_navigator.dart';
+import 'application/main_tab_navigation.dart';
+import 'presentation/main_tab_shell.dart';
 import '../features/add_task/presentation/add_task_screen.dart';
 import '../features/analytics/presentation/analytics_progress_screen.dart';
 import '../features/firebase_test/presentation/firebase_test_screen.dart';
@@ -9,7 +12,6 @@ import '../features/goals/presentation/goal_detail_screen.dart';
 import '../features/goals/presentation/goal_editor_screen.dart';
 import '../features/goals/presentation/goal_selection_screen.dart';
 import '../features/goals/presentation/goals_archive_screen.dart';
-import '../features/home/presentation/home_screen.dart';
 import '../features/plan_tomorrow/presentation/plan_tomorrow_screen.dart';
 import '../features/planning/presentation/accountability_history_screen.dart';
 import '../features/coaching/presentation/coaching_style_selection_screen.dart';
@@ -42,9 +44,9 @@ class CoachForLifeApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      initialRoute: HomeScreen.routeName,
+      initialRoute: MainTabShell.routeName,
       routes: {
-        HomeScreen.routeName: (_) => const HomeScreen(),
+        MainTabShell.routeName: (_) => const MainTabShell(),
         GoalSelectionScreen.routeName: (_) => const GoalSelectionScreen(),
         GoalEditorScreen.routeName: (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
@@ -92,8 +94,8 @@ class CoachForLifeApp extends StatelessWidget {
         // ── Coach AI ──────────────────────────────────────────────────────
         AiAssistantScreen.routeName: (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
-          return AiAssistantScreen(
-            key: args is CoachRouteArgs ? null : null,
+          return _CoachTabRedirect(
+            args: args is CoachRouteArgs ? args : null,
           );
         },
         // ── Community / Accountability Circles ────────────────────────────
@@ -106,6 +108,31 @@ class CoachForLifeApp extends StatelessWidget {
           return CircleDetailScreen(circleId: id);
         },
       },
+    );
+  }
+}
+
+/// Deep links to `/coach` switch the shell tab instead of stacking a second Coach.
+class _CoachTabRedirect extends ConsumerWidget {
+  const _CoachTabRedirect({this.args});
+
+  final CoachRouteArgs? args;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      navigateToMainTab(
+        context,
+        ref,
+        index: MainTabIndex.coach,
+        coachArgs: args,
+      );
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    });
+    return const Scaffold(
+      backgroundColor: Color(0xFF050806),
+      body: SizedBox.shrink(),
     );
   }
 }
