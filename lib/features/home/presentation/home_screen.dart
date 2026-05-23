@@ -561,7 +561,8 @@ void _maybeTriggerMorningBrief(BuildContext context, WidgetRef ref) {
             onPressed: () => Navigator.pushNamed(
               context,
               '/coach',
-              arguments: CoachRouteArgs(
+              arguments: const CoachRouteArgs(
+                openSuggestionsPanel: true,
                 preDraftedText: 'Give me a quick plan for today',
               ),
             ),

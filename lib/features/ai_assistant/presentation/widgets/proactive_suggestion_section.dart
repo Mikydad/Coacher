@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/ai_assistant_providers.dart';
+import '../../application/proactive_suggestion_display.dart';
 import 'proactive_suggestion_card.dart';
+import 'proactive_suggestions_coach_panel.dart';
 
-/// Renders up to 3 [ProactiveSuggestionCard]s between the Home header and
-/// the task list. Collapses to zero height when there are no suggestions.
+/// Shows the top proactive suggestion on Home, with a link to the full list
+/// on the Coach screen when more exist.
 class ProactiveSuggestionSection extends ConsumerWidget {
   const ProactiveSuggestionSection({super.key});
 
@@ -17,22 +19,22 @@ class ProactiveSuggestionSection extends ConsumerWidget {
       loading: () => const _SkeletonCard(),
       error: (_, _) => const SizedBox.shrink(),
       data: (suggestions) {
-        if (suggestions.isEmpty) return const SizedBox.shrink();
+        final active = activeProactiveSuggestions(suggestions);
+        if (active.isEmpty) return const SizedBox.shrink();
+
+        final onHome = active.take(kHomeProactiveSuggestionLimit).toList();
+        final remaining = active.length - onHome.length;
 
         return Column(
-          children: suggestions
-              .where((s) => !s.dismissed)
-              .map(
-                (s) => ProactiveSuggestionCard(
-                  key: ValueKey(s.id),
-                  suggestion: s,
-                  onDismiss: () {
-                    // Provider invalidation is handled inside the card widget
-                    // after logging dismissal; this is a no-op stub here.
-                  },
-                ),
-              )
-              .toList(),
+          children: [
+            for (final s in onHome)
+              ProactiveSuggestionCard(
+                key: ValueKey(s.id),
+                suggestion: s,
+                onDismiss: () {},
+              ),
+            SeeAllSuggestionsInCoachLink(remainingCount: remaining),
+          ],
         );
       },
     );

@@ -10,6 +10,7 @@ import '../data/dismissed_suggestion_repository.dart';
 import '../domain/models/proactive_suggestion.dart';
 import '../domain/models/proactive_suggestion_analytics_summary.dart';
 import 'entity_normaliser.dart';
+import 'proactive_suggestion_display.dart';
 import 'schedule_optimisation_service.dart';
 
 /// Last computed weekly summary (in-memory, for internal tuning).
@@ -37,7 +38,7 @@ class ProactiveSuggestionEngine {
   final EntityNormaliser normaliser;
   final ScheduleOptimisationService optimisationService;
 
-  static const int _maxSuggestions = 3;
+  static const int _maxSuggestions = kCoachProactiveSuggestionLimit;
   static const int _recurringThresholdDays = 4;
   static const int _lookbackDays = 7;
   static const int _scheduleGapMinutes = 90;
