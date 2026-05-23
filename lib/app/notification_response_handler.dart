@@ -16,6 +16,7 @@ import '../features/planning/application/planned_task_collect.dart';
 import '../features/reminders/application/attention_orchestrator_providers.dart';
 import '../features/reminders/domain/models/notification_interaction_type.dart';
 import 'app_navigator.dart';
+import 'application/main_tab_navigation.dart';
 
 const _taskPayloadPrefix = 'task:';
 const _goalPayloadPrefix = 'goal:';
@@ -110,12 +111,28 @@ class _PendingRouteIntent {
 
 _PendingRouteIntent? _pendingRouteIntent;
 
-bool _pushNowIfReady(String routeName, {Object? arguments}) {
+bool _pushNowIfReady(
+  String routeName, {
+  Object? arguments,
+  ProviderContainer? container,
+}) {
   final nav = appNavigatorKey.currentState;
   if (nav == null) {
     debugPrint('[NotifTap] navigator not ready for route=$routeName');
     return false;
   }
+
+  if (routeName == AnalyticsProgressScreen.routeName) {
+    final ctx = appNavigatorKey.currentContext;
+    final scope = container ??
+        (ctx != null ? ProviderScope.containerOf(ctx, listen: false) : null);
+    if (scope != null) {
+      debugPrint('[NotifTap] switching to Progress tab');
+      navigateToMainTabWithContainer(scope, index: MainTabIndex.progress);
+      return true;
+    }
+  }
+
   debugPrint('[NotifTap] pushing route=$routeName argsType=${arguments.runtimeType}');
   nav.pushNamed(routeName, arguments: arguments);
   return true;
@@ -163,7 +180,11 @@ Future<void> _flushPendingNotificationNavigationIntent() async {
   }
   debugPrint('[NotifTap] flush: trying pending route=${pending.routeName}');
   final args = pending.arguments;
-  if (_pushNowIfReady(pending.routeName, arguments: args)) {
+  if (_pushNowIfReady(
+    pending.routeName,
+    arguments: args,
+    container: appRootProviderContainer,
+  )) {
     debugPrint('[NotifTap] flush: pending intent consumed');
     _pendingRouteIntent = null;
     await _persistPendingIntent(null);
@@ -343,7 +364,10 @@ Future<void> _handleLayer4InsightTap(
   }
   debugPrint('[NotifTap] layer4 -> Progress (coaching)');
   WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!_pushNowIfReady(AnalyticsProgressScreen.routeName)) {
+    if (!_pushNowIfReady(
+      AnalyticsProgressScreen.routeName,
+      container: container,
+    )) {
       _queuePendingIntent(const _PendingRouteIntent.progress());
     }
   });

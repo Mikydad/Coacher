@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../analytics/domain/models/analytics_event.dart';
+import '../../../../app/application/main_tab_navigation.dart';
 import '../../../ai_assistant/presentation/ai_assistant_screen.dart';
 import '../../application/ai_assistant_providers.dart';
 import '../../domain/models/proactive_suggestion.dart';
@@ -86,9 +87,11 @@ class _ProactiveSuggestionCardState
       AnalyticsEventType.proactiveSuggestionAccepted,
       props: {'suggestionType': widget.suggestion.type.name},
     );
-    Navigator.of(context).pushNamed(
-      '/coach',
-      arguments: CoachRouteArgs(
+    navigateToMainTab(
+      context,
+      ref,
+      index: MainTabIndex.coach,
+      coachArgs: CoachRouteArgs(
         preDraftedText: widget.suggestion.preDraftedInput,
       ),
     );

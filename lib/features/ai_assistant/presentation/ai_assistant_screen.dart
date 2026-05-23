@@ -13,6 +13,7 @@ import 'widgets/planned_changes_card.dart';
 import 'widgets/proactive_suggestions_coach_panel.dart';
 import 'widgets/quick_directives_row.dart';
 import 'widgets/suggested_prompts_section.dart';
+import '../../../app/application/main_tab_navigation.dart';
 import '../application/proactive_suggestion_display.dart';
 
 /// Optional route arguments for pre-filling the input (e.g. from a proactive
@@ -48,21 +49,29 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   @override
   void initState() {
     super.initState();
-    // Pre-fill from route arguments (Phase 4 proactive cards)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(coachLastOpenedDateKeyProvider.notifier).state =
-          DateKeys.todayKey();
-      final args = ModalRoute.of(context)?.settings.arguments;
-      if (args is CoachRouteArgs) {
-        setState(() {
-          _openSuggestionsPanel = args.openSuggestionsPanel;
-        });
-        if (args.preDraftedText != null) {
-          _inputController.text = args.preDraftedText!;
-          _inputFocusNode.requestFocus();
-        }
+      _applyCoachLaunchArgs(
+        ModalRoute.of(context)?.settings.arguments,
+      );
+      final pending = ref.read(coachTabArgsProvider);
+      if (pending != null) {
+        _applyCoachLaunchArgs(pending);
+        ref.read(coachTabArgsProvider.notifier).state = null;
       }
     });
+  }
+
+  void _applyCoachLaunchArgs(Object? args) {
+    ref.read(coachLastOpenedDateKeyProvider.notifier).state =
+        DateKeys.todayKey();
+    if (args is! CoachRouteArgs) return;
+    setState(() {
+      _openSuggestionsPanel = args.openSuggestionsPanel;
+    });
+    if (args.preDraftedText != null) {
+      _inputController.text = args.preDraftedText!;
+      _inputFocusNode.requestFocus();
+    }
   }
 
   @override
@@ -87,6 +96,12 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<CoachRouteArgs?>(coachTabArgsProvider, (previous, next) {
+      if (next == null) return;
+      _applyCoachLaunchArgs(next);
+      ref.read(coachTabArgsProvider.notifier).state = null;
+    });
+
     final serviceAsync = ref.watch(resolvedAiAssistantProvider);
 
     return Scaffold(
@@ -107,7 +122,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     return AppBar(
       backgroundColor: const Color(0xFF0E0E0E),
       elevation: 0,
-      leading: const BackButton(color: Color(0xFFADAAAA)),
+      automaticallyImplyLeading: false,
       title: const Text(
         'Coach AI',
         style: TextStyle(

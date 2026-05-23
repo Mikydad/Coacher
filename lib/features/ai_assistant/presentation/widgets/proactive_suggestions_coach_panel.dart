@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../app/application/main_tab_navigation.dart';
 import '../../application/ai_assistant_providers.dart';
 import '../../application/proactive_suggestion_display.dart';
 import '../ai_assistant_screen.dart';
@@ -85,7 +86,7 @@ class ProactiveSuggestionsCoachPanel extends ConsumerWidget {
 }
 
 /// Link shown on Home when more than one suggestion exists.
-class SeeAllSuggestionsInCoachLink extends StatelessWidget {
+class SeeAllSuggestionsInCoachLink extends ConsumerWidget {
   const SeeAllSuggestionsInCoachLink({
     super.key,
     required this.remainingCount,
@@ -94,7 +95,7 @@ class SeeAllSuggestionsInCoachLink extends StatelessWidget {
   final int remainingCount;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (remainingCount <= 0) return const SizedBox.shrink();
 
     final label = remainingCount == 1
@@ -107,9 +108,11 @@ class SeeAllSuggestionsInCoachLink extends StatelessWidget {
         alignment: Alignment.centerRight,
         child: TextButton(
           onPressed: () {
-            Navigator.of(context).pushNamed(
-              AiAssistantScreen.routeName,
-              arguments: const CoachRouteArgs(openSuggestionsPanel: true),
+            navigateToMainTab(
+              context,
+              ref,
+              index: MainTabIndex.coach,
+              coachArgs: const CoachRouteArgs(openSuggestionsPanel: true),
             );
           },
           style: TextButton.styleFrom(
