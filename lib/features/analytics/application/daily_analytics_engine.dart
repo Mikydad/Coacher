@@ -1,4 +1,6 @@
 import '../../../core/utils/date_keys.dart';
+import '../../coaching/application/enforcement_mode_policy.dart';
+import '../../coaching/domain/models/enforcement_mode.dart';
 import '../../goals/domain/models/goal_check_in.dart';
 import '../../goals/domain/models/user_goal.dart';
 import '../../planning/domain/models/task_item.dart';
@@ -181,6 +183,8 @@ DailyAnalyticsSnapshot computeGoalHabitDailyAnalytics({
 RollupAnalyticsSnapshot rollupDailyAnalytics({
   required List<DailyAnalyticsSnapshot> snapshots,
   required DateTime now,
+  EnforcementMode enforcementMode = EnforcementMode.disciplined,
+  Set<String> protectedDateKeys = const {},
 }) {
   if (snapshots.isEmpty) {
     return const RollupAnalyticsSnapshot(
@@ -210,10 +214,19 @@ RollupAnalyticsSnapshot rollupDailyAnalytics({
     weightedCompleted += d.weightedCompleted;
   }
 
+  bool qualifies(String dateKey, DailyAnalyticsSnapshot? day) {
+    if (protectedDateKeys.contains(dateKey)) return true;
+    if (day == null) return false;
+    return EnforcementModePolicy.isStreakQualifyingDay(
+      day.weightedCompletionRate,
+      enforcementMode,
+    );
+  }
+
   var best = 0;
   var running = 0;
   for (final d in sorted) {
-    if (d.weightedCompletionRate >= 0.999) {
+    if (qualifies(d.dateKey, d)) {
       running++;
       if (running > best) best = running;
     } else {
@@ -226,12 +239,17 @@ RollupAnalyticsSnapshot rollupDailyAnalytics({
   final byDate = <String, DailyAnalyticsSnapshot>{
     for (final d in sorted) d.dateKey: d,
   };
+  final earliest = sorted.first.dateKey;
   while (true) {
     final key = DateKeys.yyyymmdd(cursor);
-    final day = byDate[key];
-    if (day == null || day.weightedCompletionRate < 0.999) break;
-    currentStreak++;
-    cursor = cursor.subtract(const Duration(days: 1));
+    if (key.compareTo(earliest) < 0) break;
+
+    if (qualifies(key, byDate[key])) {
+      currentStreak++;
+      cursor = cursor.subtract(const Duration(days: 1));
+      continue;
+    }
+    break;
   }
 
   return RollupAnalyticsSnapshot(

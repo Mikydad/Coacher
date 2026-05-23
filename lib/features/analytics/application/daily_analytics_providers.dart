@@ -6,11 +6,14 @@ import '../../goals/application/goal_period_helpers.dart';
 import '../../goals/application/goals_providers.dart';
 import '../../goals/domain/models/goal_check_in.dart';
 import '../../goals/domain/models/goal_enums.dart';
+import '../../context_override/application/context_override_providers.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
+import '../../profile/application/profile_providers.dart';
 import '../data/analytics_repository.dart';
 import '../domain/models/analytics_stats_cache.dart';
 import 'daily_analytics_engine.dart';
+import 'streak_protection.dart';
 
 class AnalyticsPeriodBundle {
   const AnalyticsPeriodBundle({
@@ -228,19 +231,46 @@ final analyticsPeriodBundleProvider = FutureProvider<AnalyticsPeriodBundle>((
     endInclusive: DateTime(now.year, now.month, now.day),
   );
 
+  final enforcementMode = ref.watch(defaultEnforcementModeProvider);
+  final attention = ref.watch(attentionStateProvider).valueOrNull;
+  final protectedWeek = buildStreakProtectedDateKeys(
+    attention: attention,
+    rangeStartInclusive: weekStart,
+    rangeEndInclusive: DateTime(now.year, now.month, now.day),
+  );
+  final protectedMonth = buildStreakProtectedDateKeys(
+    attention: attention,
+    rangeStartInclusive: monthStart,
+    rangeEndInclusive: DateTime(now.year, now.month, now.day),
+  );
+
   return AnalyticsPeriodBundle(
     goalHabitDay: todayGoalHabit,
     taskDay: todayTask,
     goalHabitWeek: rollupDailyAnalytics(
       snapshots: weekGoalHabitRange,
       now: now,
+      enforcementMode: enforcementMode,
+      protectedDateKeys: protectedWeek,
     ),
-    taskWeek: rollupDailyAnalytics(snapshots: weekTaskRange, now: now),
+    taskWeek: rollupDailyAnalytics(
+      snapshots: weekTaskRange,
+      now: now,
+      enforcementMode: enforcementMode,
+      protectedDateKeys: protectedWeek,
+    ),
     goalHabitMonth: rollupDailyAnalytics(
       snapshots: monthGoalHabitRange,
       now: now,
+      enforcementMode: enforcementMode,
+      protectedDateKeys: protectedMonth,
     ),
-    taskMonth: rollupDailyAnalytics(snapshots: monthTaskRange, now: now),
+    taskMonth: rollupDailyAnalytics(
+      snapshots: monthTaskRange,
+      now: now,
+      enforcementMode: enforcementMode,
+      protectedDateKeys: protectedMonth,
+    ),
     goalHabitWeekSeries: weekGoalHabitRange
         .map((d) => d.weightedCompletionRate.clamp(0.0, 1.0))
         .toList(),
