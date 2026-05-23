@@ -14,6 +14,10 @@ class AiOperatingLayerPayload {
     this.contextOverride,
     this.behaviorPreferences = const {},
     this.sessionHistory = const [],
+    this.recentPatterns = const [],
+    this.conversationHistory = const [],
+    this.completedInSession = const [],
+    this.previousPlan,
   });
 
   /// The raw user input for this turn.
@@ -41,6 +45,24 @@ class AiOperatingLayerPayload {
   /// Each entry: { role: 'user'|'assistant', content: String }.
   final List<Map<String, dynamic>> sessionHistory;
 
+  /// Top 5 recurring activity patterns from the last 14 days.
+  /// Each entry: { category, lastUsedTime, lastUsedDuration, frequency }.
+  /// Helps the model understand the user's schedule rhythm.
+  final List<Map<String, dynamic>> recentPatterns;
+
+  /// Full session conversation history as OpenAI-compatible role/content pairs.
+  /// Each entry: { role: 'user'|'assistant', content: String }.
+  /// Used by the client as preceding messages for multi-turn context.
+  final List<Map<String, dynamic>> conversationHistory;
+
+  /// Human-readable summaries of changes already confirmed in this session.
+  /// Tells the model not to re-plan or re-ask about these items.
+  final List<String> completedInSession;
+
+  /// The previous plan when the user is refining an earlier intent.
+  /// Serialised as a human-readable string for the AI prompt.
+  final String? previousPlan;
+
   Map<String, dynamic> toJson() => {
         'userInput': userInput,
         'activeTasks': activeTasks,
@@ -50,5 +72,9 @@ class AiOperatingLayerPayload {
         if (contextOverride != null) 'contextOverride': contextOverride,
         'behaviorPreferences': behaviorPreferences,
         'sessionHistory': sessionHistory,
+        if (recentPatterns.isNotEmpty) 'recentPatterns': recentPatterns,
+        if (conversationHistory.isNotEmpty) 'conversationHistory': conversationHistory,
+        if (completedInSession.isNotEmpty) 'completedInSession': completedInSession,
+        if (previousPlan != null) 'previousPlan': previousPlan,
       };
 }

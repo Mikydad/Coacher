@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../ai_assistant/application/ai_assistant_providers.dart';
 import '../../../core/local_db/isar_collections/isar_block.dart';
 import '../../../core/local_db/isar_collections/isar_routine.dart';
 import '../../../core/local_db/isar_collections/isar_task.dart';
@@ -229,6 +230,8 @@ final openTasksOutsideTodayProvider = FutureProvider<List<PlannedTaskRow>>((
 void invalidateTaskListProviders(WidgetRef ref) {
   ref.invalidate(openTasksOutsideTodayProvider);
   ref.invalidate(executionDayTasksProvider);
+  // Refresh proactive suggestion cards when the schedule changes (Phase 4).
+  ref.invalidate(proactiveSuggestionsProvider);
 }
 
 class HomeFlowSnapshot {

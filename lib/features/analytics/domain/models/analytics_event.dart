@@ -29,6 +29,11 @@ enum AnalyticsEventType {
   aiFollowupQuestionAsked,
   aiSuggestionAccepted,
   aiSuggestionRejected,
+  // Phase 4 — Proactive AI
+  proactiveSuggestionShown,
+  proactiveSuggestionAccepted,
+  proactiveSuggestionDismissed,
+  scheduleOptimisationSuggested,
 }
 
 class AnalyticsEvent {

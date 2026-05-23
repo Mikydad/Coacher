@@ -1,5 +1,6 @@
 import 'isar_activity_feed_cache.dart';
 import 'isar_ai_interaction_history.dart';
+import 'isar_dismissed_suggestion_log.dart';
 import 'isar_ai_pulse_cache.dart';
 import 'isar_ai_summary.dart';
 import 'isar_analytics_event.dart';
@@ -41,4 +42,5 @@ const isarSchemaList = [
   IsarActivityFeedCacheSchema,
   IsarAiPulseCacheSchema,
   IsarAiInteractionHistorySchema,
+  IsarDismissedSuggestionLogSchema,
 ];

@@ -5,6 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/utils/date_keys.dart';
+import '../../ai_assistant/application/ai_assistant_providers.dart';
+import '../../ai_assistant/presentation/ai_assistant_screen.dart';
+import '../../ai_assistant/presentation/widgets/proactive_suggestion_section.dart';
+import '../../profile/application/profile_providers.dart';
 import '../../../core/sync/sync_service.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../execution/domain/models/timer_session.dart';
@@ -64,6 +69,10 @@ class HomeScreen extends ConsumerWidget {
     final flowSnapshotAsync = ref.watch(homeFlowSnapshotProvider);
     final analyticsBundleAsync = ref.watch(analyticsPeriodBundleProvider);
     final execState = ref.watch(executionControllerProvider);
+
+    // Morning brief: show snackbar once per day between 06:00–10:00 if enabled
+    _maybeTriggerMorningBrief(context, ref);
+
     final hasRunningFocusTask =
         execState.targetType == TimerSessionTargetType.task &&
         execState.taskId.isNotEmpty &&
@@ -220,7 +229,10 @@ class HomeScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           const HomeCoachingFocusCard(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
+          // Proactive AI suggestion cards (Phase 4) — collapse when empty
+          const ProactiveSuggestionSection(),
+          const SizedBox(height: 16),
           _NeonCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -515,6 +527,49 @@ class HomeScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Shows a one-time morning brief snackbar when the feature is enabled.
+void _maybeTriggerMorningBrief(BuildContext context, WidgetRef ref) {
+    final now = DateTime.now();
+    final isMorningWindow = now.hour >= 6 && now.hour < 10;
+    if (!isMorningWindow) return;
+
+    final coachOpenedToday = ref.read(coachLastOpenedDateKeyProvider);
+    final todayKey = DateKeys.todayKey();
+    if (coachOpenedToday == todayKey) return;
+
+    // Check preference asynchronously — best-effort, no blocking
+    final prefAsync = ref.read(userProfilePreferenceStreamProvider);
+    final morningBriefEnabled =
+        prefAsync.whenOrNull(data: (p) => p?.morningBriefEnabled) ?? false;
+    if (!morningBriefEnabled) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF201f1f),
+          behavior: SnackBarBehavior.floating,
+          content: const Text(
+            'Coach AI has suggestions for today — tap to review.',
+            style: TextStyle(color: Colors.white),
+          ),
+          action: SnackBarAction(
+            label: 'Open',
+            textColor: const Color(0xFFB2ED00),
+            onPressed: () => Navigator.pushNamed(
+              context,
+              '/coach',
+              arguments: CoachRouteArgs(
+                preDraftedText: 'Give me a quick plan for today',
+              ),
+            ),
+          ),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    });
 }
 
 class _HomeTopAnalyticsCard extends ConsumerStatefulWidget {
@@ -1788,7 +1843,7 @@ class _CoachAiFab extends StatelessWidget {
 
 // ─── Bottom nav ───────────────────────────────────────────────────────────────
 
-class _ObsidianBottomNav extends StatelessWidget {
+class _ObsidianBottomNav extends ConsumerWidget {
   const _ObsidianBottomNav({required this.onTap});
 
   final void Function(int index) onTap;
@@ -1802,15 +1857,18 @@ class _ObsidianBottomNav extends StatelessWidget {
     (icon: Icons.person_rounded, label: 'Profile'),
   ];
 
-  // Profile tab (index 4) is considered "active" when this widget is on HomeScreen.
-  // We highlight nothing by default since Home is the current screen — but per
-  // design, the Profile icon uses primary-dim when selected. We keep Home
-  // unlit since all items from HomeScreen push on top; none stays selected.
   static const _kSurface = Color(0xFF0E0E0E);
   static const _kVariant = Color(0xFFADAAAA);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Show red badge on Coach tab when there is a pending blocked plan
+    final aiServiceAsync = ref.watch(resolvedAiAssistantProvider);
+    final hasBlockedPlan = aiServiceAsync.whenOrNull(
+          data: (svc) => svc.pendingPlan?.isBlockedByContext == true,
+        ) ??
+        false;
+
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     return ClipRect(
       child: BackdropFilter(
@@ -1830,6 +1888,8 @@ class _ObsidianBottomNav extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(_items.length, (i) {
                 final item = _items[i];
+                // Coach tab (index 1) gets a badge when there's a blocked plan
+                final showBadge = i == 1 && hasBlockedPlan;
                 return GestureDetector(
                   onTap: () => onTap(i),
                   behavior: HitTestBehavior.opaque,
@@ -1838,10 +1898,28 @@ class _ObsidianBottomNav extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          item.icon,
-                          size: 24,
-                          color: _kVariant,
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Icon(
+                              item.icon,
+                              size: 24,
+                              color: _kVariant,
+                            ),
+                            if (showBadge)
+                              Positioned(
+                                right: -3,
+                                top: -3,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.redAccent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(

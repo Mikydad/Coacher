@@ -15,6 +15,7 @@ class UserProfilePreference {
     required this.displayName,
     required this.defaultEnforcementMode,
     required this.updatedAtMs,
+    this.morningBriefEnabled = false,
     this.schemaVersion = kUserProfilePreferenceSchemaVersion,
   });
 
@@ -28,6 +29,10 @@ class UserProfilePreference {
   /// Default [EnforcementMode] applied to new tasks/habits when the user
   /// has not explicitly chosen one.
   final EnforcementMode defaultEnforcementMode;
+
+  /// When true, Coach AI shows a subtle "suggestions for today" banner on the
+  /// first app open between 06:00–10:00 if the Coach screen hasn't been opened.
+  final bool morningBriefEnabled;
 
   final int updatedAtMs;
   final int schemaVersion;
@@ -48,6 +53,7 @@ class UserProfilePreference {
     'id': id,
     'displayName': displayName,
     'defaultEnforcementMode': defaultEnforcementMode.toStorage(),
+    'morningBriefEnabled': morningBriefEnabled,
     'updatedAtMs': updatedAtMs,
     'schemaVersion': schemaVersion,
   };
@@ -59,6 +65,7 @@ class UserProfilePreference {
         defaultEnforcementMode: EnforcementMode.fromStorage(
           map['defaultEnforcementMode'] as String?,
         ),
+        morningBriefEnabled: map['morningBriefEnabled'] as bool? ?? false,
         updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
         schemaVersion:
             (map['schemaVersion'] as num?)?.toInt() ??
@@ -68,6 +75,7 @@ class UserProfilePreference {
   UserProfilePreference copyWith({
     String? displayName,
     EnforcementMode? defaultEnforcementMode,
+    bool? morningBriefEnabled,
     int? updatedAtMs,
     int? schemaVersion,
   }) => UserProfilePreference(
@@ -75,6 +83,7 @@ class UserProfilePreference {
     displayName: displayName ?? this.displayName,
     defaultEnforcementMode:
         defaultEnforcementMode ?? this.defaultEnforcementMode,
+    morningBriefEnabled: morningBriefEnabled ?? this.morningBriefEnabled,
     updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     schemaVersion: schemaVersion ?? this.schemaVersion,
   );

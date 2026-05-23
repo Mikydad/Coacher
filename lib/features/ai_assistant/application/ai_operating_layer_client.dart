@@ -91,6 +91,30 @@ You MUST respond with valid JSON matching one of these two schemas:
 - A single request may produce multiple actions — return all of them.
 - Dates and times are always in the user's local timezone.
 - Keep conflict strings short and human-readable (max 12 words each).
+- If focusState.isActive == true, avoid scheduling new tasks during the active override window.
+- If recentPatterns are provided, prefer times/durations matching the user's past patterns.
+
+## Coaching-style phrasing (applies to followUpQuestion and plan summaries only)
+- supportive:   Warm, encouraging tone. "Great choice! Here's what I'll add…"
+- balanced:     Neutral, professional. "Here's the plan: …"
+- disciplined:  Firm, no-fluff. "Scheduled. Stay on track."
+- intense:      Terse, commanding. "Locked in. Execute."
+Use the coachingStyle from behaviorPreferences to calibrate your wording.
+
+## Multi-turn context
+If conversationHistory is present, treat it as prior turns of this session.
+If previousPlan is present, the user is refining an earlier plan — carry over unchanged actions
+and only modify what the user explicitly specified in the new message.
+
+## Delta-only planning (critical)
+Each user message describes ONLY new changes for this turn — not the full session.
+- If activeTasks or todaySchedule already lists a task with a scheduled time, do NOT include
+  createTask, addReminder, or rescheduleReminder for that item unless the user's CURRENT
+  message explicitly names that task and asks to change it.
+- If completedInSession is present, those items are already applied — never repeat them in
+  actions or follow-up questions.
+- Do not ask follow-up questions about tasks the user already confirmed or that appear in
+  activeTasks with a time set.
 ''';
 
 // ─── OpenAI implementation ────────────────────────────────────────────────────
@@ -112,10 +136,15 @@ class OpenAiOperatingLayerClient implements AiOperatingLayerClient {
   Future<AiPlannedChanges> parseIntent(AiOperatingLayerPayload payload) async {
     final userPrompt = _buildUserPrompt(payload);
 
+    // Use full conversationHistory (Phase 3) if present, else fall back to sessionHistory
+    final priorTurns = payload.conversationHistory.isNotEmpty
+        ? payload.conversationHistory
+        : payload.sessionHistory;
+
     final messages = <Map<String, dynamic>>[
       {'role': 'system', 'content': _kSystemPrompt},
       // Inject prior session turns as context
-      for (final h in payload.sessionHistory) h,
+      for (final h in priorTurns) h,
       {'role': 'user', 'content': userPrompt},
     ];
 
@@ -186,16 +215,50 @@ class OpenAiOperatingLayerClient implements AiOperatingLayerClient {
       buffer.writeln('Active override: ${payload.contextOverride}');
     }
 
-    if (payload.focusState.isNotEmpty) {
-      buffer.writeln('Focus state: ${payload.focusState}');
+    if (payload.focusState['isActive'] == true) {
+      final type = payload.focusState['type'] ?? 'unknown';
+      final endsAt = payload.focusState['endsAt'];
+      buffer.writeln(
+        'Focus state: ACTIVE ($type${endsAt != null ? ", ends at $endsAt" : ""})',
+      );
     }
 
     if (payload.behaviorPreferences.isNotEmpty) {
       buffer.writeln('User preferences: ${payload.behaviorPreferences}');
     }
 
+    if (payload.recentPatterns.isNotEmpty) {
+      buffer.writeln('Recent activity patterns:');
+      for (final p in payload.recentPatterns) {
+        buffer.writeln(
+          '  - ${p['category']}: ${p['frequency']} times in last 14 days'
+          '${p['lastUsedTime'] != null ? ", usually at ${p['lastUsedTime']}" : ""}'
+          '${p['lastUsedDuration'] != null ? ", ~${p['lastUsedDuration']}" : ""}',
+        );
+      }
+      buffer.writeln();
+    }
+
+    if (payload.completedInSession.isNotEmpty) {
+      buffer.writeln(
+        'Already applied this session (do NOT repeat in actions or follow-ups):',
+      );
+      for (final line in payload.completedInSession) {
+        buffer.writeln('  - $line');
+      }
+      buffer.writeln();
+    }
+
+    if (payload.previousPlan != null) {
+      buffer.writeln('Previous plan (user is refining this):');
+      buffer.writeln('  ${payload.previousPlan}');
+      buffer.writeln();
+    }
+
     buffer.writeln();
-    buffer.writeln('Parse the request and return a JSON plan.');
+    buffer.writeln(
+      'Parse ONLY the new change requested in this message. Return a JSON plan.',
+    );
     return buffer.toString();
   }
 

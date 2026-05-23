@@ -18,33 +18,43 @@ const IsarAiInteractionHistorySchema = CollectionSchema(
   name: r'IsarAiInteractionHistory',
   id: -5730539528741319728,
   properties: {
-    r'confirmed': PropertySchema(
+    r'assistantSummary': PropertySchema(
       id: 0,
+      name: r'assistantSummary',
+      type: IsarType.string,
+    ),
+    r'confirmed': PropertySchema(
+      id: 1,
       name: r'confirmed',
       type: IsarType.bool,
     ),
     r'executed': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'executed',
       type: IsarType.bool,
     ),
     r'parsedActionsJson': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'parsedActionsJson',
       type: IsarType.string,
     ),
+    r'resolvedCategory': PropertySchema(
+      id: 4,
+      name: r'resolvedCategory',
+      type: IsarType.string,
+    ),
     r'sessionId': PropertySchema(
-      id: 3,
+      id: 5,
       name: r'sessionId',
       type: IsarType.string,
     ),
     r'timestampMs': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'timestampMs',
       type: IsarType.long,
     ),
     r'userInput': PropertySchema(
-      id: 5,
+      id: 7,
       name: r'userInput',
       type: IsarType.string,
     )
@@ -96,7 +106,19 @@ int _isarAiInteractionHistoryEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.assistantSummary;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.parsedActionsJson.length * 3;
+  {
+    final value = object.resolvedCategory;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.sessionId.length * 3;
   bytesCount += 3 + object.userInput.length * 3;
   return bytesCount;
@@ -108,12 +130,14 @@ void _isarAiInteractionHistorySerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeBool(offsets[0], object.confirmed);
-  writer.writeBool(offsets[1], object.executed);
-  writer.writeString(offsets[2], object.parsedActionsJson);
-  writer.writeString(offsets[3], object.sessionId);
-  writer.writeLong(offsets[4], object.timestampMs);
-  writer.writeString(offsets[5], object.userInput);
+  writer.writeString(offsets[0], object.assistantSummary);
+  writer.writeBool(offsets[1], object.confirmed);
+  writer.writeBool(offsets[2], object.executed);
+  writer.writeString(offsets[3], object.parsedActionsJson);
+  writer.writeString(offsets[4], object.resolvedCategory);
+  writer.writeString(offsets[5], object.sessionId);
+  writer.writeLong(offsets[6], object.timestampMs);
+  writer.writeString(offsets[7], object.userInput);
 }
 
 IsarAiInteractionHistory _isarAiInteractionHistoryDeserialize(
@@ -123,13 +147,15 @@ IsarAiInteractionHistory _isarAiInteractionHistoryDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = IsarAiInteractionHistory();
-  object.confirmed = reader.readBool(offsets[0]);
-  object.executed = reader.readBool(offsets[1]);
+  object.assistantSummary = reader.readStringOrNull(offsets[0]);
+  object.confirmed = reader.readBool(offsets[1]);
+  object.executed = reader.readBool(offsets[2]);
   object.isarId = id;
-  object.parsedActionsJson = reader.readString(offsets[2]);
-  object.sessionId = reader.readString(offsets[3]);
-  object.timestampMs = reader.readLong(offsets[4]);
-  object.userInput = reader.readString(offsets[5]);
+  object.parsedActionsJson = reader.readString(offsets[3]);
+  object.resolvedCategory = reader.readStringOrNull(offsets[4]);
+  object.sessionId = reader.readString(offsets[5]);
+  object.timestampMs = reader.readLong(offsets[6]);
+  object.userInput = reader.readString(offsets[7]);
   return object;
 }
 
@@ -141,16 +167,20 @@ P _isarAiInteractionHistoryDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readBool(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 1:
       return (reader.readBool(offset)) as P;
     case 2:
-      return (reader.readString(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 3:
       return (reader.readString(offset)) as P;
     case 4:
-      return (reader.readLong(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 5:
+      return (reader.readString(offset)) as P;
+    case 6:
+      return (reader.readLong(offset)) as P;
+    case 7:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -402,6 +432,162 @@ extension IsarAiInteractionHistoryQueryWhere on QueryBuilder<
 extension IsarAiInteractionHistoryQueryFilter on QueryBuilder<
     IsarAiInteractionHistory, IsarAiInteractionHistory, QFilterCondition> {
   QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> assistantSummaryIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'assistantSummary',
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> assistantSummaryIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'assistantSummary',
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> assistantSummaryEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'assistantSummary',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> assistantSummaryGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'assistantSummary',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> assistantSummaryLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'assistantSummary',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> assistantSummaryBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'assistantSummary',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> assistantSummaryStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'assistantSummary',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> assistantSummaryEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'assistantSummary',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+          QAfterFilterCondition>
+      assistantSummaryContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'assistantSummary',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+          QAfterFilterCondition>
+      assistantSummaryMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'assistantSummary',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> assistantSummaryIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'assistantSummary',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> assistantSummaryIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'assistantSummary',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
       QAfterFilterCondition> confirmedEqualTo(bool value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -610,6 +796,162 @@ extension IsarAiInteractionHistoryQueryFilter on QueryBuilder<
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'parsedActionsJson',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> resolvedCategoryIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'resolvedCategory',
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> resolvedCategoryIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'resolvedCategory',
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> resolvedCategoryEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'resolvedCategory',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> resolvedCategoryGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'resolvedCategory',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> resolvedCategoryLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'resolvedCategory',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> resolvedCategoryBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'resolvedCategory',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> resolvedCategoryStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'resolvedCategory',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> resolvedCategoryEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'resolvedCategory',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+          QAfterFilterCondition>
+      resolvedCategoryContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'resolvedCategory',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+          QAfterFilterCondition>
+      resolvedCategoryMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'resolvedCategory',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> resolvedCategoryIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'resolvedCategory',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> resolvedCategoryIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'resolvedCategory',
         value: '',
       ));
     });
@@ -957,6 +1299,20 @@ extension IsarAiInteractionHistoryQueryLinks on QueryBuilder<
 extension IsarAiInteractionHistoryQuerySortBy on QueryBuilder<
     IsarAiInteractionHistory, IsarAiInteractionHistory, QSortBy> {
   QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
+      sortByAssistantSummary() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'assistantSummary', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
+      sortByAssistantSummaryDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'assistantSummary', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
       sortByConfirmed() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'confirmed', Sort.asc);
@@ -995,6 +1351,20 @@ extension IsarAiInteractionHistoryQuerySortBy on QueryBuilder<
       sortByParsedActionsJsonDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'parsedActionsJson', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
+      sortByResolvedCategory() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'resolvedCategory', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
+      sortByResolvedCategoryDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'resolvedCategory', Sort.desc);
     });
   }
 
@@ -1043,6 +1413,20 @@ extension IsarAiInteractionHistoryQuerySortBy on QueryBuilder<
 
 extension IsarAiInteractionHistoryQuerySortThenBy on QueryBuilder<
     IsarAiInteractionHistory, IsarAiInteractionHistory, QSortThenBy> {
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
+      thenByAssistantSummary() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'assistantSummary', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
+      thenByAssistantSummaryDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'assistantSummary', Sort.desc);
+    });
+  }
+
   QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
       thenByConfirmed() {
     return QueryBuilder.apply(this, (query) {
@@ -1100,6 +1484,20 @@ extension IsarAiInteractionHistoryQuerySortThenBy on QueryBuilder<
   }
 
   QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
+      thenByResolvedCategory() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'resolvedCategory', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
+      thenByResolvedCategoryDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'resolvedCategory', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
       thenBySessionId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'sessionId', Sort.asc);
@@ -1145,6 +1543,14 @@ extension IsarAiInteractionHistoryQuerySortThenBy on QueryBuilder<
 extension IsarAiInteractionHistoryQueryWhereDistinct on QueryBuilder<
     IsarAiInteractionHistory, IsarAiInteractionHistory, QDistinct> {
   QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QDistinct>
+      distinctByAssistantSummary({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'assistantSummary',
+          caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QDistinct>
       distinctByConfirmed() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'confirmed');
@@ -1162,6 +1568,14 @@ extension IsarAiInteractionHistoryQueryWhereDistinct on QueryBuilder<
       distinctByParsedActionsJson({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'parsedActionsJson',
+          caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QDistinct>
+      distinctByResolvedCategory({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'resolvedCategory',
           caseSensitive: caseSensitive);
     });
   }
@@ -1197,6 +1611,13 @@ extension IsarAiInteractionHistoryQueryProperty on QueryBuilder<
     });
   }
 
+  QueryBuilder<IsarAiInteractionHistory, String?, QQueryOperations>
+      assistantSummaryProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'assistantSummary');
+    });
+  }
+
   QueryBuilder<IsarAiInteractionHistory, bool, QQueryOperations>
       confirmedProperty() {
     return QueryBuilder.apply(this, (query) {
@@ -1215,6 +1636,13 @@ extension IsarAiInteractionHistoryQueryProperty on QueryBuilder<
       parsedActionsJsonProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'parsedActionsJson');
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, String?, QQueryOperations>
+      resolvedCategoryProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'resolvedCategory');
     });
   }
 
