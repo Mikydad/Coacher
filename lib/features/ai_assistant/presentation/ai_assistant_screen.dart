@@ -10,15 +10,24 @@ import '../domain/models/ai_planned_changes.dart';
 import 'widgets/ai_input_card.dart';
 import 'widgets/chat_bubbles.dart';
 import 'widgets/planned_changes_card.dart';
+import 'widgets/proactive_suggestions_coach_panel.dart';
 import 'widgets/quick_directives_row.dart';
 import 'widgets/suggested_prompts_section.dart';
+import '../application/proactive_suggestion_display.dart';
 
 /// Optional route arguments for pre-filling the input (e.g. from a proactive
 /// suggestion card on Home — see Phase 4).
 class CoachRouteArgs {
-  const CoachRouteArgs({this.preDraftedText});
+  const CoachRouteArgs({
+    this.preDraftedText,
+    this.openSuggestionsPanel = false,
+  });
 
   final String? preDraftedText;
+
+  /// When true, shows the full proactive suggestions list at the top of Coach
+  /// (e.g. from Home "See all in Coach").
+  final bool openSuggestionsPanel;
 }
 
 class AiAssistantScreen extends ConsumerStatefulWidget {
@@ -34,6 +43,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   final TextEditingController _inputController = TextEditingController();
   final FocusNode _inputFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
+  bool _openSuggestionsPanel = false;
 
   @override
   void initState() {
@@ -43,9 +53,14 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       ref.read(coachLastOpenedDateKeyProvider.notifier).state =
           DateKeys.todayKey();
       final args = ModalRoute.of(context)?.settings.arguments;
-      if (args is CoachRouteArgs && args.preDraftedText != null) {
-        _inputController.text = args.preDraftedText!;
-        _inputFocusNode.requestFocus();
+      if (args is CoachRouteArgs) {
+        setState(() {
+          _openSuggestionsPanel = args.openSuggestionsPanel;
+        });
+        if (args.preDraftedText != null) {
+          _inputController.text = args.preDraftedText!;
+          _inputFocusNode.requestFocus();
+        }
       }
     });
   }
@@ -123,8 +138,11 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     // Auto-scroll on new messages
     if (hasMessages) _scrollToBottom();
 
+    final showSuggestionsPanel = _shouldShowSuggestionsPanel();
+
     return Column(
       children: [
+        if (showSuggestionsPanel) const ProactiveSuggestionsCoachPanel(),
         // "Pick up where you left off" banner — shown when no active messages
         // and there is a recent unconfirmed plan
         if (!hasMessages)
@@ -183,6 +201,13 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         ),
       ],
     );
+  }
+
+  bool _shouldShowSuggestionsPanel() {
+    if (_openSuggestionsPanel) return true;
+    final suggestions = ref.watch(proactiveSuggestionsProvider).valueOrNull;
+    if (suggestions == null) return false;
+    return activeProactiveSuggestions(suggestions).length > 1;
   }
 
   Widget _buildLoadingBody() {
