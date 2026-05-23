@@ -51,6 +51,30 @@ abstract final class EnforcementModePolicy {
     };
   }
 
+  /// Minimum weighted completion rate (0–1) for a day to count toward
+  /// progress rollups and streaks.
+  ///
+  /// | Mode        | Threshold |
+  /// |-------------|-----------|
+  /// | flexible    | 80%       |
+  /// | disciplined | 90%       |
+  /// | extreme     | 100%      |
+  static double streakDayThreshold(EnforcementMode mode) {
+    return switch (mode) {
+      EnforcementMode.flexible => 0.80,
+      EnforcementMode.disciplined => 0.90,
+      EnforcementMode.extreme => 1.0,
+    };
+  }
+
+  /// Whether [weightedCompletionRate] counts as a successful streak day.
+  static bool isStreakQualifyingDay(
+    double weightedCompletionRate,
+    EnforcementMode mode,
+  ) {
+    return weightedCompletionRate >= streakDayThreshold(mode);
+  }
+
   /// Whether only on-time completions count toward a streak.
   ///
   /// When `true` (only for `extreme`), a completion logged after the

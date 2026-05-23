@@ -16,8 +16,10 @@ import '../../execution/domain/models/timer_session.dart';
 import '../../execution/domain/task_timer_engine.dart';
 import '../../planning/application/override_rules.dart';
 import '../../planning/application/auto_next_task_flow.dart';
+import '../../execution/application/execution_controller.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
+import '../../planning/application/task_schedule_display.dart';
 import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/application/daily_analytics_providers.dart';
 import '../../analytics/application/delivery_providers.dart';
@@ -55,6 +57,9 @@ import '../../timer/presentation/timer_session_screen.dart';
 import 'quittr_app_bar_title.dart';
 
 enum _PlansChangedAction { reshuffle, defer, skip }
+
+/// Tasks and goals shown on Home before "see more" links to the full hub.
+const int kHomePreviewItemLimit = 3;
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -168,66 +173,9 @@ class HomeScreen extends ConsumerWidget {
           const ActiveOverrideBanner(),
           const PostOverrideReviewCard(),
           const _DailyDisciplineSection(),
-          const SizedBox(height: 24),
-          _NeonCard(
-            child: flowSnapshotAsync.when(
-              data: (flow) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Flow now',
-                    style: TextStyle(
-                      color: Color(0xFF00E6FF),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Current block: ${flow.currentBlockLabel}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Open tasks: ${flow.openTaskCount}',
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                  const SizedBox(height: 10),
-                  if (flow.nextTaskRow != null)
-                    FilledButton.icon(
-                      onPressed: () {
-                        final next = flow.nextTaskRow!.task;
-                        ref.read(activeExecutionTaskIdProvider.notifier).state =
-                            next.id;
-                        ref
-                                .read(activeExecutionTaskLabelProvider.notifier)
-                                .state =
-                            next.title;
-                        Navigator.pushNamed(
-                          context,
-                          TimerSessionScreen.routeName,
-                        );
-                      },
-                      icon: const Icon(Icons.play_arrow),
-                      label: Text('What next: ${flow.nextTaskRow!.task.title}'),
-                    )
-                  else
-                    const Text(
-                      'No next task suggestion yet.',
-                      style: TextStyle(color: Colors.white54),
-                    ),
-                ],
-              ),
-              loading: () => const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (e, _) => Text('Could not load flow snapshot: $e'),
-            ),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          _FlowNowStrip(flowSnapshotAsync: flowSnapshotAsync),
+          const SizedBox(height: 16),
           const HomeCoachingFocusCard(),
           const SizedBox(height: 8),
           // Proactive AI suggestion cards (Phase 4) — collapse when empty
@@ -274,9 +222,12 @@ class HomeScreen extends ConsumerWidget {
                         style: TextStyle(color: Colors.white54),
                       );
                     }
+                    final visible =
+                        rows.take(kHomePreviewItemLimit).toList();
+                    final remaining = rows.length - visible.length;
                     return Column(
                       children: [
-                        for (final row in rows)
+                        for (final row in visible)
                           _TaskItem(
                             title: row.task.title,
                             subtitle: _homeTaskSubtitle(row, scores),
@@ -296,6 +247,16 @@ class HomeScreen extends ConsumerWidget {
                             },
                             onPlansChanged: () =>
                                 _openPlansChangedFlow(context, ref, row),
+                          ),
+                        if (remaining > 0)
+                          _HomeSectionSeeMoreLink(
+                            label: remaining == 1
+                                ? '1 more task'
+                                : '$remaining more tasks',
+                            onTap: () => Navigator.pushNamed(
+                              context,
+                              TasksHubScreen.routeName,
+                            ),
                           ),
                       ],
                     );
@@ -382,9 +343,12 @@ class HomeScreen extends ConsumerWidget {
                         ],
                       );
                     }
+                    final visible =
+                        goals.take(kHomePreviewItemLimit).toList();
+                    final remaining = goals.length - visible.length;
                     return Column(
                       children: [
-                        for (final g in goals)
+                        for (final g in visible)
                           _TodayGoalTile(
                             title: g.title,
                             subtitle: _homeGoalSubtitle(g),
@@ -392,6 +356,16 @@ class HomeScreen extends ConsumerWidget {
                               context,
                               GoalDetailScreen.routeName,
                               arguments: g.id,
+                            ),
+                          ),
+                        if (remaining > 0)
+                          _HomeSectionSeeMoreLink(
+                            label: remaining == 1
+                                ? '1 more goal'
+                                : '$remaining more goals',
+                            onTap: () => Navigator.pushNamed(
+                              context,
+                              GoalSelectionScreen.routeName,
                             ),
                           ),
                       ],
@@ -1029,6 +1003,418 @@ class _ActionCircle extends StatelessWidget {
               textAlign: TextAlign.center,
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact Flow now: one status line + slim next-task row (~72px vs ~140px).
+class _FlowNowStrip extends ConsumerWidget {
+  const _FlowNowStrip({required this.flowSnapshotAsync});
+
+  final AsyncValue<HomeFlowSnapshot> flowSnapshotAsync;
+
+  static const _kAccent = Color(0xFF00E6FF);
+  static const _kMuted = Color(0xFFADAAAA);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final execState = ref.watch(executionControllerProvider);
+    final todayRows = ref.watch(todayAllTasksRowsProvider).valueOrNull ?? const [];
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111317),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: flowSnapshotAsync.when(
+        data: (flow) => _buildContent(context, ref, flow, execState, todayRows),
+        loading: () => const SizedBox(
+          height: 40,
+          child: Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        ),
+        error: (_, _) => const Text(
+          'Flow unavailable',
+          style: TextStyle(color: _kMuted, fontSize: 12),
+        ),
+      ),
+    );
+  }
+
+  PlannedTask? _findTask(List<PlannedTaskRow> rows, String taskId) {
+    for (final row in rows) {
+      if (row.task.id == taskId) return row.task;
+    }
+    return null;
+  }
+
+  void _openTimerScreen(BuildContext context, WidgetRef ref, PlannedTask task) {
+    ref.read(activeExecutionTaskIdProvider.notifier).state = task.id;
+    ref.read(activeExecutionTaskLabelProvider.notifier).state = task.title;
+    ref.read(executionControllerProvider.notifier).setTask(
+          id: task.id,
+          label: task.title,
+          durationMinutes: task.durationMinutes,
+        );
+    Navigator.pushNamed(context, TimerSessionScreen.routeName);
+  }
+
+  Future<void> _toggleFocusTimer(
+    BuildContext context,
+    WidgetRef ref,
+    PlannedTask task,
+    ExecutionState execState,
+  ) async {
+    final ctrl = ref.read(executionControllerProvider.notifier);
+    final isThisTask = execState.targetType == TimerSessionTargetType.task &&
+        execState.taskId == task.id;
+
+    if (isThisTask) {
+      if (execState.phase == ExecutionPhase.inProgress) {
+        ctrl.pause();
+        return;
+      }
+      if (execState.phase == ExecutionPhase.paused) {
+        ctrl.resume();
+        return;
+      }
+      if (execState.phase == ExecutionPhase.notStarted) {
+        ctrl.start();
+        unawaited(
+          ref.read(reminderSyncServiceProvider).markTaskStarted(task.id),
+        );
+      }
+      return;
+    }
+
+    final otherRunning = execState.targetType == TimerSessionTargetType.task &&
+        execState.taskId.isNotEmpty &&
+        execState.taskId != task.id &&
+        (execState.phase == ExecutionPhase.inProgress ||
+            execState.phase == ExecutionPhase.paused);
+    if (otherRunning) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Task "${execState.taskLabel}" is already in focus. '
+            'Pause or stop it before switching.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    ref.read(activeExecutionTaskIdProvider.notifier).state = task.id;
+    ref.read(activeExecutionTaskLabelProvider.notifier).state = task.title;
+    ctrl.setTask(
+      id: task.id,
+      label: task.title,
+      durationMinutes: task.durationMinutes,
+    );
+    ctrl.start();
+    unawaited(ref.read(reminderSyncServiceProvider).markTaskStarted(task.id));
+  }
+
+  static String _formatElapsed(Duration elapsed) {
+    final mins = elapsed.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final secs = elapsed.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final hrs = elapsed.inHours;
+    if (hrs > 0) {
+      return '${hrs.toString().padLeft(2, '0')}:$mins:$secs';
+    }
+    return '$mins:$secs';
+  }
+
+  Widget _buildContent(
+    BuildContext context,
+    WidgetRef ref,
+    HomeFlowSnapshot flow,
+    ExecutionState execState,
+    List<PlannedTaskRow> todayRows,
+  ) {
+    final block = flow.currentBlockLabel;
+    final open = flow.openTaskCount;
+    final next = flow.nextTaskRow?.task;
+
+    final focusActive = execState.targetType == TimerSessionTargetType.task &&
+        execState.taskId.isNotEmpty &&
+        (execState.phase == ExecutionPhase.inProgress ||
+            execState.phase == ExecutionPhase.paused);
+
+    final displayTask = focusActive
+        ? (_findTask(todayRows, execState.taskId) ?? next)
+        : next;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            const Text(
+              'FLOW NOW',
+              style: TextStyle(
+                color: _kAccent,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '$block · $open open',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (displayTask != null) ...[
+          const SizedBox(height: 8),
+          Material(
+            color: const Color(0xFF1A1D22),
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Row(
+                children: [
+                  _FlowNowTimerControl(
+                    task: displayTask,
+                    execState: execState,
+                    onPressed: () => unawaited(
+                      _toggleFocusTimer(context, ref, displayTask, execState),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () =>
+                          _openTimerScreen(context, ref, displayTask),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              focusActive &&
+                                      execState.taskId == displayTask.id
+                                  ? (execState.phase == ExecutionPhase.paused
+                                      ? 'Focus paused'
+                                      : 'Focus active')
+                                  : 'Next up',
+                              style: const TextStyle(
+                                color: _kMuted,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              focusActive &&
+                                      execState.taskId == displayTask.id
+                                  ? execState.taskLabel
+                                  : displayTask.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _FlowNowStrip._subtitleFor(
+                                task: displayTask,
+                                execState: execState,
+                                focusActive: focusActive &&
+                                    execState.taskId == displayTask.id,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: _kMuted,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                    onPressed: () =>
+                        _openTimerScreen(context, ref, displayTask),
+                    icon: const Icon(
+                      Icons.chevron_right,
+                      color: _kMuted,
+                      size: 20,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ] else
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Text(
+              'No next task — add one or check Tasks.',
+              style: TextStyle(color: _kMuted, fontSize: 12),
+            ),
+          ),
+      ],
+    );
+  }
+
+  static String _subtitleFor({
+    required PlannedTask task,
+    required ExecutionState execState,
+    required bool focusActive,
+  }) {
+    final parts = <String>[];
+    if (focusActive) {
+      final targetMin =
+          execState.targetDurationMinutes ?? task.durationMinutes;
+      parts.add('${_formatElapsed(execState.elapsed)} / ${targetMin}m');
+    } else {
+      parts.add('${task.durationMinutes}m target');
+    }
+    final timeLabel = taskScheduledTimeLabel(task);
+    if (timeLabel != null) {
+      parts.add(timeLabel);
+    }
+    return parts.join(' · ');
+  }
+}
+
+class _FlowNowTimerControl extends StatelessWidget {
+  const _FlowNowTimerControl({
+    required this.task,
+    required this.execState,
+    required this.onPressed,
+  });
+
+  final PlannedTask task;
+  final ExecutionState execState;
+  final VoidCallback onPressed;
+
+  static const _kAccent = Color(0xFF00E6FF);
+
+  @override
+  Widget build(BuildContext context) {
+    final isThisTask = execState.targetType == TimerSessionTargetType.task &&
+        execState.taskId == task.id;
+    final running =
+        isThisTask && execState.phase == ExecutionPhase.inProgress;
+    final paused = isThisTask && execState.phase == ExecutionPhase.paused;
+    final showProgress = running || paused;
+
+    final targetMin = isThisTask
+        ? (execState.targetDurationMinutes ?? task.durationMinutes)
+        : task.durationMinutes;
+    final target = Duration(minutes: targetMin);
+    final progress = showProgress && target.inSeconds > 0
+        ? (execState.elapsed.inSeconds / target.inSeconds).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              if (showProgress)
+                CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 3,
+                  backgroundColor: Colors.white12,
+                  color: _kAccent,
+                ),
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: _kAccent.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  running
+                      ? Icons.pause_rounded
+                      : Icons.play_arrow_rounded,
+                  color: _kAccent,
+                  size: 18,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeSectionSeeMoreLink extends StatelessWidget {
+  const _HomeSectionSeeMoreLink({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton(
+        onPressed: onTap,
+        style: TextButton.styleFrom(
+          foregroundColor: const Color(0xFFB7FF00),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right, size: 18),
           ],
         ),
       ),

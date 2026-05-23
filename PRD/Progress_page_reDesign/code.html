@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Quittr | Progress Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-tint": "#eaffb8",
+                    "secondary-fixed-dim": "#00d7f0",
+                    "inverse-surface": "#fcf8f8",
+                    "surface-variant": "#262626",
+                    "outline-variant": "#494847",
+                    "on-secondary-fixed": "#003a42",
+                    "on-primary": "#4b6600",
+                    "outline": "#777575",
+                    "inverse-on-surface": "#565554",
+                    "surface-container-high": "#201f1f",
+                    "on-surface": "#ffffff",
+                    "on-tertiary": "#685c00",
+                    "secondary-dim": "#00d4ec",
+                    "error-container": "#b92902",
+                    "surface-bright": "#2c2c2c",
+                    "on-error": "#450900",
+                    "on-primary-fixed": "#354900",
+                    "on-primary-container": "#445d00",
+                    "on-tertiary-fixed-variant": "#695e00",
+                    "on-error-container": "#ffd2c8",
+                    "on-tertiary-container": "#5e5400",
+                    "tertiary-container": "#fde74f",
+                    "surface-container-highest": "#262626",
+                    "surface": "#0e0e0e",
+                    "tertiary-fixed": "#fde74f",
+                    "on-background": "#ffffff",
+                    "on-surface-variant": "#adaaaa",
+                    "inverse-primary": "#4c6800",
+                    "on-secondary-container": "#e8fbff",
+                    "surface-container-lowest": "#000000",
+                    "primary-fixed-dim": "#b2ed00",
+                    "background": "#0e0e0e",
+                    "tertiary-dim": "#eed942",
+                    "secondary-container": "#006875",
+                    "error": "#ff7351",
+                    "tertiary-fixed-dim": "#eed942",
+                    "tertiary": "#fff4c1",
+                    "error-dim": "#d53d18",
+                    "on-secondary-fixed-variant": "#005964",
+                    "primary": "#eaffb8",
+                    "on-primary-fixed-variant": "#4c6800",
+                    "primary-fixed": "#befc00",
+                    "secondary": "#00e3fd",
+                    "on-secondary": "#004d57",
+                    "surface-dim": "#0e0e0e",
+                    "primary-dim": "#b2ed00",
+                    "secondary-fixed": "#26e6ff",
+                    "primary-container": "#befc00",
+                    "surface-container-low": "#131313",
+                    "on-tertiary-fixed": "#4a4100",
+                    "surface-container": "#1a1919"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Inter"],
+                    "display": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-card {
+            background: rgba(38, 38, 38, 0.4);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .progress-ring { transition: stroke-dashoffset 0.8s ease-in-out; }
+        .pulse-glow { animation: pulse 3s infinite ease-in-out; }
+        @keyframes pulse {
+            0%, 100% { filter: drop-shadow(0 0 5px rgba(178, 237, 0, 0.2)); }
+            50% { filter: drop-shadow(0 0 15px rgba(178, 237, 0, 0.6)); }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface selection:bg-primary selection:text-on-primary min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="docked full-width top-0 z-50 bg-surface dark:bg-surface flex justify-between items-center w-full px-6 py-4">
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-primary dark:text-primary hover:opacity-80 transition-opacity active:scale-90 transition-transform">arrow_back</button>
+<h1 class="font-headline text-headline-sm font-bold tracking-tight text-primary dark:text-primary">Progress</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-on-surface-variant hover:opacity-80 transition-opacity active:scale-90 transition-transform">history</button>
+<button class="material-symbols-outlined text-primary dark:text-primary hover:opacity-80 transition-opacity active:scale-90 transition-transform">auto_awesome</button>
+</div>
+</header>
+<main class="max-w-2xl mx-auto px-6 py-4 space-y-10">
+<!-- Weekly Visual Summary (Hero) -->
+<section class="space-y-6">
+<div class="flex items-end justify-between">
+<h2 class="text-headline-sm font-bold tracking-tight">Weekly Summary</h2>
+<span class="font-label text-label-sm uppercase tracking-widest text-on-surface-variant">Aug 14 — Aug 20</span>
+</div>
+<div class="relative overflow-hidden rounded-xl bg-surface-container-low p-8 flex flex-col md:flex-row items-center gap-8 group">
+<div class="absolute -right-16 -top-16 w-64 h-64 bg-primary/10 rounded-full blur-[80px] pointer-events-none"></div>
+<div class="absolute -left-16 -bottom-16 w-64 h-64 bg-secondary/10 rounded-full blur-[80px] pointer-events-none"></div>
+<!-- Main Ring -->
+<div class="relative w-48 h-48 flex items-center justify-center">
+<svg class="w-full h-full -rotate-90">
+<circle class="text-surface-container-highest" cx="96" cy="96" fill="transparent" r="88" stroke="currentColor" stroke-width="8"></circle>
+<circle class="progress-ring pulse-glow" cx="96" cy="96" fill="transparent" r="88" stroke="url(#gradient-ring)" stroke-dasharray="552.9" stroke-dashoffset="82.9" stroke-linecap="round" stroke-width="12"></circle>
+<defs>
+<lineargradient id="gradient-ring" x1="0%" x2="100%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#b2ed00"></stop>
+<stop offset="100%" stop-color="#00e3fd"></stop>
+</lineargradient>
+</defs>
+</svg>
+<div class="absolute flex flex-col items-center">
+<span class="text-[3.5rem] font-display font-black tracking-tighter leading-none">85</span>
+<span class="font-label text-label-sm uppercase tracking-widest text-on-surface-variant">Discipline</span>
+</div>
+</div>
+<div class="flex-1 space-y-4">
+<div class="p-4 rounded-lg bg-surface-container-high hover:bg-surface-bright transition-colors cursor-default">
+<div class="flex justify-between items-center mb-1">
+<span class="font-label text-label-sm uppercase tracking-widest text-on-surface-variant">Top Category</span>
+<span class="text-primary font-bold">+12%</span>
+</div>
+<div class="text-lg font-bold">Deep Work Focus</div>
+</div>
+<div class="p-4 rounded-lg bg-surface-container-high hover:bg-surface-bright transition-colors cursor-default">
+<div class="flex justify-between items-center mb-1">
+<span class="font-label text-label-sm uppercase tracking-widest text-on-surface-variant">Consistency</span>
+<span class="text-secondary font-bold">STABLE</span>
+</div>
+<div class="text-lg font-bold">5-Day Active Streak</div>
+</div>
+</div>
+</div>
+</section>
+<!-- AI Insights -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Coaching Focus -->
+<div class="glass-card p-6 rounded-lg relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
+<div class="absolute top-0 left-0 w-1 h-full bg-secondary"></div>
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-secondary">psychology</span>
+<h3 class="font-label text-label-sm uppercase tracking-widest text-secondary font-bold">Coaching Focus</h3>
+</div>
+<p class="text-on-surface mb-2 font-medium">Your peak focus is at 10 AM.</p>
+<p class="text-body-md text-on-surface-variant leading-relaxed">Protect this window. AI analysis shows 40% higher task completion rate during these 90 minutes.</p>
+</div>
+<!-- Progress Coaching -->
+<div class="glass-card p-6 rounded-lg relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
+<div class="absolute top-0 left-0 w-1 h-full bg-primary-dim"></div>
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-primary-dim">warning</span>
+<h3 class="font-label text-label-sm uppercase tracking-widest text-primary-dim font-bold">Streak At Risk</h3>
+</div>
+<p class="text-on-surface mb-2 font-medium">Inconsistent follow-through.</p>
+<p class="text-body-md text-on-surface-variant leading-relaxed">One intentional action now prevents a total reset of your current 4-day momentum.</p>
+</div>
+</section>
+<!-- Metrics Breakdown -->
+<section class="space-y-6">
+<!-- Goals & Habits -->
+<div class="bg-surface-container-low rounded-xl p-8 space-y-8">
+<div class="flex items-center gap-3">
+<div class="w-3 h-3 rounded-full bg-primary pulse-glow"></div>
+<h3 class="text-headline-sm font-bold tracking-tight">Goals &amp; Habits</h3>
+</div>
+<div class="flex flex-wrap gap-3">
+<span class="px-5 py-2 rounded-full bg-surface-container-highest text-sm font-medium border border-outline-variant/20">Today: 0%</span>
+<span class="px-5 py-2 rounded-full bg-surface-container-highest text-sm font-medium border border-outline-variant/20">Week: 15%</span>
+<span class="px-5 py-2 rounded-full bg-surface-container-highest text-sm font-medium border border-outline-variant/20">Month: 22%</span>
+<span class="px-5 py-2 rounded-full bg-primary-container/20 text-primary-fixed text-sm font-bold border border-primary/20">Streak: 4d (PB 12d)</span>
+</div>
+<div class="space-y-6">
+<div class="space-y-2">
+<div class="flex justify-between font-label text-label-sm uppercase tracking-widest">
+<span class="text-on-surface-variant">Today</span>
+<span class="text-primary font-bold">0%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary-dim w-0 transition-all duration-1000"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between font-label text-label-sm uppercase tracking-widest">
+<span class="text-on-surface-variant">Week</span>
+<span class="text-primary font-bold">15%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary-dim w-[15%] transition-all duration-1000"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between font-label text-label-sm uppercase tracking-widest">
+<span class="text-on-surface-variant">Month</span>
+<span class="text-primary font-bold">22%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary-dim w-[22%] transition-all duration-1000"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Tasks Breakdown -->
+<div class="bg-surface-container-low rounded-xl p-8 space-y-8">
+<div class="flex items-center gap-3">
+<div class="w-3 h-3 rounded-full bg-secondary"></div>
+<h3 class="text-headline-sm font-bold tracking-tight">Task Integrity</h3>
+</div>
+<div class="flex flex-wrap gap-3">
+<span class="px-5 py-2 rounded-full bg-surface-container-highest text-sm font-medium border border-outline-variant/20">Today: 20%</span>
+<span class="px-5 py-2 rounded-full bg-surface-container-highest text-sm font-medium border border-outline-variant/20">Week: 25%</span>
+<span class="px-5 py-2 rounded-full bg-surface-container-highest text-sm font-medium border border-outline-variant/20">Month: 67%</span>
+</div>
+<div class="space-y-6">
+<div class="space-y-2">
+<div class="flex justify-between font-label text-label-sm uppercase tracking-widest">
+<span class="text-on-surface-variant">Current Velocity</span>
+<span class="text-secondary font-bold">20%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[20%] transition-all duration-1000 delay-300"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between font-label text-label-sm uppercase tracking-widest">
+<span class="text-on-surface-variant">7-Day Average</span>
+<span class="text-secondary font-bold">25%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[25%] transition-all duration-1000 delay-300"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-surface-container dark:bg-surface-container z-50 rounded-t-xl shadow-[0_-4px_20px_rgba(0,0,0,0.4)]">
+<a class="flex flex-col items-center justify-center text-on-surface-variant opacity-60 hover:text-primary hover:opacity-100 transition-all active:scale-90 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label text-label-sm uppercase tracking-widest mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant opacity-60 hover:text-primary hover:opacity-100 transition-all active:scale-90 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="font-label text-label-sm uppercase tracking-widest mt-1">Coach</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant opacity-60 hover:text-primary hover:opacity-100 transition-all active:scale-90 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">target</span>
+<span class="font-label text-label-sm uppercase tracking-widest mt-1">Goals</span>
+</a>
+<a class="flex flex-col items-center justify-center text-primary font-bold scale-110 transition-all active:scale-90 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">analytics</span>
+<span class="font-label text-label-sm uppercase tracking-widest mt-1">Progress</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant opacity-60 hover:text-primary hover:opacity-100 transition-all active:scale-90 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label text-label-sm uppercase tracking-widest mt-1">Profile</span>
+</a>
+</nav>
+<script>
+        // Simple interactivity for demonstration
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.addEventListener('click', () => {
+                card.style.transform = 'scale(0.98)';
+                setTimeout(() => {
+                    card.style.transform = 'scale(1.02)';
+                }, 150);
+            });
+        });
+    </script>
+</body></html>
