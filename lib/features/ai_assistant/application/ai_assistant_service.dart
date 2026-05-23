@@ -8,6 +8,7 @@ import '../domain/models/ai_chat_message.dart';
 import '../domain/models/ai_planned_changes.dart';
 import 'ai_action_executor.dart';
 import 'ai_intent_parser.dart';
+import 'entity_normaliser.dart';
 
 /// Signature for fire-and-forget analytics logging from the service layer.
 typedef AiAnalyticsLogger = void Function(
@@ -25,22 +26,31 @@ class AiAssistantService extends ChangeNotifier {
     required AiActionExecutor actionExecutor,
     required AiInteractionHistoryRepository historyRepository,
     AiAnalyticsLogger? analyticsLogger,
+    EntityNormaliser? normaliser,
   })  : _intentParser = intentParser,
         _actionExecutor = actionExecutor,
         _historyRepository = historyRepository,
         _analyticsLogger = analyticsLogger,
+        _normaliser = normaliser ?? const EntityNormaliser(),
         _sessionId = StableId.generate('session');
 
   final AiIntentParser _intentParser;
   final AiActionExecutor _actionExecutor;
   final AiInteractionHistoryRepository _historyRepository;
+
+  /// Exposed for UI (e.g. pick-up-where-you-left-off banner).
+  AiInteractionHistoryRepository get historyRepository => _historyRepository;
   final AiAnalyticsLogger? _analyticsLogger;
+  final EntityNormaliser _normaliser;
 
   String _sessionId;
   final List<AiChatMessage> _messages = [];
   AiPlannedChanges? _pendingPlan;
   bool _isLoading = false;
   bool _inputFocusRequested = false;
+
+  /// Set by [editPlan] — only then do we pass [previousPlan] into the parser.
+  bool _refiningPendingPlan = false;
 
   // ─── Getters ──────────────────────────────────────────────────────────────
 
@@ -78,10 +88,21 @@ class AiAssistantService extends ChangeNotifier {
     // 3. Mark any existing plan as no longer current
     _demoteCurrentPlan();
 
+    // Only pass previous plan when the user tapped Edit on the pending card.
+    // Otherwise a brand-new request (e.g. "add reading") was being treated as a
+    // delta and the model often returned an empty actions list.
+    final previousForParser =
+        _refiningPendingPlan ? _pendingPlan : null;
+    _refiningPendingPlan = false;
+
     // 4. Parse intent
     AiPlannedChanges result;
     try {
-      result = await _intentParser.parse(userInput.trim(), _sessionId);
+      result = await _intentParser.parse(
+        userInput.trim(),
+        _sessionId,
+        previousPlan: previousForParser,
+      );
     } catch (e) {
       _replaceLoadingMessage(
         loadingId,
@@ -104,6 +125,15 @@ class AiAssistantService extends ChangeNotifier {
         timestamp: DateTime.now(),
       ));
       _pendingPlan = null;
+    } else if (result.actions.isEmpty) {
+      _pendingPlan = null;
+      _addMessage(AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.assistant,
+        content:
+            "I couldn't build a plan from that. Try rephrasing, or tap Cancel and start fresh.",
+        timestamp: DateTime.now(),
+      ));
     } else {
       // Plan ready — show preview card
       _pendingPlan = result;
@@ -139,9 +169,36 @@ class AiAssistantService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> confirmPlan() async {
-    final plan = _pendingPlan;
-    if (plan == null) return;
+  /// Confirms and executes [planFromCard] when provided (source of truth from the
+  /// preview card). Falls back to [_pendingPlan] for backwards compatibility.
+  Future<void> confirmPlan([
+    AiPlannedChanges? planFromCard,
+    String? previewMessageId,
+  ]) async {
+    final plan = planFromCard ?? _pendingPlan;
+    if (plan == null) {
+      _addMessage(AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.assistant,
+        content:
+            'That plan is no longer active. Send a new request and confirm the latest preview.',
+        timestamp: DateTime.now(),
+      ));
+      notifyListeners();
+      return;
+    }
+
+    if (plan.actions.isEmpty) {
+      _addMessage(AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.assistant,
+        content:
+            'There is nothing to apply in this plan. Try describing the change again.',
+        timestamp: DateTime.now(),
+      ));
+      notifyListeners();
+      return;
+    }
 
     _setLoading(true);
 
@@ -150,7 +207,33 @@ class AiAssistantService extends ChangeNotifier {
     await _historyRepository.markConfirmed(_sessionId);
     await _historyRepository.markExecuted(_sessionId);
 
+    // Store assistant summary for multi-turn conversationHistory (Phase 3)
+    final executionSummary = result.hasFailures
+        ? 'Already applied (do not repeat): ${result.successes.join("; ")}. Issues: ${result.failures.take(2).join("; ")}'
+        : result.successes.isNotEmpty
+            ? 'Already applied (do not repeat): ${result.successes.join("; ")}'
+            : 'Already applied (do not repeat): Done';
+    unawaited(
+      _historyRepository.saveAssistantSummary(_sessionId, executionSummary),
+    );
+
+    // Seed resolvedCategory from the primary action for the Assumption Engine
+    final primary = plan.actions.isNotEmpty ? plan.actions.first : null;
+    if (primary != null) {
+      final rawTitle =
+          primary.parameters['title']?.toString() ??
+          primary.parameters['taskTitle']?.toString() ??
+          '';
+      if (rawTitle.isNotEmpty) {
+        final category = _normaliser.normalise(rawTitle);
+        unawaited(
+          _historyRepository.updateResolvedCategory(_sessionId, category),
+        );
+      }
+    }
+
     _pendingPlan = null;
+    _markPlanExecuted(previewMessageId, plan.sessionId);
     _demoteCurrentPlan();
     _setLoading(false);
 
@@ -158,7 +241,7 @@ class AiAssistantService extends ChangeNotifier {
         ? 'Done with some issues:\n${result.toSummaryMessage()}'
         : result.successes.isNotEmpty
             ? result.toSummaryMessage()
-            : 'Done!';
+            : 'No changes were applied. Try describing a specific task to add or update.';
 
     _addMessage(AiChatMessage(
       id: StableId.generate('msg'),
@@ -173,10 +256,29 @@ class AiAssistantService extends ChangeNotifier {
       'actionTypes': plan.actions.map((a) => a.actionType.name).toList(),
     });
 
+    // Log aiSuggestionAccepted for every action that had a reason label
+    for (final action in plan.actions) {
+      if (action.reasonLabel != null) {
+        final rawTitle =
+            action.parameters['title']?.toString() ??
+            action.parameters['taskTitle']?.toString() ??
+            '';
+        final category = rawTitle.isNotEmpty
+            ? _normaliser.normalise(rawTitle)
+            : 'unknown';
+        _logEvent('aiSuggestionAccepted', {
+          'sessionId': _sessionId,
+          'category': category,
+          'confidence': action.confidence,
+        });
+      }
+    }
+
     notifyListeners();
   }
 
   void cancelPlan() {
+    _refiningPendingPlan = false;
     _pendingPlan = null;
     _demoteCurrentPlan();
 
@@ -193,6 +295,25 @@ class AiAssistantService extends ChangeNotifier {
   }
 
   void editPlan() {
+    _refiningPendingPlan = true;
+    // Log rejection for any action that had an assumption-based reason label
+    if (_pendingPlan != null) {
+      for (final action in _pendingPlan!.actions) {
+        if (action.reasonLabel != null) {
+          final rawTitle =
+              action.parameters['title']?.toString() ??
+              action.parameters['taskTitle']?.toString() ??
+              '';
+          final category = rawTitle.isNotEmpty
+              ? _normaliser.normalise(rawTitle)
+              : 'unknown';
+          _logEvent('aiSuggestionRejected', {
+            'sessionId': _sessionId,
+            'category': category,
+          });
+        }
+      }
+    }
     // Keep plan visible (read-only card) and focus the input field
     _inputFocusRequested = true;
     notifyListeners();
@@ -235,6 +356,25 @@ class AiAssistantService extends ChangeNotifier {
     for (var i = 0; i < _messages.length; i++) {
       if (_messages[i].isCurrentPlan) {
         _messages[i] = _messages[i].copyWith(isCurrentPlan: false);
+      }
+    }
+  }
+
+  void _markPlanExecuted(String? previewMessageId, String sessionId) {
+    if (previewMessageId != null) {
+      final idx = _messages.indexWhere((m) => m.id == previewMessageId);
+      if (idx != -1) {
+        _messages[idx] = _messages[idx].copyWith(
+          isCurrentPlan: false,
+          isExecuted: true,
+        );
+        return;
+      }
+    }
+    for (var i = 0; i < _messages.length; i++) {
+      final msg = _messages[i];
+      if (msg.plannedChanges?.sessionId == sessionId && msg.isCurrentPlan) {
+        _messages[i] = msg.copyWith(isCurrentPlan: false, isExecuted: true);
       }
     }
   }

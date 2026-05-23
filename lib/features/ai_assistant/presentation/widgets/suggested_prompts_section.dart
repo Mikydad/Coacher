@@ -1,22 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-const List<String> kDefaultSuggestedPrompts = [
-  'Add a workout at 5AM',
-  'Move my study session tomorrow',
-];
+import '../../application/suggested_prompts_provider.dart';
 
-class SuggestedPromptsSection extends StatelessWidget {
+export '../../application/suggested_prompts_provider.dart'
+    show kDefaultSuggestedPrompts;
+
+class SuggestedPromptsSection extends ConsumerWidget {
   const SuggestedPromptsSection({
     super.key,
     required this.onSelected,
-    this.prompts = kDefaultSuggestedPrompts,
   });
 
   final void Function(String prompt) onSelected;
-  final List<String> prompts;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncPrompts = ref.watch(suggestedPromptsProvider);
+
+    final prompts = asyncPrompts.when(
+      data: (list) => list,
+      loading: () => null,
+      error: (err, stack) => kDefaultSuggestedPrompts,
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -32,12 +39,71 @@ class SuggestedPromptsSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          ...prompts.map((p) => _PromptCard(prompt: p, onTap: () => onSelected(p))),
+          if (prompts == null)
+            _ShimmerPrompts()
+          else
+            ...prompts.map(
+              (p) => _PromptCard(prompt: p, onTap: () => onSelected(p)),
+            ),
         ],
       ),
     );
   }
 }
+
+// ─── Shimmer placeholder ──────────────────────────────────────────────────────
+
+class _ShimmerPrompts extends StatefulWidget {
+  @override
+  State<_ShimmerPrompts> createState() => _ShimmerPromptsState();
+}
+
+class _ShimmerPromptsState extends State<_ShimmerPrompts>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (ctx, child) {
+        final alpha = 0.06 + 0.08 * _ctrl.value;
+        return Column(
+          children: List.generate(
+            3,
+            (i) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: alpha),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─── Prompt card ──────────────────────────────────────────────────────────────
 
 class _PromptCard extends StatefulWidget {
   const _PromptCard({required this.prompt, required this.onTap});

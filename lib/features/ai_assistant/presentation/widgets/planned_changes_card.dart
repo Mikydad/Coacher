@@ -8,6 +8,7 @@ class PlannedChangesCard extends StatelessWidget {
     super.key,
     required this.plan,
     required this.isCurrentPlan,
+    this.isExecuted = false,
     required this.onConfirm,
     required this.onEdit,
     required this.onCancel,
@@ -16,6 +17,7 @@ class PlannedChangesCard extends StatelessWidget {
 
   final AiPlannedChanges plan;
   final bool isCurrentPlan;
+  final bool isExecuted;
   final VoidCallback onConfirm;
   final VoidCallback onEdit;
   final VoidCallback onCancel;
@@ -45,7 +47,16 @@ class PlannedChangesCard extends StatelessWidget {
           const SizedBox(height: 12),
           // Action rows
           ...plan.actions.map((action) => _ActionRow(action: action)),
-          // Conflict warnings
+          // Hard context-block rows (red)
+          if (plan.isBlockedByContext) ...[
+            const SizedBox(height: 8),
+            ...plan.blockedByContext.map(
+              (c) => _ConflictRow(message: c, isBlocking: true),
+            ),
+            const SizedBox(height: 4),
+            const _BlockedDisclaimer(),
+          ],
+          // Soft conflict warnings (amber)
           if (plan.hasConflicts) ...[
             const SizedBox(height: 8),
             ...plan.conflicts.map(
@@ -57,8 +68,8 @@ class PlannedChangesCard extends StatelessWidget {
             const SizedBox(height: 8),
             _HighRiskWarning(count: plan.highRiskCount),
           ],
-          // Action buttons
-          if (isCurrentPlan) ...[
+          // Confirm on any unexecuted card; Edit/Cancel only on the latest plan.
+          if (!isExecuted) ...[
             const SizedBox(height: 16),
             _ActionButtons(
               onConfirm: onConfirm,
@@ -66,8 +77,10 @@ class PlannedChangesCard extends StatelessWidget {
               onCancel: onCancel,
               isLoading: isLoading,
               hasConflicts: plan.hasConflicts,
+              isBlocked: plan.isBlockedByContext,
+              showEditCancel: isCurrentPlan,
             ),
-          ] else ...[
+          ] else if (isExecuted) ...[
             const SizedBox(height: 12),
             const _ExecutedLabel(),
           ],
@@ -296,6 +309,8 @@ class _ActionButtons extends StatelessWidget {
     required this.onCancel,
     required this.isLoading,
     required this.hasConflicts,
+    this.isBlocked = false,
+    this.showEditCancel = true,
   });
 
   final VoidCallback onConfirm;
@@ -303,9 +318,26 @@ class _ActionButtons extends StatelessWidget {
   final VoidCallback onCancel;
   final bool isLoading;
   final bool hasConflicts;
+  final bool isBlocked;
+  final bool showEditCancel;
 
   @override
   Widget build(BuildContext context) {
+    final String confirmLabel;
+    if (isBlocked) {
+      confirmLabel = 'CONFIRM ANYWAY ▶';
+    } else if (hasConflicts) {
+      confirmLabel = 'CONFIRM ANYWAY ▶';
+    } else {
+      confirmLabel = 'CONFIRM CHANGES ▶';
+    }
+
+    final confirmBg = isBlocked
+        ? Colors.red.withValues(alpha: 0.85)
+        : const Color(0xFFBEFC00);
+    final confirmFg =
+        isBlocked ? Colors.white : const Color(0xFF445D00);
+
     return Column(
       children: [
         // CONFIRM CHANGES — full width
@@ -314,8 +346,8 @@ class _ActionButtons extends StatelessWidget {
           child: ElevatedButton(
             onPressed: isLoading ? null : onConfirm,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFBEFC00),
-              foregroundColor: const Color(0xFF445D00),
+              backgroundColor: confirmBg,
+              foregroundColor: confirmFg,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(999),
@@ -323,16 +355,16 @@ class _ActionButtons extends StatelessWidget {
               elevation: 0,
             ),
             child: isLoading
-                ? const SizedBox(
+                ? SizedBox(
                     height: 18,
                     width: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Color(0xFF445D00),
+                      color: confirmFg,
                     ),
                   )
                 : Text(
-                    hasConflicts ? 'CONFIRM ANYWAY ▶' : 'CONFIRM CHANGES ▶',
+                    confirmLabel,
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -341,6 +373,7 @@ class _ActionButtons extends StatelessWidget {
                   ),
           ),
         ),
+        if (showEditCancel) ...[
         const SizedBox(height: 10),
         // EDIT PLAN + CANCEL — side by side
         Row(
@@ -380,7 +413,29 @@ class _ActionButtons extends StatelessWidget {
             ),
           ],
         ),
+        ],
       ],
+    );
+  }
+}
+
+// ─── Blocked disclaimer ───────────────────────────────────────────────────────
+
+class _BlockedDisclaimer extends StatelessWidget {
+  const _BlockedDisclaimer();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      child: Text(
+        'This task will be created but reminders may be suppressed.',
+        style: TextStyle(
+          fontSize: 11,
+          fontStyle: FontStyle.italic,
+          color: Colors.redAccent.withValues(alpha: 0.8),
+        ),
+      ),
     );
   }
 }

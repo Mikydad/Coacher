@@ -21,6 +21,7 @@ class AiChatMessage {
     this.plannedChanges,
     this.isLoading = false,
     this.isCurrentPlan = false,
+    this.isExecuted = false,
   });
 
   final String id;
@@ -38,6 +39,9 @@ class AiChatMessage {
   /// Controls whether action buttons (Confirm / Edit / Cancel) are shown.
   final bool isCurrentPlan;
 
+  /// True after the user confirmed and actions were applied.
+  final bool isExecuted;
+
   bool get hasPreviewCard => plannedChanges != null && !isLoading;
 
   AiChatMessage copyWith({
@@ -48,6 +52,7 @@ class AiChatMessage {
     AiPlannedChanges? plannedChanges,
     bool? isLoading,
     bool? isCurrentPlan,
+    bool? isExecuted,
   }) {
     return AiChatMessage(
       id: id ?? this.id,
@@ -57,6 +62,7 @@ class AiChatMessage {
       plannedChanges: plannedChanges ?? this.plannedChanges,
       isLoading: isLoading ?? this.isLoading,
       isCurrentPlan: isCurrentPlan ?? this.isCurrentPlan,
+      isExecuted: isExecuted ?? this.isExecuted,
     );
   }
 

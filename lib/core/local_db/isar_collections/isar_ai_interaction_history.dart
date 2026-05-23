@@ -15,11 +15,19 @@ class IsarAiInteractionHistory {
 
   late String userInput;
 
-  /// JSON-encoded List<AiAction.toJson()>
+  /// JSON-encoded list of AiAction.toJson() maps.
   late String parsedActionsJson;
 
   late bool confirmed;
   late bool executed;
+
+  /// Canonical category resolved by EntityNormaliser for the primary action.
+  /// Seeded by AiAssistantService on successful execution (Phase 2).
+  String? resolvedCategory;
+
+  /// Short summary of what the assistant did (e.g. "Added Morning Workout at 5AM").
+  /// Stored after execution to enable full assistant turns in conversationHistory (Phase 3).
+  String? assistantSummary;
 
   /// Milliseconds since epoch — used for TTL purge queries.
   @Index()

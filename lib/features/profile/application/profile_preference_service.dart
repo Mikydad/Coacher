@@ -38,6 +38,17 @@ class ProfilePreferenceService {
     await _repository.upsertPreference(updated);
   }
 
+  /// Enables or disables the morning brief notification.
+  Future<void> setMorningBriefEnabled(bool enabled) async {
+    final nowMs = _now().millisecondsSinceEpoch;
+    final existing = await _repository.getPreference();
+    final updated = (existing ?? _defaultPreference(nowMs)).copyWith(
+      morningBriefEnabled: enabled,
+      updatedAtMs: nowMs,
+    );
+    await _repository.upsertPreference(updated);
+  }
+
   /// Returns the persisted preference, or an in-memory default if none exists.
   Future<UserProfilePreference> getPreference() async {
     final nowMs = _now().millisecondsSinceEpoch;

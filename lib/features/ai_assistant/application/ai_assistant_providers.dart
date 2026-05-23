@@ -7,12 +7,20 @@ import '../../analytics/domain/models/analytics_event.dart';
 import '../../coaching/application/coaching_style_providers.dart';
 import '../../context_override/application/context_override_providers.dart';
 import '../../goals/application/goals_providers.dart';
+import '../../profile/application/profile_providers.dart';
 import '../../time_blocks/application/time_block_providers.dart';
+import '../data/dismissed_suggestion_repository.dart';
+import '../domain/models/proactive_suggestion.dart';
 import 'ai_action_executor.dart';
 import 'ai_assistant_service.dart';
+import 'ai_assumption_engine.dart';
+import 'ai_conflict_detector.dart';
 import 'ai_intent_parser.dart';
 import 'ai_operating_layer_client.dart';
 import 'ai_payload_assembler.dart';
+import 'entity_normaliser.dart';
+import 'proactive_suggestion_engine.dart';
+import 'schedule_optimisation_service.dart';
 
 // ─── AI client ────────────────────────────────────────────────────────────────
 
@@ -31,6 +39,32 @@ final aiPayloadAssemblerProvider = Provider<AiPayloadAssembler>((ref) {
     contextOverrideRepository: ref.read(contextOverrideRepositoryProvider),
     coachingStyleRepository: ref.read(coachingStyleRepositoryProvider),
     historyRepository: ref.read(aiInteractionHistoryRepositoryProvider),
+    profilePreferenceService: ref.read(profilePreferenceServiceProvider),
+  );
+});
+
+// ─── Entity normaliser ────────────────────────────────────────────────────────
+
+final entityNormaliserProvider = Provider<EntityNormaliser>((ref) {
+  return const EntityNormaliser();
+});
+
+// ─── Assumption engine ────────────────────────────────────────────────────────
+
+final aiAssumptionEngineProvider = Provider<AiAssumptionEngine>((ref) {
+  return AiAssumptionEngine(
+    planningRepository: ref.read(planningRepositoryProvider),
+    historyRepository: ref.read(aiInteractionHistoryRepositoryProvider),
+    normaliser: ref.read(entityNormaliserProvider),
+  );
+});
+
+// ─── Conflict detector ────────────────────────────────────────────────────────
+
+final aiConflictDetectorProvider = Provider<AiConflictDetector>((ref) {
+  return AiConflictDetector(
+    reminderRepository: ref.read(reminderRepositoryProvider),
+    contextOverrideRepository: ref.read(contextOverrideRepositoryProvider),
   );
 });
 
@@ -39,12 +73,21 @@ final aiPayloadAssemblerProvider = Provider<AiPayloadAssembler>((ref) {
 final aiIntentParserProvider = FutureProvider<AiIntentParser>((ref) async {
   final client = await ref.watch(aiOperatingLayerClientProvider.future);
   final assembler = ref.read(aiPayloadAssemblerProvider);
-  return AiIntentParser(client: client, assembler: assembler);
+  final assumptionEngine = ref.read(aiAssumptionEngineProvider);
+  final conflictDetector = ref.read(aiConflictDetectorProvider);
+  return AiIntentParser(
+    client: client,
+    assembler: assembler,
+    assumptionEngine: assumptionEngine,
+    conflictDetector: conflictDetector,
+  );
 });
 
 // ─── Action executor ─────────────────────────────────────────────────────────
 
 final aiActionExecutorProvider = Provider<AiActionExecutor>((ref) {
+  // Read the user's default enforcement mode for task creation
+  final enforcementMode = ref.watch(defaultEnforcementModeProvider);
   return AiActionExecutor(
     planningRepository: ref.read(planningRepositoryProvider),
     goalsRepository: ref.read(goalsRepositoryProvider),
@@ -53,6 +96,7 @@ final aiActionExecutorProvider = Provider<AiActionExecutor>((ref) {
     timeBlockSyncService: ref.read(timeBlockSyncServiceProvider),
     contextOverrideService: ref.read(contextOverrideServiceProvider),
     ref: ref,
+    defaultModeRefId: enforcementMode.name,
   );
 });
 
@@ -99,3 +143,80 @@ final resolvedAiAssistantProvider =
   final parser = await ref.watch(aiIntentParserProvider.future);
   return ref.watch(aiAssistantServiceProvider(parser));
 });
+
+// ─── Dismissed suggestion repository ─────────────────────────────────────────
+
+final dismissedSuggestionRepositoryProvider =
+    Provider<DismissedSuggestionRepository>((ref) {
+  return DismissedSuggestionRepository();
+});
+
+// ─── Schedule optimisation service ───────────────────────────────────────────
+
+final scheduleOptimisationServiceProvider =
+    Provider<ScheduleOptimisationService>((ref) {
+  return ScheduleOptimisationService(
+    planningRepository: ref.read(planningRepositoryProvider),
+    reminderRepository: ref.read(reminderRepositoryProvider),
+  );
+});
+
+// ─── Proactive suggestion engine ──────────────────────────────────────────────
+
+final proactiveSuggestionEngineProvider =
+    Provider<ProactiveSuggestionEngine>((ref) {
+  return ProactiveSuggestionEngine(
+    planningRepository: ref.read(planningRepositoryProvider),
+    goalsRepository: ref.read(goalsRepositoryProvider),
+    timeBlockRepository: ref.read(timeBlockRepositoryProvider),
+    dismissedRepo: ref.read(dismissedSuggestionRepositoryProvider),
+    normaliser: ref.read(entityNormaliserProvider),
+    optimisationService: ref.read(scheduleOptimisationServiceProvider),
+  );
+});
+
+/// [FutureProvider] that triggers [ProactiveSuggestionEngine.generateForToday].
+/// Invalidated on task mutation and app foreground events.
+final proactiveSuggestionsProvider =
+    FutureProvider<List<ProactiveSuggestion>>((ref) async {
+  final engine = ref.read(proactiveSuggestionEngineProvider);
+  return engine.generateForToday();
+});
+
+// ─── Morning brief state ──────────────────────────────────────────────────────
+
+/// Tracks the date key on which the Coach screen was last opened.
+/// Used by the morning brief to ensure the snackbar is only shown once per day.
+final coachLastOpenedDateKeyProvider =
+    StateProvider<String?>((ref) => null);
+
+// ─── Proactive analytics helper ───────────────────────────────────────────────
+
+/// Logs a proactive suggestion analytics event.
+///
+/// Callable from any widget that has access to [WidgetRef].
+void logProactiveEvent(
+  WidgetRef ref,
+  AnalyticsEventType type, {
+  Map<String, dynamic> props = const {},
+}) {
+  try {
+    final repo = ref.read(analyticsRepositoryProvider);
+    final event = AnalyticsEvent(
+      id: StableId.generate('ps_evt'),
+      type: type,
+      entityId: props['suggestionType']?.toString() ?? 'proactive',
+      entityKind: 'proactiveSuggestion',
+      dateKey: DateKeys.todayKey(),
+      timestampLocalIso: DateTime.now().toIso8601String(),
+      sourceSurface: 'home_proactive',
+      idempotencyKey: StableId.generate('ps_evt_idem'),
+      createdAtMs: DateTime.now().millisecondsSinceEpoch,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    // logEvent is async; errors must not escape the post-frame callback.
+    repo.logEvent(event).catchError((_) {});
+  } catch (_) {
+    // Best-effort logging; never propagate
+  }
+}

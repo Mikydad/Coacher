@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/date_keys.dart';
 import '../application/ai_assistant_providers.dart';
 import '../application/ai_assistant_service.dart';
+import '../data/ai_interaction_history_repository.dart';
 import '../domain/models/ai_chat_message.dart';
+import '../domain/models/ai_planned_changes.dart';
 import 'widgets/ai_input_card.dart';
 import 'widgets/chat_bubbles.dart';
 import 'widgets/planned_changes_card.dart';
@@ -37,6 +40,8 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     super.initState();
     // Pre-fill from route arguments (Phase 4 proactive cards)
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(coachLastOpenedDateKeyProvider.notifier).state =
+          DateKeys.todayKey();
       final args = ModalRoute.of(context)?.settings.arguments;
       if (args is CoachRouteArgs && args.preDraftedText != null) {
         _inputController.text = args.preDraftedText!;
@@ -120,6 +125,15 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
 
     return Column(
       children: [
+        // "Pick up where you left off" banner — shown when no active messages
+        // and there is a recent unconfirmed plan
+        if (!hasMessages)
+          _PickUpBanner(
+            historyRepository: service.historyRepository,
+            onResume: (input) {
+              service.sendMessage(input);
+            },
+          ),
         // Conversation thread
         Expanded(
           child: hasMessages
@@ -312,6 +326,179 @@ class _MessageList extends StatelessWidget {
   }
 }
 
+// ─── Pick up where you left off banner ───────────────────────────────────────
+
+class _PickUpBanner extends StatefulWidget {
+  const _PickUpBanner({
+    required this.historyRepository,
+    required this.onResume,
+  });
+
+  final AiInteractionHistoryRepository historyRepository;
+  final void Function(String input) onResume;
+
+  @override
+  State<_PickUpBanner> createState() => _PickUpBannerState();
+}
+
+class _PickUpBannerState extends State<_PickUpBanner> {
+  String? _pendingInput;
+  bool _dismissed = false;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final entry = await widget.historyRepository.getMostRecentUnconfirmed(
+        withinMinutes: 30,
+      );
+      if (mounted && entry != null) {
+        setState(() {
+          _pendingInput = entry.userInput;
+          _loaded = true;
+        });
+      } else if (mounted) {
+        setState(() => _loaded = true);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loaded = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded || _dismissed || _pendingInput == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFA726).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: const Color(0xFFFFA726).withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.history_rounded,
+            size: 14,
+            color: Color(0xFFFFA726),
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'You had a pending plan — want to continue?',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFFFFA726),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () {
+              widget.onResume(_pendingInput!);
+              setState(() => _dismissed = true);
+            },
+            child: const Text(
+              'Resume',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFFFA726),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          GestureDetector(
+            onTap: () => setState(() => _dismissed = true),
+            child: const Icon(
+              Icons.close,
+              size: 14,
+              color: Color(0xFFADAAAA),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Conflict summary banner ──────────────────────────────────────────────────
+
+class _ConflictSummaryBanner extends StatelessWidget {
+  const _ConflictSummaryBanner({required this.plan});
+
+  final AiPlannedChanges plan;
+
+  @override
+  Widget build(BuildContext context) {
+    final blockedCount = plan.blockedByContext.length;
+    final conflictCount = plan.conflicts.length;
+    final isHard = blockedCount > 0;
+
+    final totalWarnings = blockedCount + conflictCount;
+    final label = isHard
+        ? '⛔ $blockedCount blocked item${blockedCount > 1 ? 's' : ''}'
+            '${conflictCount > 0 ? " + $conflictCount conflict${conflictCount > 1 ? 's' : ''}" : ""}'
+            ' — review below.'
+        : '⚠ $totalWarnings conflict${totalWarnings > 1 ? 's' : ''} detected — review below before confirming.';
+
+    final bg = isHard
+        ? Colors.red.withValues(alpha: 0.12)
+        : const Color(0xFFFFA726).withValues(alpha: 0.12);
+    final borderColor = isHard
+        ? Colors.redAccent.withValues(alpha: 0.4)
+        : const Color(0xFFFFA726).withValues(alpha: 0.4);
+    final textColor =
+        isHard ? Colors.redAccent : const Color(0xFFFFA726);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isHard
+                ? Icons.block_rounded
+                : Icons.warning_amber_rounded,
+            size: 14,
+            color: textColor,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Message item ─────────────────────────────────────────────────────────────
+
 class _MessageItem extends StatelessWidget {
   const _MessageItem({required this.message, required this.service});
 
@@ -323,13 +510,23 @@ class _MessageItem extends StatelessWidget {
     if (message.isLoading) return const ThinkingIndicator();
 
     if (message.hasPreviewCard) {
-      return PlannedChangesCard(
-        plan: message.plannedChanges!,
-        isCurrentPlan: message.isCurrentPlan,
-        isLoading: service.isLoading,
-        onConfirm: service.confirmPlan,
-        onEdit: service.editPlan,
-        onCancel: service.cancelPlan,
+      final plan = message.plannedChanges!;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Conflict summary banner (shown above the card when there are warnings)
+          if (plan.hasAnyWarnings && message.isCurrentPlan)
+            _ConflictSummaryBanner(plan: plan),
+          PlannedChangesCard(
+            plan: plan,
+            isCurrentPlan: message.isCurrentPlan,
+            isExecuted: message.isExecuted,
+            isLoading: service.isLoading,
+            onConfirm: () => service.confirmPlan(plan, message.id),
+            onEdit: service.editPlan,
+            onCancel: service.cancelPlan,
+          ),
+        ],
       );
     }
 

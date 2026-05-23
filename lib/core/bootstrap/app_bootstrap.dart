@@ -20,6 +20,7 @@ import '../../features/community/application/circle_activity_bridge_service.dart
 import '../../features/community/application/circle_providers.dart';
 import '../../features/community/application/circle_streak_service.dart';
 import '../../features/community/application/user_circle_membership_service.dart';
+import '../../features/ai_assistant/application/ai_assistant_providers.dart';
 import '../../features/community/data/circle_repository.dart';
 
 class AppBootstrap {
@@ -56,6 +57,11 @@ class AppBootstrap {
       container
           .read(aiInteractionHistoryRepositoryProvider)
           .purgeBefore(DateTime.now().subtract(const Duration(hours: 48))),
+    );
+
+    // Purge dismissed proactive suggestion logs older than 7 days (Phase 4).
+    unawaited(
+      container.read(dismissedSuggestionRepositoryProvider).purgeOldEntries(),
     );
 
     // Community activity bridge — read-only observer; no existing flow modified.

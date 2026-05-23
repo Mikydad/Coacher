@@ -27,6 +27,7 @@ class AiInteractionHistoryRepository {
     required String sessionId,
     required String userInput,
     required List<AiAction> parsedActions,
+    String? resolvedCategory,
   }) async {
     final entry = IsarAiInteractionHistory()
       ..sessionId = sessionId
@@ -34,10 +35,49 @@ class AiInteractionHistoryRepository {
       ..parsedActionsJson = jsonEncode(parsedActions.map((a) => a.toJson()).toList())
       ..confirmed = false
       ..executed = false
+      ..resolvedCategory = resolvedCategory
       ..timestampMs = DateTime.now().millisecondsSinceEpoch;
 
     await _isar.writeTxn(() async {
       await _isar.isarAiInteractionHistorys.put(entry);
+    });
+  }
+
+  /// Stores the assistant's execution summary for the most recent entry
+  /// in [sessionId]. Used to build full conversationHistory for multi-turn context.
+  Future<void> saveAssistantSummary(
+    String sessionId,
+    String summary,
+  ) async {
+    final entries = await _isar.isarAiInteractionHistorys
+        .filter()
+        .sessionIdEqualTo(sessionId)
+        .sortByTimestampMsDesc()
+        .limit(1)
+        .findAll();
+    if (entries.isEmpty) return;
+    await _isar.writeTxn(() async {
+      entries.first.assistantSummary = summary;
+      await _isar.isarAiInteractionHistorys.put(entries.first);
+    });
+  }
+
+  /// Updates the [resolvedCategory] for all entries in [sessionId].
+  /// Called by [AiAssistantService] after successful plan execution.
+  Future<void> updateResolvedCategory(
+    String sessionId,
+    String category,
+  ) async {
+    final entries = await _isar.isarAiInteractionHistorys
+        .filter()
+        .sessionIdEqualTo(sessionId)
+        .findAll();
+    if (entries.isEmpty) return;
+    await _isar.writeTxn(() async {
+      for (final e in entries) {
+        e.resolvedCategory = category;
+        await _isar.isarAiInteractionHistorys.put(e);
+      }
     });
   }
 
@@ -91,6 +131,24 @@ class AiInteractionHistoryRepository {
         .sortByTimestampMsDesc()
         .limit(limit)
         .findAll();
+  }
+
+  /// Returns the most recent unconfirmed interaction that is within
+  /// [withinMinutes] of now. Returns null if none found.
+  ///
+  /// Used by the "Pick up where you left off" banner in [AiAssistantScreen].
+  Future<IsarAiInteractionHistory?> getMostRecentUnconfirmed({
+    int withinMinutes = 30,
+  }) async {
+    final cutoff = DateTime.now()
+        .subtract(Duration(minutes: withinMinutes))
+        .millisecondsSinceEpoch;
+    return _isar.isarAiInteractionHistorys
+        .filter()
+        .confirmedEqualTo(false)
+        .timestampMsGreaterThan(cutoff)
+        .sortByTimestampMsDesc()
+        .findFirst();
   }
 
   // ─── TTL purge ────────────────────────────────────────────────────────────
