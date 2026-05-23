@@ -4,10 +4,10 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/notifications/local_notifications_service.dart';
+import '../core/sync/post_sync_refresh_coordinator.dart';
 import '../core/sync/sync_service.dart';
 import '../core/utils/date_keys.dart';
 import '../features/context_override/application/context_override_expiry_poller.dart';
-import '../features/planning/application/planned_task_providers.dart';
 import '../features/reminders/application/attention_orchestrator_providers.dart';
 import 'notification_response_handler.dart';
 
@@ -59,16 +59,33 @@ class _AppLifecycleTaskRefreshState extends ConsumerState<AppLifecycleTaskRefres
     final nowKey = DateKeys.todayKey();
     if (nowKey != _lastTodayKey) {
       _lastTodayKey = nowKey;
-      invalidateTaskListProviders(ref);
+      PostSyncRefreshCoordinator.instance.schedule(
+        tasks: true,
+        coachingDelivery: true,
+        todayAnalytics: true,
+      );
+    }
+  }
+
+  Future<void> _refreshAfterResume() async {
+    var pulled = false;
+    try {
+      pulled = await SyncService.instance.syncFromRemote();
+    } catch (_) {
+      pulled = false;
+    }
+    if (!mounted) return;
+    if (!pulled) {
+      // Debounced skip or failed pull: refresh non-stream futures only.
+      PostSyncRefreshCoordinator.instance.schedule(tasks: true);
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      invalidateTaskListProviders(ref);
       _lastTodayKey = DateKeys.todayKey();
-      unawaited(SyncService.instance.syncFromRemote());
+      unawaited(_refreshAfterResume());
       unawaited(_drainLaunchNotificationResponse());
       // Check whether any active context override has expired.
       unawaited(ref.read(contextOverrideExpiryPollerProvider).checkNow());

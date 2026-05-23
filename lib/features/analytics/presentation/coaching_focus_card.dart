@@ -70,6 +70,7 @@ class _CoachingFocusCardShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return focusAsync.when(
+      skipLoadingOnReload: true,
       data: (focus) {
         final summary = summaryAsync.valueOrNull;
         if (focus == null || !isFocusLive(focus.lifecycleState)) {

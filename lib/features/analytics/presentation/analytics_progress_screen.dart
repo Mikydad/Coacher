@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/ai_summary_providers.dart';
 import '../application/delivery_providers.dart';
 import '../application/focus_providers.dart';
-import '../application/daily_analytics_providers.dart';
+import '../application/analytics_period_bundle_notifier.dart';
+import 'progress/progress_bundle_skeleton.dart';
 import 'progress/goals_habits_section.dart';
 import 'progress/progress_design_tokens.dart';
 import 'progress/progress_insights_row.dart';
@@ -125,6 +126,7 @@ class _AnalyticsProgressScreenState
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
           bundleAsync.when(
+            skipLoadingOnReload: true,
             data: (bundle) => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -174,15 +176,7 @@ class _AnalyticsProgressScreenState
                 ),
               ],
             ),
-            loading: () => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 48),
-              child: Center(
-                child: CircularProgressIndicator(
-                  color: ProgressDesignTokens.secondary,
-                  strokeWidth: 2,
-                ),
-              ),
-            ),
+            loading: () => const ProgressBundleSkeleton(),
             error: (_, _) => const ProgressTonalCard(
               child: Text(
                 'Could not load progress analytics.',

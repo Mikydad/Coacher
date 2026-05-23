@@ -14,6 +14,7 @@ import 'widgets/proactive_suggestions_coach_panel.dart';
 import 'widgets/quick_directives_row.dart';
 import 'widgets/suggested_prompts_section.dart';
 import '../../../app/application/main_tab_navigation.dart';
+import '../../../app/presentation/main_tab_bar_inset.dart';
 import '../application/proactive_suggestion_display.dart';
 
 /// Optional route arguments for pre-filling the input (e.g. from a proactive
@@ -186,7 +187,9 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         // Fixed bottom: input + quick directives
         Container(
           color: const Color(0xFF0E0E0E),
-          padding: const EdgeInsets.only(bottom: 12),
+          padding: EdgeInsets.only(
+            bottom: mainTabFooterPadding(context),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -207,9 +210,6 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                   _inputController.text = text;
                   _inputFocusNode.requestFocus();
                 },
-              ),
-              SizedBox(
-                height: MediaQuery.of(context).viewInsets.bottom > 0 ? 0 : 8,
               ),
             ],
           ),

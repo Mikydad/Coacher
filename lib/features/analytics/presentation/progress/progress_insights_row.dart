@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/ai_summary_providers.dart';
-import '../../application/daily_analytics_providers.dart';
+import '../../application/analytics_period_bundle.dart';
 import '../../application/delivery_providers.dart';
 import '../../application/discipline_score.dart';
 import '../../application/focus_providers.dart';
@@ -57,6 +57,7 @@ class _CoachingFocusGlass extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return focusAsync.when(
+      skipLoadingOnReload: true,
       data: (focus) {
         if (focus == null || !isFocusLive(focus.lifecycleState)) {
           return const ProgressGlassCard(
@@ -111,6 +112,7 @@ class _StreakAtRiskGlass extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return decisionAsync.when(
+      skipLoadingOnReload: true,
       data: (decision) {
         final insights = insightsAsync.valueOrNull ?? const <GeneratedInsight>[];
         final byId = {for (final i in insights) i.insightId: i};

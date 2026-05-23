@@ -1,4 +1,4 @@
-import 'daily_analytics_providers.dart';
+import 'analytics_period_bundle.dart';
 
 /// Combined discipline rate for the weekly hero (0.0–1.0).
 ///

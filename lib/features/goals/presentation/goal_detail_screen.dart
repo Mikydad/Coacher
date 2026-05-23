@@ -5,6 +5,7 @@ import '../../../core/di/providers.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../analytics/application/analytics_event_logger.dart';
+import '../../analytics/application/analytics_period_bundle_notifier.dart';
 import '../../analytics/application/daily_analytics_providers.dart';
 import '../../analytics/application/delivery_providers.dart';
 import '../../analytics/domain/models/analytics_event.dart';
@@ -270,8 +271,8 @@ class GoalDetailScreen extends ConsumerWidget {
             '${!currentlyMet ? 'habit_completed' : 'habit_skipped'}_${g.id}_$todayKey',
       );
       invalidateGoals(ref, goalId: g.id);
-      ref.invalidate(dailyGoalHabitAnalyticsProvider(todayKey));
       ref.invalidate(analyticsPeriodBundleProvider);
+      ref.invalidate(dailyGoalHabitAnalyticsProvider(todayKey));
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(

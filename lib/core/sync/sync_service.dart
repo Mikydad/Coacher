@@ -9,6 +9,7 @@ import '../offline/offline_store.dart';
 import '../utils/stable_id.dart';
 import 'offline_operation.dart';
 import 'offline_sync_queue.dart';
+import 'post_sync_refresh_coordinator.dart';
 import 'remote_isar_merge.dart';
 
 class SyncService {
@@ -38,6 +39,7 @@ class SyncService {
 
   DateTime? _lastRemoteSyncStartedAt;
   Future<void>? _activeRemotePullFuture;
+  bool _lastRemotePullSucceeded = false;
   final ValueNotifier<bool> isSyncingFromRemote = ValueNotifier<bool>(false);
 
   Future<void> initialize() async {
@@ -58,24 +60,26 @@ class SyncService {
   ///
   /// When [force] is false, debounced to at most once per 30 seconds.
   /// Concurrent callers await the same in-flight pull when one is running.
-  Future<void> syncFromRemote({bool force = false}) async {
+  ///
+  /// Returns `true` when a remote pull finished successfully (not debounced/skipped).
+  Future<bool> syncFromRemote({bool force = false}) async {
     if (_activeRemotePullFuture != null) {
       await _activeRemotePullFuture!;
-      return;
+      return _lastRemotePullSucceeded;
     }
 
     final now = debugClockForTests?.call() ?? DateTime.now();
     if (!force) {
       if (_lastRemoteSyncStartedAt != null &&
           now.difference(_lastRemoteSyncStartedAt!).inSeconds < 30) {
-        return;
+        return false;
       }
     }
 
     final isar = OfflineStore.instance.isar;
     if (isar == null) {
       debugPrint('syncFromRemote: Isar not open, skip');
-      return;
+      return false;
     }
 
     _lastRemoteSyncStartedAt = now;
@@ -83,6 +87,7 @@ class SyncService {
     _activeRemotePullFuture = _runRemotePull(isar);
     try {
       await _activeRemotePullFuture!;
+      return _lastRemotePullSucceeded;
     } finally {
       _activeRemotePullFuture = null;
     }
@@ -90,6 +95,7 @@ class SyncService {
 
   Future<void> _runRemotePull(Isar isar) async {
     isSyncingFromRemote.value = true;
+    _lastRemotePullSucceeded = false;
     try {
       if (debugRemotePullForTests != null) {
         await debugRemotePullForTests!(isar);
@@ -102,11 +108,15 @@ class SyncService {
               ),
             );
       }
+      _lastRemotePullSucceeded = true;
     } catch (e, st) {
       debugPrint('syncFromRemote failed: $e\n$st');
       rethrow;
     } finally {
       isSyncingFromRemote.value = false;
+      if (_lastRemotePullSucceeded) {
+        PostSyncRefreshCoordinator.instance.scheduleAfterSuccessfulRemotePull();
+      }
     }
   }
 
@@ -114,6 +124,7 @@ class SyncService {
   void resetRemoteSyncStateForTests() {
     _lastRemoteSyncStartedAt = null;
     _activeRemotePullFuture = null;
+    _lastRemotePullSucceeded = false;
     isSyncingFromRemote.value = false;
   }
 

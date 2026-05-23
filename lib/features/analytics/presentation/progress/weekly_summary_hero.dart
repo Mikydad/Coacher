@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../application/daily_analytics_providers.dart';
+import '../../application/analytics_period_bundle.dart';
 import '../../application/discipline_score.dart';
 import 'progress_design_tokens.dart';
 import 'progress_shared_widgets.dart';

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/sync/cloud_sync_providers.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../goals/application/goal_period_helpers.dart';
 import '../../goals/application/goals_providers.dart';
@@ -13,32 +14,25 @@ import '../../profile/application/profile_providers.dart';
 import '../data/analytics_repository.dart';
 import '../domain/models/analytics_stats_cache.dart';
 import 'daily_analytics_engine.dart';
+import 'analytics_period_bundle.dart';
 import 'streak_protection.dart';
-
-class AnalyticsPeriodBundle {
-  const AnalyticsPeriodBundle({
-    required this.goalHabitDay,
-    required this.taskDay,
-    required this.goalHabitWeek,
-    required this.taskWeek,
-    required this.goalHabitMonth,
-    required this.taskMonth,
-    this.goalHabitWeekSeries = const [],
-    this.taskWeekSeries = const [],
-  });
-
-  final DailyAnalyticsSnapshot goalHabitDay;
-  final DailyAnalyticsSnapshot taskDay;
-  final RollupAnalyticsSnapshot goalHabitWeek;
-  final RollupAnalyticsSnapshot taskWeek;
-  final RollupAnalyticsSnapshot goalHabitMonth;
-  final RollupAnalyticsSnapshot taskMonth;
-  final List<double> goalHabitWeekSeries;
-  final List<double> taskWeekSeries;
-}
 
 String _statsId({required String scopeType, required String dateKey}) =>
     'analytics::$scopeType::$dateKey';
+
+Future<DailyAnalyticsSnapshot?> readCachedDailySnapshot(
+  AnalyticsRepository repo, {
+  required String scopeType,
+  required String dateKey,
+}) async {
+  final existing = await repo.listStatsCache(
+    scopeType: scopeType,
+    scopeId: 'global',
+    dateKey: dateKey,
+  );
+  if (existing.isEmpty || existing.first.payload.isEmpty) return null;
+  return DailyAnalyticsSnapshot.fromPayload(existing.first.payload);
+}
 
 Future<void> _upsertDailySnapshot(
   AnalyticsRepository repo, {
@@ -162,6 +156,14 @@ final dailyGoalHabitAnalyticsProvider =
         ref.watch(todayAllTasksRowsProvider);
       }
       final repo = ref.read(analyticsRepositoryProvider);
+      if (ref.read(cloudSyncInProgressProvider)) {
+        final cached = await readCachedDailySnapshot(
+          repo,
+          scopeType: goalHabitDailyScope,
+          dateKey: dateKey,
+        );
+        if (cached != null) return cached;
+      }
       final snapshot = await _computeGoalHabitDailyForDate(ref, dateKey);
       await _upsertDailySnapshot(
         repo,
@@ -178,6 +180,14 @@ final dailyTaskAnalyticsProvider =
         ref.watch(todayAllTasksRowsProvider);
       }
       final repo = ref.read(analyticsRepositoryProvider);
+      if (ref.read(cloudSyncInProgressProvider)) {
+        final cached = await readCachedDailySnapshot(
+          repo,
+          scopeType: taskDailyScope,
+          dateKey: dateKey,
+        );
+        if (cached != null) return cached;
+      }
       final snapshot = await _computeTaskDailyForDate(ref, dateKey);
       await _upsertDailySnapshot(
         repo,
@@ -187,16 +197,22 @@ final dailyTaskAnalyticsProvider =
       return snapshot;
     });
 
-final analyticsPeriodBundleProvider = FutureProvider<AnalyticsPeriodBundle>((
-  ref,
-) async {
+/// Full recompute from live goals/tasks (persists daily caches as a side effect).
+Future<AnalyticsPeriodBundle> computeAnalyticsPeriodBundle(Ref ref) async {
   final now = DateTime.now();
   final todayKey = DateKeys.todayKey(now);
-  final todayGoalHabit = await ref.watch(
-    dailyGoalHabitAnalyticsProvider(todayKey).future,
+  final todayGoalHabit = await _computeGoalHabitDailyForDate(ref, todayKey);
+  final todayTask = await _computeTaskDailyForDate(ref, todayKey);
+  final repo = ref.read(analyticsRepositoryProvider);
+  await _upsertDailySnapshot(
+    repo,
+    scopeType: goalHabitDailyScope,
+    snapshot: todayGoalHabit,
   );
-  final todayTask = await ref.watch(
-    dailyTaskAnalyticsProvider(todayKey).future,
+  await _upsertDailySnapshot(
+    repo,
+    scopeType: taskDailyScope,
+    snapshot: todayTask,
   );
 
   final weekStart = DateTime(
@@ -204,17 +220,18 @@ final analyticsPeriodBundleProvider = FutureProvider<AnalyticsPeriodBundle>((
     now.month,
     now.day,
   ).subtract(const Duration(days: 6));
+  final endDay = DateTime(now.year, now.month, now.day);
   final weekGoalHabitRange = await _readOrComputeDailyRange(
     ref,
     scopeType: goalHabitDailyScope,
     startInclusive: weekStart,
-    endInclusive: DateTime(now.year, now.month, now.day),
+    endInclusive: endDay,
   );
   final weekTaskRange = await _readOrComputeDailyRange(
     ref,
     scopeType: taskDailyScope,
     startInclusive: weekStart,
-    endInclusive: DateTime(now.year, now.month, now.day),
+    endInclusive: endDay,
   );
 
   final monthStart = DateTime(now.year, now.month, 1);
@@ -222,26 +239,26 @@ final analyticsPeriodBundleProvider = FutureProvider<AnalyticsPeriodBundle>((
     ref,
     scopeType: goalHabitDailyScope,
     startInclusive: monthStart,
-    endInclusive: DateTime(now.year, now.month, now.day),
+    endInclusive: endDay,
   );
   final monthTaskRange = await _readOrComputeDailyRange(
     ref,
     scopeType: taskDailyScope,
     startInclusive: monthStart,
-    endInclusive: DateTime(now.year, now.month, now.day),
+    endInclusive: endDay,
   );
 
-  final enforcementMode = ref.watch(defaultEnforcementModeProvider);
-  final attention = ref.watch(attentionStateProvider).valueOrNull;
+  final enforcementMode = ref.read(defaultEnforcementModeProvider);
+  final attention = ref.read(attentionStateProvider).valueOrNull;
   final protectedWeek = buildStreakProtectedDateKeys(
     attention: attention,
     rangeStartInclusive: weekStart,
-    rangeEndInclusive: DateTime(now.year, now.month, now.day),
+    rangeEndInclusive: endDay,
   );
   final protectedMonth = buildStreakProtectedDateKeys(
     attention: attention,
     rangeStartInclusive: monthStart,
-    rangeEndInclusive: DateTime(now.year, now.month, now.day),
+    rangeEndInclusive: endDay,
   );
 
   return AnalyticsPeriodBundle(
@@ -278,4 +295,4 @@ final analyticsPeriodBundleProvider = FutureProvider<AnalyticsPeriodBundle>((
         .map((d) => d.weightedCompletionRate.clamp(0.0, 1.0))
         .toList(),
   );
-});
+}
