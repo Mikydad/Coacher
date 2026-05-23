@@ -1,5 +1,5 @@
 import 'package:coach_for_life/features/analytics/application/daily_analytics_engine.dart';
-import 'package:coach_for_life/features/analytics/application/daily_analytics_providers.dart';
+import 'package:coach_for_life/features/analytics/application/analytics_period_bundle.dart';
 import 'package:coach_for_life/features/analytics/application/discipline_score.dart';
 import 'package:flutter_test/flutter_test.dart';
 

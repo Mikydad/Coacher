@@ -230,8 +230,14 @@ final openTasksOutsideTodayProvider = FutureProvider<List<PlannedTaskRow>>((
 void invalidateTaskListProviders(WidgetRef ref) {
   ref.invalidate(openTasksOutsideTodayProvider);
   ref.invalidate(executionDayTasksProvider);
-  // Refresh proactive suggestion cards when the schedule changes (Phase 4).
   ref.invalidate(proactiveSuggestionsProvider);
+}
+
+void invalidateTaskListProvidersFromContainer(ProviderContainer container) {
+  container.invalidate(openTasksOutsideTodayProvider);
+  container.invalidate(executionDayTasksProvider);
+  // Refresh proactive suggestion cards when the schedule changes (Phase 4).
+  container.invalidate(proactiveSuggestionsProvider);
 }
 
 class HomeFlowSnapshot {

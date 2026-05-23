@@ -21,7 +21,7 @@ import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
 import '../../planning/application/task_schedule_display.dart';
 import '../../analytics/application/analytics_event_logger.dart';
-import '../../analytics/application/daily_analytics_providers.dart';
+import '../../analytics/application/analytics_period_bundle_notifier.dart';
 import '../../analytics/application/delivery_providers.dart';
 import '../../analytics/application/insight_generation_providers.dart';
 import '../../analytics/presentation/coaching_focus_card.dart';
@@ -396,6 +396,7 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           _NeonCard(
             child: analyticsBundleAsync.when(
+              skipLoadingOnReload: true,
               data: (bundle) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -614,6 +615,7 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
     return _NeonCard(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: bundleAsync.when(
+        skipLoadingOnReload: true,
         data: (bundle) {
           final streak = bundle.goalHabitWeek.currentStreakDays;
           final scorePercent =
@@ -777,6 +779,7 @@ class _DailyDisciplineSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final bundleAsync = ref.watch(analyticsPeriodBundleProvider);
     return bundleAsync.when(
+      skipLoadingOnReload: true,
       data: (bundle) {
         final clamped = bundle.goalHabitWeek.weightedCompletionRate.clamp(
           0.0,
@@ -2024,21 +2027,15 @@ class _SyncFromCloudActionState extends State<_SyncFromCloudAction> {
     return ValueListenableBuilder<bool>(
       valueListenable: SyncService.instance.isSyncingFromRemote,
       builder: (context, syncing, _) {
-        if (syncing) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          );
-        }
         return IconButton(
-          tooltip: 'Sync from cloud',
-          onPressed: () =>
-              unawaited(SyncService.instance.syncFromRemote(force: true)),
-          icon: const Icon(Icons.sync),
+          tooltip: syncing ? 'Syncing from cloud' : 'Sync from cloud',
+          onPressed: syncing
+              ? null
+              : () => unawaited(SyncService.instance.syncFromRemote(force: true)),
+          icon: Icon(
+            Icons.sync,
+            color: syncing ? Colors.white38 : null,
+          ),
         );
       },
     );

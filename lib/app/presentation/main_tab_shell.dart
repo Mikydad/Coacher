@@ -7,7 +7,9 @@ import '../../features/community/presentation/community_screen.dart';
 import '../../features/goals/presentation/goal_selection_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
+import '../../core/presentation/cloud_sync_global_indicator.dart';
 import '../application/main_tab_navigation.dart';
+import 'main_tab_bar_inset.dart';
 import 'obsidian_bottom_nav.dart';
 
 /// Root shell: six primary tabs with a persistent watermark bottom nav.
@@ -20,32 +22,38 @@ class MainTabShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final index = ref.watch(mainTabIndexProvider);
 
-    final bottomInset = MediaQuery.paddingOf(context).bottom + 76;
+    final bottomInset = mainTabBarBottomInset(context);
 
-    return Scaffold(
-      extendBody: true,
-      body: MediaQuery(
-        data: MediaQuery.of(context).copyWith(
-          padding: MediaQuery.paddingOf(context).copyWith(
-            bottom: bottomInset,
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Scaffold(
+          extendBody: true,
+          body: MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              padding: MediaQuery.paddingOf(context).copyWith(
+                bottom: bottomInset,
+              ),
+            ),
+            child: IndexedStack(
+              index: index,
+              children: const [
+                HomeScreen(),
+                AiAssistantScreen(),
+                GoalSelectionScreen(),
+                AnalyticsProgressScreen(),
+                CommunityScreen(),
+                ProfileScreen(),
+              ],
+            ),
+          ),
+          bottomNavigationBar: ObsidianBottomNav(
+            selectedIndex: index,
+            onTap: (i) => ref.read(mainTabIndexProvider.notifier).state = i,
           ),
         ),
-        child: IndexedStack(
-        index: index,
-        children: const [
-          HomeScreen(),
-          AiAssistantScreen(),
-          GoalSelectionScreen(),
-          AnalyticsProgressScreen(),
-          CommunityScreen(),
-          ProfileScreen(),
-        ],
-        ),
-      ),
-      bottomNavigationBar: ObsidianBottomNav(
-        selectedIndex: index,
-        onTap: (i) => ref.read(mainTabIndexProvider.notifier).state = i,
-      ),
+        const CloudSyncGlobalIndicator(),
+      ],
     );
   }
 }

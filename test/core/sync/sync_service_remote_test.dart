@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:coach_for_life/core/offline/offline_store.dart';
+import 'package:coach_for_life/core/sync/post_sync_refresh_coordinator.dart';
 import 'package:coach_for_life/core/sync/sync_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isar/isar.dart';
@@ -20,6 +21,7 @@ void main() {
     dir = opened.dir;
     OfflineStore.debugIsarOverride = isar;
     SyncService.instance.resetRemoteSyncStateForTests();
+    PostSyncRefreshCoordinator.instance.resetForTests();
     SyncService.debugClockForTests = null;
     SyncService.debugRemotePullForTests = null;
     SyncService.instance.debugResetQueueInMemoryOnly();
@@ -28,6 +30,7 @@ void main() {
   tearDown(() async {
     OfflineStore.clearDebugIsarOverrideForTests();
     SyncService.instance.resetRemoteSyncStateForTests();
+    PostSyncRefreshCoordinator.instance.resetForTests();
     SyncService.debugClockForTests = null;
     SyncService.debugRemotePullForTests = null;
     final i = isar;

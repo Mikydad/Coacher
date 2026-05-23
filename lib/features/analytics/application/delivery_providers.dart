@@ -416,6 +416,12 @@ void invalidateTodayCoachingDelivery(WidgetRef ref) {
   ref.invalidate(layer4RefreshTodayDeliveryProvider);
 }
 
+void invalidateTodayCoachingDeliveryFromContainer(ProviderContainer container) {
+  final today = DateKeys.todayKey();
+  container.invalidate(layer3DeliveryDayInsightsProvider(today));
+  container.invalidate(layer4RefreshTodayDeliveryProvider);
+}
+
 /// Drop Layer 1 feature row, Layer 3 entity insights, and refresh Layer 4 for a goal
 /// that is no longer an active coaching subject (completed or deleted).
 Future<void> clearEntityCoachingCachesForGoal(WidgetRef ref, String goalId) async {
