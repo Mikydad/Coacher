@@ -21,6 +21,7 @@ class GoalsHomeScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Goals')),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'goals_tab_fab',
         onPressed: () => Navigator.pushNamed(context, GoalEditorScreen.routeName),
         backgroundColor: const Color(0xFFB7FF00),
         foregroundColor: Colors.black,
