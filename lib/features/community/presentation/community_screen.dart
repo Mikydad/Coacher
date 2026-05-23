@@ -80,6 +80,7 @@ class CommunityScreen extends ConsumerWidget {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'community_tab_fab',
         onPressed: () => _showCreateOrDiscover(context),
         backgroundColor: const Color(0xFFB7FF00),
         foregroundColor: Colors.black,

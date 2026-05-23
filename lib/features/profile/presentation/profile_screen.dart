@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/application/main_tab_navigation.dart';
 import '../../../features/coaching/application/coaching_style_providers.dart';
 import '../../../features/coaching/domain/models/coaching_style.dart';
 import '../../../features/coaching/domain/models/enforcement_mode.dart';
@@ -55,6 +56,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final service = ref.read(profilePreferenceServiceProvider);
     await service.setDisplayName(_nameController.text);
     if (mounted) setState(() => _editingName = false);
+  }
+
+  void _onBackPressed() {
+    final nav = Navigator.of(context);
+    if (nav.canPop()) {
+      nav.pop();
+      return;
+    }
+    navigateToMainTab(context, ref, index: MainTabIndex.home);
   }
 
   Future<void> _signOut() async {
@@ -231,7 +241,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     child: Row(
                       children: [
                         GestureDetector(
-                          onTap: () => Navigator.pop(context),
+                          onTap: _onBackPressed,
                           child: const Icon(
                             Icons.arrow_back_ios_new_rounded,
                             color: _kOnSurface,

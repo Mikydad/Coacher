@@ -22,30 +22,21 @@ class MainTabShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final index = ref.watch(mainTabIndexProvider);
 
-    final bottomInset = mainTabBarBottomInset(context);
-
     return Stack(
       fit: StackFit.expand,
       children: [
         Scaffold(
           extendBody: true,
-          body: MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              padding: MediaQuery.paddingOf(context).copyWith(
-                bottom: bottomInset,
-              ),
-            ),
-            child: IndexedStack(
-              index: index,
-              children: const [
-                HomeScreen(),
-                AiAssistantScreen(),
-                GoalSelectionScreen(),
-                AnalyticsProgressScreen(),
-                CommunityScreen(),
-                ProfileScreen(),
-              ],
-            ),
+          body: IndexedStack(
+            index: index,
+            children: const [
+              MainTabInset(child: HomeScreen()),
+              AiAssistantScreen(),
+              MainTabInset(child: GoalSelectionScreen()),
+              MainTabInset(child: AnalyticsProgressScreen()),
+              MainTabInset(child: CommunityScreen()),
+              MainTabInset(child: ProfileScreen()),
+            ],
           ),
           bottomNavigationBar: ObsidianBottomNav(
             selectedIndex: index,
