@@ -47,9 +47,11 @@ final executionDayTasksProvider = FutureProvider<List<ExecutionTaskItem>>((
   );
 
   final items = <ExecutionTaskItem>[];
+  final now = DateTime.now();
   for (final prioritizedRow in prioritized) {
     final row = prioritizedRow.row;
     final task = row.task;
+    if (!isTaskAvailableForFocusNow(row, now: now)) continue;
     if (task.status == TaskStatus.notStarted ||
         task.status == TaskStatus.inProgress ||
         task.status == TaskStatus.partial) {

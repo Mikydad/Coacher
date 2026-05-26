@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/utils/stable_id.dart';
+import '../../time_blocks/application/conflict_entity_title_resolver.dart';
 import '../../time_blocks/application/time_block_providers.dart';
 import '../../time_blocks/domain/models/time_conflict.dart';
 import '../../time_blocks/presentation/conflict_bottom_sheet.dart';
@@ -149,11 +150,12 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> {
     final proposed = blockSvc.deriveBlockForGoal(goal, today);
     if (proposed == null) return true;
 
-    // Build title map: goal titles so conflicting blocks show readable names.
-    // Task titles from todayAllTasksRowsProvider are not imported here; the
-    // goal title map alone is sufficient since tasks already appear with titles
-    // when tasks check against goals via AddTaskScreen.
-    final entityTitles = ref.read(goalTitleMapProvider);
+    final repo = ref.read(timeBlockRepositoryProvider);
+    final overlapping = await repo.listOverlappingBlocks(proposed);
+    final entityTitles = await buildSchedulingConflictEntityTitles(
+      ref,
+      overlapping: overlapping,
+    );
 
     final tbSvc = ref.read(timeBlockSyncServiceProvider);
     final checkResult = await tbSvc.checkConflicts(
@@ -181,6 +183,7 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> {
     final action = await ConflictBottomSheet.show(
       context: context,
       conflicts: checkResult.conflicts,
+      proposedEntityTitle: goal.title,
     );
 
     switch (action) {

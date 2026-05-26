@@ -104,6 +104,18 @@ List<PrioritizedTaskRow> prioritizePlannedTasks(
   return out;
 }
 
+/// Reminder time on [row]'s plan date in local time, or null if unscheduled today.
+DateTime? scheduledTimeToday(PlannedTaskRow row, DateTime now) =>
+    _scheduledToday(row, now);
+
+/// Open tasks that should appear on Focus / auto-next: due now, overdue, or unscheduled.
+bool isTaskAvailableForFocusNow(PlannedTaskRow row, {DateTime? now}) {
+  final current = now ?? DateTime.now();
+  final scheduled = _scheduledToday(row, current);
+  if (scheduled == null) return true;
+  return !scheduled.isAfter(current);
+}
+
 int _compareHabitAnchor(PlannedTaskRow a, PlannedTaskRow b, DateTime now) {
   final at = _scheduledToday(a, now);
   final bt = _scheduledToday(b, now);

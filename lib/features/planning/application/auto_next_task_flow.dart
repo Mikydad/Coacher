@@ -22,9 +22,12 @@ enum NextTaskDecision { startNow, extraTime, moveWithReason }
 PlannedTaskRow? pickNextAutoTaskFromPrioritized(
   Iterable<PrioritizedTaskRow> prioritized, {
   required String completedTaskId,
+  DateTime? now,
 }) {
+  final current = now ?? DateTime.now();
   for (final item in prioritized) {
     if (item.row.task.id == completedTaskId) continue;
+    if (!isTaskAvailableForFocusNow(item.row, now: current)) continue;
     return item.row;
   }
   return null;

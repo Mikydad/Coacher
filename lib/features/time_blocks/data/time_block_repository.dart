@@ -1,6 +1,8 @@
 import 'package:isar/isar.dart';
 
+import '../../../core/local_db/isar_collections/isar_goal.dart';
 import '../../../core/local_db/isar_collections/isar_scheduled_time_block.dart';
+import '../../../core/local_db/isar_collections/isar_task.dart';
 import '../../../core/offline/offline_store.dart';
 import '../domain/models/scheduled_time_block.dart';
 
@@ -80,7 +82,9 @@ class IsarTimeBlockRepository implements TimeBlockRepository {
         .and()
         .computedEndAtMsGreaterThan(startMs)
         .findAll();
-    return rows.map((r) => r.toDomain()).toList(growable: false);
+    return _retainBlocksForLiveEntities(
+      rows.map((r) => r.toDomain()).toList(growable: false),
+    );
   }
 
   @override
@@ -99,7 +103,38 @@ class IsarTimeBlockRepository implements TimeBlockRepository {
         .not()
         .entityIdEqualTo(proposed.entityId)
         .findAll();
-    return rows.map((r) => r.toDomain()).toList(growable: false);
+    return _retainBlocksForLiveEntities(
+      rows.map((r) => r.toDomain()).toList(growable: false),
+    );
+  }
+
+  /// Excludes (and deletes) time blocks whose task/goal was removed earlier.
+  Future<List<ScheduledTimeBlock>> _retainBlocksForLiveEntities(
+    List<ScheduledTimeBlock> blocks,
+  ) async {
+    if (blocks.isEmpty) return blocks;
+    final live = <ScheduledTimeBlock>[];
+    for (final block in blocks) {
+      if (await _entityStillExists(block)) {
+        live.add(block);
+      } else {
+        await deleteBlockForEntity(block.entityId);
+      }
+    }
+    return live;
+  }
+
+  Future<bool> _entityStillExists(ScheduledTimeBlock block) async {
+    switch (block.entityKind) {
+      case 'goal':
+        final goal = await _isar.isarGoals.getByGoalId(block.entityId);
+        return goal != null;
+      case 'task':
+      case 'habit':
+      default:
+        final task = await _isar.isarTasks.getByTaskId(block.entityId);
+        return task != null;
+    }
   }
 
   @override
