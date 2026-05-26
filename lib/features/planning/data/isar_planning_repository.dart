@@ -4,6 +4,7 @@ import 'package:isar/isar.dart';
 import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/local_db/isar_collections/isar_block.dart';
 import '../../../core/local_db/isar_collections/isar_routine.dart';
+import '../../../core/local_db/isar_collections/isar_scheduled_time_block.dart';
 import '../../../core/local_db/isar_collections/isar_task.dart';
 import '../../../core/offline/offline_store.dart';
 import '../../../core/sync/sync_service.dart';
@@ -303,6 +304,11 @@ class IsarPlanningRepository implements PlanningRepository {
   }) async {
     await _isar.writeTxn(() async {
       await _isar.isarTasks.deleteByTaskId(taskId);
+      // Drop scheduling block so deleted tasks do not appear in conflict checks.
+      await _isar.isarScheduledTimeBlocks
+          .filter()
+          .entityIdEqualTo(taskId)
+          .deleteAll();
     });
     final path = FirestorePaths.tasks(routineId, blockId);
     await _enqueueDelete(entityType: 'task', path: '$path/$taskId');

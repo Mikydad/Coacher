@@ -246,7 +246,7 @@ void main() {
       );
     });
 
-    test('falls back to entity ID when title map has no entry', () async {
+    test('falls back to kind label when title map has no entry', () async {
       final (:goalSvc, :tbSvc, :repo) = _build();
       repo.overlapping = [
         _existingBlock(entityId: 'task-xyz', entityKind: 'task'),
@@ -256,7 +256,10 @@ void main() {
 
       final result = await tbSvc.checkConflicts(proposed);
 
-      expect(result.conflicts.first.conflictingEntityTitle, 'task-xyz');
+      expect(
+        result.conflicts.first.conflictingEntityTitle,
+        'Another scheduled task',
+      );
     });
 
     // ── Goal intensity → importance → severity ────────────────────────────────

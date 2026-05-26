@@ -9,15 +9,22 @@ enum ConflictAction { saveAnyway, adjustTime, shortenDuration }
 /// how to proceed. Never hard-blocks saving — the user always has a path
 /// through.
 class ConflictBottomSheet extends StatelessWidget {
-  const ConflictBottomSheet._({required this.conflicts});
+  const ConflictBottomSheet._({
+    required this.conflicts,
+    this.proposedEntityTitle,
+  });
 
   final List<TimeConflict> conflicts;
+
+  /// Title of the task/goal being saved (shown in the header for clarity).
+  final String? proposedEntityTitle;
 
   /// Show the bottom sheet and return the user's chosen [ConflictAction],
   /// or null if dismissed without choosing.
   static Future<ConflictAction?> show({
     required BuildContext context,
     required List<TimeConflict> conflicts,
+    String? proposedEntityTitle,
   }) {
     return showModalBottomSheet<ConflictAction>(
       context: context,
@@ -25,7 +32,10 @@ class ConflictBottomSheet extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => ConflictBottomSheet._(conflicts: conflicts),
+      builder: (_) => ConflictBottomSheet._(
+        conflicts: conflicts,
+        proposedEntityTitle: proposedEntityTitle,
+      ),
     );
   }
 
@@ -74,9 +84,10 @@ class ConflictBottomSheet extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              conflicts.length == 1
-                  ? 'This task overlaps 1 existing item.'
-                  : 'This task overlaps ${conflicts.length} existing items.',
+              _overlapSummary(
+                proposedTitle: proposedEntityTitle,
+                conflictCount: conflicts.length,
+              ),
               style: Theme.of(context)
                   .textTheme
                   .bodySmall
@@ -128,6 +139,20 @@ class ConflictBottomSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static String _overlapSummary({
+    required String? proposedTitle,
+    required int conflictCount,
+  }) {
+    final proposed = proposedTitle?.trim();
+    final subject = proposed != null && proposed.isNotEmpty
+        ? '"$proposed"'
+        : 'This item';
+    if (conflictCount == 1) {
+      return '$subject overlaps 1 existing item (listed below).';
+    }
+    return '$subject overlaps $conflictCount existing items (listed below).';
   }
 
   Color _worstColor(ConflictSeverity severity) {

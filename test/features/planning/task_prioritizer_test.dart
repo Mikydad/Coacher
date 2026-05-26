@@ -174,4 +174,43 @@ void main() {
     expect(prioritized[0].layer, TaskPriorityLayer.habitAnchor);
     expect(prioritized[1].layer, TaskPriorityLayer.overdueScheduled);
   });
+
+  test('isTaskAvailableForFocusNow excludes future scheduled time', () {
+    final now = DateTime(2026, 4, 30, 18, 0);
+    final sleep = _row(
+      id: 'sleep',
+      title: 'Sleep',
+      duration: 30,
+      priority: 2,
+      orderIndex: 0,
+      reminderTimeIso: DateTime(2026, 4, 30, 22, 0).toIso8601String(),
+    );
+    final work = _row(
+      id: 'work',
+      title: 'Work',
+      duration: 45,
+      priority: 2,
+      orderIndex: 1,
+      reminderTimeIso: DateTime(2026, 4, 30, 17, 0).toIso8601String(),
+    );
+    final flex = _row(id: 'flex', title: 'Flex', duration: 10, priority: 3, orderIndex: 2);
+
+    expect(isTaskAvailableForFocusNow(sleep, now: now), isFalse);
+    expect(isTaskAvailableForFocusNow(work, now: now), isTrue);
+    expect(isTaskAvailableForFocusNow(flex, now: now), isTrue);
+  });
+
+  test('isTaskAvailableForFocusNow includes habit anchor only when due', () {
+    final now = DateTime(2026, 4, 30, 18, 0);
+    final futureHabit = _row(
+      id: 'habit',
+      title: 'Habit',
+      duration: 10,
+      priority: 2,
+      orderIndex: 0,
+      reminderTimeIso: DateTime(2026, 4, 30, 22, 0).toIso8601String(),
+      isHabitAnchor: true,
+    );
+    expect(isTaskAvailableForFocusNow(futureHabit, now: now), isFalse);
+  });
 }

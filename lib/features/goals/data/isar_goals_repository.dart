@@ -3,6 +3,7 @@ import 'package:isar/isar.dart';
 
 import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/local_db/isar_collections/isar_goal.dart';
+import '../../../core/local_db/isar_collections/isar_scheduled_time_block.dart';
 import '../../../core/offline/offline_store.dart';
 import '../../../core/sync/sync_service.dart';
 import '../domain/models/goal_action.dart';
@@ -74,6 +75,10 @@ class IsarGoalsRepository implements GoalsRepository {
     await _isar.writeTxn(() async {
       final row = await _isar.isarGoals.filter().goalIdEqualTo(goalId).findFirst();
       if (row != null) await _isar.isarGoals.delete(row.id);
+      await _isar.isarScheduledTimeBlocks
+          .filter()
+          .entityIdEqualTo(goalId)
+          .deleteAll();
     });
     await _remote.deleteGoal(goalId);
   }

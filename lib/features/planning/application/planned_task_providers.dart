@@ -81,8 +81,15 @@ Future<HomeFlowSnapshot> _computeHomeFlowSnapshot(PlanningRepository repo) async
   final prioritized = prioritizePlannedTasks(
     openRows,
     blockUrgencyById: blockUrgencyById,
+    now: now,
   );
-  final next = prioritized.isEmpty ? null : prioritized.first.row;
+  PlannedTaskRow? next;
+  for (final item in prioritized) {
+    if (isTaskAvailableForFocusNow(item.row, now: now)) {
+      next = item.row;
+      break;
+    }
+  }
   return HomeFlowSnapshot(
     currentBlockLabel: blockLabel,
     openTaskCount: openRows.length,

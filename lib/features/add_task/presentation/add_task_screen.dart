@@ -14,10 +14,11 @@ import '../../planning/data/planning_repository.dart';
 import '../../planning/domain/add_task_duration.dart';
 import '../../planning/domain/models/task_item.dart';
 import '../../reminders/domain/models/reminder_config.dart';
-import '../../goals/application/goals_providers.dart';
+import '../../time_blocks/application/conflict_entity_title_resolver.dart';
 import '../../time_blocks/application/time_block_providers.dart';
 import '../../time_blocks/domain/models/time_conflict.dart';
 import '../../time_blocks/presentation/conflict_bottom_sheet.dart';
+import 'add_task_ui.dart';
 
 class AddTaskEditArgs {
   const AddTaskEditArgs({
@@ -62,6 +63,8 @@ class AddTaskScreen extends ConsumerStatefulWidget {
 
 class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
   static const _categoryOptions = ['Study', 'Fitness', 'Work', 'Personal', 'Planning'];
+  static const _durationOptions = ['15 MIN', '25 MIN', '45 MIN', '1 HOUR'];
+  static const _durationLabels = ['15m', '25m', '45m', '1h'];
   static const _modeChoiceIds = ['flexible', 'disciplined', 'extreme'];
   static const _modeLabels = ['Flexible', 'Disciplined', 'Extreme'];
   static const _modeDescriptions = [
@@ -89,6 +92,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
 
   /// Whether this task occupies a fixed (rigid) time slot.
   bool _isRigid = false;
+
+  bool _advancedExpanded = false;
 
   PlannedTask? _loadedTask;
   String? _existingReminderId;
@@ -232,6 +237,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
         _isHabitAnchor = loaded.isHabitAnchor;
         // Phase A: _isRigid defaults to false; no field on PlannedTask yet.
         _modeUserCustomized = false;
+        _advancedExpanded =
+            _isHabitAnchor || _strictModeRequired || _isRigid;
         _loaded = true;
       });
     } catch (e) {
@@ -399,12 +406,12 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
     );
     if (proposed == null) return true;
 
-    // Build a merged entityId → title map so that conflicting goal and task
-    // blocks are shown with a human-readable name in the conflict UI.
-    final goalTitles = ref.read(goalTitleMapProvider);
-    final taskRows = ref.read(todayAllTasksRowsProvider).valueOrNull ?? [];
-    final taskTitles = {for (final r in taskRows) r.task.id: r.task.title};
-    final entityTitles = {...taskTitles, ...goalTitles};
+    final repo = ref.read(timeBlockRepositoryProvider);
+    final overlapping = await repo.listOverlappingBlocks(proposed);
+    final entityTitles = await buildSchedulingConflictEntityTitles(
+      ref,
+      overlapping: overlapping,
+    );
 
     final result = await service.checkConflicts(proposed, entityTitles: entityTitles);
     if (!result.hasConflicts) {
@@ -433,6 +440,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
     final action = await ConflictBottomSheet.show(
       context: context,
       conflicts: result.conflicts,
+      proposedEntityTitle: task.title,
     );
 
     switch (action) {
@@ -602,302 +610,518 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(_isEdit ? 'Edit Task' : 'Add Task')),
-      body: !_loaded
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                const Text('TASK IDENTITY', style: TextStyle(letterSpacing: 2, color: Colors.white70)),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _controller,
-                  decoration: const InputDecoration(hintText: 'Read 10 pages'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _notesController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    hintText: 'Notes (optional)',
-                    alignLabelWithHint: true,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text('CLASSIFICATION', style: TextStyle(letterSpacing: 2, color: Colors.white70)),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  children: _categoryOptions
-                      .map(
-                        (label) => ChoiceChip(
-                          label: Text(label),
-                          selected: _category == label,
-                          onSelected: (selected) => setState(() => _category = selected ? label : null),
+  int get _selectedModeIndex {
+    final i = _modeChoiceIds.indexOf(_modeRefId);
+    return i >= 0 ? i : 0;
+  }
+
+  String get _durationDisplayLabel {
+    final i = _durationOptions.indexOf(_duration);
+    return i >= 0 ? _durationLabels[i] : _durationLabels[1];
+  }
+
+  String get _advancedSubtitle {
+    final parts = <String>[];
+    if (_isHabitAnchor) parts.add('Habit anchor');
+    if (_strictModeRequired) parts.add('Strict');
+    if (_isRigid) parts.add('Fixed time');
+    if (parts.isEmpty) return 'Habit, strict rules, fixed time';
+    return parts.join(' · ');
+  }
+
+  Widget _buildCategoryCard() {
+    return AddTaskCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const AddTaskSectionLabel(
+            title: 'Category',
+            subtitle: 'Optional — tap to select or clear',
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const spacing = 8.0;
+              const columns = 3;
+              final tileWidth =
+                  (constraints.maxWidth - spacing * (columns - 1)) / columns;
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: [
+                  for (final label in _categoryOptions)
+                    SizedBox(
+                      width: tileWidth,
+                      child: AddTaskCategoryTile(
+                        label: label,
+                        icon: addTaskCategoryIcon(label),
+                        selected: _category == label,
+                        onTap: () => setState(
+                          () => _category = _category == label ? null : label,
                         ),
-                      )
-                      .toList(),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Habit Anchor'),
-                  subtitle: const Text(
-                    'Treat this as a stable habit time with top scheduling priority.',
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                  value: _isHabitAnchor,
-                  onChanged: (v) => setState(() => _isHabitAnchor = v),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'ENFORCEMENT MODE',
-                  style: TextStyle(letterSpacing: 2, color: Colors.white70),
-                ),
-                const SizedBox(height: 8),
-                Column(
-                  children: [
-                    for (var i = 0; i < _modeChoiceIds.length; i++) ...[
-                      _EnforcementModeOption(
-                        label: _modeLabels[i],
-                        description: _modeDescriptions[i],
-                        isSelected: _modeRefId == _modeChoiceIds[i],
-                        onTap: () => setState(() {
-                          _modeUserCustomized = true;
-                          _modeRefId = _modeChoiceIds[i];
-                        }),
                       ),
-                      if (i < _modeChoiceIds.length - 1)
-                        const SizedBox(height: 6),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Per-task setting. Overrides the slot default for this task only.',
-                  style: TextStyle(color: Colors.white38, fontSize: 12),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Strict for this task'),
-                  subtitle: const Text(
-                    'Stricter checks (e.g. timer / overrides) even if the slot is Flexible.',
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                  value: _strictModeRequired,
-                  onChanged: (v) => setState(() => _strictModeRequired = v),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Fixed time slot'),
-                  subtitle: const Text(
-                    'Marks this as a hard block. Conflicts with other tasks will be flagged more strongly.',
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                  value: _isRigid,
-                  onChanged: (v) => setState(() => _isRigid = v),
-                ),
-                const SizedBox(height: 24),
-                const Text('TEMPORAL DEPTH', style: TextStyle(letterSpacing: 2, color: Colors.white70)),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  children: ['15 MIN', '25 MIN', '45 MIN', '1 HOUR']
-                      .map(
-                        (it) => ChoiceChip(
-                          selected: _duration == it,
-                          onSelected: (_) => setState(() => _duration = it),
-                          label: Text(it),
-                        ),
-                      )
-                      .toList(),
-                ),
-                const SizedBox(height: 24),
-                SwitchListTile(
-                  title: const Text('Reminder'),
-                  subtitle: const Text('Notify me before start'),
-                  value: _reminder,
-                  onChanged: (value) async {
-                    setState(() => _reminder = value);
-                    if (!value) return;
-                    final ok = await ref.read(reminderSyncServiceProvider).ensurePermissions();
-                    if (!ok && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Notification permission is disabled.')),
-                      );
-                    }
-                  },
-                ),
-                if (_reminder) ...[
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Reminder date'),
-                    subtitle: Text(
-                      MaterialLocalizations.of(context).formatFullDate(_reminderTime),
                     ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.calendar_today),
-                      onPressed: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _reminderTime,
-                          firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
-                        );
-                        if (picked == null || !mounted) return;
-                        setState(() {
-                          _reminderTime = DateTime(
-                            picked.year,
-                            picked.month,
-                            picked.day,
-                            _reminderTime.hour,
-                            _reminderTime.minute,
-                          );
-                        });
-                      },
-                    ),
-                  ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Reminder time'),
-                    subtitle: Text(_reminderTime.toLocal().toString()),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.schedule),
-                      onPressed: () async {
-                        final picked = await showTimePicker(
-                          context: context,
-                          initialTime: TimeOfDay.fromDateTime(_reminderTime),
-                        );
-                        if (picked == null) return;
-                        setState(() {
-                          _reminderTime = DateTime(
-                            _reminderTime.year,
-                            _reminderTime.month,
-                            _reminderTime.day,
-                            picked.hour,
-                            picked.minute,
-                          );
-                        });
-                      },
-                    ),
-                  ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Plan day'),
-                    subtitle: Text(
-                      _planDateKey() == DateKeys.todayKey()
-                          ? 'Today (${_planDateKey()})'
-                          : _planDateKey(),
-                    ),
-                  ),
                 ],
-                const SizedBox(height: 8),
-                SwitchListTile(
-                  title: const Text('Use for Focus Session'),
-                  subtitle: const Text('Activate deep focus protocol'),
-                  value: _focusSession,
-                  onChanged: (value) => setState(() => _focusSession = value),
-                ),
-                const SizedBox(height: 28),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(56),
-                    backgroundColor: const Color(0xFFB7FF00),
-                    foregroundColor: Colors.black,
-                  ),
-                  onPressed: _saving ? null : _onSave,
-                  child: Text(_saving ? 'Saving…' : (_isEdit ? 'Save' : 'Add Task')),
-                ),
-              ],
-            ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
-}
 
-// ─── Enforcement mode option tile ─────────────────────────────────────────────
-
-class _EnforcementModeOption extends StatelessWidget {
-  const _EnforcementModeOption({
-    required this.label,
-    required this.description,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String label;
-  final String description;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF6C63FF).withAlpha(30)
-              : Colors.white.withAlpha(7),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFF6C63FF)
-                : Colors.white.withAlpha(18),
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 18,
-              height: 18,
-              margin: const EdgeInsets.only(right: 12),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isSelected
-                    ? const Color(0xFF6C63FF)
-                    : Colors.transparent,
-                border: Border.all(
-                  color: isSelected
-                      ? const Color(0xFF6C63FF)
-                      : Colors.white38,
-                  width: 2,
+  Future<void> _showAccountabilityPicker() async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AddTaskColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final bottom = MediaQuery.paddingOf(ctx).bottom;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-              child: isSelected
-                  ? const Icon(Icons.check, size: 11, color: Colors.white)
-                  : null,
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+              const Text(
+                'Accountability',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: AddTaskColors.onSurface,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'How we remind you and follow up on this task',
+                style: TextStyle(fontSize: 12, color: AddTaskColors.muted),
+              ),
+              const SizedBox(height: 16),
+              for (var i = 0; i < _modeChoiceIds.length; i++) ...[
+                if (i > 0) const SizedBox(height: 8),
+                AddTaskEnforcementTile(
+                  modeId: _modeChoiceIds[i],
+                  label: _modeLabels[i],
+                  description: _modeDescriptions[i],
+                  isSelected: _modeRefId == _modeChoiceIds[i],
+                  onTap: () => Navigator.pop(ctx, _modeChoiceIds[i]),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+
+    if (picked == null || !mounted) return;
+    setState(() {
+      _modeUserCustomized = true;
+      _modeRefId = picked;
+    });
+  }
+
+  Widget _buildAccountabilityCard() {
+    final selectedIndex = _selectedModeIndex;
+    final modeId = _modeChoiceIds[selectedIndex];
+
+    return AddTaskCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Expanded(
+                child: AddTaskSectionLabel(
+                  title: 'Accountability',
+                  subtitle: 'Reminders and follow-up style',
+                ),
+              ),
+              TextButton(
+                onPressed: _showAccountabilityPicker,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  foregroundColor: AddTaskColors.accent,
+                ),
+                child: const Text(
+                  'Change',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Material(
+            color: AddTaskColors.accent.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: _showAccountabilityPicker,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AddTaskColors.accent.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        AddTaskEnforcementTile.iconFor(modeId),
+                        size: 17,
+                        color: AddTaskColors.accent,
+                      ),
                     ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _modeLabels[selectedIndex],
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AddTaskColors.accent,
+                            ),
+                          ),
+                          Text(
+                            _modeDescriptions[selectedIndex],
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              height: 1.25,
+                              color: AddTaskColors.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      '+2',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AddTaskColors.accent.withValues(alpha: 0.85),
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: AddTaskColors.accent.withValues(alpha: 0.7),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScheduleCard() {
+    final timeLabel = TimeOfDay.fromDateTime(_reminderTime).format(context);
+    final dateLabel =
+        MaterialLocalizations.of(context).formatMediumDate(_reminderTime);
+    final planLabel = _planDateKey() == DateKeys.todayKey()
+        ? 'Today'
+        : _planDateKey();
+
+    return AddTaskCard(
+      child: Column(
+        children: [
+          AddTaskToggleRow(
+            icon: Icons.notifications_active_outlined,
+            iconColor: AddTaskColors.cyan,
+            title: 'Reminder',
+            subtitle: 'Get notified before this task starts',
+            value: _reminder,
+            onChanged: (value) async {
+              setState(() => _reminder = value);
+              if (!value) return;
+              final ok =
+                  await ref.read(reminderSyncServiceProvider).ensurePermissions();
+              if (!ok && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Notification permission is disabled.'),
                   ),
-                  Text(
-                    description,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.white54,
+                );
+              }
+            },
+          ),
+          if (_reminder) ...[
+            const Divider(height: 24, color: AddTaskColors.border),
+            AddTaskInsetPanel(
+              child: Column(
+                children: [
+                  AddTaskPickerRow(
+                    icon: Icons.calendar_today_outlined,
+                    label: 'Date',
+                    value: dateLabel,
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _reminderTime,
+                        firstDate:
+                            DateTime.now().subtract(const Duration(days: 365)),
+                        lastDate:
+                            DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (picked == null || !mounted) return;
+                      setState(() {
+                        _reminderTime = DateTime(
+                          picked.year,
+                          picked.month,
+                          picked.day,
+                          _reminderTime.hour,
+                          _reminderTime.minute,
+                        );
+                      });
+                    },
+                  ),
+                  const Divider(height: 1, color: AddTaskColors.border),
+                  AddTaskPickerRow(
+                    icon: Icons.schedule_rounded,
+                    label: 'Time',
+                    value: timeLabel,
+                    onTap: () async {
+                      final picked = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.fromDateTime(_reminderTime),
+                      );
+                      if (picked == null) return;
+                      setState(() {
+                        _reminderTime = DateTime(
+                          _reminderTime.year,
+                          _reminderTime.month,
+                          _reminderTime.day,
+                          picked.hour,
+                          picked.minute,
+                        );
+                      });
+                    },
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.event_available_outlined,
+                          size: 18,
+                          color: AddTaskColors.muted,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Plan day',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AddTaskColors.faint,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                planLabel,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: AddTaskColors.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
           ],
+          const Divider(height: 24, color: AddTaskColors.border),
+          AddTaskToggleRow(
+            icon: Icons.center_focus_strong_rounded,
+            title: 'Focus session',
+            subtitle: 'Start in deep-focus mode when you begin',
+            value: _focusSession,
+            onChanged: (v) => setState(() => _focusSession = v),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdvancedCard() {
+    return AddTaskExpandableCard(
+      title: 'Advanced',
+      subtitle: _advancedSubtitle,
+      leadingIcon: Icons.tune_rounded,
+      expanded: _advancedExpanded,
+      onToggle: () => setState(() => _advancedExpanded = !_advancedExpanded),
+      children: [
+        AddTaskToggleRow(
+          icon: Icons.anchor_rounded,
+          iconColor: AddTaskColors.accentDim,
+          title: 'Habit anchor',
+          subtitle: 'Priority scheduling for a stable habit slot',
+          value: _isHabitAnchor,
+          onChanged: (v) => setState(() => _isHabitAnchor = v),
+        ),
+        const Divider(height: 8, color: AddTaskColors.border),
+        AddTaskToggleRow(
+          icon: Icons.gavel_rounded,
+          iconColor: AddTaskColors.cyan,
+          title: 'Strict for this task',
+          subtitle: 'Extra checks even when the slot is Flexible',
+          value: _strictModeRequired,
+          onChanged: (v) => setState(() => _strictModeRequired = v),
+        ),
+        const Divider(height: 8, color: AddTaskColors.border),
+        AddTaskToggleRow(
+          icon: Icons.lock_clock_rounded,
+          title: 'Fixed time slot',
+          subtitle: 'Treat as a hard block for conflict detection',
+          value: _isRigid,
+          onChanged: (v) => setState(() => _isRigid = v),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomSafe = MediaQuery.paddingOf(context).bottom;
+
+    return Scaffold(
+      backgroundColor: AddTaskColors.surface,
+      appBar: AppBar(
+        backgroundColor: AddTaskColors.surface,
+        elevation: 0,
+        foregroundColor: AddTaskColors.onSurface,
+        title: Text(
+          _isEdit ? 'Edit task' : 'Add task',
+          style: const TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
+      body: !_loaded
+          ? const Center(
+              child: CircularProgressIndicator(color: AddTaskColors.accent),
+            )
+          : Column(
+              children: [
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    children: [
+                      AddTaskCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const AddTaskSectionLabel(
+                              title: 'What are you doing?',
+                              subtitle: 'Give it a clear, actionable name',
+                            ),
+                            const SizedBox(height: 14),
+                            AddTaskField(
+                              controller: _controller,
+                              hint: 'Read 10 pages',
+                            ),
+                            const SizedBox(height: 12),
+                            AddTaskField(
+                              controller: _notesController,
+                              hint: 'Notes (optional)',
+                              maxLines: 3,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: AddTaskColors.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      AddTaskCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const AddTaskSectionLabel(title: 'Duration'),
+                            const SizedBox(height: 12),
+                            AddTaskDurationSegment(
+                              options: _durationLabels,
+                              selected: _durationDisplayLabel,
+                              onSelected: (label) {
+                                final i = _durationLabels.indexOf(label);
+                                if (i >= 0) {
+                                  setState(() => _duration = _durationOptions[i]);
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildCategoryCard(),
+                      const SizedBox(height: 12),
+                      _buildAccountabilityCard(),
+                      const SizedBox(height: 12),
+                      _buildScheduleCard(),
+                      const SizedBox(height: 12),
+                      _buildAdvancedCard(),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottomSafe),
+                  decoration: const BoxDecoration(
+                    color: AddTaskColors.surface,
+                    border: Border(top: BorderSide(color: AddTaskColors.border)),
+                  ),
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      backgroundColor: AddTaskColors.accent,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: _saving ? null : _onSave,
+                    child: Text(
+                      _saving ? 'Saving…' : (_isEdit ? 'Save changes' : 'Add task'),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }

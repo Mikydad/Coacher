@@ -38,7 +38,8 @@ abstract final class ConflictDetectionEngine {
       final severity = _computeSeverity(proposed, other, overlapMinutes);
       final severityLabel = _classifySeverity(severity);
       final conflictType = _classifyConflictType(proposed, other);
-      final title = entityTitles[other.entityId] ?? other.entityId;
+      final title =
+          entityTitles[other.entityId] ?? fallbackConflictEntityTitle(other);
 
       results.add(
         TimeConflict(
@@ -171,6 +172,20 @@ abstract final class ConflictDetectionEngine {
     ConflictSeverity b,
   ) {
     return a.index > b.index ? a : b;
+  }
+
+  /// Human-readable label when [entityTitles] has no entry for [block].
+  static String fallbackConflictEntityTitle(ScheduledTimeBlock block) {
+    switch (block.entityKind) {
+      case 'goal':
+        return 'Another goal';
+      case 'habit':
+        return 'A scheduled habit';
+      case 'task':
+        return 'Another scheduled task';
+      default:
+        return 'Another scheduled item';
+    }
   }
 
   /// Derive importance from enforcement mode string.
