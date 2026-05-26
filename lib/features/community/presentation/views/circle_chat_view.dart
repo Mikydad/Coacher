@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/presentation/keyboard_dismiss.dart';
 import '../../../../core/utils/stable_id.dart';
 import '../../application/circle_providers.dart';
 import '../../domain/models/circle_enums.dart';
@@ -51,6 +52,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
 
     setState(() => _sending = true);
     _textController.clear();
+    if (mounted) dismissKeyboard(context);
 
     try {
       final msg = CircleMessage(
@@ -205,7 +207,10 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
     return Column(
       children: [
         Expanded(
-          child: messagesAsync.when(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => dismissKeyboard(context),
+            child: messagesAsync.when(
             loading: () => const Center(
               child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
             ),
@@ -231,6 +236,8 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
               return ListView.builder(
                 controller: _scrollController,
                 reverse: true,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 8,
@@ -254,6 +261,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
                 },
               );
             },
+            ),
           ),
         ),
         _InputBar(
@@ -650,6 +658,13 @@ class _InputBar extends StatelessWidget {
                 maxLines: 4,
                 minLines: 1,
                 textCapitalization: TextCapitalization.sentences,
+                textInputAction: TextInputAction.send,
+                onTapOutside: (_) => dismissKeyboard(context),
+                onSubmitted: (_) {
+                  if (!sending && controller.text.trim().isNotEmpty) {
+                    onSend();
+                  }
+                },
                 decoration: InputDecoration(
                   hintText: 'Message your circle…',
                   hintStyle: const TextStyle(color: Color(0xFF8A8FA8)),

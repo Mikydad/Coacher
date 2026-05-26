@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,8 +13,14 @@ import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/domain/models/analytics_event.dart';
 import '../../planning/domain/models/routine.dart';
 import '../../planning/data/planning_repository.dart';
+import '../../context_override/application/context_override_providers.dart';
+import '../../context_override/domain/models/context_override.dart';
+import '../../planning/application/task_schedule_display.dart';
 import '../../planning/domain/add_task_duration.dart';
 import '../../planning/domain/models/task_item.dart';
+import '../../planning/domain/sleep_task.dart';
+import '../../planning/presentation/sleep_task_ios_guidance.dart';
+import 'custom_duration_dialog.dart';
 import '../../reminders/domain/models/reminder_config.dart';
 import '../../time_blocks/application/conflict_entity_title_resolver.dart';
 import '../../time_blocks/application/time_block_providers.dart';
@@ -62,9 +70,14 @@ class AddTaskScreen extends ConsumerStatefulWidget {
 }
 
 class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
-  static const _categoryOptions = ['Study', 'Fitness', 'Work', 'Personal', 'Planning'];
-  static const _durationOptions = ['15 MIN', '25 MIN', '45 MIN', '1 HOUR'];
-  static const _durationLabels = ['15m', '25m', '45m', '1h'];
+  static const _categoryOptions = [
+    'Study',
+    'Fitness',
+    'Work',
+    'Personal',
+    'Planning',
+    kSleepTaskCategory,
+  ];
   static const _modeChoiceIds = ['flexible', 'disciplined', 'extreme'];
   static const _modeLabels = ['Flexible', 'Disciplined', 'Extreme'];
   static const _modeDescriptions = [
@@ -76,6 +89,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
   final _controller = TextEditingController();
   final _notesController = TextEditingController();
   String _duration = '25 MIN';
+  int _customDurationMinutes = 90;
   String? _category;
   bool _reminder = false;
   bool _focusSession = true;
@@ -94,6 +108,12 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
   bool _isRigid = false;
 
   bool _advancedExpanded = false;
+
+  /// When [category] is Sleep: sync daily sleep window + optional in-app quiet mode.
+  bool _syncSleepWindowAndQuietMode = true;
+
+  /// `sleep` or `dnd` for in-app override when [_syncSleepWindowAndQuietMode].
+  String _inAppQuietMode = 'sleep';
 
   PlannedTask? _loadedTask;
   String? _existingReminderId;
@@ -219,7 +239,13 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
         _loadedTask = loaded;
         _controller.text = loaded.title;
         _notesController.text = loaded.notes ?? '';
-        _duration = durationLabelFromMinutes(loaded.durationMinutes);
+        _duration = durationLabelFromMinutes(
+          loaded.durationMinutes,
+          category: loaded.category,
+        );
+        if (isCustomDurationKey(_duration)) {
+          _customDurationMinutes = loaded.durationMinutes;
+        }
         _category = loaded.category;
         _reminder = loaded.reminderEnabled;
         if (loaded.reminderTimeIso != null) {
@@ -301,7 +327,10 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
       routineId: routineId,
       blockId: blockId,
       title: title,
-      durationMinutes: addTaskDurationMinutes(_duration),
+      durationMinutes: addTaskDurationMinutes(
+        _duration,
+        customMinutes: _customDurationMinutes,
+      ),
       priority: _loadedTask?.priority ?? 3,
       orderIndex: orderIndex,
       reminderEnabled: _reminder,
@@ -589,6 +618,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
       // Phase A — sync time block after successful save.
       await _syncTimeBlock(task);
 
+      await _applySleepSchedulingSideEffects(task);
+
       await _persistReminder(
         taskId: taskId,
         taskTitle: title,
@@ -610,14 +641,104 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
     }
   }
 
+  List<String> get _activeDurationOptions => isSleepCategory(_category)
+      ? sleepDurationChipKeys
+      : standardDurationChipKeys;
+
+  List<String> get _activeDurationLabels {
+    if (isSleepCategory(_category)) return sleepDurationChipLabels;
+    return [
+      ...standardDurationChipLabels.sublist(0, 4),
+      isCustomDurationKey(_duration)
+          ? formatAddTaskDurationChipLabel(_customDurationMinutes)
+          : 'Custom',
+    ];
+  }
+
+  int get _effectiveDurationMinutes => addTaskDurationMinutes(
+        _duration,
+        customMinutes: _customDurationMinutes,
+      );
+
+  Future<void> _editCustomDuration() async {
+    final picked = await showCustomDurationDialog(
+      context,
+      initialMinutes: _customDurationMinutes,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _duration = kAddTaskCustomDurationKey;
+      _customDurationMinutes = picked;
+    });
+  }
+
+  void _applySleepCategoryDefaults(String label) {
+    if (!isSleepCategory(label)) return;
+    _duration = '8 HOURS';
+    _reminder = true;
+    _isRigid = true;
+    _focusSession = false;
+    if (_controller.text.trim().isEmpty) {
+      _controller.text = kSleepTaskCategory;
+    }
+    if (Platform.isIOS) {
+      _syncSleepWindowAndQuietMode = true;
+    }
+  }
+
+  Future<void> _applySleepSchedulingSideEffects(PlannedTask task) async {
+    if (!isSleepTask(task)) return;
+    if (!task.reminderEnabled || task.reminderTimeIso == null) return;
+
+    final start = DateTime.tryParse(task.reminderTimeIso!)?.toLocal();
+    if (start == null) return;
+    final end = start.add(Duration(minutes: task.durationMinutes));
+
+    final overrideService = ref.read(contextOverrideServiceProvider);
+    await overrideService.setSleepWindow(
+      start: formatSleepWindowHHmm(start),
+      end: formatSleepWindowHHmm(end),
+    );
+
+    if (!_syncSleepWindowAndQuietMode) return;
+
+    if (Platform.isIOS && mounted) {
+      await showSleepTaskIosFocusGuidance(
+        context,
+        onUseInAppSleep: () async {
+          await overrideService.activateOverride(
+            type: ContextOverride.sleep,
+            expiresAt: end,
+          );
+        },
+        onUseInAppDnd: () async {
+          await overrideService.activateOverride(
+            type: ContextOverride.doNotDisturb,
+            expiresAt: end,
+          );
+        },
+      );
+      return;
+    }
+
+    final type = _inAppQuietMode == 'dnd'
+        ? ContextOverride.doNotDisturb
+        : ContextOverride.sleep;
+    await overrideService.activateOverride(type: type, expiresAt: end);
+  }
+
   int get _selectedModeIndex {
     final i = _modeChoiceIds.indexOf(_modeRefId);
     return i >= 0 ? i : 0;
   }
 
   String get _durationDisplayLabel {
-    final i = _durationOptions.indexOf(_duration);
-    return i >= 0 ? _durationLabels[i] : _durationLabels[1];
+    if (isCustomDurationKey(_duration)) {
+      return formatAddTaskDurationChipLabel(_customDurationMinutes);
+    }
+    final i = _activeDurationOptions.indexOf(_duration);
+    if (i >= 0) return _activeDurationLabels[i];
+    return isSleepCategory(_category) ? sleepDurationChipLabels.last : '25m';
   }
 
   String get _advancedSubtitle {
@@ -656,9 +777,20 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
                         label: label,
                         icon: addTaskCategoryIcon(label),
                         selected: _category == label,
-                        onTap: () => setState(
-                          () => _category = _category == label ? null : label,
-                        ),
+                        onTap: () => setState(() {
+                          if (_category == label) {
+                            _category = null;
+                          } else {
+                            final wasSleep = isSleepCategory(_category);
+                            _category = label;
+                            if (isSleepCategory(label)) {
+                              _applySleepCategoryDefaults(label);
+                            } else if (wasSleep &&
+                                sleepDurationChipKeys.contains(_duration)) {
+                              _duration = '25 MIN';
+                            }
+                          }
+                        }),
                       ),
                     ),
                 ],
@@ -903,7 +1035,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
                   const Divider(height: 1, color: AddTaskColors.border),
                   AddTaskPickerRow(
                     icon: Icons.schedule_rounded,
-                    label: 'Time',
+                    label: isSleepCategory(_category) ? 'Sleep start' : 'Time',
                     value: timeLabel,
                     onTap: () async {
                       final picked = await showTimePicker(
@@ -922,6 +1054,18 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
                       });
                     },
                   ),
+                  if (isSleepCategory(_category) && _reminder) ...[
+                    const Divider(height: 1, color: AddTaskColors.border),
+                    AddTaskPickerRow(
+                      icon: Icons.bedtime_rounded,
+                      label: 'Sleep end',
+                      value: formatTaskTimeOfDay(
+                        _reminderTime.add(
+                          Duration(minutes: _effectiveDurationMinutes),
+                        ),
+                      ),
+                    ),
+                  ],
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                     child: Row(
@@ -962,14 +1106,42 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
               ),
             ),
           ],
-          const Divider(height: 24, color: AddTaskColors.border),
-          AddTaskToggleRow(
-            icon: Icons.center_focus_strong_rounded,
-            title: 'Focus session',
-            subtitle: 'Start in deep-focus mode when you begin',
-            value: _focusSession,
-            onChanged: (v) => setState(() => _focusSession = v),
-          ),
+          if (isSleepCategory(_category)) ...[
+            const Divider(height: 24, color: AddTaskColors.border),
+            AddTaskToggleRow(
+              icon: Icons.bedtime_rounded,
+              iconColor: AddTaskColors.accentDim,
+              title: 'Sleep window & quiet mode',
+              subtitle: Platform.isIOS
+                  ? 'Updates daily sleep window; offers in-app Sleep or DND'
+                  : 'Updates daily sleep window and in-app quiet mode',
+              value: _syncSleepWindowAndQuietMode,
+              onChanged: (v) => setState(() => _syncSleepWindowAndQuietMode = v),
+            ),
+            if (_syncSleepWindowAndQuietMode && !Platform.isIOS) ...[
+              const SizedBox(height: 8),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'sleep', label: Text('Sleep')),
+                  ButtonSegment(value: 'dnd', label: Text('DND')),
+                ],
+                selected: {_inAppQuietMode},
+                onSelectionChanged: (s) {
+                  if (s.isEmpty) return;
+                  setState(() => _inAppQuietMode = s.first);
+                },
+              ),
+            ],
+          ] else ...[
+            const Divider(height: 24, color: AddTaskColors.border),
+            AddTaskToggleRow(
+              icon: Icons.center_focus_strong_rounded,
+              title: 'Focus session',
+              subtitle: 'Start in deep-focus mode when you begin',
+              value: _focusSession,
+              onChanged: (v) => setState(() => _focusSession = v),
+            ),
+          ],
         ],
       ),
     );
@@ -1069,16 +1241,25 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const AddTaskSectionLabel(title: 'Duration'),
+                            AddTaskSectionLabel(
+                              title: 'Duration',
+                              subtitle: isSleepCategory(_category)
+                                  ? 'Sleep blocks use longer windows (6–8 hours)'
+                                  : 'Need longer? Tap Custom to set hours and minutes',
+                            ),
                             const SizedBox(height: 12),
                             AddTaskDurationSegment(
-                              options: _durationLabels,
+                              options: _activeDurationLabels,
                               selected: _durationDisplayLabel,
-                              onSelected: (label) {
-                                final i = _durationLabels.indexOf(label);
-                                if (i >= 0) {
-                                  setState(() => _duration = _durationOptions[i]);
+                              onSelected: (label) async {
+                                final i = _activeDurationLabels.indexOf(label);
+                                if (i < 0) return;
+                                final key = _activeDurationOptions[i];
+                                if (isCustomDurationKey(key)) {
+                                  await _editCustomDuration();
+                                  return;
                                 }
+                                setState(() => _duration = key);
                               },
                             ),
                           ],

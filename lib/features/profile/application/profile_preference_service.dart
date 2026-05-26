@@ -1,3 +1,5 @@
+import '../../../features/analytics/application/coaching_insight_notification_policy.dart'
+    as coaching_notify_policy;
 import '../../../features/coaching/domain/models/enforcement_mode.dart';
 import '../data/profile_preference_repository.dart';
 import '../domain/models/user_profile_preference.dart';
@@ -35,6 +37,41 @@ class ProfilePreferenceService {
       defaultEnforcementMode: mode,
       updatedAtMs: nowMs,
     );
+    await _repository.upsertPreference(updated);
+  }
+
+  /// Enables or disables push notifications for Layer 4 coaching insights.
+  Future<void> setCoachingInsightNotificationsEnabled(bool enabled) async {
+    final nowMs = _now().millisecondsSinceEpoch;
+    final existing = await _repository.getPreference();
+    final updated = (existing ?? _defaultPreference(nowMs)).copyWith(
+      coachingInsightNotificationsEnabled: enabled,
+      updatedAtMs: nowMs,
+    );
+    await _repository.upsertPreference(updated);
+  }
+
+  Future<coaching_notify_policy.CoachingInsightNotificationSendEvaluation>
+  evaluateCoachingInsightNotificationSend({
+    DateTime? now,
+  }) async {
+    final ts = now ?? _now();
+    final existing = await _repository.getPreference();
+    final base = existing ?? _defaultPreference(ts.millisecondsSinceEpoch);
+    return coaching_notify_policy.evaluateCoachingInsightNotificationSend(
+      base,
+      ts,
+    );
+  }
+
+  Future<void> recordCoachingInsightNotificationSent({DateTime? now}) async {
+    final ts = now ?? _now();
+    final nowMs = ts.millisecondsSinceEpoch;
+    final existing = await _repository.getPreference();
+    final base = existing ?? _defaultPreference(nowMs);
+    final updated = coaching_notify_policy
+        .recordCoachingInsightNotificationSent(base, ts)
+        .copyWith(updatedAtMs: nowMs);
     await _repository.upsertPreference(updated);
   }
 

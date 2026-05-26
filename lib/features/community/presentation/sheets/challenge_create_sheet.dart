@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/presentation/keyboard_dismiss.dart';
 import '../../../../core/utils/stable_id.dart';
 import '../../application/challenge_providers.dart';
 import '../../domain/models/challenge.dart';
@@ -131,7 +132,9 @@ class _ChallengeCreateSheetState
               BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
+          child: KeyboardDismissOnTap(
+            child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
             child: Form(
               key: _formKey,
@@ -165,6 +168,7 @@ class _ChallengeCreateSheetState
                   TextFormField(
                     controller: _titleController,
                     style: const TextStyle(color: Color(0xFFF0F4FF)),
+                    onTapOutside: (_) => dismissKeyboard(context),
                     decoration: _inputDeco('e.g. Run 30 miles this month'),
                     validator: (v) {
                       final s = v?.trim() ?? '';
@@ -213,6 +217,7 @@ class _ChallengeCreateSheetState
                               controller: _targetController,
                               style: const TextStyle(
                                   color: Color(0xFFF0F4FF)),
+                              onTapOutside: (_) => dismissKeyboard(context),
                               keyboardType: TextInputType.number,
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly
@@ -242,6 +247,7 @@ class _ChallengeCreateSheetState
                               controller: _unitController,
                               style: const TextStyle(
                                   color: Color(0xFFF0F4FF)),
+                              onTapOutside: (_) => dismissKeyboard(context),
                               decoration: _inputDeco('miles / sessions'),
                               validator: (v) {
                                 if (v == null || v.trim().isEmpty) {
@@ -318,6 +324,7 @@ class _ChallengeCreateSheetState
               ),
             ),
           ),
+        ),
         ),
       ),
     );

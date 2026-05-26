@@ -22,6 +22,7 @@ import '../../planning/application/planned_task_providers.dart';
 import '../../planning/application/task_schedule_display.dart';
 import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/application/analytics_period_bundle_notifier.dart';
+import '../../analytics/application/coaching_insight_notification_policy.dart';
 import '../../analytics/application/delivery_providers.dart';
 import '../../analytics/application/insight_generation_providers.dart';
 import '../../analytics/presentation/coaching_focus_card.dart';
@@ -878,50 +879,79 @@ class _Layer4NotificationDispatchBridge extends ConsumerStatefulWidget {
 
 class _Layer4NotificationDispatchBridgeState
     extends ConsumerState<_Layer4NotificationDispatchBridge> {
-  String? _lastPrimaryInsightId;
+  String? _lastScheduledPrimaryInsightId;
+  String? _dispatchInFlightForInsightId;
 
   @override
   Widget build(BuildContext context) {
     ref.listen<AsyncValue<Layer4NotificationDecisionViewModel>>(
       layer4TodayNotificationDecisionProvider,
-      (previous, next) async {
-        final vm = next.valueOrNull;
-        if (vm == null) return;
-        final primaryId = vm.primaryInsightId;
-        final notifications = ref.read(localNotificationsServiceProvider);
-        final notificationId = primaryId == null
-            ? null
-            : ('layer4:$primaryId').hashCode.abs() % 2147483647;
-        if (!vm.isEligible || primaryId == null || primaryId.trim().isEmpty) {
-          final lastId = _lastPrimaryInsightId;
-          if (lastId != null && lastId.isNotEmpty) {
-            final oldNotificationId =
-                ('layer4:$lastId').hashCode.abs() % 2147483647;
-            await notifications.cancel(oldNotificationId);
-          }
-          _lastPrimaryInsightId = null;
-          return;
-        }
-        if (_lastPrimaryInsightId == primaryId) return;
-        final insights = ref.read(layer3TodayDeliveryInsightsProvider).valueOrNull ??
-            const <GeneratedInsight>[];
-        final selected = insights.where((item) => item.insightId == primaryId).toList();
-        final body = selected.isEmpty
-            ? 'You have a coaching insight ready.'
-            : selected.first.message;
-        final granted = await notifications.requestPermissionsIfNeeded();
-        if (!granted || notificationId == null) return;
-        await notifications.schedule(
-          id: notificationId,
-          title: 'Coach Insight Ready',
-          body: body,
-          when: DateTime.now().add(const Duration(minutes: 1)),
-          payload: 'layer4:$primaryId',
-        );
-        _lastPrimaryInsightId = primaryId;
+      (previous, next) {
+        unawaited(_onNotificationDecisionChanged(next));
       },
     );
     return const SizedBox.shrink();
+  }
+
+  Future<void> _onNotificationDecisionChanged(
+    AsyncValue<Layer4NotificationDecisionViewModel> next,
+  ) async {
+    final vm = next.valueOrNull;
+    if (vm == null) return;
+
+    final notifications = ref.read(localNotificationsServiceProvider);
+    final prefService = ref.read(profilePreferenceServiceProvider);
+    final primaryId = vm.primaryInsightId?.trim();
+
+    if (!vm.isEligible || primaryId == null || primaryId.isEmpty) {
+      await notifications.cancel(kCoachingInsightNotificationId);
+      _lastScheduledPrimaryInsightId = null;
+      _dispatchInFlightForInsightId = null;
+      return;
+    }
+
+    if (_lastScheduledPrimaryInsightId == primaryId ||
+        _dispatchInFlightForInsightId == primaryId) {
+      return;
+    }
+
+    final budget = await prefService.evaluateCoachingInsightNotificationSend();
+    if (!budget.allowed) {
+      return;
+    }
+
+    _dispatchInFlightForInsightId = primaryId;
+    try {
+      final insights =
+          ref.read(layer3TodayDeliveryInsightsProvider).valueOrNull ??
+          const <GeneratedInsight>[];
+      final selected =
+          insights.where((item) => item.insightId == primaryId).toList();
+      final body = selected.isEmpty
+          ? 'You have a coaching insight ready.'
+          : selected.first.message;
+
+      final granted = await notifications.requestPermissionsIfNeeded();
+      if (!granted) return;
+
+      // Re-check budget in case another dispatch completed while awaiting permission.
+      final budgetAfter = await prefService.evaluateCoachingInsightNotificationSend();
+      if (!budgetAfter.allowed) return;
+
+      await notifications.schedule(
+        id: kCoachingInsightNotificationId,
+        title: 'Coach Insight Ready',
+        body: body,
+        when: DateTime.now().add(const Duration(minutes: 1)),
+        payload: 'layer4:$primaryId',
+      );
+      await prefService.recordCoachingInsightNotificationSent();
+      _lastScheduledPrimaryInsightId = primaryId;
+    } finally {
+      if (_dispatchInFlightForInsightId == primaryId) {
+        _dispatchInFlightForInsightId = null;
+      }
+    }
   }
 }
 
@@ -1364,7 +1394,7 @@ class _FlowNowStrip extends ConsumerWidget {
     } else {
       parts.add('${task.durationMinutes}m target');
     }
-    final timeLabel = taskScheduledTimeLabel(task);
+    final timeLabel = taskScheduledTimeLabelForDisplay(task);
     if (timeLabel != null) {
       parts.add(timeLabel);
     }

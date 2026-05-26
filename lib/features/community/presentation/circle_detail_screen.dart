@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/presentation/keyboard_dismiss.dart';
 import '../application/circle_providers.dart';
 import '../domain/models/circle_enums.dart';
 import '../domain/models/circle_member.dart';
@@ -44,7 +45,10 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
+      if (!mounted) return;
+      if (_tabController.indexIsChanging) {
+        dismissKeyboard(context);
+      } else {
         ref
             .read(circleActiveTabProvider(widget.circleId).notifier)
             .state = _tabController.index;
@@ -102,7 +106,8 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                   .toList() ??
               [];
 
-          return NestedScrollView(
+          return KeyboardDismissOnTap(
+            child: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) => [
               SliverAppBar(
                 backgroundColor: const Color(0xFF14171C),
@@ -150,6 +155,7 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                 CircleInfoView(circleId: widget.circleId),
               ],
             ),
+          ),
           );
         },
       ),

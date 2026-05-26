@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/firebase/firestore_paths.dart';
+import '../../../core/presentation/keyboard_dismiss.dart';
 import '../../../core/utils/stable_id.dart';
 import '../application/circle_providers.dart';
 import '../domain/models/accountability_circle.dart';
@@ -139,9 +140,11 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
         ),
         elevation: 0,
       ),
-      body: Form(
+      body: KeyboardDismissOnTap(
+        child: Form(
         key: _formKey,
         child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.all(20),
           children: [
             _SectionLabel('Circle name'),
@@ -168,6 +171,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -176,6 +180,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
       controller: _nameController,
       style: const TextStyle(color: Color(0xFFF0F4FF)),
       maxLength: 40,
+      onTapOutside: (_) => dismissKeyboard(context),
       decoration: _inputDecoration('e.g. Morning runners'),
       validator: (v) {
         final s = v?.trim() ?? '';
@@ -192,6 +197,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
       style: const TextStyle(color: Color(0xFFF0F4FF)),
       maxLines: 3,
       maxLength: 200,
+      onTapOutside: (_) => dismissKeyboard(context),
       decoration: _inputDecoration('What is this circle about?'),
     );
   }

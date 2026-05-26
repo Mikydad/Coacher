@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/presentation/keyboard_dismiss.dart';
 import '../application/circle_providers.dart';
 import '../application/circle_recommendation_service.dart';
 import '../application/user_circle_membership_service.dart';
@@ -51,6 +52,12 @@ class _CircleDiscoveryScreenState
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (!mounted) return;
+      if (_tabController.indexIsChanging) {
+        dismissKeyboard(context);
+      }
+    });
     _fetchBrowse();
   }
 
@@ -209,7 +216,8 @@ class _CircleDiscoveryScreenState
           ],
         ),
       ),
-      body: TabBarView(
+      body: KeyboardDismissOnTap(
+        child: TabBarView(
         controller: _tabController,
         children: [
           _BrowseTab(
@@ -233,6 +241,7 @@ class _CircleDiscoveryScreenState
             onJoin: _joinOrRequest,
           ),
         ],
+      ),
       ),
     );
   }
@@ -515,6 +524,7 @@ class _SearchTab extends StatelessWidget {
           child: TextField(
             controller: controller,
             onChanged: onChanged,
+            onTapOutside: (_) => dismissKeyboard(context),
             style: const TextStyle(color: Color(0xFFF0F4FF)),
             decoration: InputDecoration(
               hintText: 'Search circles…',

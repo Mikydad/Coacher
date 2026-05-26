@@ -16,6 +16,9 @@ class UserProfilePreference {
     required this.defaultEnforcementMode,
     required this.updatedAtMs,
     this.morningBriefEnabled = false,
+    this.coachingInsightNotificationsEnabled = true,
+    this.coachingNotificationBudgetDateKey = '',
+    this.coachingNotificationSentAtMs = const <int>[],
     this.schemaVersion = kUserProfilePreferenceSchemaVersion,
   });
 
@@ -33,6 +36,15 @@ class UserProfilePreference {
   /// When true, Coach AI shows a subtle "suggestions for today" banner on the
   /// first app open between 06:00–10:00 if the Coach screen hasn't been opened.
   final bool morningBriefEnabled;
+
+  /// When false, coaching insights still appear in-app but no push is scheduled.
+  final bool coachingInsightNotificationsEnabled;
+
+  /// Local date key (YYYY-MM-DD) for [coachingNotificationSentAtMs].
+  final String coachingNotificationBudgetDateKey;
+
+  /// Milliseconds since epoch for each coaching insight push sent on [coachingNotificationBudgetDateKey].
+  final List<int> coachingNotificationSentAtMs;
 
   final int updatedAtMs;
   final int schemaVersion;
@@ -54,6 +66,9 @@ class UserProfilePreference {
     'displayName': displayName,
     'defaultEnforcementMode': defaultEnforcementMode.toStorage(),
     'morningBriefEnabled': morningBriefEnabled,
+    'coachingInsightNotificationsEnabled': coachingInsightNotificationsEnabled,
+    'coachingNotificationBudgetDateKey': coachingNotificationBudgetDateKey,
+    'coachingNotificationSentAtMs': coachingNotificationSentAtMs,
     'updatedAtMs': updatedAtMs,
     'schemaVersion': schemaVersion,
   };
@@ -66,6 +81,13 @@ class UserProfilePreference {
           map['defaultEnforcementMode'] as String?,
         ),
         morningBriefEnabled: map['morningBriefEnabled'] as bool? ?? false,
+        coachingInsightNotificationsEnabled:
+            map['coachingInsightNotificationsEnabled'] as bool? ?? true,
+        coachingNotificationBudgetDateKey:
+            map['coachingNotificationBudgetDateKey'] as String? ?? '',
+        coachingNotificationSentAtMs: _parseIntList(
+          map['coachingNotificationSentAtMs'],
+        ),
         updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
         schemaVersion:
             (map['schemaVersion'] as num?)?.toInt() ??
@@ -76,6 +98,9 @@ class UserProfilePreference {
     String? displayName,
     EnforcementMode? defaultEnforcementMode,
     bool? morningBriefEnabled,
+    bool? coachingInsightNotificationsEnabled,
+    String? coachingNotificationBudgetDateKey,
+    List<int>? coachingNotificationSentAtMs,
     int? updatedAtMs,
     int? schemaVersion,
   }) => UserProfilePreference(
@@ -84,7 +109,18 @@ class UserProfilePreference {
     defaultEnforcementMode:
         defaultEnforcementMode ?? this.defaultEnforcementMode,
     morningBriefEnabled: morningBriefEnabled ?? this.morningBriefEnabled,
+    coachingInsightNotificationsEnabled: coachingInsightNotificationsEnabled ??
+        this.coachingInsightNotificationsEnabled,
+    coachingNotificationBudgetDateKey: coachingNotificationBudgetDateKey ??
+        this.coachingNotificationBudgetDateKey,
+    coachingNotificationSentAtMs:
+        coachingNotificationSentAtMs ?? this.coachingNotificationSentAtMs,
     updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     schemaVersion: schemaVersion ?? this.schemaVersion,
   );
+}
+
+List<int> _parseIntList(Object? raw) {
+  if (raw is! List) return const <int>[];
+  return raw.map((e) => (e as num).toInt()).toList(growable: false);
 }
