@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../coaching/presentation/coaching_style_settings_section.dart';
 import '../../context_override/presentation/override_settings_section.dart';
+import '../../profile/presentation/coaching_insight_notification_settings_section.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const _kSurface = Color(0xFF0E0E0E);
@@ -55,6 +56,12 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
         children: [
+          _SettingsSectionHeader(label: 'Notifications'),
+          const SizedBox(height: 10),
+          const _ObsidianCard(
+            child: CoachingInsightNotificationSettingsSection(),
+          ),
+          const SizedBox(height: 32),
           _SettingsSectionHeader(label: 'Coaching Style'),
           const SizedBox(height: 10),
           const _ObsidianCard(child: CoachingStyleSettingsSection()),

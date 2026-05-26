@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/presentation/keyboard_dismiss.dart';
 import '../../../../core/utils/date_keys.dart';
 import '../../../../core/utils/stable_id.dart';
 import '../../application/weekly_commitment_providers.dart';
@@ -35,6 +36,7 @@ class WeeklyCommitmentsView extends ConsumerWidget {
         final isEndOfWeek = _isEndOfWeek();
 
         return ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.all(16),
           children: [
             // ── End-of-week banner ─────────────────────────────────────────
@@ -245,7 +247,8 @@ class _EditCommitmentsSheetState extends State<_EditCommitmentsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return KeyboardDismissOnTap(
+      child: Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
@@ -275,6 +278,8 @@ class _EditCommitmentsSheetState extends State<_EditCommitmentsSheet> {
             Flexible(
               child: ListView.builder(
                 shrinkWrap: true,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: _drafts.length,
                 itemBuilder: (_, i) => _DraftRow(
@@ -329,6 +334,7 @@ class _EditCommitmentsSheetState extends State<_EditCommitmentsSheet> {
           ],
         ),
       ),
+    ),
     );
   }
 }
@@ -366,6 +372,7 @@ class _DraftRow extends StatelessWidget {
           Expanded(
             child: TextField(
               controller: draft.titleController,
+              onTapOutside: (_) => dismissKeyboard(context),
               style: const TextStyle(color: Color(0xFFF0F4FF)),
               decoration: InputDecoration(
                 hintText: 'e.g. Workout ×3',

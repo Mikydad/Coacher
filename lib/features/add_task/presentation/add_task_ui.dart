@@ -241,16 +241,17 @@ class AddTaskPickerRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
-    required this.onTap,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String value;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final interactive = onTap != null;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -285,7 +286,8 @@ class AddTaskPickerRow extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: AddTaskColors.faint, size: 20),
+              if (interactive)
+                const Icon(Icons.chevron_right, color: AddTaskColors.faint, size: 20),
             ],
           ),
         ),
@@ -635,6 +637,8 @@ IconData addTaskCategoryIcon(String label) {
       return Icons.favorite_border_rounded;
     case 'Planning':
       return Icons.calendar_month_outlined;
+    case 'Sleep':
+      return Icons.bedtime_rounded;
     default:
       return Icons.menu_book_rounded;
   }

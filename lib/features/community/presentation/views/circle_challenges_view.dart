@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/presentation/keyboard_dismiss.dart';
 import '../../application/challenge_providers.dart';
 import '../../domain/models/challenge.dart';
 import '../sheets/challenge_create_sheet.dart';
@@ -661,7 +662,8 @@ class _ManualProgressSheetState
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return KeyboardDismissOnTap(
+      child: Padding(
       padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
@@ -710,6 +712,7 @@ class _ManualProgressSheetState
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly
                 ],
+                onTapOutside: (_) => dismissKeyboard(context),
                 style: const TextStyle(color: Color(0xFFF0F4FF)),
                 decoration: InputDecoration(
                   hintText:
@@ -785,6 +788,7 @@ class _ManualProgressSheetState
           ),
         ),
       ),
+    ),
     );
   }
 }

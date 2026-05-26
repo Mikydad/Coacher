@@ -1,15 +1,60 @@
+import 'sleep_task.dart';
+
+/// Chip key when duration is not a preset (15m–1h or sleep).
+const String kAddTaskCustomDurationKey = 'CUSTOM';
+
+const List<String> standardDurationChipKeys = [
+  '15 MIN',
+  '25 MIN',
+  '45 MIN',
+  '1 HOUR',
+  kAddTaskCustomDurationKey,
+];
+
+const List<String> standardDurationChipLabels = [
+  '15m',
+  '25m',
+  '45m',
+  '1h',
+  'Custom',
+];
+
+/// Short label for duration chips (e.g. `90m`, `2h`, `1h 30m`).
+String formatAddTaskDurationChipLabel(int minutes) {
+  if (minutes < 1) return '1m';
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  if (h == 0) return '${minutes}m';
+  if (m == 0) return '${h}h';
+  return '${h}h ${m}m';
+}
+
 /// Maps minutes back to the closest Add Task chip label.
-String durationLabelFromMinutes(int minutes) {
-  if (minutes <= 15) return '15 MIN';
-  if (minutes <= 25) return '25 MIN';
-  if (minutes <= 45) return '45 MIN';
-  if (minutes <= 60) return '1 HOUR';
-  return '1 HOUR';
+String durationLabelFromMinutes(int minutes, {String? category}) {
+  if (isSleepCategory(category)) {
+    if (minutes <= 6 * 60 + 30) return '6 HOURS';
+    if (minutes <= 7 * 60 + 30) return '7 HOURS';
+    return '8 HOURS';
+  }
+  if (minutes == 15) return '15 MIN';
+  if (minutes == 25) return '25 MIN';
+  if (minutes == 45) return '45 MIN';
+  if (minutes == 60) return '1 HOUR';
+  return kAddTaskCustomDurationKey;
 }
 
 /// Maps Add Task screen duration chip labels to minutes.
-int addTaskDurationMinutes(String label) {
+int addTaskDurationMinutes(
+  String label, {
+  int customMinutes = 90,
+}) {
   switch (label.trim().toUpperCase()) {
+    case '6 HOURS':
+      return 6 * 60;
+    case '7 HOURS':
+      return 7 * 60;
+    case '8 HOURS':
+      return 8 * 60;
     case '15 MIN':
       return 15;
     case '25 MIN':
@@ -18,7 +63,15 @@ int addTaskDurationMinutes(String label) {
       return 45;
     case '1 HOUR':
       return 60;
+    case 'CUSTOM':
+      return customMinutes.clamp(kAddTaskMinCustomMinutes, kAddTaskMaxCustomMinutes);
     default:
       return 25;
   }
 }
+
+const int kAddTaskMinCustomMinutes = 1;
+const int kAddTaskMaxCustomMinutes = 12 * 60;
+
+bool isCustomDurationKey(String label) =>
+    label.trim().toUpperCase() == kAddTaskCustomDurationKey;
