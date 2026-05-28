@@ -63,6 +63,12 @@ void main() {
       expect(s.taskCurrentDays, 5);
     });
 
+    test('homeDisplayStreakDays matches Home hero (goal/habit week streak)', () {
+      final bundle = _bundle(goalWeek: 0.6, taskWeek: 0.4);
+      expect(homeDisplayStreakDays(bundle), 4);
+      expect(homeDisplayStreakDays(bundle), bundle.goalHabitWeek.currentStreakDays);
+    });
+
     test('disciplineTopCategoryLabel picks leading scope', () {
       expect(
         disciplineTopCategoryLabel(_bundle(goalWeek: 0.8, taskWeek: 0.3)),

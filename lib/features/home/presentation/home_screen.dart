@@ -22,6 +22,7 @@ import '../../planning/application/planned_task_providers.dart';
 import '../../planning/application/task_schedule_display.dart';
 import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/application/analytics_period_bundle_notifier.dart';
+import '../../analytics/application/discipline_score.dart';
 import '../../analytics/application/coaching_insight_notification_policy.dart';
 import '../../analytics/application/delivery_providers.dart';
 import '../../analytics/application/insight_generation_providers.dart';
@@ -618,7 +619,7 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
       child: bundleAsync.when(
         skipLoadingOnReload: true,
         data: (bundle) {
-          final streak = bundle.goalHabitWeek.currentStreakDays;
+          final streak = homeDisplayStreakDays(bundle);
           final scorePercent =
               (bundle.goalHabitDay.weightedCompletionRate * 100).round();
           _handleMilestones(streak: streak, scorePercent: scorePercent);

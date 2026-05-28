@@ -1,4 +1,7 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'analytics_period_bundle.dart';
+import 'analytics_period_bundle_notifier.dart';
 
 /// Combined discipline rate for the weekly hero (0.0–1.0).
 ///
@@ -55,6 +58,19 @@ DisciplineStreakSummary disciplineStreakSummary(AnalyticsPeriodBundle bundle) {
     taskBestDays: bundle.taskWeek.bestStreakDays,
   );
 }
+
+/// Goals/habits current streak days — same metric as the Home hero card.
+int homeDisplayStreakDays(AnalyticsPeriodBundle bundle) =>
+    bundle.goalHabitWeek.currentStreakDays;
+
+/// Shared streak count for Home and Profile heroes.
+final homeDisplayStreakDaysProvider = Provider<int>((ref) {
+  return ref.watch(analyticsPeriodBundleProvider).when(
+        data: homeDisplayStreakDays,
+        loading: () => 0,
+        error: (_, _) => 0,
+      );
+});
 
 /// Weighted blend for internal scoring only (not shown as a single streak).
 double disciplineBlendedStreakScore(AnalyticsPeriodBundle bundle) {

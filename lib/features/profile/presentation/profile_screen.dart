@@ -9,6 +9,7 @@ import '../../../features/coaching/domain/models/coaching_style.dart';
 import '../../../features/coaching/domain/models/enforcement_mode.dart';
 import '../../../features/context_override/application/context_override_providers.dart';
 import '../../../features/settings/presentation/settings_screen.dart';
+import '../../analytics/application/discipline_score.dart';
 import '../application/profile_providers.dart';
 
 // ─── Design tokens (Obsidian Pulse) ──────────────────────────────────────────
@@ -88,7 +89,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final coachingStyle = ref.watch(activeCoachingStyleProvider);
     final defaultMode = ref.watch(defaultEnforcementModeProvider);
     final attentionAsync = ref.watch(attentionStateProvider);
-    final completionsAsync = ref.watch(totalCompletionsCountProvider);
+    final streakDays = ref.watch(homeDisplayStreakDaysProvider);
 
     if (!_editingName && _nameController.text != displayName) {
       _nameController.text = displayName;
@@ -102,12 +103,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final quietLabel = hasQuietHours
         ? '${attentionState!.sleepWindowStart}–${attentionState.sleepWindowEnd}'
         : '8:00 AM';
-
-    final totalCompletions = completionsAsync.when(
-      data: (n) => n,
-      loading: () => null,
-      error: (_, _) => null,
-    );
 
     return Scaffold(
       backgroundColor: _kSurface,
@@ -130,7 +125,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     editingName: _editingName,
                     nameController: _nameController,
                     coachingStyle: coachingStyle,
-                    streakCount: totalCompletions ?? 0,
+                    streakCount: streakDays,
                     onEditTap: () => setState(() => _editingName = true),
                     onSaveName: _saveName,
                   ),
