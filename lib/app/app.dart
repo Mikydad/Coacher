@@ -22,7 +22,9 @@ import '../features/ai_assistant/presentation/ai_assistant_screen.dart';
 import '../features/community/presentation/community_screen.dart';
 import '../features/profile/presentation/default_enforcement_mode_selection_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
-import '../features/settings/presentation/settings_screen.dart';
+import '../features/settings/presentation/account_settings_screen.dart';
+import '../features/settings/presentation/notification_settings_screen.dart';
+import '../features/settings/presentation/reminder_settings_screen.dart';
 import '../features/tasks_hub/presentation/tasks_hub_screen.dart';
 import '../features/timer/presentation/timer_session_screen.dart';
 
@@ -85,7 +87,10 @@ class CoachForLifeApp extends StatelessWidget {
             launchArgs: args is TimerLaunchArgs ? args : null,
           );
         },
-        SettingsScreen.routeName: (_) => const SettingsScreen(),
+        AccountSettingsScreen.routeName: (_) => const AccountSettingsScreen(),
+        NotificationSettingsScreen.routeName: (_) =>
+            const NotificationSettingsScreen(),
+        ReminderSettingsScreen.routeName: (_) => const ReminderSettingsScreen(),
         ProfileScreen.routeName: (_) => const ProfileScreen(),
         DefaultEnforcementModeSelectionScreen.routeName: (_) =>
             const DefaultEnforcementModeSelectionScreen(),
