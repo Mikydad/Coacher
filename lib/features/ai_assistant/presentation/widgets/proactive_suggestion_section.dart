@@ -74,9 +74,6 @@ class _ProactiveSuggestionSectionState
         final showExpandLink = !_expanded && hiddenCount > 0;
         final showCollapseLink = _expanded && active.length > kHomeProactiveSuggestionLimit;
 
-        final maxHeight = MediaQuery.sizeOf(context).height *
-            kHomeExpandedSuggestionsMaxHeightFraction;
-
         return Listener(
           onPointerDown: (_) => _onExpandedInteraction(),
           child: AnimatedSize(
@@ -86,30 +83,12 @@ class _ProactiveSuggestionSectionState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (_expanded && active.length > 2)
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: maxHeight),
-                    child: ListView(
-                      shrinkWrap: true,
-                      physics: const BouncingScrollPhysics(),
-                      padding: EdgeInsets.zero,
-                      children: [
-                        for (final s in visible)
-                          ProactiveSuggestionCard(
-                            key: ValueKey(s.id),
-                            suggestion: s,
-                            onDismiss: () {},
-                          ),
-                      ],
-                    ),
-                  )
-                else
-                  for (final s in visible)
-                    ProactiveSuggestionCard(
-                      key: ValueKey(s.id),
-                      suggestion: s,
-                      onDismiss: () {},
-                    ),
+                for (final s in visible)
+                  ProactiveSuggestionCard(
+                    key: ValueKey(s.id),
+                    suggestion: s,
+                    onDismiss: () {},
+                  ),
                 if (showExpandLink)
                   _SuggestionsExpandLink(
                     label: hiddenCount == 1
