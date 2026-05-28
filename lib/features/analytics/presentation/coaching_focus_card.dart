@@ -26,6 +26,7 @@ class HomeCoachingFocusCard extends ConsumerWidget {
       focusAsync: focusAsync,
       summaryAsync: summaryAsync,
       compact: false,
+      hideWhenEmpty: true,
       onRefresh: () {
         ref.invalidate(recomputeCoachingFocusProvider);
         ref.invalidate(recomputeAiSummaryProvider);
@@ -60,12 +61,16 @@ class _CoachingFocusCardShell extends ConsumerWidget {
     required this.summaryAsync,
     required this.compact,
     required this.onRefresh,
+    this.hideWhenEmpty = false,
   });
 
   final AsyncValue<CurrentCoachingFocus?> focusAsync;
   final AsyncValue<AiSummaryResponse?> summaryAsync;
   final bool compact;
   final VoidCallback? onRefresh;
+
+  /// When true (Home), no card is shown until a live focus exists.
+  final bool hideWhenEmpty;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -74,6 +79,7 @@ class _CoachingFocusCardShell extends ConsumerWidget {
       data: (focus) {
         final summary = summaryAsync.valueOrNull;
         if (focus == null || !isFocusLive(focus.lifecycleState)) {
+          if (hideWhenEmpty) return const SizedBox.shrink();
           return _EmptyFocusCard(compact: compact);
         }
         return _FocusCard(
@@ -84,13 +90,19 @@ class _CoachingFocusCardShell extends ConsumerWidget {
           ref: ref,
         );
       },
-      loading: () => _CardShell(
-        child: const SizedBox(
-          height: 48,
-          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        ),
-      ),
-      error: (_, _) => _EmptyFocusCard(compact: compact),
+      loading: () {
+        if (hideWhenEmpty) return const SizedBox.shrink();
+        return _CardShell(
+          child: const SizedBox(
+            height: 48,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          ),
+        );
+      },
+      error: (_, _) {
+        if (hideWhenEmpty) return const SizedBox.shrink();
+        return _EmptyFocusCard(compact: compact);
+      },
     );
   }
 }

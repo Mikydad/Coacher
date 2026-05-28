@@ -1,18 +1,57 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/ai_assistant_providers.dart';
 import '../../application/proactive_suggestion_display.dart';
 import 'proactive_suggestion_card.dart';
-import 'proactive_suggestions_coach_panel.dart';
 
-/// Shows the top proactive suggestion on Home, with a link to the full list
-/// on the Coach screen when more exist.
-class ProactiveSuggestionSection extends ConsumerWidget {
+/// Shows proactive suggestions on Home: one card by default, expandable in place
+/// to reveal the full list (no Coach tab detour).
+class ProactiveSuggestionSection extends ConsumerStatefulWidget {
   const ProactiveSuggestionSection({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProactiveSuggestionSection> createState() =>
+      _ProactiveSuggestionSectionState();
+}
+
+class _ProactiveSuggestionSectionState
+    extends ConsumerState<ProactiveSuggestionSection> {
+  bool _expanded = false;
+  Timer? _collapseTimer;
+
+  @override
+  void dispose() {
+    _collapseTimer?.cancel();
+    super.dispose();
+  }
+
+  void _collapse() {
+    _collapseTimer?.cancel();
+    if (!_expanded) return;
+    setState(() => _expanded = false);
+  }
+
+  void _expand() {
+    setState(() => _expanded = true);
+    _scheduleAutoCollapse();
+  }
+
+  void _scheduleAutoCollapse() {
+    _collapseTimer?.cancel();
+    _collapseTimer = Timer(kHomeSuggestionsAutoCollapseDuration, () {
+      if (mounted) _collapse();
+    });
+  }
+
+  void _onExpandedInteraction() {
+    if (_expanded) _scheduleAutoCollapse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final suggestionsAsync = ref.watch(proactiveSuggestionsProvider);
 
     return suggestionsAsync.when(
@@ -22,21 +61,121 @@ class ProactiveSuggestionSection extends ConsumerWidget {
         final active = activeProactiveSuggestions(suggestions);
         if (active.isEmpty) return const SizedBox.shrink();
 
-        final onHome = active.take(kHomeProactiveSuggestionLimit).toList();
-        final remaining = active.length - onHome.length;
+        if (active.length <= kHomeProactiveSuggestionLimit && _expanded) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _collapse();
+          });
+        }
 
-        return Column(
-          children: [
-            for (final s in onHome)
-              ProactiveSuggestionCard(
-                key: ValueKey(s.id),
-                suggestion: s,
-                onDismiss: () {},
-              ),
-            SeeAllSuggestionsInCoachLink(remainingCount: remaining),
-          ],
+        final visible = _expanded
+            ? active
+            : active.take(kHomeProactiveSuggestionLimit).toList();
+        final hiddenCount = active.length - kHomeProactiveSuggestionLimit;
+        final showExpandLink = !_expanded && hiddenCount > 0;
+        final showCollapseLink = _expanded && active.length > kHomeProactiveSuggestionLimit;
+
+        final maxHeight = MediaQuery.sizeOf(context).height *
+            kHomeExpandedSuggestionsMaxHeightFraction;
+
+        return Listener(
+          onPointerDown: (_) => _onExpandedInteraction(),
+          child: AnimatedSize(
+            duration: kHomeSuggestionsExpandDuration,
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_expanded && active.length > 2)
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: maxHeight),
+                    child: ListView(
+                      shrinkWrap: true,
+                      physics: const BouncingScrollPhysics(),
+                      padding: EdgeInsets.zero,
+                      children: [
+                        for (final s in visible)
+                          ProactiveSuggestionCard(
+                            key: ValueKey(s.id),
+                            suggestion: s,
+                            onDismiss: () {},
+                          ),
+                      ],
+                    ),
+                  )
+                else
+                  for (final s in visible)
+                    ProactiveSuggestionCard(
+                      key: ValueKey(s.id),
+                      suggestion: s,
+                      onDismiss: () {},
+                    ),
+                if (showExpandLink)
+                  _SuggestionsExpandLink(
+                    label: hiddenCount == 1
+                        ? 'Show 1 more'
+                        : 'Show $hiddenCount more',
+                    icon: Icons.expand_more_rounded,
+                    onPressed: _expand,
+                  ),
+                if (showCollapseLink)
+                  _SuggestionsExpandLink(
+                    label: 'Show less',
+                    icon: Icons.expand_less_rounded,
+                    onPressed: _collapse,
+                  ),
+              ],
+            ),
+          ),
         );
       },
+    );
+  }
+}
+
+class _SuggestionsExpandLink extends StatelessWidget {
+  const _SuggestionsExpandLink({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  static const _kAccent = Color(0xFFB2ED00);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: TextButton(
+          onPressed: onPressed,
+          style: TextButton.styleFrom(
+            foregroundColor: _kAccent,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(icon, size: 18),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
