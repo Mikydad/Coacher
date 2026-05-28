@@ -51,7 +51,6 @@ import '../../../app/application/main_tab_navigation.dart';
 import '../../context_override/presentation/active_override_banner.dart';
 import '../../context_override/presentation/context_override_quick_activate_sheet.dart';
 import '../../context_override/presentation/post_override_review_card.dart';
-import '../../settings/presentation/settings_screen.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 import 'quittr_app_bar_title.dart';
 
@@ -97,12 +96,6 @@ class HomeScreen extends ConsumerWidget {
               AccountabilityHistoryScreen.routeName,
             ),
             icon: const Icon(Icons.history),
-          ),
-          IconButton(
-            tooltip: 'Settings',
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () =>
-                Navigator.pushNamed(context, SettingsScreen.routeName),
           ),
           const Padding(
             padding: EdgeInsets.only(right: 16),

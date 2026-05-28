@@ -8,7 +8,9 @@ import '../../../features/coaching/application/coaching_style_providers.dart';
 import '../../../features/coaching/domain/models/coaching_style.dart';
 import '../../../features/coaching/domain/models/enforcement_mode.dart';
 import '../../../features/context_override/application/context_override_providers.dart';
-import '../../../features/settings/presentation/settings_screen.dart';
+import '../../settings/presentation/account_settings_screen.dart';
+import '../../settings/presentation/notification_settings_screen.dart';
+import '../../settings/presentation/reminder_settings_screen.dart';
 import '../../analytics/application/discipline_score.dart';
 import '../application/profile_providers.dart';
 
@@ -183,10 +185,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: _CoreOptimizationSection(
-                    quietLabel: quietLabel,
-                    hasQuietHours: hasQuietHours,
-                  ),
+                  child: _CoreOptimizationSection(quietLabel: quietLabel),
                 ),
               ),
 
@@ -758,13 +757,9 @@ class _CoachToneSection extends ConsumerWidget {
 // ─── Core Optimization (settings list) ───────────────────────────────────────
 
 class _CoreOptimizationSection extends StatelessWidget {
-  const _CoreOptimizationSection({
-    required this.quietLabel,
-    required this.hasQuietHours,
-  });
+  const _CoreOptimizationSection({required this.quietLabel});
 
   final String quietLabel;
-  final bool hasQuietHours;
 
   @override
   Widget build(BuildContext context) {
@@ -781,21 +776,29 @@ class _CoreOptimizationSection extends StatelessWidget {
               color: _kOnSurfaceVariant,
               size: 20,
             ),
-            onTap: () =>
-                Navigator.pushNamed(context, SettingsScreen.routeName),
+            onTap: () => Navigator.pushNamed(
+              context,
+              AccountSettingsScreen.routeName,
+            ),
           ),
           _SettingRow(
             icon: Icons.notifications_active_outlined,
             title: 'Notifications',
-            subtitle: 'Sound, Haptics & Push',
-            trailing: _NeonToggle(value: hasQuietHours),
-            onTap: () =>
-                Navigator.pushNamed(context, SettingsScreen.routeName),
+            subtitle: 'Coaching insights & push alerts',
+            trailing: const Icon(
+              Icons.chevron_right_rounded,
+              color: _kOnSurfaceVariant,
+              size: 20,
+            ),
+            onTap: () => Navigator.pushNamed(
+              context,
+              NotificationSettingsScreen.routeName,
+            ),
           ),
           _SettingRow(
             icon: Icons.alarm_on_rounded,
             title: 'Reminder Settings',
-            subtitle: 'Adaptive daily triggers',
+            subtitle: 'Sleep window & attention modes',
             trailing: Text(
               quietLabel,
               style: const TextStyle(
@@ -804,8 +807,10 @@ class _CoreOptimizationSection extends StatelessWidget {
                 color: _kPrimary,
               ),
             ),
-            onTap: () =>
-                Navigator.pushNamed(context, SettingsScreen.routeName),
+            onTap: () => Navigator.pushNamed(
+              context,
+              ReminderSettingsScreen.routeName,
+            ),
             isLast: true,
           ),
         ],
@@ -871,40 +876,6 @@ class _SettingRow extends StatelessWidget {
               const SizedBox(width: 8),
               trailing,
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Neon toggle indicator ────────────────────────────────────────────────────
-
-class _NeonToggle extends StatelessWidget {
-  const _NeonToggle({required this.value});
-  final bool value;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: 40,
-      height: 22,
-      decoration: BoxDecoration(
-        color: value ? _kPrimaryDim : _kSurfaceHighest,
-        borderRadius: BorderRadius.circular(99),
-      ),
-      child: Align(
-        alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 3),
-          child: Container(
-            width: 16,
-            height: 16,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: value ? _kOnPrimaryFixed : _kOnSurfaceVariant,
-            ),
           ),
         ),
       ),
