@@ -6,6 +6,7 @@ import 'package:coach_for_life/features/context_override/application/context_ove
 import 'package:coach_for_life/features/context_override/domain/models/user_attention_state.dart';
 import 'package:coach_for_life/features/goals/application/goals_providers.dart';
 import 'package:coach_for_life/features/goals/domain/models/user_goal.dart';
+import 'package:coach_for_life/features/analytics/application/discipline_score.dart';
 import 'package:coach_for_life/features/profile/application/profile_providers.dart';
 import 'package:coach_for_life/features/profile/domain/models/user_profile_preference.dart';
 import 'package:coach_for_life/features/profile/presentation/profile_screen.dart';
@@ -63,8 +64,7 @@ Widget _buildScreen({
       ),
       // Active goals
       goalsStreamProvider.overrideWith((ref) => Stream.value(activeGoals)),
-      // Total completions
-      totalCompletionsCountProvider.overrideWith((ref) async => 42),
+      homeDisplayStreakDaysProvider.overrideWithValue(12),
     ],
     child: const MaterialApp(home: ProfileScreen()),
   );
