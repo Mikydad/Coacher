@@ -15,6 +15,7 @@ import '../application/goals_providers.dart';
 import '../domain/models/goal_categories.dart';
 import '../domain/models/goal_check_in.dart';
 import '../domain/models/goal_enums.dart';
+import '../domain/models/goal_action.dart';
 import '../domain/models/goal_milestone.dart';
 import '../domain/models/user_goal.dart';
 import 'goal_editor_screen.dart';
@@ -86,6 +87,8 @@ class GoalDetailScreen extends ConsumerWidget {
             .where((m) => m.completed)
             .length;
         final totalMilestones = bundle.milestones.length;
+        final doneActions = bundle.actions.where((a) => a.completed).length;
+        final totalActions = bundle.actions.length;
         GoalCheckIn? todayCheckIn;
         for (final c in bundle.checkIns) {
           if (c.dateKey == todayKey) {
@@ -199,17 +202,41 @@ class GoalDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
               ],
+              Row(
+                children: [
+                  const Text(
+                    'Actions',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                  ),
+                  const Spacer(),
+                  if (totalActions > 0)
+                    Text(
+                      '$doneActions / $totalActions done',
+                      style: const TextStyle(color: Colors.white54, fontSize: 13),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
               const Text(
-                'Actions',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                'Check off each step as you complete it.',
+                style: TextStyle(color: Colors.white54, fontSize: 12),
               ),
               const SizedBox(height: 8),
-              for (final a in bundle.actions)
-                ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.play_circle_outline, size: 20),
-                  title: Text(a.title),
-                ),
+              if (totalActions == 0)
+                const Text(
+                  'No actions yet. Edit this goal to add steps.',
+                  style: TextStyle(color: Colors.white54),
+                )
+              else ...[
+                if (totalActions > 0)
+                  LinearProgressIndicator(
+                    value: doneActions / totalActions,
+                    minHeight: 6,
+                  ),
+                const SizedBox(height: 8),
+                for (final a in bundle.actions)
+                  _GoalActionTile(goalId: g.id, action: a),
+              ],
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -429,6 +456,38 @@ class _NewMilestoneDialogState extends State<_NewMilestoneDialog> {
           child: const Text('Add'),
         ),
       ],
+    );
+  }
+}
+
+class _GoalActionTile extends ConsumerWidget {
+  const _GoalActionTile({required this.goalId, required this.action});
+
+  final String goalId;
+  final GoalAction action;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Card(
+      color: const Color(0xFF1A1C1F),
+      margin: const EdgeInsets.only(bottom: 6),
+      child: CheckboxListTile(
+        value: action.completed,
+        onChanged: (v) async {
+          if (v == null) return;
+          final repo = ref.read(goalsRepositoryProvider);
+          await repo.upsertAction(action.copyWith(completed: v));
+          invalidateGoals(ref, goalId: goalId);
+        },
+        title: Text(
+          action.title,
+          style: TextStyle(
+            decoration: action.completed ? TextDecoration.lineThrough : null,
+            color: action.completed ? Colors.white38 : null,
+          ),
+        ),
+        controlAffinity: ListTileControlAffinity.leading,
+      ),
     );
   }
 }

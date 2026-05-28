@@ -66,6 +66,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Coach needs access to your photo library so you can share proof images in circle chat.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Coach AI uses the microphone so you can give voice commands to manage your tasks and schedule.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

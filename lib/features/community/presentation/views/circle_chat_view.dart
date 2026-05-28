@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/presentation/keyboard_dismiss.dart';
 import '../../../../core/utils/stable_id.dart';
 import '../../application/circle_providers.dart';
+import '../../data/circle_proof_storage.dart';
 import '../../domain/models/circle_enums.dart';
 import '../../domain/models/circle_message.dart';
 
@@ -97,12 +98,12 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
     setState(() => _sending = true);
     try {
       final file = File(picked.path);
-      final ext = picked.path.split('.').last;
-      final ref = FirebaseStorage.instance.ref(
-        'circles/${widget.circleId}/proofs/${StableId.generate('proof')}.$ext',
-      );
-      await ref.putFile(file);
-      final url = await ref.getDownloadURL();
+      final url = await ref.read(circleProofStorageProvider).uploadChatProof(
+            circleId: widget.circleId,
+            file: file,
+            mimeType: picked.mimeType,
+            sourcePath: picked.path,
+          );
 
       final msg = CircleMessage(
         id: StableId.generate('msg'),
@@ -114,11 +115,12 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
         imageUrl: url,
         createdAtMs: DateTime.now().millisecondsSinceEpoch,
       );
-      await this.ref.read(circleMessageRepositoryProvider).sendMessage(msg);
-    } catch (_) {
+      await ref.read(circleMessageRepositoryProvider).sendMessage(msg);
+    } catch (e, st) {
+      debugPrint('Circle chat image upload failed: $e\n$st');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to upload image.')),
+          SnackBar(content: Text(circleProofUploadErrorMessage(e))),
         );
       }
     } finally {

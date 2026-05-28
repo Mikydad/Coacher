@@ -6,6 +6,7 @@ import '../../../core/di/providers.dart';
 import '../data/activity_feed_repository.dart';
 import '../data/circle_member_repository.dart';
 import '../data/circle_message_repository.dart';
+import '../data/circle_proof_storage.dart';
 import '../data/circle_repository.dart';
 import '../data/removal_vote_repository.dart';
 import '../domain/models/accountability_circle.dart';
@@ -26,6 +27,10 @@ final circleMemberRepositoryProvider = Provider<CircleMemberRepository>(
 
 final circleMessageRepositoryProvider = Provider<CircleMessageRepository>(
   (ref) => FirestoreCircleMessageRepository(),
+);
+
+final circleProofStorageProvider = Provider<CircleProofStorage>(
+  (ref) => CircleProofStorage(),
 );
 
 // ── My circles ────────────────────────────────────────────────────────────────

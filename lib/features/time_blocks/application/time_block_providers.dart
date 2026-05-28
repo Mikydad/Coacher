@@ -1,8 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/di/providers.dart';
+import '../../goals/application/goals_providers.dart';
 import '../data/time_block_repository.dart';
 import '../domain/models/scheduled_time_block.dart';
 import '../domain/models/time_conflict.dart';
+import 'conflict_resolution_service.dart';
 import 'reclaimed_time_service.dart';
 import 'time_block_sync_service.dart';
 
@@ -44,5 +47,19 @@ final conflictCheckProvider = FutureProvider.family<ConflictCheckResult,
 final reclaimedTimeServiceProvider = Provider<ReclaimedTimeService>((ref) {
   return ReclaimedTimeService(
     repository: ref.read(timeBlockRepositoryProvider),
+  );
+});
+
+final conflictResolutionServiceProvider = Provider<ConflictResolutionService>((ref) {
+  return ConflictResolutionService(
+    planning: ref.read(planningRepositoryProvider),
+    goals: ref.read(goalsRepositoryProvider),
+    timeBlocks: ref.read(timeBlockRepositoryProvider),
+    timeBlockSync: ref.read(timeBlockSyncServiceProvider),
+    goalBlockSync: ref.read(goalBlockSyncServiceProvider),
+    reminderRepository: ref.read(reminderRepositoryProvider),
+    reminderSync: ref.read(reminderSyncServiceProvider),
+    goalReminderSync: ref.read(goalReminderSyncServiceProvider),
+    offlineStore: ref.read(offlineStoreProvider),
   );
 });

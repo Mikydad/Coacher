@@ -63,9 +63,29 @@ class TimeBlockSyncService {
 
   // ─── Persistence ─────────────────────────────────────────────────────────
 
-  /// Upsert a block. Existing block for the same [entityId] is replaced.
+  /// Upsert a block. Existing block(s) for the same [entityId] are replaced.
+  ///
+  /// [deriveBlock] always mints a new [ScheduledTimeBlock.id]; we reuse the
+  /// stored id when present and delete stale rows so conflict checks stay accurate.
   Future<void> syncBlock(ScheduledTimeBlock block) async {
-    await _repository.upsertBlock(block);
+    final existing = await _repository.getBlockForEntity(block.entityId);
+    final toSync = existing != null
+        ? ScheduledTimeBlock(
+            id: existing.id,
+            entityId: block.entityId,
+            entityKind: block.entityKind,
+            startAt: block.startAt,
+            expectedDurationMinutes: block.expectedDurationMinutes,
+            computedEndAt: block.computedEndAt,
+            flexibilityType: block.flexibilityType,
+            allowOverlapOverride: block.allowOverlapOverride,
+            importance: block.importance,
+            createdAtMs: existing.createdAtMs,
+            updatedAtMs: block.updatedAtMs,
+          )
+        : block;
+    await _repository.deleteBlockForEntity(block.entityId);
+    await _repository.upsertBlock(toSync);
   }
 
   /// Delete the block for an entity (on task deletion or schedule cleared).

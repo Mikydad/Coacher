@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +8,8 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/presentation/keyboard_dismiss.dart';
 import '../../application/challenge_providers.dart';
+import '../../application/circle_providers.dart';
+import '../../data/circle_proof_storage.dart';
 import '../../domain/models/challenge.dart';
 import '../sheets/challenge_create_sheet.dart';
 import '../widgets/challenge_vote_banner.dart';
@@ -644,9 +645,11 @@ class _ManualProgressSheetState
     setState(() => _uploading = true);
     try {
       if (_proofImage != null) {
-        final path =
-            'challenge_proofs/${widget.challenge.id}/${widget.userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        await FirebaseStorage.instance.ref(path).putFile(_proofImage!);
+        await ref.read(circleProofStorageProvider).uploadChallengeProof(
+              challengeId: widget.challenge.id,
+              userId: widget.userId,
+              file: _proofImage!,
+            );
       }
       await ref.read(challengeRepositoryProvider).updateProgress(
             circleId: widget.circleId,

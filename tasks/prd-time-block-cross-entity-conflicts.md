@@ -13,7 +13,8 @@ The app already detects scheduling conflicts between two **tasks** using a three
 1. `TimeBlockSyncService.deriveBlock()` — converts entity fields into a `ScheduledTimeBlock`
 2. `TimeBlockRepository.listOverlappingBlocks()` — geometric Isar query
 3. `ConflictDetectionEngine.detect()` — threshold + severity scoring → `ConflictCheckResult`
-4. `ConflictBottomSheet` / SnackBar — user resolution UI
+4. `ConflictBottomSheet` / SnackBar — user resolution UI  
+   **Note:** Moderate/severe conflicts on **Add Task** and **Goal editor** now use [`SchedulingConflictSheet`](../lib/features/time_blocks/presentation/scheduling_conflict_sheet.dart) (inline move + draft persistence). `ConflictBottomSheet` remains for other surfaces unless migrated.
 
 **What is missing:** Goals are never written to `IsarScheduledTimeBlock`, so the Isar geometric query cannot see them. This means:
 

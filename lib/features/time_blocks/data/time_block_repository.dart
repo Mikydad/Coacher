@@ -82,9 +82,10 @@ class IsarTimeBlockRepository implements TimeBlockRepository {
         .and()
         .computedEndAtMsGreaterThan(startMs)
         .findAll();
-    return _retainBlocksForLiveEntities(
+    final retained = await _retainBlocksForLiveEntities(
       rows.map((r) => r.toDomain()).toList(growable: false),
     );
+    return _dedupeBlocksPerEntity(retained);
   }
 
   @override
@@ -103,9 +104,10 @@ class IsarTimeBlockRepository implements TimeBlockRepository {
         .not()
         .entityIdEqualTo(proposed.entityId)
         .findAll();
-    return _retainBlocksForLiveEntities(
+    final retained = await _retainBlocksForLiveEntities(
       rows.map((r) => r.toDomain()).toList(growable: false),
     );
+    return _dedupeBlocksPerEntity(retained);
   }
 
   /// Excludes (and deletes) time blocks whose task/goal was removed earlier.
@@ -124,6 +126,26 @@ class IsarTimeBlockRepository implements TimeBlockRepository {
     return live;
   }
 
+  /// Keeps the newest block per [ScheduledTimeBlock.entityId] and deletes duplicates.
+  Future<List<ScheduledTimeBlock>> _dedupeBlocksPerEntity(
+    List<ScheduledTimeBlock> blocks,
+  ) async {
+    if (blocks.length <= 1) return blocks;
+    final grouped = <String, List<ScheduledTimeBlock>>{};
+    for (final block in blocks) {
+      grouped.putIfAbsent(block.entityId, () => []).add(block);
+    }
+    final deduped = <ScheduledTimeBlock>[];
+    for (final group in grouped.values) {
+      group.sort((a, b) => b.updatedAtMs.compareTo(a.updatedAtMs));
+      deduped.add(group.first);
+      for (var i = 1; i < group.length; i++) {
+        await deleteBlock(group[i].id);
+      }
+    }
+    return deduped;
+  }
+
   Future<bool> _entityStillExists(ScheduledTimeBlock block) async {
     switch (block.entityKind) {
       case 'goal':
@@ -139,10 +161,18 @@ class IsarTimeBlockRepository implements TimeBlockRepository {
 
   @override
   Future<ScheduledTimeBlock?> getBlockForEntity(String entityId) async {
-    final row = await _isar.isarScheduledTimeBlocks
+    final rows = await _isar.isarScheduledTimeBlocks
         .filter()
         .entityIdEqualTo(entityId)
-        .findFirst();
-    return row?.toDomain();
+        .findAll();
+    if (rows.isEmpty) return null;
+    rows.sort((a, b) => b.updatedAtMs.compareTo(a.updatedAtMs));
+    final newest = rows.first.toDomain();
+    if (rows.length > 1) {
+      for (var i = 1; i < rows.length; i++) {
+        await deleteBlock(rows[i].blockId);
+      }
+    }
+    return newest;
   }
 }
