@@ -28,6 +28,15 @@
 - [ ] Confirm reminders stop after task start or logical reason submission.
 - [ ] Confirm emergency bypass path prevents hard gating behavior.
 
+## Inline scheduling conflicts & form drafts
+- [ ] Create a task that overlaps an existing item (moderate/severe). Confirm **Scheduling conflict** sheet appears (not the old three-button-only sheet).
+- [ ] Choose **Move [existing item]** → apply a suggested slot → confirmation chip → **Continue & save** without re-entering task fields.
+- [ ] Choose **Move [your item]** → form scrolls to schedule; earlier slot may be suggested in SnackBar; save after adjusting.
+- [ ] Choose **Allow overlap** → save succeeds.
+- [ ] Minor overlap only → SnackBar, no sheet.
+- [ ] Fill Add Task or Goal editor, back out within 60 minutes → **Restore draft** repopulates fields; **Start fresh** clears draft.
+- [ ] Plan Tomorrow / future-day task: conflict suggestions use that plan day (not only today).
+
 ## Migration Safety
 - [ ] Verify old routine docs without mode fields still load in Plan Tomorrow.
 - [ ] Verify old reminder docs without escalation fields still schedule.

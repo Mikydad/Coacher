@@ -141,6 +141,13 @@ class ConflictBottomSheet extends StatelessWidget {
     );
   }
 
+  /// Shared overlap copy for scheduling conflict UIs.
+  static String overlapSummary({
+    required String? proposedTitle,
+    required int conflictCount,
+  }) =>
+      _overlapSummary(proposedTitle: proposedTitle, conflictCount: conflictCount);
+
   static String _overlapSummary({
     required String? proposedTitle,
     required int conflictCount,

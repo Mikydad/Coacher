@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -16,16 +17,21 @@ import '../../planning/data/planning_repository.dart';
 import '../../context_override/application/context_override_providers.dart';
 import '../../context_override/domain/models/context_override.dart';
 import '../../planning/application/task_schedule_display.dart';
+import '../../planning/application/form_draft_autosave.dart';
+import '../../planning/application/form_draft_providers.dart';
 import '../../planning/domain/add_task_duration.dart';
+import '../../planning/domain/models/add_task_form_draft.dart';
 import '../../planning/domain/models/task_item.dart';
 import '../../planning/domain/sleep_task.dart';
 import '../../planning/presentation/sleep_task_ios_guidance.dart';
 import 'custom_duration_dialog.dart';
 import '../../reminders/domain/models/reminder_config.dart';
 import '../../time_blocks/application/conflict_entity_title_resolver.dart';
+import '../../time_blocks/application/scheduling_conflict_analytics.dart';
 import '../../time_blocks/application/time_block_providers.dart';
 import '../../time_blocks/domain/models/time_conflict.dart';
-import '../../time_blocks/presentation/conflict_bottom_sheet.dart';
+import '../../time_blocks/domain/models/conflict_resolution_outcome.dart';
+import '../../time_blocks/presentation/scheduling_conflict_sheet.dart';
 import 'add_task_ui.dart';
 
 class AddTaskEditArgs {
@@ -69,7 +75,7 @@ class AddTaskScreen extends ConsumerStatefulWidget {
   ConsumerState<AddTaskScreen> createState() => _AddTaskScreenState();
 }
 
-class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
+class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindingObserver {
   static const _categoryOptions = [
     'Study',
     'Fitness',
@@ -88,6 +94,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
 
   final _controller = TextEditingController();
   final _notesController = TextEditingController();
+  final _scheduleSectionKey = GlobalKey();
   String _duration = '25 MIN';
   int _customDurationMinutes = 90;
   String? _category;
@@ -119,11 +126,21 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
   String? _existingReminderId;
   int? _reminderCreatedAtMs;
 
+  FormDraftAutosave? _draftAutosave;
+  bool _draftInitialized = false;
+  bool _draftRestoreOffered = false;
+  bool _suppressDraftDirty = false;
+  bool _draftClearedOnSuccessfulSave = false;
+
   bool get _isEdit => widget.editArgs != null;
+
+  String get _draftKey =>
+      _isEdit ? addTaskEditDraftKey(widget.editArgs!.taskId) : addTaskCreateDraftKey();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Pre-set reminder time to slot's plan day at 9 AM if coming from a future slot.
     final slotDateKey = widget.slotArgs?.dateKey;
     if (slotDateKey != null && slotDateKey != DateKeys.todayKey()) {
@@ -133,20 +150,201 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
       }
     }
     if (_isEdit) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _loadEdit());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadEdit().then((_) {
+          if (mounted) _offerDraftRestoreIfNeeded();
+        });
+      });
     } else {
       _loaded = true;
-      if (widget.slotArgs != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _seedModeFromRoutineSlot());
-      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (widget.slotArgs != null) _seedModeFromRoutineSlot();
+        _offerDraftRestoreIfNeeded();
+      });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_draftInitialized) {
+      _draftInitialized = true;
+      _draftAutosave = FormDraftAutosave(
+        repository: ref.read(formDraftRepositoryProvider),
+        key: _draftKey,
+        capture: _captureDraftJson,
+      );
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      unawaited(_draftAutosave?.persistIfDirty());
+    }
+  }
+
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    if (_draftInitialized && !_suppressDraftDirty) {
+      _draftAutosave?.markDirty();
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    if (!_draftClearedOnSuccessfulSave) {
+      unawaited(_draftAutosave?.persistIfDirty());
+    }
+    _draftAutosave?.dispose();
     _controller.dispose();
     _notesController.dispose();
     super.dispose();
+  }
+
+  AddTaskFormDraft _captureDraft() {
+    final slot = widget.slotArgs;
+    return AddTaskFormDraft(
+      savedAtMs: DateTime.now().millisecondsSinceEpoch,
+      title: _controller.text,
+      notes: _notesController.text,
+      duration: _duration,
+      customDurationMinutes: _customDurationMinutes,
+      category: _category,
+      reminder: _reminder,
+      focusSession: _focusSession,
+      isHabitAnchor: _isHabitAnchor,
+      reminderTimeMs: _reminderTime.millisecondsSinceEpoch,
+      modeRefId: _modeRefId,
+      strictModeRequired: _strictModeRequired,
+      modeUserCustomized: _modeUserCustomized,
+      isRigid: _isRigid,
+      advancedExpanded: _advancedExpanded,
+      syncSleepWindowAndQuietMode: _syncSleepWindowAndQuietMode,
+      inAppQuietMode: _inAppQuietMode,
+      slotRoutineId: slot?.routineId,
+      slotBlockId: slot?.blockId,
+      slotDateKey: slot?.dateKey,
+    );
+  }
+
+  Map<String, dynamic> _captureDraftJson() => _captureDraft().toJson();
+
+  void _applyDraft(AddTaskFormDraft draft) {
+    _suppressDraftDirty = true;
+    setState(() {
+      _controller.text = draft.title;
+      _notesController.text = draft.notes;
+      _duration = draft.duration;
+      _customDurationMinutes = draft.customDurationMinutes;
+      _category = draft.category;
+      _reminder = draft.reminder;
+      _focusSession = draft.focusSession;
+      _isHabitAnchor = draft.isHabitAnchor;
+      _reminderTime = DateTime.fromMillisecondsSinceEpoch(draft.reminderTimeMs);
+      _modeRefId = draft.modeRefId;
+      _strictModeRequired = draft.strictModeRequired;
+      _modeUserCustomized = draft.modeUserCustomized;
+      _isRigid = draft.isRigid;
+      _advancedExpanded = draft.advancedExpanded;
+      _syncSleepWindowAndQuietMode = draft.syncSleepWindowAndQuietMode;
+      _inAppQuietMode = draft.inAppQuietMode;
+    });
+    _suppressDraftDirty = false;
+    _draftAutosave?.dirty = false;
+  }
+
+  Future<void> _offerDraftRestoreIfNeeded() async {
+    if (_draftRestoreOffered || !mounted) return;
+    _draftRestoreOffered = true;
+
+    final repo = ref.read(formDraftRepositoryProvider);
+    final raw = await repo.load(_draftKey);
+    if (!mounted || raw == null) return;
+
+    final draft = AddTaskFormDraft.fromJson(raw);
+    if (repo.isExpired(draft.savedAtMs)) {
+      await repo.delete(_draftKey);
+      return;
+    }
+    if (!draft.hasMeaningfulContent) {
+      await repo.delete(_draftKey);
+      return;
+    }
+
+    final current = _captureDraft();
+    if (current.contentEquals(draft)) {
+      await repo.delete(_draftKey);
+      return;
+    }
+
+    final restore = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restore draft?'),
+        content: const Text(
+          'You have unsaved changes from earlier. Restore them or start fresh?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Start fresh'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (restore == true) {
+      _applyDraft(draft);
+      await repo.delete(_draftKey);
+      _draftAutosave?.cancel();
+      fireAndForgetAnalyticsEvent(
+        ref,
+        type: AnalyticsEventType.formDraftRestored,
+        entityId: _draftKey,
+        entityKind: 'form_draft',
+        sourceSurface: _isEdit ? 'add_task_edit' : 'add_task_create',
+        idempotencyKey: 'form_draft_restored_$_draftKey',
+      );
+    } else {
+      await repo.delete(_draftKey);
+      fireAndForgetAnalyticsEvent(
+        ref,
+        type: AnalyticsEventType.formDraftDiscarded,
+        entityId: _draftKey,
+        entityKind: 'form_draft',
+        sourceSurface: _isEdit ? 'add_task_edit' : 'add_task_create',
+        idempotencyKey: 'form_draft_discarded_$_draftKey',
+      );
+    }
+  }
+
+  void _logOverlapResolvedInline({
+    required String taskId,
+    required String movedEntity,
+    required Object suggestionIndex,
+    String? conflictingEntityId,
+  }) {
+    fireAndForgetAnalyticsEvent(
+      ref,
+      type: AnalyticsEventType.overlapResolvedInline,
+      entityId: taskId,
+      entityKind: 'task',
+      sourceSurface: _isEdit ? 'add_task_edit' : 'add_task_create',
+      idempotencyKey:
+          'overlap_resolved_inline_${taskId}_${DateTime.now().millisecondsSinceEpoch}',
+      reason: inlineConflictResolutionReason(
+        movedEntity: movedEntity,
+        suggestionIndex: suggestionIndex,
+        conflictingEntityId: conflictingEntityId,
+      ),
+    );
   }
 
   String _planDateKey() {
@@ -235,6 +433,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
 
       if (!mounted) return;
       final loaded = task;
+      _suppressDraftDirty = true;
       setState(() {
         _loadedTask = loaded;
         _controller.text = loaded.title;
@@ -267,7 +466,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
             _isHabitAnchor || _strictModeRequired || _isRigid;
         _loaded = true;
       });
+      _suppressDraftDirty = false;
     } catch (e) {
+      _suppressDraftDirty = false;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not load task: $e')));
         Navigator.pop(context);
@@ -465,29 +666,110 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
       return true;
     }
 
-    // Moderate / severe: show full conflict bottom sheet.
-    final action = await ConflictBottomSheet.show(
-      context: context,
-      conflicts: result.conflicts,
-      proposedEntityTitle: task.title,
+    final planDay = DateTime(
+      proposed.startAt.year,
+      proposed.startAt.month,
+      proposed.startAt.day,
     );
 
-    switch (action) {
-      case ConflictAction.saveAnyway:
-        _logOverlapCreated(task, overridden: true);
-        fireAndForgetAnalyticsEvent(
+    final outcome = await SchedulingConflictSheet.show(
+      context: context,
+      proposedTitle: task.title,
+      proposedKind: 'task',
+      proposedBlock: proposed,
+      conflicts: result.conflicts,
+      resolutionPort: ref.read(conflictResolutionServiceProvider),
+      loadEntityTitles: () async {
+        final overlapping = await ref
+            .read(timeBlockRepositoryProvider)
+            .listOverlappingBlocks(proposed);
+        return buildSchedulingConflictEntityTitles(
           ref,
-          type: AnalyticsEventType.overlapOverridden,
-          entityId: task.id,
-          entityKind: 'task',
-          sourceSurface: _isEdit ? 'add_task_edit' : 'add_task_create',
-          idempotencyKey: 'overlap_overridden_${task.id}_${DateTime.now().millisecondsSinceEpoch}',
-          modeRefId: task.modeRefId,
+          overlapping: overlapping,
         );
+      },
+      planDay: planDay,
+      ignoreEntityIds: {task.id},
+      onEntityMoved: () => invalidateTaskListProviders(ref),
+      onAdjustProposedSchedule: (start, durationMinutes) {
+        setState(() {
+          _reminder = true;
+          _reminderTime = start;
+          _duration = durationLabelFromMinutes(
+            durationMinutes,
+            category: _category,
+          );
+        });
+        _scrollToScheduleSection();
+      },
+      onOverlapResolvedInline: ({
+        required movedEntity,
+        required suggestionIndex,
+        conflictingEntityId,
+      }) =>
+          _logOverlapResolvedInline(
+        taskId: task.id,
+        movedEntity: movedEntity,
+        suggestionIndex: suggestionIndex,
+        conflictingEntityId: conflictingEntityId,
+      ),
+    );
+
+    return _handleConflictResolutionOutcome(task, outcome);
+  }
+
+  void _scrollToScheduleSection() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _scheduleSectionKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  bool _handleConflictResolutionOutcome(
+    PlannedTask task,
+    ConflictResolutionOutcome? outcome,
+  ) {
+    if (outcome == null) return false;
+    switch (outcome.kind) {
+      case ConflictResolutionKind.proceedToSave:
+        if (outcome.overlapOverridden) {
+          _logOverlapCreated(task, overridden: true);
+          fireAndForgetAnalyticsEvent(
+            ref,
+            type: AnalyticsEventType.overlapOverridden,
+            entityId: task.id,
+            entityKind: 'task',
+            sourceSurface: _isEdit ? 'add_task_edit' : 'add_task_create',
+            idempotencyKey:
+                'overlap_overridden_${task.id}_${DateTime.now().millisecondsSinceEpoch}',
+            modeRefId: task.modeRefId,
+          );
+        }
         return true;
-      case ConflictAction.adjustTime:
-      case ConflictAction.shortenDuration:
-      case null:
+      case ConflictResolutionKind.stayOnForm:
+        return false;
+      case ConflictResolutionKind.proposedScheduleAdjusted:
+        if (outcome.adjustedStart != null) {
+          setState(() {
+            _reminder = true;
+            _reminderTime = outcome.adjustedStart!;
+          });
+        }
+        if (outcome.adjustedDurationMinutes != null) {
+          setState(() {
+            _duration = durationLabelFromMinutes(
+              outcome.adjustedDurationMinutes!,
+              category: _category,
+            );
+          });
+        }
+        _scrollToScheduleSection();
         return false;
     }
   }
@@ -629,6 +911,11 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
       );
       invalidateTaskListProviders(ref);
 
+      _draftClearedOnSuccessfulSave = true;
+      _suppressDraftDirty = true;
+      _draftAutosave?.cancel();
+      await ref.read(formDraftRepositoryProvider).delete(_draftKey);
+
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
@@ -637,7 +924,10 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        if (_draftClearedOnSuccessfulSave) _suppressDraftDirty = true;
+        setState(() => _saving = false);
+      }
     }
   }
 
@@ -972,6 +1262,13 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> {
   }
 
   Widget _buildScheduleCard() {
+    return KeyedSubtree(
+      key: _scheduleSectionKey,
+      child: _buildScheduleCardContent(),
+    );
+  }
+
+  Widget _buildScheduleCardContent() {
     final timeLabel = TimeOfDay.fromDateTime(_reminderTime).format(context);
     final dateLabel =
         MaterialLocalizations.of(context).formatMediumDate(_reminderTime);

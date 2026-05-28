@@ -10,7 +10,8 @@ class _FakeTimeBlockRepository implements TimeBlockRepository {
 
   @override
   Future<void> upsertBlock(ScheduledTimeBlock block) async {
-    blocks.removeWhere((b) => b.entityId == block.entityId);
+    // Mirror Isar: keyed by block id, not entity id.
+    blocks.removeWhere((b) => b.id == block.id);
     blocks.add(block);
   }
 

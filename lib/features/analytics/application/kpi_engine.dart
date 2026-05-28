@@ -47,6 +47,9 @@ HabitKpiSnapshot computeHabitKpisFromEvents(
       case AnalyticsEventType.autoNextStarted:
       case AnalyticsEventType.overlapCreated:
       case AnalyticsEventType.overlapOverridden:
+      case AnalyticsEventType.overlapResolvedInline:
+      case AnalyticsEventType.formDraftRestored:
+      case AnalyticsEventType.formDraftDiscarded:
       case AnalyticsEventType.reclaimedTimeGenerated:
       case AnalyticsEventType.reclaimedTimeUsed:
       case AnalyticsEventType.notificationDelivered:

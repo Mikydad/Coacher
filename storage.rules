@@ -1,0 +1,35 @@
+rules_version = '2';
+
+// Deploy with: firebase deploy --only storage
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isCircleMember(circleId) {
+      return isSignedIn() &&
+        firestore.exists(
+          /databases/(default)/documents/circles/$(circleId)/members/$(request.auth.uid)
+        );
+    }
+
+    function isValidImageUpload() {
+      return request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Circle chat proof images
+    match /circles/{circleId}/proofs/{fileName} {
+      allow read: if isCircleMember(circleId);
+      allow write: if isCircleMember(circleId) && isValidImageUpload();
+    }
+
+    // Challenge progress proof images
+    match /challenge_proofs/{challengeId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidImageUpload();
+    }
+  }
+}

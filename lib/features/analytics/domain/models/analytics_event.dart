@@ -13,6 +13,9 @@ enum AnalyticsEventType {
   // Phase A — time block signals
   overlapCreated,
   overlapOverridden,
+  overlapResolvedInline,
+  formDraftRestored,
+  formDraftDiscarded,
   reclaimedTimeGenerated,
   reclaimedTimeUsed,
   // Phase C — notification fatigue signals
