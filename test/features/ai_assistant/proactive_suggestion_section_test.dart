@@ -4,9 +4,9 @@ library;
 import 'dart:async';
 
 import 'package:coach_for_life/features/ai_assistant/application/ai_assistant_providers.dart';
+import 'package:coach_for_life/features/ai_assistant/application/proactive_suggestion_display.dart';
 import 'package:coach_for_life/features/ai_assistant/data/dismissed_suggestion_repository.dart';
 import 'package:coach_for_life/features/ai_assistant/domain/models/proactive_suggestion.dart';
-import 'package:coach_for_life/features/ai_assistant/presentation/ai_assistant_screen.dart';
 import 'package:coach_for_life/features/ai_assistant/presentation/widgets/proactive_suggestion_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -77,53 +77,65 @@ Widget _wrap(List<ProactiveSuggestion> suggestions) {
 
 void main() {
   group('ProactiveSuggestionSection', () {
-    testWidgets('3 suggestions → 1 card on Home + see all link', (tester) async {
+    testWidgets('3 suggestions → 1 card + show more link', (tester) async {
       await tester.pumpWidget(_wrap([_s1, _s2, _s3]));
       await tester.pumpAndSettle();
 
       expect(find.text('Free slot'), findsOneWidget);
       expect(find.text('Behind pace'), findsNothing);
       expect(find.text('Reorder'), findsNothing);
-      expect(find.text('See all 2 more in Coach'), findsOneWidget);
+      expect(find.text('Show 2 more'), findsOneWidget);
+      expect(find.textContaining('Coach'), findsNothing);
     });
 
-    testWidgets('1 suggestion → single card, no see-all link', (tester) async {
+    testWidgets('tap show more expands all cards on Home', (tester) async {
+      await tester.pumpWidget(_wrap([_s1, _s2, _s3]));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Show 2 more'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Free slot'), findsOneWidget);
+      expect(find.text('Behind pace'), findsOneWidget);
+      expect(find.text('Reorder'), findsOneWidget);
+      expect(find.text('Show less'), findsOneWidget);
+    });
+
+    testWidgets('show less collapses back to one card', (tester) async {
+      await tester.pumpWidget(_wrap([_s1, _s2, _s3]));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Show 2 more'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Show less'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Free slot'), findsOneWidget);
+      expect(find.text('Behind pace'), findsNothing);
+      expect(find.text('Show 2 more'), findsOneWidget);
+    });
+
+    testWidgets('auto-collapses after idle period', (tester) async {
+      await tester.pumpWidget(_wrap([_s1, _s2, _s3]));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Show 2 more'));
+      await tester.pumpAndSettle();
+      expect(find.text('Behind pace'), findsOneWidget);
+
+      await tester.pump(kHomeSuggestionsAutoCollapseDuration);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Behind pace'), findsNothing);
+      expect(find.text('Show 2 more'), findsOneWidget);
+    });
+
+    testWidgets('1 suggestion → single card, no expand link', (tester) async {
       await tester.pumpWidget(_wrap([_s1]));
       await tester.pumpAndSettle();
 
       expect(find.text('Free slot'), findsOneWidget);
-      expect(find.textContaining('See'), findsNothing);
-    });
-
-    testWidgets('see all opens Coach with suggestions panel flag', (tester) async {
-      CoachRouteArgs? captured;
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            dismissedSuggestionRepositoryProvider
-                .overrideWithValue(_NoOpDismissedRepo()),
-            proactiveSuggestionsProvider.overrideWith((ref) async => [_s1, _s2]),
-          ],
-          child: MaterialApp(
-            routes: {
-              AiAssistantScreen.routeName: (context) {
-                captured = ModalRoute.of(context)!.settings.arguments
-                    as CoachRouteArgs?;
-                return const Scaffold(body: Text('coach stub'));
-              },
-            },
-            home: const Scaffold(body: ProactiveSuggestionSection()),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('See 1 more in Coach'));
-      await tester.pumpAndSettle();
-
-      expect(captured?.openSuggestionsPanel, isTrue);
-      expect(find.text('coach stub'), findsOneWidget);
+      expect(find.textContaining('Show'), findsNothing);
     });
 
     testWidgets('0 suggestions → section collapses', (tester) async {
