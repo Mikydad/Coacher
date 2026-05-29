@@ -32,4 +32,16 @@ class OfflineStore {
     );
     debugPrint('OfflineStore: Isar opened at ${dir.path}');
   }
+
+  /// Wipe all Isar collections in a single write transaction.
+  ///
+  /// Called by [AuthSessionPolicy.clearLocalSession] on sign-out or when a
+  /// different user account signs in. Safe to call when [isar] is null
+  /// (no-op, e.g. before first [initialize]).
+  Future<void> clearAll() async {
+    final db = isar;
+    if (db == null) return;
+    await db.writeTxn(() => db.clear());
+    debugPrint('OfflineStore: all collections cleared (session wipe)');
+  }
 }

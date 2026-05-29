@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/application/main_tab_navigation.dart';
+import '../../auth/application/auth_providers.dart';
+import '../../auth/application/auth_session_policy.dart';
 import '../../../features/coaching/application/coaching_style_providers.dart';
 import '../../../features/coaching/domain/models/coaching_style.dart';
 import '../../../features/coaching/domain/models/enforcement_mode.dart';
@@ -76,13 +78,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       builder: (_) => _ObsidianDialog(
         title: 'Log Out?',
         body:
-            'Your data is saved locally and will be restored when you sign back in.',
+            'Your local data will be cleared. You can sign back in any time.',
         confirmLabel: 'Log Out',
         confirmColor: _kError,
       ),
     );
     if (confirmed != true || !mounted) return;
-    if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+
+    // Signal AuthGate to show the landing screen (not silent anon re-sign-in).
+    ref.read(pendingAuthLandingProvider.notifier).state = true;
+
+    // Wipe local data first, then sign out so AuthGate reacts cleanly.
+    await AuthSessionPolicy.clearLocalSession();
+    await ref.read(authRepositoryProvider).signOut();
+    // AuthGate will rebuild and show the AuthLandingScreen.
+    // No manual navigation required.
   }
 
   @override

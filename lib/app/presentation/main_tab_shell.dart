@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/ai_assistant/presentation/ai_assistant_screen.dart';
 import '../../features/analytics/presentation/analytics_progress_screen.dart';
+import '../../features/auth/presentation/widgets/email_verification_banner.dart';
 import '../../features/community/presentation/community_screen.dart';
 import '../../features/goals/presentation/goal_selection_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
@@ -22,29 +23,31 @@ class MainTabShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final index = ref.watch(mainTabIndexProvider);
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Scaffold(
-          extendBody: true,
-          body: IndexedStack(
-            index: index,
-            children: const [
-              MainTabInset(child: HomeScreen()),
-              AiAssistantScreen(),
-              MainTabInset(child: GoalSelectionScreen()),
-              MainTabInset(child: AnalyticsProgressScreen()),
-              MainTabInset(child: CommunityScreen()),
-              MainTabInset(child: ProfileScreen()),
-            ],
+    return EmailVerificationBanner(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Scaffold(
+            extendBody: true,
+            body: IndexedStack(
+              index: index,
+              children: const [
+                MainTabInset(child: HomeScreen()),
+                AiAssistantScreen(),
+                MainTabInset(child: GoalSelectionScreen()),
+                MainTabInset(child: AnalyticsProgressScreen()),
+                MainTabInset(child: CommunityScreen()),
+                MainTabInset(child: ProfileScreen()),
+              ],
+            ),
+            bottomNavigationBar: ObsidianBottomNav(
+              selectedIndex: index,
+              onTap: (i) => ref.read(mainTabIndexProvider.notifier).state = i,
+            ),
           ),
-          bottomNavigationBar: ObsidianBottomNav(
-            selectedIndex: index,
-            onTap: (i) => ref.read(mainTabIndexProvider.notifier).state = i,
-          ),
-        ),
-        const CloudSyncGlobalIndicator(),
-      ],
+          const CloudSyncGlobalIndicator(),
+        ],
+      ),
     );
   }
 }

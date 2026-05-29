@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/local_db/isar_collections/isar_ai_action_batch.dart';
 import '../../../core/utils/date_keys.dart';
+import '../application/ai_action_batch_state.dart';
 import '../application/ai_assistant_providers.dart';
 import '../application/ai_assistant_service.dart';
+import '../application/ai_action_executor.dart';
 import '../data/ai_interaction_history_repository.dart';
 import '../domain/models/ai_chat_message.dart';
 import '../domain/models/ai_planned_changes.dart';
@@ -204,7 +207,9 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                   service.sendMessage(text);
                 },
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
+              _AiActionBar(service: service),
+              const SizedBox(height: 4),
               QuickDirectivesRow(
                 onSelected: (text) {
                   _inputController.text = text;
@@ -575,5 +580,342 @@ class _MessageItem extends StatelessWidget {
     }
 
     return AssistantMessageBubble(content: message.content);
+  }
+}
+
+// ── AI action bar (undo + history) ────────────────────────────────────────────
+
+class _AiActionBar extends ConsumerWidget {
+  const _AiActionBar({required this.service});
+  final AiAssistantService service;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final canUndoAsync = ref.watch(canUndoLastAiBatchProvider);
+    final recentAsync = ref.watch(recentAiBatchesProvider);
+    final recentCount = recentAsync.valueOrNull?.length ?? 0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          if (canUndoAsync.valueOrNull == true)
+            _UndoChip(
+              onUndo: () => _handleUndo(context, ref),
+            ),
+          const Spacer(),
+          if (recentCount > 0)
+            GestureDetector(
+              onTap: () => _showHistorySheet(context, ref),
+              child: Text(
+                'View recent AI changes ($recentCount)',
+                style: const TextStyle(
+                  color: Color(0xFF888888),
+                  fontSize: 12,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleUndo(BuildContext context, WidgetRef ref) async {
+    final executor = ref.read(aiActionExecutorProvider);
+    final result = await executor.undoLastAiBatch();
+    if (!context.mounted) return;
+
+    switch (result) {
+      case UndoSuccess():
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('AI changes have been undone.'),
+            backgroundColor: Color(0xFF1A1A1A),
+          ),
+        );
+        ref.invalidate(lastAiBatchProvider);
+        ref.invalidate(canUndoLastAiBatchProvider);
+        ref.invalidate(recentAiBatchesProvider);
+
+      case UndoWarningTasksCompleted(:final completedTitles):
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            title: const Text(
+              'Some tasks were completed',
+              style: TextStyle(color: Colors.white),
+            ),
+            content: Text(
+              'The following tasks added by the AI have since been completed. '
+              'Undoing will revert those completions:\n\n'
+              '${completedTitles.map((t) => '• $t').join('\n')}',
+              style: const TextStyle(color: Color(0xFFCCCCCC)),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Undo anyway',
+                  style: TextStyle(color: Color(0xFF00E3FD)),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (proceed == true && context.mounted) {
+          // Rollback already happened in undoLastAiBatch for warning case.
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('AI changes undone (including completed tasks).'),
+              backgroundColor: Color(0xFF1A1A1A),
+            ),
+          );
+          ref.invalidate(lastAiBatchProvider);
+          ref.invalidate(canUndoLastAiBatchProvider);
+          ref.invalidate(recentAiBatchesProvider);
+        }
+
+      case UndoNotAvailable(:final reason):
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(reason),
+            backgroundColor: const Color(0xFF1A1A1A),
+          ),
+        );
+    }
+  }
+
+  void _showHistorySheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A1A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => _AiHistorySheet(executor: ref.read(aiActionExecutorProvider)),
+    );
+  }
+}
+
+class _UndoChip extends StatelessWidget {
+  const _UndoChip({required this.onUndo});
+  final VoidCallback onUndo;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onUndo,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E2A2A),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0x3300E3FD)),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.undo_rounded, color: Color(0xFF00E3FD), size: 14),
+            SizedBox(width: 6),
+            Text(
+              'Undo AI changes',
+              style: TextStyle(
+                color: Color(0xFF00E3FD),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── AI history bottom sheet ───────────────────────────────────────────────────
+
+class _AiHistorySheet extends ConsumerWidget {
+  const _AiHistorySheet({required this.executor});
+  final AiActionExecutor executor;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recentAsync = ref.watch(recentAiBatchesProvider);
+    final canUndoAsync = ref.watch(canUndoLastAiBatchProvider);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 12),
+        Container(
+          width: 36,
+          height: 4,
+          decoration: BoxDecoration(
+            color: const Color(0xFF444444),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Recent AI changes',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        recentAsync.when(
+          data: (batches) => ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: batches.length,
+            itemBuilder: (ctx, i) {
+              final batch = batches[i];
+              final isFirst = i == 0;
+              final canUndo = isFirst && (canUndoAsync.valueOrNull ?? false);
+              return _BatchRow(
+                batch: batch,
+                canUndo: canUndo,
+                onUndo: canUndo
+                    ? () async {
+                        Navigator.pop(context);
+                        // Trigger undo through the outer bar's handler (invalidate is handled there)
+                        final result = await executor.undoLastAiBatch();
+                        if (!context.mounted) return;
+                        final msg = switch (result) {
+                          UndoSuccess() => 'AI changes undone.',
+                          UndoWarningTasksCompleted() =>
+                            'AI changes undone (some completed tasks reverted).',
+                          UndoNotAvailable(:final reason) => reason,
+                        };
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(msg),
+                            backgroundColor: const Color(0xFF1A1A1A),
+                          ),
+                        );
+                        ref.invalidate(lastAiBatchProvider);
+                        ref.invalidate(canUndoLastAiBatchProvider);
+                        ref.invalidate(recentAiBatchesProvider);
+                      }
+                    : null,
+              );
+            },
+          ),
+          loading: () => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(
+                color: Color(0xFF00E3FD),
+                strokeWidth: 2,
+              ),
+            ),
+          ),
+          error: (e, _) => const SizedBox.shrink(),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+}
+
+class _BatchRow extends StatelessWidget {
+  const _BatchRow({
+    required this.batch,
+    required this.canUndo,
+    this.onUndo,
+  });
+
+  final IsarAiActionBatch batch;
+  final bool canUndo;
+  final VoidCallback? onUndo;
+
+  @override
+  Widget build(BuildContext context) {
+    final ts = DateTime.fromMillisecondsSinceEpoch(batch.createdAtMs);
+    final label = '${ts.hour.toString().padLeft(2, '0')}:${ts.minute.toString().padLeft(2, '0')}  '
+        '${ts.day}/${ts.month}';
+    final stateColor = _stateColor(batch.state);
+    final stateLabel = _stateLabel(batch.state);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                ),
+                const SizedBox(height: 2),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: stateColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    stateLabel,
+                    style: TextStyle(
+                      color: stateColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (canUndo)
+            TextButton(
+              onPressed: onUndo,
+              child: const Text(
+                'Undo',
+                style: TextStyle(
+                  color: Color(0xFF00E3FD),
+                  fontSize: 13,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Color _stateColor(String state) {
+    if (state == AiActionBatchState.completed.name) {
+      return const Color(0xFF4CAF50);
+    }
+    if (state == AiActionBatchState.rolledBack.name) {
+      return const Color(0xFFFF9800);
+    }
+    if (state == AiActionBatchState.partialFailure.name) {
+      return const Color(0xFFFF5252);
+    }
+    return const Color(0xFF888888);
+  }
+
+  String _stateLabel(String state) {
+    if (state == AiActionBatchState.completed.name) return 'Completed';
+    if (state == AiActionBatchState.rolledBack.name) return 'Undone';
+    if (state == AiActionBatchState.partialFailure.name) return 'Partial failure';
+    if (state == AiActionBatchState.executing.name) return 'Executing';
+    if (state == AiActionBatchState.pending.name) return 'Pending';
+    return state;
   }
 }

@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../app/application/main_tab_navigation.dart';
-import '../../features/analytics/application/analytics_period_bundle_notifier.dart';
-import '../../features/analytics/application/delivery_providers.dart';
 import '../../features/planning/application/planned_task_providers.dart';
+import '../runtime/recompute_scope.dart';
+import '../runtime/unified_recompute_graph.dart';
 
 /// Debounces Riverpod invalidations after cloud pull so UI does not flash loaders repeatedly.
 class PostSyncRefreshCoordinator {
@@ -76,14 +76,16 @@ class PostSyncRefreshCoordinator {
     final pending = _pending;
     _pending = const _PendingRefresh();
 
+    // Legacy direct invalidations kept for call sites not yet migrated to
+    // ScheduleMutationCoordinator. Tasks list is not covered by
+    // UnifiedRecomputeGraph scopes, so it stays here.
     if (pending.tasks) {
       invalidateTaskListProvidersFromContainer(container);
     }
-    if (pending.coachingDelivery) {
-      invalidateTodayCoachingDeliveryFromContainer(container);
-    }
-    if (pending.todayAnalytics) {
-      container.invalidate(analyticsPeriodBundleProvider);
+
+    // Delegate analytics + coaching + notifications to UnifiedRecomputeGraph.
+    if (pending.coachingDelivery || pending.todayAnalytics) {
+      UnifiedRecomputeGraph.instance.schedule(RecomputeScope.forFullRefresh()); // migrated to coordinator
     }
   }
 }

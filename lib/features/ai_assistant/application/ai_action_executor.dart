@@ -1,5 +1,8 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:convert';
 
+import '../../../core/local_db/isar_collections/isar_ai_action_batch.dart';
+import '../../../core/runtime/mutation_request.dart';
+import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../context_override/application/context_override_service.dart';
@@ -9,7 +12,6 @@ import '../../goals/domain/models/goal_categories.dart';
 import '../../goals/domain/models/goal_enums.dart';
 import '../../goals/domain/models/user_goal.dart';
 import '../../planning/application/planned_task_collect.dart';
-import '../../planning/application/planned_task_providers.dart';
 import '../../planning/data/planning_repository.dart';
 import '../../planning/domain/models/task_item.dart';
 import '../../reminders/application/reminder_sync_service.dart';
@@ -17,6 +19,8 @@ import '../../reminders/data/reminder_repository.dart';
 import '../../reminders/domain/models/reminder_config.dart';
 import '../../time_blocks/application/time_block_sync_service.dart';
 import '../domain/models/ai_action.dart';
+import 'ai_action_batch_repository.dart';
+import 'ai_action_batch_state.dart';
 
 // ─── Execution result ─────────────────────────────────────────────────────────
 
@@ -24,10 +28,18 @@ class ExecutionResult {
   const ExecutionResult({
     this.successes = const [],
     this.failures = const [],
+    this.batchId,
+    this.wasRolledBack = false,
   });
 
   final List<String> successes;
   final List<String> failures;
+
+  /// The [batchId] of the persisted [IsarAiActionBatch] for this execution.
+  final String? batchId;
+
+  /// True if the batch was rolled back due to a partial failure.
+  final bool wasRolledBack;
 
   bool get hasFailures => failures.isNotEmpty;
 
@@ -44,6 +56,28 @@ class ExecutionResult {
   }
 }
 
+// ─── Undo result ──────────────────────────────────────────────────────────────
+
+sealed class UndoResult {
+  const UndoResult();
+}
+
+class UndoSuccess extends UndoResult {
+  const UndoSuccess();
+}
+
+class UndoNotAvailable extends UndoResult {
+  const UndoNotAvailable(this.reason);
+  final String reason;
+}
+
+/// Undo succeeded but some tasks that were created/edited by the AI
+/// have since been completed by the user. Undo reverts those completions.
+class UndoWarningTasksCompleted extends UndoResult {
+  const UndoWarningTasksCompleted(this.completedTitles);
+  final List<String> completedTitles;
+}
+
 // ─── Executor ─────────────────────────────────────────────────────────────────
 
 /// Routes confirmed [AiAction]s to the correct existing services.
@@ -58,7 +92,7 @@ class AiActionExecutor {
     required this.reminderSyncService,
     required this.timeBlockSyncService,
     required this.contextOverrideService,
-    required this.ref,
+    required this.batchRepository,
     this.defaultModeRefId,
   });
 
@@ -68,32 +102,359 @@ class AiActionExecutor {
   final ReminderSyncService reminderSyncService;
   final TimeBlockSyncService timeBlockSyncService;
   final ContextOverrideService contextOverrideService;
-  final Ref ref;
+  final AiActionBatchRepository batchRepository;
 
   /// Default enforcement mode ref-id applied to AI-created tasks when the
   /// action does not specify one. Sourced from [defaultEnforcementModeProvider].
   final String? defaultModeRefId;
 
+  // ─── Public execute ────────────────────────────────────────────────────────
+
   Future<ExecutionResult> execute(List<AiAction> actions) async {
+    final batchId = StableId.generate('ai_batch');
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    // Idempotency guard: if this batchId somehow already exists as completed, skip.
+    final existing = await batchRepository.findByBatchId(batchId);
+    if (existing?.state == AiActionBatchState.completed.name) {
+      return ExecutionResult(
+        batchId: batchId,
+        successes: const ['(already completed)'],
+      );
+    }
+
+    // Capture pre-mutation snapshot of affected tasks.
+    final snapshotJson = await _captureSnapshot(actions);
+
+    // Persist the batch as pending, then transition to executing.
+    final batch = IsarAiActionBatch()
+      ..batchId = batchId
+      ..state = AiActionBatchState.pending.name
+      ..actionsJson = jsonEncode(
+        actions.map((a) => {'type': a.actionType.name, 'params': a.parameters}).toList(),
+      )
+      ..snapshotJson = snapshotJson
+      ..succeededActionIds = []
+      ..failedActionIds = []
+      ..createdAtMs = now
+      ..updatedAtMs = now;
+    await batchRepository.createBatch(batch);
+    await batchRepository.updateState(batchId, AiActionBatchState.executing);
+
     final successes = <String>[];
     final failures = <String>[];
+    final succeededIds = <String>[];
+    final failedIds = <String>[];
 
     for (final action in actions) {
+      final actionId = action.parameters['_actionId'] as String? ??
+          '${action.actionType.name}_${actions.indexOf(action)}';
       try {
         final message = await _dispatch(action);
         if (message != null) successes.add(message);
+        await _notifyCoordinator(action);
+        succeededIds.add(actionId);
       } catch (e) {
         failures.add('${_humanLabel(action)}: ${e.toString()}');
+        failedIds.add(actionId);
       }
     }
 
-    // Refresh task lists so Home / Tasks hub show new items immediately.
-    if (actions.any(_isTaskAction)) {
-      ref.invalidate(todayAllTasksRowsProvider);
-      ref.invalidate(openTasksOutsideTodayProvider);
+    if (failures.isEmpty) {
+      await batchRepository.updateState(
+        batchId,
+        AiActionBatchState.completed,
+        succeeded: succeededIds,
+        failed: [],
+      );
+      return ExecutionResult(
+        successes: successes,
+        failures: failures,
+        batchId: batchId,
+      );
+    } else {
+      // Partial failure — record it, then roll back all completed steps.
+      await batchRepository.updateState(
+        batchId,
+        AiActionBatchState.partialFailure,
+        succeeded: succeededIds,
+        failed: failedIds,
+      );
+      await _rollbackBatch(batchId, snapshotJson);
+      return ExecutionResult(
+        successes: const [],
+        failures: const [
+          "I couldn't complete all steps — I've restored your schedule to its previous state.",
+        ],
+        batchId: batchId,
+        wasRolledBack: true,
+      );
+    }
+  }
+
+  // ─── Undo last batch ───────────────────────────────────────────────────────
+
+  /// Undo the most recent AI batch that is in `completed` or `partialFailure`
+  /// state and was created within the last 30 minutes.
+  Future<UndoResult> undoLastAiBatch() async {
+    final batch = await batchRepository.findMostRecent();
+    if (batch == null) {
+      return const UndoNotAvailable('No AI changes to undo.');
     }
 
-    return ExecutionResult(successes: successes, failures: failures);
+    final isUndoable = batch.state == AiActionBatchState.completed.name ||
+        batch.state == AiActionBatchState.partialFailure.name;
+    if (!isUndoable) {
+      return UndoNotAvailable(
+        'The last AI batch (${batch.state}) cannot be undone.',
+      );
+    }
+
+    final ageMs =
+        DateTime.now().millisecondsSinceEpoch - batch.createdAtMs;
+    if (ageMs > const Duration(minutes: 30).inMilliseconds) {
+      return const UndoNotAvailable(
+        'This AI change is more than 30 minutes old and can no longer be undone.',
+      );
+    }
+
+    // Check if any snapshotted tasks have been completed since the AI batch.
+    final completedTitles = await _findCompletedSnapshotTasks(batch.snapshotJson);
+
+    await _rollbackBatch(batch.batchId, batch.snapshotJson);
+
+    if (completedTitles.isNotEmpty) {
+      return UndoWarningTasksCompleted(completedTitles);
+    }
+    return const UndoSuccess();
+  }
+
+  // ─── Snapshot ─────────────────────────────────────────────────────────────
+
+  /// Capture a minimal JSON snapshot of entities that will be mutated.
+  /// Uses the affected date keys from the actions to fetch all tasks for
+  /// those dates, then filters to only the relevant taskIds.
+  /// Used as the rollback payload for [_rollbackBatch].
+  Future<String> _captureSnapshot(List<AiAction> actions) async {
+    final tasks = <Map<String, dynamic>>[];
+    final seenTaskIds = <String>{};
+
+    // Collect all affected date keys and explicit task IDs.
+    final dateKeys = <String>{};
+    for (final action in actions) {
+      final dateStr = _resolveDate(action.parameters['date'] as String?);
+      dateKeys.add(dateStr);
+      final destDate =
+          _resolveDate(action.parameters['destinationDate'] as String?);
+      dateKeys.add(destDate);
+    }
+
+    // Fetch all tasks for each affected date and snapshot them.
+    for (final dateKey in dateKeys) {
+      try {
+        final rows = await collectTasksForDateKey(planningRepository, dateKey);
+        for (final row in rows) {
+          final t = row.task;
+          if (seenTaskIds.contains(t.id)) continue;
+          seenTaskIds.add(t.id);
+          tasks.add({
+            'id': t.id,
+            'routineId': t.routineId,
+            'blockId': t.blockId,
+            'title': t.title,
+            'durationMinutes': t.durationMinutes,
+            'priority': t.priority,
+            'orderIndex': t.orderIndex,
+            'reminderEnabled': t.reminderEnabled,
+            'reminderTimeIso': t.reminderTimeIso,
+            'status': t.status.name,
+            'planDateKey': t.planDateKey,
+            'modeRefId': t.modeRefId,
+            'notes': t.notes,
+            'category': t.category,
+            'createdAtMs': t.createdAtMs,
+            'updatedAtMs': t.updatedAtMs,
+          });
+        }
+      } catch (_) {}
+    }
+
+    return jsonEncode({'tasks': tasks});
+  }
+
+  // ─── Rollback ─────────────────────────────────────────────────────────────
+
+  /// Restore all snapshotted entities from [snapshotJson] and trigger
+  /// recompute through the coordinator.
+  Future<void> _rollbackBatch(String batchId, String snapshotJson) async {
+    try {
+      final snapshot = jsonDecode(snapshotJson) as Map<String, dynamic>?;
+      final taskList =
+          (snapshot?['tasks'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+
+      for (final taskMap in taskList) {
+        final restored = PlannedTask(
+          id: taskMap['id'] as String,
+          routineId: taskMap['routineId'] as String,
+          blockId: taskMap['blockId'] as String,
+          title: taskMap['title'] as String,
+          durationMinutes: (taskMap['durationMinutes'] as num).toInt(),
+          priority: (taskMap['priority'] as num).toInt(),
+          orderIndex: (taskMap['orderIndex'] as num).toInt(),
+          reminderEnabled: taskMap['reminderEnabled'] as bool,
+          reminderTimeIso: taskMap['reminderTimeIso'] as String?,
+          status: _taskStatusFromName(taskMap['status'] as String?),
+          planDateKey: taskMap['planDateKey'] as String?,
+          modeRefId: taskMap['modeRefId'] as String?,
+          notes: taskMap['notes'] as String?,
+          category: taskMap['category'] as String?,
+          createdAtMs: (taskMap['createdAtMs'] as num).toInt(),
+          // Bump updatedAtMs so LWW wins over any stale remote state.
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+        );
+        await planningRepository.upsertTask(restored);
+        await ScheduleMutationCoordinator.instance.run(
+          TaskUpdatedMutation(
+            entityId: restored.id,
+            sourceContext: 'ai_rollback',
+            dateStr: restored.planDateKey ?? DateKeys.todayKey(),
+          ),
+          commitOverride: () async {},
+        );
+      }
+
+      await batchRepository.updateState(
+        batchId,
+        AiActionBatchState.rolledBack,
+        undoneAtMs: DateTime.now().millisecondsSinceEpoch,
+      );
+    } catch (_) {}
+  }
+
+  /// Check if any tasks in the snapshot have since been completed by the user.
+  Future<List<String>> _findCompletedSnapshotTasks(String snapshotJson) async {
+    final titles = <String>[];
+    try {
+      final snapshot = jsonDecode(snapshotJson) as Map<String, dynamic>?;
+      final taskList =
+          (snapshot?['tasks'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+
+      // Collect unique date keys from snapshot to query current tasks.
+      final dateKeys = <String>{};
+      for (final t in taskList) {
+        final dk = t['planDateKey'] as String?;
+        if (dk != null) dateKeys.add(dk);
+      }
+      final taskIdToSnapshotStatus = {
+        for (final t in taskList)
+          if (t['id'] != null) t['id'] as String: t['status'] as String?,
+      };
+
+      for (final dateKey in dateKeys) {
+        final rows = await collectTasksForDateKey(planningRepository, dateKey);
+        for (final row in rows) {
+          final taskId = row.task.id;
+          if (!taskIdToSnapshotStatus.containsKey(taskId)) continue;
+          final wasCompleted =
+              taskIdToSnapshotStatus[taskId] == TaskStatus.completed.name;
+          final isNowCompleted = row.task.status == TaskStatus.completed;
+          // Warn if the task went from not-completed to completed since the AI batch.
+          if (!wasCompleted && isNowCompleted) {
+            titles.add(row.task.title);
+          }
+        }
+      }
+    } catch (_) {}
+    return titles;
+  }
+
+  TaskStatus _taskStatusFromName(String? name) {
+    for (final s in TaskStatus.values) {
+      if (s.name == name) return s;
+    }
+    return TaskStatus.notStarted;
+  }
+
+  // ─── Coordinator notify ───────────────────────────────────────────────────
+
+  /// Notify [ScheduleMutationCoordinator] about a completed action so it can
+  /// trigger the correct recompute scope and publish a domain event.
+  ///
+  /// Uses [commitOverride] = no-op because the write has already happened
+  /// inside [_dispatch]. This is the adapter pattern for incremental migration.
+  Future<void> _notifyCoordinator(AiAction action) async {
+    final request = _mutationRequestFor(action);
+    if (request == null) return;
+    await ScheduleMutationCoordinator.instance.run(
+      request,
+      commitOverride: () async {}, // write already done by _dispatch
+    );
+  }
+
+  /// Maps an [AiAction] to the appropriate [MutationRequest] for the coordinator.
+  MutationRequest? _mutationRequestFor(AiAction action) {
+    final dateStr = _resolveDate(action.parameters['date'] as String?);
+    const source = 'ai_action_executor';
+
+    switch (action.actionType) {
+      case ActionType.createTask:
+      case ActionType.addReminder:
+        final taskId = action.parameters['_resolvedTaskId'] as String? ?? 'ai-task';
+        return TaskCreatedMutation(
+          entityId: taskId,
+          sourceContext: source,
+          dateStr: dateStr,
+        );
+      case ActionType.editTask:
+      case ActionType.rescheduleReminder:
+        final taskId = action.parameters['_resolvedTaskId'] as String? ?? 'ai-task';
+        return TaskUpdatedMutation(
+          entityId: taskId,
+          sourceContext: source,
+          dateStr: dateStr,
+        );
+      case ActionType.moveTask:
+        final taskId = action.parameters['_resolvedTaskId'] as String? ?? 'ai-task';
+        final toDate = _resolveDate(action.parameters['destinationDate'] as String?);
+        return TaskDeferredMutation(
+          entityId: taskId,
+          sourceContext: source,
+          fromDateStr: dateStr,
+          toDateStr: toDate,
+        );
+      case ActionType.deleteTask:
+        final taskId = action.parameters['_resolvedTaskId'] as String? ?? 'ai-task';
+        return TaskDeletedMutation(
+          entityId: taskId,
+          sourceContext: source,
+          dateStr: dateStr,
+        );
+      case ActionType.createGoal:
+      case ActionType.modifyGoal:
+      case ActionType.deleteGoal:
+        final goalId = action.parameters['_resolvedGoalId'] as String? ?? 'ai-goal';
+        return GoalChangedMutation(
+          entityId: goalId,
+          sourceContext: source,
+          changeKind: action.actionType.name,
+        );
+      case ActionType.removeReminder:
+        final taskId = action.parameters['_resolvedTaskId'] as String? ?? 'ai-task';
+        return ReminderChangedMutation(
+          entityId: taskId,
+          sourceContext: source,
+        );
+      case ActionType.activateContextOverride:
+      case ActionType.endContextOverride:
+        return ContextOverrideChangedMutation(
+          entityId: 'context_override',
+          sourceContext: source,
+          overrideType: action.parameters['overrideType'] as String? ?? 'none',
+        );
+      case ActionType.suggestFreeTimeBlock:
+      case ActionType.moveConflictingTasks:
+        return null; // read-only actions — no mutation to notify
+    }
   }
 
   // ─── Dispatcher ───────────────────────────────────────────────────────────
@@ -411,15 +772,6 @@ class AiActionExecutor {
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
-
-  bool _isTaskAction(AiAction action) {
-    return action.actionType == ActionType.createTask ||
-        action.actionType == ActionType.editTask ||
-        action.actionType == ActionType.moveTask ||
-        action.actionType == ActionType.deleteTask ||
-        action.actionType == ActionType.addReminder ||
-        action.actionType == ActionType.rescheduleReminder;
-  }
 
   Future<int> _nextOrderIndexForDate(String dateKey) async {
     final rows = await collectTasksForDateKey(planningRepository, dateKey);

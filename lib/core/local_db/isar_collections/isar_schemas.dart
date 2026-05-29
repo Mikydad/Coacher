@@ -1,4 +1,5 @@
 import 'isar_activity_feed_cache.dart';
+import 'isar_ai_action_batch.dart';
 import 'isar_ai_interaction_history.dart';
 import 'isar_dismissed_suggestion_log.dart';
 import 'isar_ai_pulse_cache.dart';
@@ -12,6 +13,7 @@ import 'isar_delivery_decision_snapshot.dart';
 import 'isar_delivery_history_entry.dart';
 import 'isar_generated_insight.dart';
 import 'isar_goal.dart';
+import 'isar_notification_ledger_entry.dart';
 import 'isar_reminder.dart';
 import 'isar_routine.dart';
 import 'isar_scheduled_time_block.dart';
@@ -43,4 +45,6 @@ const isarSchemaList = [
   IsarAiPulseCacheSchema,
   IsarAiInteractionHistorySchema,
   IsarDismissedSuggestionLogSchema,
+  IsarNotificationLedgerEntrySchema,
+  IsarAiActionBatchSchema,
 ];

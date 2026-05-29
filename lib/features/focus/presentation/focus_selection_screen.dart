@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/runtime/mutation_request.dart';
+import '../../../core/runtime/schedule_mutation_coordinator.dart';
+import '../../../core/utils/date_keys.dart';
 import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/domain/models/analytics_event.dart';
 import '../../execution/application/execution_day_loader.dart';
 import '../../execution/domain/models/timer_session.dart';
 import '../../execution/domain/task_timer_engine.dart';
-import '../../planning/application/planned_task_providers.dart';
 import '../application/focus_quick_task.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 import '../../home/presentation/quittr_app_bar_title.dart';
@@ -103,7 +105,15 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
       );
       if (!mounted) return;
       _quickController.clear();
-      invalidateTaskListProviders(ref);
+      // migrated to coordinator
+      await ScheduleMutationCoordinator.instance.run(
+        TaskCreatedMutation(
+          entityId: 'focus_quick_add',
+          sourceContext: 'focus_selection_screen',
+          dateStr: DateKeys.todayKey(),
+        ),
+        commitOverride: () async {},
+      );
       FocusScope.of(context).unfocus();
     } catch (e) {
       if (mounted) {

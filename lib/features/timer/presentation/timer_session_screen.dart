@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/runtime/mutation_request.dart';
+import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../execution/application/execution_controller.dart';
 import '../../execution/domain/task_timer_engine.dart';
 import '../../execution/domain/models/timer_session.dart';
@@ -267,7 +269,21 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
       modeRefId: t.modeRefId,
     );
     await ref.read(planningRepositoryProvider).upsertTask(updated);
-    invalidateTaskListProviders(ref);
+    // migrated to coordinator
+    await ScheduleMutationCoordinator.instance.run(
+      nextStatus == TaskStatus.completed
+          ? TaskCompletedMutation(
+              entityId: t.id,
+              sourceContext: 'timer_session_screen',
+              dateStr: t.planDateKey ?? row.dateKey,
+            )
+          : TaskUpdatedMutation(
+              entityId: t.id,
+              sourceContext: 'timer_session_screen',
+              dateStr: t.planDateKey ?? row.dateKey,
+            ),
+      commitOverride: () async {},
+    );
   }
 
   @override

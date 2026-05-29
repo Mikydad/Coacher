@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/runtime/mutation_request.dart';
+import '../../../core/runtime/schedule_mutation_coordinator.dart';
+import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/domain/models/analytics_event.dart';
@@ -245,7 +248,15 @@ Future<bool> _handleExtraTime(
     row: row,
     minutesFromNow: extraMinutes,
   );
-  invalidateTaskListProviders(ref);
+  // migrated to coordinator
+  await ScheduleMutationCoordinator.instance.run(
+    TaskUpdatedMutation(
+      entityId: row.task.id,
+      sourceContext: 'auto_next_task_flow.extend',
+      dateStr: row.task.planDateKey ?? DateKeys.todayKey(),
+    ),
+    commitOverride: () async {},
+  );
   if (!context.mounted) return false;
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(content: Text('Added $extraMinutes minutes and scheduled a reminder.')),
@@ -469,7 +480,16 @@ Future<bool> _handleMoveWithReason(
     ),
   );
   await ref.read(reminderSyncServiceProvider).markLogicalReasonProvided(t.id);
-  invalidateTaskListProviders(ref);
+  // migrated to coordinator
+  await ScheduleMutationCoordinator.instance.run(
+    TaskDeferredMutation(
+      entityId: t.id,
+      sourceContext: 'auto_next_task_flow.defer',
+      fromDateStr: t.planDateKey ?? DateKeys.todayKey(),
+      toDateStr: DateKeys.todayKey(),
+    ),
+    commitOverride: () async {},
+  );
   if (!context.mounted) return false;
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(content: Text('Moved "${t.title}" to later: ${choice.reason.label}.')),

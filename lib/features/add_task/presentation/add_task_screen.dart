@@ -5,11 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/runtime/mutation_request.dart';
+import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../planning/application/effective_task_mode.dart';
 import '../../planning/application/habit_anchor_aggregator.dart';
-import '../../planning/application/planned_task_providers.dart';
 import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/domain/models/analytics_event.dart';
 import '../../planning/domain/models/routine.dart';
@@ -690,7 +691,14 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       },
       planDay: planDay,
       ignoreEntityIds: {task.id},
-      onEntityMoved: () => invalidateTaskListProviders(ref),
+      onEntityMoved: () => ScheduleMutationCoordinator.instance.run( // migrated to coordinator
+        TimeBlockChangedMutation(
+          entityId: task.id,
+          sourceContext: 'add_task_screen.conflict_resolution',
+          dateStr: DateKeys.todayKey(planDay),
+        ),
+        commitOverride: () async {}, // move already done by conflict resolution
+      ),
       onAdjustProposedSchedule: (start, durationMinutes) {
         setState(() {
           _reminder = true;
@@ -909,7 +917,21 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
         blockId: blockId,
         modeRefId: modeRefId,
       );
-      invalidateTaskListProviders(ref);
+      // migrated to coordinator
+      await ScheduleMutationCoordinator.instance.run(
+        _isEdit
+            ? TaskUpdatedMutation(
+                entityId: taskId,
+                sourceContext: 'add_task_screen',
+                dateStr: planKey,
+              )
+            : TaskCreatedMutation(
+                entityId: taskId,
+                sourceContext: 'add_task_screen',
+                dateStr: planKey,
+              ),
+        commitOverride: () async {}, // write already done above (upsertTask + syncTimeBlock + persistReminder)
+      );
 
       _draftClearedOnSuccessfulSave = true;
       _suppressDraftDirty = true;

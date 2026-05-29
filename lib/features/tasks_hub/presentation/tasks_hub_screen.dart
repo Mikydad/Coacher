@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/runtime/mutation_request.dart';
+import '../../../core/runtime/schedule_mutation_coordinator.dart';
+import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../add_task/presentation/add_task_screen.dart';
 import '../../analytics/application/analytics_event_logger.dart';
-import '../../analytics/application/delivery_providers.dart';
 import '../../analytics/domain/models/analytics_event.dart';
 import '../../planning/application/auto_next_task_flow.dart';
 import '../../planning/application/planned_task_collect.dart';
@@ -71,7 +73,17 @@ class TasksHubScreen extends ConsumerWidget {
 
   Future<void> _openAddTask(BuildContext context, WidgetRef ref) async {
     await Navigator.pushNamed(context, AddTaskScreen.routeName);
-    invalidateTaskListProviders(ref);
+    // AddTaskScreen calls the coordinator on save; this is a safety net
+    // recompute for the case the user navigates back without saving.
+    // migrated to coordinator
+    await ScheduleMutationCoordinator.instance.run(
+      TaskCreatedMutation(
+        entityId: 'tasks_hub_post_add',
+        sourceContext: 'tasks_hub.open_add',
+        dateStr: DateKeys.todayKey(),
+      ),
+      commitOverride: () async {},
+    );
   }
 
   Future<void> _openEditTask(BuildContext context, WidgetRef ref, PlannedTaskRow row) async {
@@ -85,7 +97,15 @@ class TasksHubScreen extends ConsumerWidget {
         dateKey: row.dateKey,
       ),
     );
-    invalidateTaskListProviders(ref);
+    // migrated to coordinator
+    await ScheduleMutationCoordinator.instance.run(
+      TaskUpdatedMutation(
+        entityId: row.task.id,
+        sourceContext: 'tasks_hub.open_edit',
+        dateStr: row.task.planDateKey ?? DateKeys.todayKey(),
+      ),
+      commitOverride: () async {},
+    );
   }
 
   @override
@@ -133,7 +153,15 @@ class TasksHubScreen extends ConsumerWidget {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          invalidateTaskListProviders(ref);
+          // migrated to coordinator
+          await ScheduleMutationCoordinator.instance.run(
+            TaskUpdatedMutation(
+              entityId: 'tasks_hub_pull_refresh',
+              sourceContext: 'tasks_hub.pull_to_refresh',
+              dateStr: DateKeys.todayKey(),
+            ),
+            commitOverride: () async {},
+          );
           await readFreshTodayPlannedRows(ref);
         },
         child: SingleChildScrollView(
@@ -187,7 +215,17 @@ class TasksHubScreen extends ConsumerWidget {
                         if (row.task.orderIndex == i) continue;
                         await planning.upsertTask(_hubTaskWithOrderIndex(row, i));
                       }
-                      invalidateTaskListProviders(ref);
+                      // migrated to coordinator
+                      await ScheduleMutationCoordinator.instance.run(
+                        TaskUpdatedMutation(
+                          entityId: copy.isNotEmpty ? copy.first.task.id : 'tasks_hub_reorder',
+                          sourceContext: 'tasks_hub.drag_reorder',
+                          dateStr: copy.isNotEmpty
+                              ? (copy.first.task.planDateKey ?? DateKeys.todayKey())
+                              : DateKeys.todayKey(),
+                        ),
+                        commitOverride: () async {},
+                      );
                     },
                     children: [
                       for (final row in rows)
@@ -289,8 +327,15 @@ Future<void> _completeFromHub(BuildContext context, WidgetRef ref, PlannedTaskRo
     modeRefId: t.modeRefId,
   );
   await ref.read(reminderSyncServiceProvider).markTaskStarted(t.id);
-  invalidateTaskListProviders(ref);
-  invalidateTodayCoachingDelivery(ref);
+  // migrated to coordinator
+  await ScheduleMutationCoordinator.instance.run(
+    TaskCompletedMutation(
+      entityId: t.id,
+      sourceContext: 'tasks_hub.complete',
+      dateStr: t.planDateKey ?? DateKeys.todayKey(),
+    ),
+    commitOverride: () async {}, // upsertTask already called above
+  );
   if (!context.mounted) return;
   await runAutoNextTaskFlow(
     context,
@@ -393,7 +438,15 @@ Future<void> confirmDeletePlannedTask(BuildContext context, WidgetRef ref, Plann
   await ref
       .read(timeBlockSyncServiceProvider)
       .removeBlockForEntity(row.task.id);
-  invalidateTaskListProviders(ref);
+  // migrated to coordinator
+  await ScheduleMutationCoordinator.instance.run(
+    TaskDeletedMutation(
+      entityId: row.task.id,
+      sourceContext: 'tasks_hub.delete',
+      dateStr: row.task.planDateKey ?? DateKeys.todayKey(),
+    ),
+    commitOverride: () async {}, // delete already done above
+  );
 }
 
 class _HubTaskTile extends StatelessWidget {

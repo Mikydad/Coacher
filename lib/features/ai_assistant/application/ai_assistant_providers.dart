@@ -9,8 +9,12 @@ import '../../context_override/application/context_override_providers.dart';
 import '../../goals/application/goals_providers.dart';
 import '../../profile/application/profile_providers.dart';
 import '../../time_blocks/application/time_block_providers.dart';
+import '../../../core/local_db/isar_collections/isar_ai_action_batch.dart';
+import '../../../core/offline/offline_store.dart';
 import '../data/dismissed_suggestion_repository.dart';
 import '../domain/models/proactive_suggestion.dart';
+import 'ai_action_batch_repository.dart';
+import 'ai_action_batch_state.dart';
 import 'ai_action_executor.dart';
 import 'ai_assistant_service.dart';
 import 'ai_assumption_engine.dart';
@@ -83,6 +87,36 @@ final aiIntentParserProvider = FutureProvider<AiIntentParser>((ref) async {
   );
 });
 
+// ─── Batch repository provider ────────────────────────────────────────────────
+
+final aiActionBatchRepositoryProvider = Provider<AiActionBatchRepository>((ref) {
+  return AiActionBatchRepository(OfflineStore.instance.isar!);
+});
+
+/// The most recent [IsarAiActionBatch] — used by the UI to decide whether
+/// to show the "Undo AI changes" button.
+final lastAiBatchProvider = FutureProvider<IsarAiActionBatch?>((ref) async {
+  final repo = ref.read(aiActionBatchRepositoryProvider);
+  return repo.findMostRecent();
+});
+
+/// Whether the undo button should be visible: most recent batch is `completed`
+/// and was created within the last 30 minutes.
+final canUndoLastAiBatchProvider = FutureProvider<bool>((ref) async {
+  final batch = await ref.watch(lastAiBatchProvider.future);
+  if (batch == null) return false;
+  final isUndoable = batch.state == AiActionBatchState.completed.name;
+  if (!isUndoable) return false;
+  final ageMs = DateTime.now().millisecondsSinceEpoch - batch.createdAtMs;
+  return ageMs <= const Duration(minutes: 30).inMilliseconds;
+});
+
+/// Recent AI batch history — last 5 batches, newest first.
+final recentAiBatchesProvider =
+    FutureProvider<List<IsarAiActionBatch>>((ref) async {
+  return ref.read(aiActionBatchRepositoryProvider).listRecent();
+});
+
 // ─── Action executor ─────────────────────────────────────────────────────────
 
 final aiActionExecutorProvider = Provider<AiActionExecutor>((ref) {
@@ -95,7 +129,7 @@ final aiActionExecutorProvider = Provider<AiActionExecutor>((ref) {
     reminderSyncService: ref.read(reminderSyncServiceProvider),
     timeBlockSyncService: ref.read(timeBlockSyncServiceProvider),
     contextOverrideService: ref.read(contextOverrideServiceProvider),
-    ref: ref,
+    batchRepository: ref.read(aiActionBatchRepositoryProvider),
     defaultModeRefId: enforcementMode.name,
   );
 });

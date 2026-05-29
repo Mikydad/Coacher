@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/runtime/mutation_request.dart';
+import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../analytics/application/analytics_event_logger.dart';
-import '../../analytics/application/analytics_period_bundle_notifier.dart';
 import '../../analytics/application/daily_analytics_providers.dart';
 import '../../analytics/application/delivery_providers.dart';
 import '../../analytics/domain/models/analytics_event.dart';
@@ -298,8 +299,16 @@ class GoalDetailScreen extends ConsumerWidget {
             '${!currentlyMet ? 'habit_completed' : 'habit_skipped'}_${g.id}_$todayKey',
       );
       invalidateGoals(ref, goalId: g.id);
-      ref.invalidate(analyticsPeriodBundleProvider);
       ref.invalidate(dailyGoalHabitAnalyticsProvider(todayKey));
+      // migrated to coordinator (triggers analyticsPeriodBundle invalidation via UnifiedRecomputeGraph)
+      await ScheduleMutationCoordinator.instance.run(
+        GoalChangedMutation(
+          entityId: g.id,
+          sourceContext: 'goal_detail_screen.habit_toggle',
+          changeKind: !currentlyMet ? 'completed' : 'skipped',
+        ),
+        commitOverride: () async {},
+      );
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(

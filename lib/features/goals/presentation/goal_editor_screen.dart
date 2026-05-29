@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/runtime/mutation_request.dart';
+import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/domain/models/analytics_event.dart';
 import '../../planning/application/form_draft_autosave.dart';
@@ -17,7 +19,6 @@ import '../../time_blocks/domain/models/conflict_resolution_outcome.dart';
 import '../../time_blocks/presentation/scheduling_conflict_sheet.dart';
 import '../application/goal_intensity_mode.dart';
 import '../application/goal_period_helpers.dart';
-import '../../planning/application/planned_task_providers.dart';
 import '../application/goals_providers.dart';
 import '../domain/models/goal_action.dart';
 import '../domain/models/goal_categories.dart';
@@ -426,7 +427,15 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
       ignoreEntityIds: {goal.id},
       onEntityMoved: () {
         invalidateGoals(ref, goalId: goal.id);
-        invalidateTaskListProviders(ref);
+        // migrated to coordinator
+        ScheduleMutationCoordinator.instance.run(
+          GoalChangedMutation(
+            entityId: goal.id,
+            sourceContext: 'goal_editor_screen.conflict_resolution',
+            changeKind: 'updated',
+          ),
+          commitOverride: () async {},
+        );
       },
       onAdjustProposedSchedule: (start, _) {
         setState(() {

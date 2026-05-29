@@ -7,7 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
-class LocalNotificationsService {
+import 'notification_reconciliation_service.dart';
+
+class LocalNotificationsService implements ActiveNotificationsSource {
   LocalNotificationsService._();
 
   static final LocalNotificationsService instance = LocalNotificationsService._();
@@ -103,6 +105,7 @@ class LocalNotificationsService {
     await _indexNotificationTaskMapping(id: id, payload: payload);
   }
 
+  @override
   Future<void> cancel(int id) async {
     await _plugin.cancel(id);
     await _removeNotificationTaskMapping(id);
@@ -111,6 +114,19 @@ class LocalNotificationsService {
   Future<void> cancelAll() async {
     await _plugin.cancelAll();
     await _clearNotificationTaskMapping();
+  }
+
+  /// Returns the list of notifications currently shown in the OS tray.
+  ///
+  /// Available on iOS 10+ and Android 6+. Returns an empty list on
+  /// unsupported platforms or if the plugin cannot query the tray.
+  @override
+  Future<List<ActiveNotification>> getActiveNotifications() async {
+    try {
+      return await _plugin.getActiveNotifications();
+    } catch (_) {
+      return const [];
+    }
   }
 
   int idFromTaskId(String taskId, {int slot = 0}) =>
