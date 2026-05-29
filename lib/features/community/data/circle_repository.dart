@@ -45,9 +45,9 @@ class FirestoreCircleRepository implements CircleRepository {
     if (circleIds.isEmpty) {
       return Stream.value([]);
     }
-    // V1 max members = 8, so circleIds.length ≤ 8 — no chunking needed.
+    // User belongs to at most 3 circles; whereIn limit is 10 on document IDs.
     return _circles
-        .where('id', whereIn: circleIds)
+        .where(FieldPath.documentId, whereIn: circleIds)
         .snapshots()
         .map((s) => s.docs.map(_fromDoc).toList());
   }

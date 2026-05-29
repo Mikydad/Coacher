@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -121,12 +123,37 @@ class _CircleDiscoveryScreenState
     });
   }
 
-  Future<void> _joinOrRequest(AccountabilityCircle circle) async {
-    // Read the live joined-IDs set straight from the provider
-    final joinedIds = ref.read(myCircleIdsProvider).valueOrNull?.toSet() ?? {};
+  void _logJoin(String message) {
+    debugPrint('[CircleDiscovery] $message');
+    if (kDebugMode) {
+      // Visible in `flutter run` / Xcode device log (debugPrint is easy to miss).
+      print('[CircleDiscovery] $message');
+    }
+  }
 
-    // Already a member — navigate directly instead of joining again
-    if (joinedIds.contains(circle.id)) {
+  Future<void> _joinOrRequest(AccountabilityCircle circle) async {
+    _logJoin('Join tapped for ${circle.id} (${circle.name})');
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty) {
+      _logJoin('Aborted: not signed in');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sign in to join a circle.')),
+        );
+      }
+      return;
+    }
+
+    final joinedIds = ref.read(myCircleIdsProvider).valueOrNull?.toSet() ?? {};
+    final service = ref.read(userCircleMembershipServiceProvider);
+
+    // Creator or indexed member — open circle detail (repair index if needed).
+    if (joinedIds.contains(circle.id) ||
+        (uid.isNotEmpty && circle.creatorId == uid)) {
+      _logJoin('Already joined (index or creator) — opening circle');
+      if (!joinedIds.contains(circle.id)) {
+        await service.ensureCircleIndex(circle.id);
+      }
       if (mounted) {
         Navigator.pushNamed(
           context,
@@ -137,10 +164,27 @@ class _CircleDiscoveryScreenState
       return;
     }
 
-    final service = ref.read(userCircleMembershipServiceProvider);
+    final existingMember =
+        uid.isNotEmpty ? await service.isActiveMember(circle.id) : false;
+    if (existingMember) {
+      _logJoin('Already active member — repairing index');
+      await service.ensureCircleIndex(circle.id);
+      if (mounted) {
+        Navigator.pushNamed(
+          context,
+          CircleDetailScreen.routeName,
+          arguments: circle.id,
+        );
+      }
+      return;
+    }
     try {
       if (circle.joinPolicy == JoinPolicy.open) {
+        _logJoin('Calling joinCircle…');
         await service.joinCircle(circle.id);
+        _logJoin('joinCircle succeeded');
+        ref.invalidate(myCircleIdsProvider);
+        ref.invalidate(myCirclesProvider);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Joined ${circle.name}!')),
@@ -160,19 +204,32 @@ class _CircleDiscoveryScreenState
         }
       }
     } on CircleLimitException catch (e) {
+      _logJoin('CircleLimitException: $e');
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(e.toString())));
       }
     } on CircleFullException catch (e) {
+      _logJoin('CircleFullException: $e');
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(e.toString())));
       }
-    } catch (_) {
+    } catch (e, st) {
+      _logJoin('join failed: $e\n$st');
       if (mounted) {
+        final isPermission = e is FirebaseException &&
+            e.code == 'permission-denied';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Something went wrong. Try again.')),
+          SnackBar(
+            content: Text(
+              isPermission
+                  ? 'Join blocked by Firestore rules. Deploy firestore.rules '
+                      '(firebase deploy --only firestore:rules), then retry.'
+                  : 'Could not join: $e',
+            ),
+            duration: const Duration(seconds: 5),
+          ),
         );
       }
     }
@@ -183,6 +240,7 @@ class _CircleDiscoveryScreenState
     // Always read live from Riverpod — no local copy needed.
     final joinedIds =
         ref.watch(myCircleIdsProvider).valueOrNull?.toSet() ?? {};
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     // Fetch recommendations once we have the joined-IDs list.
     if (!_recommendationsFetched && joinedIds.isNotEmpty) {
@@ -226,6 +284,7 @@ class _CircleDiscoveryScreenState
             loading: _loadingBrowse,
             selectedCategory: _selectedCategory,
             joinedIds: joinedIds,
+            currentUid: currentUid,
             onCategoryChanged: (cat) {
               setState(() => _selectedCategory = cat);
               _fetchBrowse(category: cat);
@@ -237,6 +296,7 @@ class _CircleDiscoveryScreenState
             results: _searchResults,
             loading: _loadingSearch,
             joinedIds: joinedIds,
+            currentUid: currentUid,
             onChanged: _onSearchChanged,
             onJoin: _joinOrRequest,
           ),
@@ -256,6 +316,7 @@ class _BrowseTab extends StatelessWidget {
     required this.loading,
     required this.selectedCategory,
     required this.joinedIds,
+    required this.currentUid,
     required this.onCategoryChanged,
     required this.onJoin,
   });
@@ -265,8 +326,13 @@ class _BrowseTab extends StatelessWidget {
   final bool loading;
   final String selectedCategory;
   final Set<String> joinedIds;
+  final String currentUid;
   final ValueChanged<String> onCategoryChanged;
   final Future<void> Function(AccountabilityCircle) onJoin;
+
+  bool _isJoined(AccountabilityCircle circle) =>
+      joinedIds.contains(circle.id) ||
+      (currentUid.isNotEmpty && circle.creatorId == currentUid);
 
   @override
   Widget build(BuildContext context) {
@@ -339,7 +405,7 @@ class _BrowseTab extends StatelessWidget {
                           padding: const EdgeInsets.only(bottom: 12),
                           child: _CircleCard(
                             circle: c,
-                            joined: joinedIds.contains(c.id),
+                            joined: _isJoined(c),
                             onJoin: onJoin,
                           ),
                         ),
@@ -504,6 +570,7 @@ class _SearchTab extends StatelessWidget {
     required this.results,
     required this.loading,
     required this.joinedIds,
+    required this.currentUid,
     required this.onChanged,
     required this.onJoin,
   });
@@ -512,8 +579,13 @@ class _SearchTab extends StatelessWidget {
   final List<AccountabilityCircle> results;
   final bool loading;
   final Set<String> joinedIds;
+  final String currentUid;
   final ValueChanged<String> onChanged;
   final Future<void> Function(AccountabilityCircle) onJoin;
+
+  bool _isJoined(AccountabilityCircle circle) =>
+      joinedIds.contains(circle.id) ||
+      (currentUid.isNotEmpty && circle.creatorId == currentUid);
 
   @override
   Widget build(BuildContext context) {
@@ -571,7 +643,7 @@ class _SearchTab extends StatelessWidget {
                               const SizedBox(height: 12),
                           itemBuilder: (_, i) => _CircleCard(
                             circle: results[i],
-                            joined: joinedIds.contains(results[i].id),
+                            joined: _isJoined(results[i]),
                             onJoin: onJoin,
                           ),
                         ),
@@ -679,15 +751,24 @@ class _CircleCardState extends State<_CircleCard> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: (isFull && !isJoined) || _joining
+              onPressed: _joining
                   ? null
                   : () async {
                       if (isJoined) {
-                        // Already a member — navigate straight in
                         Navigator.pushNamed(
                           context,
                           CircleDetailScreen.routeName,
                           arguments: circle.id,
+                        );
+                        return;
+                      }
+                      if (isFull) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'This circle is full (8/8 members).',
+                            ),
+                          ),
                         );
                         return;
                       }

@@ -25,6 +25,24 @@ service cloud.firestore {
         get(/databases/$(database)/documents/circles/$(circleId)).data.moderatorIds.hasAny([request.auth.uid]);
     }
 
+    // Join/leave only touch memberCount on the circle doc (see UserCircleMembershipService).
+    function circleMemberCountOnlyChange() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount']);
+    }
+
+    // Member doc is written in the same transaction; avoid exists() (ordering).
+    function isJoinIncrementingMemberCount() {
+      return isSignedIn()
+        && circleMemberCountOnlyChange()
+        && request.resource.data.memberCount == resource.data.memberCount + 1;
+    }
+
+    function isLeaveDecrementingMemberCount() {
+      return isSignedIn()
+        && circleMemberCountOnlyChange()
+        && request.resource.data.memberCount == resource.data.memberCount - 1;
+    }
+
     // ─── Users ─────────────────────────────────────────────────────────────
     // Users can read/write their own document and ALL subcollections
     // (routines, blocks, tasks, reminders, goals, analytics, circleIds, etc.)
@@ -48,8 +66,10 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.creatorId == request.auth.uid;
 
-      // Only moderators can update circle metadata
-      allow update: if isCircleModerator(circleId);
+      // Moderators can update metadata; members can bump memberCount on join/leave.
+      allow update: if isCircleModerator(circleId)
+        || isJoinIncrementingMemberCount()
+        || isLeaveDecrementingMemberCount();
 
       // Only the creator can delete
       allow delete: if isCircleModerator(circleId)

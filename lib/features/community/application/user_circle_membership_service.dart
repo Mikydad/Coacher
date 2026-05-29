@@ -50,21 +50,100 @@ class UserCircleMembershipService {
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
+  /// Creates the circle document, adds the creator as active moderator, and
+  /// writes the user's `circleIds` index in a single batch (all or nothing).
+  Future<void> createCircleWithCreator(AccountabilityCircle circle) async {
+    final uid = _currentUserId();
+    if (uid.isEmpty) {
+      throw StateError('Not signed in');
+    }
+    if (circle.creatorId != uid) {
+      throw ArgumentError('creatorId must match the signed-in user');
+    }
+
+    circle.validate();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final db = FirebaseFirestore.instance;
+
+    final member = CircleMember(
+      userId: uid,
+      circleId: circle.id,
+      displayName: _currentDisplayName(),
+      role: CircleMemberRole.moderator,
+      status: CircleMemberStatus.active,
+      joinedAtMs: now,
+      updatedAtMs: now,
+    );
+
+    final batch = db.batch();
+    batch.set(db.doc(FirestorePaths.circleDoc(circle.id)), circle.toMap());
+    batch.set(
+      db.doc(FirestorePaths.circleMemberDoc(circle.id, uid)),
+      member.toMap(),
+    );
+    batch.set(
+      db.doc(FirestorePaths.userCircleIdDoc(uid, circle.id)),
+      {'circleId': circle.id, 'joinedAtMs': now},
+    );
+    await batch.commit();
+  }
+
+  /// Ensures `users/{uid}/circleIds/{circleId}` exists when the user is already
+  /// an active member (repairs partial creates or legacy data).
+  Future<void> ensureCircleIndex(String circleId) async {
+    final uid = _currentUserId();
+    if (uid.isEmpty) return;
+
+    final member = await _memberRepo.getMember(circleId, uid);
+    if (member == null || member.status != CircleMemberStatus.active) return;
+
+    await FirebaseFirestore.instance
+        .doc(FirestorePaths.userCircleIdDoc(uid, circleId))
+        .set({
+      'circleId': circleId,
+      'joinedAtMs': member.joinedAtMs,
+    }, SetOptions(merge: true));
+  }
+
   /// Join an open circle immediately.
   ///
   /// Throws [CircleLimitException] if the user is already in 3 circles.
   /// Throws [CircleFullException] if the circle already has 8 members.
   Future<void> joinCircle(String circleId) async {
     final uid = _currentUserId();
+    if (uid.isEmpty) {
+      throw StateError('Not signed in');
+    }
+    await pruneStaleCircleIndexes();
     await _guardLimit(uid);
 
     await FirebaseFirestore.instance.runTransaction((tx) async {
       final circleRef =
           FirebaseFirestore.instance.doc(FirestorePaths.circleDoc(circleId));
+      final memberRef =
+          FirebaseFirestore.instance.doc(FirestorePaths.circleMemberDoc(circleId, uid));
+      final userCircleRef = FirebaseFirestore.instance
+          .doc(FirestorePaths.userCircleIdDoc(uid, circleId));
+
       final circleSnap = await tx.get(circleRef);
       final circle = AccountabilityCircle.fromMap(
         Map<String, dynamic>.from(circleSnap.data() ?? {})..['id'] = circleId,
       );
+
+      final memberSnap = await tx.get(memberRef);
+      if (memberSnap.exists) {
+        final existingData = Map<String, dynamic>.from(memberSnap.data() ?? {});
+        existingData['userId'] = uid;
+        final existing = CircleMember.fromMap(existingData);
+        if (existing.status == CircleMemberStatus.active) {
+          // Already a member — repair index only, do not bump memberCount.
+          tx.set(userCircleRef, {
+            'circleId': circleId,
+            'joinedAtMs': existing.joinedAtMs,
+          });
+          return;
+        }
+      }
 
       if (circle.memberCount >= AccountabilityCircle.kMaxMembers) {
         throw CircleFullException();
@@ -81,17 +160,8 @@ class UserCircleMembershipService {
         updatedAtMs: now,
       );
 
-      // Write member doc
-      final memberRef = FirebaseFirestore.instance
-          .doc(FirestorePaths.circleMemberDoc(circleId, uid));
       tx.set(memberRef, member.toMap(), SetOptions(merge: true));
-
-      // Increment memberCount
       tx.update(circleRef, {'memberCount': FieldValue.increment(1)});
-
-      // Write circleId index under user doc
-      final userCircleRef = FirebaseFirestore.instance
-          .doc(FirestorePaths.userCircleIdDoc(uid, circleId));
       tx.set(userCircleRef, {
         'circleId': circleId,
         'joinedAtMs': now,
@@ -209,19 +279,71 @@ class UserCircleMembershipService {
     await _circleRepo.deleteCircle(circleId);
   }
 
+  /// Whether the signed-in user is an active member of [circleId].
+  Future<bool> isActiveMember(String circleId) async {
+    final uid = _currentUserId();
+    if (uid.isEmpty) return false;
+    final member = await _memberRepo.getMember(circleId, uid);
+    return member?.status == CircleMemberStatus.active;
+  }
+
+  /// Removes `users/{uid}/circleIds/*` entries that no longer reflect active
+  /// membership (e.g. after deleting a circle or a failed partial join).
+  Future<void> pruneStaleCircleIndexes() async {
+    final uid = _currentUserId();
+    if (uid.isEmpty) return;
+
+    final snap = await FirebaseFirestore.instance
+        .collection(FirestorePaths.userCircleIds(uid))
+        .get();
+
+    final db = FirebaseFirestore.instance;
+    final batch = db.batch();
+    var writes = 0;
+
+    for (final doc in snap.docs) {
+      final circleId = doc.id;
+      final member = await _memberRepo.getMember(circleId, uid);
+      final circle = await _circleRepo.getCircle(circleId);
+
+      final keepIndex = member?.status == CircleMemberStatus.active &&
+          circle != null;
+      if (!keepIndex) {
+        batch.delete(doc.reference);
+        writes++;
+      }
+    }
+
+    if (writes > 0) {
+      await batch.commit();
+    }
+  }
+
   /// How many circles the current user is currently in (active only).
   Future<int> myCircleCount() async {
     final uid = _currentUserId();
+    if (uid.isEmpty) return 0;
+
     final snap = await FirebaseFirestore.instance
         .collection(FirestorePaths.userCircleIds(uid))
-        .count()
         .get();
-    return snap.count ?? 0;
+
+    var count = 0;
+    for (final doc in snap.docs) {
+      final member = await _memberRepo.getMember(doc.id, uid);
+      if (member?.status == CircleMemberStatus.active) {
+        count++;
+      }
+    }
+    return count;
   }
 
   // ── Internal helpers ────────────────────────────────────────────────────────
 
   Future<void> _guardLimit(String uid) async {
+    if (uid.isEmpty) {
+      throw StateError('Not signed in');
+    }
     final count = await myCircleCount();
     if (count >= kMaxCirclesPerUser) throw CircleLimitException();
   }

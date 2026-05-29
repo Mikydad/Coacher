@@ -1,15 +1,13 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/presentation/keyboard_dismiss.dart';
 import '../../../core/utils/stable_id.dart';
+import '../../../core/di/providers.dart';
 import '../application/circle_providers.dart';
 import '../domain/models/accountability_circle.dart';
 import '../domain/models/circle_enums.dart';
-import '../domain/models/circle_member.dart';
 import 'circle_detail_screen.dart';
 
 const _kCategories = [
@@ -82,28 +80,11 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
         updatedAtMs: now,
       );
 
-      final circleRepo = ref.read(circleRepositoryProvider);
-      final memberRepo = ref.read(circleMemberRepositoryProvider);
+      await ref
+          .read(userCircleMembershipServiceProvider)
+          .createCircleWithCreator(circle);
 
-      await circleRepo.createCircle(circle);
-
-      // Creator is added directly as active moderator (no limit check needed)
-      final member = CircleMember(
-        userId: user.uid,
-        circleId: circleId,
-        displayName: user.displayName ?? 'User',
-        role: CircleMemberRole.moderator,
-        status: CircleMemberStatus.active,
-        joinedAtMs: now,
-        updatedAtMs: now,
-      );
-      await memberRepo.setMember(member);
-
-      // Write circleId index under user doc for fast myCircleIds lookup
-      await FirebaseFirestore.instance
-          .doc(FirestorePaths.userCircleIdDoc(user.uid, circleId))
-          .set({'circleId': circleId, 'joinedAtMs': now});
-
+      ref.invalidate(myCircleIdsProvider);
       ref.invalidate(myCirclesProvider);
 
       if (mounted) {

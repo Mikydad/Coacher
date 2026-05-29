@@ -50,8 +50,15 @@ final myCircleIdsProvider = StreamProvider<List<String>>((ref) {
 /// Live stream of all circles the current user belongs to.
 final myCirclesProvider = StreamProvider<List<AccountabilityCircle>>((ref) {
   final idsAsync = ref.watch(myCircleIdsProvider);
-  final ids = idsAsync.valueOrNull ?? [];
 
+  if (idsAsync.isLoading) {
+    return const Stream.empty();
+  }
+  if (idsAsync.hasError) {
+    return Stream.error(idsAsync.error!, idsAsync.stackTrace);
+  }
+
+  final ids = idsAsync.value ?? [];
   if (ids.isEmpty) return Stream.value([]);
 
   return ref.watch(circleRepositoryProvider).watchCircles(ids);
