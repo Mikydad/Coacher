@@ -4,10 +4,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../application/auth_providers.dart';
 import '../application/auth_session_policy.dart';
-import 'login_screen.dart';
+import 'forgot_password_screen.dart';
 import 'sign_up_screen.dart';
+import 'widgets/auth_apple_sign_in_button.dart';
+import 'widgets/auth_email_password_form.dart';
 import 'widgets/auth_google_sign_in_button.dart';
-import 'widgets/auth_primary_button.dart';
 
 const String _kMigrationBannerDismissedKey = 'auth_migration_banner_dismissed';
 
@@ -74,86 +75,82 @@ class _AuthLandingScreenState extends ConsumerState<AuthLandingScreen> {
             if (showBanner) _MigrationBanner(onDismiss: _dismissBanner),
 
             Expanded(
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 28),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Spacer(flex: 3),
-
-                    // ── Logo / app name ───────────────────────────────────────
-              _AppLogo(),
-              const SizedBox(height: 16),
-              const Text(
-                'Coach for Life',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 30,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Your personal productivity coach.\nBuild habits that last.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Color(0xFF888888),
-                  fontSize: 15,
-                  height: 1.6,
-                ),
-              ),
-
-              const Spacer(flex: 4),
-
-              // ── CTA buttons ───────────────────────────────────────────
-              AuthPrimaryButton(
-                label: 'Sign in',
-                onPressed: _guestLoading
-                    ? null
-                    : () => Navigator.pushNamed(
-                          context,
-                          LoginScreen.routeName,
-                        ),
-              ),
-              const SizedBox(height: 12),
-              _OutlinedAuthButton(
-                label: 'Create account',
-                onPressed: _guestLoading
-                    ? null
-                    : () => Navigator.pushNamed(
-                          context,
-                          SignUpScreen.routeName,
-                        ),
-              ),
-              const AuthOrDivider(),
-              AuthGoogleSignInButton(enabled: !_guestLoading),
-
-              // "Continue as guest" — only shown when flag is false so devs
-              // can still bypass the auth wall during development.
-              if (!kRequireRegisteredAuth) ...[
-                const SizedBox(height: 16),
-                _guestLoading
-                    ? const SizedBox(
-                        height: 22,
-                        width: 22,
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF888888),
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : TextButton(
-                        onPressed: _continueAsGuest,
-                        child: const Text(
-                          'Continue as guest',
-                          style: TextStyle(
-                            color: Color(0xFF666666),
-                            fontSize: 13,
-                          ),
-                        ),
+                    const SizedBox(height: 24),
+                    _AppLogo(),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Coach for Life',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 30,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
                       ),
-              ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Your personal productivity coach.\nBuild habits that last.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFF888888),
+                        fontSize: 15,
+                        height: 1.6,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
 
-              const SizedBox(height: 24),
+                    // ── Email / password ──────────────────────────────────────
+                    AuthEmailPasswordForm(
+                      enabled: !_guestLoading,
+                      onForgotPassword: () => Navigator.pushNamed(
+                        context,
+                        ForgotPasswordScreen.routeName,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _OutlinedAuthButton(
+                      label: 'Create account with email',
+                      onPressed: _guestLoading
+                          ? null
+                          : () => Navigator.pushNamed(
+                                context,
+                                SignUpScreen.routeName,
+                              ),
+                    ),
+                    const AuthOrDivider(label: 'or continue with'),
+                    AuthSocialSignInSection(enabled: !_guestLoading),
+
+                    if (!kRequireRegisteredAuth) ...[
+                      const SizedBox(height: 16),
+                      _guestLoading
+                          ? const Center(
+                              child: SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(
+                                  color: Color(0xFF888888),
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          : TextButton(
+                              onPressed: _continueAsGuest,
+                              child: const Text(
+                                'Continue as guest',
+                                style: TextStyle(
+                                  color: Color(0xFF666666),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                    ],
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),

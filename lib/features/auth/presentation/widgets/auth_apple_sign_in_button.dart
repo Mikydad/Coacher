@@ -1,23 +1,30 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../profile/application/profile_providers.dart';
 import '../../application/auth_providers.dart';
 import '../../domain/auth_failure.dart';
 import 'auth_error_text.dart';
+import 'auth_google_sign_in_button.dart';
 
-/// "Continue with Google" for auth screens.
-class AuthGoogleSignInButton extends ConsumerStatefulWidget {
-  const AuthGoogleSignInButton({super.key, this.enabled = true});
+/// Whether Sign in with Apple should be offered on this platform.
+bool get isAppleSignInSupported =>
+    !kIsWeb &&
+    (defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS);
+
+/// "Continue with Apple" for auth screens (iOS / macOS only).
+class AuthAppleSignInButton extends ConsumerStatefulWidget {
+  const AuthAppleSignInButton({super.key, this.enabled = true});
 
   final bool enabled;
 
   @override
-  ConsumerState<AuthGoogleSignInButton> createState() =>
-      _AuthGoogleSignInButtonState();
+  ConsumerState<AuthAppleSignInButton> createState() =>
+      _AuthAppleSignInButtonState();
 }
 
-class _AuthGoogleSignInButtonState extends ConsumerState<AuthGoogleSignInButton> {
+class _AuthAppleSignInButtonState extends ConsumerState<AuthAppleSignInButton> {
   bool _loading = false;
   String? _error;
 
@@ -29,7 +36,7 @@ class _AuthGoogleSignInButtonState extends ConsumerState<AuthGoogleSignInButton>
     });
 
     final (failure, _) =
-        await ref.read(authRepositoryProvider).signInWithGoogle();
+        await ref.read(authRepositoryProvider).signInWithApple();
 
     if (!mounted) return;
 
@@ -45,19 +52,12 @@ class _AuthGoogleSignInButtonState extends ConsumerState<AuthGoogleSignInButton>
       });
       return;
     }
-
-    // Profile UI reads from Isar — seed name after Google profile is on Firebase.
-    final name = ref.read(authRepositoryProvider).currentUser?.displayName?.trim();
-    if (name != null && name.isNotEmpty) {
-      await ref
-          .read(profilePreferenceServiceProvider)
-          .syncDisplayNameFromAuthIfEmpty(name);
-    }
-    // AuthGate reacts to authStateChanges for navigation.
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!isAppleSignInSupported) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -67,6 +67,7 @@ class _AuthGoogleSignInButtonState extends ConsumerState<AuthGoogleSignInButton>
             onPressed: _loading || !widget.enabled ? null : _signIn,
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
+              backgroundColor: Colors.white,
               side: const BorderSide(color: Color(0xFF2E2E2E), width: 1.5),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -84,15 +85,12 @@ class _AuthGoogleSignInButtonState extends ConsumerState<AuthGoogleSignInButton>
                 : const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.g_mobiledata_rounded,
-                        color: Colors.white,
-                        size: 28,
-                      ),
+                      Icon(Icons.apple, color: Colors.black, size: 24),
                       SizedBox(width: 10),
                       Text(
-                        'Continue with Google',
+                        'Continue with Apple',
                         style: TextStyle(
+                          color: Colors.black,
                           fontWeight: FontWeight.w600,
                           fontSize: 16,
                         ),
@@ -110,29 +108,23 @@ class _AuthGoogleSignInButtonState extends ConsumerState<AuthGoogleSignInButton>
   }
 }
 
-/// Horizontal rule with centered label (e.g. "or").
-class AuthOrDivider extends StatelessWidget {
-  const AuthOrDivider({super.key, this.label = 'or'});
+/// Google + Apple sign-in buttons with spacing (Apple hidden off iOS/macOS).
+class AuthSocialSignInSection extends StatelessWidget {
+  const AuthSocialSignInSection({super.key, required this.enabled});
 
-  final String label;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Row(
-        children: [
-          const Expanded(child: Divider(color: Color(0xFF2A2A2A))),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(
-              label,
-              style: const TextStyle(color: Color(0xFF666666), fontSize: 13),
-            ),
-          ),
-          const Expanded(child: Divider(color: Color(0xFF2A2A2A))),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AuthGoogleSignInButton(enabled: enabled),
+        if (isAppleSignInSupported) ...[
+          const SizedBox(height: 12),
+          AuthAppleSignInButton(enabled: enabled),
         ],
-      ),
+      ],
     );
   }
 }

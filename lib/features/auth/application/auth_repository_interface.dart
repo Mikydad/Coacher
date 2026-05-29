@@ -16,6 +16,7 @@ abstract class AuthRepositoryInterface {
   Future<void> signOut();
   Future<(AuthFailure?, User?)> signInAnonymously();
   Future<(AuthFailure?, User?)> signInWithGoogle();
+  Future<(AuthFailure?, User?)> signInWithApple();
   Future<(AuthFailure?, User?)> signInWithEmail({
     required String email,
     required String password,

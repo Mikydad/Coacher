@@ -33,6 +33,9 @@ class _FakeAuthRepo implements AuthRepositoryInterface {
   Future<(AuthFailure?, User?)> signInWithGoogle() async =>
       (const AuthSignInCanceled(), null);
   @override
+  Future<(AuthFailure?, User?)> signInWithApple() async =>
+      (const AuthSignInCanceled(), null);
+  @override
   Future<(AuthFailure?, User?)> signInWithEmail({
     required String email,
     required String password,

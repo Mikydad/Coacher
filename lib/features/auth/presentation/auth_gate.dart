@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/sync/sync_service.dart';
+import '../../profile/application/profile_providers.dart';
 import '../application/auth_providers.dart';
 import '../application/auth_session_policy.dart';
 import 'auth_landing_screen.dart';
@@ -75,6 +76,24 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     }
 
     await AuthSessionPolicy.persistUid(uid);
+
+    // Use the latest Firebase user (displayName may be set after Google profile sync).
+    final fresh = ref.read(authRepositoryProvider).currentUser;
+    await _syncLocalDisplayNameFromAuth(fresh ?? user);
+  }
+
+  /// Profile screen reads display name from Isar — seed it from Firebase after
+  /// Google/email sign-in when the user has not set a local name yet.
+  Future<void> _syncLocalDisplayNameFromAuth(dynamic user) async {
+    final name = (user as dynamic).displayName as String?;
+    if (name == null || name.trim().isEmpty) return;
+    try {
+      await ref
+          .read(profilePreferenceServiceProvider)
+          .syncDisplayNameFromAuthIfEmpty(name.trim());
+    } catch (e, st) {
+      debugPrint('[AuthGate] sync local display name failed: $e\n$st');
+    }
   }
 
   Future<void> _triggerAnonymousSignIn() async {

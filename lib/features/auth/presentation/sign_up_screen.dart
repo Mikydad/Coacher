@@ -6,6 +6,7 @@ import '../application/auth_providers.dart';
 import '../domain/auth_failure.dart';
 import 'login_screen.dart';
 import 'widgets/auth_error_text.dart';
+import 'widgets/auth_apple_sign_in_button.dart';
 import 'widgets/auth_google_sign_in_button.dart';
 import 'widgets/auth_primary_button.dart';
 import 'widgets/auth_text_field.dart';
@@ -289,7 +290,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               ],
 
               const AuthOrDivider(),
-              AuthGoogleSignInButton(enabled: !_loading),
+              AuthSocialSignInSection(enabled: !_loading),
 
               const SizedBox(height: 28),
               _buildSignInRow(),

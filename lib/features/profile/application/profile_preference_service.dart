@@ -18,6 +18,20 @@ class ProfilePreferenceService {
   final ProfilePreferenceRepository _repository;
   final DateTime Function() _now;
 
+  /// Seeds local display name from Firebase Auth when the user has not set one.
+  ///
+  /// Does not overwrite a non-empty name the user already chose in Profile.
+  Future<void> syncDisplayNameFromAuthIfEmpty(String authDisplayName) async {
+    final trimmed = authDisplayName.trim();
+    if (trimmed.isEmpty) return;
+
+    final existing = await _repository.getPreference();
+    final current = existing?.displayName.trim() ?? '';
+    if (current.isNotEmpty) return;
+
+    await setDisplayName(trimmed);
+  }
+
   /// Updates the user's display name.
   Future<void> setDisplayName(String name) async {
     final nowMs = _now().millisecondsSinceEpoch;

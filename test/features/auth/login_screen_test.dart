@@ -9,6 +9,7 @@ import 'package:coach_for_life/features/auth/application/auth_providers.dart';
 import 'package:coach_for_life/features/auth/application/auth_repository_interface.dart';
 import 'package:coach_for_life/features/auth/domain/auth_failure.dart';
 import 'package:coach_for_life/features/auth/presentation/login_screen.dart';
+import 'package:coach_for_life/features/auth/presentation/widgets/auth_email_password_form.dart';
 import 'package:coach_for_life/features/auth/presentation/widgets/auth_error_text.dart';
 
 // ── Fake repository ───────────────────────────────────────────────────────────
@@ -34,6 +35,9 @@ class _FakeAuthRepo implements AuthRepositoryInterface {
       (const NetworkFailure(), null);
   @override
   Future<(AuthFailure?, User?)> signInWithGoogle() async =>
+      (const AuthSignInCanceled(), null);
+  @override
+  Future<(AuthFailure?, User?)> signInWithApple() async =>
       (const AuthSignInCanceled(), null);
   @override
   Future<(AuthFailure?, User?)> signInWithEmail({
@@ -106,7 +110,7 @@ void main() {
       final fake = _FakeAuthRepo();
       await tester.pumpWidget(_buildScreen(fake));
 
-      await tester.tap(find.text('Sign in'));
+      await tester.tap(find.text('Sign in with email'));
       await tester.pump();
 
       expect(find.byType(AuthErrorText), findsOneWidget);
@@ -127,7 +131,7 @@ void main() {
       await tester.enterText(
           find.widgetWithText(TextField, 'Password'), 'password123');
 
-      await tester.tap(find.text('Sign in'));
+      await tester.tap(find.text('Sign in with email'));
       await tester.pump();
       await tester.pump();
 
@@ -146,10 +150,14 @@ void main() {
       await tester.enterText(
           find.widgetWithText(TextField, 'Password'), 'pass1234');
 
-      await tester.tap(find.text('Sign in'));
+      await tester.tap(find.text('Sign in with email'));
       await tester.pump();
 
-      final btn = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+      final emailBtn = find.descendant(
+        of: find.byType(AuthEmailPasswordForm),
+        matching: find.byType(ElevatedButton),
+      );
+      final btn = tester.widget<ElevatedButton>(emailBtn);
       expect(btn.onPressed, isNull);
 
       completer.complete((const InvalidCredentials(), null));

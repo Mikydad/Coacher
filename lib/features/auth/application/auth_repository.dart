@@ -1,9 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../core/config/google_auth_config.dart';
 import '../domain/auth_failure.dart';
+import 'apple_auth_nonce.dart';
 import 'auth_repository_interface.dart';
 
 /// Wraps [FirebaseAuth] and maps all exceptions to typed [AuthFailure] values.
@@ -102,7 +104,12 @@ class AuthRepository implements AuthRepositoryInterface {
         result = await _auth.signInWithCredential(credential);
         debugPrint('[Auth] signInWithGoogle uid=${_shortUid(result.user?.uid)}');
       }
-      return (null, result.user);
+
+      final user = await _applyGoogleProfileToFirebaseUser(
+        result.user,
+        googleUser,
+      );
+      return (null, user);
     } on GoogleSignInException catch (e) {
       if (e.code == GoogleSignInExceptionCode.canceled ||
           e.code == GoogleSignInExceptionCode.interrupted) {
@@ -116,6 +123,90 @@ class AuthRepository implements AuthRepositoryInterface {
       return (_mapException(e), null);
     } catch (e) {
       debugPrint('[Auth] signInWithGoogle failed: $e');
+      return (UnknownAuthFailure('$e'), null);
+    }
+  }
+
+  // ── Apple ────────────────────────────────────────────────────────────────────
+
+  @override
+  Future<(AuthFailure?, User?)> signInWithApple() async {
+    try {
+      if (!await SignInWithApple.isAvailable()) {
+        return (
+          const UnknownAuthFailure(
+            'Sign in with Apple is not available on this device.',
+          ),
+          null,
+        );
+      }
+
+      final rawNonce = generateAppleAuthNonce();
+      final hashedNonce = sha256Nonce(rawNonce);
+
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: hashedNonce,
+      );
+
+      final idToken = appleCredential.identityToken;
+      if (idToken == null || idToken.isEmpty) {
+        debugPrint('[Auth] signInWithApple failed: missing identityToken');
+        return (
+          const UnknownAuthFailure(
+            'Apple sign-in did not return a token. Enable Apple in Firebase '
+            'Console → Authentication → Sign-in method.',
+          ),
+          null,
+        );
+      }
+
+      final credential = OAuthProvider('apple.com').credential(
+        idToken: idToken,
+        rawNonce: rawNonce,
+      );
+
+      final current = _auth.currentUser;
+      final UserCredential result;
+      if (current != null && current.isAnonymous) {
+        result = await current.linkWithCredential(credential);
+        debugPrint(
+            '[Auth] linkAnonymousWithApple uid=${_shortUid(result.user?.uid)}');
+      } else {
+        result = await _auth.signInWithCredential(credential);
+        debugPrint('[Auth] signInWithApple uid=${_shortUid(result.user?.uid)}');
+      }
+
+      final user = result.user;
+      if (user != null &&
+          (user.displayName == null || user.displayName!.trim().isEmpty)) {
+        final given = appleCredential.givenName;
+        final family = appleCredential.familyName;
+        if (given != null || family != null) {
+          final name =
+              [given, family].whereType<String>().where((s) => s.isNotEmpty).join(' ');
+          if (name.isNotEmpty) {
+            await user.updateDisplayName(name);
+          }
+        }
+      }
+
+      return (null, result.user);
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        debugPrint('[Auth] signInWithApple canceled');
+        return (const AuthSignInCanceled(), null);
+      }
+      debugPrint('[Auth] signInWithApple failed: ${e.code}');
+      return (UnknownAuthFailure(e.message), null);
+    } on FirebaseAuthException catch (e) {
+      debugPrint('[Auth] signInWithApple firebase failed: code=${e.code}');
+      return (_mapException(e), null);
+    } catch (e) {
+      debugPrint('[Auth] signInWithApple failed: $e');
       return (UnknownAuthFailure('$e'), null);
     }
   }
@@ -273,6 +364,36 @@ class AuthRepository implements AuthRepositoryInterface {
       'network-request-failed' => const NetworkFailure(),
       _ => UnknownAuthFailure(e.message ?? e.code),
     };
+  }
+
+  /// Copies Google account name/photo onto the Firebase user when missing.
+  Future<User?> _applyGoogleProfileToFirebaseUser(
+    User? user,
+    GoogleSignInAccount googleUser,
+  ) async {
+    if (user == null) return null;
+
+    final googleName = googleUser.displayName?.trim();
+    final googlePhoto = googleUser.photoUrl?.trim();
+
+    final needsName = googleName != null &&
+        googleName.isNotEmpty &&
+        (user.displayName == null || user.displayName!.trim().isEmpty);
+    final needsPhoto = googlePhoto != null &&
+        googlePhoto.isNotEmpty &&
+        (user.photoURL == null || user.photoURL!.trim().isEmpty);
+
+    if (!needsName && !needsPhoto) return user;
+
+    if (needsName) {
+      await user.updateDisplayName(googleName);
+      debugPrint('[Auth] signInWithGoogle set displayName from Google profile');
+    }
+    if (needsPhoto) {
+      await user.updatePhotoURL(googlePhoto);
+    }
+    await user.reload();
+    return _auth.currentUser ?? user;
   }
 
   String _shortUid(String? uid) =>
