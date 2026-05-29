@@ -183,8 +183,7 @@ class _CircleDiscoveryScreenState
         _logJoin('Calling joinCircle…');
         await service.joinCircle(circle.id);
         _logJoin('joinCircle succeeded');
-        ref.invalidate(myCircleIdsProvider);
-        ref.invalidate(myCirclesProvider);
+        invalidateCircleScopedProviders(ref);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Joined ${circle.name}!')),

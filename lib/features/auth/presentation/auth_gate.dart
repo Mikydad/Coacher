@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/sync/sync_service.dart';
+import '../../community/application/circle_providers.dart';
 import '../../profile/application/profile_providers.dart';
 import '../application/auth_providers.dart';
 import '../application/auth_session_policy.dart';
@@ -68,6 +69,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     if (changed && mounted) {
       setState(() => _handlingUidChange = true);
       try {
+        invalidateCircleScopedProviders(ref);
         await AuthSessionPolicy.clearLocalSession();
         await SyncService.instance.syncFromRemote(force: true);
       } finally {

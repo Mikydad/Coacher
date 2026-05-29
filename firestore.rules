@@ -19,6 +19,17 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid));
     }
 
+    // Denormalized join index under the user doc (kept in sync on join/leave).
+    function hasCircleIndex(circleId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)/circleIds/$(circleId));
+    }
+
+    // Chat/activity read: member doc OR circleIds index (covers account-switch races).
+    function canAccessCircleContent(circleId) {
+      return isCircleMember(circleId) || hasCircleIndex(circleId);
+    }
+
     // Reads circle doc once to check moderatorIds list
     function isCircleModerator(circleId) {
       return isSignedIn() &&
@@ -92,7 +103,7 @@ service cloud.firestore {
 
       // ── Messages ─────────────────────────────────────────────────────────
       match /messages/{messageId} {
-        allow read: if isCircleMember(circleId);
+        allow read: if canAccessCircleContent(circleId);
         allow create: if isCircleMember(circleId)
           && request.resource.data.senderId == request.auth.uid;
         allow update: if isCircleMember(circleId);
@@ -102,19 +113,19 @@ service cloud.firestore {
 
       // ── Activity feed ─────────────────────────────────────────────────────
       match /activityFeed/{itemId} {
-        allow read: if isCircleMember(circleId);
+        allow read: if canAccessCircleContent(circleId);
         allow create: if isSignedIn();
         allow update, delete: if false;
       }
 
       // ── Weekly commitments ────────────────────────────────────────────────
       match /weeklyCommitments/{commitmentId} {
-        allow read, write: if isCircleMember(circleId);
+        allow read, write: if canAccessCircleContent(circleId);
       }
 
       // ── Challenges ────────────────────────────────────────────────────────
       match /challenges/{challengeId} {
-        allow read: if isCircleMember(circleId);
+        allow read: if canAccessCircleContent(circleId);
         allow create: if isCircleMember(circleId)
           && request.resource.data.creatorId == request.auth.uid;
         allow update: if isCircleMember(circleId);

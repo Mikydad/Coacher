@@ -84,8 +84,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
           .read(userCircleMembershipServiceProvider)
           .createCircleWithCreator(circle);
 
-      ref.invalidate(myCircleIdsProvider);
-      ref.invalidate(myCirclesProvider);
+      invalidateCircleScopedProviders(ref);
 
       if (mounted) {
         Navigator.pushReplacementNamed(

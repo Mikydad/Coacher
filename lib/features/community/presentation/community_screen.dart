@@ -14,6 +14,7 @@ class CommunityScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final idsAsync = ref.watch(myCircleIdsProvider);
     final circlesAsync = ref.watch(myCirclesProvider);
 
     return Scaffold(
@@ -40,7 +41,11 @@ class CommunityScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: circlesAsync.when(
+      body: (idsAsync.isLoading && !idsAsync.hasValue)
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
+            )
+          : circlesAsync.when(
         loading: () => const Center(
           child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
         ),
@@ -62,7 +67,7 @@ class CommunityScreen extends ConsumerWidget {
           return RefreshIndicator(
             color: const Color(0xFFB7FF00),
             backgroundColor: const Color(0xFF14171C),
-            onRefresh: () async => ref.invalidate(myCirclesProvider),
+            onRefresh: () async => invalidateCircleScopedProviders(ref),
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: circles.length,

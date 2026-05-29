@@ -1,10 +1,13 @@
 import 'dart:ui';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/di/providers.dart';
 import '../../../core/presentation/keyboard_dismiss.dart';
+import '../../auth/application/auth_providers.dart';
 import '../application/circle_providers.dart';
 import '../domain/models/circle_enums.dart';
 import '../domain/models/circle_member.dart';
@@ -54,6 +57,13 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
             .state = _tabController.index;
       }
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref
+          .read(userCircleMembershipServiceProvider)
+          .ensureCircleIndex(widget.circleId);
+    });
   }
 
   @override
@@ -64,8 +74,18 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    final authAsync = ref.watch(authStateProvider);
     final circleAsync = ref.watch(circleDetailProvider(widget.circleId));
     final membersAsync = ref.watch(circleMembersProvider(widget.circleId));
+
+    if (authAsync.isLoading && !authAsync.hasValue) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0D0F12),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
+        ),
+      );
+    }
 
     // When the circle document is deleted (stream emits null), go back
     // immediately instead of showing a "not found" placeholder.
@@ -86,10 +106,16 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
         loading: () => const Center(
           child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
         ),
-        error: (e, _) => const Center(
-          child: Text(
-            'Could not load circle.',
-            style: TextStyle(color: Color(0xFF8A8FA8)),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              kDebugMode
+                  ? 'Could not load circle.\n$e'
+                  : 'Could not load circle.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFF8A8FA8)),
+            ),
           ),
         ),
         data: (circle) {

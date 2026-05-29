@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../auth/application/auth_providers.dart';
 import '../data/activity_feed_repository.dart';
 import '../data/circle_member_repository.dart';
 import '../data/circle_message_repository.dart';
@@ -37,8 +37,9 @@ final circleProofStorageProvider = Provider<CircleProofStorage>(
 
 /// Live stream of circle IDs the current user belongs to.
 /// Reacts instantly when the user joins or leaves a circle.
-final myCircleIdsProvider = StreamProvider<List<String>>((ref) {
-  final uid = FirebaseAuth.instance.currentUser?.uid;
+final myCircleIdsProvider = StreamProvider.autoDispose<List<String>>((ref) {
+  // Re-subscribe when the signed-in uid changes (logout / account switch).
+  final uid = ref.watch(authStateProvider).valueOrNull?.uid;
   if (uid == null || uid.isEmpty) return Stream.value([]);
 
   return FirebaseFirestore.instance
@@ -48,17 +49,18 @@ final myCircleIdsProvider = StreamProvider<List<String>>((ref) {
 });
 
 /// Live stream of all circles the current user belongs to.
-final myCirclesProvider = StreamProvider<List<AccountabilityCircle>>((ref) {
+final myCirclesProvider = StreamProvider.autoDispose<List<AccountabilityCircle>>((ref) {
   final idsAsync = ref.watch(myCircleIdsProvider);
 
-  if (idsAsync.isLoading) {
-    return const Stream.empty();
-  }
   if (idsAsync.hasError) {
     return Stream.error(idsAsync.error!, idsAsync.stackTrace);
   }
 
-  final ids = idsAsync.value ?? [];
+  // While ids are loading after an account switch, avoid Stream.empty() which
+  // never emits and surfaces as a provider error in CommunityScreen.
+  final ids = idsAsync.value;
+  if (ids == null) return Stream.value([]);
+
   if (ids.isEmpty) return Stream.value([]);
 
   return ref.watch(circleRepositoryProvider).watchCircles(ids);
@@ -66,21 +68,46 @@ final myCirclesProvider = StreamProvider<List<AccountabilityCircle>>((ref) {
 
 // ── Per-circle providers ──────────────────────────────────────────────────────
 
+/// Rebuilds all circle-scoped streams when the signed-in uid changes.
+final authUidProvider = Provider<String?>((ref) {
+  return ref.watch(authStateProvider).valueOrNull?.uid;
+});
+
+/// Clears cached per-circle streams after logout / account switch.
+void invalidateCircleScopedProviders(WidgetRef ref) {
+  ref.invalidate(myCircleIdsProvider);
+  ref.invalidate(myCirclesProvider);
+  ref.invalidate(circleDetailProvider);
+  ref.invalidate(circleMembersProvider);
+  ref.invalidate(circleMessagesProvider);
+  ref.invalidate(circleActivityFeedProvider);
+  ref.invalidate(circleRemovalVotesProvider);
+}
+
 /// Live stream of a single circle document.
 final circleDetailProvider =
-    StreamProvider.family<AccountabilityCircle?, String>((ref, circleId) {
+    StreamProvider.autoDispose.family<AccountabilityCircle?, String>((ref, circleId) {
+  final uid = ref.watch(authUidProvider);
+  if (uid == null || uid.isEmpty) return Stream.value(null);
+
   return ref.watch(circleRepositoryProvider).watchCircle(circleId);
 });
 
 /// Live stream of all members in a circle (ordered by joinedAtMs asc).
 final circleMembersProvider =
-    StreamProvider.family<List<CircleMember>, String>((ref, circleId) {
+    StreamProvider.autoDispose.family<List<CircleMember>, String>((ref, circleId) {
+  final uid = ref.watch(authUidProvider);
+  if (uid == null || uid.isEmpty) return Stream.value([]);
+
   return ref.watch(circleMemberRepositoryProvider).watchMembers(circleId);
 });
 
 /// Live stream of the latest 50 messages in a circle (ordered by createdAtMs desc).
 final circleMessagesProvider =
-    StreamProvider.family<List<CircleMessage>, String>((ref, circleId) {
+    StreamProvider.autoDispose.family<List<CircleMessage>, String>((ref, circleId) {
+  final uid = ref.watch(authUidProvider);
+  if (uid == null || uid.isEmpty) return Stream.value([]);
+
   return ref.watch(circleMessageRepositoryProvider).watchMessages(circleId);
 });
 
@@ -97,7 +124,10 @@ final activityFeedRepositoryProvider = Provider<ActivityFeedRepository>(
 
 /// Live stream of the latest 30 activity feed items for a circle.
 final circleActivityFeedProvider =
-    StreamProvider.family<List<ActivityFeedItem>, String>((ref, circleId) {
+    StreamProvider.autoDispose.family<List<ActivityFeedItem>, String>((ref, circleId) {
+  final uid = ref.watch(authUidProvider);
+  if (uid == null || uid.isEmpty) return Stream.value([]);
+
   return ref.watch(activityFeedRepositoryProvider).watchFeed(circleId);
 });
 
@@ -111,7 +141,10 @@ final removalVoteRepositoryProvider = Provider<RemovalVoteRepository>((ref) {
 
 /// Live stream of pending removal votes for a circle.
 final circleRemovalVotesProvider =
-    StreamProvider.family<List<RemovalVote>, String>((ref, circleId) {
+    StreamProvider.autoDispose.family<List<RemovalVote>, String>((ref, circleId) {
+  final uid = ref.watch(authUidProvider);
+  if (uid == null || uid.isEmpty) return Stream.value([]);
+
   return ref
       .watch(removalVoteRepositoryProvider)
       .watchActiveVotes(circleId);
