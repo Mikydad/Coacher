@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/runtime/mutation_request.dart';
+import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../ai_assistant/application/ai_assistant_providers.dart';
 import '../../ai_assistant/presentation/ai_assistant_screen.dart';
@@ -1838,7 +1840,16 @@ Future<void> _openPlansChangedFlow(
   );
   await ref.read(reminderSyncServiceProvider).markLogicalReasonProvided(t.id);
 
-  invalidateTaskListProviders(ref);
+  // migrated to coordinator
+  await ScheduleMutationCoordinator.instance.run(
+    TaskDeferredMutation(
+      entityId: t.id,
+      sourceContext: 'home_screen.skip_task',
+      fromDateStr: t.planDateKey ?? DateKeys.todayKey(),
+      toDateStr: DateKeys.todayKey(),
+    ),
+    commitOverride: () async {},
+  );
   if (!context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
@@ -2197,8 +2208,15 @@ Future<void> _completeTaskFromHome(
         .submit(taskId: t.id, completionPercent: 100);
     final prev = ref.read(scoredTaskStatusesProvider);
     ref.read(scoredTaskStatusesProvider.notifier).state = {...prev, t.id: 100};
-    invalidateTaskListProviders(ref);
-    invalidateTodayCoachingDelivery(ref);
+    // migrated to coordinator
+    await ScheduleMutationCoordinator.instance.run(
+      TaskCompletedMutation(
+        entityId: t.id,
+        sourceContext: 'home_screen.complete_task',
+        dateStr: t.planDateKey ?? DateKeys.todayKey(),
+      ),
+      commitOverride: () async {},
+    );
     if (!context.mounted) return;
     await runAutoNextTaskFlow(
       context,
@@ -2264,7 +2282,15 @@ Future<void> _uncompleteTaskFromHome(
     final prev = ref.read(scoredTaskStatusesProvider);
     final next = Map<String, int>.from(prev)..remove(t.id);
     ref.read(scoredTaskStatusesProvider.notifier).state = next;
-    invalidateTaskListProviders(ref);
+    // migrated to coordinator
+    await ScheduleMutationCoordinator.instance.run(
+      TaskUpdatedMutation(
+        entityId: t.id,
+        sourceContext: 'home_screen.undo_completion',
+        dateStr: t.planDateKey ?? DateKeys.todayKey(),
+      ),
+      commitOverride: () async {},
+    );
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(

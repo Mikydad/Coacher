@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:isar/isar.dart';
 
@@ -63,6 +64,13 @@ class SyncService {
   ///
   /// Returns `true` when a remote pull finished successfully (not debounced/skipped).
   Future<bool> syncFromRemote({bool force = false}) async {
+    // No authenticated user → there is no user-scoped data to pull, and any
+    // Firestore query would fail with permission-denied. Skip silently.
+    if (FirebaseAuth.instance.currentUser == null) {
+      debugPrint('syncFromRemote: no signed-in user, skip');
+      return false;
+    }
+
     if (_activeRemotePullFuture != null) {
       await _activeRemotePullFuture!;
       return _lastRemotePullSucceeded;

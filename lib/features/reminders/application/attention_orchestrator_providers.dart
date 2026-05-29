@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/notifications/notification_ledger_repository.dart';
+import '../../../core/offline/offline_store.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../analytics/application/feature_builder_recompute_service.dart';
@@ -69,6 +71,7 @@ final attentionOrchestratorServiceProvider =
     focusRepository: ref.read(focusRepositoryProvider),
     reminderRepository: ref.read(reminderRepositoryProvider),
     notifications: ref.read(localNotificationsServiceProvider),
+    ledger: NotificationLedgerRepository(OfflineStore.instance.isar!),
     logEvent: logEvent,
     // Synchronous getter — reads cached Riverpod state without suspending.
     getCoachingStyle: () => ref.read(activeCoachingStyleProvider),

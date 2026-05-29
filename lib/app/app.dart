@@ -4,6 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app_navigator.dart';
 import 'application/main_tab_navigation.dart';
 import 'presentation/main_tab_shell.dart';
+import '../features/auth/presentation/auth_landing_screen.dart';
+import '../features/auth/presentation/change_password_screen.dart';
+import '../features/auth/presentation/forgot_password_screen.dart';
+import '../features/auth/presentation/login_screen.dart';
+import '../features/auth/presentation/sign_up_screen.dart';
 import '../features/add_task/presentation/add_task_screen.dart';
 import '../features/analytics/presentation/analytics_progress_screen.dart';
 import '../features/firebase_test/presentation/firebase_test_screen.dart';
@@ -48,6 +53,20 @@ class CoachForLifeApp extends StatelessWidget {
       ),
       initialRoute: MainTabShell.routeName,
       routes: {
+        // ── Auth ──────────────────────────────────────────────────────────
+        AuthLandingScreen.routeName: (_) => const AuthLandingScreen(),
+        LoginScreen.routeName: (context) {
+          final email =
+              ModalRoute.of(context)?.settings.arguments as String?;
+          return LoginScreen(prefillEmail: email);
+        },
+        SignUpScreen.routeName: (_) => const SignUpScreen(),
+        ForgotPasswordScreen.routeName: (context) {
+          final email =
+              ModalRoute.of(context)?.settings.arguments as String?;
+          return ForgotPasswordScreen(prefillEmail: email);
+        },
+        ChangePasswordScreen.routeName: (_) => const ChangePasswordScreen(),
         MainTabShell.routeName: (_) => const MainTabShell(),
         GoalSelectionScreen.routeName: (_) => const GoalSelectionScreen(),
         GoalEditorScreen.routeName: (context) {

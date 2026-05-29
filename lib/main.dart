@@ -6,6 +6,7 @@ import 'app/app_lifecycle_task_refresh.dart';
 import 'app/application/main_tab_navigation.dart';
 import 'app/first_launch_gate.dart';
 import 'core/bootstrap/app_bootstrap.dart';
+import 'features/auth/presentation/auth_gate.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,9 +16,11 @@ Future<void> main() async {
   runApp(
     UncontrolledProviderScope(
       container: container,
-      child: const FirstLaunchGate(
-        child: AppLifecycleTaskRefresh(
-          child: CoachForLifeApp(),
+      child: const AuthGate(
+        child: FirstLaunchGate(
+          child: AppLifecycleTaskRefresh(
+            child: CoachForLifeApp(),
+          ),
         ),
       ),
     ),

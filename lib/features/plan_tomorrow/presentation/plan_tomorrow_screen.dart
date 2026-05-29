@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/runtime/mutation_request.dart';
+import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
+import '../../planning/application/planned_task_providers.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../add_task/presentation/add_task_screen.dart';
 import '../../planning/application/planned_task_collect.dart';
-import '../../planning/application/planned_task_providers.dart';
 import '../../planning/domain/models/block.dart';
 import '../../planning/domain/models/routine.dart';
 import '../../planning/domain/models/routine_mode.dart';
@@ -202,7 +204,15 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
         modeRefId: t.modeRefId,
       ),
     );
-    invalidateTaskListProviders(ref);
+    // migrated to coordinator
+    await ScheduleMutationCoordinator.instance.run(
+      TaskUpdatedMutation(
+        entityId: t.id,
+        sourceContext: 'plan_tomorrow_screen',
+        dateStr: DateKeys.tomorrowKey(),
+      ),
+      commitOverride: () async {},
+    );
     invalidateTomorrowProviders(ref);
   }
 

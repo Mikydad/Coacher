@@ -5,6 +5,7 @@ import '../firebase/firestore_client.dart';
 import '../notifications/local_notifications_service.dart';
 import '../offline/offline_store.dart';
 import '../sync/sync_service.dart';
+import '../../features/auth/application/auth_providers.dart';
 import '../../features/planning/application/routine_mode_policy_resolver.dart';
 import '../../features/planning/data/isar_planning_repository.dart';
 import '../../features/planning/data/planning_repository.dart';
@@ -30,7 +31,14 @@ import '../../features/ai_assistant/data/ai_interaction_history_repository.dart'
 import '../../features/community/application/circle_providers.dart';
 import '../../features/community/application/user_circle_membership_service.dart';
 
-final firestoreClientProvider = Provider<FirestoreClient>((ref) => FirestoreClient());
+/// Rebuilds whenever the signed-in uid changes so all downstream repositories
+/// always use the correct uid-scoped Firestore path.
+final firestoreClientProvider = Provider<FirestoreClient>((ref) {
+  // Watch auth state so this provider invalidates on uid change.
+  final uid = ref.watch(authStateProvider).valueOrNull?.uid ??
+      FirebaseAuth.instance.currentUser?.uid;
+  return FirestoreClient(uid: uid);
+});
 final localNotificationsServiceProvider = Provider<LocalNotificationsService>(
   (ref) => LocalNotificationsService.instance,
 );
