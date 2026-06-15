@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/goals_providers.dart';
 import '../domain/models/user_goal.dart';
-import 'goal_editor_screen.dart';
+import 'goal_template_picker_screen.dart';
 import 'goals_archive_screen.dart';
 import 'widgets/category_chip_row.dart';
 import 'widgets/goal_card.dart';
@@ -32,7 +32,7 @@ class GoalsHomeScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'goals_tab_fab',
         onPressed: () =>
-            Navigator.pushNamed(context, GoalEditorScreen.routeName),
+            Navigator.pushNamed(context, GoalTemplatePickerScreen.routeName),
         backgroundColor: const Color(0xFFB7FF00),
         foregroundColor: Colors.black,
         icon: const Icon(Icons.add),

@@ -17,24 +17,28 @@ import '../../time_blocks/application/time_block_providers.dart';
 import '../../time_blocks/domain/models/time_conflict.dart';
 import '../../time_blocks/domain/models/conflict_resolution_outcome.dart';
 import '../../time_blocks/presentation/scheduling_conflict_sheet.dart';
-import '../application/goal_intensity_mode.dart';
 import '../application/goal_period_helpers.dart';
 import '../application/goals_providers.dart';
 import '../domain/models/goal_action.dart';
 import '../domain/models/goal_categories.dart';
 import '../domain/models/goal_enums.dart';
 import '../domain/models/goal_editor_form_draft.dart';
+import '../domain/models/goal_template.dart';
 import '../domain/models/user_goal.dart';
+import 'widgets/goal_editor_widgets.dart';
 
 class GoalEditorArgs {
-  const GoalEditorArgs({this.goalId});
+  const GoalEditorArgs({this.goalId, this.template});
+
   final String? goalId;
+  final GoalTemplate? template;
 }
 
 class GoalEditorScreen extends ConsumerStatefulWidget {
-  const GoalEditorScreen({super.key, this.goalId});
+  const GoalEditorScreen({super.key, this.goalId, this.template});
 
   final String? goalId;
+  final GoalTemplate? template;
 
   static const routeName = '/goals/edit';
 
@@ -64,6 +68,7 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
   int _reminderMinutesFromMidnight = 9 * 60;
   bool _seeded = false;
   bool _saving = false;
+  bool _advancedExpanded = false;
 
   FormDraftAutosave? _draftAutosave;
   bool _draftInitialized = false;
@@ -80,6 +85,9 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (widget.goalId == null && widget.template != null && !widget.template!.isBlank) {
+      _applyTemplate(widget.template!);
+    }
     if (widget.goalId == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _offerDraftRestoreIfNeeded());
     }
@@ -203,6 +211,43 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
     });
     _suppressDraftDirty = false;
     _draftAutosave?.dirty = false;
+  }
+
+  void _applyTemplate(GoalTemplate template) {
+    _suppressDraftDirty = true;
+    for (final d in _actionDrafts) {
+      d.controller.dispose();
+    }
+    _actionDrafts.clear();
+    if (template.setupSteps.isEmpty) {
+      _actionDrafts.add(_ActionDraft());
+    } else {
+      for (final step in template.setupSteps) {
+        _actionDrafts.add(_ActionDraft(controller: TextEditingController(text: step)));
+      }
+    }
+    setState(() {
+      if (template.suggestedTitle.isNotEmpty) {
+        _title.text = template.suggestedTitle;
+      }
+      if (template.categoryId != null) _categoryId = template.categoryId!;
+      if (template.horizon != null) _horizon = template.horizon!;
+      if (template.periodMode != null) _periodMode = template.periodMode!;
+      if (template.measurement != null) _measurement = template.measurement!;
+      if (template.targetValue != null) {
+        final t = template.targetValue!;
+        _target.text = t == t.roundToDouble() ? '${t.toInt()}' : '$t';
+      }
+      if (template.intensity != null) _intensity = template.intensity!.toDouble();
+      if (template.reminderEnabled != null) _reminderEnabled = template.reminderEnabled!;
+      if (template.reminderMinutesFromMidnight != null) {
+        _reminderMinutesFromMidnight = template.reminderMinutesFromMidnight!;
+      }
+      if (template.customLabel != null) {
+        _customLabel.text = template.customLabel!;
+      }
+    });
+    _suppressDraftDirty = false;
   }
 
   Future<void> _offerDraftRestoreIfNeeded() async {
@@ -522,15 +567,6 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid target number')));
       return;
     }
-    final actionTitles = _actionDrafts
-        .map((d) => d.controller.text.trim())
-        .where((t) => t.isNotEmpty)
-        .toList();
-    if (actionTitles.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add at least one action')));
-      return;
-    }
-
     setState(() => _saving = true);
     final repo = ref.read(goalsRepositoryProvider);
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -660,12 +696,146 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
     }
     setState(() {});
     _suppressDraftDirty = false;
+    if (widget.goalId != null) {
+      _advancedExpanded = true;
+    }
     if (!_draftRestoreScheduled) {
       _draftRestoreScheduled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _offerDraftRestoreIfNeeded();
       });
     }
+  }
+
+  String _targetLabelText() {
+    return switch ((_periodMode, _horizon)) {
+      (GoalPeriodMode.durationDays, _) => 'Target (per day in this run)',
+      (_, GoalHorizon.weekly) => 'Target (this week)',
+      (_, GoalHorizon.monthly) => 'Target (per day in that month)',
+      (_, GoalHorizon.daily) => 'Target (per day)',
+    };
+  }
+
+  String _monthTitle() {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    return '${months[_monthAnchor.month - 1]} ${_monthAnchor.year}';
+  }
+
+  Widget _buildScheduleSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const GoalEditorSectionLabel('Schedule'),
+        GoalEditorHorizonToggle(
+          selected: _horizon,
+          onChanged: (h) => setState(() => _horizon = h),
+        ),
+        if (_periodMode == GoalPeriodMode.calendar) ...[
+          const SizedBox(height: 12),
+          if (_horizon == GoalHorizon.monthly)
+            GoalEditorDateCard(
+              title: _monthTitle(),
+              subtitle: 'Whole calendar month (local time)',
+              onTap: _pickMonth,
+            )
+          else ...[
+            GoalEditorDateCard(
+              title:
+                  'Start: ${_rangeStart.year}-${_rangeStart.month.toString().padLeft(2, '0')}-${_rangeStart.day.toString().padLeft(2, '0')}',
+              subtitle: 'First day',
+              onTap: _pickStart,
+            ),
+            const SizedBox(height: 8),
+            GoalEditorDateCard(
+              title:
+                  'End: ${_rangeEnd.year}-${_rangeEnd.month.toString().padLeft(2, '0')}-${_rangeEnd.day.toString().padLeft(2, '0')}',
+              subtitle: 'Last day',
+              onTap: _pickEnd,
+            ),
+          ],
+        ] else
+          const Padding(
+            padding: EdgeInsets.only(top: 10),
+            child: Text(
+              'Day count mode — set start date and duration in Advanced settings.',
+              style: TextStyle(color: Colors.white38, fontSize: 12),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildAdvancedSection(BuildContext context) {
+    return GoalEditorCollapsibleSection(
+      title: 'Advanced settings',
+      subtitle: 'Sector, period mode, discipline, reminder',
+      expanded: _advancedExpanded,
+      onToggle: () => setState(() => _advancedExpanded = !_advancedExpanded),
+      children: [
+        const GoalEditorSectionLabel('Sector'),
+        GoalEditorSectorChips(
+          selectedId: _categoryId,
+          onSelected: (id) => setState(() => _categoryId = id),
+        ),
+        const SizedBox(height: 20),
+        const GoalEditorSectionLabel('Period mode'),
+        GoalEditorPeriodModeCards(
+          selected: _periodMode,
+          onChanged: (m) => setState(() => _periodMode = m),
+        ),
+        if (_periodMode == GoalPeriodMode.durationDays) ...[
+          const SizedBox(height: 12),
+          GoalEditorDateCard(
+            title:
+                'Starts: ${_durationStart.year}-${_durationStart.month.toString().padLeft(2, '0')}-${_durationStart.day.toString().padLeft(2, '0')}',
+            subtitle: 'First day of the run',
+            onTap: _pickDurationStart,
+          ),
+          const SizedBox(height: 8),
+          GoalEditorTextField(
+            controller: _durationDays,
+            keyboardType: TextInputType.number,
+            hintText: '30',
+            helperText: 'Inclusive: day 1 through this many days',
+          ),
+        ],
+        const SizedBox(height: 20),
+        const GoalEditorSectionLabel('Discipline level'),
+        GoalEditorDisciplineSection(
+          intensity: _intensity,
+          onChanged: (v) => setState(() => _intensity = v),
+        ),
+        const SizedBox(height: 20),
+        KeyedSubtree(
+          key: _reminderSectionKey,
+          child: GoalEditorReminderCard(
+            enabled: _reminderEnabled,
+            timeLabel: _formatReminderTime(context),
+            onToggle: (v) async {
+              if (v) {
+                final ok = await ref
+                    .read(localNotificationsServiceProvider)
+                    .requestPermissionsIfNeeded();
+                if (!context.mounted) return;
+                if (!ok) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Allow notifications to get goal reminders.'),
+                    ),
+                  );
+                }
+              }
+              if (!context.mounted) return;
+              setState(() => _reminderEnabled = v);
+            },
+            onPickTime: _pickReminderTime,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -681,259 +851,88 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
       });
     }
 
+    final filledSteps = _actionDrafts
+        .where((d) => d.controller.text.trim().isNotEmpty)
+        .length;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.goalId == null ? 'New goal' : 'Edit goal'),
+      appBar: GoalEditorHeader(
+        isEditing: widget.goalId != null,
+        onBack: () => Navigator.pop(context),
+        onSave: _saving ? null : _save,
       ),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
           children: [
-            TextFormField(
+            // ── 1. Title ────────────────────────────────────────────────
+            const GoalEditorSectionLabel('Title'),
+            GoalEditorTextField(
               controller: _title,
-              decoration: const InputDecoration(labelText: 'Title', hintText: 'e.g. Learn Chinese'),
+              hintText: 'What is your mission?',
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-            ),
-            const SizedBox(height: 16),
-            const Text('Category', style: TextStyle(color: Colors.white70)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final id in GoalCategories.all)
-                  ChoiceChip(
-                    label: Text(GoalCategories.label(id)),
-                    selected: _categoryId == id,
-                    onSelected: (_) => setState(() => _categoryId = id),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SegmentedButton<GoalHorizon>(
-              segments: const [
-                ButtonSegment(value: GoalHorizon.daily, label: Text('Daily')),
-                ButtonSegment(value: GoalHorizon.weekly, label: Text('Weekly')),
-                ButtonSegment(value: GoalHorizon.monthly, label: Text('Monthly')),
-              ],
-              selected: {_horizon},
-              onSelectionChanged: (s) => setState(() => _horizon = s.first),
-            ),
-            const SizedBox(height: 12),
-            const Text('How long', style: TextStyle(color: Colors.white70)),
-            const SizedBox(height: 8),
-            SegmentedButton<GoalPeriodMode>(
-              segments: const [
-                ButtonSegment(
-                  value: GoalPeriodMode.calendar,
-                  label: Text('Calendar'),
-                  icon: Icon(Icons.calendar_today, size: 18),
-                ),
-                ButtonSegment(
-                  value: GoalPeriodMode.durationDays,
-                  label: Text('Day count'),
-                  icon: Icon(Icons.timelapse, size: 18),
-                ),
-              ],
-              selected: {_periodMode},
-              onSelectionChanged: (s) => setState(() => _periodMode = s.first),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _periodMode == GoalPeriodMode.calendar
-                  ? 'Pick a calendar month or start/end dates.'
-                  : 'Pick a start date and how many days the goal runs (e.g. 30-day sprint).',
-              style: const TextStyle(color: Colors.white54, fontSize: 12),
-            ),
-            const SizedBox(height: 8),
-            if (_periodMode == GoalPeriodMode.calendar) ...[
-              if (_horizon == GoalHorizon.monthly)
-                ListTile(
-                  title: Text(
-                    'Month: ${_monthAnchor.year}-${_monthAnchor.month.toString().padLeft(2, '0')}',
-                  ),
-                  subtitle: const Text('Whole calendar month (local)'),
-                  trailing: const Icon(Icons.calendar_month),
-                  onTap: _pickMonth,
-                )
-              else ...[
-                ListTile(
-                  title: Text('Start: ${_rangeStart.year}-${_rangeStart.month}-${_rangeStart.day}'),
-                  subtitle: const Text('First day'),
-                  onTap: _pickStart,
-                ),
-                ListTile(
-                  title: Text('End: ${_rangeEnd.year}-${_rangeEnd.month}-${_rangeEnd.day}'),
-                  subtitle: const Text('Last day'),
-                  onTap: _pickEnd,
-                ),
-              ],
-            ] else ...[
-              ListTile(
-                title: Text(
-                  'Starts: ${_durationStart.year}-${_durationStart.month.toString().padLeft(2, '0')}-${_durationStart.day.toString().padLeft(2, '0')}',
-                ),
-                subtitle: const Text('First day of the run'),
-                trailing: const Icon(Icons.event),
-                onTap: _pickDurationStart,
-              ),
-              TextFormField(
-                controller: _durationDays,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Number of days',
-                  hintText: 'e.g. 30',
-                  helperText: 'Inclusive: day 1 through this many days',
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            DropdownButtonFormField<MeasurementKind>(
-              // Controlled field; `initialValue` does not follow selection changes.
-              // ignore: deprecated_member_use
-              value: _measurement,
-              decoration: const InputDecoration(labelText: 'Measure progress with'),
-              items: [
-                for (final k in MeasurementKind.values)
-                  DropdownMenuItem(value: k, child: Text(k.displayLabel())),
-              ],
-              onChanged: (v) => setState(() => _measurement = v ?? MeasurementKind.minutes),
-            ),
-            if (_measurement == MeasurementKind.custom)
-              TextFormField(
-                controller: _customLabel,
-                decoration: const InputDecoration(labelText: 'Custom unit label'),
-              ),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _target,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: switch ((_periodMode, _horizon)) {
-                  (GoalPeriodMode.durationDays, _) => 'Target (per day in this run)',
-                  (_, GoalHorizon.weekly) => 'Target (this week)',
-                  (_, GoalHorizon.monthly) => 'Target (per day in that month)',
-                  (_, GoalHorizon.daily) => 'Target (per day)',
-                },
-                hintText: 'e.g. 30',
-              ),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Intensity (discipline level)',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${_intensity.round()} / 5 · ${GoalIntensityMode.displayLabelForIntensity(_intensity.round())}',
-              style: const TextStyle(color: Colors.white70),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              '1–2 flexible · 3–4 disciplined · 5 extreme',
-              style: TextStyle(color: Colors.white38, fontSize: 12),
-            ),
-            Slider(
-              value: _intensity,
-              min: 1,
-              max: 5,
-              divisions: 4,
-              label: '${_intensity.round()}',
-              onChanged: (v) => setState(() => _intensity = v),
-            ),
-            const SizedBox(height: 16),
-            KeyedSubtree(
-              key: _reminderSectionKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-            const Text('Reminder', style: TextStyle(color: Colors.white70)),
-            const SizedBox(height: 4),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Daily reminder'),
-              subtitle: Text(
-                _reminderEnabled
-                    ? 'At ${_formatReminderTime(context)} (local), while this goal is active'
-                    : 'Off',
-                style: const TextStyle(color: Colors.white54, fontSize: 13),
-              ),
-              value: _reminderEnabled,
-              onChanged: (v) async {
-                if (v) {
-                  final ok = await ref.read(localNotificationsServiceProvider).requestPermissionsIfNeeded();
-                  if (!context.mounted) return;
-                  if (!ok) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Allow notifications to get goal reminders.')),
-                    );
-                  }
-                }
-                if (!context.mounted) return;
-                setState(() => _reminderEnabled = v);
-              },
-            ),
-            if (_reminderEnabled)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Reminder time'),
-                subtitle: Text(_formatReminderTime(context)),
-                trailing: const Icon(Icons.schedule),
-                onTap: _pickReminderTime,
-              ),
-            const Padding(
-              padding: EdgeInsets.only(bottom: 8),
-              child: Text(
-                'Uses one notification per day at this time. Other patterns (several pings, “until you start”) can extend this later.',
-                style: TextStyle(color: Colors.white38, fontSize: 12),
-              ),
-            ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text('Actions (what you actually do)', style: TextStyle(color: Colors.white70)),
-            const SizedBox(height: 8),
-            for (var i = 0; i < _actionDrafts.length; i++)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _actionDrafts[i].controller,
-                        decoration: InputDecoration(hintText: 'Action ${i + 1}'),
-                      ),
-                    ),
-                    if (_actionDrafts.length > 1)
-                      IconButton(
-                        icon: const Icon(Icons.remove_circle_outline),
-                        onPressed: () {
-                          setState(() {
-                            _actionDrafts[i].controller.dispose();
-                            _actionDrafts.removeAt(i);
-                          });
-                        },
-                      ),
-                  ],
-                ),
-              ),
-            TextButton.icon(
-              onPressed: () => setState(() => _actionDrafts.add(_ActionDraft())),
-              icon: const Icon(Icons.add),
-              label: const Text('Add action'),
             ),
             const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _saving ? null : _save,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(52),
-                backgroundColor: const Color(0xFFB7FF00),
-                foregroundColor: Colors.black,
+
+            // ── 2. Progress type ────────────────────────────────────────
+            const GoalEditorSectionLabel('Measure progress with'),
+            GoalEditorMeasurementDropdown(
+              value: _measurement,
+              onChanged: (v) => setState(() => _measurement = v),
+            ),
+            if (_measurement == MeasurementKind.custom) ...[
+              const SizedBox(height: 12),
+              GoalEditorTextField(
+                controller: _customLabel,
+                hintText: 'Custom unit label',
               ),
-              child: _saving ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Save goal'),
+            ],
+            const SizedBox(height: 24),
+
+            // ── 3. Target ───────────────────────────────────────────────
+            const GoalEditorSectionLabel('Target'),
+            GoalEditorTextField(
+              controller: _target,
+              keyboardType: TextInputType.number,
+              hintText: 'e.g. 30',
+              helperText: _targetLabelText(),
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+            ),
+            const SizedBox(height: 24),
+
+            // ── 4. Schedule ───────────────────────────────────────────────
+            _buildScheduleSection(),
+            const SizedBox(height: 24),
+
+            // ── 5. Setup steps (optional) ───────────────────────────────
+            GoalEditorSetupStepsSection(
+              stepCount: filledSteps,
+              onAdd: () => setState(() => _actionDrafts.add(_ActionDraft())),
+              children: [
+                for (var i = 0; i < _actionDrafts.length; i++)
+                  GoalEditorSetupStepRow(
+                    index: i,
+                    controller: _actionDrafts[i].controller,
+                    canRemove: _actionDrafts.length > 1,
+                    onRemove: () {
+                      setState(() {
+                        _actionDrafts[i].controller.dispose();
+                        _actionDrafts.removeAt(i);
+                      });
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // ── 6. Advanced settings ────────────────────────────────────
+            _buildAdvancedSection(context),
+            const SizedBox(height: 28),
+
+            GoalEditorSaveButton(
+              saving: _saving,
+              onPressed: _saving ? null : _save,
             ),
           ],
         ),

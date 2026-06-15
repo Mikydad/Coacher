@@ -424,7 +424,7 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
           child: Row(
             children: [
               const Text(
-                'Actions',
+                'Setup steps',
                 style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,

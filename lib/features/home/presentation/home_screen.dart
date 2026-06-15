@@ -47,7 +47,7 @@ import '../../goals/domain/models/goal_categories.dart';
 import '../../goals/domain/models/goal_enums.dart';
 import '../../goals/domain/models/user_goal.dart';
 import '../../goals/presentation/goal_detail_screen.dart';
-import '../../goals/presentation/goal_editor_screen.dart';
+import '../../goals/presentation/goal_template_picker_screen.dart';
 import '../../plan_tomorrow/presentation/plan_tomorrow_screen.dart';
 import '../../../app/application/main_tab_navigation.dart';
 import '../../context_override/presentation/active_override_banner.dart';
@@ -328,7 +328,7 @@ class HomeScreen extends ConsumerWidget {
                           TextButton.icon(
                             onPressed: () => Navigator.pushNamed(
                               context,
-                              GoalEditorScreen.routeName,
+                              GoalTemplatePickerScreen.routeName,
                             ),
                             icon: const Icon(
                               Icons.add,

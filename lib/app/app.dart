@@ -15,6 +15,7 @@ import '../features/firebase_test/presentation/firebase_test_screen.dart';
 import '../features/focus/presentation/focus_selection_screen.dart';
 import '../features/goals/presentation/goal_detail_screen.dart';
 import '../features/goals/presentation/goal_editor_screen.dart';
+import '../features/goals/presentation/goal_template_picker_screen.dart';
 import '../features/goals/presentation/goal_selection_screen.dart';
 import '../features/goals/presentation/goals_archive_screen.dart';
 import '../features/plan_tomorrow/presentation/plan_tomorrow_screen.dart';
@@ -69,10 +70,13 @@ class CoachForLifeApp extends StatelessWidget {
         ChangePasswordScreen.routeName: (_) => const ChangePasswordScreen(),
         MainTabShell.routeName: (_) => const MainTabShell(),
         GoalSelectionScreen.routeName: (_) => const GoalSelectionScreen(),
+        GoalTemplatePickerScreen.routeName: (_) => const GoalTemplatePickerScreen(),
         GoalEditorScreen.routeName: (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
-          final id = args is GoalEditorArgs ? args.goalId : null;
-          return GoalEditorScreen(goalId: id);
+          if (args is GoalEditorArgs) {
+            return GoalEditorScreen(goalId: args.goalId, template: args.template);
+          }
+          return const GoalEditorScreen();
         },
         GoalDetailScreen.routeName: (context) {
           final id =

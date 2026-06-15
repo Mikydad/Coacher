@@ -1,0 +1,945 @@
+import 'package:flutter/material.dart';
+
+import '../../application/goal_intensity_mode.dart';
+import '../../domain/models/goal_categories.dart';
+import '../../domain/models/goal_enums.dart';
+
+/// Shared palette for the goal editor — matches goals list accent styling.
+abstract final class GoalEditorColors {
+  static const lime = Color(0xFFB7FF00);
+  static const cyan = Color(0xFF2A9B8B);
+  static const surface = Color(0xFF1A1C1F);
+  static const surfaceRaised = Color(0xFF222528);
+  static const border = Color(0xFF2A2D32);
+  static const label = Color(0xFF6B7280);
+  static const hint = Color(0xFF4B5563);
+}
+
+class GoalEditorSectionLabel extends StatelessWidget {
+  const GoalEditorSectionLabel(this.text, {super.key, this.trailing});
+
+  final String text;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Text(
+            text.toUpperCase(),
+            style: const TextStyle(
+              color: GoalEditorColors.label,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+          if (trailing != null) ...[const Spacer(), trailing!],
+        ],
+      ),
+    );
+  }
+}
+
+class GoalEditorTextField extends StatelessWidget {
+  const GoalEditorTextField({
+    super.key,
+    required this.controller,
+    this.hintText,
+    this.validator,
+    this.keyboardType,
+    this.helperText,
+  });
+
+  final TextEditingController controller;
+  final String? hintText;
+  final String? Function(String?)? validator;
+  final TextInputType? keyboardType;
+  final String? helperText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextFormField(
+          controller: controller,
+          validator: validator,
+          keyboardType: keyboardType,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: const TextStyle(color: GoalEditorColors.hint, fontWeight: FontWeight.w500),
+            filled: true,
+            fillColor: GoalEditorColors.surface,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: GoalEditorColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: GoalEditorColors.lime, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: Colors.red.shade300),
+            ),
+          ),
+        ),
+        if (helperText != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            helperText!,
+            style: const TextStyle(color: Colors.white38, fontSize: 12),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class GoalEditorSectorChips extends StatelessWidget {
+  const GoalEditorSectorChips({
+    super.key,
+    required this.selectedId,
+    required this.onSelected,
+  });
+
+  final String selectedId;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final id in GoalCategories.all)
+          _SectorChip(
+            label: GoalCategories.label(id),
+            selected: selectedId == id,
+            onTap: () => onSelected(id),
+          ),
+      ],
+    );
+  }
+}
+
+class _SectorChip extends StatelessWidget {
+  const _SectorChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? GoalEditorColors.lime : GoalEditorColors.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: selected ? null : Border.all(color: GoalEditorColors.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected) ...[
+              const Icon(Icons.check, size: 14, color: Colors.black),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.black : Colors.white70,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class GoalEditorHorizonToggle extends StatelessWidget {
+  const GoalEditorHorizonToggle({
+    super.key,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final GoalHorizon selected;
+  final ValueChanged<GoalHorizon> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: GoalEditorColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: GoalEditorColors.border),
+      ),
+      child: Row(
+        children: [
+          for (final h in GoalHorizon.values)
+            Expanded(
+              child: _HorizonTab(
+                label: switch (h) {
+                  GoalHorizon.daily => 'Daily',
+                  GoalHorizon.weekly => 'Weekly',
+                  GoalHorizon.monthly => 'Monthly',
+                },
+                selected: selected == h,
+                onTap: () => onChanged(h),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HorizonTab extends StatelessWidget {
+  const _HorizonTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? GoalEditorColors.surfaceRaised : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: GoalEditorColors.lime.withValues(alpha: 0.15),
+                    blurRadius: 12,
+                  ),
+                ]
+              : null,
+          border: selected
+              ? Border.all(color: GoalEditorColors.lime.withValues(alpha: 0.4))
+              : null,
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: selected ? GoalEditorColors.lime : Colors.white54,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class GoalEditorPeriodModeCards extends StatelessWidget {
+  const GoalEditorPeriodModeCards({
+    super.key,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final GoalPeriodMode selected;
+  final ValueChanged<GoalPeriodMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _PeriodCard(
+            icon: Icons.calendar_today_outlined,
+            title: 'CALENDAR',
+            subtitle: 'Execution tied to specific dates.',
+            selected: selected == GoalPeriodMode.calendar,
+            onTap: () => onChanged(GoalPeriodMode.calendar),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _PeriodCard(
+            icon: Icons.timelapse_outlined,
+            title: 'DAY COUNT',
+            subtitle: 'Continuous streak objective.',
+            selected: selected == GoalPeriodMode.durationDays,
+            onTap: () => onChanged(GoalPeriodMode.durationDays),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PeriodCard extends StatelessWidget {
+  const _PeriodCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.all(14),
+        height: 110,
+        decoration: BoxDecoration(
+          color: GoalEditorColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? Colors.white70 : GoalEditorColors.border,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: selected ? Colors.white : Colors.white38, size: 20),
+            const Spacer(),
+            Text(
+              title,
+              style: TextStyle(
+                color: selected ? Colors.white : Colors.white54,
+                fontWeight: FontWeight.w800,
+                fontSize: 11,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: const TextStyle(color: Colors.white38, fontSize: 10, height: 1.3),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class GoalEditorDateCard extends StatelessWidget {
+  const GoalEditorDateCard({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: GoalEditorColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: GoalEditorColors.border),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: Colors.white38, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: GoalEditorColors.lime,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.calendar_month, color: Colors.black, size: 20),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class GoalEditorMeasurementDropdown extends StatelessWidget {
+  const GoalEditorMeasurementDropdown({
+    super.key,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final MeasurementKind value;
+  final ValueChanged<MeasurementKind> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: GoalEditorColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: GoalEditorColors.border),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<MeasurementKind>(
+          value: value,
+          isExpanded: true,
+          dropdownColor: GoalEditorColors.surfaceRaised,
+          icon: const Icon(Icons.unfold_more, color: Colors.white38, size: 20),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
+          items: [
+            for (final k in MeasurementKind.values)
+              DropdownMenuItem(value: k, child: Text(k.displayLabel())),
+          ],
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class GoalEditorDisciplineSection extends StatelessWidget {
+  const GoalEditorDisciplineSection({
+    super.key,
+    required this.intensity,
+    required this.onChanged,
+  });
+
+  final double intensity;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final level = intensity.round().clamp(1, 5);
+    final label = GoalIntensityMode.displayLabelForIntensity(level).toUpperCase();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 18,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: GoalEditorColors.lime,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'LVL $level',
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '$level / 5 FOCUS',
+              style: const TextStyle(color: Colors.white38, fontSize: 11),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            trackHeight: 6,
+            activeTrackColor: GoalEditorColors.lime,
+            inactiveTrackColor: GoalEditorColors.cyan.withValues(alpha: 0.6),
+            thumbColor: GoalEditorColors.lime,
+            overlayColor: GoalEditorColors.lime.withValues(alpha: 0.15),
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12),
+          ),
+          child: Slider(
+            value: intensity,
+            min: 1,
+            max: 5,
+            divisions: 4,
+            onChanged: onChanged,
+          ),
+        ),
+        const Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('FLEXIBLE', style: TextStyle(color: Colors.white38, fontSize: 10)),
+            Text('EXTREME', style: TextStyle(color: Colors.white38, fontSize: 10)),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class GoalEditorReminderCard extends StatelessWidget {
+  const GoalEditorReminderCard({
+    super.key,
+    required this.enabled,
+    required this.timeLabel,
+    required this.onToggle,
+    required this.onPickTime,
+  });
+
+  final bool enabled;
+  final String timeLabel;
+  final ValueChanged<bool> onToggle;
+  final VoidCallback onPickTime;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: GoalEditorColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: GoalEditorColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white24),
+            ),
+            child: const Icon(Icons.notifications_outlined, color: Colors.white54, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: GestureDetector(
+              onTap: enabled ? onPickTime : null,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Daily reminder',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    enabled ? 'Alert scheduled for $timeLabel' : 'Off',
+                    style: const TextStyle(color: Colors.white38, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Switch.adaptive(
+            value: enabled,
+            activeTrackColor: GoalEditorColors.lime.withValues(alpha: 0.4),
+            activeThumbColor: GoalEditorColors.lime,
+            onChanged: onToggle,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class GoalEditorCollapsibleSection extends StatelessWidget {
+  const GoalEditorCollapsibleSection({
+    super.key,
+    required this.title,
+    required this.expanded,
+    required this.onToggle,
+    required this.children,
+    this.subtitle,
+  });
+
+  final String title;
+  final String? subtitle;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: onToggle,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: GoalEditorColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: GoalEditorColors.border),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title.toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle!,
+                          style: const TextStyle(color: Colors.white38, fontSize: 11),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(Icons.keyboard_arrow_down, color: Colors.white54),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedCrossFade(
+          firstCurve: Curves.easeOutCubic,
+          secondCurve: Curves.easeOutCubic,
+          sizeCurve: Curves.easeOutCubic,
+          crossFadeState:
+              expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 220),
+          firstChild: const SizedBox.shrink(),
+          secondChild: Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: children,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class GoalEditorSetupStepsSection extends StatelessWidget {
+  const GoalEditorSetupStepsSection({
+    super.key,
+    required this.stepCount,
+    required this.children,
+    required this.onAdd,
+  });
+
+  final int stepCount;
+  final List<Widget> children;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GoalEditorSectionLabel(
+          'Setup steps',
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: GoalEditorColors.cyan.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: GoalEditorColors.cyan.withValues(alpha: 0.5)),
+            ),
+            child: Text(
+              stepCount == 0 ? 'OPTIONAL' : '$stepCount ADDED',
+              style: const TextStyle(
+                color: GoalEditorColors.cyan,
+                fontWeight: FontWeight.w700,
+                fontSize: 10,
+              ),
+            ),
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 10),
+          child: Text(
+            'Prep tasks to get started — they don\'t drive goal completion.',
+            style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.4),
+          ),
+        ),
+        ...children,
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: onAdd,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white24),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.add, color: Colors.white54, size: 18),
+                SizedBox(width: 6),
+                Text(
+                  'Add setup step',
+                  style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// @deprecated Use [GoalEditorSetupStepsSection].
+typedef GoalEditorActionsSection = GoalEditorSetupStepsSection;
+
+class GoalEditorSetupStepRow extends StatelessWidget {
+  const GoalEditorSetupStepRow({
+    super.key,
+    required this.index,
+    required this.controller,
+    required this.canRemove,
+    required this.onRemove,
+  });
+
+  final int index;
+  final TextEditingController controller;
+  final bool canRemove;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final number = (index + 1).toString().padLeft(2, '0');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        decoration: BoxDecoration(
+          color: GoalEditorColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: GoalEditorColors.border),
+        ),
+        child: Row(
+          children: [
+            Text(
+              number,
+              style: const TextStyle(
+                color: GoalEditorColors.lime,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: controller,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: index == 0
+                      ? 'Install Flutter SDK'
+                      : 'Add next setup step…',
+                  hintStyle: TextStyle(
+                    color: controller.text.isEmpty ? Colors.white30 : Colors.white38,
+                    fontStyle: index > 0 ? FontStyle.italic : FontStyle.normal,
+                  ),
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+            if (canRemove)
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.white38, size: 18),
+                onPressed: onRemove,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// @deprecated Use [GoalEditorSetupStepRow].
+typedef GoalEditorActionRow = GoalEditorSetupStepRow;
+
+class GoalEditorHeader extends StatelessWidget implements PreferredSizeWidget {
+  const GoalEditorHeader({
+    super.key,
+    required this.isEditing,
+    required this.onBack,
+    this.onSave,
+  });
+
+  final bool isEditing;
+  final VoidCallback onBack;
+  final VoidCallback? onSave;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(56);
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.white70),
+        onPressed: onBack,
+      ),
+      centerTitle: true,
+      title: Text(
+        isEditing ? 'EDIT GOAL' : 'NEW GOAL',
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+          fontSize: 14,
+          letterSpacing: 1.5,
+        ),
+      ),
+      actions: [
+        IconButton(
+          tooltip: 'Save',
+          onPressed: onSave,
+          icon: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: onSave != null
+                  ? GoalEditorColors.lime
+                  : GoalEditorColors.lime.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.save_outlined,
+              size: 18,
+              color: onSave != null ? Colors.black : Colors.black38,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+}
+
+class GoalEditorSaveButton extends StatelessWidget {
+  const GoalEditorSaveButton({
+    super.key,
+    required this.saving,
+    required this.onPressed,
+  });
+
+  final bool saving;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: GoalEditorColors.lime,
+          foregroundColor: Colors.black,
+          disabledBackgroundColor: GoalEditorColors.lime.withValues(alpha: 0.4),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 0,
+        ),
+        child: saving
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black54),
+              )
+            : const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'SAVE GOAL',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: 0.5),
+                  ),
+                  SizedBox(width: 6),
+                  Icon(Icons.bolt, size: 18),
+                ],
+              ),
+      ),
+    );
+  }
+}
