@@ -112,6 +112,14 @@ final goalDetailProvider = FutureProvider.family<GoalDetailBundle?, String>((ref
   );
 });
 
+/// Lightweight fetch of actions for a single goal — used by the counter sheet
+/// to show the action checklist without loading milestones or check-in history.
+final goalActionsProvider =
+    FutureProvider.family<List<GoalAction>, String>((ref, goalId) async {
+  final repo = ref.read(goalsRepositoryProvider);
+  return repo.getActions(goalId);
+});
+
 /// Provides [GoalBlockSyncService] for writing/removing goal time blocks.
 final goalBlockSyncServiceProvider = Provider<GoalBlockSyncService>((ref) {
   return GoalBlockSyncService(
@@ -135,5 +143,91 @@ void invalidateGoals(WidgetRef ref, {String? goalId}) {
   ref.invalidate(goalsStreamProvider);
   if (goalId != null) {
     ref.invalidate(goalDetailProvider(goalId));
+    ref.invalidate(goalTodayProgressProvider(goalId));
+    ref.invalidate(goalActionsProvider(goalId));
   }
 }
+
+/// Progress snapshot for a single goal combining action completion and
+/// the numeric measurement value logged today.
+class GoalTodayProgress {
+  const GoalTodayProgress({
+    required this.currentValue,
+    required this.targetValue,
+    required this.progress,
+    required this.metCommitment,
+    required this.doneActions,
+    required this.totalActions,
+    this.checkIn,
+  });
+
+  /// Numeric amount logged today via the measurement counter (e.g. 30 minutes).
+  final double currentValue;
+
+  /// The goal's measurement target (e.g. 60 minutes, 5 sessions).
+  final double targetValue;
+
+  /// Measurement-based fill fraction: [currentValue] / [targetValue], clamped 0.0–1.0.
+  /// Drives the card fill bar and the ring in the counter sheet.
+  final double progress;
+
+  /// True when the user has explicitly marked today as met.
+  final bool metCommitment;
+
+  /// How many of the goal's actions are completed.
+  final int doneActions;
+
+  /// Total number of actions on this goal.
+  final int totalActions;
+
+  /// Raw check-in for today, or null if none exists yet.
+  final GoalCheckIn? checkIn;
+}
+
+/// Fetches today's progress for a single goal.
+///
+/// [progress] is measurement-based: [currentValue] / [targetValue].
+/// [doneActions] / [totalActions] are carried separately for the actions bar.
+final goalTodayProgressProvider =
+    FutureProvider.family<GoalTodayProgress, String>((ref, goalId) async {
+  final repo = ref.read(goalsRepositoryProvider);
+  final goalAsync = ref.watch(goalsStreamProvider);
+
+  UserGoal? goal;
+  goalAsync.whenData((list) {
+    try {
+      goal = list.firstWhere((g) => g.id == goalId);
+    } catch (_) {
+      goal = null;
+    }
+  });
+
+  final target = goal?.targetValue ?? 1.0;
+  final dateKey = DateKeys.todayKey();
+
+  // Fetch actions and today's check-in concurrently.
+  final results = await Future.wait([
+    repo.getActions(goalId),
+    repo.getTodayCheckIn(goalId, dateKey),
+  ]);
+
+  final actions = results[0] as List<GoalAction>;
+  final checkIn = results[1] as GoalCheckIn?;
+
+  final totalActions = actions.length;
+  final doneActions = actions.where((a) => a.completed).length;
+  final currentValue = checkIn?.value ?? 0.0;
+
+  // Progress is measurement-based (value / target), shown in the ring and card fill.
+  final progress = target > 0 ? (currentValue / target).clamp(0.0, 1.0) : 0.0;
+
+  return GoalTodayProgress(
+    currentValue: currentValue,
+    targetValue: target,
+    progress: progress,
+    metCommitment: checkIn?.metCommitment ?? false,
+    doneActions: doneActions,
+    totalActions: totalActions,
+    checkIn: checkIn,
+  );
+});

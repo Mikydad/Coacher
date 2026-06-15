@@ -107,6 +107,10 @@ class IsarGoalsRepository implements GoalsRepository {
   Future<void> upsertCheckIn(GoalCheckIn checkIn) => _remote.upsertCheckIn(checkIn);
 
   @override
+  Future<GoalCheckIn?> getTodayCheckIn(String goalId, String dateKey) =>
+      _remote.getTodayCheckIn(goalId, dateKey);
+
+  @override
   Future<List<GoalCheckIn>> getCheckInsForGoal(
     String goalId, {
     String? startDateKey,

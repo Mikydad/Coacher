@@ -25,6 +25,7 @@ class UserGoal {
     this.reminderStyle = GoalReminderStyle.dailyOnce,
     required this.createdAtMs,
     required this.updatedAtMs,
+    this.colorHex,
   });
 
   final String id;
@@ -35,6 +36,10 @@ class UserGoal {
   final MeasurementKind measurementKind;
   final double targetValue;
   final String? customLabel;
+
+  /// Optional hex color string (e.g. `'FF5C35'`) chosen by the user.
+  /// When null, the card uses the category's default color.
+  final String? colorHex;
   /// 1–5 (`prd-goals.md` §4.2).
   final int intensity;
   final int periodStartMs;
@@ -90,6 +95,7 @@ class UserGoal {
     GoalReminderStyle? reminderStyle,
     int? createdAtMs,
     int? updatedAtMs,
+    String? colorHex,
   }) {
     return UserGoal(
       id: id ?? this.id,
@@ -110,6 +116,7 @@ class UserGoal {
       reminderStyle: reminderStyle ?? this.reminderStyle,
       createdAtMs: createdAtMs ?? this.createdAtMs,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+      colorHex: colorHex ?? this.colorHex,
     );
   }
 
@@ -132,6 +139,7 @@ class UserGoal {
     'reminderStyle': reminderStyle.storageValue,
     'createdAtMs': createdAtMs,
     'updatedAtMs': updatedAtMs,
+    if (colorHex != null) 'colorHex': colorHex,
   };
 
   static UserGoal fromMap(Map<String, dynamic> map) {
@@ -155,6 +163,7 @@ class UserGoal {
       reminderStyle: GoalReminderStyleStorage.fromStorage(map['reminderStyle'] as String?),
       createdAtMs: (map['createdAtMs'] as num?)?.toInt() ?? 0,
       updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
+      colorHex: map['colorHex'] as String?,
     );
   }
 }

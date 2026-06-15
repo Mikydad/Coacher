@@ -36,6 +36,8 @@ abstract class GoalsRepository {
 
   Future<void> upsertCheckIn(GoalCheckIn checkIn);
 
+  Future<GoalCheckIn?> getTodayCheckIn(String goalId, String dateKey);
+
   Future<List<GoalCheckIn>> getCheckInsForGoal(
     String goalId, {
     String? startDateKey,
@@ -209,6 +211,13 @@ class FirestoreGoalsRepository implements GoalsRepository {
       path: path,
       payload: checkIn.toMap(),
     );
+  }
+
+  @override
+  Future<GoalCheckIn?> getTodayCheckIn(String goalId, String dateKey) async {
+    final doc = await _goals.doc(goalId).collection('checkIns').doc(dateKey).get();
+    if (!doc.exists || doc.data() == null) return null;
+    return GoalCheckIn.fromMap(Map<String, dynamic>.from(doc.data()!));
   }
 
   @override
