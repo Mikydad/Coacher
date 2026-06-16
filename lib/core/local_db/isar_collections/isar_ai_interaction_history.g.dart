@@ -43,18 +43,23 @@ const IsarAiInteractionHistorySchema = CollectionSchema(
       name: r'resolvedCategory',
       type: IsarType.string,
     ),
-    r'sessionId': PropertySchema(
+    r'responseType': PropertySchema(
       id: 5,
+      name: r'responseType',
+      type: IsarType.string,
+    ),
+    r'sessionId': PropertySchema(
+      id: 6,
       name: r'sessionId',
       type: IsarType.string,
     ),
     r'timestampMs': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'timestampMs',
       type: IsarType.long,
     ),
     r'userInput': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'userInput',
       type: IsarType.string,
     )
@@ -119,6 +124,12 @@ int _isarAiInteractionHistoryEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
+  {
+    final value = object.responseType;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.sessionId.length * 3;
   bytesCount += 3 + object.userInput.length * 3;
   return bytesCount;
@@ -135,9 +146,10 @@ void _isarAiInteractionHistorySerialize(
   writer.writeBool(offsets[2], object.executed);
   writer.writeString(offsets[3], object.parsedActionsJson);
   writer.writeString(offsets[4], object.resolvedCategory);
-  writer.writeString(offsets[5], object.sessionId);
-  writer.writeLong(offsets[6], object.timestampMs);
-  writer.writeString(offsets[7], object.userInput);
+  writer.writeString(offsets[5], object.responseType);
+  writer.writeString(offsets[6], object.sessionId);
+  writer.writeLong(offsets[7], object.timestampMs);
+  writer.writeString(offsets[8], object.userInput);
 }
 
 IsarAiInteractionHistory _isarAiInteractionHistoryDeserialize(
@@ -153,9 +165,10 @@ IsarAiInteractionHistory _isarAiInteractionHistoryDeserialize(
   object.isarId = id;
   object.parsedActionsJson = reader.readString(offsets[3]);
   object.resolvedCategory = reader.readStringOrNull(offsets[4]);
-  object.sessionId = reader.readString(offsets[5]);
-  object.timestampMs = reader.readLong(offsets[6]);
-  object.userInput = reader.readString(offsets[7]);
+  object.responseType = reader.readStringOrNull(offsets[5]);
+  object.sessionId = reader.readString(offsets[6]);
+  object.timestampMs = reader.readLong(offsets[7]);
+  object.userInput = reader.readString(offsets[8]);
   return object;
 }
 
@@ -177,10 +190,12 @@ P _isarAiInteractionHistoryDeserializeProp<P>(
     case 4:
       return (reader.readStringOrNull(offset)) as P;
     case 5:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 6:
-      return (reader.readLong(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 7:
+      return (reader.readLong(offset)) as P;
+    case 8:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -958,6 +973,162 @@ extension IsarAiInteractionHistoryQueryFilter on QueryBuilder<
   }
 
   QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> responseTypeIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'responseType',
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> responseTypeIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'responseType',
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> responseTypeEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'responseType',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> responseTypeGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'responseType',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> responseTypeLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'responseType',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> responseTypeBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'responseType',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> responseTypeStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'responseType',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> responseTypeEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'responseType',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+          QAfterFilterCondition>
+      responseTypeContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'responseType',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+          QAfterFilterCondition>
+      responseTypeMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'responseType',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> responseTypeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'responseType',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
+      QAfterFilterCondition> responseTypeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'responseType',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory,
       QAfterFilterCondition> sessionIdEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -1369,6 +1540,20 @@ extension IsarAiInteractionHistoryQuerySortBy on QueryBuilder<
   }
 
   QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
+      sortByResponseType() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'responseType', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
+      sortByResponseTypeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'responseType', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
       sortBySessionId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'sessionId', Sort.asc);
@@ -1498,6 +1683,20 @@ extension IsarAiInteractionHistoryQuerySortThenBy on QueryBuilder<
   }
 
   QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
+      thenByResponseType() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'responseType', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
+      thenByResponseTypeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'responseType', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QAfterSortBy>
       thenBySessionId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'sessionId', Sort.asc);
@@ -1581,6 +1780,13 @@ extension IsarAiInteractionHistoryQueryWhereDistinct on QueryBuilder<
   }
 
   QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QDistinct>
+      distinctByResponseType({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'responseType', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, IsarAiInteractionHistory, QDistinct>
       distinctBySessionId({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'sessionId', caseSensitive: caseSensitive);
@@ -1643,6 +1849,13 @@ extension IsarAiInteractionHistoryQueryProperty on QueryBuilder<
       resolvedCategoryProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'resolvedCategory');
+    });
+  }
+
+  QueryBuilder<IsarAiInteractionHistory, String?, QQueryOperations>
+      responseTypeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'responseType');
     });
   }
 

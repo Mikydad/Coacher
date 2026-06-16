@@ -1,12 +1,16 @@
 import '../../../core/utils/date_keys.dart';
 import '../../coaching/data/coaching_style_repository.dart';
 import '../../context_override/data/context_override_repository.dart';
+import '../../goals/application/goal_period_helpers.dart';
 import '../../goals/data/goals_repository.dart';
+import '../../goals/domain/models/goal_check_in.dart';
+import '../../goals/domain/models/goal_enums.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/data/planning_repository.dart';
 import '../../profile/application/profile_preference_service.dart';
 import '../data/ai_interaction_history_repository.dart';
 import '../domain/models/ai_operating_layer_payload.dart';
+import 'ai_capability_registry.dart';
 import 'entity_normaliser.dart';
 
 /// Assembles the [AiOperatingLayerPayload] from live app data.
@@ -41,7 +45,10 @@ class AiPayloadAssembler {
     final results = await Future.wait([
       _buildActiveTasks(),
       _buildGoals(),
+      _buildGoalProgress(),
       _buildTodaySchedule(),
+      _buildTomorrowTasks(),
+      _buildTomorrowSchedule(),
       _buildFocusState(),
       _buildContextOverride(),
       _buildBehaviorPreferences(),
@@ -55,14 +62,18 @@ class AiPayloadAssembler {
       userInput: userInput,
       activeTasks: results[0] as List<Map<String, dynamic>>,
       goals: results[1] as List<Map<String, dynamic>>,
-      todaySchedule: results[2] as List<Map<String, dynamic>>,
-      focusState: results[3] as Map<String, dynamic>,
-      contextOverride: results[4] as Map<String, dynamic>?,
-      behaviorPreferences: results[5] as Map<String, dynamic>,
-      sessionHistory: results[6] as List<Map<String, dynamic>>,
-      recentPatterns: results[7] as List<Map<String, dynamic>>,
-      conversationHistory: results[8] as List<Map<String, dynamic>>,
-      completedInSession: results[9] as List<String>,
+      goalProgress: results[2] as List<Map<String, dynamic>>,
+      todaySchedule: results[3] as List<Map<String, dynamic>>,
+      tomorrowTasks: results[4] as List<Map<String, dynamic>>,
+      tomorrowSchedule: results[5] as List<Map<String, dynamic>>,
+      focusState: results[6] as Map<String, dynamic>,
+      contextOverride: results[7] as Map<String, dynamic>?,
+      behaviorPreferences: results[8] as Map<String, dynamic>,
+      sessionHistory: results[9] as List<Map<String, dynamic>>,
+      recentPatterns: results[10] as List<Map<String, dynamic>>,
+      conversationHistory: results[11] as List<Map<String, dynamic>>,
+      completedInSession: results[12] as List<String>,
+      capabilities: AiCapabilityRegistry.buildPayloadSection(),
       previousPlan: previousPlanSummary,
     );
   }
@@ -72,33 +83,99 @@ class AiPayloadAssembler {
   Future<List<Map<String, dynamic>>> _buildActiveTasks() async {
     try {
       final rows = await collectTodayPlannedRows(planningRepository);
-      return rows.map((row) {
-        final t = row.task;
-        String? timeStr;
-        if (t.reminderTimeIso != null && t.reminderTimeIso!.isNotEmpty) {
-          final dt = DateTime.tryParse(t.reminderTimeIso!)?.toLocal();
-          if (dt != null) {
-            timeStr =
-                '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-          }
-        }
-        return {
-          'title': t.title,
-          'time': timeStr ?? 'no time set',
-          'duration': '${t.durationMinutes} min',
-          'status': t.status.name,
-        };
-      }).toList();
+      return _taskMapsFromRows(rows);
     } catch (_) {
       return [];
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _buildTomorrowTasks() async {
+    try {
+      final rows = await collectTasksForDateKey(
+        planningRepository,
+        DateKeys.tomorrowKey(),
+      );
+      return _taskMapsFromRows(rows);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _buildTodaySchedule() async {
+    try {
+      final rows = await collectTodayPlannedRows(planningRepository);
+      return _scheduleMapsFromRows(rows);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _buildTomorrowSchedule() async {
+    try {
+      final rows = await collectTasksForDateKey(
+        planningRepository,
+        DateKeys.tomorrowKey(),
+      );
+      return _scheduleMapsFromRows(rows);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  List<Map<String, dynamic>> _taskMapsFromRows(List<PlannedTaskRow> rows) {
+    return rows.map((row) {
+      final t = row.task;
+      String? timeStr;
+      if (t.reminderTimeIso != null && t.reminderTimeIso!.isNotEmpty) {
+        final dt = DateTime.tryParse(t.reminderTimeIso!)?.toLocal();
+        if (dt != null) {
+          timeStr =
+              '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+        }
+      }
+      final durationLabel = t.durationMinutes >= 1
+          ? '${t.durationMinutes} min'
+          : 'reminder only';
+      return {
+        'title': t.title,
+        'time': timeStr ?? 'no time set',
+        'duration': durationLabel,
+        'status': t.status.name,
+      };
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _scheduleMapsFromRows(List<PlannedTaskRow> rows) {
+    final scheduled = rows.where((r) {
+      final iso = r.task.reminderTimeIso;
+      return iso != null && iso.isNotEmpty;
+    }).toList();
+
+    return scheduled.map((row) {
+      final t = row.task;
+      final dt = DateTime.tryParse(t.reminderTimeIso!)?.toLocal();
+      final startStr = dt != null
+          ? '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}'
+          : '?';
+      final endDt = dt != null && t.durationMinutes >= 1
+          ? dt.add(Duration(minutes: t.durationMinutes))
+          : null;
+      final endStr = endDt != null
+          ? '${endDt.hour.toString().padLeft(2, '0')}:${endDt.minute.toString().padLeft(2, '0')}'
+          : '?';
+      return {
+        'title': t.title,
+        'startTime': startStr,
+        'endTime': endStr,
+      };
+    }).toList();
   }
 
   Future<List<Map<String, dynamic>>> _buildGoals() async {
     try {
       final goals = await goalsRepository.fetchGoalsOnce();
       return goals
-          .where((g) => g.status.name == 'active')
+          .where((g) => g.status == GoalStatus.active)
           .take(5)
           .map((g) {
             final deadline = DateTime.fromMillisecondsSinceEpoch(g.periodEndMs)
@@ -118,32 +195,42 @@ class AiPayloadAssembler {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _buildTodaySchedule() async {
-    // Today's time blocks come from active tasks with a set time — already in
-    // _buildActiveTasks; return a filtered view of scheduled items only.
+  Future<List<Map<String, dynamic>>> _buildGoalProgress() async {
     try {
-      final rows = await collectTodayPlannedRows(planningRepository);
-      final scheduled = rows.where((r) {
-        final iso = r.task.reminderTimeIso;
-        return iso != null && iso.isNotEmpty;
-      }).toList();
+      final goals = await goalsRepository.fetchGoalsOnce();
+      final active = goals.where((g) => g.status == GoalStatus.active).take(5);
+      final now = DateTime.now();
+      final progress = <Map<String, dynamic>>[];
 
-      return scheduled.map((row) {
-        final t = row.task;
-        final dt = DateTime.tryParse(t.reminderTimeIso!)?.toLocal();
-        final startStr = dt != null
-            ? '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}'
-            : '?';
-        final endDt = dt?.add(Duration(minutes: t.durationMinutes));
-        final endStr = endDt != null
-            ? '${endDt.hour.toString().padLeft(2, '0')}:${endDt.minute.toString().padLeft(2, '0')}'
-            : '?';
-        return {
-          'title': t.title,
-          'startTime': startStr,
-          'endTime': endStr,
-        };
-      }).toList();
+      for (final g in active) {
+        final periodStart = DateTime.fromMillisecondsSinceEpoch(g.periodStartMs)
+            .toLocal();
+        final periodEnd = DateTime.fromMillisecondsSinceEpoch(g.periodEndMs)
+            .toLocal();
+
+        List<GoalCheckIn> checkIns;
+        try {
+          checkIns = await goalsRepository.getCheckInsForGoal(
+            g.id,
+            startDateKey: DateKeys.yyyymmdd(periodStart),
+            endDateKey: DateKeys.yyyymmdd(periodEnd),
+          );
+        } catch (_) {
+          checkIns = const [];
+        }
+
+        progress.add({
+          'title': g.title,
+          'target':
+              '${g.targetValue.toStringAsFixed(0)} ${g.customLabel ?? g.measurementKind.name}',
+          'periodSummary': GoalPeriodHelpers.formatPeriodSummary(g),
+          'daysMet': GoalPeriodHelpers.countMetCheckIns(checkIns),
+          'daysElapsed': GoalPeriodHelpers.daysElapsedInPeriodThrough(g, now),
+          'totalDays': GoalPeriodHelpers.totalCalendarDaysInPeriod(g),
+        });
+      }
+
+      return progress;
     } catch (_) {
       return [];
     }

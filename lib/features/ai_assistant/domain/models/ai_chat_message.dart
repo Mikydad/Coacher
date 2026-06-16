@@ -19,6 +19,7 @@ class AiChatMessage {
     required this.content,
     required this.timestamp,
     this.plannedChanges,
+    this.suggestedPrompts = const [],
     this.isLoading = false,
     this.isCurrentPlan = false,
     this.isExecuted = false,
@@ -31,6 +32,9 @@ class AiChatMessage {
 
   /// Non-null only for assistant messages that carry a preview card.
   final AiPlannedChanges? plannedChanges;
+
+  /// Optional follow-up chips under an informational assistant message.
+  final List<String> suggestedPrompts;
 
   /// True while the AI is still processing (shows loading dots).
   final bool isLoading;
@@ -50,6 +54,7 @@ class AiChatMessage {
     String? content,
     DateTime? timestamp,
     AiPlannedChanges? plannedChanges,
+    List<String>? suggestedPrompts,
     bool? isLoading,
     bool? isCurrentPlan,
     bool? isExecuted,
@@ -60,6 +65,7 @@ class AiChatMessage {
       content: content ?? this.content,
       timestamp: timestamp ?? this.timestamp,
       plannedChanges: plannedChanges ?? this.plannedChanges,
+      suggestedPrompts: suggestedPrompts ?? this.suggestedPrompts,
       isLoading: isLoading ?? this.isLoading,
       isCurrentPlan: isCurrentPlan ?? this.isCurrentPlan,
       isExecuted: isExecuted ?? this.isExecuted,

@@ -28,7 +28,14 @@ class AiInteractionHistoryRepository {
     required String userInput,
     required List<AiAction> parsedActions,
     String? resolvedCategory,
+    String? assistantSummary,
+    String? responseType,
   }) async {
+    final trimmed = assistantSummary?.trim();
+    final capped = trimmed != null && trimmed.isNotEmpty
+        ? (trimmed.length > 500 ? '${trimmed.substring(0, 497)}…' : trimmed)
+        : null;
+
     final entry = IsarAiInteractionHistory()
       ..sessionId = sessionId
       ..userInput = userInput
@@ -36,6 +43,8 @@ class AiInteractionHistoryRepository {
       ..confirmed = false
       ..executed = false
       ..resolvedCategory = resolvedCategory
+      ..assistantSummary = capped
+      ..responseType = responseType
       ..timestampMs = DateTime.now().millisecondsSinceEpoch;
 
     await _isar.writeTxn(() async {

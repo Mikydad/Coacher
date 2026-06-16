@@ -7,6 +7,9 @@ import '../../../core/ai/ai_remote_config_service.dart';
 import '../domain/models/ai_action.dart';
 import '../domain/models/ai_operating_layer_payload.dart';
 import '../domain/models/ai_planned_changes.dart';
+import '../domain/models/ai_response_type.dart';
+import 'ai_operating_layer_response_parser.dart';
+import 'ai_capability_registry.dart';
 
 // ─── Abstract client ──────────────────────────────────────────────────────────
 
@@ -40,9 +43,11 @@ class AiOperatingLayerException implements Exception {
 const String _kSystemPrompt = '''
 You are the AI Operating Layer for a personal productivity app called "Coach for Life".
 
-Your job is to convert a user's natural-language request into a structured JSON plan.
+You handle two kinds of user messages:
+1. **Questions / summaries** — answer from the schedule and goal data in the prompt (read-only).
+2. **Change requests** — return structured actions for preview and confirmation (writes).
 
-## Supported action types
+## Supported action types (mutate only)
 createTask, editTask, moveTask, deleteTask,
 createGoal, modifyGoal, deleteGoal,
 addReminder, removeReminder, rescheduleReminder,
@@ -50,10 +55,11 @@ activateContextOverride, endContextOverride,
 suggestFreeTimeBlock, moveConflictingTasks
 
 ## Output format
-You MUST respond with valid JSON matching one of these two schemas:
+You MUST respond with valid JSON matching ONE of these schemas:
 
-### Schema A — Plan ready
+### Schema A — Plan ready (mutate)
 {
+  "responseType": "mutate",
   "actions": [
     {
       "actionType": "<one of the supported types>",
@@ -64,12 +70,32 @@ You MUST respond with valid JSON matching one of these two schemas:
   "conflicts": ["<human-readable conflict string>", ...]
 }
 
-### Schema B — Missing information
+### Schema B — Missing information (follow-up)
 {
+  "responseType": "followUp",
   "actions": [],
   "conflicts": [],
   "followUpQuestion": "<single, friendly question asking for the missing detail>"
 }
+
+### Schema C — Informational answer (read-only)
+{
+  "responseType": "informational",
+  "message": "<clear summary citing only payload data>",
+  "suggestedPrompts": ["<optional follow-up the user might tap>", ...]
+}
+
+Use Schema C when the user asks what is scheduled, what is on their plan, summaries of today/tomorrow, or goal overview — WITHOUT asking you to create, move, delete, or change anything.
+
+If a schedule section is empty, say so explicitly (e.g. "Nothing scheduled for tomorrow yet.").
+
+### Schema D — Unsupported request
+{
+  "responseType": "unsupported",
+  "message": "<honest limit, e.g. community/circles/billing not available in Coach AI yet>"
+}
+
+Use Schema D only when the user asks for features outside tasks, goals, reminders, schedule, and focus/context overrides.
 
 ## Parameter keys by action type
 - createTask / editTask:        title (str), time (HH:MM), duration (int, minutes), date (YYYY-MM-DD or "today"/"tomorrow")
@@ -85,20 +111,21 @@ You MUST respond with valid JSON matching one of these two schemas:
 - suggestFreeTimeBlock:         durationMinutes (int)
 
 ## Rules
-- NEVER invent values — use only what the user said or what appears in activeTasks/goals.
+- For informational answers: NEVER invent tasks or times — use ONLY activeTasks, todaySchedule, tomorrowTasks, tomorrowSchedule, and goals from the prompt.
+- For mutate requests: NEVER invent values — use only what the user said or what appears in activeTasks/goals.
 - If a required field is missing and cannot be clearly inferred, use Schema B (follow-up question).
 - Ask ONLY one question at a time.
-- A single request may produce multiple actions — return all of them.
+- A single mutate request may produce multiple actions — return all of them.
 - Dates and times are always in the user's local timezone.
 - Keep conflict strings short and human-readable (max 12 words each).
 - If focusState.isActive == true, avoid scheduling new tasks during the active override window.
 - If recentPatterns are provided, prefer times/durations matching the user's past patterns.
 
-## Coaching-style phrasing (applies to followUpQuestion and plan summaries only)
-- supportive:   Warm, encouraging tone. "Great choice! Here's what I'll add…"
-- balanced:     Neutral, professional. "Here's the plan: …"
-- disciplined:  Firm, no-fluff. "Scheduled. Stay on track."
-- intense:      Terse, commanding. "Locked in. Execute."
+## Coaching-style phrasing (applies to message and followUpQuestion)
+- supportive:   Warm, encouraging tone.
+- balanced:     Neutral, professional.
+- disciplined:  Firm, no-fluff.
+- intense:      Terse, commanding.
 Use the coachingStyle from behaviorPreferences to calibrate your wording.
 
 ## Multi-turn context
@@ -106,7 +133,7 @@ If conversationHistory is present, treat it as prior turns of this session.
 If previousPlan is present, the user is refining an earlier plan — carry over unchanged actions
 and only modify what the user explicitly specified in the new message.
 
-## Delta-only planning (critical)
+## Delta-only planning (critical — mutate only)
 Each user message describes ONLY new changes for this turn — not the full session.
 - If activeTasks or todaySchedule already lists a task with a scheduled time, do NOT include
   createTask, addReminder, or rescheduleReminder for that item unless the user's CURRENT
@@ -203,11 +230,47 @@ class OpenAiOperatingLayerClient implements AiOperatingLayerClient {
       buffer.writeln();
     }
 
+    if (payload.goalProgress.isNotEmpty) {
+      buffer.writeln('Goal progress this period:');
+      for (final g in payload.goalProgress) {
+        buffer.writeln(
+          '  - ${g['title']}: ${g['daysMet']}/${g['target']} '
+          '(${g['daysElapsed']}/${g['totalDays']} days, ${g['periodSummary']})',
+        );
+      }
+      buffer.writeln();
+    }
+
     if (payload.todaySchedule.isNotEmpty) {
       buffer.writeln("Today's schedule blocks:");
       for (final s in payload.todaySchedule) {
         buffer.writeln('  - ${s['title']} ${s['startTime']}–${s['endTime']}');
       }
+      buffer.writeln();
+    } else {
+      buffer.writeln("Today's schedule blocks: (none)");
+      buffer.writeln();
+    }
+
+    if (payload.tomorrowTasks.isNotEmpty) {
+      buffer.writeln("Tomorrow's tasks:");
+      for (final t in payload.tomorrowTasks) {
+        buffer.writeln('  - ${t['title']} at ${t['time'] ?? 'no time'} (${t['duration'] ?? '?'}, ${t['status'] ?? 'pending'})');
+      }
+      buffer.writeln();
+    } else {
+      buffer.writeln("Tomorrow's tasks: (none)");
+      buffer.writeln();
+    }
+
+    if (payload.tomorrowSchedule.isNotEmpty) {
+      buffer.writeln("Tomorrow's schedule blocks:");
+      for (final s in payload.tomorrowSchedule) {
+        buffer.writeln('  - ${s['title']} ${s['startTime']}–${s['endTime']}');
+      }
+      buffer.writeln();
+    } else {
+      buffer.writeln("Tomorrow's schedule blocks: (none)");
       buffer.writeln();
     }
 
@@ -255,9 +318,12 @@ class OpenAiOperatingLayerClient implements AiOperatingLayerClient {
       buffer.writeln();
     }
 
+    buffer.writeln(AiCapabilityRegistry.formatForPrompt());
+
     buffer.writeln();
     buffer.writeln(
-      'Parse ONLY the new change requested in this message. Return a JSON plan.',
+      'Choose the correct responseType. For questions about schedule/goals use informational. '
+      'For change requests use mutate. Return valid JSON only.',
     );
     return buffer.toString();
   }
@@ -272,30 +338,7 @@ class OpenAiOperatingLayerClient implements AiOperatingLayerClient {
       final content =
           ((choices.first as Map)['message'] as Map)['content'] as String? ?? '';
       final inner = jsonDecode(content) as Map<String, dynamic>;
-
-      // Schema B — follow-up question
-      final followUp = inner['followUpQuestion'] as String?;
-      if (followUp != null && followUp.isNotEmpty) {
-        return AiPlannedChanges(
-          sessionId: sessionId,
-          followUpQuestion: followUp,
-        );
-      }
-
-      // Schema A — plan
-      final actionsRaw = inner['actions'] as List? ?? [];
-      final actions = actionsRaw
-          .map((a) => AiAction.fromJson(Map<String, dynamic>.from(a as Map)))
-          .toList();
-
-      final conflictsRaw = inner['conflicts'] as List? ?? [];
-      final conflicts = conflictsRaw.map((c) => c.toString()).toList();
-
-      return AiPlannedChanges(
-        sessionId: sessionId,
-        actions: actions,
-        conflicts: conflicts,
-      );
+      return parseOperatingLayerJsonMap(inner, sessionId);
     } catch (e) {
       throw AiOperatingLayerException('Failed to parse AI response: $e');
     }
@@ -320,7 +363,8 @@ Future<AiOperatingLayerClient> buildAiOperatingLayerClient() async {
 
 // ─── Mock client ──────────────────────────────────────────────────────────────
 
-/// Deterministic mock — returns a single createTask action for testing.
+/// Deterministic mock — schedule queries return informational answers;
+/// other inputs return a sample createTask plan for testing.
 class MockAiOperatingLayerClient implements AiOperatingLayerClient {
   const MockAiOperatingLayerClient({this.shouldFail = false});
 
@@ -334,7 +378,20 @@ class MockAiOperatingLayerClient implements AiOperatingLayerClient {
       throw const AiOperatingLayerException('Mock forced failure');
     }
 
-    // Simulate a simple createTask response
+    final unsupported = AiCapabilityRegistry.detectUnsupported(payload.userInput);
+    if (unsupported != null) {
+      return AiPlannedChanges(
+        sessionId: payload.userInput,
+        responseType: AiResponseType.unsupported,
+        informationalMessage: unsupported.message,
+        suggestedPrompts: unsupported.suggestedPrompts,
+      );
+    }
+
+    if (_looksLikeScheduleQuery(payload.userInput)) {
+      return _mockInformationalScheduleAnswer(payload);
+    }
+
     return AiPlannedChanges(
       sessionId: payload.userInput,
       actions: [
@@ -350,6 +407,67 @@ class MockAiOperatingLayerClient implements AiOperatingLayerClient {
         ),
       ],
       conflicts: const [],
+    );
+  }
+
+  static bool _looksLikeScheduleQuery(String input) {
+    final lower = input.toLowerCase();
+    const queryWords = [
+      'what',
+      'show',
+      'tell me',
+      'list',
+      'how many',
+      'what\'s',
+      'whats',
+    ];
+    const scheduleWords = [
+      'plan',
+      'schedule',
+      'tomorrow',
+      'today',
+      'on my',
+      'this week',
+    ];
+    final hasQuery = queryWords.any(lower.contains);
+    final hasSchedule = scheduleWords.any(lower.contains);
+    return hasQuery && hasSchedule;
+  }
+
+  static AiPlannedChanges _mockInformationalScheduleAnswer(
+    AiOperatingLayerPayload payload,
+  ) {
+    final lower = payload.userInput.toLowerCase();
+    final forTomorrow = lower.contains('tomorrow');
+    final tasks = forTomorrow ? payload.tomorrowTasks : payload.activeTasks;
+    final schedule =
+        forTomorrow ? payload.tomorrowSchedule : payload.todaySchedule;
+    final label = forTomorrow ? 'tomorrow' : 'today';
+
+    final buffer = StringBuffer('Here\'s your plan for $label:\n');
+    if (schedule.isNotEmpty) {
+      for (final block in schedule) {
+        buffer.writeln(
+          '• ${block['title']} ${block['startTime']}–${block['endTime']}',
+        );
+      }
+    } else if (tasks.isNotEmpty) {
+      for (final task in tasks) {
+        buffer.writeln(
+          '• ${task['title']} at ${task['time']} (${task['duration']})',
+        );
+      }
+    } else {
+      buffer.writeln('Nothing scheduled yet.');
+    }
+
+    return AiPlannedChanges(
+      sessionId: payload.userInput,
+      responseType: AiResponseType.informational,
+      informationalMessage: buffer.toString().trim(),
+      suggestedPrompts: forTomorrow
+          ? const ['Add a task for tomorrow at 9am']
+          : const ['What\'s my plan for tomorrow?'],
     );
   }
 }

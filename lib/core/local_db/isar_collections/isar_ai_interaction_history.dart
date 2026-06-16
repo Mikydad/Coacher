@@ -29,6 +29,9 @@ class IsarAiInteractionHistory {
   /// Stored after execution to enable full assistant turns in conversationHistory (Phase 3).
   String? assistantSummary;
 
+  /// Response mode for analytics — informational, mutate, followUp, unsupported.
+  String? responseType;
+
   /// Milliseconds since epoch — used for TTL purge queries.
   @Index()
   late int timestampMs;

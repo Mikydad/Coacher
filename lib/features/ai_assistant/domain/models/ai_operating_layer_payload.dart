@@ -10,6 +10,8 @@ class AiOperatingLayerPayload {
     this.activeTasks = const [],
     this.goals = const [],
     this.todaySchedule = const [],
+    this.tomorrowTasks = const [],
+    this.tomorrowSchedule = const [],
     this.focusState = const {},
     this.contextOverride,
     this.behaviorPreferences = const {},
@@ -17,6 +19,8 @@ class AiOperatingLayerPayload {
     this.recentPatterns = const [],
     this.conversationHistory = const [],
     this.completedInSession = const [],
+    this.goalProgress = const [],
+    this.capabilities = const {},
     this.previousPlan,
   });
 
@@ -32,6 +36,12 @@ class AiOperatingLayerPayload {
   /// Today's time blocks — each entry: { title, startTime, endTime }.
   final List<Map<String, dynamic>> todaySchedule;
 
+  /// Tomorrow's tasks — same shape as [activeTasks].
+  final List<Map<String, dynamic>> tomorrowTasks;
+
+  /// Tomorrow's scheduled blocks — same shape as [todaySchedule].
+  final List<Map<String, dynamic>> tomorrowSchedule;
+
   /// Current focus/flow state.
   final Map<String, dynamic> focusState;
 
@@ -42,25 +52,25 @@ class AiOperatingLayerPayload {
   final Map<String, dynamic> behaviorPreferences;
 
   /// Last ≤10 user↔AI exchanges for multi-turn context.
-  /// Each entry: { role: 'user'|'assistant', content: String }.
   final List<Map<String, dynamic>> sessionHistory;
 
   /// Top 5 recurring activity patterns from the last 14 days.
-  /// Each entry: { category, lastUsedTime, lastUsedDuration, frequency }.
-  /// Helps the model understand the user's schedule rhythm.
   final List<Map<String, dynamic>> recentPatterns;
 
   /// Full session conversation history as OpenAI-compatible role/content pairs.
-  /// Each entry: { role: 'user'|'assistant', content: String }.
-  /// Used by the client as preceding messages for multi-turn context.
   final List<Map<String, dynamic>> conversationHistory;
 
   /// Human-readable summaries of changes already confirmed in this session.
-  /// Tells the model not to re-plan or re-ask about these items.
   final List<String> completedInSession;
 
+  /// Active goals with progress in the current period.
+  /// Each entry: { title, target, periodSummary, daysMet, daysElapsed, totalDays }.
+  final List<Map<String, dynamic>> goalProgress;
+
+  /// Supported / unsupported capability lists for the model.
+  final Map<String, dynamic> capabilities;
+
   /// The previous plan when the user is refining an earlier intent.
-  /// Serialised as a human-readable string for the AI prompt.
   final String? previousPlan;
 
   Map<String, dynamic> toJson() => {
@@ -68,6 +78,8 @@ class AiOperatingLayerPayload {
         'activeTasks': activeTasks,
         'goals': goals,
         'todaySchedule': todaySchedule,
+        'tomorrowTasks': tomorrowTasks,
+        'tomorrowSchedule': tomorrowSchedule,
         'focusState': focusState,
         if (contextOverride != null) 'contextOverride': contextOverride,
         'behaviorPreferences': behaviorPreferences,
@@ -75,6 +87,8 @@ class AiOperatingLayerPayload {
         if (recentPatterns.isNotEmpty) 'recentPatterns': recentPatterns,
         if (conversationHistory.isNotEmpty) 'conversationHistory': conversationHistory,
         if (completedInSession.isNotEmpty) 'completedInSession': completedInSession,
+        if (goalProgress.isNotEmpty) 'goalProgress': goalProgress,
+        if (capabilities.isNotEmpty) 'capabilities': capabilities,
         if (previousPlan != null) 'previousPlan': previousPlan,
       };
 }

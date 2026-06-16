@@ -6,9 +6,9 @@ import '../../planning/application/planned_task_collect.dart';
 import 'entity_normaliser.dart';
 
 const List<String> kDefaultSuggestedPrompts = [
+  'What\'s my plan for tomorrow?',
   'Add a workout at 5AM',
   'Move my study session tomorrow',
-  'Enable focus mode for 90 minutes',
 ];
 
 /// Generates up to 3 context-specific suggested prompts based on the user's

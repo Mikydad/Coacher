@@ -1,7 +1,9 @@
 import '../domain/models/ai_action.dart';
 import '../domain/models/ai_planned_changes.dart';
 import '../domain/models/ai_operating_layer_payload.dart';
+import '../domain/models/ai_response_type.dart';
 import 'ai_assumption_engine.dart';
+import 'ai_capability_registry.dart';
 import 'ai_conflict_detector.dart';
 import 'ai_missing_field_detector.dart';
 import 'ai_operating_layer_client.dart';
@@ -34,6 +36,17 @@ class AiIntentParser {
     String sessionId, {
     AiPlannedChanges? previousPlan,
   }) async {
+    // Fast path — unsupported domains never reach the LLM.
+    final unsupported = AiCapabilityRegistry.detectUnsupported(userInput);
+    if (unsupported != null) {
+      return AiPlannedChanges(
+        sessionId: sessionId,
+        responseType: AiResponseType.unsupported,
+        informationalMessage: unsupported.message,
+        suggestedPrompts: unsupported.suggestedPrompts,
+      );
+    }
+
     // Build a human-readable summary of the previous plan for the AI context
     final previousPlanSummary = previousPlan != null && previousPlan.actions.isNotEmpty
         ? previousPlan.actions
@@ -77,10 +90,13 @@ class AiIntentParser {
     // Carry the correct sessionId (client may return the user input as id)
     result = result.copyWith(sessionId: sessionId);
 
-    // Step 3 — If the AI already asked a follow-up, propagate it
+    // Step 3 — Read-only or unsupported answers skip the mutation pipeline.
+    if (result.isInformational || result.isUnsupported) return result;
+
+    // Step 4 — If the AI already asked a follow-up, propagate it
     if (result.requiresFollowUp) return result;
 
-    // Step 4 — Missing field check + Assumption Engine
+    // Step 5 — Missing field check + Assumption Engine
     var enrichedActions = await _enrichWithAssumptions(result.actions);
 
     // Step 4b — Drop actions that duplicate tasks already on today's list
@@ -109,7 +125,7 @@ class AiIntentParser {
       );
     }
 
-    // Step 5 — Conflict detection (reminder collision, context, enforcement)
+    // Step 6 — Conflict detection (reminder collision, context, enforcement)
     final allConflicts = List<String>.from(result.conflicts);
     final allBlocked = <String>[];
 

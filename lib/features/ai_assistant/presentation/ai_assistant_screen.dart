@@ -179,6 +179,10 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                   service: service,
                   scrollController: _scrollController,
                   isLoading: service.isLoading,
+                  onSuggestedPrompt: (prompt) {
+                    _inputController.text = prompt;
+                    _inputFocusNode.requestFocus();
+                  },
                 )
               : _EmptyState(
                   onPromptSelected: (p) {
@@ -323,7 +327,7 @@ class _EmptyState extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'Tell me what you want and I\'ll organise it for you.',
+              'Ask about your schedule or tell me what to plan.',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.white.withValues(alpha: 0.45),
@@ -346,12 +350,14 @@ class _MessageList extends StatelessWidget {
     required this.service,
     required this.scrollController,
     required this.isLoading,
+    required this.onSuggestedPrompt,
   });
 
   final List<AiChatMessage> messages;
   final AiAssistantService service;
   final ScrollController scrollController;
   final bool isLoading;
+  final void Function(String prompt) onSuggestedPrompt;
 
   @override
   Widget build(BuildContext context) {
@@ -365,7 +371,11 @@ class _MessageList extends StatelessWidget {
           return const ThinkingIndicator();
         }
         final msg = messages[i];
-        return _MessageItem(message: msg, service: service);
+        return _MessageItem(
+          message: msg,
+          service: service,
+          onSuggestedPrompt: onSuggestedPrompt,
+        );
       },
     );
   }
@@ -545,10 +555,15 @@ class _ConflictSummaryBanner extends StatelessWidget {
 // ─── Message item ─────────────────────────────────────────────────────────────
 
 class _MessageItem extends StatelessWidget {
-  const _MessageItem({required this.message, required this.service});
+  const _MessageItem({
+    required this.message,
+    required this.service,
+    required this.onSuggestedPrompt,
+  });
 
   final AiChatMessage message;
   final AiAssistantService service;
+  final void Function(String prompt) onSuggestedPrompt;
 
   @override
   Widget build(BuildContext context) {
@@ -579,7 +594,34 @@ class _MessageItem extends StatelessWidget {
       return UserMessageBubble(content: message.content);
     }
 
-    return AssistantMessageBubble(content: message.content);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AssistantMessageBubble(content: message.content),
+        if (message.suggestedPrompts.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final prompt in message.suggestedPrompts)
+                  ActionChip(
+                    label: Text(
+                      prompt,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    backgroundColor: const Color(0xFF1A1A1A),
+                    side: BorderSide(
+                      color: const Color(0xFF00E3FD).withValues(alpha: 0.25),
+                    ),
+                    onPressed: () => onSuggestedPrompt(prompt),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
   }
 }
 

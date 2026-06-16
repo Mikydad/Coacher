@@ -117,21 +117,45 @@ class AiAssistantService extends ChangeNotifier {
     _setLoading(false);
 
     if (result.requiresFollowUp) {
-      // Follow-up question — show text only, no preview card
+      final question = result.followUpQuestion!;
       _addMessage(AiChatMessage(
         id: StableId.generate('msg'),
         role: ChatRole.assistant,
-        content: result.followUpQuestion!,
+        content: question,
         timestamp: DateTime.now(),
       ));
       _pendingPlan = null;
-    } else if (result.actions.isEmpty) {
-      _pendingPlan = null;
+    } else if (result.isInformational || result.isUnsupported) {
+      final message = result.informationalMessage ??
+          "I couldn't find an answer for that right now.";
       _addMessage(AiChatMessage(
         id: StableId.generate('msg'),
         role: ChatRole.assistant,
-        content:
-            "I couldn't build a plan from that. Try rephrasing, or tap Cancel and start fresh.",
+        content: message,
+        timestamp: DateTime.now(),
+        suggestedPrompts: result.suggestedPrompts,
+      ));
+      _pendingPlan = null;
+      if (result.isInformational) {
+        _logEvent('aiInformationalAnswer', {
+          'sessionId': _sessionId,
+          'responseType': result.responseType.name,
+        });
+      } else {
+        _logEvent('aiUnsupportedRequest', {
+          'sessionId': _sessionId,
+          'responseType': result.responseType.name,
+        });
+      }
+    } else if (result.actions.isEmpty) {
+      _pendingPlan = null;
+      const fallback =
+          "I can answer questions about your schedule or help you add and move tasks. "
+          "Try asking \"What's my plan for tomorrow?\" or \"Add a workout at 6am tomorrow.\"";
+      _addMessage(AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.assistant,
+        content: fallback,
         timestamp: DateTime.now(),
       ));
     } else {
@@ -147,11 +171,13 @@ class AiAssistantService extends ChangeNotifier {
       ));
     }
 
-    // 6. Persist interaction
+    // 6. Persist interaction (user turn + assistant summary for multi-turn context)
     await _historyRepository.save(
       sessionId: _sessionId,
       userInput: userInput.trim(),
       parsedActions: result.actions,
+      assistantSummary: _assistantSummaryForHistory(result),
+      responseType: result.responseType.name,
     );
 
     // 7. Analytics
@@ -388,5 +414,36 @@ class AiAssistantService extends ChangeNotifier {
     unawaited(
       Future.microtask(() => _analyticsLogger?.call(name, props ?? {})),
     );
+  }
+
+  Future<void> _persistAssistantTurn(String summary) async {
+    final trimmed = summary.trim();
+    if (trimmed.isEmpty) return;
+    final capped = trimmed.length > 500 ? '${trimmed.substring(0, 497)}…' : trimmed;
+    await _historyRepository.saveAssistantSummary(_sessionId, capped);
+  }
+
+  String? _assistantSummaryForHistory(AiPlannedChanges result) {
+    if (result.requiresFollowUp) {
+      return result.followUpQuestion;
+    }
+    if (result.isInformational || result.isUnsupported) {
+      return result.informationalMessage;
+    }
+    if (result.actions.isEmpty) {
+      return "I can answer questions about your schedule or help you add and move tasks. "
+          "Try asking \"What's my plan for tomorrow?\" or \"Add a workout at 6am tomorrow.\"";
+    }
+    return _planPreviewSummary(result);
+  }
+
+  String _planPreviewSummary(AiPlannedChanges plan) {
+    final parts = plan.actions.take(4).map((a) {
+      final title = a.parameters['title']?.toString() ??
+          a.parameters['taskTitle']?.toString() ??
+          a.actionType.name;
+      return '${a.actionType.name}: $title';
+    }).join('; ');
+    return 'Plan preview: $parts';
   }
 }
