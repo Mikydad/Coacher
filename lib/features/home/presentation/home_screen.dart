@@ -2218,6 +2218,7 @@ Future<void> _completeTaskFromHome(
       commitOverride: () async {},
     );
     if (!context.mounted) return;
+    invalidateTaskListProviders(ref);
     await runAutoNextTaskFlow(
       context,
       ref,

@@ -149,14 +149,14 @@ Future<void> runAutoNextTaskFlow(
       final handled = await _handleExtraTime(context, ref, row: selectedNext);
       if (!context.mounted) return;
       if (handled) {
-        await _returnToFocusList(context);
+        await _returnToFocusList(context, ref);
       }
       return;
     case NextTaskDecision.moveWithReason:
       final handled = await _handleMoveWithReason(context, ref, row: selectedNext);
       if (!context.mounted) return;
       if (handled) {
-        await _returnToFocusList(context);
+        await _returnToFocusList(context, ref);
       }
       return;
   }
@@ -521,7 +521,8 @@ String _appendExtraTimeNote({
   return '$existing\n$entry';
 }
 
-Future<void> _returnToFocusList(BuildContext context) async {
+Future<void> _returnToFocusList(BuildContext context, WidgetRef ref) async {
+  invalidateTaskListProviders(ref);
   await Navigator.pushNamedAndRemoveUntil(
     context,
     FocusSelectionScreen.routeName,

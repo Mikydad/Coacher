@@ -337,6 +337,7 @@ Future<void> _completeFromHub(BuildContext context, WidgetRef ref, PlannedTaskRo
     commitOverride: () async {}, // upsertTask already called above
   );
   if (!context.mounted) return;
+  invalidateTaskListProviders(ref);
   await runAutoNextTaskFlow(
     context,
     ref,

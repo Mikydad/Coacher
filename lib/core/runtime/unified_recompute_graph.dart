@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/analytics/application/analytics_period_bundle_notifier.dart';
 import '../../features/analytics/application/delivery_providers.dart';
 import '../../features/analytics/application/focus_providers.dart';
+import '../../features/execution/application/execution_day_loader.dart';
 import '../../features/ai_assistant/application/ai_assistant_providers.dart';
 import '../../features/analytics/application/ai_summary_providers.dart';
 import 'recompute_scope.dart';
@@ -91,6 +92,7 @@ class UnifiedRecomputeGraph {
     // ── Step 3: Coaching focus (light path) ───────────────────────────────
     if (scope.focus) {
       container.invalidate(recomputeCoachingFocusProvider);
+      container.invalidate(executionDayTasksProvider);
       debugPrint('[UnifiedRecomputeGraph] step:focus');
     }
 

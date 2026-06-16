@@ -143,6 +143,7 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
         taskId: execState.taskId,
         completionPercent: result.completionPercent,
       );
+      invalidateTaskListProviders(ref);
 
       // Phase A — check for reclaimed time on full completion.
       if (result.completionPercent >= 100) {
