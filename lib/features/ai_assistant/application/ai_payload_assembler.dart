@@ -20,7 +20,7 @@ import 'entity_normaliser.dart';
 /// - All values are human-readable; no raw IDs or internal references.
 /// - Reading is best-effort: errors in one source never crash the whole assembly.
 class AiPayloadAssembler {
-  const AiPayloadAssembler({
+  AiPayloadAssembler({
     required this.planningRepository,
     required this.goalsRepository,
     required this.contextOverrideRepository,
@@ -28,7 +28,9 @@ class AiPayloadAssembler {
     required this.historyRepository,
     this.profilePreferenceService,
     EntityNormaliser? normaliser,
-  }) : _normaliser = normaliser ?? const EntityNormaliser();
+    Duration scheduleCacheTtl = const Duration(seconds: 30),
+  })  : _normaliser = normaliser ?? const EntityNormaliser(),
+        _scheduleCacheTtl = scheduleCacheTtl;
 
   final PlanningRepository planningRepository;
   final GoalsRepository goalsRepository;
@@ -37,6 +39,14 @@ class AiPayloadAssembler {
   final AiInteractionHistoryRepository historyRepository;
   final ProfilePreferenceService? profilePreferenceService;
   final EntityNormaliser _normaliser;
+  final Duration _scheduleCacheTtl;
+
+  final Map<String, _CachedScheduleSlice> _scheduleCache = {};
+
+  /// Clears cached schedule data after the user confirms plan changes.
+  void invalidateSessionCache(String sessionId) {
+    _scheduleCache.remove(sessionId);
+  }
 
   Future<AiOperatingLayerPayload> assemble(
     String userInput,
@@ -45,6 +55,43 @@ class AiPayloadAssembler {
     AiIntentRoute? intentRoute,
     Map<String, dynamic>? proactiveContext,
   }) async {
+    final schedule = await _scheduleSliceForSession(sessionId);
+
+    final dynamicResults = await Future.wait([
+      _buildSessionHistory(sessionId),
+      buildConversationHistory(sessionId),
+      _buildCompletedInSession(sessionId),
+    ]);
+
+    return AiOperatingLayerPayload(
+      userInput: userInput,
+      activeTasks: schedule.activeTasks,
+      goals: schedule.goals,
+      goalProgress: schedule.goalProgress,
+      todaySchedule: schedule.todaySchedule,
+      tomorrowTasks: schedule.tomorrowTasks,
+      tomorrowSchedule: schedule.tomorrowSchedule,
+      weekOverview: schedule.weekOverview,
+      focusState: schedule.focusState,
+      contextOverride: schedule.contextOverride,
+      behaviorPreferences: schedule.behaviorPreferences,
+      sessionHistory: dynamicResults[0] as List<Map<String, dynamic>>,
+      recentPatterns: schedule.recentPatterns,
+      conversationHistory: dynamicResults[1] as List<Map<String, dynamic>>,
+      completedInSession: dynamicResults[2] as List<String>,
+      capabilities: AiCapabilityRegistry.buildPayloadSection(),
+      intentHint: intentRoute?.toPromptHint(),
+      proactiveContext: proactiveContext,
+      previousPlan: previousPlanSummary,
+    );
+  }
+
+  Future<_CachedScheduleSlice> _scheduleSliceForSession(String sessionId) async {
+    final cached = _scheduleCache[sessionId];
+    if (cached != null && !cached.isExpired(_scheduleCacheTtl)) {
+      return cached;
+    }
+
     final results = await Future.wait([
       _buildActiveTasks(),
       _buildGoals(),
@@ -56,14 +103,11 @@ class AiPayloadAssembler {
       _buildFocusState(),
       _buildContextOverride(),
       _buildBehaviorPreferences(),
-      _buildSessionHistory(sessionId),
       _buildRecentPatterns(),
-      buildConversationHistory(sessionId),
-      _buildCompletedInSession(sessionId),
     ]);
 
-    return AiOperatingLayerPayload(
-      userInput: userInput,
+    final slice = _CachedScheduleSlice(
+      fetchedAt: DateTime.now(),
       activeTasks: results[0] as List<Map<String, dynamic>>,
       goals: results[1] as List<Map<String, dynamic>>,
       goalProgress: results[2] as List<Map<String, dynamic>>,
@@ -74,15 +118,10 @@ class AiPayloadAssembler {
       focusState: results[7] as Map<String, dynamic>,
       contextOverride: results[8] as Map<String, dynamic>?,
       behaviorPreferences: results[9] as Map<String, dynamic>,
-      sessionHistory: results[10] as List<Map<String, dynamic>>,
-      recentPatterns: results[11] as List<Map<String, dynamic>>,
-      conversationHistory: results[12] as List<Map<String, dynamic>>,
-      completedInSession: results[13] as List<String>,
-      capabilities: AiCapabilityRegistry.buildPayloadSection(),
-      intentHint: intentRoute?.toPromptHint(),
-      proactiveContext: proactiveContext,
-      previousPlan: previousPlanSummary,
+      recentPatterns: results[10] as List<Map<String, dynamic>>,
     );
+    _scheduleCache[sessionId] = slice;
+    return slice;
   }
 
   // ─── Private builders ─────────────────────────────────────────────────────
@@ -570,6 +609,39 @@ class AiPayloadAssembler {
       return [];
     }
   }
+}
+
+class _CachedScheduleSlice {
+  _CachedScheduleSlice({
+    required this.fetchedAt,
+    required this.activeTasks,
+    required this.goals,
+    required this.goalProgress,
+    required this.todaySchedule,
+    required this.tomorrowTasks,
+    required this.tomorrowSchedule,
+    required this.weekOverview,
+    required this.focusState,
+    required this.contextOverride,
+    required this.behaviorPreferences,
+    required this.recentPatterns,
+  });
+
+  final DateTime fetchedAt;
+  final List<Map<String, dynamic>> activeTasks;
+  final List<Map<String, dynamic>> goals;
+  final List<Map<String, dynamic>> goalProgress;
+  final List<Map<String, dynamic>> todaySchedule;
+  final List<Map<String, dynamic>> tomorrowTasks;
+  final List<Map<String, dynamic>> tomorrowSchedule;
+  final List<Map<String, dynamic>> weekOverview;
+  final Map<String, dynamic> focusState;
+  final Map<String, dynamic>? contextOverride;
+  final Map<String, dynamic> behaviorPreferences;
+  final List<Map<String, dynamic>> recentPatterns;
+
+  bool isExpired(Duration ttl) =>
+      DateTime.now().difference(fetchedAt) > ttl;
 }
 
 // ─── Internal helper ──────────────────────────────────────────────────────────

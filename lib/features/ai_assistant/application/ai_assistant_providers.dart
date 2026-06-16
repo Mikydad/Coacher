@@ -155,10 +155,12 @@ final aiAssistantServiceProvider =
     ChangeNotifierProvider.family<AiAssistantService, AiIntentParser>(
   (ref, parser) {
     final analyticsRepo = ref.read(analyticsRepositoryProvider);
+    final assembler = ref.read(aiPayloadAssemblerProvider);
     return AiAssistantService(
       intentParser: parser,
       actionExecutor: ref.read(aiActionExecutorProvider),
       historyRepository: ref.read(aiInteractionHistoryRepositoryProvider),
+      onScheduleMutated: assembler.invalidateSessionCache,
       analyticsLogger: (eventName, props) {
         final type = AnalyticsEventType.values.firstWhere(
           (e) => e.name == eventName,

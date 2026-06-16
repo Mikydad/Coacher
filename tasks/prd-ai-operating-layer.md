@@ -327,6 +327,17 @@ Build:
 - Schedule optimisation recommendations.
 - Predictive action cards on Home screen ("You usually add a workout — want to schedule one?").
 
+### Phase 5 — Conversational Intelligence
+Build:
+- **Read path:** Informational answers for today/tomorrow/week schedule and goal progress (Schema C).
+- **Suggest path:** Collaborative planning with "Apply this plan" before preview (Schema E).
+- **Intent routing:** Query vs suggest vs mutate classification with router guardrails.
+- **Capability registry:** Honest unsupported boundaries for community, billing, account, sync.
+- **Conversation memory:** All turn types persisted for multi-turn context.
+- **Proactive bridge:** Home suggestion cards auto-open Coach with session context.
+- **Week overview payload:** 7-day task counts for week-level questions.
+- **Safety:** Informational output guard — no raw IDs or internal field names in user-facing text.
+
 ---
 
 ## 9. Success Metrics

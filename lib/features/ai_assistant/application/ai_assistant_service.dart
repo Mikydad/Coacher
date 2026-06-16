@@ -7,6 +7,7 @@ import '../data/ai_interaction_history_repository.dart';
 import '../domain/models/ai_chat_message.dart';
 import '../domain/models/ai_planned_changes.dart';
 import 'ai_action_executor.dart';
+import 'ai_informational_output_guard.dart';
 import 'ai_intent_parser.dart';
 import 'proactive_chat_conversion_tracker.dart';
 import 'entity_normaliser.dart';
@@ -16,6 +17,8 @@ typedef AiAnalyticsLogger = void Function(
   String eventName,
   Map<String, dynamic> properties,
 );
+
+typedef AiScheduleCacheInvalidator = void Function(String sessionId);
 
 /// Single entry point for the Coach AI presentation layer.
 ///
@@ -28,11 +31,13 @@ class AiAssistantService extends ChangeNotifier {
     required AiInteractionHistoryRepository historyRepository,
     AiAnalyticsLogger? analyticsLogger,
     EntityNormaliser? normaliser,
+    AiScheduleCacheInvalidator? onScheduleMutated,
   })  : _intentParser = intentParser,
         _actionExecutor = actionExecutor,
         _historyRepository = historyRepository,
         _analyticsLogger = analyticsLogger,
         _normaliser = normaliser ?? const EntityNormaliser(),
+        _onScheduleMutated = onScheduleMutated,
         _sessionId = StableId.generate('session');
 
   final AiIntentParser _intentParser;
@@ -43,6 +48,7 @@ class AiAssistantService extends ChangeNotifier {
   AiInteractionHistoryRepository get historyRepository => _historyRepository;
   final AiAnalyticsLogger? _analyticsLogger;
   final EntityNormaliser _normaliser;
+  final AiScheduleCacheInvalidator? _onScheduleMutated;
 
   String _sessionId;
   final List<AiChatMessage> _messages = [];
@@ -140,7 +146,7 @@ class AiAssistantService extends ChangeNotifier {
     _setLoading(false);
 
     if (result.requiresFollowUp) {
-      final question = result.followUpQuestion!;
+      final question = AiInformationalOutputGuard.sanitize(result.followUpQuestion!);
       _addMessage(AiChatMessage(
         id: StableId.generate('msg'),
         role: ChatRole.assistant,
@@ -149,8 +155,9 @@ class AiAssistantService extends ChangeNotifier {
       ));
       _pendingPlan = null;
     } else if (result.isInformational || result.isUnsupported) {
-      final message = result.informationalMessage ??
+      final raw = result.informationalMessage ??
           "I couldn't find an answer for that right now.";
+      final message = AiInformationalOutputGuard.sanitize(raw);
       _addMessage(AiChatMessage(
         id: StableId.generate('msg'),
         role: ChatRole.assistant,
@@ -171,8 +178,9 @@ class AiAssistantService extends ChangeNotifier {
         });
       }
     } else if (result.isSuggest) {
-      final message = result.informationalMessage ??
+      final raw = result.informationalMessage ??
           'Here\'s what I\'d suggest based on your schedule.';
+      final message = AiInformationalOutputGuard.sanitize(raw);
       _addMessage(AiChatMessage(
         id: StableId.generate('msg'),
         role: ChatRole.assistant,
@@ -321,6 +329,7 @@ class AiAssistantService extends ChangeNotifier {
       'actionTypes': plan.actions.map((a) => a.actionType.name).toList(),
     });
     _recordProactiveChatConversion();
+    _onScheduleMutated?.call(_sessionId);
 
     // Log aiSuggestionAccepted for every action that had a reason label
     for (final action in plan.actions) {

@@ -288,23 +288,23 @@ Understand → Read data → Propose → Preview → Confirm (suggest)
 
 #### G.1 UX copy
 
-- [ ] **G.1.1** Coach screen placeholder: “Ask about your schedule or tell me what to plan…”
-- [ ] **G.1.2** Empty-state examples mixing read + write.
+- [x] **G.1.1** Coach screen placeholder: “Ask about your schedule or tell me what to plan…”
+- [x] **G.1.2** Empty-state examples mixing read + write.
 
 #### G.2 Performance
 
-- [ ] **G.2.1** Parallel payload builders (already mostly parallel); add tomorrow to existing `Future.wait`.
-- [ ] **G.2.2** Consider caching today/tomorrow payload for 30s within a session to reduce Isar reads.
+- [x] **G.2.1** Parallel payload builders (already mostly parallel); add tomorrow to existing `Future.wait`.
+- [x] **G.2.2** Consider caching today/tomorrow payload for 30s within a session to reduce Isar reads.
 
 #### G.3 Safety
 
-- [ ] **G.3.1** Informational answers must not include raw IDs or internal field names (PRD §4.12 — already a rule; add test).
-- [ ] **G.3.2** Mutate path unchanged: still requires Confirm for all writes.
+- [x] **G.3.1** Informational answers must not include raw IDs or internal field names (PRD §4.12 — already a rule; add test).
+- [x] **G.3.2** Mutate path unchanged: still requires Confirm for all writes.
 
 #### G.4 Documentation
 
-- [ ] **G.4.1** Update `tasks/prd-ai-operating-layer.md` §Phases with “Phase 5 — Conversational Intelligence”.
-- [ ] **G.4.2** Add developer note in `ai_operating_layer_client.dart` documenting all response schemas.
+- [x] **G.4.1** Update `tasks/prd-ai-operating-layer.md` §Phases with “Phase 5 — Conversational Intelligence”.
+- [x] **G.4.2** Add developer note in `ai_operating_layer_client.dart` documenting all response schemas.
 
 ---
 

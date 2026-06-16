@@ -37,7 +37,7 @@ class AiInputCard extends StatelessWidget {
               color: Colors.white,
             ),
             decoration: const InputDecoration(
-              hintText: 'Plan a workout tomorrow…',
+              hintText: 'Ask about your schedule or tell me what to plan…',
               hintStyle: TextStyle(
                 color: Color(0xFFADAAAA),
                 fontSize: 15,

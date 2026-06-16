@@ -362,6 +362,12 @@ class _EmptyState extends StatelessWidget {
 
   final void Function(String) onPromptSelected;
 
+  static const _examples = [
+    "What's my plan for tomorrow?",
+    'Add a workout at 6am',
+    'How am I doing on my goals?',
+  ];
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -377,6 +383,28 @@ class _EmptyState extends StatelessWidget {
                 fontSize: 14,
                 color: Colors.white.withValues(alpha: 0.45),
               ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final example in _examples)
+                  ActionChip(
+                    label: Text(
+                      example,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    backgroundColor: const Color(0xFF1A1A1A),
+                    side: BorderSide(
+                      color: const Color(0xFF00E3FD).withValues(alpha: 0.25),
+                    ),
+                    onPressed: () => onPromptSelected(example),
+                  ),
+              ],
             ),
           ),
           const SizedBox(height: 24),

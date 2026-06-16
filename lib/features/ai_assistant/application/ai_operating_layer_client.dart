@@ -39,7 +39,22 @@ class AiOperatingLayerException implements Exception {
 }
 
 // ─── System prompt ────────────────────────────────────────────────────────────
-
+//
+// ## LLM response schemas (developer reference)
+//
+// All model output is JSON inside the chat completion `content` field.
+// Parsed by [parseOperatingLayerJsonMap] in `ai_operating_layer_response_parser.dart`.
+//
+// | Schema | responseType   | When to use |
+// |--------|----------------|-------------|
+// | A      | mutate         | User asked to create/move/delete — returns `actions[]` |
+// | B      | followUp       | Required field missing — returns `followUpQuestion` |
+// | C      | informational  | Read-only schedule/goal answer — returns `message` |
+// | D      | unsupported    | Feature outside Coach AI scope — returns `message` |
+// | E      | suggest        | Collaborative plan — returns `message` + optional `actions[]` |
+//
+// Legacy: absent `responseType` + non-empty `actions` → mutate; `followUpQuestion` → followUp.
+//
 const String _kSystemPrompt = '''
 You are the AI Operating Layer for a personal productivity app called "Coach for Life".
 
