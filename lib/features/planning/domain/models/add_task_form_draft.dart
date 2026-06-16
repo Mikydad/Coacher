@@ -1,3 +1,5 @@
+import '../add_task_duration.dart';
+
 /// Serializable snapshot of [AddTaskScreen] field state.
 class AddTaskFormDraft {
   const AddTaskFormDraft({
@@ -48,7 +50,7 @@ class AddTaskFormDraft {
 
   bool get hasMeaningfulContent {
     if (title.trim().isNotEmpty || notes.trim().isNotEmpty) return true;
-    if (!durationEnabled) return true;
+    if (durationEnabled || focusSession) return true;
     if (reminder || isHabitAnchor || strictModeRequired || isRigid) return true;
     if (category != null && category!.isNotEmpty) return true;
     if (modeUserCustomized || modeRefId != 'flexible') return true;
@@ -85,11 +87,12 @@ class AddTaskFormDraft {
       title: json['title'] as String? ?? '',
       notes: json['notes'] as String? ?? '',
       duration: json['duration'] as String? ?? '25 MIN',
-      durationEnabled: json['durationEnabled'] as bool? ?? true,
-      customDurationMinutes: json['customDurationMinutes'] as int? ?? 90,
+      durationEnabled: json['durationEnabled'] as bool? ?? false,
+      customDurationMinutes: json['customDurationMinutes'] as int? ??
+          kAddTaskDefaultCustomMinutes,
       category: json['category'] as String?,
       reminder: json['reminder'] as bool? ?? false,
-      focusSession: json['focusSession'] as bool? ?? true,
+      focusSession: json['focusSession'] as bool? ?? false,
       isHabitAnchor: json['isHabitAnchor'] as bool? ?? false,
       reminderTimeMs: json['reminderTimeMs'] as int? ?? DateTime.now().millisecondsSinceEpoch,
       modeRefId: json['modeRefId'] as String? ?? 'flexible',

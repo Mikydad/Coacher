@@ -313,7 +313,7 @@ class GoalEditorPeriodModeCards extends StatelessWidget {
           child: _PeriodCard(
             icon: Icons.calendar_today_outlined,
             title: 'CALENDAR',
-            subtitle: 'Execution tied to specific dates.',
+            subtitle: 'Pick dates / month / week',
             selected: selected == GoalPeriodMode.calendar,
             onTap: () => onChanged(GoalPeriodMode.calendar),
           ),
@@ -323,7 +323,7 @@ class GoalEditorPeriodModeCards extends StatelessWidget {
           child: _PeriodCard(
             icon: Icons.timelapse_outlined,
             title: 'DAY COUNT',
-            subtitle: 'Continuous streak objective.',
+            subtitle: 'Fixed number of days — e.g. 30-day challenge',
             selected: selected == GoalPeriodMode.durationDays,
             onTap: () => onChanged(GoalPeriodMode.durationDays),
           ),

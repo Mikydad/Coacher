@@ -648,12 +648,12 @@ class AddTaskDurationSegment extends StatelessWidget {
   const AddTaskDurationSegment({
     super.key,
     required this.options,
-    required this.selected,
+    this.selected,
     required this.onSelected,
   });
 
   final List<String> options;
-  final String selected;
+  final String? selected;
   final ValueChanged<String> onSelected;
 
   @override

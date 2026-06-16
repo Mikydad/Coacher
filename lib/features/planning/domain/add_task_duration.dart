@@ -53,7 +53,7 @@ String durationLabelFromMinutes(int minutes, {String? category}) {
 /// Maps Add Task screen duration chip labels to minutes.
 int addTaskDurationMinutes(
   String label, {
-  int customMinutes = 90,
+  int customMinutes = kAddTaskDefaultCustomMinutes,
 }) {
   switch (label.trim().toUpperCase()) {
     case '6 HOURS':
@@ -79,6 +79,9 @@ int addTaskDurationMinutes(
 
 const int kAddTaskMinCustomMinutes = 1;
 const int kAddTaskMaxCustomMinutes = 12 * 60;
+
+/// Default when opening the custom duration picker (0h 30m).
+const int kAddTaskDefaultCustomMinutes = 30;
 
 bool isCustomDurationKey(String label) =>
     label.trim().toUpperCase() == kAddTaskCustomDurationKey;

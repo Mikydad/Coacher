@@ -97,11 +97,11 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
   final _notesController = TextEditingController();
   final _scheduleSectionKey = GlobalKey();
   String _duration = '25 MIN';
-  int _customDurationMinutes = 90;
-  bool _durationEnabled = true;
+  int _customDurationMinutes = kAddTaskDefaultCustomMinutes;
+  bool _durationEnabled = false;
   String? _category;
   bool _reminder = false;
-  bool _focusSession = true;
+  bool _focusSession = false;
   bool _isHabitAnchor = false;
   DateTime _reminderTime = DateTime.now().add(const Duration(minutes: 10));
   bool _saving = false;
@@ -1014,6 +1014,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
     setState(() {
       _duration = kAddTaskCustomDurationKey;
       _customDurationMinutes = picked;
+      if (!sleep) _durationEnabled = true;
     });
   }
 
@@ -1087,6 +1088,14 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
     return isSleepCategory(_category) ? sleepDurationChipLabels.last : '25m';
   }
 
+  /// No chip highlighted until duration is enabled (sleep always has duration).
+  String? get _durationSegmentSelection {
+    if (isSleepCategory(_category) || _durationEnabled) {
+      return _durationDisplayLabel;
+    }
+    return null;
+  }
+
   String get _advancedSubtitle {
     final parts = <String>[];
     if (isSleepCategory(_category) && _syncSleepWindowAndQuietMode) {
@@ -1152,23 +1161,24 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
             ],
           ],
         ),
-        if (sleep || _durationEnabled) ...[
-          const SizedBox(height: 16),
-          AddTaskDurationSegment(
-            options: _activeDurationLabels,
-            selected: _durationDisplayLabel,
-            onSelected: (label) async {
-              final i = _activeDurationLabels.indexOf(label);
-              if (i < 0) return;
-              final key = _activeDurationOptions[i];
-              if (isCustomDurationKey(key)) {
-                await _editCustomDuration();
-                return;
-              }
-              setState(() => _duration = key);
-            },
-          ),
-        ],
+        const SizedBox(height: 16),
+        AddTaskDurationSegment(
+          options: _activeDurationLabels,
+          selected: _durationSegmentSelection,
+          onSelected: (label) async {
+            final i = _activeDurationLabels.indexOf(label);
+            if (i < 0) return;
+            final key = _activeDurationOptions[i];
+            if (isCustomDurationKey(key)) {
+              await _editCustomDuration();
+              return;
+            }
+            setState(() {
+              _durationEnabled = true;
+              _duration = key;
+            });
+          },
+        ),
       ],
     );
   }

@@ -19,6 +19,7 @@ void main() {
       title: 'Deep work',
       notes: 'Notes',
       duration: '25 MIN',
+      durationEnabled: true,
       customDurationMinutes: 90,
       category: 'Study',
       reminder: true,

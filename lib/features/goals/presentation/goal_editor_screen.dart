@@ -771,16 +771,10 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
   Widget _buildAdvancedSection(BuildContext context) {
     return GoalEditorCollapsibleSection(
       title: 'Advanced settings',
-      subtitle: 'Sector, period mode, discipline, reminder',
+      subtitle: 'Period mode, discipline, reminder',
       expanded: _advancedExpanded,
       onToggle: () => setState(() => _advancedExpanded = !_advancedExpanded),
       children: [
-        const GoalEditorSectionLabel('Sector'),
-        GoalEditorSectorChips(
-          selectedId: _categoryId,
-          onSelected: (id) => setState(() => _categoryId = id),
-        ),
-        const SizedBox(height: 20),
         const GoalEditorSectionLabel('Period mode'),
         GoalEditorPeriodModeCards(
           selected: _periodMode,
