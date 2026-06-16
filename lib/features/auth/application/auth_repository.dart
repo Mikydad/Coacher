@@ -66,7 +66,8 @@ class AuthRepository implements AuthRepositoryInterface {
   Future<void> _ensureGoogleSignInInitialized() async {
     if (_googleSignInInitialized) return;
     await _googleSignIn.initialize(
-      clientId: GoogleAuthConfig.iosClientId,
+      clientId:
+          GoogleAuthConfig.hasIosClientId ? GoogleAuthConfig.iosClientId : null,
       serverClientId:
           GoogleAuthConfig.hasWebClientId ? GoogleAuthConfig.webClientId : null,
     );

@@ -57,6 +57,7 @@ GoogleService-Info.plist
 ios/Runner/GoogleService-Info.plist
 **/google-services.json
 lib/firebase_options.dart
+lib/core/config/google_auth_config.local.dart
 
 # Isar VM tests may place a native library in the repo root; do not commit.
 /libisar.dylib

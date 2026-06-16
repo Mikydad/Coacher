@@ -77,17 +77,6 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>com.googleusercontent.apps.REPLACE_WITH_REVERSED_CLIENT_ID</string>
-			</array>
-		</dict>
-	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Coach needs access to your photo library so you can share proof images in circle chat.</string>
 	<key>NSMicrophoneUsageDescription</key>

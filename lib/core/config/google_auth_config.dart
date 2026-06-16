@@ -1,26 +1,18 @@
 /// Google Sign-In OAuth client IDs for Firebase Auth.
 ///
-/// **Web client ID** (required for Firebase to verify Google id tokens on mobile):
-/// Firebase Console → Authentication → Sign-in method → Google → expand
-/// "Web SDK configuration" and copy the Web client ID.
+/// Do not commit real client IDs. Pass at build time:
+/// ```bash
+/// flutter run \
+///   --dart-define=GOOGLE_IOS_CLIENT_ID=YOUR_IOS_CLIENT_ID.apps.googleusercontent.com \
+///   --dart-define=GOOGLE_WEB_CLIENT_ID=YOUR_WEB_CLIENT_ID.apps.googleusercontent.com
+/// ```
 ///
-/// Pass at build time:
-/// `flutter run --dart-define=GOOGLE_WEB_CLIENT_ID=8992228827-xxxx.apps.googleusercontent.com`
-///
-/// Or replace [webClientIdDefault] below for local dev.
+/// iOS client ID: `ios/Runner/GoogleService-Info.plist` → `CLIENT_ID`
+/// Web client ID: Firebase Console → Authentication → Google → Web SDK configuration
 abstract final class GoogleAuthConfig {
-  /// iOS OAuth client from `ios/Runner/GoogleService-Info.plist` → `CLIENT_ID`.
-  static const String iosClientId =
-      'REPLACE_WITH_IOS_OAUTH_CLIENT_ID';
+  static const String iosClientId = String.fromEnvironment('GOOGLE_IOS_CLIENT_ID');
+  static const String webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
 
-  /// Set via `--dart-define` or replace for local runs without dart-define.
-  static const String webClientIdDefault =
-      'REPLACE_WITH_WEB_OAUTH_CLIENT_ID';
-
-  static const String webClientId = String.fromEnvironment(
-    'GOOGLE_WEB_CLIENT_ID',
-    defaultValue: webClientIdDefault,
-  );
-
+  static bool get hasIosClientId => iosClientId.trim().isNotEmpty;
   static bool get hasWebClientId => webClientId.trim().isNotEmpty;
 }
