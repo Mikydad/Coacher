@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/context_override_providers.dart';
 import '../application/context_override_service.dart';
-import '../domain/models/context_override.dart';
 import '../application/override_attention_policy.dart';
+import '../domain/models/context_override.dart';
+import 'widgets/attention_mode_widgets.dart';
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
@@ -15,8 +16,9 @@ Future<void> showContextOverrideQuickActivateSheet(BuildContext context) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+    backgroundColor: AttentionModeColors.sheet,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
     ),
     builder: (_) => const _QuickActivateSheet(),
   );
@@ -53,9 +55,9 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(
-          20,
-          16,
-          20,
+          24,
+          8,
+          24,
           MediaQuery.of(context).viewInsets.bottom + 24,
         ),
         child: AnimatedSize(
@@ -74,26 +76,20 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _handle(),
-        Text(
-          'Set attention mode',
-          style: Theme.of(context)
-              .textTheme
-              .titleMedium
-              ?.copyWith(fontWeight: FontWeight.bold),
+        const AttentionModeSheetHandle(),
+        const AttentionModeSheetHeader(
+          subtitle:
+              'Tell the app what you\'re doing so it knows when to hold reminders.',
         ),
-        const SizedBox(height: 4),
-        const Text(
-          'Tell the app what you\'re doing so it knows when to hold reminders.',
-          style: TextStyle(color: Colors.white54, fontSize: 13),
-        ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         for (final type in _overrideTypes) ...[
-          _OverrideTypeRow(
-            type: type,
+          AttentionModeTypeCard(
+            icon: type.icon,
+            title: type.displayName,
+            subtitle: OverrideAttentionPolicy.suppressionSummary(type),
             onTap: () => setState(() => _selectedType = type),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
         ],
       ],
     );
@@ -109,7 +105,7 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _handle(),
+        const AttentionModeSheetHandle(),
         Row(
           children: [
             GestureDetector(
@@ -118,33 +114,43 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
                 _selectedPreset = null;
                 _showCustomSlider = false;
               }),
-              child: const Icon(Icons.arrow_back_ios, size: 18),
+              child: const Padding(
+                padding: EdgeInsets.only(right: 8),
+                child: Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.white70),
+              ),
+            ),
+            Text(
+              type.icon,
+              style: const TextStyle(fontSize: 22),
             ),
             const SizedBox(width: 8),
-            Text(
-              '${type.icon}  ${type.displayName}',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold),
+            Expanded(
+              child: Text(
+                type.displayName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         Text(
           OverrideAttentionPolicy.suppressionSummary(type),
-          style: const TextStyle(color: Colors.white54, fontSize: 13),
+          style: const TextStyle(color: AttentionModeColors.label, fontSize: 14),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
             for (final preset in presets)
-              ChoiceChip(
-                label: Text(preset.label),
+              AttentionModeDurationChip(
+                label: preset.label,
                 selected: _selectedPreset?.label == preset.label,
-                onSelected: (_) => setState(() {
+                onSelected: () => setState(() {
                   _selectedPreset = preset;
                   _showCustomSlider = preset.label == 'Custom';
                 }),
@@ -152,27 +158,32 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
           ],
         ),
         if (_showCustomSlider) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
             'Custom: $_customMinutes min',
-            style: const TextStyle(color: Colors.white70),
+            style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
           ),
-          Slider(
-            value: _customMinutes.toDouble(),
-            min: 15,
-            max: 720,
-            divisions: 47,
-            label: '$_customMinutes min',
-            onChanged: (v) => setState(() => _customMinutes = v.round()),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: AttentionModeColors.lime,
+              inactiveTrackColor: AttentionModeColors.card,
+              thumbColor: AttentionModeColors.lime,
+              overlayColor: AttentionModeColors.lime.withValues(alpha: 0.12),
+            ),
+            child: Slider(
+              value: _customMinutes.toDouble(),
+              min: 15,
+              max: 720,
+              divisions: 47,
+              label: '$_customMinutes min',
+              onChanged: (v) => setState(() => _customMinutes = v.round()),
+            ),
           ),
         ],
-        const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: _canConfirm ? _confirm : null,
-            child: const Text('Activate'),
-          ),
+        const SizedBox(height: 24),
+        AttentionModeActivateButton(
+          enabled: _canConfirm,
+          onPressed: _confirm,
         ),
       ],
     );
@@ -201,71 +212,5 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
         .activateOverride(type: type, expiresAt: expiresAt);
 
     if (mounted) Navigator.pop(context);
-  }
-
-  Widget _handle() {
-    return Center(
-      child: Container(
-        width: 40,
-        height: 4,
-        margin: const EdgeInsets.only(bottom: 16),
-        decoration: BoxDecoration(
-          color: Colors.white24,
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Override type row ────────────────────────────────────────────────────────
-
-class _OverrideTypeRow extends StatelessWidget {
-  const _OverrideTypeRow({required this.type, required this.onTap});
-
-  final ContextOverride type;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white.withAlpha(10),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white12),
-        ),
-        child: Row(
-          children: [
-            Text(type.icon, style: const TextStyle(fontSize: 20)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    type.displayName,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  Text(
-                    OverrideAttentionPolicy.suppressionSummary(type),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.white54,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: Colors.white30, size: 18),
-          ],
-        ),
-      ),
-    );
   }
 }

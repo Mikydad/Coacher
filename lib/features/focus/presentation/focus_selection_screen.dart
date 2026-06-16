@@ -162,12 +162,6 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 12),
-          const Text(
-            "Lists today's plan with open tasks only — same as Home. "
-            'Completed tasks stay on Home; add or reopen tasks there if this list is empty.',
-            style: TextStyle(color: Colors.white54, fontSize: 14, height: 1.35),
-          ),
           const SizedBox(height: 20),
           ...taskList.when(
             data: (tasks) {
@@ -176,7 +170,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 16),
                     child: Text(
-                      'No open tasks for today. Add one below, from Home, or uncomplete a task on Home if you finished it by mistake.',
+                      'No tasks today.',
                       style: TextStyle(color: Colors.white38, fontSize: 15),
                     ),
                   ),
