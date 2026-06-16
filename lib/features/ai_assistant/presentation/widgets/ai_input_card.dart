@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+
+import '../../../../core/presentation/keyboard_dismiss.dart';
 
 class AiInputCard extends StatelessWidget {
   const AiInputCard({
@@ -32,6 +35,7 @@ class AiInputCard extends StatelessWidget {
             maxLines: 4,
             minLines: 1,
             textInputAction: TextInputAction.newline,
+            onTapOutside: (_) => dismissKeyboard(context),
             style: const TextStyle(
               fontSize: 15,
               color: Colors.white,
@@ -52,21 +56,9 @@ class AiInputCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Mic button placeholder (wired in Epic 8 after speech_to_text added)
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.12),
-                  ),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: const Icon(
-                  Icons.mic_none_rounded,
-                  size: 20,
-                  color: Color(0xFFADAAAA),
-                ),
+              _VoiceInputButton(
+                controller: controller,
+                enabled: !isLoading,
               ),
               // Send button
               ValueListenableBuilder<TextEditingValue>(
@@ -118,6 +110,130 @@ class AiInputCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Tap-to-dictate mic button. Streams recognised words into [controller] so
+/// the user can review the text before sending.
+class _VoiceInputButton extends StatefulWidget {
+  const _VoiceInputButton({
+    required this.controller,
+    required this.enabled,
+  });
+
+  final TextEditingController controller;
+  final bool enabled;
+
+  @override
+  State<_VoiceInputButton> createState() => _VoiceInputButtonState();
+}
+
+class _VoiceInputButtonState extends State<_VoiceInputButton> {
+  final SpeechToText _speech = SpeechToText();
+  bool _initialised = false;
+  bool _available = false;
+  bool _listening = false;
+  String _baseText = '';
+
+  @override
+  void dispose() {
+    if (_listening) {
+      _speech.stop();
+    }
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    if (_listening) {
+      await _speech.stop();
+      if (mounted) setState(() => _listening = false);
+      return;
+    }
+
+    if (!_initialised) {
+      _available = await _speech.initialize(
+        onStatus: _onStatus,
+        onError: (_) {
+          if (mounted) setState(() => _listening = false);
+        },
+      );
+      _initialised = true;
+    }
+
+    if (!_available) {
+      if (mounted) {
+        _showMessage(
+          'Voice input is unavailable. Check microphone and speech '
+          'permissions in Settings.',
+        );
+      }
+      return;
+    }
+
+    _baseText = widget.controller.text;
+    await _speech.listen(
+      onResult: (result) {
+        final recognised = result.recognizedWords;
+        final needsSpace =
+            _baseText.isNotEmpty && !_baseText.endsWith(' ');
+        final combined =
+            '$_baseText${needsSpace ? ' ' : ''}$recognised';
+        widget.controller.value = TextEditingValue(
+          text: combined,
+          selection: TextSelection.collapsed(offset: combined.length),
+        );
+      },
+      listenOptions: SpeechListenOptions(
+        partialResults: true,
+        cancelOnError: true,
+      ),
+    );
+    if (mounted) setState(() => _listening = true);
+  }
+
+  void _onStatus(String status) {
+    if (!mounted) return;
+    if (status == 'done' || status == 'notListening') {
+      setState(() => _listening = false);
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFF1A1A1A),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = const Color(0xFF00E3FD);
+    return GestureDetector(
+      onTap: widget.enabled ? _toggle : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: _listening
+              ? accent.withValues(alpha: 0.18)
+              : Colors.transparent,
+          border: Border.all(
+            color: _listening
+                ? accent.withValues(alpha: 0.8)
+                : Colors.white.withValues(alpha: 0.12),
+          ),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Icon(
+          _listening ? Icons.mic_rounded : Icons.mic_none_rounded,
+          size: 20,
+          color: _listening ? accent : const Color(0xFFADAAAA),
+        ),
       ),
     );
   }

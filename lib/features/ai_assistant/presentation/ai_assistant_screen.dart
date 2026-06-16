@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/local_db/isar_collections/isar_ai_action_batch.dart';
+import '../../../core/presentation/keyboard_dismiss.dart';
 import '../../../core/utils/date_keys.dart';
 import '../application/ai_action_batch_state.dart';
 import '../application/ai_assistant_providers.dart';
@@ -206,35 +207,45 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
 
     return Column(
       children: [
-        if (showSuggestionsPanel) const ProactiveSuggestionsCoachPanel(),
-        // "Pick up where you left off" banner — shown when no active messages
-        // and there is a recent unconfirmed plan
-        if (!hasMessages)
-          _PickUpBanner(
-            historyRepository: service.historyRepository,
-            onResume: (input) {
-              service.sendMessage(input);
-            },
-          ),
-        // Conversation thread
         Expanded(
-          child: hasMessages
-              ? _MessageList(
-                  messages: messages,
-                  service: service,
-                  scrollController: _scrollController,
-                  isLoading: service.isLoading,
-                  onSuggestedPrompt: (prompt) {
-                    _inputController.text = prompt;
-                    _inputFocusNode.requestFocus();
-                  },
-                )
-              : _EmptyState(
-                  onPromptSelected: (p) {
-                    _inputController.text = p;
-                    _inputFocusNode.requestFocus();
-                  },
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => dismissKeyboard(context),
+            child: Column(
+              children: [
+                if (showSuggestionsPanel) const ProactiveSuggestionsCoachPanel(),
+                // "Pick up where you left off" banner — shown when no active messages
+                // and there is a recent unconfirmed plan
+                if (!hasMessages)
+                  _PickUpBanner(
+                    historyRepository: service.historyRepository,
+                    onResume: (input) {
+                      service.sendMessage(input);
+                    },
+                  ),
+                // Conversation thread
+                Expanded(
+                  child: hasMessages
+                      ? _MessageList(
+                          messages: messages,
+                          service: service,
+                          scrollController: _scrollController,
+                          isLoading: service.isLoading,
+                          onSuggestedPrompt: (prompt) {
+                            _inputController.text = prompt;
+                            _inputFocusNode.requestFocus();
+                          },
+                        )
+                      : _EmptyState(
+                          onPromptSelected: (p) {
+                            _inputController.text = p;
+                            _inputFocusNode.requestFocus();
+                          },
+                        ),
                 ),
+              ],
+            ),
+          ),
         ),
         // Fixed bottom: input + quick directives
         Container(
@@ -371,6 +382,7 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(0, 8, 0, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -436,6 +448,7 @@ class _MessageList extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView.builder(
       controller: scrollController,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: messages.length + (isLoading ? 1 : 0),
       itemBuilder: (context, i) {
