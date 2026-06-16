@@ -98,6 +98,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
   final _scheduleSectionKey = GlobalKey();
   String _duration = '25 MIN';
   int _customDurationMinutes = 90;
+  bool _durationEnabled = true;
   String? _category;
   bool _reminder = false;
   bool _focusSession = true;
@@ -212,6 +213,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       title: _controller.text,
       notes: _notesController.text,
       duration: _duration,
+      durationEnabled: _durationEnabled,
       customDurationMinutes: _customDurationMinutes,
       category: _category,
       reminder: _reminder,
@@ -239,6 +241,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       _controller.text = draft.title;
       _notesController.text = draft.notes;
       _duration = draft.duration;
+      _durationEnabled = draft.durationEnabled;
       _customDurationMinutes = draft.customDurationMinutes;
       _category = draft.category;
       _reminder = draft.reminder;
@@ -439,12 +442,15 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
         _loadedTask = loaded;
         _controller.text = loaded.title;
         _notesController.text = loaded.notes ?? '';
-        _duration = durationLabelFromMinutes(
-          loaded.durationMinutes,
-          category: loaded.category,
-        );
-        if (isCustomDurationKey(_duration)) {
-          _customDurationMinutes = loaded.durationMinutes;
+        _durationEnabled = taskHasFocusDuration(loaded.durationMinutes);
+        if (_durationEnabled) {
+          _duration = durationLabelFromMinutes(
+            loaded.durationMinutes,
+            category: loaded.category,
+          );
+          if (isCustomDurationKey(_duration)) {
+            _customDurationMinutes = loaded.durationMinutes;
+          }
         }
         _category = loaded.category;
         _reminder = loaded.reminderEnabled;
@@ -529,10 +535,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       routineId: routineId,
       blockId: blockId,
       title: title,
-      durationMinutes: addTaskDurationMinutes(
-        _duration,
-        customMinutes: _customDurationMinutes,
-      ),
+      durationMinutes: _resolvedDurationMinutes,
       priority: _loadedTask?.priority ?? 3,
       orderIndex: orderIndex,
       reminderEnabled: _reminder,
@@ -621,6 +624,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
   // ─── Phase A: time block helpers ──────────────────────────────────────────
 
   Future<bool> _checkTimeBlockConflicts(PlannedTask task) async {
+    if (!taskHasFocusDuration(task.durationMinutes)) return true;
     final reminderIso = task.reminderTimeIso;
     if (reminderIso == null) return true;
     final startAt = DateTime.tryParse(reminderIso);
@@ -783,6 +787,10 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
   }
 
   Future<void> _syncTimeBlock(PlannedTask task) async {
+    if (!taskHasFocusDuration(task.durationMinutes)) {
+      await ref.read(timeBlockSyncServiceProvider).removeBlockForEntity(task.id);
+      return;
+    }
     final reminderIso = task.reminderTimeIso;
     if (reminderIso == null) {
       await ref.read(timeBlockSyncServiceProvider).removeBlockForEntity(task.id);
@@ -958,7 +966,14 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       : standardDurationChipKeys;
 
   List<String> get _activeDurationLabels {
-    if (isSleepCategory(_category)) return sleepDurationChipLabels;
+    if (isSleepCategory(_category)) {
+      return [
+        ...sleepDurationChipLabels.sublist(0, sleepDurationChipLabels.length - 1),
+        isCustomDurationKey(_duration)
+            ? formatAddTaskDurationChipLabel(_customDurationMinutes)
+            : sleepDurationChipLabels.last,
+      ];
+    }
     return [
       ...standardDurationChipLabels.sublist(0, 4),
       isCustomDurationKey(_duration)
@@ -967,15 +982,33 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
     ];
   }
 
-  int get _effectiveDurationMinutes => addTaskDurationMinutes(
+  int get _resolvedDurationMinutes {
+    if (isSleepCategory(_category) || _durationEnabled) {
+      return addTaskDurationMinutes(
         _duration,
         customMinutes: _customDurationMinutes,
       );
+    }
+    return kReminderOnlyDurationMinutes;
+  }
+
+  int get _effectiveDurationMinutes => _resolvedDurationMinutes;
 
   Future<void> _editCustomDuration() async {
+    final sleep = isSleepCategory(_category);
     final picked = await showCustomDurationDialog(
       context,
-      initialMinutes: _customDurationMinutes,
+      initialMinutes: sleep
+          ? _customDurationMinutes.clamp(
+              kSleepMinCustomMinutes,
+              kSleepMaxCustomMinutes,
+            )
+          : _customDurationMinutes,
+      minMinutes: sleep ? kSleepMinCustomMinutes : null,
+      maxMinutes: sleep ? kSleepMaxCustomMinutes : null,
+      title: sleep ? 'Custom sleep length' : null,
+      minErrorMessage: sleep ? 'Sleep length must be at least 3 hours' : null,
+      maxErrorMessage: sleep ? 'Maximum sleep length is 14 hours' : null,
     );
     if (picked == null || !mounted) return;
     setState(() {
@@ -986,6 +1019,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
 
   void _applySleepCategoryDefaults(String label) {
     if (!isSleepCategory(label)) return;
+    _durationEnabled = true;
     _duration = '8 HOURS';
     _reminder = true;
     _isRigid = true;
@@ -1074,6 +1108,69 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       default:
         return 'GENTLE REMINDERS';
     }
+  }
+
+  Widget _buildDurationSection() {
+    final sleep = isSleepCategory(_category);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: AddTaskHeroSectionLabel(
+                title: 'Duration',
+                subtitle: sleep
+                    ? 'Choose a preset or tap Custom for your sleep length'
+                    : _durationEnabled
+                        ? 'Define your focus sprint'
+                        : 'Reminder only — no calendar time block',
+              ),
+            ),
+            if (!sleep) ...[
+              const SizedBox(width: 12),
+              Column(
+                children: [
+                  Switch.adaptive(
+                    value: _durationEnabled,
+                    onChanged: (value) => setState(() => _durationEnabled = value),
+                    activeTrackColor: AddTaskColors.accentDim.withValues(alpha: 0.55),
+                    activeThumbColor: AddTaskColors.accentContainer,
+                  ),
+                  const Text(
+                    'Use duration',
+                    style: TextStyle(
+                      color: AddTaskColors.muted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+        if (sleep || _durationEnabled) ...[
+          const SizedBox(height: 16),
+          AddTaskDurationSegment(
+            options: _activeDurationLabels,
+            selected: _durationDisplayLabel,
+            onSelected: (label) async {
+              final i = _activeDurationLabels.indexOf(label);
+              if (i < 0) return;
+              final key = _activeDurationOptions[i];
+              if (isCustomDurationKey(key)) {
+                await _editCustomDuration();
+                return;
+              }
+              setState(() => _duration = key);
+            },
+          ),
+        ],
+      ],
+    );
   }
 
   Widget _buildCategorySection() {
@@ -1486,27 +1583,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
                         ),
                       ),
                       const SizedBox(height: 32),
-                      AddTaskHeroSectionLabel(
-                        title: 'Duration',
-                        subtitle: isSleepCategory(_category)
-                            ? 'Sleep blocks use longer windows (6–8 hours)'
-                            : 'Define your focus sprint',
-                      ),
-                      const SizedBox(height: 16),
-                      AddTaskDurationSegment(
-                        options: _activeDurationLabels,
-                        selected: _durationDisplayLabel,
-                        onSelected: (label) async {
-                          final i = _activeDurationLabels.indexOf(label);
-                          if (i < 0) return;
-                          final key = _activeDurationOptions[i];
-                          if (isCustomDurationKey(key)) {
-                            await _editCustomDuration();
-                            return;
-                          }
-                          setState(() => _duration = key);
-                        },
-                      ),
+                      _buildDurationSection(),
                       const SizedBox(height: 32),
                       _buildCategorySection(),
                       const SizedBox(height: 24),

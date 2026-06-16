@@ -7,12 +7,15 @@ import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/domain/models/analytics_event.dart';
+import '../../execution/application/execution_controller.dart';
 import '../../execution/application/execution_day_loader.dart';
+import '../../planning/domain/add_task_duration.dart';
 import '../../execution/domain/models/timer_session.dart';
 import '../../execution/domain/task_timer_engine.dart';
 import '../application/focus_quick_task.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 import '../../home/presentation/quittr_app_bar_title.dart';
+import 'focus_session_duration_picker.dart';
 
 class FocusLaunchArgs {
   const FocusLaunchArgs({
@@ -126,6 +129,85 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
     }
   }
 
+  Future<int?> _resolveFocusDurationMinutes(ExecutionTaskItem task) async {
+    if (taskHasFocusDuration(task.durationMinutes)) {
+      return task.durationMinutes;
+    }
+    return showFocusSessionDurationPicker(
+      context,
+      taskTitle: task.title,
+    );
+  }
+
+  Future<void> _selectTask(
+    ExecutionTaskItem task, {
+    required bool hasRunningTask,
+    required ExecutionState execState,
+  }) async {
+    if (hasRunningTask && execState.taskId != task.id) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Task "${execState.taskLabel}" is already running. '
+            'Finish or stop it before switching focus.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    ref.read(activeExecutionTaskIdProvider.notifier).state = task.id;
+    ref.read(activeExecutionTaskLabelProvider.notifier).state = task.title;
+
+    final focusMinutes = taskHasFocusDuration(task.durationMinutes)
+        ? task.durationMinutes
+        : null;
+    ref.read(executionControllerProvider.notifier).setTask(
+      id: task.id,
+      label: task.title,
+      durationMinutes: focusMinutes,
+    );
+
+    fireAndForgetAnalyticsEvent(
+      ref,
+      type: AnalyticsEventType.taskStarted,
+      entityId: task.id,
+      entityKind: 'task',
+      sourceSurface: 'focus_selection',
+      idempotencyKey:
+          'task_started_focus_${task.id}_${DateTime.now().millisecondsSinceEpoch}',
+    );
+  }
+
+  Future<void> _openTimerForSelectedTask(List<ExecutionTaskItem> tasks) async {
+    final selectedId = ref.read(activeExecutionTaskIdProvider);
+    ExecutionTaskItem? selected;
+    for (final task in tasks) {
+      if (task.id == selectedId) {
+        selected = task;
+        break;
+      }
+    }
+    if (selected == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a task to start focus.')),
+      );
+      return;
+    }
+
+    final minutes = await _resolveFocusDurationMinutes(selected);
+    if (!mounted || minutes == null) return;
+
+    ref.read(executionControllerProvider.notifier).setTask(
+      id: selected.id,
+      label: selected.title,
+      durationMinutes: minutes,
+    );
+
+    if (!mounted) return;
+    await Navigator.pushNamed(context, TimerSessionScreen.routeName);
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedTask = ref.watch(activeExecutionTaskLabelProvider);
@@ -182,45 +264,13 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
                       padding: const EdgeInsets.only(bottom: 10),
                       child: _TaskCard(
                         title: task.title,
-                        subtitle: '${task.durationMinutes}m target',
+                        subtitle: focusTaskSubtitle(task.durationMinutes),
                         selected: selectedTask == task.title,
-                        onTap: () {
-                          if (hasRunningTask && execState.taskId != task.id) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Task "${execState.taskLabel}" is already running. '
-                                  'Finish or stop it before switching focus.',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-                          ref
-                                  .read(activeExecutionTaskIdProvider.notifier)
-                                  .state =
-                              task.id;
-                          ref
-                              .read(activeExecutionTaskLabelProvider.notifier)
-                              .state = task
-                              .title;
-                          ref
-                              .read(executionControllerProvider.notifier)
-                              .setTask(
-                                id: task.id,
-                                label: task.title,
-                                durationMinutes: task.durationMinutes,
-                              );
-                          fireAndForgetAnalyticsEvent(
-                            ref,
-                            type: AnalyticsEventType.taskStarted,
-                            entityId: task.id,
-                            entityKind: 'task',
-                            sourceSurface: 'focus_selection',
-                            idempotencyKey:
-                                'task_started_focus_${task.id}_${DateTime.now().millisecondsSinceEpoch}',
-                          );
-                        },
+                        onTap: () => _selectTask(
+                          task,
+                          hasRunningTask: hasRunningTask,
+                          execState: execState,
+                        ),
                       ),
                     ),
                   )
@@ -270,7 +320,12 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
                   : const Color(0xFFB7FF00),
               foregroundColor: hasRunningTask ? Colors.white : Colors.black,
             ),
-            onPressed: () => Navigator.pushNamed(context, TimerSessionScreen.routeName),
+            onPressed: hasRunningTask
+                ? () => Navigator.pushNamed(context, TimerSessionScreen.routeName)
+                : taskList.maybeWhen(
+                    data: (tasks) => () => _openTimerForSelectedTask(tasks),
+                    orElse: () => null,
+                  ),
             child: Text(
               hasRunningTask ? 'Running Focus' : 'Start Focus',
               style: TextStyle(fontWeight: FontWeight.w700),

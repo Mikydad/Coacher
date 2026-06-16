@@ -3,6 +3,11 @@ import 'sleep_task.dart';
 /// Chip key when duration is not a preset (15m–1h or sleep).
 const String kAddTaskCustomDurationKey = 'CUSTOM';
 
+/// Stored on [PlannedTask.durationMinutes] when the user turns duration off.
+const int kReminderOnlyDurationMinutes = 0;
+
+bool taskHasFocusDuration(int durationMinutes) => durationMinutes >= 1;
+
 const List<String> standardDurationChipKeys = [
   '15 MIN',
   '25 MIN',
@@ -31,10 +36,12 @@ String formatAddTaskDurationChipLabel(int minutes) {
 
 /// Maps minutes back to the closest Add Task chip label.
 String durationLabelFromMinutes(int minutes, {String? category}) {
+  if (minutes < 1) return kAddTaskCustomDurationKey;
   if (isSleepCategory(category)) {
-    if (minutes <= 6 * 60 + 30) return '6 HOURS';
-    if (minutes <= 7 * 60 + 30) return '7 HOURS';
-    return '8 HOURS';
+    if (minutes == 6 * 60) return '6 HOURS';
+    if (minutes == 7 * 60) return '7 HOURS';
+    if (minutes == 8 * 60) return '8 HOURS';
+    return kAddTaskCustomDurationKey;
   }
   if (minutes == 15) return '15 MIN';
   if (minutes == 25) return '25 MIN';

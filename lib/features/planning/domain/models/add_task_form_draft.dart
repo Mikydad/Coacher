@@ -5,6 +5,7 @@ class AddTaskFormDraft {
     required this.title,
     required this.notes,
     required this.duration,
+    required this.durationEnabled,
     required this.customDurationMinutes,
     this.category,
     required this.reminder,
@@ -27,6 +28,7 @@ class AddTaskFormDraft {
   final String title;
   final String notes;
   final String duration;
+  final bool durationEnabled;
   final int customDurationMinutes;
   final String? category;
   final bool reminder;
@@ -46,6 +48,7 @@ class AddTaskFormDraft {
 
   bool get hasMeaningfulContent {
     if (title.trim().isNotEmpty || notes.trim().isNotEmpty) return true;
+    if (!durationEnabled) return true;
     if (reminder || isHabitAnchor || strictModeRequired || isRigid) return true;
     if (category != null && category!.isNotEmpty) return true;
     if (modeUserCustomized || modeRefId != 'flexible') return true;
@@ -57,6 +60,7 @@ class AddTaskFormDraft {
         'title': title,
         'notes': notes,
         'duration': duration,
+        'durationEnabled': durationEnabled,
         'customDurationMinutes': customDurationMinutes,
         'category': category,
         'reminder': reminder,
@@ -81,6 +85,7 @@ class AddTaskFormDraft {
       title: json['title'] as String? ?? '',
       notes: json['notes'] as String? ?? '',
       duration: json['duration'] as String? ?? '25 MIN',
+      durationEnabled: json['durationEnabled'] as bool? ?? true,
       customDurationMinutes: json['customDurationMinutes'] as int? ?? 90,
       category: json['category'] as String?,
       reminder: json['reminder'] as bool? ?? false,
@@ -105,6 +110,7 @@ class AddTaskFormDraft {
     return title == other.title &&
         notes == other.notes &&
         duration == other.duration &&
+        durationEnabled == other.durationEnabled &&
         customDurationMinutes == other.customDurationMinutes &&
         category == other.category &&
         reminder == other.reminder &&

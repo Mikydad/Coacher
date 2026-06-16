@@ -47,6 +47,7 @@ void main() {
       expect(durationLabelFromMinutes(360, category: 'Sleep'), '6 HOURS');
       expect(durationLabelFromMinutes(420, category: 'Sleep'), '7 HOURS');
       expect(durationLabelFromMinutes(480, category: 'Sleep'), '8 HOURS');
+      expect(durationLabelFromMinutes(540, category: 'Sleep'), kAddTaskCustomDurationKey);
     });
   });
 

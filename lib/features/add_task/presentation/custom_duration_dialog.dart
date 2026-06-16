@@ -4,21 +4,45 @@ import 'package:flutter/services.dart';
 import '../../planning/domain/add_task_duration.dart';
 import 'add_task_ui.dart';
 
-/// Lets the user set any duration between 1 minute and 12 hours.
+/// Lets the user set a custom duration between [minMinutes] and [maxMinutes].
 Future<int?> showCustomDurationDialog(
   BuildContext context, {
   required int initialMinutes,
+  int? minMinutes,
+  int? maxMinutes,
+  String? title,
+  String? minErrorMessage,
+  String? maxErrorMessage,
 }) {
   return showDialog<int>(
     context: context,
-    builder: (ctx) => _CustomDurationDialog(initialMinutes: initialMinutes),
+    builder: (ctx) => _CustomDurationDialog(
+      initialMinutes: initialMinutes,
+      minMinutes: minMinutes ?? kAddTaskMinCustomMinutes,
+      maxMinutes: maxMinutes ?? kAddTaskMaxCustomMinutes,
+      title: title ?? 'Custom duration',
+      minErrorMessage: minErrorMessage,
+      maxErrorMessage: maxErrorMessage,
+    ),
   );
 }
 
 class _CustomDurationDialog extends StatefulWidget {
-  const _CustomDurationDialog({required this.initialMinutes});
+  const _CustomDurationDialog({
+    required this.initialMinutes,
+    required this.minMinutes,
+    required this.maxMinutes,
+    required this.title,
+    this.minErrorMessage,
+    this.maxErrorMessage,
+  });
 
   final int initialMinutes;
+  final int minMinutes;
+  final int maxMinutes;
+  final String title;
+  final String? minErrorMessage;
+  final String? maxErrorMessage;
 
   @override
   State<_CustomDurationDialog> createState() => _CustomDurationDialogState();
@@ -33,8 +57,8 @@ class _CustomDurationDialogState extends State<_CustomDurationDialog> {
   void initState() {
     super.initState();
     final clamped = widget.initialMinutes.clamp(
-      kAddTaskMinCustomMinutes,
-      kAddTaskMaxCustomMinutes,
+      widget.minMinutes,
+      widget.maxMinutes,
     );
     _hoursController = TextEditingController(text: '${clamped ~/ 60}');
     _minutesController = TextEditingController(text: '${clamped % 60}');
@@ -55,12 +79,14 @@ class _CustomDurationDialogState extends State<_CustomDurationDialog> {
       return;
     }
     final total = h * 60 + m;
-    if (total < kAddTaskMinCustomMinutes) {
-      setState(() => _error = 'Duration must be at least 1 minute');
+    if (total < widget.minMinutes) {
+      setState(() => _error = widget.minErrorMessage ??
+          'Duration must be at least ${widget.minMinutes} minutes');
       return;
     }
-    if (total > kAddTaskMaxCustomMinutes) {
-      setState(() => _error = 'Maximum duration is 12 hours');
+    if (total > widget.maxMinutes) {
+      setState(() => _error = widget.maxErrorMessage ??
+          'Maximum duration is ${widget.maxMinutes ~/ 60} hours');
       return;
     }
     Navigator.pop(context, total);
@@ -70,9 +96,9 @@ class _CustomDurationDialogState extends State<_CustomDurationDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: AddTaskColors.card,
-      title: const Text(
-        'Custom duration',
-        style: TextStyle(color: AddTaskColors.onSurface),
+      title: Text(
+        widget.title,
+        style: const TextStyle(color: AddTaskColors.onSurface),
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,

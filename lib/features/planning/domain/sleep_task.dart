@@ -2,9 +2,18 @@ import '../domain/models/task_item.dart';
 
 const String kSleepTaskCategory = 'Sleep';
 
-const List<String> sleepDurationChipKeys = ['6 HOURS', '7 HOURS', '8 HOURS'];
+const List<String> sleepDurationChipKeys = [
+  '6 HOURS',
+  '7 HOURS',
+  '8 HOURS',
+  'CUSTOM',
+];
 
-const List<String> sleepDurationChipLabels = ['6h', '7h', '8h'];
+const List<String> sleepDurationChipLabels = ['6h', '7h', '8h', 'Custom'];
+
+/// Allowed custom sleep block length (3–14 hours).
+const int kSleepMinCustomMinutes = 3 * 60;
+const int kSleepMaxCustomMinutes = 14 * 60;
 
 bool isSleepCategory(String? category) =>
     category?.trim().toLowerCase() == kSleepTaskCategory.toLowerCase();

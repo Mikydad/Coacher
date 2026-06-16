@@ -66,7 +66,7 @@ class PlannedTask {
     ModelValidators.requireNotBlank(title, 'task.title');
     ModelValidators.requireRange(
       value: durationMinutes,
-      min: 1,
+      min: 0,
       max: 24 * 60,
       fieldName: 'task.durationMinutes',
     );
