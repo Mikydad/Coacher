@@ -1,40 +1,48 @@
 import '../domain/models/ai_action.dart';
+import '../domain/models/ai_intent_kind.dart';
 import '../domain/models/ai_planned_changes.dart';
 import '../domain/models/ai_operating_layer_payload.dart';
 import '../domain/models/ai_response_type.dart';
 import 'ai_assumption_engine.dart';
 import 'ai_capability_registry.dart';
+import 'ai_chat_suggestion_enricher.dart';
 import 'ai_conflict_detector.dart';
+import 'ai_intent_router.dart';
 import 'ai_missing_field_detector.dart';
 import 'ai_operating_layer_client.dart';
 import 'ai_payload_assembler.dart';
 import 'ai_plan_deduplicator.dart';
+import 'ai_schedule_answer_formatter.dart';
 
 /// Orchestrates the full parse pipeline for a single user turn:
 ///
-///   1. Assemble context payload from live app data.
-///   2. Call the AI client to parse the user's intent.
-///   3. Run the Missing Field Detector on every returned action.
-///   4. For each incomplete action, try the Assumption Engine.
-///   5. Run the Conflict Detector on the complete action list.
-///   6. Return [AiPlannedChanges] — with plan, conflicts, or a follow-up question.
+///   1. Classify intent (query / suggest / mutate).
+///   2. Assemble context payload from live app data.
+///   3. Call the AI client to parse the user's intent.
+///   4. Apply router guardrails (query coercion, mutate clarify).
+///   5. Run the Missing Field Detector + Assumption Engine.
+///   6. Run the Conflict Detector on the complete action list.
+///   7. Return [AiPlannedChanges] — informational, suggest, mutate, or follow-up.
 class AiIntentParser {
   const AiIntentParser({
     required this.client,
     required this.assembler,
     required this.assumptionEngine,
     this.conflictDetector,
+    this.chatSuggestionEnricher,
   });
 
   final AiOperatingLayerClient client;
   final AiPayloadAssembler assembler;
   final AiAssumptionEngine assumptionEngine;
   final AiConflictDetector? conflictDetector;
+  final AiChatSuggestionEnricher? chatSuggestionEnricher;
 
   Future<AiPlannedChanges> parse(
     String userInput,
     String sessionId, {
     AiPlannedChanges? previousPlan,
+    Map<String, dynamic>? proactiveContext,
   }) async {
     // Fast path — unsupported domains never reach the LLM.
     final unsupported = AiCapabilityRegistry.detectUnsupported(userInput);
@@ -46,6 +54,8 @@ class AiIntentParser {
         suggestedPrompts: unsupported.suggestedPrompts,
       );
     }
+
+    final route = AiIntentRouter.classify(userInput);
 
     // Build a human-readable summary of the previous plan for the AI context
     final previousPlanSummary = previousPlan != null && previousPlan.actions.isNotEmpty
@@ -61,6 +71,8 @@ class AiIntentParser {
         userInput,
         sessionId,
         previousPlanSummary: previousPlanSummary,
+        intentRoute: route,
+        proactiveContext: proactiveContext,
       );
     } catch (e) {
       return AiPlannedChanges(
@@ -90,16 +102,35 @@ class AiIntentParser {
     // Carry the correct sessionId (client may return the user input as id)
     result = result.copyWith(sessionId: sessionId);
 
-    // Step 3 — Read-only or unsupported answers skip the mutation pipeline.
-    if (result.isInformational || result.isUnsupported) return result;
+    // Step 3 — Router guardrails before mutation pipeline.
+    result = _applyRouterGuardrails(result, route, payload);
 
-    // Step 4 — If the AI already asked a follow-up, propagate it
+    // Read-only or unsupported answers skip the mutation pipeline.
+    if (result.isInformational || result.isUnsupported) {
+      if (result.isInformational && chatSuggestionEnricher != null) {
+        final extra =
+            await chatSuggestionEnricher!.promptsForInformationalGaps(payload);
+        if (extra.isNotEmpty) {
+          final merged = <String>[
+            ...result.suggestedPrompts,
+            ...extra,
+          ].take(3).toList();
+          result = result.copyWith(suggestedPrompts: merged);
+        }
+      }
+      return result;
+    }
+
+    // Suggest with narrative only (no draft actions).
+    if (result.isSuggest && result.actions.isEmpty) return result;
+
+    // If the AI already asked a follow-up, propagate it
     if (result.requiresFollowUp) return result;
 
-    // Step 5 — Missing field check + Assumption Engine
+    // Step 4 — Missing field check + Assumption Engine
     var enrichedActions = await _enrichWithAssumptions(result.actions);
 
-    // Step 4b — Drop actions that duplicate tasks already on today's list
+    // Drop actions that duplicate tasks already on today's list
     enrichedActions = AiPlanDeduplicator.filter(
       enrichedActions,
       payload.activeTasks,
@@ -125,7 +156,7 @@ class AiIntentParser {
       );
     }
 
-    // Step 6 — Conflict detection (reminder collision, context, enforcement)
+    // Step 5 — Conflict detection (reminder collision, context, enforcement)
     final allConflicts = List<String>.from(result.conflicts);
     final allBlocked = <String>[];
 
@@ -139,11 +170,84 @@ class AiIntentParser {
       }
     }
 
+    final responseType = _resolveResponseType(result, route, enrichedActions);
+
     return result.copyWith(
+      responseType: responseType,
       actions: enrichedActions,
       conflicts: allConflicts,
       blockedByContext: allBlocked,
+      informationalMessage: responseType == AiResponseType.suggest
+          ? (result.informationalMessage ?? _defaultSuggestMessage(enrichedActions))
+          : result.informationalMessage,
     );
+  }
+
+  AiPlannedChanges _applyRouterGuardrails(
+    AiPlannedChanges result,
+    AiIntentRoute route,
+    AiOperatingLayerPayload payload,
+  ) {
+    if (route.kind == AiIntentKind.query &&
+        result.isMutate &&
+        result.actions.isNotEmpty) {
+      final coerced = AiScheduleAnswerFormatter.tryAnswerScheduleQuery(payload);
+      if (coerced != null) {
+        return AiPlannedChanges(
+          sessionId: result.sessionId,
+          responseType: AiResponseType.informational,
+          informationalMessage: coerced,
+        );
+      }
+    }
+
+    if (route.kind == AiIntentKind.mutate &&
+        result.isInformational &&
+        result.actions.isEmpty) {
+      return AiPlannedChanges(
+        sessionId: result.sessionId,
+        followUpQuestion:
+            'Could you tell me exactly what you\'d like to change? '
+            'For example: "Add workout at 6am tomorrow."',
+      );
+    }
+
+    if (route.kind == AiIntentKind.suggest &&
+        result.isMutate &&
+        result.actions.isNotEmpty &&
+        (result.informationalMessage == null ||
+            result.informationalMessage!.isEmpty)) {
+      return result.copyWith(
+        responseType: AiResponseType.suggest,
+        informationalMessage: _defaultSuggestMessage(result.actions),
+      );
+    }
+
+    return result;
+  }
+
+  AiResponseType _resolveResponseType(
+    AiPlannedChanges result,
+    AiIntentRoute route,
+    List<AiAction> actions,
+  ) {
+    if (result.isSuggest) return AiResponseType.suggest;
+    if (route.kind == AiIntentKind.suggest && actions.isNotEmpty) {
+      return AiResponseType.suggest;
+    }
+    return AiResponseType.mutate;
+  }
+
+  String _defaultSuggestMessage(List<AiAction> actions) {
+    if (actions.isEmpty) {
+      return 'Here\'s what I\'d suggest based on your schedule.';
+    }
+    final parts = actions.take(3).map((a) {
+      final title = a.parameters['title']?.toString() ?? a.actionType.name;
+      final time = a.parameters['time']?.toString();
+      return time != null ? '$title at $time' : title;
+    }).join(', ');
+    return 'I\'d suggest: $parts. Tap Apply this plan when you\'re ready to preview.';
   }
 
   // ─── Private helpers ──────────────────────────────────────────────────────

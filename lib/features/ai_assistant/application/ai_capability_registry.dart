@@ -5,6 +5,7 @@ abstract final class AiCapabilityRegistry {
     'tomorrow_schedule',
     'goals_summary',
     'goal_progress',
+    'week_overview',
     'focus_state',
     'activity_patterns',
   ];

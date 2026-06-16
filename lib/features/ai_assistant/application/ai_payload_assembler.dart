@@ -9,6 +9,7 @@ import '../../planning/application/planned_task_collect.dart';
 import '../../planning/data/planning_repository.dart';
 import '../../profile/application/profile_preference_service.dart';
 import '../data/ai_interaction_history_repository.dart';
+import '../domain/models/ai_intent_kind.dart';
 import '../domain/models/ai_operating_layer_payload.dart';
 import 'ai_capability_registry.dart';
 import 'entity_normaliser.dart';
@@ -41,6 +42,8 @@ class AiPayloadAssembler {
     String userInput,
     String sessionId, {
     String? previousPlanSummary,
+    AiIntentRoute? intentRoute,
+    Map<String, dynamic>? proactiveContext,
   }) async {
     final results = await Future.wait([
       _buildActiveTasks(),
@@ -49,6 +52,7 @@ class AiPayloadAssembler {
       _buildTodaySchedule(),
       _buildTomorrowTasks(),
       _buildTomorrowSchedule(),
+      _buildWeekOverview(),
       _buildFocusState(),
       _buildContextOverride(),
       _buildBehaviorPreferences(),
@@ -66,14 +70,17 @@ class AiPayloadAssembler {
       todaySchedule: results[3] as List<Map<String, dynamic>>,
       tomorrowTasks: results[4] as List<Map<String, dynamic>>,
       tomorrowSchedule: results[5] as List<Map<String, dynamic>>,
-      focusState: results[6] as Map<String, dynamic>,
-      contextOverride: results[7] as Map<String, dynamic>?,
-      behaviorPreferences: results[8] as Map<String, dynamic>,
-      sessionHistory: results[9] as List<Map<String, dynamic>>,
-      recentPatterns: results[10] as List<Map<String, dynamic>>,
-      conversationHistory: results[11] as List<Map<String, dynamic>>,
-      completedInSession: results[12] as List<String>,
+      weekOverview: results[6] as List<Map<String, dynamic>>,
+      focusState: results[7] as Map<String, dynamic>,
+      contextOverride: results[8] as Map<String, dynamic>?,
+      behaviorPreferences: results[9] as Map<String, dynamic>,
+      sessionHistory: results[10] as List<Map<String, dynamic>>,
+      recentPatterns: results[11] as List<Map<String, dynamic>>,
+      conversationHistory: results[12] as List<Map<String, dynamic>>,
+      completedInSession: results[13] as List<String>,
       capabilities: AiCapabilityRegistry.buildPayloadSection(),
+      intentHint: intentRoute?.toPromptHint(),
+      proactiveContext: proactiveContext,
       previousPlan: previousPlanSummary,
     );
   }
@@ -120,6 +127,55 @@ class AiPayloadAssembler {
     } catch (_) {
       return [];
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _buildWeekOverview() async {
+    try {
+      final today = DateTime.now();
+      final dayFutures = <Future<Map<String, dynamic>>>[];
+      for (var offset = 0; offset < 7; offset++) {
+        final day = today.add(Duration(days: offset));
+        dayFutures.add(_buildDayOverview(day, offset));
+      }
+      return await Future.wait(dayFutures);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> _buildDayOverview(
+    DateTime day,
+    int offsetFromToday,
+  ) async {
+    final dateKey = DateKeys.yyyymmdd(day);
+    try {
+      final rows = await collectTasksForDateKey(planningRepository, dateKey);
+      var scheduledCount = 0;
+      for (final row in rows) {
+        final time = row.task.reminderTimeIso;
+        if (time != null && time.isNotEmpty) scheduledCount++;
+      }
+      return {
+        'date': dateKey,
+        'label': _weekDayLabel(offsetFromToday, day),
+        'taskCount': rows.length,
+        'scheduledCount': scheduledCount,
+      };
+    } catch (_) {
+      return {
+        'date': dateKey,
+        'label': _weekDayLabel(offsetFromToday, day),
+        'taskCount': 0,
+        'scheduledCount': 0,
+      };
+    }
+  }
+
+  static String _weekDayLabel(int offsetFromToday, DateTime day) {
+    if (offsetFromToday == 0) return 'today';
+    if (offsetFromToday == 1) return 'tomorrow';
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return weekdays[day.weekday - 1];
   }
 
   List<Map<String, dynamic>> _taskMapsFromRows(List<PlannedTaskRow> rows) {

@@ -7,8 +7,8 @@ import 'entity_normaliser.dart';
 
 const List<String> kDefaultSuggestedPrompts = [
   'What\'s my plan for tomorrow?',
+  'How am I doing on my goals this week?',
   'Add a workout at 5AM',
-  'Move my study session tomorrow',
 ];
 
 /// Generates up to 3 context-specific suggested prompts based on the user's

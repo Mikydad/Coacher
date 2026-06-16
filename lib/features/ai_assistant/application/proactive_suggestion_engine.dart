@@ -8,9 +8,11 @@ import '../../planning/data/planning_repository.dart';
 import '../../time_blocks/data/time_block_repository.dart';
 import '../data/dismissed_suggestion_repository.dart';
 import '../domain/models/proactive_suggestion.dart';
+import 'proactive_chat_conversion_tracker.dart';
 import '../domain/models/proactive_suggestion_analytics_summary.dart';
 import 'entity_normaliser.dart';
 import 'proactive_suggestion_display.dart';
+import 'proactive_suggestion_source.dart';
 import 'schedule_optimisation_service.dart';
 
 /// Last computed weekly summary (in-memory, for internal tuning).
@@ -21,7 +23,7 @@ ProactiveSuggestionAnalyticsSummary? lastProactiveSuggestionAnalyticsSummary;
 ///
 /// All suggestions are advisory — they only pre-fill Coach AI input.
 /// Nothing is executed without explicit user confirmation.
-class ProactiveSuggestionEngine {
+class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
   const ProactiveSuggestionEngine({
     required this.planningRepository,
     required this.goalsRepository,
@@ -84,6 +86,7 @@ class ProactiveSuggestionEngine {
       weekStartKey: DateKeys.todayKey(weekStart),
       totalGenerated: shown.length,
       byType: byType,
+      chatConversionsByType: ProactiveChatConversionTracker.snapshot(),
     );
   }
 

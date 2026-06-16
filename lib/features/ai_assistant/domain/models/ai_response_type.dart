@@ -11,6 +11,9 @@ enum AiResponseType {
 
   /// Clarifying question before planning (legacy follow-up path).
   followUp,
+
+  /// Proposed plan with optional draft actions — user taps Apply before preview.
+  suggest,
 }
 
 AiResponseType aiResponseTypeFromJson(String? raw) {
@@ -23,6 +26,8 @@ AiResponseType aiResponseTypeFromJson(String? raw) {
     case 'follow_up':
     case 'follow-up':
       return AiResponseType.followUp;
+    case 'suggest':
+      return AiResponseType.suggest;
     case 'mutate':
     default:
       return AiResponseType.mutate;

@@ -9,6 +9,7 @@ import 'ai_response_type.dart';
 ///   3. [isBlockedByContext] == true       → hard warning; confirm disabled by default.
 ///   4. [hasConflicts] == true             → soft advisory warnings; confirm still available.
 ///   5. [isMutate] with actions            → plan ready, preview card.
+///   6. [isSuggest] with actions           → narrative + Apply this plan tap.
 class AiPlannedChanges {
   const AiPlannedChanges({
     required this.sessionId,
@@ -48,6 +49,7 @@ class AiPlannedChanges {
   bool get isInformational => responseType == AiResponseType.informational;
   bool get isUnsupported => responseType == AiResponseType.unsupported;
   bool get isMutate => responseType == AiResponseType.mutate;
+  bool get isSuggest => responseType == AiResponseType.suggest;
 
   bool get hasHighRiskActions =>
       actions.any((a) => a.riskLevel == AiActionRiskLevel.high);
@@ -61,6 +63,7 @@ class AiPlannedChanges {
   String? get assistantDisplayMessage {
     if (requiresFollowUp) return followUpQuestion;
     if (isInformational || isUnsupported) return informationalMessage;
+    if (isSuggest) return informationalMessage;
     return null;
   }
 

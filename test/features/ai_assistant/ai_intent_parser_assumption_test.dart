@@ -25,6 +25,8 @@ class _FakeAssembler implements AiPayloadAssembler {
     String userInput,
     String sessionId, {
     String? previousPlanSummary,
+    intentRoute,
+    proactiveContext,
   }) async =>
       _stubPayload;
 

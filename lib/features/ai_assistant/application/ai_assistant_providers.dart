@@ -18,6 +18,7 @@ import 'ai_action_batch_state.dart';
 import 'ai_action_executor.dart';
 import 'ai_assistant_service.dart';
 import 'ai_assumption_engine.dart';
+import 'ai_chat_suggestion_enricher.dart';
 import 'ai_conflict_detector.dart';
 import 'ai_intent_parser.dart';
 import 'ai_operating_layer_client.dart';
@@ -72,6 +73,16 @@ final aiConflictDetectorProvider = Provider<AiConflictDetector>((ref) {
   );
 });
 
+// ─── Chat suggestion enricher ─────────────────────────────────────────────────
+
+final aiChatSuggestionEnricherProvider =
+    Provider<AiChatSuggestionEnricher>((ref) {
+  return AiChatSuggestionEnricher(
+    proactiveEngine: ref.read(proactiveSuggestionEngineProvider),
+    dismissedRepo: ref.read(dismissedSuggestionRepositoryProvider),
+  );
+});
+
 // ─── Intent parser ────────────────────────────────────────────────────────────
 
 final aiIntentParserProvider = FutureProvider<AiIntentParser>((ref) async {
@@ -79,11 +90,13 @@ final aiIntentParserProvider = FutureProvider<AiIntentParser>((ref) async {
   final assembler = ref.read(aiPayloadAssemblerProvider);
   final assumptionEngine = ref.read(aiAssumptionEngineProvider);
   final conflictDetector = ref.read(aiConflictDetectorProvider);
+  final enricher = ref.read(aiChatSuggestionEnricherProvider);
   return AiIntentParser(
     client: client,
     assembler: assembler,
     assumptionEngine: assumptionEngine,
     conflictDetector: conflictDetector,
+    chatSuggestionEnricher: enricher,
   );
 });
 

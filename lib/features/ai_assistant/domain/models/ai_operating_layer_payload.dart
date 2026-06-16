@@ -1,3 +1,5 @@
+import 'ai_intent_kind.dart';
+
 /// The context payload sent to the AI model for intent parsing.
 ///
 /// Design rules (from PRD §4.12):
@@ -12,6 +14,7 @@ class AiOperatingLayerPayload {
     this.todaySchedule = const [],
     this.tomorrowTasks = const [],
     this.tomorrowSchedule = const [],
+    this.weekOverview = const [],
     this.focusState = const {},
     this.contextOverride,
     this.behaviorPreferences = const {},
@@ -21,6 +24,8 @@ class AiOperatingLayerPayload {
     this.completedInSession = const [],
     this.goalProgress = const [],
     this.capabilities = const {},
+    this.intentHint,
+    this.proactiveContext,
     this.previousPlan,
   });
 
@@ -41,6 +46,9 @@ class AiOperatingLayerPayload {
 
   /// Tomorrow's scheduled blocks — same shape as [todaySchedule].
   final List<Map<String, dynamic>> tomorrowSchedule;
+
+  /// Next 7 days — each entry: { date, label, taskCount, scheduledCount }.
+  final List<Map<String, dynamic>> weekOverview;
 
   /// Current focus/flow state.
   final Map<String, dynamic> focusState;
@@ -70,6 +78,12 @@ class AiOperatingLayerPayload {
   /// Supported / unsupported capability lists for the model.
   final Map<String, dynamic> capabilities;
 
+  /// Router hint — QUERY, SUGGEST, or MUTATE with optional focus date.
+  final String? intentHint;
+
+  /// Proactive suggestion that led the user into this session (if any).
+  final Map<String, dynamic>? proactiveContext;
+
   /// The previous plan when the user is refining an earlier intent.
   final String? previousPlan;
 
@@ -80,6 +94,7 @@ class AiOperatingLayerPayload {
         'todaySchedule': todaySchedule,
         'tomorrowTasks': tomorrowTasks,
         'tomorrowSchedule': tomorrowSchedule,
+        if (weekOverview.isNotEmpty) 'weekOverview': weekOverview,
         'focusState': focusState,
         if (contextOverride != null) 'contextOverride': contextOverride,
         'behaviorPreferences': behaviorPreferences,
@@ -89,6 +104,8 @@ class AiOperatingLayerPayload {
         if (completedInSession.isNotEmpty) 'completedInSession': completedInSession,
         if (goalProgress.isNotEmpty) 'goalProgress': goalProgress,
         if (capabilities.isNotEmpty) 'capabilities': capabilities,
+        if (intentHint != null) 'intentHint': intentHint,
+        if (proactiveContext != null) 'proactiveContext': proactiveContext,
         if (previousPlan != null) 'previousPlan': previousPlan,
       };
 }

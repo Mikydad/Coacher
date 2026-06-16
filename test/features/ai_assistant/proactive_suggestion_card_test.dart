@@ -1,6 +1,7 @@
 /// Tasks 6.3, 6.4, 6.5 — Widget and integration tests for proactive suggestion UI.
 library;
 
+import 'package:coach_for_life/app/application/main_tab_navigation.dart';
 import 'package:coach_for_life/features/ai_assistant/application/ai_assistant_providers.dart';
 import 'package:coach_for_life/features/ai_assistant/data/dismissed_suggestion_repository.dart';
 import 'package:coach_for_life/features/ai_assistant/domain/models/proactive_suggestion.dart';
@@ -88,10 +89,9 @@ void main() {
       expect(dismissed, isTrue);
     });
 
-    testWidgets('"Let\'s do it" navigates to /coach with preDraftedText',
+    testWidgets('"Let\'s do it" sets coach tab args with proactive context',
         (tester) async {
-      String? pushedRoute;
-      Object? pushedArgs;
+      CoachRouteArgs? capturedArgs;
 
       await tester.pumpWidget(
         ProviderScope(
@@ -99,21 +99,20 @@ void main() {
             dismissedSuggestionRepositoryProvider
                 .overrideWithValue(_NoOpDismissedRepo()),
           ],
-          child: MaterialApp(
-            onGenerateRoute: (settings) {
-              pushedRoute = settings.name;
-              pushedArgs = settings.arguments;
-              return MaterialPageRoute(
-                builder: (_) => const Scaffold(body: Text('Coach')),
-                settings: settings,
+          child: Consumer(
+            builder: (context, ref, _) {
+              ref.listen<CoachRouteArgs?>(coachTabArgsProvider, (_, next) {
+                capturedArgs = next;
+              });
+              return MaterialApp(
+                home: Scaffold(
+                  body: ProactiveSuggestionCard(
+                    suggestion: _testSuggestion,
+                    onDismiss: () {},
+                  ),
+                ),
               );
             },
-            home: Scaffold(
-              body: ProactiveSuggestionCard(
-                suggestion: _testSuggestion,
-                onDismiss: () {},
-              ),
-            ),
           ),
         ),
       );
@@ -122,10 +121,12 @@ void main() {
       await tester.tap(find.text("Let's do it"));
       await tester.pumpAndSettle();
 
-      expect(pushedRoute, equals('/coach'));
-      expect(pushedArgs, isA<CoachRouteArgs>());
-      final args = pushedArgs as CoachRouteArgs;
-      expect(args.preDraftedText, equals('Schedule workout at 07:00'));
+      expect(capturedArgs, isNotNull);
+      expect(capturedArgs!.preDraftedText, equals('Schedule workout at 07:00'));
+      expect(capturedArgs!.proactiveSuggestionId, equals(_testSuggestion.id));
+      expect(capturedArgs!.proactiveSuggestionType,
+          equals(_testSuggestion.type.name));
+      expect(capturedArgs!.autoSendMessage, isTrue);
     });
 
     testWidgets('Slide-in animation completes on mount', (tester) async {

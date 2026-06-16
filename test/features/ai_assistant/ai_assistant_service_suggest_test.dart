@@ -7,6 +7,7 @@ import 'package:coach_for_life/features/ai_assistant/application/ai_payload_asse
 import 'package:coach_for_life/features/ai_assistant/application/entity_normaliser.dart';
 import 'package:coach_for_life/features/ai_assistant/data/ai_interaction_history_repository.dart';
 import 'package:coach_for_life/features/ai_assistant/domain/models/ai_action.dart';
+import 'package:coach_for_life/features/ai_assistant/domain/models/ai_intent_kind.dart';
 import 'package:coach_for_life/features/ai_assistant/domain/models/ai_operating_layer_payload.dart';
 import 'package:coach_for_life/features/ai_assistant/domain/models/ai_planned_changes.dart';
 import 'package:coach_for_life/features/ai_assistant/domain/models/ai_response_type.dart';
@@ -42,16 +43,6 @@ class _FakeClient implements AiOperatingLayerClient {
 }
 
 class _RecordingHistory implements AiInteractionHistoryRepository {
-  _RecordingHistory();
-
-  String? lastSummary;
-  String? lastResponseType;
-
-  @override
-  Future<void> saveAssistantSummary(String sessionId, String summary) async {
-    lastSummary = summary;
-  }
-
   @override
   Future<void> save({
     required String sessionId,
@@ -60,10 +51,7 @@ class _RecordingHistory implements AiInteractionHistoryRepository {
     String? resolvedCategory,
     String? assistantSummary,
     String? responseType,
-  }) async {
-    lastSummary = assistantSummary;
-    lastResponseType = responseType;
-  }
+  }) async {}
 
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
@@ -80,22 +68,31 @@ class _FakeExecutor implements AiActionExecutor {
 }
 
 void main() {
-  test('informational result renders text bubble without pending plan', () async {
-    final history = _RecordingHistory();
+  test('suggest result shows narrative and draft plan without pending preview', () async {
     const normaliser = EntityNormaliser();
     final parser = AiIntentParser(
       client: _FakeClient(
         AiPlannedChanges(
           sessionId: 'x',
-          responseType: AiResponseType.informational,
-          informationalMessage: 'Tomorrow you have Study at 9:00.',
-          suggestedPrompts: const ['Add a task tomorrow'],
+          responseType: AiResponseType.suggest,
+          informationalMessage: 'Tomorrow morning is open. I\'d add Study at 9.',
+          actions: [
+            AiAction(
+              actionType: ActionType.createTask,
+              parameters: {
+                'title': 'Study',
+                'time': '09:00',
+                'duration': 45,
+                'date': 'tomorrow',
+              },
+            ),
+          ],
         ),
       ),
       assembler: const _FakeAssembler(),
       assumptionEngine: AiAssumptionEngine(
         planningRepository: _FakePlanningRepo(),
-        historyRepository: history,
+        historyRepository: _RecordingHistory(),
         normaliser: normaliser,
       ),
     );
@@ -103,16 +100,61 @@ void main() {
     final service = AiAssistantService(
       intentParser: parser,
       actionExecutor: _FakeExecutor(),
-      historyRepository: history,
+      historyRepository: _RecordingHistory(),
     );
 
-    await service.sendMessage('What is my plan for tomorrow?');
+    await service.sendMessage('Help me plan tomorrow');
 
     expect(service.hasPendingPlan, isFalse);
     expect(service.messages, hasLength(2));
     expect(service.messages.last.content, contains('Study'));
-    expect(service.messages.last.suggestedPrompts, ['Add a task tomorrow']);
-    expect(history.lastSummary, contains('Study'));
-    expect(history.lastResponseType, 'informational');
+    expect(service.messages.last.hasDraftPlan, isTrue);
+    expect(service.messages.last.plannedChanges, isNull);
+  });
+
+  test('applySuggestedPlan reveals preview card and sets pending plan', () async {
+    const normaliser = EntityNormaliser();
+    final suggestPlan = AiPlannedChanges(
+      sessionId: 'x',
+      responseType: AiResponseType.suggest,
+      informationalMessage: 'I\'d add Study at 9.',
+      actions: [
+        AiAction(
+          actionType: ActionType.createTask,
+          parameters: {
+            'title': 'Study',
+            'time': '09:00',
+            'duration': 45,
+            'date': 'tomorrow',
+          },
+        ),
+      ],
+    );
+
+    final parser = AiIntentParser(
+      client: _FakeClient(suggestPlan),
+      assembler: const _FakeAssembler(),
+      assumptionEngine: AiAssumptionEngine(
+        planningRepository: _FakePlanningRepo(),
+        historyRepository: _RecordingHistory(),
+        normaliser: normaliser,
+      ),
+    );
+
+    final service = AiAssistantService(
+      intentParser: parser,
+      actionExecutor: _FakeExecutor(),
+      historyRepository: _RecordingHistory(),
+    );
+
+    await service.sendMessage('Help me plan tomorrow');
+    final messageId = service.messages.last.id;
+
+    service.applySuggestedPlan(messageId);
+
+    expect(service.hasPendingPlan, isTrue);
+    expect(service.messages.last.hasPreviewCard, isTrue);
+    expect(service.messages.last.isCurrentPlan, isTrue);
+    expect(service.messages.last.hasDraftPlan, isFalse);
   });
 }

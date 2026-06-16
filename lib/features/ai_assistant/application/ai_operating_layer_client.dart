@@ -43,9 +43,10 @@ class AiOperatingLayerException implements Exception {
 const String _kSystemPrompt = '''
 You are the AI Operating Layer for a personal productivity app called "Coach for Life".
 
-You handle two kinds of user messages:
+You handle three kinds of user messages:
 1. **Questions / summaries** — answer from the schedule and goal data in the prompt (read-only).
-2. **Change requests** — return structured actions for preview and confirmation (writes).
+2. **Planning suggestions** — propose a plan in plain language with optional draft actions (Schema E).
+3. **Change requests** — return structured actions for preview and confirmation (writes).
 
 ## Supported action types (mutate only)
 createTask, editTask, moveTask, deleteTask,
@@ -89,6 +90,15 @@ Use Schema C when the user asks what is scheduled, what is on their plan, summar
 
 If a schedule section is empty, say so explicitly (e.g. "Nothing scheduled for tomorrow yet.").
 
+For goal progress questions, cite goalProgress and use the user's coachingStyle from behaviorPreferences for tone (supportive vs direct).
+
+For week questions, summarize from weekOverview counts — give tomorrow in detail only when asked.
+
+Example informational answers:
+- "What's my plan for tomorrow?" → list tomorrowSchedule/tomorrowTasks or say nothing scheduled.
+- "How am I doing on my goals?" → cite daysMet vs target from goalProgress.
+- "What does my week look like?" → summarize weekOverview task counts per day.
+
 ### Schema D — Unsupported request
 {
   "responseType": "unsupported",
@@ -96,6 +106,17 @@ If a schedule section is empty, say so explicitly (e.g. "Nothing scheduled for t
 }
 
 Use Schema D only when the user asks for features outside tasks, goals, reminders, schedule, and focus/context overrides.
+
+### Schema E — Suggested plan (propose, not apply)
+{
+  "responseType": "suggest",
+  "message": "<narrative explaining the proposed plan>",
+  "actions": [ ... optional draft actions ... ],
+  "conflicts": [],
+  "suggestedPrompts": ["Apply this plan", ...]
+}
+
+Use Schema E when the user asks you to plan, suggest, recommend, or help fill their schedule — WITHOUT explicitly commanding a single add/create/delete. Include draft actions when you can propose specific tasks.
 
 ## Parameter keys by action type
 - createTask / editTask:        title (str), time (HH:MM), duration (int, minutes), date (YYYY-MM-DD or "today"/"tomorrow")
@@ -214,6 +235,11 @@ class OpenAiOperatingLayerClient implements AiOperatingLayerClient {
     buffer.writeln('User request: "${payload.userInput}"');
     buffer.writeln();
 
+    if (payload.intentHint != null) {
+      buffer.writeln(payload.intentHint);
+      buffer.writeln();
+    }
+
     if (payload.activeTasks.isNotEmpty) {
       buffer.writeln("Today's tasks:");
       for (final t in payload.activeTasks) {
@@ -271,6 +297,22 @@ class OpenAiOperatingLayerClient implements AiOperatingLayerClient {
       buffer.writeln();
     } else {
       buffer.writeln("Tomorrow's schedule blocks: (none)");
+      buffer.writeln();
+    }
+
+    if (payload.weekOverview.isNotEmpty) {
+      buffer.writeln('Week overview (next 7 days):');
+      for (final day in payload.weekOverview) {
+        buffer.writeln(
+          '  - ${day['label']} (${day['date']}): '
+          '${day['taskCount']} tasks, ${day['scheduledCount']} scheduled',
+        );
+      }
+      buffer.writeln();
+    }
+
+    if (payload.proactiveContext != null) {
+      buffer.writeln('Proactive suggestion context: ${payload.proactiveContext}');
       buffer.writeln();
     }
 
@@ -392,6 +434,10 @@ class MockAiOperatingLayerClient implements AiOperatingLayerClient {
       return _mockInformationalScheduleAnswer(payload);
     }
 
+    if (_looksLikeSuggestRequest(payload.userInput)) {
+      return _mockSuggestPlanAnswer(payload);
+    }
+
     return AiPlannedChanges(
       sessionId: payload.userInput,
       actions: [
@@ -432,6 +478,57 @@ class MockAiOperatingLayerClient implements AiOperatingLayerClient {
     final hasQuery = queryWords.any(lower.contains);
     final hasSchedule = scheduleWords.any(lower.contains);
     return hasQuery && hasSchedule;
+  }
+
+  static bool _looksLikeSuggestRequest(String input) {
+    final lower = input.toLowerCase();
+    const suggestWords = [
+      'help me plan',
+      'suggest',
+      'recommend',
+      'plan my',
+      'plan tomorrow',
+    ];
+    return suggestWords.any(lower.contains);
+  }
+
+  static AiPlannedChanges _mockSuggestPlanAnswer(
+    AiOperatingLayerPayload payload,
+  ) {
+    final lower = payload.userInput.toLowerCase();
+    final forTomorrow = lower.contains('tomorrow');
+    final date = forTomorrow ? 'tomorrow' : 'today';
+
+    return AiPlannedChanges(
+      sessionId: payload.userInput,
+      responseType: AiResponseType.suggest,
+      informationalMessage:
+          '${forTomorrow ? 'Tomorrow' : 'Today'} morning looks open. '
+          'I\'d add Study at 9:00 and a Workout at 18:00.',
+      actions: [
+        AiAction(
+          actionType: ActionType.createTask,
+          parameters: {
+            'title': 'Study',
+            'time': '09:00',
+            'duration': 45,
+            'date': date,
+          },
+          confidence: 0.9,
+        ),
+        AiAction(
+          actionType: ActionType.createTask,
+          parameters: {
+            'title': 'Workout',
+            'time': '18:00',
+            'duration': 30,
+            'date': date,
+          },
+          confidence: 0.85,
+        ),
+      ],
+      suggestedPrompts: const ['Apply this plan'],
+    );
   }
 
   static AiPlannedChanges _mockInformationalScheduleAnswer(

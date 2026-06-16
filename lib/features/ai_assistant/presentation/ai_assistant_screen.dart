@@ -26,6 +26,9 @@ class CoachRouteArgs {
   const CoachRouteArgs({
     this.preDraftedText,
     this.openSuggestionsPanel = false,
+    this.proactiveSuggestionId,
+    this.proactiveSuggestionType,
+    this.autoSendMessage = false,
   });
 
   final String? preDraftedText;
@@ -33,6 +36,13 @@ class CoachRouteArgs {
   /// When true, shows the full proactive suggestions list at the top of Coach
   /// (e.g. from Home "See all in Coach").
   final bool openSuggestionsPanel;
+
+  /// Proactive card the user tapped — passed into AI session context.
+  final String? proactiveSuggestionId;
+  final String? proactiveSuggestionType;
+
+  /// When true, auto-sends a suggest-mode message on Coach open.
+  final bool autoSendMessage;
 }
 
 class AiAssistantScreen extends ConsumerStatefulWidget {
@@ -49,6 +59,9 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   final FocusNode _inputFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
   bool _openSuggestionsPanel = false;
+  String? _pendingAutoSendMessage;
+  ({String id, String? type})? _pendingProactiveContext;
+  bool _autoSendHandled = false;
 
   @override
   void initState() {
@@ -74,7 +87,37 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     });
     if (args.preDraftedText != null) {
       _inputController.text = args.preDraftedText!;
-      _inputFocusNode.requestFocus();
+      if (!args.autoSendMessage) {
+        _inputFocusNode.requestFocus();
+      }
+    }
+    if (args.proactiveSuggestionId != null) {
+      _pendingProactiveContext = (
+        id: args.proactiveSuggestionId!,
+        type: args.proactiveSuggestionType,
+      );
+    }
+    if (args.autoSendMessage && args.preDraftedText != null) {
+      _pendingAutoSendMessage = 'Help me with: ${args.preDraftedText}';
+      _autoSendHandled = false;
+    }
+  }
+
+  void _handlePendingCoachLaunch(AiAssistantService service) {
+    final proactive = _pendingProactiveContext;
+    if (proactive != null) {
+      service.setProactiveContext(
+        suggestionId: proactive.id,
+        suggestionType: proactive.type,
+      );
+      _pendingProactiveContext = null;
+    }
+
+    final autoMessage = _pendingAutoSendMessage;
+    if (!_autoSendHandled && autoMessage != null) {
+      _autoSendHandled = true;
+      _pendingAutoSendMessage = null;
+      service.sendMessage(autoMessage);
     }
   }
 
@@ -143,6 +186,8 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   }
 
   Widget _buildBody(AiAssistantService service) {
+    _handlePendingCoachLaunch(service);
+
     // Listen to inputFocusRequested
     if (service.inputFocusRequested) {
       service.clearInputFocusRequest();
@@ -574,7 +619,6 @@ class _MessageItem extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Conflict summary banner (shown above the card when there are warnings)
           if (plan.hasAnyWarnings && message.isCurrentPlan)
             _ConflictSummaryBanner(plan: plan),
           PlannedChangesCard(
@@ -585,6 +629,65 @@ class _MessageItem extends StatelessWidget {
             onConfirm: () => service.confirmPlan(plan, message.id),
             onEdit: service.editPlan,
             onCancel: service.cancelPlan,
+          ),
+        ],
+      );
+    }
+
+    if (message.hasDraftPlan) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AssistantMessageBubble(content: message.content),
+          if (message.suggestedPrompts.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final prompt in message.suggestedPrompts)
+                    ActionChip(
+                      label: Text(
+                        prompt,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      backgroundColor: const Color(0xFF1A1A1A),
+                      side: BorderSide(
+                        color: const Color(0xFF00E3FD).withValues(alpha: 0.25),
+                      ),
+                      onPressed: () => onSuggestedPrompt(prompt),
+                    ),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: service.isLoading
+                    ? null
+                    : () => service.applySuggestedPlan(message.id),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFBEFC00),
+                  foregroundColor: const Color(0xFF445D00),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'APPLY THIS PLAN ▶',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       );

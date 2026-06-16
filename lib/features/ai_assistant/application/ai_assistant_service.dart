@@ -8,6 +8,7 @@ import '../domain/models/ai_chat_message.dart';
 import '../domain/models/ai_planned_changes.dart';
 import 'ai_action_executor.dart';
 import 'ai_intent_parser.dart';
+import 'proactive_chat_conversion_tracker.dart';
 import 'entity_normaliser.dart';
 
 /// Signature for fire-and-forget analytics logging from the service layer.
@@ -52,6 +53,9 @@ class AiAssistantService extends ChangeNotifier {
   /// Set by [editPlan] — only then do we pass [previousPlan] into the parser.
   bool _refiningPendingPlan = false;
 
+  String? _proactiveSuggestionId;
+  String? _proactiveSuggestionType;
+
   // ─── Getters ──────────────────────────────────────────────────────────────
 
   List<AiChatMessage> get messages => List.unmodifiable(_messages);
@@ -60,6 +64,24 @@ class AiAssistantService extends ChangeNotifier {
   AiPlannedChanges? get pendingPlan => _pendingPlan;
   bool get inputFocusRequested => _inputFocusRequested;
   String get sessionId => _sessionId;
+
+  /// Links this session to a proactive card the user tapped before opening Coach.
+  void setProactiveContext({
+    String? suggestionId,
+    String? suggestionType,
+  }) {
+    _proactiveSuggestionId = suggestionId;
+    _proactiveSuggestionType = suggestionType;
+  }
+
+  Map<String, dynamic>? get _proactiveContextForPayload {
+    if (_proactiveSuggestionId == null) return null;
+    return {
+      'suggestionId': _proactiveSuggestionId,
+      if (_proactiveSuggestionType != null)
+        'suggestionType': _proactiveSuggestionType,
+    };
+  }
 
   // ─── Public API ───────────────────────────────────────────────────────────
 
@@ -102,6 +124,7 @@ class AiAssistantService extends ChangeNotifier {
         userInput.trim(),
         _sessionId,
         previousPlan: previousForParser,
+        proactiveContext: _proactiveContextForPayload,
       );
     } catch (e) {
       _replaceLoadingMessage(
@@ -147,6 +170,22 @@ class AiAssistantService extends ChangeNotifier {
           'responseType': result.responseType.name,
         });
       }
+    } else if (result.isSuggest) {
+      final message = result.informationalMessage ??
+          'Here\'s what I\'d suggest based on your schedule.';
+      _addMessage(AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.assistant,
+        content: message,
+        timestamp: DateTime.now(),
+        draftPlan: result.actions.isNotEmpty ? result : null,
+        suggestedPrompts: result.suggestedPrompts,
+      ));
+      _pendingPlan = null;
+      _logEvent('aiSuggestPlanShown', {
+        'sessionId': _sessionId,
+        'actionCount': result.actions.length,
+      });
     } else if (result.actions.isEmpty) {
       _pendingPlan = null;
       const fallback =
@@ -281,6 +320,7 @@ class AiAssistantService extends ChangeNotifier {
       'actionCount': plan.actions.length,
       'actionTypes': plan.actions.map((a) => a.actionType.name).toList(),
     });
+    _recordProactiveChatConversion();
 
     // Log aiSuggestionAccepted for every action that had a reason label
     for (final action in plan.actions) {
@@ -299,6 +339,31 @@ class AiAssistantService extends ChangeNotifier {
         });
       }
     }
+
+    notifyListeners();
+  }
+
+  void applySuggestedPlan(String messageId) {
+    final idx = _messages.indexWhere((m) => m.id == messageId);
+    if (idx == -1) return;
+
+    final message = _messages[idx];
+    final plan = message.draftPlan;
+    if (plan == null || plan.actions.isEmpty) return;
+
+    _demoteCurrentPlan();
+    _pendingPlan = plan;
+    _messages[idx] = message.copyWith(
+      clearDraftPlan: true,
+      plannedChanges: plan,
+      isCurrentPlan: true,
+    );
+
+    _logEvent('aiSuggestPlanApplied', {
+      'sessionId': _sessionId,
+      'actionCount': plan.actions.length,
+    });
+    _recordProactiveChatConversion();
 
     notifyListeners();
   }
@@ -356,6 +421,8 @@ class AiAssistantService extends ChangeNotifier {
     _pendingPlan = null;
     _isLoading = false;
     _inputFocusRequested = false;
+    _proactiveSuggestionId = null;
+    _proactiveSuggestionType = null;
     notifyListeners();
   }
 
@@ -430,6 +497,9 @@ class AiAssistantService extends ChangeNotifier {
     if (result.isInformational || result.isUnsupported) {
       return result.informationalMessage;
     }
+    if (result.isSuggest) {
+      return result.informationalMessage;
+    }
     if (result.actions.isEmpty) {
       return "I can answer questions about your schedule or help you add and move tasks. "
           "Try asking \"What's my plan for tomorrow?\" or \"Add a workout at 6am tomorrow.\"";
@@ -445,5 +515,16 @@ class AiAssistantService extends ChangeNotifier {
       return '${a.actionType.name}: $title';
     }).join('; ');
     return 'Plan preview: $parts';
+  }
+
+  void _recordProactiveChatConversion() {
+    final type = _proactiveSuggestionType;
+    if (type == null || type.isEmpty) return;
+    ProactiveChatConversionTracker.record(type);
+    _logEvent('proactiveSuggestionChatConverted', {
+      'sessionId': _sessionId,
+      'suggestionId': _proactiveSuggestionId,
+      'suggestionType': type,
+    });
   }
 }

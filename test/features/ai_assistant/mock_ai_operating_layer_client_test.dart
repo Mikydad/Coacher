@@ -69,5 +69,18 @@ void main() {
       expect(result.isUnsupported, isTrue);
       expect(result.informationalMessage, contains('Circles'));
     });
+
+    test('returns suggest plan for planning requests', () async {
+      const client = MockAiOperatingLayerClient();
+      const payload = AiOperatingLayerPayload(
+        userInput: 'Help me plan tomorrow',
+      );
+
+      final result = await client.parseIntent(payload);
+
+      expect(result.isSuggest, isTrue);
+      expect(result.informationalMessage, contains('Study'));
+      expect(result.actions, hasLength(2));
+    });
   });
 }

@@ -49,6 +49,20 @@ AiPlannedChanges parseOperatingLayerJsonMap(
 
   final conflictsRaw = inner['conflicts'] as List? ?? [];
   final conflicts = conflictsRaw.map((c) => c.toString()).toList();
+  final promptsRaw = inner['suggestedPrompts'] as List? ?? const [];
+
+  if (responseType == AiResponseType.suggest) {
+    return AiPlannedChanges(
+      sessionId: sessionId,
+      responseType: AiResponseType.suggest,
+      informationalMessage: message?.isNotEmpty == true
+          ? message
+          : 'Here\'s what I\'d suggest based on your schedule:',
+      actions: actions,
+      conflicts: conflicts,
+      suggestedPrompts: promptsRaw.map((e) => e.toString()).toList(),
+    );
+  }
 
   if (actions.isEmpty && message != null && message.isNotEmpty) {
     return AiPlannedChanges(

@@ -87,5 +87,33 @@ void main() {
       expect(result.isInformational, isTrue);
       expect(result.informationalMessage, contains('Nothing scheduled'));
     });
+
+    test('parses suggest response with draft actions', () {
+      final result = parseOperatingLayerJsonMap(
+        {
+          'responseType': 'suggest',
+          'message': 'Tomorrow morning is open. I\'d add Study at 9.',
+          'actions': [
+            {
+              'actionType': 'createTask',
+              'parameters': {
+                'title': 'Study',
+                'time': '09:00',
+                'duration': 45,
+                'date': 'tomorrow',
+              },
+              'confidence': 0.9,
+            },
+          ],
+          'suggestedPrompts': ['Apply this plan'],
+        },
+        'sess6',
+      );
+
+      expect(result.isSuggest, isTrue);
+      expect(result.informationalMessage, contains('Study'));
+      expect(result.actions, hasLength(1));
+      expect(result.suggestedPrompts, ['Apply this plan']);
+    });
   });
 }

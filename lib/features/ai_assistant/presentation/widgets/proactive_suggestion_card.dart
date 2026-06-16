@@ -93,6 +93,9 @@ class _ProactiveSuggestionCardState
       index: MainTabIndex.coach,
       coachArgs: CoachRouteArgs(
         preDraftedText: widget.suggestion.preDraftedInput,
+        proactiveSuggestionId: widget.suggestion.id,
+        proactiveSuggestionType: widget.suggestion.type.name,
+        autoSendMessage: true,
       ),
     );
   }
