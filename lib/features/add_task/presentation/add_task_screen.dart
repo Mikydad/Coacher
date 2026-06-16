@@ -1055,6 +1055,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
 
   String get _advancedSubtitle {
     final parts = <String>[];
+    if (isSleepCategory(_category) && _syncSleepWindowAndQuietMode) {
+      parts.add('Sleep window');
+    }
     if (_isHabitAnchor) parts.add('Habit anchor');
     if (_strictModeRequired) parts.add('Strict');
     if (_isRigid) parts.add('Fixed time');
@@ -1062,17 +1065,27 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
     return parts.join(' · ');
   }
 
-  Widget _buildCategoryCard() {
-    return AddTaskCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const AddTaskSectionLabel(
-            title: 'Category',
-            subtitle: 'Optional — tap to select or clear',
-          ),
-          const SizedBox(height: 14),
-          LayoutBuilder(
+  String _accountabilitySubtitle(int index) {
+    switch (_modeChoiceIds[index]) {
+      case 'extreme':
+        return 'AGGRESSIVE REMINDERS';
+      case 'disciplined':
+        return 'STEADY ACCOUNTABILITY';
+      default:
+        return 'GENTLE REMINDERS';
+    }
+  }
+
+  Widget _buildCategorySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const AddTaskHeroSectionLabel(
+          title: 'Category',
+          subtitle: 'Tap to organize your energy',
+        ),
+        const SizedBox(height: 16),
+        LayoutBuilder(
             builder: (context, constraints) {
               const spacing = 8.0;
               const columns = 3;
@@ -1109,8 +1122,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
               );
             },
           ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -1177,120 +1189,29 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
     });
   }
 
-  Widget _buildAccountabilityCard() {
+  Widget _buildAccountabilityRow() {
     final selectedIndex = _selectedModeIndex;
-    final modeId = _modeChoiceIds[selectedIndex];
 
-    return AddTaskCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Expanded(
-                child: AddTaskSectionLabel(
-                  title: 'Accountability',
-                  subtitle: 'Reminders and follow-up style',
-                ),
-              ),
-              TextButton(
-                onPressed: _showAccountabilityPicker,
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  foregroundColor: AddTaskColors.accent,
-                ),
-                child: const Text(
-                  'Change',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Material(
-            color: AddTaskColors.accent.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: _showAccountabilityPicker,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: AddTaskColors.accent.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        AddTaskEnforcementTile.iconFor(modeId),
-                        size: 17,
-                        color: AddTaskColors.accent,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _modeLabels[selectedIndex],
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: AddTaskColors.accent,
-                            ),
-                          ),
-                          Text(
-                            _modeDescriptions[selectedIndex],
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              height: 1.25,
-                              color: AddTaskColors.muted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      '+2',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AddTaskColors.accent.withValues(alpha: 0.85),
-                      ),
-                    ),
-                    const SizedBox(width: 2),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      size: 18,
-                      color: AddTaskColors.accent.withValues(alpha: 0.7),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+    return AddTaskSettingsActionRow(
+      icon: Icons.verified_user_outlined,
+      title: 'Accountability',
+      subtitle: _accountabilitySubtitle(selectedIndex),
+      actionLabel: 'CHANGE',
+      onTap: _showAccountabilityPicker,
     );
   }
 
-  Widget _buildScheduleCard() {
-    return KeyedSubtree(
-      key: _scheduleSectionKey,
-      child: _buildScheduleCardContent(),
+  Widget _buildDeepWorkRow() {
+    return AddTaskSettingsToggleRow(
+      icon: Icons.bolt_rounded,
+      title: 'Deep Work',
+      subtitle: 'NOTIFICATION BLACKOUT',
+      value: _focusSession,
+      onChanged: (v) => setState(() => _focusSession = v),
     );
   }
 
-  Widget _buildScheduleCardContent() {
+  Widget _buildReminderSection() {
     final timeLabel = TimeOfDay.fromDateTime(_reminderTime).format(context);
     final dateLabel =
         MaterialLocalizations.of(context).formatMediumDate(_reminderTime);
@@ -1298,182 +1219,191 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
         ? 'Today'
         : _planDateKey();
 
-    return AddTaskCard(
-      child: Column(
-        children: [
-          AddTaskToggleRow(
-            icon: Icons.notifications_active_outlined,
-            iconColor: AddTaskColors.cyan,
-            title: 'Reminder',
-            subtitle: 'Get notified before this task starts',
-            value: _reminder,
-            onChanged: (value) async {
-              setState(() => _reminder = value);
-              if (!value) return;
-              final ok =
-                  await ref.read(reminderSyncServiceProvider).ensurePermissions();
-              if (!ok && context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Notification permission is disabled.'),
-                  ),
-                );
-              }
-            },
-          ),
-          if (_reminder) ...[
-            const Divider(height: 24, color: AddTaskColors.border),
-            AddTaskInsetPanel(
-              child: Column(
-                children: [
-                  AddTaskPickerRow(
-                    icon: Icons.calendar_today_outlined,
-                    label: 'Date',
-                    value: dateLabel,
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _reminderTime,
-                        firstDate:
-                            DateTime.now().subtract(const Duration(days: 365)),
-                        lastDate:
-                            DateTime.now().add(const Duration(days: 365)),
-                      );
-                      if (picked == null || !mounted) return;
-                      setState(() {
-                        _reminderTime = DateTime(
-                          picked.year,
-                          picked.month,
-                          picked.day,
-                          _reminderTime.hour,
-                          _reminderTime.minute,
-                        );
-                      });
-                    },
-                  ),
-                  const Divider(height: 1, color: AddTaskColors.border),
-                  AddTaskPickerRow(
-                    icon: Icons.schedule_rounded,
-                    label: isSleepCategory(_category) ? 'Sleep start' : 'Time',
-                    value: timeLabel,
-                    onTap: () async {
-                      final picked = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay.fromDateTime(_reminderTime),
-                      );
-                      if (picked == null) return;
-                      setState(() {
-                        _reminderTime = DateTime(
-                          _reminderTime.year,
-                          _reminderTime.month,
-                          _reminderTime.day,
-                          picked.hour,
-                          picked.minute,
-                        );
-                      });
-                    },
-                  ),
-                  if (isSleepCategory(_category) && _reminder) ...[
-                    const Divider(height: 1, color: AddTaskColors.border),
-                    AddTaskPickerRow(
-                      icon: Icons.bedtime_rounded,
-                      label: 'Sleep end',
-                      value: formatTaskTimeOfDay(
-                        _reminderTime.add(
-                          Duration(minutes: _effectiveDurationMinutes),
-                        ),
+    return KeyedSubtree(
+      key: _scheduleSectionKey,
+      child: Material(
+        color: AddTaskColors.card,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AddTaskToggleRow(
+                icon: Icons.notifications_active_outlined,
+                iconColor: AddTaskColors.cyan,
+                title: 'Reminder',
+                subtitle: 'Get notified before this task starts',
+                value: _reminder,
+                onChanged: (value) async {
+                  setState(() => _reminder = value);
+                  if (!value) return;
+                  final ok =
+                      await ref.read(reminderSyncServiceProvider).ensurePermissions();
+                  if (!ok && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Notification permission is disabled.'),
                       ),
-                    ),
-                  ],
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.event_available_outlined,
-                          size: 18,
-                          color: AddTaskColors.muted,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Plan day',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AddTaskColors.faint,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              Text(
-                                planLabel,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: AddTaskColors.onSurface,
-                                ),
-                              ),
-                            ],
+                    );
+                  }
+                },
+              ),
+              if (_reminder) ...[
+                AddTaskInsetPanel(
+                  child: Column(
+                    children: [
+                      AddTaskPickerRow(
+                        icon: Icons.calendar_today_outlined,
+                        label: 'Date',
+                        value: dateLabel,
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _reminderTime,
+                            firstDate:
+                                DateTime.now().subtract(const Duration(days: 365)),
+                            lastDate:
+                                DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (picked == null || !mounted) return;
+                          setState(() {
+                            _reminderTime = DateTime(
+                              picked.year,
+                              picked.month,
+                              picked.day,
+                              _reminderTime.hour,
+                              _reminderTime.minute,
+                            );
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      AddTaskPickerRow(
+                        icon: Icons.schedule_rounded,
+                        label: isSleepCategory(_category) ? 'Sleep start' : 'Time',
+                        value: timeLabel,
+                        onTap: () async {
+                          final picked = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.fromDateTime(_reminderTime),
+                          );
+                          if (picked == null) return;
+                          setState(() {
+                            _reminderTime = DateTime(
+                              _reminderTime.year,
+                              _reminderTime.month,
+                              _reminderTime.day,
+                              picked.hour,
+                              picked.minute,
+                            );
+                          });
+                        },
+                      ),
+                      if (isSleepCategory(_category) && _reminder) ...[
+                        const SizedBox(height: 8),
+                        AddTaskPickerRow(
+                          icon: Icons.bedtime_rounded,
+                          label: 'Sleep end',
+                          value: formatTaskTimeOfDay(
+                            _reminderTime.add(
+                              Duration(minutes: _effectiveDurationMinutes),
+                            ),
                           ),
                         ),
                       ],
-                    ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.event_available_outlined,
+                              size: 18,
+                              color: AddTaskColors.muted,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Plan day',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AddTaskColors.faint,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  Text(
+                                    planLabel,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: AddTaskColors.onSurface,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          ],
-          if (isSleepCategory(_category)) ...[
-            const Divider(height: 24, color: AddTaskColors.border),
-            AddTaskToggleRow(
-              icon: Icons.bedtime_rounded,
-              iconColor: AddTaskColors.accentDim,
-              title: 'Sleep window & quiet mode',
-              subtitle: Platform.isIOS
-                  ? 'Updates daily sleep window; offers in-app Sleep or DND'
-                  : 'Updates daily sleep window and in-app quiet mode',
-              value: _syncSleepWindowAndQuietMode,
-              onChanged: (v) => setState(() => _syncSleepWindowAndQuietMode = v),
-            ),
-            if (_syncSleepWindowAndQuietMode && !Platform.isIOS) ...[
-              const SizedBox(height: 8),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'sleep', label: Text('Sleep')),
-                  ButtonSegment(value: 'dnd', label: Text('DND')),
-                ],
-                selected: {_inAppQuietMode},
-                onSelectionChanged: (s) {
-                  if (s.isEmpty) return;
-                  setState(() => _inAppQuietMode = s.first);
-                },
-              ),
+                ),
+              ],
             ],
-          ] else ...[
-            const Divider(height: 24, color: AddTaskColors.border),
-            AddTaskToggleRow(
-              icon: Icons.center_focus_strong_rounded,
-              title: 'Focus session',
-              subtitle: 'Start in deep-focus mode when you begin',
-              value: _focusSession,
-              onChanged: (v) => setState(() => _focusSession = v),
-            ),
-          ],
-        ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildAdvancedCard() {
-    return AddTaskExpandableCard(
-      title: 'Advanced',
+  Widget _buildSleepAdvancedExtras() {
+    if (!isSleepCategory(_category)) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AddTaskToggleRow(
+          icon: Icons.bedtime_rounded,
+          iconColor: AddTaskColors.accentDim,
+          title: 'Sleep window & quiet mode',
+          subtitle: Platform.isIOS
+              ? 'Updates daily sleep window; offers in-app Sleep or DND'
+              : 'Updates daily sleep window and in-app quiet mode',
+          value: _syncSleepWindowAndQuietMode,
+          onChanged: (v) => setState(() => _syncSleepWindowAndQuietMode = v),
+        ),
+        if (_syncSleepWindowAndQuietMode && !Platform.isIOS) ...[
+          const SizedBox(height: 8),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'sleep', label: Text('Sleep')),
+              ButtonSegment(value: 'dnd', label: Text('DND')),
+            ],
+            selected: {_inAppQuietMode},
+            onSelectionChanged: (s) {
+              if (s.isEmpty) return;
+              setState(() => _inAppQuietMode = s.first);
+            },
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildAdvancedSection() {
+    return AddTaskCollapsibleSection(
+      title: 'Advanced settings',
       subtitle: _advancedSubtitle,
-      leadingIcon: Icons.tune_rounded,
       expanded: _advancedExpanded,
       onToggle: () => setState(() => _advancedExpanded = !_advancedExpanded),
       children: [
+        if (isSleepCategory(_category)) ...[
+          _buildSleepAdvancedExtras(),
+          const SizedBox(height: 12),
+        ],
         AddTaskToggleRow(
           icon: Icons.anchor_rounded,
           iconColor: AddTaskColors.accentDim,
@@ -1482,7 +1412,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
           value: _isHabitAnchor,
           onChanged: (v) => setState(() => _isHabitAnchor = v),
         ),
-        const Divider(height: 8, color: AddTaskColors.border),
+        const SizedBox(height: 8),
         AddTaskToggleRow(
           icon: Icons.gavel_rounded,
           iconColor: AddTaskColors.cyan,
@@ -1491,7 +1421,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
           value: _strictModeRequired,
           onChanged: (v) => setState(() => _strictModeRequired = v),
         ),
-        const Divider(height: 8, color: AddTaskColors.border),
+        const SizedBox(height: 8),
         AddTaskToggleRow(
           icon: Icons.lock_clock_rounded,
           title: 'Fixed time slot',
@@ -1512,10 +1442,17 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       appBar: AppBar(
         backgroundColor: AddTaskColors.surface,
         elevation: 0,
-        foregroundColor: AddTaskColors.onSurface,
+        scrolledUnderElevation: 0,
+        foregroundColor: AddTaskColors.accent,
+        centerTitle: true,
         title: Text(
-          _isEdit ? 'Edit task' : 'Add task',
-          style: const TextStyle(fontWeight: FontWeight.w700),
+          (_isEdit ? 'Edit task' : 'Add task').toUpperCase(),
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+            letterSpacing: 2,
+            color: AddTaskColors.onSurface,
+          ),
         ),
       ),
       body: !_loaded
@@ -1526,96 +1463,97 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
               children: [
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
                     children: [
-                      AddTaskCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const AddTaskSectionLabel(
-                              title: 'What are you doing?',
-                              subtitle: 'Give it a clear, actionable name',
-                            ),
-                            const SizedBox(height: 14),
-                            AddTaskField(
-                              controller: _controller,
-                              hint: 'Read 10 pages',
-                            ),
-                            const SizedBox(height: 12),
-                            AddTaskField(
-                              controller: _notesController,
-                              hint: 'Notes (optional)',
-                              maxLines: 3,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: AddTaskColors.onSurface,
-                              ),
-                            ),
-                          ],
-                        ),
+                      const AddTaskHeroSectionLabel(
+                        title: 'What are you doing?',
+                        subtitle: 'Give it a clear, actionable name',
+                      ),
+                      const SizedBox(height: 16),
+                      AddTaskField(
+                        controller: _controller,
+                        hint: 'Read 10 pages',
                       ),
                       const SizedBox(height: 12),
-                      AddTaskCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            AddTaskSectionLabel(
-                              title: 'Duration',
-                              subtitle: isSleepCategory(_category)
-                                  ? 'Sleep blocks use longer windows (6–8 hours)'
-                                  : 'Need longer? Tap Custom to set hours and minutes',
-                            ),
-                            const SizedBox(height: 12),
-                            AddTaskDurationSegment(
-                              options: _activeDurationLabels,
-                              selected: _durationDisplayLabel,
-                              onSelected: (label) async {
-                                final i = _activeDurationLabels.indexOf(label);
-                                if (i < 0) return;
-                                final key = _activeDurationOptions[i];
-                                if (isCustomDurationKey(key)) {
-                                  await _editCustomDuration();
-                                  return;
-                                }
-                                setState(() => _duration = key);
-                              },
-                            ),
-                          ],
+                      AddTaskField(
+                        controller: _notesController,
+                        hint: 'Notes (optional)',
+                        maxLines: 2,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: AddTaskColors.muted,
                         ),
                       ),
+                      const SizedBox(height: 32),
+                      AddTaskHeroSectionLabel(
+                        title: 'Duration',
+                        subtitle: isSleepCategory(_category)
+                            ? 'Sleep blocks use longer windows (6–8 hours)'
+                            : 'Define your focus sprint',
+                      ),
+                      const SizedBox(height: 16),
+                      AddTaskDurationSegment(
+                        options: _activeDurationLabels,
+                        selected: _durationDisplayLabel,
+                        onSelected: (label) async {
+                          final i = _activeDurationLabels.indexOf(label);
+                          if (i < 0) return;
+                          final key = _activeDurationOptions[i];
+                          if (isCustomDurationKey(key)) {
+                            await _editCustomDuration();
+                            return;
+                          }
+                          setState(() => _duration = key);
+                        },
+                      ),
+                      const SizedBox(height: 32),
+                      _buildCategorySection(),
+                      const SizedBox(height: 24),
+                      _buildAccountabilityRow(),
+                      if (!isSleepCategory(_category)) ...[
+                        const SizedBox(height: 12),
+                        _buildDeepWorkRow(),
+                      ],
                       const SizedBox(height: 12),
-                      _buildCategoryCard(),
-                      const SizedBox(height: 12),
-                      _buildAccountabilityCard(),
-                      const SizedBox(height: 12),
-                      _buildScheduleCard(),
-                      const SizedBox(height: 12),
-                      _buildAdvancedCard(),
+                      _buildReminderSection(),
+                      const SizedBox(height: 24),
+                      _buildAdvancedSection(),
                     ],
                   ),
                 ),
                 Container(
-                  padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottomSafe),
-                  decoration: const BoxDecoration(
+                  padding: EdgeInsets.fromLTRB(24, 16, 24, 16 + bottomSafe),
+                  decoration: BoxDecoration(
                     color: AddTaskColors.surface,
-                    border: Border(top: BorderSide(color: AddTaskColors.border)),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        AddTaskColors.surface.withValues(alpha: 0),
+                        AddTaskColors.surface,
+                      ],
+                    ),
                   ),
                   child: FilledButton(
                     style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(52),
-                      backgroundColor: AddTaskColors.accent,
-                      foregroundColor: Colors.black,
+                      minimumSize: const Size.fromHeight(56),
+                      backgroundColor: AddTaskColors.accentContainer,
+                      foregroundColor: const Color(0xFF445D00),
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(28),
                       ),
                     ),
                     onPressed: _saving ? null : _onSave,
                     child: Text(
-                      _saving ? 'Saving…' : (_isEdit ? 'Save changes' : 'Add task'),
+                      _saving
+                          ? 'Saving…'
+                          : (_isEdit ? 'Save changes' : 'Add task').toUpperCase(),
                       style: const TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
                       ),
                     ),
                   ),

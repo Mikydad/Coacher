@@ -10,9 +10,59 @@ abstract final class GoalEditorColors {
   static const cyan = Color(0xFF2A9B8B);
   static const surface = Color(0xFF1A1C1F);
   static const surfaceRaised = Color(0xFF222528);
+  static const inputFill = Color(0xFF111111);
   static const border = Color(0xFF2A2D32);
   static const label = Color(0xFF6B7280);
   static const hint = Color(0xFF4B5563);
+}
+
+/// Matches Add Task field styling — darker inset fill, soft radius, clear hints.
+InputDecoration goalEditorInputDecoration({
+  String? hintText,
+  double radius = 28,
+  bool isDense = false,
+  EdgeInsetsGeometry? contentPadding,
+}) {
+  return InputDecoration(
+    hintText: hintText,
+    hintStyle: TextStyle(
+      color: GoalEditorColors.label.withValues(alpha: 0.5),
+      fontWeight: FontWeight.w400,
+      fontStyle: FontStyle.italic,
+      fontSize: isDense ? 14 : 16,
+    ),
+    filled: true,
+    fillColor: GoalEditorColors.inputFill,
+    isDense: isDense,
+    contentPadding: contentPadding ??
+        EdgeInsets.symmetric(
+          horizontal: 22,
+          vertical: isDense ? 12 : 18,
+        ),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(radius),
+      borderSide: BorderSide.none,
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(radius),
+      borderSide: BorderSide.none,
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(radius),
+      borderSide: BorderSide(
+        color: GoalEditorColors.lime.withValues(alpha: 0.85),
+        width: 1.5,
+      ),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(radius),
+      borderSide: BorderSide(color: Colors.red.shade300),
+    ),
+    focusedErrorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(radius),
+      borderSide: BorderSide(color: Colors.red.shade300, width: 1.5),
+    ),
+  );
 }
 
 class GoalEditorSectionLabel extends StatelessWidget {
@@ -68,30 +118,12 @@ class GoalEditorTextField extends StatelessWidget {
           controller: controller,
           validator: validator,
           keyboardType: keyboardType,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-          decoration: InputDecoration(
-            hintText: hintText,
-            hintStyle: const TextStyle(color: GoalEditorColors.hint, fontWeight: FontWeight.w500),
-            filled: true,
-            fillColor: GoalEditorColors.surface,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: GoalEditorColors.border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: GoalEditorColors.lime, width: 1.5),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: Colors.red.shade300),
-            ),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
           ),
+          decoration: goalEditorInputDecoration(hintText: hintText),
         ),
         if (helperText != null) ...[
           const SizedBox(height: 6),
@@ -375,11 +407,10 @@ class GoalEditorDateCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
-          color: GoalEditorColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: GoalEditorColors.border),
+          color: GoalEditorColors.inputFill,
+          borderRadius: BorderRadius.circular(28),
         ),
         child: Row(
           children: [
@@ -432,11 +463,10 @@ class GoalEditorMeasurementDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       decoration: BoxDecoration(
-        color: GoalEditorColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: GoalEditorColors.border),
+        color: GoalEditorColors.inputFill,
+        borderRadius: BorderRadius.circular(28),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<MeasurementKind>(
@@ -557,11 +587,10 @@ class GoalEditorReminderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: GoalEditorColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: GoalEditorColors.border),
+        color: GoalEditorColors.inputFill,
+        borderRadius: BorderRadius.circular(28),
       ),
       child: Row(
         children: [
@@ -786,11 +815,10 @@ class GoalEditorSetupStepRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
         decoration: BoxDecoration(
-          color: GoalEditorColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: GoalEditorColors.border),
+          color: GoalEditorColors.inputFill,
+          borderRadius: BorderRadius.circular(22),
         ),
         child: Row(
           children: [
@@ -806,18 +834,29 @@ class GoalEditorSetupStepRow extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: controller,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
                 decoration: InputDecoration(
                   hintText: index == 0
                       ? 'Install Flutter SDK'
                       : 'Add next setup step…',
                   hintStyle: TextStyle(
-                    color: controller.text.isEmpty ? Colors.white30 : Colors.white38,
-                    fontStyle: index > 0 ? FontStyle.italic : FontStyle.normal,
+                    color: GoalEditorColors.label.withValues(alpha: 0.5),
+                    fontWeight: FontWeight.w400,
+                    fontStyle: FontStyle.italic,
+                    fontSize: 14,
                   ),
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 10,
+                  ),
                 ),
               ),
             ),
