@@ -11,11 +11,13 @@ class ExecutionTaskItem {
     required this.id,
     required this.title,
     required this.durationMinutes,
+    required this.status,
   });
 
   final String id;
   final String title;
   final int durationMinutes;
+  final TaskStatus status;
 }
 
 /// Non–auto-dispose so hot reload doesn’t hit a `FutureProvider` vs
@@ -60,6 +62,7 @@ final executionDayTasksProvider = FutureProvider<List<ExecutionTaskItem>>((
           id: task.id,
           title: task.title,
           durationMinutes: task.durationMinutes,
+          status: task.status,
         ),
       );
     }

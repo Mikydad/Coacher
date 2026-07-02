@@ -521,7 +521,7 @@ String _appendExtraTimeNote({
   return '$existing\n$entry';
 }
 
-Future<void> _returnToFocusList(BuildContext context, WidgetRef ref) async {
+Future<void> returnToFocusList(BuildContext context, WidgetRef ref) async {
   invalidateTaskListProviders(ref);
   await Navigator.pushNamedAndRemoveUntil(
     context,
@@ -529,6 +529,9 @@ Future<void> _returnToFocusList(BuildContext context, WidgetRef ref) async {
     (route) => route.settings.name == FocusSelectionScreen.routeName,
   );
 }
+
+Future<void> _returnToFocusList(BuildContext context, WidgetRef ref) =>
+    returnToFocusList(context, ref);
 
 Future<void> _scheduleExtensionReminder(
   WidgetRef ref, {

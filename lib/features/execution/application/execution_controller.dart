@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/stable_id.dart';
+import '../../focus/data/focus_resume_store.dart';
 import '../data/execution_repository.dart';
 import '../data/timer_runtime_cache.dart';
 import '../domain/models/timer_session.dart';
@@ -63,6 +64,7 @@ class ExecutionController extends StateNotifier<ExecutionState> {
   ExecutionController({
     required this.repository,
     required this.runtimeCache,
+    required this.resumeStore,
     required String initialTaskId,
     required String initialTaskLabel,
   }) : _engine = TaskTimerEngine(),
@@ -101,6 +103,7 @@ class ExecutionController extends StateNotifier<ExecutionState> {
 
   final ExecutionRepository repository;
   final TimerRuntimeCache runtimeCache;
+  final FocusResumeStore resumeStore;
   final TaskTimerEngine _engine;
   StreamSubscription<TimerSnapshot>? _sub;
 
@@ -138,7 +141,12 @@ class ExecutionController extends StateNotifier<ExecutionState> {
     );
   }
 
-  void setTask({required String id, required String label, int? durationMinutes}) {
+  void setTask({
+    required String id,
+    required String label,
+    int? durationMinutes,
+    Duration resumeElapsed = Duration.zero,
+  }) {
     final sameRunningTask = state.targetType == TimerSessionTargetType.task &&
         state.taskId == id &&
         (state.phase == ExecutionPhase.inProgress || state.phase == ExecutionPhase.paused);
@@ -156,7 +164,7 @@ class ExecutionController extends StateNotifier<ExecutionState> {
       readyToScore: false,
       targetDurationMinutes: durationMinutes,
     );
-    _engine.restore(phase: ExecutionPhase.notStarted, elapsed: Duration.zero);
+    _engine.restore(phase: ExecutionPhase.notStarted, elapsed: resumeElapsed);
   }
 
   void setBlock({required String id, required String label}) {
@@ -200,9 +208,18 @@ class ExecutionController extends StateNotifier<ExecutionState> {
       ),
     };
     await repository.upsertSession(session);
+    if (state.targetType == TimerSessionTargetType.task &&
+        state.taskId.isNotEmpty) {
+      await resumeStore.saveElapsed(state.taskId, snapshot.elapsed);
+    }
     await runtimeCache.clear();
     state = state.copyWith(readyToScore: true);
   }
+
+  /// Clears the locally stored resume point for [taskId] (e.g. on full
+  /// completion so a later re-add starts fresh).
+  Future<void> clearResumePoint(String taskId) =>
+      resumeStore.clear(taskId);
 
   @override
   void dispose() {

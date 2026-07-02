@@ -9,10 +9,13 @@ import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/domain/models/analytics_event.dart';
 import '../../execution/application/execution_controller.dart';
 import '../../execution/application/execution_day_loader.dart';
+import '../../planning/domain/models/task_item.dart';
+import '../../scoring/application/scoring_controller.dart';
 import '../../planning/domain/add_task_duration.dart';
 import '../../execution/domain/models/timer_session.dart';
 import '../../execution/domain/task_timer_engine.dart';
 import '../application/focus_quick_task.dart';
+import '../application/focus_task_resume.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 import '../../home/presentation/quittr_app_bar_title.dart';
 import 'focus_session_duration_picker.dart';
@@ -198,13 +201,34 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
     final minutes = await _resolveFocusDurationMinutes(selected);
     if (!mounted || minutes == null) return;
 
+    var resumeElapsed = Duration.zero;
+    var targetMinutes = minutes;
+    if (selected.status == TaskStatus.partial) {
+      resumeElapsed = await readPriorFocusElapsedForTask(ref, selected.id);
+      // Extend the auto-stop target past what was already done so the timer
+      // keeps running instead of stopping the instant Start is pressed.
+      if (resumeElapsed > Duration.zero) {
+        targetMinutes = minutes + resumeElapsed.inMinutes;
+      }
+    }
+
     ref.read(executionControllerProvider.notifier).setTask(
       id: selected.id,
       label: selected.title,
-      durationMinutes: minutes,
+      durationMinutes: targetMinutes,
+      resumeElapsed: resumeElapsed,
     );
 
     if (!mounted) return;
+    if (resumeElapsed > Duration.zero) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Continuing from ${formatFocusElapsed(resumeElapsed)}',
+          ),
+        ),
+      );
+    }
     await Navigator.pushNamed(context, TimerSessionScreen.routeName);
   }
 
@@ -212,6 +236,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
   Widget build(BuildContext context) {
     final selectedTask = ref.watch(activeExecutionTaskLabelProvider);
     final taskList = ref.watch(executionDayTasksProvider);
+    final scores = ref.watch(scoredTaskStatusesProvider);
     final execState = ref.watch(executionControllerProvider);
     final hasRunningTask = execState.targetType == TimerSessionTargetType.task &&
         execState.taskId.isNotEmpty &&
@@ -264,7 +289,11 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
                       padding: const EdgeInsets.only(bottom: 10),
                       child: _TaskCard(
                         title: task.title,
-                        subtitle: focusTaskSubtitle(task.durationMinutes),
+                        subtitle: focusTaskListSubtitle(
+                          task: task,
+                          scores: scores,
+                        ),
+                        isPartial: task.status == TaskStatus.partial,
                         selected: selectedTask == task.title,
                         onTap: () => _selectTask(
                           task,
@@ -342,12 +371,14 @@ class _TaskCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.selected,
+    this.isPartial = false,
     required this.onTap,
   });
 
   final String title;
   final String subtitle;
   final bool selected;
+  final bool isPartial;
   final VoidCallback onTap;
 
   @override
@@ -361,7 +392,11 @@ class _TaskCard extends StatelessWidget {
           color: const Color(0xFF111317),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: selected ? const Color(0xFFB7FF00) : Colors.white12,
+            color: selected
+                ? const Color(0xFFB7FF00)
+                : isPartial
+                ? const Color(0xFFFFA726).withValues(alpha: 0.55)
+                : Colors.white12,
           ),
         ),
         child: Column(
@@ -374,7 +409,12 @@ class _TaskCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               subtitle,
-              style: const TextStyle(fontSize: 26, color: Colors.white60),
+              style: TextStyle(
+                fontSize: 26,
+                color: isPartial
+                    ? const Color(0xFFFFA726)
+                    : Colors.white60,
+              ),
             ),
           ],
         ),

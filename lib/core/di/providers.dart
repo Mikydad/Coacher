@@ -12,6 +12,7 @@ import '../../features/planning/data/planning_repository.dart';
 import '../../features/execution/application/execution_controller.dart';
 import '../../features/execution/data/execution_repository.dart';
 import '../../features/execution/data/timer_runtime_cache.dart';
+import '../../features/focus/data/focus_resume_store.dart';
 import '../../features/scoring/application/scoring_controller.dart';
 import '../../features/scoring/data/scoring_repository.dart';
 import '../../features/goals/application/goal_reminder_sync_service.dart';
@@ -59,6 +60,9 @@ final executionRepositoryProvider = Provider<ExecutionRepository>(
 
 final timerRuntimeCacheProvider = Provider<TimerRuntimeCache>((ref) => const TimerRuntimeCache());
 
+final focusResumeStoreProvider =
+    Provider<FocusResumeStore>((ref) => const FocusResumeStore());
+
 final activeExecutionTaskIdProvider = StateProvider<String>((ref) => 'task_ui_architecture');
 final activeExecutionTaskLabelProvider = StateProvider<String>((ref) => 'Deep Work: UI Architecture');
 
@@ -66,6 +70,7 @@ final executionControllerProvider = StateNotifierProvider<ExecutionController, E
   return ExecutionController(
     repository: ref.read(executionRepositoryProvider),
     runtimeCache: ref.read(timerRuntimeCacheProvider),
+    resumeStore: ref.read(focusResumeStoreProvider),
     initialTaskId: ref.read(activeExecutionTaskIdProvider),
     initialTaskLabel: ref.read(activeExecutionTaskLabelProvider),
   );

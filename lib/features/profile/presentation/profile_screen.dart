@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/application/main_tab_navigation.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../auth/application/auth_session_policy.dart';
+import '../../auth/application/user_scoped_invalidation.dart';
 import '../../../features/coaching/application/coaching_style_providers.dart';
 import '../../../features/coaching/domain/models/coaching_style.dart';
 import '../../../features/coaching/domain/models/enforcement_mode.dart';
@@ -88,7 +89,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     // Signal AuthGate to show the landing screen (not silent anon re-sign-in).
     ref.read(pendingAuthLandingProvider.notifier).state = true;
 
-    // Wipe local data first, then sign out so AuthGate reacts cleanly.
+    // Clear in-memory per-user Riverpod state so nothing leaks into the next
+    // session, then wipe local data, then sign out so AuthGate reacts cleanly.
+    invalidateUserScopedProviders(ref);
     await AuthSessionPolicy.clearLocalSession();
     await ref.read(authRepositoryProvider).signOut();
     // AuthGate will rebuild and show the AuthLandingScreen.

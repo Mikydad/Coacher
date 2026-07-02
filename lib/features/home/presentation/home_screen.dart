@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -85,7 +84,7 @@ class HomeScreen extends ConsumerWidget {
             execState.phase == ExecutionPhase.paused);
 
     return Scaffold(
-      floatingActionButton: _CoachAiFab(),
+      floatingActionButton: const _CoachHomeFab(),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       appBar: AppBar(
         title: const QuittrAppBarTitle(),
@@ -2301,37 +2300,32 @@ Future<void> _uncompleteTaskFromHome(
   }
 }
 
-// ─── Coach AI FAB ─────────────────────────────────────────────────────────────
+// ─── Coach home FAB (icon only, bottom-right) ────────────────────────────────
 
-class _CoachAiFab extends ConsumerWidget {
+class _CoachHomeFab extends ConsumerWidget {
+  const _CoachHomeFab();
+
+  static const _accent = Color(0xFF00E3FD);
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ClipOval(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: GestureDetector(
-          onTap: () => navigateToMainTab(
-            context,
-            ref,
-            index: MainTabIndex.coach,
-          ),
-          child: Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: const Color(0xFF262626).withValues(alpha: 0.85),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFEAFFB8).withValues(alpha: 0.25),
-              ),
-            ),
-            child: const Icon(
-              Icons.auto_awesome_rounded,
-              color: Color(0xFFEAFFB8),
-              size: 24,
-            ),
-          ),
-        ),
+    return FloatingActionButton(
+      onPressed: () => navigateToMainTab(
+        context,
+        ref,
+        index: MainTabIndex.coach,
+      ),
+      elevation: 0,
+      highlightElevation: 0,
+      splashColor: _accent.withValues(alpha: 0.12),
+      backgroundColor: const Color(0xFF1A1A1A),
+      shape: CircleBorder(
+        side: BorderSide(color: _accent.withValues(alpha: 0.35)),
+      ),
+      child: const Icon(
+        Icons.auto_awesome_rounded,
+        color: _accent,
+        size: 22,
       ),
     );
   }

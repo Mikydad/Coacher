@@ -3,6 +3,7 @@ import 'package:coach_for_life/features/execution/data/execution_repository.dart
 import 'package:coach_for_life/features/execution/data/timer_runtime_cache.dart';
 import 'package:coach_for_life/features/execution/domain/models/timer_session.dart';
 import 'package:coach_for_life/features/execution/domain/task_timer_engine.dart';
+import 'package:coach_for_life/features/focus/data/focus_resume_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeExecutionRepository implements ExecutionRepository {
@@ -19,6 +20,23 @@ class _FakeExecutionRepository implements ExecutionRepository {
   @override
   Future<void> upsertSession(TimerSession session) async {
     sessions.add(session);
+  }
+}
+
+class _FakeFocusResumeStore implements FocusResumeStore {
+  final Map<String, Duration> saved = {};
+
+  @override
+  Future<void> saveElapsed(String taskId, Duration elapsed) async {
+    saved[taskId] = elapsed;
+  }
+
+  @override
+  Future<Duration?> readElapsed(String taskId) async => saved[taskId];
+
+  @override
+  Future<void> clear(String taskId) async {
+    saved.remove(taskId);
   }
 }
 
@@ -66,6 +84,7 @@ void main() {
     final ctrl = ExecutionController(
       repository: repo,
       runtimeCache: cache,
+      resumeStore: _FakeFocusResumeStore(),
       initialTaskId: 'task1',
       initialTaskLabel: 'Task 1',
     );
@@ -101,6 +120,7 @@ void main() {
     final ctrl = ExecutionController(
       repository: _FakeExecutionRepository(),
       runtimeCache: cache,
+      resumeStore: _FakeFocusResumeStore(),
       initialTaskId: 'task1',
       initialTaskLabel: 'Task 1',
     );

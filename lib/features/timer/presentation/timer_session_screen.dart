@@ -147,6 +147,9 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
 
       // Phase A — check for reclaimed time on full completion.
       if (result.completionPercent >= 100) {
+        await ref
+            .read(executionControllerProvider.notifier)
+            .clearResumePoint(execState.taskId);
         await _checkReclaimedTime(execState.taskId);
       }
       final prev = ref.read(scoredTaskStatusesProvider);
@@ -166,12 +169,16 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
         );
       }
       if (!mounted) return;
-      await runAutoNextTaskFlow(
-        context,
-        ref,
-        completedTaskId: execState.taskId,
-        completionPercent: result.completionPercent,
-      );
+      if (result.completionPercent >= 100) {
+        await runAutoNextTaskFlow(
+          context,
+          ref,
+          completedTaskId: execState.taskId,
+          completionPercent: result.completionPercent,
+        );
+      } else {
+        await returnToFocusList(context, ref);
+      }
     } finally {
       if (mounted) {
         setState(() => _isHandlingStopFlow = false);

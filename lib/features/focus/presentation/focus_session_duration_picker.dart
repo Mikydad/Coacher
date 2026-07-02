@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../add_task/presentation/custom_duration_dialog.dart';
+import '../../execution/application/execution_day_loader.dart';
 import '../../planning/domain/add_task_duration.dart';
+import '../../planning/domain/models/task_item.dart';
 
 /// Quick duration picker before starting Focus on a reminder-only task.
 Future<int?> showFocusSessionDurationPicker(
@@ -119,4 +121,18 @@ String focusTaskSubtitle(int durationMinutes) {
     return '${durationMinutes}m target';
   }
   return 'Reminder only';
+}
+
+String focusTaskListSubtitle({
+  required ExecutionTaskItem task,
+  required Map<String, int> scores,
+}) {
+  final durationPart = focusTaskSubtitle(task.durationMinutes);
+  if (task.status != TaskStatus.partial) return durationPart;
+
+  final percent = scores[task.id];
+  if (percent != null) {
+    return 'Partial · $percent% · $durationPart';
+  }
+  return 'Partial · $durationPart';
 }
