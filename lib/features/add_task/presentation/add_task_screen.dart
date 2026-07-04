@@ -9,8 +9,10 @@ import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
+import '../../coaching/application/default_mode_resolver.dart';
 import '../../planning/application/effective_task_mode.dart';
 import '../../planning/application/habit_anchor_aggregator.dart';
+import '../../profile/application/profile_providers.dart';
 import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/domain/models/analytics_event.dart';
 import '../../planning/domain/models/routine.dart';
@@ -113,6 +115,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
   /// When false, new-task save may inherit [Routine.modeId] for the target routine.
   bool _modeUserCustomized = false;
 
+  /// Where the inherited (non-customized) mode came from: `profile` | `routine`.
+  String _modeInheritSource = 'profile';
+
   /// Whether this task occupies a fixed (rigid) time slot.
   bool _isRigid = false;
 
@@ -159,9 +164,13 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       });
     } else {
       _loaded = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (widget.slotArgs != null) _seedModeFromRoutineSlot();
-        _offerDraftRestoreIfNeeded();
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        // Profile-scaled default first, then the parent routine's mode wins
+        // over it when the slot's routine has one. User customization wins
+        // over both (guarded inside each seed).
+        await _seedModeFromProfileDefault();
+        if (widget.slotArgs != null) await _seedModeFromRoutineSlot();
+        if (mounted) _offerDraftRestoreIfNeeded();
       });
     }
   }
@@ -370,11 +379,49 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       for (final r in routines) {
         if (r.id == widget.slotArgs!.routineId) {
           if (!mounted || _modeUserCustomized) return;
-          setState(() => _modeRefId = r.modeId);
+          final id = r.modeId.trim().toLowerCase();
+          // Only inherit a known routine mode; otherwise keep the
+          // profile-scaled seed from _seedModeFromProfileDefault.
+          if (_modeChoiceIds.contains(id)) {
+            setState(() {
+              _modeRefId = id;
+              _modeInheritSource = 'routine';
+            });
+          }
           return;
         }
       }
     } catch (_) {}
+  }
+
+  /// Seeds the mode from the profile-level Discipline Mode, scaled by the
+  /// target block's urgency when the slot is known ("how strict is the app
+  /// overall" — see [DefaultModeResolver]). Never overrides a user choice.
+  Future<void> _seedModeFromProfileDefault() async {
+    if (_isEdit || _modeUserCustomized || !mounted) return;
+    final profileDefault = ref.read(defaultEnforcementModeProvider);
+    final urgency = await _blockUrgencyForSlot();
+    if (!mounted || _modeUserCustomized) return;
+    setState(() {
+      _modeRefId = DefaultModeResolver.resolveModeRefId(
+        profileDefault: profileDefault,
+        blockUrgencyScore: urgency,
+      );
+      _modeInheritSource = 'profile';
+    });
+  }
+
+  Future<int?> _blockUrgencyForSlot() async {
+    final slot = widget.slotArgs;
+    if (slot == null) return null;
+    try {
+      final planning = ref.read(planningRepositoryProvider);
+      final blocks = await planning.getBlocks(slot.routineId);
+      for (final b in blocks) {
+        if (b.id == slot.blockId) return b.urgencyScore;
+      }
+    } catch (_) {}
+    return null;
   }
 
   Future<String> _effectiveModeRefIdForSave({
@@ -384,11 +431,19 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
     required String blockId,
   }) async {
     Routine? routine;
+    var blockUrgency = 50;
     try {
       final routines = await planning.getRoutinesForDate(planDateKey);
       for (final r in routines) {
         if (r.id == routineId) {
           routine = r;
+          break;
+        }
+      }
+      final blocks = await planning.getBlocks(routineId);
+      for (final b in blocks) {
+        if (b.id == blockId) {
+          blockUrgency = b.urgencyScore;
           break;
         }
       }
@@ -410,7 +465,16 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       updatedAtMs: 0,
       modeRefId: explicit,
     );
-    return EffectiveTaskMode.effectiveModeRefId(task: task, routine: routine);
+    final fallback = DefaultModeResolver.resolveModeRefId(
+      profileDefault: ref.read(defaultEnforcementModeProvider),
+      priority: _loadedTask?.priority ?? 3,
+      blockUrgencyScore: blockUrgency,
+    );
+    return EffectiveTaskMode.effectiveModeRefId(
+      task: task,
+      routine: routine,
+      fallbackModeRefId: fallback,
+    );
   }
 
   Future<void> _loadEdit() async {
@@ -1109,14 +1173,13 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
   }
 
   String _accountabilitySubtitle(int index) {
-    switch (_modeChoiceIds[index]) {
-      case 'extreme':
-        return 'AGGRESSIVE REMINDERS';
-      case 'disciplined':
-        return 'STEADY ACCOUNTABILITY';
-      default:
-        return 'GENTLE REMINDERS';
+    final label = _modeLabels[index].toUpperCase();
+    // Until the user picks a mode themselves, the value is inherited from
+    // the routine or the profile Discipline Mode — show which one.
+    if (!_isEdit && !_modeUserCustomized) {
+      return '$label · FROM ${_modeInheritSource.toUpperCase()}';
     }
+    return label;
   }
 
   Widget _buildDurationSection() {

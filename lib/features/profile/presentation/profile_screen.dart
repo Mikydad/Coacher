@@ -151,7 +151,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
               // ── Discipline Modes ──────────────────────────────────────────
               SliverToBoxAdapter(
-                child: _SectionLabel(label: 'Discipline Modes'),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _SectionLabel(label: 'Discipline Modes'),
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Text(
+                        'How strict the app is overall. New tasks inherit '
+                        'this based on how important they are — you can '
+                        'still change it per task.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: _kOnSurfaceVariant.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               SliverToBoxAdapter(
                 child: Padding(

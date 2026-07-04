@@ -6,6 +6,7 @@ import '../../../core/utils/stable_id.dart';
 import '../../analytics/domain/models/analytics_event.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../coaching/application/coaching_style_providers.dart';
+import '../../coaching/application/default_mode_resolver.dart';
 import '../../context_override/application/context_override_providers.dart';
 import '../../goals/application/goals_providers.dart';
 import '../../profile/application/profile_providers.dart';
@@ -164,7 +165,8 @@ final recentAiBatchesProvider =
 // ─── Action executor ─────────────────────────────────────────────────────────
 
 final aiActionExecutorProvider = Provider<AiActionExecutor>((ref) {
-  // Read the user's default enforcement mode for task creation
+  // AI-created tasks default to the profile Discipline Mode scaled to
+  // medium importance (same matrix as Add Task) — never raw `extreme`.
   final enforcementMode = ref.watch(defaultEnforcementModeProvider);
   return AiActionExecutor(
     planningRepository: ref.read(planningRepositoryProvider),
@@ -174,7 +176,9 @@ final aiActionExecutorProvider = Provider<AiActionExecutor>((ref) {
     timeBlockSyncService: ref.read(timeBlockSyncServiceProvider),
     contextOverrideService: ref.read(contextOverrideServiceProvider),
     batchRepository: ref.read(aiActionBatchRepositoryProvider),
-    defaultModeRefId: enforcementMode.name,
+    defaultModeRefId: DefaultModeResolver.resolveModeRefId(
+      profileDefault: enforcementMode,
+    ),
   );
 });
 
