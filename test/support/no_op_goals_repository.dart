@@ -30,6 +30,9 @@ class NoOpGoalsRepository implements GoalsRepository {
   Future<UserGoal?> getGoal(String goalId) async => null;
 
   @override
+  Future<GoalCheckIn?> getTodayCheckIn(String goalId, String dateKey) async => null;
+
+  @override
   Future<List<GoalMilestone>> getMilestones(String goalId) async => const [];
 
   @override

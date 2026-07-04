@@ -92,98 +92,88 @@ void main() {
       expect(find.text('You'), findsOneWidget);
     });
 
-    testWidgets('renders Coaching Contract section header', (tester) async {
+    testWidgets('renders Discipline Modes section header', (tester) async {
       await tester.pumpWidget(_buildScreen());
       await tester.pump();
-      expect(find.text('YOUR COACHING CONTRACT'), findsOneWidget);
+      expect(find.text('DISCIPLINE MODES'), findsOneWidget);
     });
 
-    testWidgets('shows Coaching Style tile with current style name',
+    testWidgets('shows the active coaching style in the hero badge',
         (tester) async {
-      // Use supportive so "Supportive" is unique (not also used for enforcement).
       await tester.pumpWidget(
         _buildScreen(style: CoachingStyle.supportive),
       );
       await tester.pump();
-      expect(find.text('Coaching Style'), findsOneWidget);
-      expect(find.text(CoachingStyle.supportive.displayName), findsOneWidget);
-    });
-
-    testWidgets('shows Enforcement Mode tile', (tester) async {
-      await tester.pumpWidget(_buildScreen());
-      await tester.pump();
-      expect(find.text('Enforcement Mode'), findsOneWidget);
-      // "Disciplined" appears for both coaching style subtitle and enforcement
-      // mode subtitle — use findsWidgets (≥1) rather than findsOneWidget.
       expect(
-        find.text(EnforcementMode.disciplined.displayName),
-        findsWidgets,
+        find.text(CoachingStyle.supportive.displayName.toUpperCase()),
+        findsOneWidget,
       );
     });
 
-    testWidgets('renders Progress section header', (tester) async {
+    testWidgets('shows all enforcement mode tiles', (tester) async {
       await tester.pumpWidget(_buildScreen());
       await tester.pump();
-      expect(find.text('PROGRESS'), findsOneWidget);
+      for (final mode in EnforcementMode.values) {
+        expect(find.text(mode.displayName), findsWidgets);
+      }
+      // The active mode carries the ACTIVE badge.
+      expect(find.text('ACTIVE'), findsOneWidget);
     });
 
-    testWidgets('renders Account section header', (tester) async {
+    testWidgets('renders streak card', (tester) async {
       await tester.pumpWidget(_buildScreen());
       await tester.pump();
-      // Scroll to the bottom to ensure off-screen widgets are built.
-      await tester.dragUntilVisible(
-        find.text('ACCOUNT'),
-        find.byType(ListView),
-        const Offset(0, -200),
-      );
-      expect(find.text('ACCOUNT'), findsOneWidget);
+      expect(find.text('DAY STREAK'), findsOneWidget);
+      expect(find.text('12'), findsOneWidget);
     });
 
-    testWidgets('shows Sign Out and Export Data tiles', (tester) async {
+    testWidgets('renders Coach Tone section with all styles', (tester) async {
       await tester.pumpWidget(_buildScreen());
       await tester.pump();
-      await tester.dragUntilVisible(
-        find.text('Sign Out'),
-        find.byType(ListView),
-        const Offset(0, -200),
+      await tester.scrollUntilVisible(
+        find.text('COACH TONE'),
+        200,
+        scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text('Sign Out'), findsOneWidget);
-      expect(find.text('Export Data'), findsOneWidget);
+      expect(find.text('COACH TONE'), findsOneWidget);
     });
 
-    testWidgets('shows Delete Account tile', (tester) async {
+    testWidgets('shows Core Optimization settings rows', (tester) async {
       await tester.pumpWidget(_buildScreen());
       await tester.pump();
-      await tester.dragUntilVisible(
-        find.text('Delete Account'),
-        find.byType(ListView),
-        const Offset(0, -200),
+      await tester.scrollUntilVisible(
+        find.text('Account Settings'),
+        200,
+        scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text('Delete Account'), findsOneWidget);
+      expect(find.text('Account Settings'), findsOneWidget);
+      expect(find.text('Notifications'), findsOneWidget);
+      expect(find.text('Reminder Settings'), findsOneWidget);
     });
 
-    testWidgets('shows app name footer', (tester) async {
+    testWidgets('shows Log Out button', (tester) async {
       await tester.pumpWidget(_buildScreen());
       await tester.pump();
-      await tester.dragUntilVisible(
-        find.text('Coach for Life'),
-        find.byType(ListView),
-        const Offset(0, -200),
+      await tester.scrollUntilVisible(
+        find.text('Log Out'),
+        200,
+        scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text('Coach for Life'), findsOneWidget);
+      expect(find.text('Log Out'), findsOneWidget);
     });
 
-    testWidgets('Export Data tap shows snackbar', (tester) async {
+    testWidgets('Log Out tap shows confirmation dialog', (tester) async {
       await tester.pumpWidget(_buildScreen());
       await tester.pump();
-      await tester.dragUntilVisible(
-        find.text('Export Data'),
-        find.byType(ListView),
-        const Offset(0, -200),
+      await tester.scrollUntilVisible(
+        find.text('Log Out'),
+        200,
+        scrollable: find.byType(Scrollable).first,
       );
-      await tester.tap(find.text('Export Data'));
-      await tester.pump();
-      expect(find.text('Export coming soon.'), findsOneWidget);
+      await tester.tap(find.text('Log Out'));
+      await tester.pumpAndSettle();
+      expect(find.text('Log Out?'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
     });
 
     testWidgets('avatar initial uses first letter of display name',

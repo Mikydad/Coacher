@@ -84,12 +84,15 @@ void main() {
       final first = await stream.first;
       expect(first!.name, 'Morning Runners');
 
+      // Subscribe before updating so the emission can't be missed.
+      final sawUpdate = expectLater(
+        repo.watchCircle(circle.id),
+        emitsThrough(
+          predicate<AccountabilityCircle?>((c) => c?.name == 'Night Owls'),
+        ),
+      );
       await repo.updateCircle(circle.copyWith(name: 'Night Owls'));
-      // Give fake Firestore a moment to propagate.
-      await Future<void>.delayed(Duration.zero);
-
-      final second = await stream.first;
-      expect(second!.name, 'Night Owls');
+      await sawUpdate;
     });
   });
 
@@ -100,8 +103,8 @@ void main() {
     });
 
     test('emits list after creation', () async {
-      final c1 = _makeCircle(id: 'c-1', name: 'A');
-      final c2 = _makeCircle(id: 'c-2', name: 'B');
+      final c1 = _makeCircle(id: 'c-1', name: 'Alpha Circle');
+      final c2 = _makeCircle(id: 'c-2', name: 'Beta Circle');
       await repo.createCircle(c1);
       await repo.createCircle(c2);
 

@@ -11,6 +11,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../support/no_op_orchestrator_service.dart';
+
 class _FakeExecutionRepository implements ExecutionRepository {
   @override
   Future<List<TimerSession>> getSessionsForBlock(String blockId) async => const [];
@@ -98,6 +100,7 @@ void main() {
     final reminderSync = ReminderSyncService(
       repository: _FakeReminderRepository(),
       notifications: _FakeReminderNotifications(),
+      orchestratorService: NoOpOrchestratorService(),
     );
 
     await tester.pumpWidget(

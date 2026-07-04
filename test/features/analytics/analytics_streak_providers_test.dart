@@ -3,6 +3,8 @@ import 'package:coach_for_life/features/analytics/application/analytics_streak_p
 import 'package:coach_for_life/features/analytics/data/analytics_repository.dart';
 import 'package:coach_for_life/features/analytics/domain/models/analytics_event.dart';
 import 'package:coach_for_life/features/analytics/domain/models/analytics_stats_cache.dart';
+import 'package:coach_for_life/features/reminders/data/reminder_repository.dart';
+import 'package:coach_for_life/features/reminders/domain/models/reminder_config.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -64,11 +66,23 @@ class _FakeAnalyticsRepository implements AnalyticsRepository {
   Future<void> upsertStatsCache(AnalyticsStatsCache stats) async {}
 }
 
+class _NoOpReminderRepository implements ReminderRepository {
+  @override
+  Future<List<ReminderConfig>> listAllReminders() async => const [];
+  @override
+  Future<List<ReminderConfig>> getRemindersForTasks(List<String> taskIds) async => const [];
+  @override
+  Future<void> hydrateFromRemoteForTasks(List<String> taskIds) async {}
+  @override
+  Future<void> upsertReminder(ReminderConfig reminder) async {}
+}
+
 void main() {
   test('habitStreakSummaryProvider computes streak summary for habit id', () async {
     final container = ProviderContainer(
       overrides: [
         analyticsRepositoryProvider.overrideWithValue(_FakeAnalyticsRepository()),
+        reminderRepositoryProvider.overrideWithValue(_NoOpReminderRepository()),
       ],
     );
     addTearDown(container.dispose);

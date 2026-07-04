@@ -7,6 +7,7 @@ import 'package:coach_for_life/features/focus/presentation/focus_selection_scree
 import 'package:coach_for_life/features/planning/domain/models/block.dart';
 import 'package:coach_for_life/features/planning/domain/models/routine.dart';
 import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
+import 'package:coach_for_life/features/reminders/application/attention_orchestrator_providers.dart';
 import 'package:coach_for_life/features/reminders/data/reminder_repository.dart';
 import 'package:coach_for_life/features/reminders/domain/models/reminder_config.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../support/no_op_orchestrator_service.dart';
 import '../support/no_op_planning_repository.dart';
 
 class _FakeReminderRepository implements ReminderRepository {
@@ -128,6 +130,7 @@ void main() {
           _FakePlanningRepository(taskId: taskId, title: title),
         ),
         reminderRepositoryProvider.overrideWithValue(_FakeReminderRepository(const [])),
+        attentionOrchestratorServiceProvider.overrideWithValue(NoOpOrchestratorService()),
       ],
     );
     addTearDown(container.dispose);
@@ -171,6 +174,7 @@ void main() {
           _FakePlanningRepository(taskId: taskId, title: title),
         ),
         reminderRepositoryProvider.overrideWithValue(_FakeReminderRepository(const [])),
+        attentionOrchestratorServiceProvider.overrideWithValue(NoOpOrchestratorService()),
       ],
     );
     addTearDown(container.dispose);
@@ -206,6 +210,7 @@ void main() {
           _FakePlanningRepository(taskId: taskId, title: title),
         ),
         reminderRepositoryProvider.overrideWithValue(_FakeReminderRepository(const [])),
+        attentionOrchestratorServiceProvider.overrideWithValue(NoOpOrchestratorService()),
       ],
     );
     addTearDown(container.dispose);

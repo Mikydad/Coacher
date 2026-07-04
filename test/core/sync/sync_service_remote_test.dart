@@ -24,6 +24,7 @@ void main() {
     PostSyncRefreshCoordinator.instance.resetForTests();
     SyncService.debugClockForTests = null;
     SyncService.debugRemotePullForTests = null;
+    SyncService.debugUidForTests = 'test-user';
     SyncService.instance.debugResetQueueInMemoryOnly();
   });
 
@@ -33,6 +34,7 @@ void main() {
     PostSyncRefreshCoordinator.instance.resetForTests();
     SyncService.debugClockForTests = null;
     SyncService.debugRemotePullForTests = null;
+    SyncService.debugUidForTests = null;
     final i = isar;
     final d = dir;
     isar = null;
@@ -87,5 +89,37 @@ void main() {
     await SyncService.instance.syncFromRemote(force: true);
     await SyncService.instance.syncFromRemote(force: true);
     expect(pulls, 2);
+  });
+
+  test('uid change supersedes an in-flight pull instead of joining it', () async {
+    var pulls = 0;
+    SyncService.debugRemotePullForTests = (_) async {
+      pulls++;
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+    };
+
+    // User A's pull starts, then user B signs in and forces a sync while
+    // A's pull is still running. B must get its own pull, not A's result.
+    final pullA = SyncService.instance.syncFromRemote(force: true);
+    SyncService.debugUidForTests = 'test-user-b';
+    final pullB = SyncService.instance.syncFromRemote(force: true);
+    await Future.wait([pullA, pullB]);
+
+    expect(pulls, 2);
+  });
+
+  test('no signed-in user skips the pull', () async {
+    var pulls = 0;
+    SyncService.debugRemotePullForTests = (_) async {
+      pulls++;
+    };
+
+    SyncService.debugUidForTests = null;
+    // Firebase is not initialized in VM tests, so a null test uid means
+    // "signed out" and the pull must be skipped.
+    final result = await SyncService.instance.syncFromRemote(force: true);
+
+    expect(result, isFalse);
+    expect(pulls, 0);
   });
 }

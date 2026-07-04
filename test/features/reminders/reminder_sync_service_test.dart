@@ -11,8 +11,9 @@ import 'package:coach_for_life/features/reminders/domain/models/reminder_config.
 import 'package:coach_for_life/features/reminders/domain/models/reminder_intent.dart';
 import 'package:coach_for_life/features/reminders/domain/models/reminder_type.dart';
 import 'package:coach_for_life/core/notifications/local_notifications_service.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../support/no_op_notification_ledger.dart';
 
 // ── Fakes ────────────────────────────────────────────────────────────────────
 
@@ -82,6 +83,7 @@ class _FakeOrchestratorService extends AttentionOrchestratorService {
         focusRepository: _NoOpFocusRepo(),
         reminderRepository: _NoOpReminderRepo(),
         notifications: LocalNotificationsService.instance,
+        ledger: NoOpNotificationLedger(),
         logEvent: _noOpLog,
       );
 
