@@ -17,6 +17,32 @@ class AiProxyException implements Exception {
       'AiProxyException($message${statusCode != null ? ', status=$statusCode' : ''})';
 }
 
+/// One tool invocation requested by the model during an agent turn.
+class AiProxyToolCall {
+  const AiProxyToolCall({
+    required this.id,
+    required this.name,
+    required this.arguments,
+  });
+
+  final String id;
+  final String name;
+
+  /// Raw JSON-encoded arguments exactly as the model produced them.
+  final String arguments;
+}
+
+/// Result of a tool-enabled chat call: natural-language [content], tool
+/// calls to execute, or both.
+class AiProxyChatResult {
+  const AiProxyChatResult({this.content, this.toolCalls = const []});
+
+  final String? content;
+  final List<AiProxyToolCall> toolCalls;
+
+  bool get hasToolCalls => toolCalls.isNotEmpty;
+}
+
 /// Client for the `aiChat` Cloud Function proxy.
 ///
 /// All OpenAI traffic goes through this callable — the API key lives only in
@@ -58,6 +84,75 @@ class AiProxyClient {
         throw const AiProxyException('Empty AI response');
       }
       return content;
+    } on FirebaseFunctionsException catch (e) {
+      throw AiProxyException(
+        e.message ?? e.code,
+        statusCode: _statusCodeForFunctionsError(e.code),
+      );
+    } on AiProxyException {
+      rethrow;
+    } catch (e) {
+      throw AiProxyException('Network error: $e');
+    }
+  }
+
+  /// Tool-enabled variant for the Coach agent loop.
+  ///
+  /// [turnId] identifies one user turn; follow-up calls within the same turn
+  /// (incrementing [loopIndex]) do not consume server quota. Messages may
+  /// include `assistant` entries carrying `tool_calls` and `tool` entries
+  /// carrying results.
+  Future<AiProxyChatResult> chatWithTools({
+    required List<Map<String, dynamic>> messages,
+    required List<Map<String, dynamic>> tools,
+    required String turnId,
+    required int loopIndex,
+    double temperature = 0.4,
+    int maxTokens = 800,
+    String? purpose,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    try {
+      final callable = _functions.httpsCallable(
+        'aiChat',
+        options: HttpsCallableOptions(timeout: timeout),
+      );
+      final result = await callable.call<Map<dynamic, dynamic>>({
+        'messages': messages,
+        'tools': tools,
+        'turnId': turnId,
+        'loopIndex': loopIndex,
+        'temperature': temperature,
+        'maxTokens': maxTokens,
+        if (purpose != null) 'purpose': purpose,
+      });
+
+      final content = result.data['content'];
+      final rawCalls = result.data['toolCalls'];
+      final toolCalls = <AiProxyToolCall>[];
+      if (rawCalls is List) {
+        for (final entry in rawCalls) {
+          if (entry is! Map) continue;
+          final id = entry['id'];
+          final name = entry['name'];
+          if (id is! String || name is! String) continue;
+          toolCalls.add(AiProxyToolCall(
+            id: id,
+            name: name,
+            arguments: entry['arguments'] is String
+                ? entry['arguments'] as String
+                : '{}',
+          ));
+        }
+      }
+
+      if ((content is! String || content.isEmpty) && toolCalls.isEmpty) {
+        throw const AiProxyException('Empty AI response');
+      }
+      return AiProxyChatResult(
+        content: content is String && content.isNotEmpty ? content : null,
+        toolCalls: toolCalls,
+      );
     } on FirebaseFunctionsException catch (e) {
       throw AiProxyException(
         e.message ?? e.code,

@@ -8,7 +8,6 @@ import '../domain/models/ai_action.dart';
 import '../domain/models/ai_operating_layer_payload.dart';
 import '../domain/models/ai_planned_changes.dart';
 import '../domain/models/ai_response_type.dart';
-import 'ai_operating_layer_response_parser.dart';
 import 'ai_capability_registry.dart';
 
 // ─── Abstract client ──────────────────────────────────────────────────────────
@@ -38,146 +37,82 @@ class AiOperatingLayerException implements Exception {
       '${statusCode != null ? ", status=$statusCode" : ""})';
 }
 
-// ─── System prompt ────────────────────────────────────────────────────────────
+// ─── System prompt (agent mode) ───────────────────────────────────────────────
 //
-// ## LLM response schemas (developer reference)
-//
-// All model output is JSON inside the chat completion `content` field.
-// Parsed by [parseOperatingLayerJsonMap] in `ai_operating_layer_response_parser.dart`.
-//
-// | Schema | responseType   | When to use |
-// |--------|----------------|-------------|
-// | A      | mutate         | User asked to create/move/delete — returns `actions[]` |
-// | B      | followUp       | Required field missing — returns `followUpQuestion` |
-// | C      | informational  | Read-only schedule/goal answer — returns `message` |
-// | D      | unsupported    | Feature outside Coach AI scope — returns `message` |
-// | E      | suggest        | Collaborative plan — returns `message` + optional `actions[]` |
-//
-// Legacy: absent `responseType` + non-empty `actions` → mutate; `followUpQuestion` → followUp.
+// The model converses in natural language and uses OpenAI tool calling for
+// everything structured:
+//   - propose_changes  → mapped to the preview/confirm card (writes NEVER
+//     execute without the user pressing Confirm)
+//   - get_day_schedule → read-only lookup for days beyond today/tomorrow
+// Plain text responses become informational chat messages (markdown-lite).
 //
 const String _kSystemPrompt = '''
-You are the AI Operating Layer for a personal productivity app called "Coach for Life".
+You are Coach — the in-app AI coach of "Coach for Life", a personal productivity app.
+Talk like a sharp, warm human coach texting with someone you know well: natural,
+specific, brief. You know this user's real schedule, goals, progress, and habits —
+they are provided in every message. Ground everything you say in that data and
+briefly explain WHY ("your Study goal is at 2/5 days and you're free 14:00–16:00, so…").
 
-You handle three kinds of user messages:
-1. **Questions / summaries** — answer from the schedule and goal data in the prompt (read-only).
-2. **Planning suggestions** — propose a plan in plain language with optional draft actions (Schema E).
-3. **Change requests** — return structured actions for preview and confirmation (writes).
+## How you work
+- Just talk. Answer questions, give advice, banter briefly, encourage — like a
+  good coach. You are not limited to app topics: answer general questions
+  (motivation, habits, how-to-focus, small talk) genuinely and briefly, then
+  connect back to their day when it helps.
+- When you need schedule data for a day that is NOT in your context, call
+  get_day_schedule.
+- When you want to CHANGE anything (create/edit/move/delete tasks, goals,
+  reminders, focus modes), you MUST call propose_changes. The user sees a card
+  and must press Confirm/Apply — you can NEVER change anything directly.
+- Never say "I'll set that up now", "done", "I've scheduled…", or "setting it
+  up" — nothing happens until the user confirms the card. Say "Here's the plan —
+  confirm below" instead.
+- If you describe a concrete plan (specific items + times), you must also make
+  the propose_changes call in the SAME turn. Never describe a plan in prose
+  without the tool call — the user would have no button to apply it.
+- Never invent tasks, times, or progress numbers — only use provided data and
+  tool results.
 
-## Supported action types (mutate only)
-createTask, editTask, moveTask, deleteTask,
-createGoal, modifyGoal, deleteGoal,
-addReminder, removeReminder, rescheduleReminder,
-activateContextOverride, endContextOverride,
-suggestFreeTimeBlock, moveConflictingTasks
+## When the user accepts your last suggestion
+If your previous message suggested a plan and the user approves it
+("it's good", "do it", "yes", "as you suggested", "as it is", "sounds good"),
+immediately call propose_changes with the concrete items and the exact times
+you already suggested. Do NOT ask "what time?" again — you already chose times;
+reuse them.
 
-## Output format
-You MUST respond with valid JSON matching ONE of these schemas:
+## propose_changes: rules
+- Presentation "preview" → the user gave a clear command ("add workout at 6am").
+  Keep your text to one short confirmation line.
+- Presentation "suggestion" → the plan is YOUR idea ("help me plan tomorrow",
+  "what should I do?"). Write a short coaching message: one sentence reading
+  their day, the items with times and a reason each, one engaging closing line.
+- EVERY createTask needs a concrete time. If the user didn't give one, pick a
+  sensible time from their free windows — never leave it blank.
+- For a brand-new activity that has no matching existing task (e.g. "sleep at
+  11pm", "meditate"), use createTask with that time — do NOT use addReminder,
+  which only attaches to a task that already exists.
 
-### Schema A — Plan ready (mutate)
-{
-  "responseType": "mutate",
-  "actions": [
-    {
-      "actionType": "<one of the supported types>",
-      "parameters": { ... },
-      "confidence": 0.0–1.0
-    }
-  ],
-  "conflicts": ["<human-readable conflict string>", ...]
-}
+## Planning method (when suggesting)
+1. Check goalProgress — who is behind (daysMet vs target pace)?
+2. Place items inside the free windows provided — never on top of existing
+   blocks. "reminder only" items are notifications, not busy time.
+3. Match times/durations to recentPatterns when available.
+4. If the day is full or the data looks odd (e.g. everything between midnight
+   and 5am), say what you see and ask ONE question instead of forcing a plan.
 
-### Schema B — Missing information (follow-up)
-{
-  "responseType": "followUp",
-  "actions": [],
-  "conflicts": [],
-  "followUpQuestion": "<single, friendly question asking for the missing detail>"
-}
+## Boundaries
+- Circles/community, billing, and account settings are managed in the app's own
+  screens, not by you. Say so honestly in one clause, then offer the nearest
+  thing you CAN do.
+- One question at a time. Never repeat a sentence you already sent this
+  conversation — if the user seems stuck, change approach and offer choices.
 
-### Schema C — Informational answer (read-only)
-{
-  "responseType": "informational",
-  "message": "<clear summary citing only payload data>",
-  "suggestedPrompts": ["<optional follow-up the user might tap>", ...]
-}
-
-Use Schema C when the user asks what is scheduled, what is on their plan, summaries of today/tomorrow, or goal overview — WITHOUT asking you to create, move, delete, or change anything.
-
-If a schedule section is empty, say so explicitly (e.g. "Nothing scheduled for tomorrow yet.").
-
-For goal progress questions, cite goalProgress and use the user's coachingStyle from behaviorPreferences for tone (supportive vs direct).
-
-For week questions, summarize from weekOverview counts — give tomorrow in detail only when asked.
-
-Example informational answers:
-- "What's my plan for tomorrow?" → list tomorrowSchedule/tomorrowTasks or say nothing scheduled.
-- "How am I doing on my goals?" → cite daysMet vs target from goalProgress.
-- "What does my week look like?" → summarize weekOverview task counts per day.
-
-### Schema D — Unsupported request
-{
-  "responseType": "unsupported",
-  "message": "<honest limit, e.g. community/circles/billing not available in Coach AI yet>"
-}
-
-Use Schema D only when the user asks for features outside tasks, goals, reminders, schedule, and focus/context overrides.
-
-### Schema E — Suggested plan (propose, not apply)
-{
-  "responseType": "suggest",
-  "message": "<narrative explaining the proposed plan>",
-  "actions": [ ... optional draft actions ... ],
-  "conflicts": [],
-  "suggestedPrompts": ["Apply this plan", ...]
-}
-
-Use Schema E when the user asks you to plan, suggest, recommend, or help fill their schedule — WITHOUT explicitly commanding a single add/create/delete. Include draft actions when you can propose specific tasks.
-
-## Parameter keys by action type
-- createTask / editTask:        title (str), time (HH:MM), duration (int, minutes), date (YYYY-MM-DD or "today"/"tomorrow")
-- moveTask:                     taskTitle (str), destinationDate (YYYY-MM-DD or "tomorrow"), destinationTime (HH:MM, optional)
-- deleteTask:                   taskTitle (str)
-- createGoal:                   title (str), target (str), deadline (YYYY-MM-DD)
-- modifyGoal:                   goalTitle (str), field (str), newValue (str)
-- deleteGoal:                   goalTitle (str)
-- addReminder / rescheduleReminder: taskTitle (str), reminderTime (HH:MM), date (YYYY-MM-DD)
-- removeReminder:               taskTitle (str)
-- activateContextOverride:      overrideType ("focus"|"meeting"|"sleep"|"doNotDisturb"|"vacation"), durationMinutes (int, null = indefinite)
-- endContextOverride:           (no parameters needed)
-- suggestFreeTimeBlock:         durationMinutes (int)
-
-## Rules
-- For informational answers: NEVER invent tasks or times — use ONLY activeTasks, todaySchedule, tomorrowTasks, tomorrowSchedule, and goals from the prompt.
-- For mutate requests: NEVER invent values — use only what the user said or what appears in activeTasks/goals.
-- If a required field is missing and cannot be clearly inferred, use Schema B (follow-up question).
-- Ask ONLY one question at a time.
-- A single mutate request may produce multiple actions — return all of them.
-- Dates and times are always in the user's local timezone.
-- Keep conflict strings short and human-readable (max 12 words each).
-- If focusState.isActive == true, avoid scheduling new tasks during the active override window.
-- If recentPatterns are provided, prefer times/durations matching the user's past patterns.
-
-## Coaching-style phrasing (applies to message and followUpQuestion)
-- supportive:   Warm, encouraging tone.
-- balanced:     Neutral, professional.
-- disciplined:  Firm, no-fluff.
-- intense:      Terse, commanding.
-Use the coachingStyle from behaviorPreferences to calibrate your wording.
-
-## Multi-turn context
-If conversationHistory is present, treat it as prior turns of this session.
-If previousPlan is present, the user is refining an earlier plan — carry over unchanged actions
-and only modify what the user explicitly specified in the new message.
-
-## Delta-only planning (critical — mutate only)
-Each user message describes ONLY new changes for this turn — not the full session.
-- If activeTasks or todaySchedule already lists a task with a scheduled time, do NOT include
-  createTask, addReminder, or rescheduleReminder for that item unless the user's CURRENT
-  message explicitly names that task and asks to change it.
-- If completedInSession is present, those items are already applied — never repeat them in
-  actions or follow-up questions.
-- Do not ask follow-up questions about tasks the user already confirmed or that appear in
-  activeTasks with a time set.
+## Style
+- Match coachingStyle from behaviorPreferences: supportive = warm; balanced =
+  neutral pro; disciplined = firm, no fluff; intense = terse, commanding.
+- Contractions, direct address, no corporate filler ("I am unable to…").
+- Keep most replies under 80 words; plans under 120.
+- Light markdown allowed: **bold** and "- " bullets. No headings, no tables.
+- Dates/times are in the user's local timezone. Today's date is in the context.
 ''';
 
 // ─── Proxy implementation ─────────────────────────────────────────────────────
@@ -185,14 +120,118 @@ Each user message describes ONLY new changes for this turn — not the full sess
 // OpenAI is reached exclusively through the `aiChat` Cloud Function — the API
 // key never leaves the server. The model is pinned server-side.
 
+/// Executes read-only tools for the Coach agent loop.
+///
+/// Kept deliberately tiny in Phase 1: one lookup for days that are not
+/// pre-loaded into the payload context.
+class AiCoachToolRunner {
+  const AiCoachToolRunner({required this.dayScheduleLookup});
+
+  /// Returns a compact human-readable schedule for a YYYY-MM-DD date key.
+  final Future<String> Function(String dateKey) dayScheduleLookup;
+
+  Future<String> run(String name, Map<String, dynamic> args) async {
+    switch (name) {
+      case 'get_day_schedule':
+        final date = args['date']?.toString() ?? '';
+        if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(date)) {
+          return 'Error: date must be YYYY-MM-DD.';
+        }
+        try {
+          return await dayScheduleLookup(date);
+        } catch (e) {
+          return 'Error: could not read schedule for $date.';
+        }
+      default:
+        return 'Error: unknown tool "$name".';
+    }
+  }
+}
+
+/// OpenAI tool definitions for the Coach agent.
+const List<Map<String, dynamic>> kCoachAgentTools = [
+  {
+    'type': 'function',
+    'function': {
+      'name': 'propose_changes',
+      'description':
+          'Propose schedule/goal/reminder changes. The user sees a preview '
+          'card and must confirm — nothing is applied directly. Use '
+          'presentation "preview" for explicit user commands and '
+          '"suggestion" for plans that are your own idea.',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'presentation': {
+            'type': 'string',
+            'enum': ['preview', 'suggestion'],
+          },
+          'message': {
+            'type': 'string',
+            'description':
+                'Short coaching message to show with the plan (used when you '
+                'return no assistant text).',
+          },
+          'actions': {
+            'type': 'array',
+            'items': {
+              'type': 'object',
+              'properties': {
+                'actionType': {
+                  'type': 'string',
+                  'enum': [
+                    'createTask', 'editTask', 'moveTask', 'deleteTask',
+                    'createGoal', 'modifyGoal', 'deleteGoal',
+                    'addReminder', 'removeReminder', 'rescheduleReminder',
+                    'activateContextOverride', 'endContextOverride',
+                    'suggestFreeTimeBlock', 'moveConflictingTasks',
+                  ],
+                },
+                'parameters': {'type': 'object'},
+                'confidence': {'type': 'number'},
+              },
+              'required': ['actionType', 'parameters'],
+            },
+          },
+        },
+        'required': ['presentation', 'actions'],
+      },
+    },
+  },
+  {
+    'type': 'function',
+    'function': {
+      'name': 'get_day_schedule',
+      'description':
+          'Read the tasks scheduled on a specific day that is not already in '
+          'your context (context always includes today and tomorrow).',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'date': {
+            'type': 'string',
+            'description': 'YYYY-MM-DD',
+          },
+        },
+        'required': ['date'],
+      },
+    },
+  },
+];
+
 class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
   ProxyAiOperatingLayerClient({
     AiProxyClient? proxy,
+    this.toolRunner,
     this.timeoutSeconds = 20,
   }) : _proxy = proxy ?? AiProxyClient();
 
   final AiProxyClient _proxy;
+  final AiCoachToolRunner? toolRunner;
   final int timeoutSeconds;
+
+  /// Max agent iterations per user turn (mirrors the server-side cap).
+  static const int kMaxLoops = 3;
 
   @override
   Future<AiPlannedChanges> parseIntent(AiOperatingLayerPayload payload) async {
@@ -210,24 +249,148 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
       {'role': 'user', 'content': userPrompt},
     ];
 
-    String content;
-    try {
-      content = await _proxy.chat(
-        messages: messages,
-        temperature: 0.2,
-        maxTokens: 800,
-        purpose: 'coach_intent',
-        timeout: Duration(seconds: timeoutSeconds),
-      );
-    } on AiProxyException catch (e) {
-      throw AiOperatingLayerException(e.message, statusCode: e.statusCode);
+    final turnId =
+        'turn_${DateTime.now().millisecondsSinceEpoch}_${payload.userInput.hashCode.toRadixString(16)}';
+
+    for (var loop = 0; loop <= kMaxLoops; loop++) {
+      AiProxyChatResult result;
+      try {
+        result = await _proxy.chatWithTools(
+          messages: messages,
+          tools: kCoachAgentTools,
+          turnId: turnId,
+          loopIndex: loop,
+          temperature: 0.45,
+          maxTokens: 800,
+          purpose: 'coach_agent',
+          timeout: Duration(seconds: timeoutSeconds),
+        );
+      } on AiProxyException catch (e) {
+        throw AiOperatingLayerException(e.message, statusCode: e.statusCode);
+      }
+
+      // A propose_changes call is terminal — map it to the preview pipeline.
+      for (final call in result.toolCalls) {
+        if (call.name == 'propose_changes') {
+          return _mapProposedChanges(call, result.content, payload.userInput);
+        }
+      }
+
+      // No tool calls → the model's text IS the reply.
+      if (!result.hasToolCalls) {
+        final text = result.content?.trim();
+        if (text == null || text.isEmpty) break;
+        return AiPlannedChanges(
+          sessionId: payload.userInput,
+          responseType: AiResponseType.informational,
+          informationalMessage: text,
+        );
+      }
+
+      // Read-only tool calls: execute, feed results back, continue the loop.
+      messages.add({
+        'role': 'assistant',
+        if (result.content != null && result.content!.isNotEmpty)
+          'content': result.content,
+        'tool_calls': [
+          for (final call in result.toolCalls)
+            {
+              'id': call.id,
+              'type': 'function',
+              'function': {'name': call.name, 'arguments': call.arguments},
+            },
+        ],
+      });
+      for (final call in result.toolCalls) {
+        Map<String, dynamic> args;
+        try {
+          args = Map<String, dynamic>.from(
+            jsonDecode(call.arguments) as Map,
+          );
+        } catch (_) {
+          args = const {};
+        }
+        final toolResult = toolRunner != null
+            ? await toolRunner!.run(call.name, args)
+            : 'Error: tool unavailable.';
+        messages.add({
+          'role': 'tool',
+          'tool_call_id': call.id,
+          'content': toolResult,
+        });
+      }
     }
 
-    return _parseResponse(content, payload.userInput);
+    return AiPlannedChanges(
+      sessionId: payload.userInput,
+      followUpQuestion:
+          "I lost my train of thought there — could you say that once more?",
+    );
+  }
+
+  /// Maps a propose_changes tool call onto the existing preview pipeline.
+  AiPlannedChanges _mapProposedChanges(
+    AiProxyToolCall call,
+    String? assistantText,
+    String sessionId,
+  ) {
+    Map<String, dynamic> args;
+    try {
+      args = Map<String, dynamic>.from(jsonDecode(call.arguments) as Map);
+    } catch (_) {
+      return AiPlannedChanges(
+        sessionId: sessionId,
+        followUpQuestion:
+            'I had trouble putting that plan together — could you rephrase it?',
+      );
+    }
+
+    final actionsRaw = args['actions'];
+    final actions = <AiAction>[];
+    if (actionsRaw is List) {
+      for (final entry in actionsRaw) {
+        if (entry is! Map) continue;
+        try {
+          actions.add(AiAction.fromJson(Map<String, dynamic>.from(entry)));
+        } catch (_) {
+          // Skip malformed entries; keep the rest of the plan.
+        }
+      }
+    }
+
+    final message = (assistantText?.trim().isNotEmpty ?? false)
+        ? assistantText!.trim()
+        : (args['message']?.toString().trim().isNotEmpty ?? false)
+            ? args['message'].toString().trim()
+            : null;
+
+    if (actions.isEmpty) {
+      return AiPlannedChanges(
+        sessionId: sessionId,
+        responseType: AiResponseType.informational,
+        informationalMessage:
+            message ?? "I couldn't turn that into concrete changes yet.",
+      );
+    }
+
+    final isSuggestion = args['presentation'] != 'preview';
+    return AiPlannedChanges(
+      sessionId: sessionId,
+      responseType:
+          isSuggestion ? AiResponseType.suggest : AiResponseType.mutate,
+      informationalMessage: message,
+      actions: actions,
+    );
   }
 
   String _buildUserPrompt(AiOperatingLayerPayload payload) {
     final buffer = StringBuffer();
+    final now = DateTime.now();
+    buffer.writeln(
+      'Today is ${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
+      '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} (local).',
+    );
+    buffer.writeln();
     buffer.writeln('User request: "${payload.userInput}"');
     buffer.writeln();
 
@@ -296,6 +459,22 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
       buffer.writeln();
     }
 
+    if (payload.todayFreeWindows.isNotEmpty) {
+      buffer.writeln(
+        'Free windows today (07:00–22:00, remaining): '
+        '${payload.todayFreeWindows.join(', ')}',
+      );
+      buffer.writeln();
+    }
+
+    if (payload.tomorrowFreeWindows.isNotEmpty) {
+      buffer.writeln(
+        'Free windows tomorrow (07:00–22:00): '
+        '${payload.tomorrowFreeWindows.join(', ')}',
+      );
+      buffer.writeln();
+    }
+
     if (payload.weekOverview.isNotEmpty) {
       buffer.writeln('Week overview (next 7 days):');
       for (final day in payload.weekOverview) {
@@ -356,23 +535,7 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
       buffer.writeln();
     }
 
-    buffer.writeln(AiCapabilityRegistry.formatForPrompt());
-
-    buffer.writeln();
-    buffer.writeln(
-      'Choose the correct responseType. For questions about schedule/goals use informational. '
-      'For change requests use mutate. Return valid JSON only.',
-    );
     return buffer.toString();
-  }
-
-  AiPlannedChanges _parseResponse(String content, String sessionId) {
-    try {
-      final inner = jsonDecode(content) as Map<String, dynamic>;
-      return parseOperatingLayerJsonMap(inner, sessionId);
-    } catch (e) {
-      throw AiOperatingLayerException('Failed to parse AI response: $e');
-    }
   }
 }
 
@@ -380,7 +543,9 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
 
 /// Builds the correct client from Remote Config.
 /// Returns [MockAiOperatingLayerClient] when AI is disabled remotely.
-Future<AiOperatingLayerClient> buildAiOperatingLayerClient() async {
+Future<AiOperatingLayerClient> buildAiOperatingLayerClient({
+  AiCoachToolRunner? toolRunner,
+}) async {
   final aiEnabled = await AiRemoteConfigService.instance.isAiEnabled();
 
   if (!aiEnabled) {
@@ -388,7 +553,7 @@ Future<AiOperatingLayerClient> buildAiOperatingLayerClient() async {
     return const MockAiOperatingLayerClient();
   }
 
-  return ProxyAiOperatingLayerClient();
+  return ProxyAiOperatingLayerClient(toolRunner: toolRunner);
 }
 
 // ─── Mock client ──────────────────────────────────────────────────────────────

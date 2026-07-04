@@ -9,6 +9,7 @@ import '../../coaching/application/coaching_style_providers.dart';
 import '../../context_override/application/context_override_providers.dart';
 import '../../goals/application/goals_providers.dart';
 import '../../profile/application/profile_providers.dart';
+import '../../planning/application/planned_task_collect.dart';
 import '../../time_blocks/application/time_block_providers.dart';
 import '../../../core/local_db/isar_collections/isar_ai_action_batch.dart';
 import '../../../core/offline/offline_store.dart';
@@ -33,7 +34,32 @@ import 'schedule_optimisation_service.dart';
 /// Async because [buildAiOperatingLayerClient] fetches Remote Config.
 final aiOperatingLayerClientProvider =
     FutureProvider<AiOperatingLayerClient>((ref) async {
-  return buildAiOperatingLayerClient();
+  final planning = ref.read(planningRepositoryProvider);
+  return buildAiOperatingLayerClient(
+    toolRunner: AiCoachToolRunner(
+      dayScheduleLookup: (dateKey) async {
+        final rows = await collectTasksForDateKey(planning, dateKey);
+        if (rows.isEmpty) return 'Nothing scheduled on $dateKey.';
+        final buffer = StringBuffer('Tasks on $dateKey:\n');
+        for (final row in rows) {
+          final t = row.task;
+          var time = 'no time set';
+          final iso = t.reminderTimeIso;
+          if (iso != null && iso.isNotEmpty) {
+            final dt = DateTime.tryParse(iso)?.toLocal();
+            if (dt != null) {
+              time =
+                  '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+            }
+          }
+          buffer.writeln(
+            '- ${t.title} at $time (${t.durationMinutes} min, ${t.status.name})',
+          );
+        }
+        return buffer.toString().trim();
+      },
+    ),
+  );
 });
 
 // ─── Payload assembler ────────────────────────────────────────────────────────
