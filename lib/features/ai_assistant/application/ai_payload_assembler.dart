@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../../../core/utils/date_keys.dart';
 import '../../coaching/data/coaching_style_repository.dart';
 import '../../context_override/data/context_override_repository.dart';
@@ -81,9 +83,90 @@ class AiPayloadAssembler {
       completedInSession: dynamicResults[2] as List<String>,
       capabilities: AiCapabilityRegistry.buildPayloadSection(),
       intentHint: intentRoute?.toPromptHint(),
+      intentKind: intentRoute?.kind.name,
       proactiveContext: proactiveContext,
       previousPlan: previousPlanSummary,
+      todayFreeWindows: computeFreeWindows(
+        schedule.todaySchedule,
+        fromMinuteOfDay: _nowMinuteOfDay(),
+      ),
+      tomorrowFreeWindows: computeFreeWindows(schedule.tomorrowSchedule),
     );
+  }
+
+  static int _nowMinuteOfDay() {
+    final now = DateTime.now();
+    return now.hour * 60 + now.minute;
+  }
+
+  /// Computes free windows between scheduled blocks inside the waking day
+  /// (07:00–22:00), as human-readable strings like "14:00–16:30 (2h 30m)".
+  ///
+  /// [scheduleMaps] is the { title, startTime, endTime } shape produced by
+  /// [_scheduleMapsFromRows]. For today pass [fromMinuteOfDay] so windows that
+  /// have already passed are excluded. Windows shorter than 30 minutes are
+  /// dropped; at most 4 are returned.
+  @visibleForTesting
+  static List<String> computeFreeWindows(
+    List<Map<String, dynamic>> scheduleMaps, {
+    int fromMinuteOfDay = 0,
+  }) {
+    const dayStart = 7 * 60; // 07:00
+    const dayEnd = 22 * 60; // 22:00
+    const minWindowMinutes = 30;
+
+    int? parseMinute(Object? hhmm) {
+      if (hhmm is! String) return null;
+      final parts = hhmm.split(':');
+      if (parts.length != 2) return null;
+      final h = int.tryParse(parts[0]);
+      final m = int.tryParse(parts[1]);
+      if (h == null || m == null) return null;
+      return h * 60 + m;
+    }
+
+    // Collect busy intervals (clamped to the waking day).
+    final busy = <(int, int)>[];
+    for (final block in scheduleMaps) {
+      final start = parseMinute(block['startTime']);
+      if (start == null) continue;
+      final end = parseMinute(block['endTime']) ?? (start + 30);
+      final clampedStart = start.clamp(0, 24 * 60);
+      final clampedEnd = end < start ? clampedStart : end.clamp(0, 24 * 60);
+      busy.add((clampedStart, clampedEnd));
+    }
+    busy.sort((a, b) => a.$1.compareTo(b.$1));
+
+    // Merge overlaps.
+    final merged = <(int, int)>[];
+    for (final interval in busy) {
+      if (merged.isEmpty || interval.$1 > merged.last.$2) {
+        merged.add(interval);
+      } else if (interval.$2 > merged.last.$2) {
+        merged[merged.length - 1] = (merged.last.$1, interval.$2);
+      }
+    }
+
+    String fmt(int minute) =>
+        '${(minute ~/ 60).toString().padLeft(2, '0')}:${(minute % 60).toString().padLeft(2, '0')}';
+    String span(int minutes) {
+      final h = minutes ~/ 60;
+      final m = minutes % 60;
+      if (h == 0) return '${m}m';
+      return m == 0 ? '${h}h' : '${h}h ${m}m';
+    }
+
+    final windows = <String>[];
+    var cursor = fromMinuteOfDay > dayStart ? fromMinuteOfDay : dayStart;
+    for (final interval in [...merged, (dayEnd, dayEnd)]) {
+      final gapEnd = interval.$1 < dayEnd ? interval.$1 : dayEnd;
+      if (gapEnd - cursor >= minWindowMinutes) {
+        windows.add('${fmt(cursor)}–${fmt(gapEnd)} (${span(gapEnd - cursor)})');
+      }
+      if (interval.$2 > cursor) cursor = interval.$2;
+      if (cursor >= dayEnd) break;
+    }
+    return windows.take(4).toList();
   }
 
   Future<_CachedScheduleSlice> _scheduleSliceForSession(String sessionId) async {

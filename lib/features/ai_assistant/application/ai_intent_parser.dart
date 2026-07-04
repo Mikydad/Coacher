@@ -44,6 +44,17 @@ class AiIntentParser {
     AiPlannedChanges? previousPlan,
     Map<String, dynamic>? proactiveContext,
   }) async {
+    // Fast path — "what can you do?" gets a real answer, never the LLM's
+    // guess or a clarify loop.
+    if (AiCapabilityRegistry.isCapabilityQuestion(userInput)) {
+      return AiPlannedChanges(
+        sessionId: sessionId,
+        responseType: AiResponseType.informational,
+        informationalMessage: AiCapabilityRegistry.capabilityAnswer,
+        suggestedPrompts: AiCapabilityRegistry.capabilitySuggestedPrompts,
+      );
+    }
+
     // Fast path — unsupported domains never reach the LLM.
     final unsupported = AiCapabilityRegistry.detectUnsupported(userInput);
     if (unsupported != null) {
@@ -201,9 +212,15 @@ class AiIntentParser {
       }
     }
 
+    // The mutate route is a keyword heuristic and misfires on conversational
+    // messages ("what else can you do", "thanks"). When the model answered
+    // with a real informational message, trust the model — only fall back to
+    // the clarify question when it produced nothing usable at all.
     if (route.kind == AiIntentKind.mutate &&
         result.isInformational &&
-        result.actions.isEmpty) {
+        result.actions.isEmpty &&
+        (result.informationalMessage == null ||
+            result.informationalMessage!.trim().isEmpty)) {
       return AiPlannedChanges(
         sessionId: result.sessionId,
         followUpQuestion:

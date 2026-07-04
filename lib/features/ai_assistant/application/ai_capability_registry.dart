@@ -95,6 +95,60 @@ abstract final class AiCapabilityRegistry {
     return buffer.toString();
   }
 
+  // ─── Capability questions ("what can you do?") ─────────────────────────────
+
+  /// Phrases that mean the user is asking about the assistant itself, not
+  /// their schedule. Kept intentionally narrow — "help me plan tomorrow"
+  /// must NOT match (it routes to suggest).
+  static const _capabilityPhrases = [
+    'what can you do',
+    'what else can you do',
+    'what can u do',
+    'what do you do',
+    'what are you able',
+    'what are your skills',
+    'your skills',
+    'your capabilities',
+    'what are you capable',
+    'how can you help',
+    'how do you help',
+    'what can you help',
+    'who are you',
+    'what are you',
+  ];
+
+  /// Warm, honest answer describing what Coach AI can do right now.
+  /// Used by the fast path so capability questions never produce the
+  /// "tell me exactly what to change" clarify loop.
+  static const capabilityAnswer =
+      "Happy to explain! Here's what I can do as your coach:\n\n"
+      "📋 Plan with you — \"Help me plan tomorrow\" and I'll look at your "
+      "goals, tasks, and free time, then propose a schedule you can apply "
+      "with one tap.\n"
+      "➕ Manage tasks — add, move, edit, or delete tasks and set reminders.\n"
+      "🎯 Work on goals — create or adjust goals and tell you how you're "
+      "tracking against them.\n"
+      "🔎 Answer questions — what's on today, tomorrow, or this week.\n"
+      "🧘 Protect your focus — start focus, sleep, or do-not-disturb windows.\n\n"
+      "Not in my hands yet: Circles/community, billing, and account settings — "
+      "those live in the app's own screens.";
+
+  static const capabilitySuggestedPrompts = [
+    'Help me plan tomorrow',
+    "What's on my schedule today?",
+    'How am I doing on my goals?',
+  ];
+
+  /// Returns true when [userInput] is a question about the assistant's own
+  /// abilities (as opposed to a request to use them).
+  static bool isCapabilityQuestion(String userInput) {
+    final lower = userInput.toLowerCase().trim();
+    if (lower.isEmpty) return false;
+    // Bare cries for help / discovery.
+    if (lower == 'help' || lower == 'skills' || lower == '?') return true;
+    return _capabilityPhrases.any(lower.contains);
+  }
+
   /// Fast client-side guard before calling the LLM.
   static AiUnsupportedMatch? detectUnsupported(String userInput) {
     final lower = userInput.toLowerCase();

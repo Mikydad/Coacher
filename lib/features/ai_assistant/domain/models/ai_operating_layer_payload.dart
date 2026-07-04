@@ -1,5 +1,3 @@
-import 'ai_intent_kind.dart';
-
 /// The context payload sent to the AI model for intent parsing.
 ///
 /// Design rules (from PRD §4.12):
@@ -25,8 +23,11 @@ class AiOperatingLayerPayload {
     this.goalProgress = const [],
     this.capabilities = const {},
     this.intentHint,
+    this.intentKind,
     this.proactiveContext,
     this.previousPlan,
+    this.todayFreeWindows = const [],
+    this.tomorrowFreeWindows = const [],
   });
 
   /// The raw user input for this turn.
@@ -81,11 +82,22 @@ class AiOperatingLayerPayload {
   /// Router hint — QUERY, SUGGEST, or MUTATE with optional focus date.
   final String? intentHint;
 
+  /// Router classification name ("query" | "suggest" | "mutate") — used to
+  /// pick the model temperature per turn.
+  final String? intentKind;
+
   /// Proactive suggestion that led the user into this session (if any).
   final Map<String, dynamic>? proactiveContext;
 
   /// The previous plan when the user is refining an earlier intent.
   final String? previousPlan;
+
+  /// Human-readable free windows for today, e.g. "14:00–16:30 (2h 30m)".
+  final List<String> todayFreeWindows;
+
+  /// Human-readable free windows for tomorrow — same shape as
+  /// [todayFreeWindows].
+  final List<String> tomorrowFreeWindows;
 
   Map<String, dynamic> toJson() => {
         'userInput': userInput,
@@ -105,7 +117,11 @@ class AiOperatingLayerPayload {
         if (goalProgress.isNotEmpty) 'goalProgress': goalProgress,
         if (capabilities.isNotEmpty) 'capabilities': capabilities,
         if (intentHint != null) 'intentHint': intentHint,
+        if (intentKind != null) 'intentKind': intentKind,
         if (proactiveContext != null) 'proactiveContext': proactiveContext,
         if (previousPlan != null) 'previousPlan': previousPlan,
+        if (todayFreeWindows.isNotEmpty) 'todayFreeWindows': todayFreeWindows,
+        if (tomorrowFreeWindows.isNotEmpty)
+          'tomorrowFreeWindows': tomorrowFreeWindows,
       };
 }
