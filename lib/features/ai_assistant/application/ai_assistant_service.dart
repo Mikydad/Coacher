@@ -59,6 +59,12 @@ class AiAssistantService extends ChangeNotifier {
   /// Set by [editPlan] — only then do we pass [previousPlan] into the parser.
   bool _refiningPendingPlan = false;
 
+  /// A partial plan the model proposed that is still missing a detail (the
+  /// parser asked a follow-up). Kept so the user's NEXT message refines it
+  /// instead of starting over — otherwise "schedule as you suggested" loops
+  /// back to the same question.
+  AiPlannedChanges? _pendingClarification;
+
   String? _proactiveSuggestionId;
   String? _proactiveSuggestionType;
 
@@ -94,6 +100,13 @@ class AiAssistantService extends ChangeNotifier {
   Future<void> sendMessage(String userInput) async {
     if (userInput.trim().isEmpty) return;
 
+    // 0. While a plan is awaiting confirmation, treat a plain yes/no as the
+    // answer to "confirm changes?" — never send it to the parser, which would
+    // re-propose the same plan.
+    if (_pendingPlan != null && _handlePendingPlanShortReply(userInput.trim())) {
+      return;
+    }
+
     // 1. Append user message
     _addMessage(AiChatMessage(
       id: StableId.generate('msg'),
@@ -116,12 +129,15 @@ class AiAssistantService extends ChangeNotifier {
     // 3. Mark any existing plan as no longer current
     _demoteCurrentPlan();
 
-    // Only pass previous plan when the user tapped Edit on the pending card.
-    // Otherwise a brand-new request (e.g. "add reading") was being treated as a
-    // delta and the model often returned an empty actions list.
-    final previousForParser =
-        _refiningPendingPlan ? _pendingPlan : null;
+    // Pass a previous plan when the user tapped Edit, OR when we're waiting on
+    // the answer to a missing-detail question — so the reply refines that plan
+    // instead of the model re-proposing from scratch (which caused the
+    // "What time should I schedule it?" loop).
+    final previousForParser = _refiningPendingPlan
+        ? _pendingPlan
+        : _pendingClarification;
     _refiningPendingPlan = false;
+    _pendingClarification = null;
 
     // 4. Parse intent
     AiPlannedChanges result;
@@ -154,6 +170,8 @@ class AiAssistantService extends ChangeNotifier {
         timestamp: DateTime.now(),
       ));
       _pendingPlan = null;
+      // Remember the partial plan (if any) so the user's answer refines it.
+      _pendingClarification = result.actions.isNotEmpty ? result : null;
     } else if (result.isInformational || result.isUnsupported) {
       final raw = result.informationalMessage ??
           "I couldn't find an answer for that right now.";
@@ -197,21 +215,30 @@ class AiAssistantService extends ChangeNotifier {
     } else if (result.actions.isEmpty) {
       _pendingPlan = null;
       const fallback =
-          "I can answer questions about your schedule or help you add and move tasks. "
-          "Try asking \"What's my plan for tomorrow?\" or \"Add a workout at 6am tomorrow.\"";
+          "I didn't quite catch what you'd like me to do there. I'm best at "
+          "planning your day, managing tasks and goals, and answering "
+          "schedule questions — ask \"what can you do?\" for the full list.";
       _addMessage(AiChatMessage(
         id: StableId.generate('msg'),
         role: ChatRole.assistant,
         content: fallback,
         timestamp: DateTime.now(),
+        suggestedPrompts: const [
+          'What can you do?',
+          'Help me plan tomorrow',
+        ],
       ));
     } else {
-      // Plan ready — show preview card
+      // Plan ready — show preview card. Prefer the model's own short
+      // confirmation line when the agent provided one.
       _pendingPlan = result;
+      final previewText = result.informationalMessage?.trim();
       _addMessage(AiChatMessage(
         id: StableId.generate('msg'),
         role: ChatRole.assistant,
-        content: 'Here\'s what I\'ll do:',
+        content: previewText?.isNotEmpty == true
+            ? previewText!
+            : 'Here\'s what I\'ll do:',
         timestamp: DateTime.now(),
         plannedChanges: result,
         isCurrentPlan: true,
@@ -379,6 +406,7 @@ class AiAssistantService extends ChangeNotifier {
 
   void cancelPlan() {
     _refiningPendingPlan = false;
+    _pendingClarification = null;
     _pendingPlan = null;
     _demoteCurrentPlan();
 
@@ -428,6 +456,7 @@ class AiAssistantService extends ChangeNotifier {
     _sessionId = StableId.generate('session');
     _messages.clear();
     _pendingPlan = null;
+    _pendingClarification = null;
     _isLoading = false;
     _inputFocusRequested = false;
     _proactiveSuggestionId = null;
@@ -436,6 +465,49 @@ class AiAssistantService extends ChangeNotifier {
   }
 
   // ─── Private helpers ──────────────────────────────────────────────────────
+
+  static final _rejectionPattern = RegExp(
+    r'^(n+o+(pe|o*)?|nah+|cancel( that| it)?|stop|never ?mind|no thanks?|'
+    r"don'?t|forget it)[.!]*$",
+  );
+
+  static final _affirmationPattern = RegExp(
+    r'^(y+e+s+|yes please|ye[ap]h?|yep|sure|ok(ay)?|confirm|apply( it| this)?|'
+    r'do it|go ahead|sounds? good|please do)[.!]*$',
+  );
+
+  /// Handles a short yes/no-style reply while a plan is pending.
+  /// Returns true when the reply was consumed (confirmed or cancelled).
+  bool _handlePendingPlanShortReply(String input) {
+    final normalized = input.toLowerCase().trim();
+    // Only intercept short replies — full sentences go to the parser.
+    if (normalized.split(RegExp(r'\s+')).length > 3) return false;
+
+    if (_rejectionPattern.hasMatch(normalized)) {
+      _addMessage(AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.user,
+        content: input,
+        timestamp: DateTime.now(),
+      ));
+      cancelPlan();
+      return true;
+    }
+
+    if (_affirmationPattern.hasMatch(normalized)) {
+      _addMessage(AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.user,
+        content: input,
+        timestamp: DateTime.now(),
+      ));
+      notifyListeners();
+      unawaited(confirmPlan());
+      return true;
+    }
+
+    return false;
+  }
 
   void _addMessage(AiChatMessage msg) {
     _messages.add(msg);
