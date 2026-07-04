@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/application/main_tab_navigation.dart';
 import '../../../core/sync/sync_service.dart';
+import '../../community/application/community_bridge_coordinator.dart';
 import '../../profile/application/profile_providers.dart';
 import '../application/auth_providers.dart';
 import '../application/auth_session_policy.dart';
@@ -71,6 +73,12 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       try {
         invalidateUserScopedProviders(ref);
         await AuthSessionPolicy.clearLocalSession();
+        // Restart community bridges so their in-memory dedupe state
+        // (previous user's goal/task ids) doesn't leak into this session.
+        final container = appRootProviderContainer;
+        if (container != null) {
+          CommunityBridgeCoordinator.instance.restart(container);
+        }
         await SyncService.instance.syncFromRemote(force: true);
       } finally {
         if (mounted) setState(() => _handlingUidChange = false);
@@ -78,6 +86,17 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     }
 
     await AuthSessionPolicy.persistUid(uid);
+
+    // A different uid may have signed in while the wipe above was in flight
+    // (fast account switch); the guard dropped that emission, so re-check and
+    // re-run the handler for the latest user instead of leaving stale data.
+    if (changed && mounted) {
+      final latest = ref.read(authRepositoryProvider).currentUser;
+      if (latest != null && latest.uid != uid) {
+        await _onAuthStateChanged(latest);
+        return;
+      }
+    }
 
     // Use the latest Firebase user (displayName may be set after Google profile sync).
     final fresh = ref.read(authRepositoryProvider).currentUser;

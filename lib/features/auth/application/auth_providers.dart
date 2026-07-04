@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_repository.dart';
@@ -26,6 +27,18 @@ final authStateProvider = StreamProvider<User?>(
 /// In-memory only — resets to `false` on app restart and whenever a user signs
 /// back in, so first-launch guest behaviour is preserved.
 final pendingAuthLandingProvider = StateProvider<bool>((ref) => false);
+
+/// The signed-in uid, or `null` when signed out.
+///
+/// User-scoped providers should `ref.watch` this so they rebuild (and drop
+/// cached values) on logout / account switch instead of relying solely on
+/// the manual invalidation list in `user_scoped_invalidation.dart`.
+final authUidProvider = Provider<String?>((ref) {
+  // VM unit tests run without Firebase; touching authStateProvider there
+  // would throw [core/no-app] from FirebaseAuth.instance.
+  if (Firebase.apps.isEmpty) return null;
+  return ref.watch(authStateProvider).valueOrNull?.uid;
+});
 
 /// Convenience: `true` when a user is signed in (anonymous or registered).
 final isSignedInProvider = Provider<bool>(

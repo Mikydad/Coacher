@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/notifications/local_notifications_service.dart';
 import '../../../core/offline/offline_store.dart';
+import '../../../core/sync/sync_service.dart';
 
 // ── Feature flag ──────────────────────────────────────────────────────────────
 
@@ -67,7 +68,11 @@ abstract final class AuthSessionPolicy {
     // 2. Wipe Isar (all collections).
     await OfflineStore.instance.clearAll();
 
-    // 3. Clear the relevant SharedPreferences keys.
+    // 3. Drop any queued offline writes — they belong to the previous user
+    //    and must never replay into the next account's Firestore tree.
+    await SyncService.instance.clearQueue();
+
+    // 4. Clear the relevant SharedPreferences keys.
     //    NOTE: kLastSignedInUidPrefsKey is intentionally kept so that the next
     //    restart can detect whether a *different* account signed in and trigger
     //    another wipe if needed. Removing it here would cause every cold-start

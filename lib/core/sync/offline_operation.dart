@@ -6,6 +6,7 @@ class OfflineOperation {
     required this.documentPath,
     required this.payload,
     required this.updatedAtMs,
+    this.uid,
   });
 
   final String id;
@@ -15,6 +16,12 @@ class OfflineOperation {
   final Map<String, dynamic>? payload;
   final int updatedAtMs;
 
+  /// Uid of the user who enqueued this operation. Ops whose uid does not
+  /// match the current user are dropped at flush time so one account's
+  /// offline writes never replay into another account's Firestore tree.
+  /// Null only for entries persisted before this field existed.
+  final String? uid;
+
   Map<String, dynamic> toMap() => {
     'id': id,
     'entityType': entityType,
@@ -22,6 +29,7 @@ class OfflineOperation {
     'documentPath': documentPath,
     'payload': payload,
     'updatedAtMs': updatedAtMs,
+    if (uid != null) 'uid': uid,
   };
 
   static OfflineOperation fromMap(Map<String, dynamic> map) => OfflineOperation(
@@ -31,5 +39,6 @@ class OfflineOperation {
     documentPath: map['documentPath'] as String,
     payload: (map['payload'] as Map?)?.cast<String, dynamic>(),
     updatedAtMs: map['updatedAtMs'] as int,
+    uid: map['uid'] as String?,
   );
 }

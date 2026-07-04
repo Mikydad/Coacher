@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../auth/application/auth_providers.dart';
 import '../domain/models/analytics_event.dart';
 import 'kpi_engine.dart';
 import 'streak_engine.dart';
@@ -17,6 +18,8 @@ final habitTaskFallbackSnapshotProvider =
       ref,
       taskIdsKey,
     ) async {
+      // Rebuild on account switch so cached values never leak across users.
+      ref.watch(authUidProvider);
       final ids = taskIdsKey
           .split('|')
           .where((e) => e.trim().isNotEmpty)

@@ -47,7 +47,9 @@ final offlineStoreProvider = Provider<OfflineStore>((ref) => OfflineStore.instan
 final syncServiceProvider = Provider<SyncService>((ref) => SyncService.instance);
 
 final planningRepositoryProvider = Provider<PlanningRepository>((ref) {
-  final firestore = FirestorePlanningRepository(ref.read(firestoreClientProvider));
+  // watch (not read): rebuilds on uid change so the repository never holds a
+  // FirestoreClient pinned to a previous account after a switch.
+  final firestore = FirestorePlanningRepository(ref.watch(firestoreClientProvider));
   return IsarPlanningRepository(firestore);
 });
 final routineModePolicyResolverProvider = Provider<RoutineModePolicyResolver>(

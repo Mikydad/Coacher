@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/local_db/isar_collections/isar_coaching_focus.dart';
 import '../../../core/utils/date_keys.dart';
+import '../../auth/application/auth_providers.dart';
 import '../../coaching/domain/models/enforcement_mode.dart';
 import '../domain/models/current_coaching_focus.dart';
 import '../domain/models/detected_behavior_pattern.dart';
@@ -55,6 +56,8 @@ final currentCoachingFocusProvider = StreamProvider<CurrentCoachingFocus?>((ref)
 // ─── Focus history ────────────────────────────────────────────────────────────
 
 final focusHistoryProvider = FutureProvider<List<CurrentCoachingFocus>>((ref) {
+  // Rebuild on account switch so cached values never leak across users.
+  ref.watch(authUidProvider);
   return ref.read(focusRepositoryProvider).getRecentFocusHistory();
 });
 

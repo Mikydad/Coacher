@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../auth/application/auth_providers.dart';
 import '../../coaching/domain/models/enforcement_mode.dart';
 import '../../context_override/application/context_override_providers.dart';
 import '../domain/models/analytics_event.dart';
@@ -10,6 +11,8 @@ final habitStreakSummaryProvider = FutureProvider.family<StreakSummary, String>(
   ref,
   habitId,
 ) async {
+  // Rebuild on account switch so cached values never leak across users.
+  ref.watch(authUidProvider);
   final repo = ref.read(analyticsRepositoryProvider);
   final events = await repo.listEvents(entityId: habitId);
   final habitEvents = events.where((e) {

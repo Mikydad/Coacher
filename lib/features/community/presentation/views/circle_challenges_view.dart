@@ -646,6 +646,7 @@ class _ManualProgressSheetState
     try {
       if (_proofImage != null) {
         await ref.read(circleProofStorageProvider).uploadChallengeProof(
+              circleId: widget.circleId,
               challengeId: widget.challenge.id,
               userId: widget.userId,
               file: _proofImage!,

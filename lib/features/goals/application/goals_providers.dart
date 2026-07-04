@@ -14,7 +14,9 @@ import '../domain/models/goal_milestone.dart';
 import '../domain/models/user_goal.dart';
 
 final goalsRepositoryProvider = Provider<GoalsRepository>(
-  (ref) => IsarGoalsRepository(FirestoreGoalsRepository(ref.read(firestoreClientProvider))),
+  // watch (not read): rebuilds on uid change so the repository never holds a
+  // FirestoreClient pinned to a previous account after a switch.
+  (ref) => IsarGoalsRepository(FirestoreGoalsRepository(ref.watch(firestoreClientProvider))),
 );
 
 /// Raw stream of all goals for the signed-in user (ordered by `updatedAtMs` desc).
@@ -98,7 +100,8 @@ class GoalDetailBundle {
 }
 
 final goalDetailProvider = FutureProvider.family<GoalDetailBundle?, String>((ref, goalId) async {
-  final repo = ref.read(goalsRepositoryProvider);
+  // watch: re-runs when the repository re-scopes on account switch.
+  final repo = ref.watch(goalsRepositoryProvider);
   final goal = await repo.getGoal(goalId);
   if (goal == null) return null;
   final actions = await repo.getActions(goalId);
@@ -116,7 +119,7 @@ final goalDetailProvider = FutureProvider.family<GoalDetailBundle?, String>((ref
 /// to show the action checklist without loading milestones or check-in history.
 final goalActionsProvider =
     FutureProvider.family<List<GoalAction>, String>((ref, goalId) async {
-  final repo = ref.read(goalsRepositoryProvider);
+  final repo = ref.watch(goalsRepositoryProvider);
   return repo.getActions(goalId);
 });
 
@@ -190,7 +193,7 @@ class GoalTodayProgress {
 /// [doneActions] / [totalActions] are carried separately for the actions bar.
 final goalTodayProgressProvider =
     FutureProvider.family<GoalTodayProgress, String>((ref, goalId) async {
-  final repo = ref.read(goalsRepositoryProvider);
+  final repo = ref.watch(goalsRepositoryProvider);
   final goalAsync = ref.watch(goalsStreamProvider);
 
   UserGoal? goal;

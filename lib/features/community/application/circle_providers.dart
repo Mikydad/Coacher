@@ -67,11 +67,8 @@ final myCirclesProvider = StreamProvider.autoDispose<List<AccountabilityCircle>>
 });
 
 // ── Per-circle providers ──────────────────────────────────────────────────────
-
-/// Rebuilds all circle-scoped streams when the signed-in uid changes.
-final authUidProvider = Provider<String?>((ref) {
-  return ref.watch(authStateProvider).valueOrNull?.uid;
-});
+// Circle-scoped streams key off `authUidProvider` (auth_providers.dart) so
+// they rebuild when the signed-in uid changes.
 
 /// Clears cached per-circle streams after logout / account switch.
 void invalidateCircleScopedProviders(WidgetRef ref) {

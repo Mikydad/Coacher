@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:isar/isar.dart';
 
@@ -11,7 +13,6 @@ import '../../features/planning/domain/models/task_item.dart';
 import '../../features/reminders/data/reminder_repository.dart';
 import '../../features/reminders/domain/models/reminder_config.dart';
 import '../firebase/firestore_client.dart';
-import '../firebase/firestore_paths.dart';
 import '../local_db/isar_collections/isar_block.dart';
 import '../local_db/isar_collections/isar_analytics_event.dart';
 import '../local_db/isar_collections/isar_analytics_stats.dart';
@@ -33,16 +34,38 @@ String _docFieldId(
 }
 
 /// Pulls Firestore planning, reminders, and goals into Isar using last-write-wins on [updatedAtMs].
+///
+/// The uid is pinned once at construction (via [FirestoreClient]) so every
+/// collection in a single pull reads from the same user tree — never a mix of
+/// two accounts when auth changes mid-pull. If the signed-in uid changes while
+/// the pull is running, the pull aborts before the next phase.
 class RemoteIsarMerge {
   RemoteIsarMerge(this._isar);
 
   final Isar _isar;
   final FirestoreClient _client = FirestoreClient();
 
+  bool get _uidStillCurrent {
+    if (Firebase.apps.isEmpty) return true; // VM tests — no auth to compare
+    return FirebaseAuth.instance.currentUser?.uid == _client.uid;
+  }
+
+  void _abortIfUidChanged() {
+    if (!_uidStillCurrent) {
+      throw StateError(
+        'RemoteIsarMerge: signed-in uid changed mid-pull — aborting to avoid '
+        'writing another account\'s data into local Isar.',
+      );
+    }
+  }
+
   Future<void> run() async {
     await _pullRoutinesBlocksTasks();
+    _abortIfUidChanged();
     await _pullReminders();
+    _abortIfUidChanged();
     await _pullGoals();
+    _abortIfUidChanged();
     await _pullAnalytics();
     debugPrint('RemoteIsarMerge: pull finished');
   }
@@ -97,7 +120,9 @@ class RemoteIsarMerge {
   }
 
   Future<void> _pullReminders() async {
-    final snap = await FirebaseFirestore.instance.collection(FirestorePaths.reminders).get();
+    // Use the pinned client (not FirestorePaths, which resolves the uid at
+    // call time) so a mid-pull account switch can't mix user trees.
+    final snap = await _client.userCollection('reminders').get();
     for (final doc in snap.docs) {
       try {
         final r = reminderConfigFromFirestoreDoc(doc);
@@ -109,7 +134,7 @@ class RemoteIsarMerge {
   }
 
   Future<void> _pullGoals() async {
-    final snap = await FirebaseFirestore.instance.collection(FirestorePaths.goals).get();
+    final snap = await _client.userCollection('goals').get();
     for (final doc in snap.docs) {
       try {
         final m = Map<String, dynamic>.from(doc.data());
@@ -123,7 +148,7 @@ class RemoteIsarMerge {
   }
 
   Future<void> _pullAnalytics() async {
-    final eventsSnap = await FirebaseFirestore.instance.collection(FirestorePaths.analyticsEvents).get();
+    final eventsSnap = await _client.userCollection('analytics_events').get();
     for (final doc in eventsSnap.docs) {
       try {
         final m = Map<String, dynamic>.from(doc.data());
@@ -135,7 +160,7 @@ class RemoteIsarMerge {
       }
     }
 
-    final statsSnap = await FirebaseFirestore.instance.collection(FirestorePaths.analyticsStats).get();
+    final statsSnap = await _client.userCollection('analytics_stats').get();
     for (final doc in statsSnap.docs) {
       try {
         final m = Map<String, dynamic>.from(doc.data());

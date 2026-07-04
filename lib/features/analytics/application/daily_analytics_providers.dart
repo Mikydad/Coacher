@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/sync/cloud_sync_providers.dart';
 import '../../../core/utils/date_keys.dart';
+import '../../auth/application/auth_providers.dart';
 import '../../goals/application/goal_period_helpers.dart';
 import '../../goals/application/goals_providers.dart';
 import '../../goals/domain/models/goal_check_in.dart';
@@ -149,6 +150,8 @@ Future<List<DailyAnalyticsSnapshot>> _readOrComputeDailyRange(
 
 final dailyGoalHabitAnalyticsProvider =
     FutureProvider.family<DailyAnalyticsSnapshot, String>((ref, dateKey) async {
+      // Rebuild on account switch so cached values never leak across users.
+      ref.watch(authUidProvider);
       // Recompute when goals change; for today also react to task-stream updates
       // because habit-task completion is a hybrid source.
       ref.watch(goalsStreamProvider);
@@ -175,6 +178,8 @@ final dailyGoalHabitAnalyticsProvider =
 
 final dailyTaskAnalyticsProvider =
     FutureProvider.family<DailyAnalyticsSnapshot, String>((ref, dateKey) async {
+      // Rebuild on account switch so cached values never leak across users.
+      ref.watch(authUidProvider);
       // Recompute task daily analytics immediately as today's tasks stream changes.
       if (dateKey == DateKeys.todayKey()) {
         ref.watch(todayAllTasksRowsProvider);

@@ -39,25 +39,8 @@ HabitKpiSnapshot computeHabitKpisFromEvents(
       case AnalyticsEventType.habitMissedWindow:
         outcomeByDate[e.dateKey] = outcomeByDate[e.dateKey] ?? false;
         break;
-      case AnalyticsEventType.habitSnoozed:
-      case AnalyticsEventType.taskStarted:
-      case AnalyticsEventType.taskCompleted:
-      case AnalyticsEventType.taskDeferred:
-      case AnalyticsEventType.overlapOverride:
-      case AnalyticsEventType.autoNextStarted:
-      case AnalyticsEventType.overlapCreated:
-      case AnalyticsEventType.overlapOverridden:
-      case AnalyticsEventType.overlapResolvedInline:
-      case AnalyticsEventType.formDraftRestored:
-      case AnalyticsEventType.formDraftDiscarded:
-      case AnalyticsEventType.reclaimedTimeGenerated:
-      case AnalyticsEventType.reclaimedTimeUsed:
-      case AnalyticsEventType.notificationDelivered:
-      case AnalyticsEventType.notificationOpened:
-      case AnalyticsEventType.notificationDismissed:
-      case AnalyticsEventType.notificationIgnored:
-      case AnalyticsEventType.reminderSuppressed:
-      case AnalyticsEventType.repeatedSnoozePattern:
+      default:
+        // Non-habit events don't affect habit KPIs.
         break;
     }
   }

@@ -19,6 +19,9 @@ class FirestoreClient {
   final FirebaseFirestore _firestore;
   final String _uid;
 
+  /// The uid this client was pinned to at construction time.
+  String get uid => _uid;
+
   CollectionReference<Map<String, dynamic>> userCollection(String collection) {
     return _firestore.collection('users').doc(_uid).collection(collection);
   }
