@@ -54,8 +54,10 @@ void main() {
     final repo = container.read(planningRepositoryProvider);
     final today = DateKeys.todayKey();
     final ids = await repo.ensureDefaultDayPlan(today);
-    final now = DateTime.now();
-    final stableReference = DateTime(now.year, now.month, now.day, 12);
+    // Times must be relative to the real clock: timed tasks are hidden until
+    // their scheduled time is reached, so a fixed noon reference would make
+    // "overdue" not-yet-due whenever the suite runs before noon.
+    final stableReference = DateTime.now();
 
     await repo.upsertTask(
       PlannedTask(
