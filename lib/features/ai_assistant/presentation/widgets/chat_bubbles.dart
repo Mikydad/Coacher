@@ -54,16 +54,60 @@ class AssistantMessageBubble extends StatelessWidget {
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.85,
         ),
-        child: Text(
-          content,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Color(0xFFADAAAA),
+        child: Text.rich(
+          markdownLiteSpan(
+            content,
+            const TextStyle(fontSize: 14, color: Color(0xFFADAAAA)),
           ),
         ),
       ),
     );
   }
+}
+
+/// Renders the markdown-lite subset the Coach agent is allowed to produce:
+/// `**bold**` and `- ` / `* ` / `1. ` list markers (converted to bullets).
+/// Everything else passes through verbatim — no dependency needed.
+@visibleForTesting
+TextSpan markdownLiteSpan(String text, TextStyle baseStyle) {
+  final bold = baseStyle.copyWith(
+    fontWeight: FontWeight.w700,
+    color: Colors.white,
+  );
+
+  final lines = text.split('\n');
+  final children = <TextSpan>[];
+
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+
+    // List markers → bullet dot.
+    final listMatch = RegExp(r'^(\s*)([-*]|\d+\.)\s+').firstMatch(line);
+    if (listMatch != null) {
+      children.add(TextSpan(text: '${listMatch.group(1)}• ', style: baseStyle));
+      line = line.substring(listMatch.end);
+    }
+
+    // Inline **bold** segments.
+    var cursor = 0;
+    for (final match in RegExp(r'\*\*(.+?)\*\*').allMatches(line)) {
+      if (match.start > cursor) {
+        children.add(
+          TextSpan(text: line.substring(cursor, match.start), style: baseStyle),
+        );
+      }
+      children.add(TextSpan(text: match.group(1), style: bold));
+      cursor = match.end;
+    }
+    if (cursor < line.length) {
+      children.add(TextSpan(text: line.substring(cursor), style: baseStyle));
+    }
+    if (i < lines.length - 1) {
+      children.add(TextSpan(text: '\n', style: baseStyle));
+    }
+  }
+
+  return TextSpan(children: children);
 }
 
 // ─── Loading indicator (thinking dots) ───────────────────────────────────────
