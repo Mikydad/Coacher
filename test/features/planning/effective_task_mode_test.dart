@@ -79,6 +79,39 @@ void main() {
       );
     });
 
+    test('uses provided fallback when task and routine give nothing', () {
+      expect(
+        EffectiveTaskMode.effectiveModeRefId(
+          task: _task(modeRefId: null),
+          routine: null,
+          fallbackModeRefId: 'disciplined',
+        ),
+        'disciplined',
+      );
+    });
+
+    test('explicit task mode still wins over fallback', () {
+      expect(
+        EffectiveTaskMode.effectiveModeRefId(
+          task: _task(modeRefId: 'flexible'),
+          routine: null,
+          fallbackModeRefId: 'extreme',
+        ),
+        'flexible',
+      );
+    });
+
+    test('unknown fallback value degrades to flexible', () {
+      expect(
+        EffectiveTaskMode.effectiveModeRefId(
+          task: _task(modeRefId: null),
+          routine: null,
+          fallbackModeRefId: 'bogus',
+        ),
+        'flexible',
+      );
+    });
+
     test('normalizes casing on task ref', () {
       expect(
         EffectiveTaskMode.effectiveModeRefId(task: _task(modeRefId: ' EXTREME '), routine: null),

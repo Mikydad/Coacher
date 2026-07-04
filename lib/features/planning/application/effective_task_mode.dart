@@ -10,7 +10,8 @@ import '../domain/models/task_item.dart';
 /// Precedence:
 /// 1. [PlannedTask.modeRefId] when it is a known built-in id (`flexible`, `disciplined`, `extreme`).
 /// 2. [Routine.modeId] when it matches a known id; else [Routine.mode].
-/// 3. `flexible`.
+/// 3. [fallbackModeRefId] — callers resolving a *new* task should pass the
+///    profile-scaled default from `DefaultModeResolver`; defaults to `flexible`.
 ///
 /// Unknown / legacy `modeRefId` values on the task are ignored so we fall back to the routine
 /// or default (avoids typos locking the user into the wrong policy).
@@ -20,6 +21,7 @@ abstract final class EffectiveTaskMode {
   static String effectiveModeRefId({
     required PlannedTask task,
     Routine? routine,
+    String fallbackModeRefId = 'flexible',
   }) {
     final tRaw = task.modeRefId?.trim().toLowerCase();
     if (tRaw != null && tRaw.isNotEmpty && _known.contains(tRaw)) {
@@ -37,7 +39,8 @@ abstract final class EffectiveTaskMode {
       }
     }
 
-    return 'flexible';
+    final fRaw = fallbackModeRefId.trim().toLowerCase();
+    return _known.contains(fRaw) ? fRaw : 'flexible';
   }
 
   static RoutineMode routineModeForTask({
