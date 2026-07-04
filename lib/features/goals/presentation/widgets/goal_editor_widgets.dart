@@ -795,6 +795,124 @@ class GoalEditorSetupStepsSection extends StatelessWidget {
 /// @deprecated Use [GoalEditorSetupStepsSection].
 typedef GoalEditorActionsSection = GoalEditorSetupStepsSection;
 
+/// Greyed-out template steps shown as a worked example, not real content.
+/// Collapses away (fade + size) once the user starts writing their own steps;
+/// "Use these steps" copies them into real editable rows for users who want them.
+class GoalEditorExampleStepsCard extends StatelessWidget {
+  const GoalEditorExampleStepsCard({
+    super.key,
+    required this.visible,
+    required this.steps,
+    required this.onUseThese,
+  });
+
+  final bool visible;
+  final List<String> steps;
+  final VoidCallback onUseThese;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedCrossFade(
+      firstCurve: Curves.easeOutCubic,
+      secondCurve: Curves.easeOutCubic,
+      sizeCurve: Curves.easeOutCubic,
+      duration: const Duration(milliseconds: 260),
+      crossFadeState:
+          visible ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+      firstChild: const SizedBox.shrink(),
+      secondChild: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: GoalEditorColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: GoalEditorColors.cyan.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: GoalEditorColors.cyan.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: const Text(
+                    'EXAMPLE',
+                    style: TextStyle(
+                      color: GoalEditorColors.cyan,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Steps could look like this:',
+                    style: TextStyle(color: Colors.white38, fontSize: 11),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            for (var i = 0; i < steps.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      (i + 1).toString().padLeft(2, '0'),
+                      style: TextStyle(
+                        color: GoalEditorColors.lime.withValues(alpha: 0.4),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        steps[i],
+                        style: const TextStyle(
+                          color: Colors.white38,
+                          fontStyle: FontStyle.italic,
+                          fontSize: 14,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: onUseThese,
+                style: TextButton.styleFrom(
+                  foregroundColor: GoalEditorColors.cyan,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                ),
+                child: const Text(
+                  'Use these steps',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class GoalEditorSetupStepRow extends StatelessWidget {
   const GoalEditorSetupStepRow({
     super.key,
@@ -802,12 +920,14 @@ class GoalEditorSetupStepRow extends StatelessWidget {
     required this.controller,
     required this.canRemove,
     required this.onRemove,
+    this.onChanged,
   });
 
   final int index;
   final TextEditingController controller;
   final bool canRemove;
   final VoidCallback onRemove;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -834,6 +954,7 @@ class GoalEditorSetupStepRow extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: controller,
+                onChanged: onChanged,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,

@@ -138,10 +138,20 @@ DateTime? _scheduledToday(PlannedTaskRow row, DateTime now) {
   final parsed = DateTime.tryParse(iso);
   if (parsed == null) return null;
   final local = parsed.toLocal();
-  if (local.year != now.year || local.month != now.month || local.day != now.day) {
-    return null;
-  }
-  return local;
+  // Gate on the reminder's clock time projected onto today. A task set for e.g.
+  // 04:00 must not become focus-available (or be suggested as the next task)
+  // before 04:00. We project rather than require an exact date match because a
+  // reminder's stored date can drift by a day when it round-trips through
+  // Firestore as a UTC timestamp — the old date-equality check let those
+  // drifted, not-yet-due tasks fall through the gate as "unscheduled".
+  return DateTime(
+    now.year,
+    now.month,
+    now.day,
+    local.hour,
+    local.minute,
+    local.second,
+  );
 }
 
 int _compareByScheduledTime(PlannedTaskRow a, PlannedTaskRow b, DateTime now) {

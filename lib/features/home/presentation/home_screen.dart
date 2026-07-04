@@ -37,9 +37,9 @@ import '../../planning/domain/models/routine.dart';
 import '../../planning/domain/models/task_item.dart';
 import '../../planning/presentation/accountability_history_screen.dart';
 import '../../scoring/application/scoring_controller.dart';
+import '../../scoring/presentation/score_task_dialog.dart';
 import '../../add_task/presentation/add_task_screen.dart';
 import '../../tasks_hub/presentation/tasks_hub_screen.dart';
-import '../../firebase_test/presentation/firebase_test_screen.dart';
 import '../../focus/presentation/focus_selection_screen.dart';
 import '../../goals/application/goals_providers.dart';
 import '../../goals/domain/models/goal_categories.dart';
@@ -459,25 +459,6 @@ class HomeScreen extends ConsumerWidget {
                   : 'All changes synced',
               style: const TextStyle(color: Colors.white54),
             ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF301615),
-              foregroundColor: const Color(0xFFFF6D4E),
-              minimumSize: const Size.fromHeight(56),
-            ),
-            onPressed: () {},
-            child: const Text(
-              "I'M DISTRACTED",
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton(
-            onPressed: () =>
-                Navigator.pushNamed(context, FirebaseTestScreen.routeName),
-            child: const Text('Open Firebase Test Screen'),
           ),
         ],
       ),
@@ -2166,6 +2147,13 @@ Future<void> _completeTaskFromHome(
       return;
     }
   }
+  // Ask for the completion rate first — same score dialog the focus/timer flow
+  // uses. Cancelling (tap outside / back) leaves the task untouched.
+  final scoreResult = await ScoreTaskDialog.show(context, taskTitle: t.title);
+  if (scoreResult == null || !context.mounted) return;
+  final completionPercent = scoreResult.completionPercent;
+  final isComplete = completionPercent >= 100;
+
   final planning = ref.read(planningRepositoryProvider);
   final now = DateTime.now().millisecondsSinceEpoch;
   final updated = PlannedTask(
@@ -2178,7 +2166,7 @@ Future<void> _completeTaskFromHome(
     orderIndex: t.orderIndex,
     reminderEnabled: t.reminderEnabled,
     reminderTimeIso: t.reminderTimeIso,
-    status: TaskStatus.completed,
+    status: isComplete ? TaskStatus.completed : TaskStatus.partial,
     createdAtMs: t.createdAtMs,
     updatedAtMs: now,
     category: t.category,
@@ -2193,37 +2181,56 @@ Future<void> _completeTaskFromHome(
     await planning.upsertTask(updated);
     fireAndForgetAnalyticsEvent(
       ref,
-      type: AnalyticsEventType.taskCompleted,
+      type: isComplete
+          ? AnalyticsEventType.taskCompleted
+          : AnalyticsEventType.taskDeferred,
       entityId: t.id,
       entityKind: 'task',
       sourceSurface: 'home',
       idempotencyKey:
-          'task_completed_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
+          '${isComplete ? 'task_completed' : 'task_deferred'}_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
+      reason: scoreResult.reason,
       modeRefId: t.modeRefId,
     );
     await ref.read(reminderSyncServiceProvider).markTaskStarted(t.id);
-    await ref
-        .read(scoringControllerProvider)
-        .submit(taskId: t.id, completionPercent: 100);
+    await ref.read(scoringControllerProvider).submit(
+          taskId: t.id,
+          completionPercent: completionPercent,
+          reason: scoreResult.reason,
+        );
     final prev = ref.read(scoredTaskStatusesProvider);
-    ref.read(scoredTaskStatusesProvider.notifier).state = {...prev, t.id: 100};
+    ref.read(scoredTaskStatusesProvider.notifier).state = {
+      ...prev,
+      t.id: completionPercent,
+    };
     // migrated to coordinator
     await ScheduleMutationCoordinator.instance.run(
-      TaskCompletedMutation(
-        entityId: t.id,
-        sourceContext: 'home_screen.complete_task',
-        dateStr: t.planDateKey ?? DateKeys.todayKey(),
-      ),
+      isComplete
+          ? TaskCompletedMutation(
+              entityId: t.id,
+              sourceContext: 'home_screen.complete_task',
+              dateStr: t.planDateKey ?? DateKeys.todayKey(),
+            )
+          : TaskUpdatedMutation(
+              entityId: t.id,
+              sourceContext: 'home_screen.complete_task',
+              dateStr: t.planDateKey ?? DateKeys.todayKey(),
+            ),
       commitOverride: () async {},
     );
     if (!context.mounted) return;
     invalidateTaskListProviders(ref);
-    await runAutoNextTaskFlow(
-      context,
-      ref,
-      completedTaskId: t.id,
-      completionPercent: 100,
-    );
+    // Only a full completion suggests the next task. On Home the suggestion is
+    // dismissible (tap outside stays on Home) and never auto-opens Focus.
+    if (isComplete) {
+      await runAutoNextTaskFlow(
+        context,
+        ref,
+        completedTaskId: t.id,
+        completionPercent: completionPercent,
+        fromHome: true,
+      );
+    }
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(

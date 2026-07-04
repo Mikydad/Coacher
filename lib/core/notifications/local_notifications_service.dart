@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
@@ -22,6 +23,10 @@ class LocalNotificationsService implements ActiveNotificationsSource {
     void Function(NotificationResponse response)? onDidReceiveNotificationResponse,
   }) async {
     tz_data.initializeTimeZones();
+    // Without this, `tz.local` stays UTC and every `zonedSchedule` below fires at
+    // the wrong absolute time (off by the device's UTC offset) — the root cause
+    // of reminders silently not appearing. Point `tz.local` at the device zone.
+    await _configureLocalTimeZone();
     const initializationSettings = InitializationSettings(
       iOS: DarwinInitializationSettings(),
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
@@ -30,6 +35,18 @@ class LocalNotificationsService implements ActiveNotificationsSource {
       initializationSettings,
       onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
     );
+  }
+
+  Future<void> _configureLocalTimeZone() async {
+    try {
+      final timeZoneName = (await FlutterTimezone.getLocalTimezone()).identifier;
+      tz.setLocalLocation(tz.getLocation(timeZoneName));
+      debugPrint('[Notif] local timezone set to $timeZoneName');
+    } catch (e) {
+      // Fall back to UTC if the device timezone can't be resolved. Better to
+      // keep scheduling (possibly offset) than to crash notification init.
+      debugPrint('[Notif] failed to resolve local timezone, using UTC: $e');
+    }
   }
 
   /// Cold start: the plugin does not always deliver [onDidReceiveNotificationResponse] for

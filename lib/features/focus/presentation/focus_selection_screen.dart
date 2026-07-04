@@ -242,7 +242,19 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
         execState.taskId.isNotEmpty &&
         (execState.phase == ExecutionPhase.inProgress || execState.phase == ExecutionPhase.paused);
 
-    return Scaffold(
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      // Swipe right anywhere to go back Home — augments the iOS edge-swipe so a
+      // full-width rightward drag pops back to the previous (Home) route.
+      onHorizontalDragEnd: (details) {
+        final velocity = details.primaryVelocity;
+        if (velocity != null &&
+            velocity > 250 &&
+            Navigator.of(context).canPop()) {
+          Navigator.of(context).maybePop();
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: const QuittrAppBarTitle(),
         actions: [
@@ -361,6 +373,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

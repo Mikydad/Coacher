@@ -203,7 +203,8 @@ final todayAllTasksRowsProvider = StreamProvider<List<PlannedTaskRow>>((ref) {
 final openTasksOutsideTodayProvider = FutureProvider<List<PlannedTaskRow>>((
   ref,
 ) async {
-  final repo = ref.read(planningRepositoryProvider);
+  // watch: re-runs when the repository re-scopes on account switch.
+  final repo = ref.watch(planningRepositoryProvider);
   final today = DateKeys.todayKey();
   final now = DateTime.now();
   final base = DateTime(now.year, now.month, now.day);

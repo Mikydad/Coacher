@@ -55,6 +55,20 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
   final _actionDrafts = <_ActionDraft>[_ActionDraft()];
   final _reminderSectionKey = GlobalKey();
 
+  /// A template's suggested title, shown as a placeholder (not prefilled text)
+  /// so it never looks like a label the user must work around. Used as the
+  /// title when the user saves without typing their own.
+  String? _suggestedTitle;
+
+  /// Template target value, shown as a placeholder like [_suggestedTitle];
+  /// applied on save when the field is left blank.
+  String? _suggestedTarget;
+
+  /// Template setup steps rendered as a greyed example card — never saved
+  /// unless the user taps "Use these steps".
+  final List<String> _exampleSteps = [];
+  bool _exampleStepsDismissed = false;
+
   String _categoryId = GoalCategories.study;
   GoalHorizon _horizon = GoalHorizon.monthly;
   GoalPeriodMode _periodMode = GoalPeriodMode.calendar;
@@ -190,6 +204,11 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
       }
     }
     setState(() {
+      // A restored draft is the user's own work-in-progress — don't show the
+      // template example card on top of their real steps.
+      _exampleStepsDismissed = _actionDrafts.any(
+        (d) => d.controller.text.trim().isNotEmpty,
+      );
       _title.text = draft.title;
       _target.text = draft.target;
       _customLabel.text = draft.customLabel;
@@ -219,16 +238,19 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
       d.controller.dispose();
     }
     _actionDrafts.clear();
-    if (template.setupSteps.isEmpty) {
-      _actionDrafts.add(_ActionDraft());
-    } else {
-      for (final step in template.setupSteps) {
-        _actionDrafts.add(_ActionDraft(controller: TextEditingController(text: step)));
-      }
-    }
+    // Template steps are shown as a greyed example card, not prefilled rows —
+    // the user starts from one empty row and the example fades away once they
+    // write their own (or is copied in via "Use these steps").
+    _actionDrafts.add(_ActionDraft());
+    _exampleSteps
+      ..clear()
+      ..addAll(template.setupSteps);
+    _exampleStepsDismissed = false;
     setState(() {
       if (template.suggestedTitle.isNotEmpty) {
-        _title.text = template.suggestedTitle;
+        // Show as a placeholder rather than prefilled text; applied on save if
+        // the user leaves the field blank.
+        _suggestedTitle = template.suggestedTitle;
       }
       if (template.categoryId != null) _categoryId = template.categoryId!;
       if (template.horizon != null) _horizon = template.horizon!;
@@ -236,7 +258,8 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
       if (template.measurement != null) _measurement = template.measurement!;
       if (template.targetValue != null) {
         final t = template.targetValue!;
-        _target.text = t == t.roundToDouble() ? '${t.toInt()}' : '$t';
+        // Placeholder, not prefilled — applied on save when left blank.
+        _suggestedTarget = t == t.roundToDouble() ? '${t.toInt()}' : '$t';
       }
       if (template.intensity != null) _intensity = template.intensity!.toDouble();
       if (template.reminderEnabled != null) _reminderEnabled = template.reminderEnabled!;
@@ -248,6 +271,26 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
       }
     });
     _suppressDraftDirty = false;
+  }
+
+  /// Copies the example steps into real editable rows (explicit opt-in from
+  /// the example card) and collapses the card.
+  void _useExampleSteps() {
+    setState(() {
+      // Drop untouched empty rows so the copied steps don't leave a stray
+      // blank row above them; keep anything the user already typed.
+      _actionDrafts.removeWhere((d) {
+        if (d.controller.text.trim().isNotEmpty) return false;
+        d.controller.dispose();
+        return true;
+      });
+      for (final step in _exampleSteps) {
+        _actionDrafts.add(
+          _ActionDraft(controller: TextEditingController(text: step)),
+        );
+      }
+      _exampleStepsDismissed = true;
+    });
   }
 
   Future<void> _offerDraftRestoreIfNeeded() async {
@@ -562,7 +605,10 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
         return;
       }
     }
-    final target = double.tryParse(_target.text.trim());
+    final targetText = _target.text.trim().isNotEmpty
+        ? _target.text.trim()
+        : (_suggestedTarget ?? '');
+    final target = double.tryParse(targetText);
     if (target == null || target < 0) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid target number')));
       return;
@@ -575,9 +621,10 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
 
     try {
       final existing = widget.goalId != null ? await repo.getGoal(goalId) : null;
+      final typedTitle = _title.text.trim();
       final goal = UserGoal(
         id: goalId,
-        title: _title.text.trim(),
+        title: typedTitle.isNotEmpty ? typedTitle : (_suggestedTitle?.trim() ?? ''),
         categoryId: _categoryId,
         horizon: _horizon,
         status: existing?.status ?? GoalStatus.active,
@@ -864,8 +911,17 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
             const GoalEditorSectionLabel('Title'),
             GoalEditorTextField(
               controller: _title,
-              hintText: 'What is your mission?',
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+              hintText: (_suggestedTitle != null && _suggestedTitle!.isNotEmpty)
+                  ? _suggestedTitle!
+                  : 'What is your mission?',
+              validator: (v) {
+                // A blank field is fine when a template suggestion will be used.
+                if (v != null && v.trim().isNotEmpty) return null;
+                if (_suggestedTitle != null && _suggestedTitle!.trim().isNotEmpty) {
+                  return null;
+                }
+                return 'Required';
+              },
             ),
             const SizedBox(height: 24),
 
@@ -889,9 +945,14 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
             GoalEditorTextField(
               controller: _target,
               keyboardType: TextInputType.number,
-              hintText: 'e.g. 30',
+              hintText: _suggestedTarget ?? 'e.g. 30',
               helperText: _targetLabelText(),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+              validator: (v) {
+                // Blank is fine when the template suggestion will be used.
+                if (v != null && v.trim().isNotEmpty) return null;
+                if (_suggestedTarget != null) return null;
+                return 'Required';
+              },
             ),
             const SizedBox(height: 24),
 
@@ -902,13 +963,28 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
             // ── 5. Setup steps (optional) ───────────────────────────────
             GoalEditorSetupStepsSection(
               stepCount: filledSteps,
-              onAdd: () => setState(() => _actionDrafts.add(_ActionDraft())),
+              onAdd: () => setState(() {
+                // Writing their own steps — the example has done its job.
+                _exampleStepsDismissed = true;
+                _actionDrafts.add(_ActionDraft());
+              }),
               children: [
+                if (_exampleSteps.isNotEmpty)
+                  GoalEditorExampleStepsCard(
+                    visible: !_exampleStepsDismissed,
+                    steps: _exampleSteps,
+                    onUseThese: _useExampleSteps,
+                  ),
                 for (var i = 0; i < _actionDrafts.length; i++)
                   GoalEditorSetupStepRow(
                     index: i,
                     controller: _actionDrafts[i].controller,
                     canRemove: _actionDrafts.length > 1,
+                    onChanged: (text) {
+                      if (!_exampleStepsDismissed && text.trim().isNotEmpty) {
+                        setState(() => _exampleStepsDismissed = true);
+                      }
+                    },
                     onRemove: () {
                       setState(() {
                         _actionDrafts[i].controller.dispose();

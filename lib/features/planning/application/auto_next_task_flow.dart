@@ -41,6 +41,7 @@ Future<void> runAutoNextTaskFlow(
   WidgetRef ref, {
   required String completedTaskId,
   required int completionPercent,
+  bool fromHome = false,
 }) async {
   if (completionPercent != 100) return;
   final prioritized = await readFreshTodayPrioritizedRows(ref);
@@ -56,6 +57,15 @@ Future<void> runAutoNextTaskFlow(
     return;
   }
   final selectedNext = next;
+
+  // Home uses a lightweight, dismissible suggestion: tapping outside keeps the
+  // user on Home, and only an explicit "Start now" opens the timer. It never
+  // routes to the Focus list or prompts for a reason — those are Focus-page
+  // semantics, left unchanged in the flow below.
+  if (fromHome) {
+    await _runHomeNextTaskSuggestion(context, ref, selectedNext);
+    return;
+  }
   String? conflictNotice;
   final anchors = await readHabitAnchorsForDate(ref, dateKey: selectedNext.dateKey);
   if (!context.mounted) return;
@@ -160,6 +170,59 @@ Future<void> runAutoNextTaskFlow(
       }
       return;
   }
+}
+
+/// Home-only next-task suggestion. Dismissible (tap outside → stay on Home);
+/// only an explicit "Start now" opens the timer. Never navigates to Focus.
+Future<void> _runHomeNextTaskSuggestion(
+  BuildContext context,
+  WidgetRef ref,
+  PlannedTaskRow selectedNext,
+) async {
+  final start = await showDialog<bool>(
+    context: context,
+    barrierDismissible: true,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Next up'),
+      content: Text(selectedNext.task.title),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Not now'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Start now'),
+        ),
+      ],
+    ),
+  );
+  // Dismissed (tapped outside / "Not now" / back) → stay on Home, do nothing.
+  if (start != true || !context.mounted) return;
+
+  fireAndForgetAnalyticsEvent(
+    ref,
+    type: AnalyticsEventType.autoNextStarted,
+    entityId: selectedNext.task.id,
+    entityKind: 'task',
+    sourceSurface: 'auto_next_home',
+    idempotencyKey:
+        'auto_next_started_${selectedNext.task.id}_${DateTime.now().millisecondsSinceEpoch}',
+    modeRefId: selectedNext.task.modeRefId,
+  );
+  ref.read(activeExecutionTaskIdProvider.notifier).state = selectedNext.task.id;
+  ref.read(activeExecutionTaskLabelProvider.notifier).state =
+      selectedNext.task.title;
+  ref.read(executionControllerProvider.notifier).setTask(
+        id: selectedNext.task.id,
+        label: selectedNext.task.title,
+        durationMinutes: selectedNext.task.durationMinutes,
+      );
+  await Navigator.pushNamed(
+    context,
+    TimerSessionScreen.routeName,
+    arguments: const TimerLaunchArgs(autoStartDelaySeconds: 10),
+  );
 }
 
 Future<Routine?> _routineForPlannedRow(WidgetRef ref, PlannedTaskRow row) async {

@@ -1593,6 +1593,10 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
                         ),
                       ),
                       const SizedBox(height: 32),
+                      // Reminder sits directly under the name so it can be set
+                      // without scrolling — the most common add-task intent.
+                      _buildReminderSection(),
+                      const SizedBox(height: 32),
                       _buildDurationSection(),
                       const SizedBox(height: 32),
                       _buildCategorySection(),
@@ -1602,8 +1606,6 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
                         const SizedBox(height: 12),
                         _buildDeepWorkRow(),
                       ],
-                      const SizedBox(height: 12),
-                      _buildReminderSection(),
                       const SizedBox(height: 24),
                       _buildAdvancedSection(),
                     ],
