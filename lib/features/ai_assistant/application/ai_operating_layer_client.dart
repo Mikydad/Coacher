@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 
+import '../../../core/ai/ai_proxy_client.dart';
 import '../../../core/ai/ai_remote_config_service.dart';
 import '../domain/models/ai_action.dart';
 import '../domain/models/ai_operating_layer_payload.dart';
@@ -180,19 +180,18 @@ Each user message describes ONLY new changes for this turn — not the full sess
   activeTasks with a time set.
 ''';
 
-// ─── OpenAI implementation ────────────────────────────────────────────────────
+// ─── Proxy implementation ─────────────────────────────────────────────────────
+//
+// OpenAI is reached exclusively through the `aiChat` Cloud Function — the API
+// key never leaves the server. The model is pinned server-side.
 
-const String _kOpenAiUrl = 'https://api.openai.com/v1/chat/completions';
-
-class OpenAiOperatingLayerClient implements AiOperatingLayerClient {
-  const OpenAiOperatingLayerClient({
-    required this.apiKey,
-    this.model = 'gpt-4o-mini',
+class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
+  ProxyAiOperatingLayerClient({
+    AiProxyClient? proxy,
     this.timeoutSeconds = 20,
-  });
+  }) : _proxy = proxy ?? AiProxyClient();
 
-  final String apiKey;
-  final String model;
+  final AiProxyClient _proxy;
   final int timeoutSeconds;
 
   @override
@@ -211,38 +210,20 @@ class OpenAiOperatingLayerClient implements AiOperatingLayerClient {
       {'role': 'user', 'content': userPrompt},
     ];
 
-    final requestBody = jsonEncode({
-      'model': model,
-      'temperature': 0.2,
-      'max_tokens': 800,
-      'response_format': {'type': 'json_object'},
-      'messages': messages,
-    });
-
-    http.Response response;
+    String content;
     try {
-      response = await http
-          .post(
-            Uri.parse(_kOpenAiUrl),
-            headers: {
-              'Authorization': 'Bearer $apiKey',
-              'Content-Type': 'application/json',
-            },
-            body: requestBody,
-          )
-          .timeout(Duration(seconds: timeoutSeconds));
-    } catch (e) {
-      throw AiOperatingLayerException('Network error: $e');
-    }
-
-    if (response.statusCode != 200) {
-      throw AiOperatingLayerException(
-        'OpenAI request failed',
-        statusCode: response.statusCode,
+      content = await _proxy.chat(
+        messages: messages,
+        temperature: 0.2,
+        maxTokens: 800,
+        purpose: 'coach_intent',
+        timeout: Duration(seconds: timeoutSeconds),
       );
+    } on AiProxyException catch (e) {
+      throw AiOperatingLayerException(e.message, statusCode: e.statusCode);
     }
 
-    return _parseResponse(response.body, payload.userInput);
+    return _parseResponse(content, payload.userInput);
   }
 
   String _buildUserPrompt(AiOperatingLayerPayload payload) {
@@ -385,15 +366,8 @@ class OpenAiOperatingLayerClient implements AiOperatingLayerClient {
     return buffer.toString();
   }
 
-  AiPlannedChanges _parseResponse(String body, String sessionId) {
+  AiPlannedChanges _parseResponse(String content, String sessionId) {
     try {
-      final outer = jsonDecode(body) as Map<String, dynamic>;
-      final choices = outer['choices'] as List?;
-      if (choices == null || choices.isEmpty) {
-        throw const AiOperatingLayerException('No choices in response');
-      }
-      final content =
-          ((choices.first as Map)['message'] as Map)['content'] as String? ?? '';
       final inner = jsonDecode(content) as Map<String, dynamic>;
       return parseOperatingLayerJsonMap(inner, sessionId);
     } catch (e) {
@@ -405,17 +379,16 @@ class OpenAiOperatingLayerClient implements AiOperatingLayerClient {
 // ─── Factory helper ───────────────────────────────────────────────────────────
 
 /// Builds the correct client from Remote Config.
-/// Returns [MockAiOperatingLayerClient] if the API key is empty.
+/// Returns [MockAiOperatingLayerClient] when AI is disabled remotely.
 Future<AiOperatingLayerClient> buildAiOperatingLayerClient() async {
-  final apiKey = await AiRemoteConfigService.instance.getOpenAiApiKey();
-  final model = await AiRemoteConfigService.instance.getOpenAiModel();
+  final aiEnabled = await AiRemoteConfigService.instance.isAiEnabled();
 
-  if (apiKey.isEmpty) {
-    debugPrint('[AiOperatingLayer] No API key — using mock client.');
+  if (!aiEnabled) {
+    debugPrint('[AiOperatingLayer] AI disabled remotely — using mock client.');
     return const MockAiOperatingLayerClient();
   }
 
-  return OpenAiOperatingLayerClient(apiKey: apiKey, model: model);
+  return ProxyAiOperatingLayerClient();
 }
 
 // ─── Mock client ──────────────────────────────────────────────────────────────

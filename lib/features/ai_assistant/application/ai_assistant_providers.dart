@@ -4,6 +4,7 @@ import '../../../core/di/providers.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../analytics/domain/models/analytics_event.dart';
+import '../../auth/application/auth_providers.dart';
 import '../../coaching/application/coaching_style_providers.dart';
 import '../../context_override/application/context_override_providers.dart';
 import '../../goals/application/goals_providers.dart';
@@ -109,6 +110,8 @@ final aiActionBatchRepositoryProvider = Provider<AiActionBatchRepository>((ref) 
 /// The most recent [IsarAiActionBatch] — used by the UI to decide whether
 /// to show the "Undo AI changes" button.
 final lastAiBatchProvider = FutureProvider<IsarAiActionBatch?>((ref) async {
+  // Rebuild on account switch so cached values never leak across users.
+  ref.watch(authUidProvider);
   final repo = ref.read(aiActionBatchRepositoryProvider);
   return repo.findMostRecent();
 });
@@ -127,6 +130,8 @@ final canUndoLastAiBatchProvider = FutureProvider<bool>((ref) async {
 /// Recent AI batch history — last 5 batches, newest first.
 final recentAiBatchesProvider =
     FutureProvider<List<IsarAiActionBatch>>((ref) async {
+  // Rebuild on account switch so cached values never leak across users.
+  ref.watch(authUidProvider);
   return ref.read(aiActionBatchRepositoryProvider).listRecent();
 });
 

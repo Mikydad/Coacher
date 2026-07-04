@@ -1,7 +1,6 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
-
+import '../../../core/ai/ai_proxy_client.dart';
 import '../../coaching/domain/models/coaching_style.dart';
 import '../domain/models/ai_summary_response.dart';
 import '../domain/models/coaching_ai_payload.dart';
@@ -37,16 +36,13 @@ class AiClientException implements Exception {
       'AiClientException($message${statusCode != null ? ', status=$statusCode' : ''})';
 }
 
-// ─── OpenAI implementation ────────────────────────────────────────────────────
+// ─── Proxy implementation ─────────────────────────────────────────────────────
 
-const String _kOpenAiChatUrl = 'https://api.openai.com/v1/chat/completions';
-const String _kDefaultModel = 'gpt-4o-mini';
-
-/// OpenAI GPT-4o mini coaching client.
+/// Coaching client backed by the `aiChat` Cloud Function proxy.
 ///
 /// Configuration:
-/// - Model is injected (defaulting to gpt-4o-mini) for future swap.
-/// - API key is injected — never hardcoded or stored in client source.
+/// - The OpenAI key never reaches the client — it lives in Secret Manager
+///   and only the Cloud Function can read it. The model is pinned server-side.
 /// - Prompt is built deterministically from [CoachingAiPayload].
 ///
 /// Response contract expected from the model:
@@ -58,15 +54,13 @@ const String _kDefaultModel = 'gpt-4o-mini';
 ///   "framing": "momentum|recovery|protection|stabilization|consistency"
 /// }
 /// ```
-class OpenAiCoachingClient implements CoachingAiClient {
-  const OpenAiCoachingClient({
-    required this.apiKey,
-    this.model = _kDefaultModel,
+class ProxyCoachingAiClient implements CoachingAiClient {
+  ProxyCoachingAiClient({
+    AiProxyClient? proxy,
     this.timeoutSeconds = 15,
-  });
+  }) : _proxy = proxy ?? AiProxyClient();
 
-  final String apiKey;
-  final String model;
+  final AiProxyClient _proxy;
   final int timeoutSeconds;
 
   @override
@@ -76,36 +70,23 @@ class OpenAiCoachingClient implements CoachingAiClient {
     final systemPrompt = _buildSystemPrompt(payload);
     final userPrompt = _buildUserPrompt(payload);
 
-    final requestBody = jsonEncode({
-      'model': model,
-      'temperature': 0.3, // Low temperature for consistent, controlled output
-      'max_tokens': 300,
-      'response_format': {'type': 'json_object'},
-      'messages': [
-        {'role': 'system', 'content': systemPrompt},
-        {'role': 'user', 'content': userPrompt},
-      ],
-    });
-
-    final response = await http
-        .post(
-          Uri.parse(_kOpenAiChatUrl),
-          headers: {
-            'Authorization': 'Bearer $apiKey',
-            'Content-Type': 'application/json',
-          },
-          body: requestBody,
-        )
-        .timeout(Duration(seconds: timeoutSeconds));
-
-    if (response.statusCode != 200) {
-      throw AiClientException(
-        'OpenAI request failed',
-        statusCode: response.statusCode,
+    String content;
+    try {
+      content = await _proxy.chat(
+        messages: [
+          {'role': 'system', 'content': systemPrompt},
+          {'role': 'user', 'content': userPrompt},
+        ],
+        temperature: 0.3, // Low temperature for consistent, controlled output
+        maxTokens: 300,
+        purpose: 'coaching_summary',
+        timeout: Duration(seconds: timeoutSeconds),
       );
+    } on AiProxyException catch (e) {
+      throw AiClientException(e.message, statusCode: e.statusCode);
     }
 
-    return _parseResponse(response.body, payload);
+    return _parseResponse(content, payload);
   }
 
   // ─── Prompt builders ───────────────────────────────────────────────────────
@@ -169,15 +150,8 @@ Generate the coaching summary.
 
   // ─── Response parser ───────────────────────────────────────────────────────
 
-  AiSummaryResponse _parseResponse(String body, CoachingAiPayload payload) {
+  AiSummaryResponse _parseResponse(String content, CoachingAiPayload payload) {
     try {
-      final outer = jsonDecode(body) as Map<String, dynamic>;
-      final choices = outer['choices'] as List?;
-      if (choices == null || choices.isEmpty) {
-        throw const AiClientException('No choices in response');
-      }
-      final message = (choices.first as Map)['message'] as Map;
-      final content = message['content'] as String? ?? '';
       final inner = jsonDecode(content) as Map<String, dynamic>;
 
       return AiSummaryResponse(

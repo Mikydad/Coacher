@@ -93,13 +93,15 @@ class CircleProofStorage {
   }
 
   Future<void> uploadChallengeProof({
+    required String circleId,
     required String challengeId,
     required String userId,
     required File file,
   }) async {
     final ext = imageExtensionFromPath(file.path);
+    // Path shape is enforced by storage.rules: circle-scoped and uid-prefixed.
     final objectRef = _storage.ref(
-      'challenge_proofs/$challengeId/${userId}_${DateTime.now().millisecondsSinceEpoch}.$ext',
+      'circles/$circleId/challenge_proofs/$challengeId/${userId}_${DateTime.now().millisecondsSinceEpoch}.$ext',
     );
     await objectRef.putFile(
       file,

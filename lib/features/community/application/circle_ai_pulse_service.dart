@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 
+import '../../../core/ai/ai_proxy_client.dart';
 import '../../../core/ai/ai_remote_config_service.dart';
 import '../../../core/utils/stable_id.dart';
 import '../data/activity_feed_repository.dart';
@@ -13,26 +13,25 @@ import '../domain/models/ai_pulse.dart';
 import '../domain/models/activity_feed_item.dart';
 import '../domain/models/circle_enums.dart';
 
-const _kOpenAiChatUrl = 'https://api.openai.com/v1/chat/completions';
-const _kDefaultModel = 'gpt-4o-mini';
-
 /// Generates daily and weekly AI pulses for a circle.
 ///
-/// Delegates to the OpenAI API directly using the same endpoint as
-/// [OpenAiCoachingClient], but with circle-specific prompts.
-/// Does NOT modify [CoachingAiClient] or any existing AI code.
+/// Delegates to the `aiChat` Cloud Function proxy with circle-specific
+/// prompts. Does NOT modify [CoachingAiClient] or any existing AI code.
 class CircleAiPulseService {
   CircleAiPulseService({
     required AiPulseRepository pulseRepo,
     required ActivityFeedRepository feedRepo,
     required ChallengeRepository challengeRepo,
+    AiProxyClient? proxyClient,
   })  : _pulseRepo = pulseRepo,
         _feedRepo = feedRepo,
-        _challengeRepo = challengeRepo;
+        _challengeRepo = challengeRepo,
+        _proxy = proxyClient ?? AiProxyClient();
 
   final AiPulseRepository _pulseRepo;
   final ActivityFeedRepository _feedRepo;
   final ChallengeRepository _challengeRepo;
+  final AiProxyClient _proxy;
 
   /// Generates a daily pulse for [circleId] if not on cooldown.
   /// Returns `null` if on cooldown or if AI fails.
@@ -111,19 +110,11 @@ class CircleAiPulseService {
     required String prompt,
   }) async {
     try {
-      final apiKey = await AiRemoteConfigService.instance.getOpenAiApiKey();
-      if (apiKey.isEmpty) return null;
+      final aiEnabled = await AiRemoteConfigService.instance.isAiEnabled();
+      if (!aiEnabled) return null;
 
-      final modelRaw =
-          await AiRemoteConfigService.instance.getOpenAiModel();
-      final model = modelRaw.isEmpty ? _kDefaultModel : modelRaw;
-
-      final body = jsonEncode({
-        'model': model,
-        'temperature': 0.4,
-        'max_tokens': 400,
-        'response_format': {'type': 'json_object'},
-        'messages': [
+      final content = await _proxy.chat(
+        messages: [
           {
             'role': 'system',
             'content':
@@ -132,29 +123,13 @@ class CircleAiPulseService {
           },
           {'role': 'user', 'content': prompt},
         ],
-      });
+        temperature: 0.4,
+        maxTokens: 400,
+        purpose: 'circle_pulse',
+        timeout: const Duration(seconds: 20),
+      );
 
-      final response = await http
-          .post(
-            Uri.parse(_kOpenAiChatUrl),
-            headers: {
-              'Authorization': 'Bearer $apiKey',
-              'Content-Type': 'application/json',
-            },
-            body: body,
-          )
-          .timeout(const Duration(seconds: 20));
-
-      if (response.statusCode != 200) {
-        debugPrint(
-            '[CircleAiPulseService] HTTP ${response.statusCode}');
-        return null;
-      }
-
-      return _parsePulse(
-          circleId: circleId,
-          type: type,
-          responseBody: response.body);
+      return _parsePulse(circleId: circleId, type: type, content: content);
     } catch (e) {
       debugPrint('[CircleAiPulseService] AI call failed: $e');
       return null;
@@ -164,15 +139,9 @@ class CircleAiPulseService {
   AiPulse? _parsePulse({
     required String circleId,
     required AiPulseType type,
-    required String responseBody,
+    required String content,
   }) {
     try {
-      final outer = jsonDecode(responseBody) as Map<String, dynamic>;
-      final choices = outer['choices'] as List?;
-      if (choices == null || choices.isEmpty) return null;
-      final content =
-          ((choices.first as Map)['message'] as Map)['content'] as String? ??
-              '';
       final inner = jsonDecode(content) as Map<String, dynamic>;
 
       final lines = ((inner['memberLines'] as List?)

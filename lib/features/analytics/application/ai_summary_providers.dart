@@ -21,16 +21,15 @@ import 'layer4_delivery_policy.dart';
 
 // aiSummaryRepositoryProvider is declared in core/di/providers.dart
 
-/// Resolves to [OpenAiCoachingClient] when a key is available from Remote
-/// Config, or [MockCoachingAiClient] when the key is absent/empty.
+/// Resolves to [ProxyCoachingAiClient] (backed by the `aiChat` Cloud Function)
+/// when AI is enabled, or [MockCoachingAiClient] when disabled remotely.
 /// This is an async provider because Remote Config requires a network fetch.
 final coachingAiClientProvider = FutureProvider<CoachingAiClient>((ref) async {
-  final apiKey = await AiRemoteConfigService.instance.getOpenAiApiKey();
-  if (apiKey.isEmpty) {
+  final aiEnabled = await AiRemoteConfigService.instance.isAiEnabled();
+  if (!aiEnabled) {
     return const MockCoachingAiClient();
   }
-  final model = await AiRemoteConfigService.instance.getOpenAiModel();
-  return OpenAiCoachingClient(apiKey: apiKey, model: model);
+  return ProxyCoachingAiClient();
 });
 
 final _deterministicRendererProvider = Provider<DeterministicCoachingRenderer>(

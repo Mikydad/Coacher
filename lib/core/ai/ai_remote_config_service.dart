@@ -1,13 +1,12 @@
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter/foundation.dart';
 
-/// Remote Config key for the OpenAI API key.
-/// Set this key in the Firebase console under Remote Config.
-const String kRemoteConfigOpenAiApiKey = 'openai_api_key';
-
-/// Remote Config key for the AI model name override.
-/// Defaults to gpt-4o-mini if absent or empty.
-const String kRemoteConfigOpenAiModel = 'openai_model';
+/// Remote Config key acting as a kill switch for all AI features.
+/// When false, clients fall back to mock/deterministic behavior.
+///
+/// The OpenAI API key is NOT distributed to clients — it lives in Google
+/// Secret Manager and is only readable by the `aiChat` Cloud Function proxy.
+const String kRemoteConfigAiEnabled = 'ai_enabled';
 
 /// Minimum fetch interval for Remote Config in production.
 const Duration kRemoteConfigFetchInterval = Duration(hours: 1);
@@ -16,9 +15,8 @@ const Duration kRemoteConfigFetchInterval = Duration(hours: 1);
 ///
 /// Design:
 /// - Fetches and activates on first call; subsequent calls use in-memory cache.
-/// - Returns empty string if the key is missing or fetch fails — callers must
-///   treat an empty API key as "use mock/fallback".
-/// - Never throws; all errors are caught and logged.
+/// - Never throws; all errors are caught and logged, and safe defaults are
+///   returned (AI enabled — the Cloud Function is the real gate).
 class AiRemoteConfigService {
   AiRemoteConfigService._();
   static final AiRemoteConfigService instance = AiRemoteConfigService._();
@@ -37,8 +35,7 @@ class AiRemoteConfigService {
       ));
       // Sensible defaults so the app never crashes before first fetch.
       await rc.setDefaults(const {
-        kRemoteConfigOpenAiApiKey: '',
-        kRemoteConfigOpenAiModel: 'gpt-4o-mini',
+        kRemoteConfigAiEnabled: true,
       });
       await rc.fetchAndActivate();
       _initialized = true;
@@ -50,29 +47,15 @@ class AiRemoteConfigService {
     }
   }
 
-  /// Returns the OpenAI API key from Remote Config, or empty string if absent.
-  Future<String> getOpenAiApiKey() async {
+  /// Whether AI features are enabled. Acts as a remote kill switch; when
+  /// false, callers must use their mock/deterministic fallbacks.
+  Future<bool> isAiEnabled() async {
     await _ensureInitialized();
     try {
-      return FirebaseRemoteConfig.instance
-          .getString(kRemoteConfigOpenAiApiKey)
-          .trim();
+      return FirebaseRemoteConfig.instance.getBool(kRemoteConfigAiEnabled);
     } catch (e) {
-      debugPrint('[AiRemoteConfigService] Failed to read API key: $e');
-      return '';
-    }
-  }
-
-  /// Returns the configured model name, defaulting to gpt-4o-mini.
-  Future<String> getOpenAiModel() async {
-    await _ensureInitialized();
-    try {
-      final model = FirebaseRemoteConfig.instance
-          .getString(kRemoteConfigOpenAiModel)
-          .trim();
-      return model.isEmpty ? 'gpt-4o-mini' : model;
-    } catch (e) {
-      return 'gpt-4o-mini';
+      debugPrint('[AiRemoteConfigService] Failed to read ai_enabled: $e');
+      return true;
     }
   }
 

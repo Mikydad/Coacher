@@ -106,7 +106,10 @@ service cloud.firestore {
         allow read: if canAccessCircleContent(circleId);
         allow create: if isCircleMember(circleId)
           && request.resource.data.senderId == request.auth.uid;
-        allow update: if isCircleMember(circleId);
+        // Only the sender can edit their own message, and senderId is immutable.
+        allow update: if isCircleMember(circleId)
+          && resource.data.senderId == request.auth.uid
+          && request.resource.data.senderId == resource.data.senderId;
         allow delete: if isCircleMember(circleId)
           && (resource.data.senderId == request.auth.uid || isCircleModerator(circleId));
       }
@@ -114,7 +117,9 @@ service cloud.firestore {
       // ── Activity feed ─────────────────────────────────────────────────────
       match /activityFeed/{itemId} {
         allow read: if canAccessCircleContent(circleId);
-        allow create: if isSignedIn();
+        // Only members may post, and only as themselves.
+        allow create: if isCircleMember(circleId)
+          && request.resource.data.userId == request.auth.uid;
         allow update, delete: if false;
       }
 

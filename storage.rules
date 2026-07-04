@@ -26,10 +26,14 @@ service firebase.storage {
       allow write: if isCircleMember(circleId) && isValidImageUpload();
     }
 
-    // Challenge progress proof images
-    match /challenge_proofs/{challengeId}/{fileName} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isValidImageUpload();
+    // Challenge progress proof images — scoped to the circle; only members
+    // can read, and writes must be uid-prefixed so uploads can't be spoofed
+    // or clobbered by other users.
+    match /circles/{circleId}/challenge_proofs/{challengeId}/{fileName} {
+      allow read: if isCircleMember(circleId);
+      allow write: if isCircleMember(circleId)
+        && isValidImageUpload()
+        && fileName.matches(request.auth.uid + '_.*');
     }
   }
 }
