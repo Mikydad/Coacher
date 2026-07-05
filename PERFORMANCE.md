@@ -256,10 +256,10 @@ per day per app session.
 
 ### Known remaining gap
 
-Flutter's image cache is memory-only, so proof images still re-download
-once per app session. The full fix is adopting `cached_network_image`
-(disk cache); we chose not to add the dependency in this pass. If feeds
-get heavier, that's the next step.
+~~Flutter's image cache is memory-only, so proof images still re-download
+once per app session.~~ **Closed 2026-07-06:** chat proof images now use
+`cached_network_image` (disk cache — each image downloads once, ever) and
+open in a full-screen pinch-zoom viewer that reuses the cached bytes.
 
 ---
 
@@ -349,7 +349,8 @@ actually changes local data refreshes exactly as before.
   scoped this as "when list sizes become user-controlled" — today the
   backing queries are capped (50 messages / 30 feed items), so the impact
   is bounded. Convert them if those caps are lifted.
-- **`cached_network_image`** — see §5's known remaining gap.
+- **`cached_network_image`** — adopted 2026-07-06 together with the
+  full-screen image viewer; see §5.
 
 ## Verification summary
 

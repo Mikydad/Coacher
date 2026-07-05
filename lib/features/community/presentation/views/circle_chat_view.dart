@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ import '../../application/circle_providers.dart';
 import '../../data/circle_proof_storage.dart';
 import '../../domain/models/circle_enums.dart';
 import '../../domain/models/circle_message.dart';
+import '../widgets/full_screen_image_viewer.dart';
 
 import '../../../../core/presentation/app_colors.dart';
 
@@ -451,22 +453,49 @@ class _ImageMessageBubble extends StatelessWidget {
                     child: Stack(
                       children: [
                         if (message.imageUrl != null)
-                          Image.network(
-                            message.imageUrl!,
-                            width: 220,
-                            // Decode at display size — without this each
-                            // ~1080px source is decoded full-res for a
-                            // 220-logical-px bubble (several MB RAM each).
-                            cacheWidth:
-                                (220 * MediaQuery.devicePixelRatioOf(context))
+                          GestureDetector(
+                            onTap: () => FullScreenImageViewer.open(
+                              context,
+                              imageUrl: message.imageUrl!,
+                              heroTag: 'chat_image_${message.id}',
+                            ),
+                            child: Hero(
+                              tag: 'chat_image_${message.id}',
+                              child: CachedNetworkImage(
+                                imageUrl: message.imageUrl!,
+                                width: 220,
+                                // Decode at display size — without this each
+                                // ~1080px source is decoded full-res for a
+                                // 220-logical-px bubble (several MB RAM
+                                // each). Disk cache: downloads once, ever.
+                                memCacheWidth: (220 *
+                                        MediaQuery.devicePixelRatioOf(context))
                                     .round(),
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              width: 220,
-                              height: 140,
-                              color: AppColors.surfaceCard,
-                              child: const Icon(Icons.broken_image_rounded,
-                                  color: AppColors.textMuted),
+                                fit: BoxFit.cover,
+                                placeholder: (_, _) => Container(
+                                  width: 220,
+                                  height: 140,
+                                  color: AppColors.surfaceCard,
+                                  child: const Center(
+                                    child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.textMuted,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                errorWidget: (_, _, _) => Container(
+                                  width: 220,
+                                  height: 140,
+                                  color: AppColors.surfaceCard,
+                                  child: const Icon(
+                                      Icons.broken_image_rounded,
+                                      color: AppColors.textMuted),
+                                ),
+                              ),
                             ),
                           ),
                         if (message.content != null &&
