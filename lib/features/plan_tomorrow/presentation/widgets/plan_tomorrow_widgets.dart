@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 /// Obsidian Pulse tokens for Plan Tomorrow — visual only.
 abstract final class PlanTomorrowColors {
-  static const lime = Color(0xFFB7FF00);
-  static const cyan = Color(0xFF00E3FD);
-  static const surface = Color(0xFF0E0E0E);
-  static const card = Color(0xFF131313);
-  static const cardRaised = Color(0xFF201F1F);
-  static const label = Color(0xFFADAAAA);
-  static const hint = Color(0xFF6B7280);
+  static const lime = AppColors.accent;
+  static const cyan = AppColors.cyan;
+  static const surface = AppColors.ink;
+  static const card = AppColors.inkDeep;
+  static const cardRaised = AppColors.inkWarm;
+  static const label = AppColors.textSoft;
+  static const hint = AppColors.graySlate;
 }
 
 class PlanTomorrowHeader extends StatelessWidget implements PreferredSizeWidget {

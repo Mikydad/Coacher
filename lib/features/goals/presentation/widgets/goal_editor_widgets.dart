@@ -4,16 +4,18 @@ import '../../application/goal_intensity_mode.dart';
 import '../../domain/models/goal_categories.dart';
 import '../../domain/models/goal_enums.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 /// Shared palette for the goal editor — matches goals list accent styling.
 abstract final class GoalEditorColors {
-  static const lime = Color(0xFFB7FF00);
-  static const cyan = Color(0xFF2A9B8B);
-  static const surface = Color(0xFF1A1C1F);
-  static const surfaceRaised = Color(0xFF222528);
-  static const inputFill = Color(0xFF111111);
-  static const border = Color(0xFF2A2D32);
-  static const label = Color(0xFF6B7280);
-  static const hint = Color(0xFF4B5563);
+  static const lime = AppColors.accent;
+  static const cyan = AppColors.categoryTeal;
+  static const surface = AppColors.surfaceMuted;
+  static const surfaceRaised = AppColors.dark222528;
+  static const inputFill = AppColors.dark111111;
+  static const border = AppColors.dark2A2D32;
+  static const label = AppColors.graySlate;
+  static const hint = AppColors.graySlateDeep;
 }
 
 /// Matches Add Task field styling — darker inset fill, soft radius, clear hints.

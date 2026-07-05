@@ -8,6 +8,8 @@ import '../../../../core/utils/stable_id.dart';
 import '../../application/challenge_providers.dart';
 import '../../domain/models/challenge.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 class ChallengeCreateSheet extends ConsumerStatefulWidget {
   const ChallengeCreateSheet({super.key, required this.circleId});
 
@@ -49,9 +51,9 @@ class _ChallengeCreateSheetState
       builder: (ctx, child) => Theme(
         data: ThemeData.dark().copyWith(
           colorScheme: const ColorScheme.dark(
-            primary: Color(0xFFB7FF00),
+            primary: AppColors.accent,
             onPrimary: Colors.black,
-            surface: Color(0xFF1C2029),
+            surface: AppColors.surfaceCard,
           ),
         ),
         child: child!,
@@ -127,7 +129,7 @@ class _ChallengeCreateSheetState
           bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         decoration: const BoxDecoration(
-          color: Color(0xFF14171C),
+          color: AppColors.surfaceDark,
           borderRadius:
               BorderRadius.vertical(top: Radius.circular(20)),
         ),
@@ -155,7 +157,7 @@ class _ChallengeCreateSheetState
                   const Text(
                     'New challenge',
                     style: TextStyle(
-                      color: Color(0xFFF0F4FF),
+                      color: AppColors.textPrimary,
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                     ),
@@ -167,7 +169,7 @@ class _ChallengeCreateSheetState
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _titleController,
-                    style: const TextStyle(color: Color(0xFFF0F4FF)),
+                    style: const TextStyle(color: AppColors.textPrimary),
                     onTapOutside: (_) => dismissKeyboard(context),
                     decoration: _inputDeco('e.g. Run 30 miles this month'),
                     validator: (v) {
@@ -216,7 +218,7 @@ class _ChallengeCreateSheetState
                             TextFormField(
                               controller: _targetController,
                               style: const TextStyle(
-                                  color: Color(0xFFF0F4FF)),
+                                  color: AppColors.textPrimary),
                               onTapOutside: (_) => dismissKeyboard(context),
                               keyboardType: TextInputType.number,
                               inputFormatters: [
@@ -246,7 +248,7 @@ class _ChallengeCreateSheetState
                             TextFormField(
                               controller: _unitController,
                               style: const TextStyle(
-                                  color: Color(0xFFF0F4FF)),
+                                  color: AppColors.textPrimary),
                               onTapOutside: (_) => dismissKeyboard(context),
                               decoration: _inputDeco('miles / sessions'),
                               validator: (v) {
@@ -279,7 +281,7 @@ class _ChallengeCreateSheetState
                         padding: EdgeInsets.symmetric(horizontal: 8),
                         child: Text('→',
                             style: TextStyle(
-                                color: Color(0xFF8A8FA8))),
+                                color: AppColors.textMuted)),
                       ),
                       Expanded(
                         child: _DateButton(
@@ -297,7 +299,7 @@ class _ChallengeCreateSheetState
                     child: FilledButton(
                       onPressed: _saving ? null : _save,
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFB7FF00),
+                        backgroundColor: AppColors.accent,
                         foregroundColor: Colors.black,
                         minimumSize: const Size.fromHeight(48),
                         shape: RoundedRectangleBorder(
@@ -332,16 +334,16 @@ class _ChallengeCreateSheetState
 
   InputDecoration _inputDeco(String hint) => InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFF8A8FA8)),
+        hintStyle: const TextStyle(color: AppColors.textMuted),
         filled: true,
-        fillColor: const Color(0xFF1C2029),
+        fillColor: AppColors.surfaceCard,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide.none,
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFFFF4D4D)),
+          borderSide: const BorderSide(color: AppColors.danger),
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -350,13 +352,13 @@ class _ChallengeCreateSheetState
   ButtonStyle _segmentStyle() => ButtonStyle(
         backgroundColor: WidgetStateProperty.resolveWith((s) {
           if (s.contains(WidgetState.selected)) {
-            return const Color(0xFFB7FF00);
+            return AppColors.accent;
           }
-          return const Color(0xFF1C2029);
+          return AppColors.surfaceCard;
         }),
         foregroundColor: WidgetStateProperty.resolveWith((s) {
           if (s.contains(WidgetState.selected)) return Colors.black;
-          return const Color(0xFF8A8FA8);
+          return AppColors.textMuted;
         }),
       );
 }
@@ -370,7 +372,7 @@ class _Label extends StatelessWidget {
     return Text(
       text,
       style: const TextStyle(
-        color: Color(0xFF8A8FA8),
+        color: AppColors.textMuted,
         fontSize: 12,
         fontWeight: FontWeight.w500,
         letterSpacing: 0.4,
@@ -400,13 +402,13 @@ class _DateButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(
             horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF1C2029),
+          color: AppColors.surfaceCard,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [
             const Icon(Icons.calendar_today_rounded,
-                size: 14, color: Color(0xFF8A8FA8)),
+                size: 14, color: AppColors.textMuted),
             const SizedBox(width: 6),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -414,14 +416,14 @@ class _DateButton extends StatelessWidget {
                 Text(
                   label,
                   style: const TextStyle(
-                    color: Color(0xFF8A8FA8),
+                    color: AppColors.textMuted,
                     fontSize: 10,
                   ),
                 ),
                 Text(
                   formatted,
                   style: const TextStyle(
-                    color: Color(0xFFF0F4FF),
+                    color: AppColors.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),

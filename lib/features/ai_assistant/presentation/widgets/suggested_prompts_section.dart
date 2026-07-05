@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/suggested_prompts_provider.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 export '../../application/suggested_prompts_provider.dart'
     show kDefaultSuggestedPrompts;
 
@@ -35,7 +37,7 @@ class SuggestedPromptsSection extends ConsumerWidget {
               fontSize: 11,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.10 * 11,
-              color: Color(0xFFADAAAA),
+              color: AppColors.textSoft,
             ),
           ),
           const SizedBox(height: 10),
@@ -154,7 +156,7 @@ class _PromptCardState extends State<_PromptCard>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: const Color(0xFF201F1F),
+              color: AppColors.inkWarm,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -164,14 +166,14 @@ class _PromptCardState extends State<_PromptCard>
                     '"${widget.prompt}"',
                     style: const TextStyle(
                       fontSize: 14,
-                      color: Color(0xFFE0E0E0),
+                      color: AppColors.grayBright,
                     ),
                   ),
                 ),
                 const Icon(
                   Icons.north_east_rounded,
                   size: 16,
-                  color: Color(0xFFADAAAA),
+                  color: AppColors.textSoft,
                 ),
               ],
             ),

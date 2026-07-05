@@ -3,6 +3,8 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../../../core/presentation/keyboard_dismiss.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 class AiInputCard extends StatelessWidget {
   const AiInputCard({
     super.key,
@@ -23,7 +25,7 @@ class AiInputCard extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 0),
       padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF262626),
+        color: AppColors.inkElevated,
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
@@ -43,14 +45,14 @@ class AiInputCard extends StatelessWidget {
             decoration: const InputDecoration(
               hintText: 'Ask about your schedule or tell me what to plan…',
               hintStyle: TextStyle(
-                color: Color(0xFFADAAAA),
+                color: AppColors.textSoft,
                 fontSize: 15,
               ),
               border: InputBorder.none,
               isDense: true,
               contentPadding: EdgeInsets.zero,
             ),
-            cursorColor: const Color(0xFF00E3FD),
+            cursorColor: AppColors.cyan,
           ),
           const SizedBox(height: 10),
           Row(
@@ -75,8 +77,8 @@ class AiInputCard extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: canSend
-                            ? const Color(0xFFBEFC00)
-                            : const Color(0xFF3A3A3A),
+                            ? AppColors.accentBright
+                            : AppColors.gray3A,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Row(
@@ -88,8 +90,8 @@ class AiInputCard extends StatelessWidget {
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                               color: canSend
-                                  ? const Color(0xFF445D00)
-                                  : const Color(0xFF666666),
+                                  ? AppColors.accentDeep
+                                  : AppColors.textFaint,
                               letterSpacing: 0.5,
                             ),
                           ),
@@ -98,8 +100,8 @@ class AiInputCard extends StatelessWidget {
                             Icons.play_arrow_rounded,
                             size: 16,
                             color: canSend
-                                ? const Color(0xFF445D00)
-                                : const Color(0xFF666666),
+                                ? AppColors.accentDeep
+                                : AppColors.textFaint,
                           ),
                         ],
                       ),
@@ -204,14 +206,14 @@ class _VoiceInputButtonState extends State<_VoiceInputButton> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: AppColors.inkCard,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final accent = const Color(0xFF00E3FD);
+    final accent = AppColors.cyan;
     return GestureDetector(
       onTap: widget.enabled ? _toggle : null,
       child: AnimatedContainer(
@@ -232,7 +234,7 @@ class _VoiceInputButtonState extends State<_VoiceInputButton> {
         child: Icon(
           _listening ? Icons.mic_rounded : Icons.mic_none_rounded,
           size: 20,
-          color: _listening ? accent : const Color(0xFFADAAAA),
+          color: _listening ? accent : AppColors.textSoft,
         ),
       ),
     );

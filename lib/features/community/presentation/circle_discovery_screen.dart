@@ -15,6 +15,8 @@ import '../domain/models/accountability_circle.dart';
 import '../domain/models/circle_enums.dart';
 import 'circle_detail_screen.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 const _kAllCategories = [
   'all',
   'fitness',
@@ -249,23 +251,23 @@ class _CircleDiscoveryScreenState
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0F12),
+      backgroundColor: AppColors.surfaceDeep,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF14171C),
-        foregroundColor: const Color(0xFFF0F4FF),
+        backgroundColor: AppColors.surfaceDark,
+        foregroundColor: AppColors.textPrimary,
         title: const Text(
           'Discover circles',
           style: TextStyle(
-            color: Color(0xFFF0F4FF),
+            color: AppColors.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
         elevation: 0,
         bottom: TabBar(
           controller: _tabController,
-          labelColor: const Color(0xFFB7FF00),
-          unselectedLabelColor: const Color(0xFF8A8FA8),
-          indicatorColor: const Color(0xFFB7FF00),
+          labelColor: AppColors.accent,
+          unselectedLabelColor: AppColors.textMuted,
+          indicatorColor: AppColors.accent,
           indicatorSize: TabBarIndicatorSize.label,
           tabs: const [
             Tab(text: 'Browse'),
@@ -345,7 +347,7 @@ class _BrowseTab extends StatelessWidget {
           child: loading
               ? const Center(
                   child: CircularProgressIndicator(
-                    color: Color(0xFFB7FF00),
+                    color: AppColors.accent,
                   ),
                 )
               : ListView(
@@ -358,7 +360,7 @@ class _BrowseTab extends StatelessWidget {
                         child: Text(
                           'RECOMMENDED FOR YOU',
                           style: TextStyle(
-                            color: Color(0xFF8A8FA8),
+                            color: AppColors.textMuted,
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                             letterSpacing: 0.8,
@@ -383,7 +385,7 @@ class _BrowseTab extends StatelessWidget {
                       const Text(
                         'ALL CIRCLES',
                         style: TextStyle(
-                          color: Color(0xFF8A8FA8),
+                          color: AppColors.textMuted,
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.8,
@@ -439,10 +441,10 @@ class _RecommendedCircleCard extends StatelessWidget {
         width: 180,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFF14171C),
+          color: AppColors.surfaceDark,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: const Color(0xFFB7FF00).withValues(alpha: 0.3),
+            color: AppColors.accent.withValues(alpha: 0.3),
           ),
         ),
         child: Column(
@@ -454,7 +456,7 @@ class _RecommendedCircleCard extends StatelessWidget {
                   child: Text(
                     circle.name,
                     style: const TextStyle(
-                      color: Color(0xFFF0F4FF),
+                      color: AppColors.textPrimary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -468,7 +470,7 @@ class _RecommendedCircleCard extends StatelessWidget {
             Text(
               scored.matchReason,
               style: const TextStyle(
-                color: Color(0xFFB7FF00),
+                color: AppColors.accent,
                 fontSize: 11,
               ),
               maxLines: 1,
@@ -478,12 +480,12 @@ class _RecommendedCircleCard extends StatelessWidget {
             Row(
               children: [
                 const Icon(Icons.people_outline,
-                    color: Color(0xFF8A8FA8), size: 12),
+                    color: AppColors.textMuted, size: 12),
                 const SizedBox(width: 4),
                 Text(
                   '${circle.memberCount}/${AccountabilityCircle.kMaxMembers}',
                   style: const TextStyle(
-                    color: Color(0xFF8A8FA8),
+                    color: AppColors.textMuted,
                     fontSize: 11,
                   ),
                 ),
@@ -494,7 +496,7 @@ class _RecommendedCircleCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFB7FF00),
+                      color: AppColors.accent,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text(
@@ -541,16 +543,16 @@ class _CategoryChipRow extends StatelessWidget {
             label: Text(
               cat[0].toUpperCase() + cat.substring(1),
               style: TextStyle(
-                color: isSelected ? Colors.black : const Color(0xFF8A8FA8),
+                color: isSelected ? Colors.black : AppColors.textMuted,
                 fontSize: 13,
               ),
             ),
             selected: isSelected,
-            selectedColor: const Color(0xFFB7FF00),
-            backgroundColor: const Color(0xFF1C2029),
+            selectedColor: AppColors.accent,
+            backgroundColor: AppColors.surfaceCard,
             side: BorderSide(
               color: isSelected
-                  ? const Color(0xFFB7FF00)
+                  ? AppColors.accent
                   : Colors.white.withOpacity(0.06),
             ),
             onSelected: (_) => onChanged(cat),
@@ -596,14 +598,14 @@ class _SearchTab extends StatelessWidget {
             controller: controller,
             onChanged: onChanged,
             onTapOutside: (_) => dismissKeyboard(context),
-            style: const TextStyle(color: Color(0xFFF0F4FF)),
+            style: const TextStyle(color: AppColors.textPrimary),
             decoration: InputDecoration(
               hintText: 'Search circles…',
-              hintStyle: const TextStyle(color: Color(0xFF8A8FA8)),
+              hintStyle: const TextStyle(color: AppColors.textMuted),
               prefixIcon: const Icon(Icons.search_rounded,
-                  color: Color(0xFF8A8FA8)),
+                  color: AppColors.textMuted),
               filled: true,
-              fillColor: const Color(0xFF14171C),
+              fillColor: AppColors.surfaceDark,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
@@ -616,7 +618,7 @@ class _SearchTab extends StatelessWidget {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFB7FF00)),
+                borderSide: const BorderSide(color: AppColors.accent),
               ),
             ),
           ),
@@ -625,7 +627,7 @@ class _SearchTab extends StatelessWidget {
           child: loading
               ? const Center(
                   child: CircularProgressIndicator(
-                    color: Color(0xFFB7FF00),
+                    color: AppColors.accent,
                   ),
                 )
               : controller.text.isEmpty
@@ -682,7 +684,7 @@ class _CircleCardState extends State<_CircleCard> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF14171C),
+        color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white.withOpacity(0.06)),
       ),
@@ -695,7 +697,7 @@ class _CircleCardState extends State<_CircleCard> {
                 child: Text(
                   circle.name,
                   style: const TextStyle(
-                    color: Color(0xFFF0F4FF),
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
                     fontSize: 16,
                   ),
@@ -711,7 +713,7 @@ class _CircleCardState extends State<_CircleCard> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: Color(0xFF8A8FA8),
+                color: AppColors.textMuted,
                 fontSize: 13,
               ),
             ),
@@ -720,24 +722,24 @@ class _CircleCardState extends State<_CircleCard> {
           Row(
             children: [
               const Icon(Icons.group_rounded,
-                  size: 14, color: Color(0xFF8A8FA8)),
+                  size: 14, color: AppColors.textMuted),
               const SizedBox(width: 4),
               Text(
                 '${circle.memberCount}/${AccountabilityCircle.kMaxMembers}',
                 style: const TextStyle(
-                  color: Color(0xFF8A8FA8),
+                  color: AppColors.textMuted,
                   fontSize: 13,
                 ),
               ),
               const SizedBox(width: 12),
               const Icon(Icons.schedule_rounded,
-                  size: 14, color: Color(0xFF8A8FA8)),
+                  size: 14, color: AppColors.textMuted),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   circle.timezone,
                   style: const TextStyle(
-                    color: Color(0xFF8A8FA8),
+                    color: AppColors.textMuted,
                     fontSize: 13,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -777,14 +779,14 @@ class _CircleCardState extends State<_CircleCard> {
                     },
               style: FilledButton.styleFrom(
                 backgroundColor: isJoined
-                    ? const Color(0xFF1C2029)
+                    ? AppColors.surfaceCard
                     : isFull
-                        ? const Color(0xFF1C2029)
-                        : const Color(0xFFB7FF00),
+                        ? AppColors.surfaceCard
+                        : AppColors.accent,
                 foregroundColor: isJoined
-                    ? const Color(0xFF8A8FA8)
+                    ? AppColors.textMuted
                     : isFull
-                        ? const Color(0xFF8A8FA8)
+                        ? AppColors.textMuted
                         : Colors.black,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -825,13 +827,13 @@ class _CategoryBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: const Color(0xFFB7FF00).withOpacity(0.12),
+        color: AppColors.accent.withOpacity(0.12),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         category[0].toUpperCase() + category.substring(1),
         style: const TextStyle(
-          color: Color(0xFFB7FF00),
+          color: AppColors.accent,
           fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
@@ -850,7 +852,7 @@ class _PolicyBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C2029),
+        color: AppColors.surfaceCard,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
@@ -859,13 +861,13 @@ class _PolicyBadge extends StatelessWidget {
           Icon(
             isOpen ? Icons.lock_open_rounded : Icons.lock_rounded,
             size: 11,
-            color: const Color(0xFF8A8FA8),
+            color: AppColors.textMuted,
           ),
           const SizedBox(width: 4),
           Text(
             isOpen ? 'Open' : 'Approval',
             style: const TextStyle(
-              color: Color(0xFF8A8FA8),
+              color: AppColors.textMuted,
               fontSize: 11,
             ),
           ),
@@ -888,7 +890,7 @@ class _EmptyState extends StatelessWidget {
           message,
           textAlign: TextAlign.center,
           style: const TextStyle(
-            color: Color(0xFF8A8FA8),
+            color: AppColors.textMuted,
             fontSize: 15,
           ),
         ),

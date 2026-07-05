@@ -14,6 +14,8 @@ import '../../domain/models/challenge.dart';
 import '../sheets/challenge_create_sheet.dart';
 import '../widgets/challenge_vote_banner.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 class CircleChallengesView extends ConsumerWidget {
   const CircleChallengesView({super.key, required this.circleId});
 
@@ -29,7 +31,7 @@ class CircleChallengesView extends ConsumerWidget {
         ref.watch(completedChallengesProvider(circleId));
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
+      backgroundColor: AppColors.dark0D1117,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showModalBottomSheet(
           context: context,
@@ -37,7 +39,7 @@ class CircleChallengesView extends ConsumerWidget {
           backgroundColor: Colors.transparent,
           builder: (_) => ChallengeCreateSheet(circleId: circleId),
         ),
-        backgroundColor: const Color(0xFFB7FF00),
+        backgroundColor: AppColors.accent,
         foregroundColor: Colors.black,
         icon: const Icon(Icons.add),
         label: const Text('New challenge',
@@ -91,7 +93,7 @@ class CircleChallengesView extends ConsumerWidget {
             ),
             error: (e, _) => Text(
               'Error loading challenges: $e',
-              style: const TextStyle(color: Color(0xFFFF4D4D)),
+              style: const TextStyle(color: AppColors.danger),
             ),
           ),
 
@@ -137,7 +139,7 @@ class _SectionHeader extends StatelessWidget {
       child: Text(
         text.toUpperCase(),
         style: const TextStyle(
-          color: Color(0xFF8A8FA8),
+          color: AppColors.textMuted,
           fontSize: 11,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.8,
@@ -172,9 +174,9 @@ class _CompetitionChallengeCard extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF14171C),
+        color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF2A2F3D)),
+        border: Border.all(color: AppColors.surfaceSlate),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,13 +184,13 @@ class _CompetitionChallengeCard extends ConsumerWidget {
           Row(
             children: [
               const Icon(Icons.emoji_events_rounded,
-                  color: Color(0xFFFFD700), size: 16),
+                  color: AppColors.gold, size: 16),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   challenge.title,
                   style: const TextStyle(
-                    color: Color(0xFFF0F4FF),
+                    color: AppColors.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                   ),
@@ -198,8 +200,8 @@ class _CompetitionChallengeCard extends ConsumerWidget {
                 '$daysLeft d left',
                 style: TextStyle(
                   color: daysLeft <= 3
-                      ? const Color(0xFFFF4D4D)
-                      : const Color(0xFF8A8FA8),
+                      ? AppColors.danger
+                      : AppColors.textMuted,
                   fontSize: 12,
                 ),
               ),
@@ -209,7 +211,7 @@ class _CompetitionChallengeCard extends ConsumerWidget {
           Text(
             'Target: ${challenge.targetValue} ${challenge.unit}',
             style: const TextStyle(
-              color: Color(0xFF8A8FA8),
+              color: AppColors.textMuted,
               fontSize: 12,
             ),
           ),
@@ -237,11 +239,11 @@ class _CompetitionChallengeCard extends ConsumerWidget {
             child: TextButton.icon(
               onPressed: () => _showManualUpdate(context, ref, uid),
               icon: const Icon(Icons.add_circle_outline,
-                  size: 16, color: Color(0xFFB7FF00)),
+                  size: 16, color: AppColors.accent),
               label: const Text(
                 'Log progress',
                 style: TextStyle(
-                  color: Color(0xFFB7FF00),
+                  color: AppColors.accent,
                   fontSize: 13,
                 ),
               ),
@@ -294,9 +296,9 @@ class _TeamChallengeCard extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF14171C),
+        color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF2A2F3D)),
+        border: Border.all(color: AppColors.surfaceSlate),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -304,13 +306,13 @@ class _TeamChallengeCard extends ConsumerWidget {
           Row(
             children: [
               const Icon(Icons.group_rounded,
-                  color: Color(0xFF7B9CFF), size: 16),
+                  color: AppColors.periwinkle, size: 16),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   challenge.title,
                   style: const TextStyle(
-                    color: Color(0xFFF0F4FF),
+                    color: AppColors.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                   ),
@@ -320,8 +322,8 @@ class _TeamChallengeCard extends ConsumerWidget {
                 '$daysLeft d left',
                 style: TextStyle(
                   color: daysLeft <= 3
-                      ? const Color(0xFFFF4D4D)
-                      : const Color(0xFF8A8FA8),
+                      ? AppColors.danger
+                      : AppColors.textMuted,
                   fontSize: 12,
                 ),
               ),
@@ -334,7 +336,7 @@ class _TeamChallengeCard extends ConsumerWidget {
               Text(
                 '${challenge.teamTotal}/${challenge.targetValue} ${challenge.unit}',
                 style: const TextStyle(
-                  color: Color(0xFFF0F4FF),
+                  color: AppColors.textPrimary,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -342,7 +344,7 @@ class _TeamChallengeCard extends ConsumerWidget {
               Text(
                 '${(ratio * 100).toStringAsFixed(0)}%',
                 style: const TextStyle(
-                  color: Color(0xFFB7FF00),
+                  color: AppColors.accent,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -354,8 +356,8 @@ class _TeamChallengeCard extends ConsumerWidget {
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: ratio.toDouble(),
-              backgroundColor: const Color(0xFF2A2F3D),
-              color: const Color(0xFFB7FF00),
+              backgroundColor: AppColors.surfaceSlate,
+              color: AppColors.accent,
               minHeight: 8,
             ),
           ),
@@ -372,12 +374,12 @@ class _TeamChallengeCard extends ConsumerWidget {
                     horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: isMe
-                      ? const Color(0xFFB7FF00).withValues(alpha: 0.12)
-                      : const Color(0xFF1C2029),
+                      ? AppColors.accent.withValues(alpha: 0.12)
+                      : AppColors.surfaceCard,
                   borderRadius: BorderRadius.circular(20),
                   border: isMe
                       ? Border.all(
-                          color: const Color(0xFFB7FF00)
+                          color: AppColors.accent
                               .withValues(alpha: 0.4))
                       : null,
                 ),
@@ -385,8 +387,8 @@ class _TeamChallengeCard extends ConsumerWidget {
                   '${isMe ? "You" : e.key.substring(0, 4)}  ${e.value}',
                   style: TextStyle(
                     color: isMe
-                        ? const Color(0xFFB7FF00)
-                        : const Color(0xFF8A8FA8),
+                        ? AppColors.accent
+                        : AppColors.textMuted,
                     fontSize: 11,
                   ),
                 ),
@@ -407,11 +409,11 @@ class _TeamChallengeCard extends ConsumerWidget {
                 ),
               ),
               icon: const Icon(Icons.add_circle_outline,
-                  size: 16, color: Color(0xFF7B9CFF)),
+                  size: 16, color: AppColors.periwinkle),
               label: const Text(
                 'Log team progress',
                 style: TextStyle(
-                  color: Color(0xFF7B9CFF),
+                  color: AppColors.periwinkle,
                   fontSize: 13,
                 ),
               ),
@@ -456,12 +458,12 @@ class _RankRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: isMe
-            ? const Color(0xFFB7FF00).withValues(alpha: 0.06)
-            : const Color(0xFF1C2029),
+            ? AppColors.accent.withValues(alpha: 0.06)
+            : AppColors.surfaceCard,
         borderRadius: BorderRadius.circular(8),
         border: isMe
             ? Border.all(
-                color: const Color(0xFFB7FF00).withValues(alpha: 0.3))
+                color: AppColors.accent.withValues(alpha: 0.3))
             : null,
       ),
       child: Row(
@@ -478,8 +480,8 @@ class _RankRow extends StatelessWidget {
               isMe ? 'You' : userId.substring(0, 6),
               style: TextStyle(
                 color: isMe
-                    ? const Color(0xFFB7FF00)
-                    : const Color(0xFFF0F4FF),
+                    ? AppColors.accent
+                    : AppColors.textPrimary,
                 fontSize: 13,
                 fontWeight:
                     isMe ? FontWeight.w600 : FontWeight.normal,
@@ -490,8 +492,8 @@ class _RankRow extends StatelessWidget {
             '$progress/$target $unit',
             style: TextStyle(
               color: isMe
-                  ? const Color(0xFFB7FF00)
-                  : const Color(0xFF8A8FA8),
+                  ? AppColors.accent
+                  : AppColors.textMuted,
               fontSize: 12,
               fontWeight:
                   isMe ? FontWeight.w600 : FontWeight.normal,
@@ -528,7 +530,7 @@ class _CompletedSectionState extends State<_CompletedSection> {
               const Text(
                 'COMPLETED',
                 style: TextStyle(
-                  color: Color(0xFF8A8FA8),
+                  color: AppColors.textMuted,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.8,
@@ -539,13 +541,13 @@ class _CompletedSectionState extends State<_CompletedSection> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1C2029),
+                  color: AppColors.surfaceCard,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   '${widget.challenges.length}',
                   style: const TextStyle(
-                    color: Color(0xFF8A8FA8),
+                    color: AppColors.textMuted,
                     fontSize: 11,
                   ),
                 ),
@@ -555,7 +557,7 @@ class _CompletedSectionState extends State<_CompletedSection> {
                 _expanded
                     ? Icons.keyboard_arrow_up
                     : Icons.keyboard_arrow_down,
-                color: const Color(0xFF8A8FA8),
+                color: AppColors.textMuted,
                 size: 18,
               ),
             ],
@@ -567,19 +569,19 @@ class _CompletedSectionState extends State<_CompletedSection> {
               margin: const EdgeInsets.only(top: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF14171C),
+                color: AppColors.surfaceDark,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
                 children: [
                   const Icon(Icons.check_circle,
-                      color: Color(0xFF4ADE80), size: 16),
+                      color: AppColors.success, size: 16),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       c.title,
                       style: const TextStyle(
-                        color: Color(0xFF8A8FA8),
+                        color: AppColors.textMuted,
                         fontSize: 13,
                       ),
                     ),
@@ -589,7 +591,7 @@ class _CompletedSectionState extends State<_CompletedSection> {
                         ? '${c.teamTotal}/${c.targetValue} ${c.unit}'
                         : '${c.targetValue} ${c.unit}',
                     style: const TextStyle(
-                      color: Color(0xFF8A8FA8),
+                      color: AppColors.textMuted,
                       fontSize: 12,
                     ),
                   ),
@@ -679,7 +681,7 @@ class _ManualProgressSheetState
           bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         decoration: const BoxDecoration(
-          color: Color(0xFF14171C),
+          color: AppColors.surfaceDark,
           borderRadius:
               BorderRadius.vertical(top: Radius.circular(20)),
         ),
@@ -703,7 +705,7 @@ class _ManualProgressSheetState
               const Text(
                 'Log progress',
                 style: TextStyle(
-                  color: Color(0xFFF0F4FF),
+                  color: AppColors.textPrimary,
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                 ),
@@ -712,7 +714,7 @@ class _ManualProgressSheetState
               Text(
                 widget.challenge.title,
                 style: const TextStyle(
-                  color: Color(0xFF8A8FA8),
+                  color: AppColors.textMuted,
                   fontSize: 13,
                 ),
               ),
@@ -724,14 +726,14 @@ class _ManualProgressSheetState
                   FilteringTextInputFormatter.digitsOnly
                 ],
                 onTapOutside: (_) => dismissKeyboard(context),
-                style: const TextStyle(color: Color(0xFFF0F4FF)),
+                style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
                   hintText:
                       'Amount (${widget.challenge.unit})',
                   hintStyle: const TextStyle(
-                      color: Color(0xFF8A8FA8)),
+                      color: AppColors.textMuted),
                   filled: true,
-                  fillColor: const Color(0xFF1C2029),
+                  fillColor: AppColors.surfaceCard,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
@@ -747,13 +749,13 @@ class _ManualProgressSheetState
                   padding: const EdgeInsets.symmetric(
                       vertical: 10, horizontal: 14),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1C2029),
+                    color: AppColors.surfaceCard,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
                     children: [
                       const Icon(Icons.camera_alt_rounded,
-                          color: Color(0xFF8A8FA8), size: 18),
+                          color: AppColors.textMuted, size: 18),
                       const SizedBox(width: 8),
                       Text(
                         _proofImage == null
@@ -761,8 +763,8 @@ class _ManualProgressSheetState
                             : 'Photo selected',
                         style: TextStyle(
                           color: _proofImage == null
-                              ? const Color(0xFF8A8FA8)
-                              : const Color(0xFF4ADE80),
+                              ? AppColors.textMuted
+                              : AppColors.success,
                           fontSize: 13,
                         ),
                       ),
@@ -776,7 +778,7 @@ class _ManualProgressSheetState
                 child: FilledButton(
                   onPressed: _uploading ? null : _submit,
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFB7FF00),
+                    backgroundColor: AppColors.accent,
                     foregroundColor: Colors.black,
                     minimumSize: const Size.fromHeight(48),
                     shape: RoundedRectangleBorder(
@@ -818,12 +820,12 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           children: [
             const Icon(Icons.emoji_events_outlined,
-                color: Color(0xFF8A8FA8), size: 48),
+                color: AppColors.textMuted, size: 48),
             const SizedBox(height: 12),
             const Text(
               'No challenges yet',
               style: TextStyle(
-                color: Color(0xFFF0F4FF),
+                color: AppColors.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
@@ -832,7 +834,7 @@ class _EmptyState extends StatelessWidget {
             const Text(
               'Create a challenge to motivate your circle',
               style: TextStyle(
-                color: Color(0xFF8A8FA8),
+                color: AppColors.textMuted,
                 fontSize: 13,
               ),
             ),
@@ -842,7 +844,7 @@ class _EmptyState extends StatelessWidget {
               icon: const Icon(Icons.add),
               label: const Text('New challenge'),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFB7FF00),
+                backgroundColor: AppColors.accent,
                 foregroundColor: Colors.black,
               ),
             ),

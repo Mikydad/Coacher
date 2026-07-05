@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../sync/cloud_sync_providers.dart';
 
+import 'app_colors.dart';
+
 /// App-wide cloud sync affordance: thin progress under the status bar.
 ///
 /// Visible on every main tab while [SyncService.syncFromRemote] runs so you can
@@ -10,7 +12,7 @@ import '../sync/cloud_sync_providers.dart';
 class CloudSyncGlobalIndicator extends ConsumerWidget {
   const CloudSyncGlobalIndicator({super.key});
 
-  static const _accent = Color(0xFFB7FF00);
+  static const _accent = AppColors.accent;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

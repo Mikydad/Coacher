@@ -11,6 +11,8 @@ import 'widgets/auth_google_sign_in_button.dart';
 import 'widgets/auth_primary_button.dart';
 import 'widgets/auth_text_field.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
 
@@ -124,7 +126,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     final goToLogin = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: AppColors.inkCard,
         title: const Text(
           'Account already exists',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -133,19 +135,19 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           'An account with this email already exists. '
           'Sign in to it instead? '
           'Your offline guest data won\'t be merged automatically.',
-          style: TextStyle(color: Color(0xFF888888), height: 1.5),
+          style: TextStyle(color: AppColors.textGray, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF888888))),
+                style: TextStyle(color: AppColors.textGray)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Sign in instead',
                 style: TextStyle(
-                    color: Color(0xFFB2ED00), fontWeight: FontWeight.w600)),
+                    color: AppColors.accentDim, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -165,7 +167,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF050806),
+      backgroundColor: AppColors.scaffold,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -248,21 +250,21 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     onChanged: _loading
                         ? null
                         : (v) => setState(() => _tosAccepted = v ?? false),
-                    activeColor: const Color(0xFFB2ED00),
+                    activeColor: AppColors.accentDim,
                     checkColor: Colors.black,
-                    side: const BorderSide(color: Color(0xFF444444), width: 1.5),
+                    side: const BorderSide(color: AppColors.textDim, width: 1.5),
                   ),
                   Expanded(
                     child: Text.rich(
                       TextSpan(
                         text: 'I agree to the ',
                         style: const TextStyle(
-                            color: Color(0xFF888888), fontSize: 13),
+                            color: AppColors.textGray, fontSize: 13),
                         children: [
                           TextSpan(
                             text: 'Terms of Service',
                             style: const TextStyle(
-                              color: Color(0xFFB2ED00),
+                              color: AppColors.accentDim,
                               decoration: TextDecoration.underline,
                             ),
                             recognizer: TapGestureRecognizer()
@@ -308,7 +310,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       children: [
         const Text(
           'Already have an account? ',
-          style: TextStyle(color: Color(0xFF888888), fontSize: 14),
+          style: TextStyle(color: AppColors.textGray, fontSize: 14),
         ),
         GestureDetector(
           onTap: _loading
@@ -320,7 +322,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           child: const Text(
             'Sign in',
             style: TextStyle(
-              color: Color(0xFFB2ED00),
+              color: AppColors.accentDim,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),

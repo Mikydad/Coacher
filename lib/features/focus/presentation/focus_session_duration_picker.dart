@@ -5,6 +5,8 @@ import '../../execution/application/execution_day_loader.dart';
 import '../../planning/domain/add_task_duration.dart';
 import '../../planning/domain/models/task_item.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 /// Quick duration picker before starting Focus on a reminder-only task.
 Future<int?> showFocusSessionDurationPicker(
   BuildContext context, {
@@ -12,7 +14,7 @@ Future<int?> showFocusSessionDurationPicker(
 }) {
   return showModalBottomSheet<int>(
     context: context,
-    backgroundColor: const Color(0xFF131313),
+    backgroundColor: AppColors.inkDeep,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
@@ -94,7 +96,7 @@ class _DurationChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFF201F1F),
+      color: AppColors.inkWarm,
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
         onTap: onTap,
@@ -104,7 +106,7 @@ class _DurationChip extends StatelessWidget {
           child: Text(
             label,
             style: const TextStyle(
-              color: Color(0xFFB7FF00),
+              color: AppColors.accent,
               fontWeight: FontWeight.w800,
               fontSize: 13,
               letterSpacing: 0.4,

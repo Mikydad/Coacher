@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../application/auth_providers.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 const String _kDismissedUntilKey = 'email_verification_banner_dismissed_until_ms';
 
 /// Non-blocking banner shown at the top of the screen when the signed-in user
@@ -132,18 +134,18 @@ class _Banner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      color: const Color(0xFF0A1600),
+      color: AppColors.limeInkDeep,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
           const Icon(Icons.mark_email_unread_outlined,
-              color: Color(0xFFB2ED00), size: 16),
+              color: AppColors.accentDim, size: 16),
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
               'Verify your email to unlock all features.',
               style: TextStyle(
-                  color: Color(0xFFD4F08A), fontSize: 12, height: 1.4),
+                  color: AppColors.limeSoft, fontSize: 12, height: 1.4),
             ),
           ),
           if (isLoading)
@@ -151,7 +153,7 @@ class _Banner extends StatelessWidget {
               width: 14,
               height: 14,
               child: CircularProgressIndicator(
-                  color: Color(0xFFB2ED00), strokeWidth: 1.5),
+                  color: AppColors.accentDim, strokeWidth: 1.5),
             )
           else
             TextButton(
@@ -165,7 +167,7 @@ class _Banner extends StatelessWidget {
               child: const Text(
                 'Resend',
                 style: TextStyle(
-                    color: Color(0xFFB2ED00),
+                    color: AppColors.accentDim,
                     fontSize: 12,
                     fontWeight: FontWeight.w600),
               ),
@@ -174,7 +176,7 @@ class _Banner extends StatelessWidget {
             onTap: onDismiss,
             child: const Padding(
               padding: EdgeInsets.only(left: 4),
-              child: Icon(Icons.close, color: Color(0xFF555555), size: 14),
+              child: Icon(Icons.close, color: AppColors.gray55, size: 14),
             ),
           ),
         ],

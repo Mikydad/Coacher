@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/goals_providers.dart';
 import '../../domain/models/goal_categories.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 /// Horizontally scrollable category filter chips.
 ///
 /// Replaces the previous bento-grid layout with a simpler, more mobile-friendly
@@ -63,11 +65,11 @@ class _CategoryChip extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFB7FF00) : const Color(0xFF1A1C1F),
+          color: selected ? AppColors.accent : AppColors.surfaceMuted,
           borderRadius: BorderRadius.circular(20),
           border: selected
               ? null
-              : Border.all(color: const Color(0xFF2A2D32)),
+              : Border.all(color: AppColors.dark2A2D32),
         ),
         child: Text(
           label,

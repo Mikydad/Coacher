@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../domain/models/ai_action.dart';
 import '../../domain/models/ai_planned_changes.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 class PlannedChangesCard extends StatelessWidget {
   const PlannedChangesCard({
     super.key,
@@ -29,7 +31,7 @@ class PlannedChangesCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF131313),
+        color: AppColors.inkDeep,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -41,7 +43,7 @@ class PlannedChangesCard extends StatelessWidget {
               fontSize: 11,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.10 * 11,
-              color: Color(0xFFADAAAA),
+              color: AppColors.textSoft,
             ),
           ),
           const SizedBox(height: 12),
@@ -116,7 +118,7 @@ class _ActionRow extends StatelessWidget {
                   description,
                   style: const TextStyle(
                     fontSize: 14,
-                    color: Color(0xFFE0E0E0),
+                    color: AppColors.grayBright,
                   ),
                 ),
               ),
@@ -130,7 +132,7 @@ class _ActionRow extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 11,
                   fontStyle: FontStyle.italic,
-                  color: Color(0xFFADAAAA),
+                  color: AppColors.textSoft,
                 ),
               ),
             ),
@@ -144,7 +146,7 @@ class _ActionRow extends StatelessWidget {
       case ActionType.createTask:
       case ActionType.createGoal:
       case ActionType.addReminder:
-        return (icon: Icons.add_rounded, color: const Color(0xFFB2ED00));
+        return (icon: Icons.add_rounded, color: AppColors.accentDim);
 
       case ActionType.deleteTask:
       case ActionType.deleteGoal:
@@ -155,15 +157,15 @@ class _ActionRow extends StatelessWidget {
       case ActionType.moveTask:
       case ActionType.modifyGoal:
       case ActionType.rescheduleReminder:
-        return (icon: Icons.edit_rounded, color: const Color(0xFFADAAAA));
+        return (icon: Icons.edit_rounded, color: AppColors.textSoft);
 
       case ActionType.activateContextOverride:
       case ActionType.endContextOverride:
-        return (icon: Icons.shield_rounded, color: const Color(0xFF00E3FD));
+        return (icon: Icons.shield_rounded, color: AppColors.cyan);
 
       case ActionType.suggestFreeTimeBlock:
       case ActionType.moveConflictingTasks:
-        return (icon: Icons.schedule_rounded, color: const Color(0xFF00E3FD));
+        return (icon: Icons.schedule_rounded, color: AppColors.cyan);
     }
   }
 
@@ -233,8 +235,8 @@ class _ConflictRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final bg = isBlocking
         ? Colors.red.withValues(alpha: 0.15)
-        : const Color(0xFFFFA726).withValues(alpha: 0.15);
-    final textColor = isBlocking ? Colors.redAccent : const Color(0xFFFFA726);
+        : AppColors.amber.withValues(alpha: 0.15);
+    final textColor = isBlocking ? Colors.redAccent : AppColors.amber;
     final icon = isBlocking ? Icons.block_rounded : Icons.warning_amber_rounded;
 
     return Container(
@@ -334,9 +336,9 @@ class _ActionButtons extends StatelessWidget {
 
     final confirmBg = isBlocked
         ? Colors.red.withValues(alpha: 0.85)
-        : const Color(0xFFBEFC00);
+        : AppColors.accentBright;
     final confirmFg =
-        isBlocked ? Colors.white : const Color(0xFF445D00);
+        isBlocked ? Colors.white : AppColors.accentDeep;
 
     return Column(
       children: [
@@ -382,7 +384,7 @@ class _ActionButtons extends StatelessWidget {
               child: OutlinedButton(
                 onPressed: isLoading ? null : onEdit,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFADAAAA),
+                  foregroundColor: AppColors.textSoft,
                   side: BorderSide(
                     color: Colors.white.withValues(alpha: 0.15),
                   ),
@@ -449,11 +451,11 @@ class _ExecutedLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Row(
       children: [
-        Icon(Icons.check_circle_outline_rounded, size: 14, color: Color(0xFFADAAAA)),
+        Icon(Icons.check_circle_outline_rounded, size: 14, color: AppColors.textSoft),
         SizedBox(width: 6),
         Text(
           'Applied',
-          style: TextStyle(fontSize: 12, color: Color(0xFFADAAAA)),
+          style: TextStyle(fontSize: 12, color: AppColors.textSoft),
         ),
       ],
     );

@@ -17,6 +17,8 @@ import '../../timer/presentation/timer_session_screen.dart';
 import '../../home/presentation/quittr_app_bar_title.dart';
 import 'focus_session_duration_picker.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 class FocusLaunchArgs {
   const FocusLaunchArgs({
     required this.taskId,
@@ -262,7 +264,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
         children: [
           const Text(
             'SELECTION MODE',
-            style: TextStyle(letterSpacing: 3, color: Color(0xFF00E6FF)),
+            style: TextStyle(letterSpacing: 3, color: AppColors.cyan),
           ),
           const SizedBox(height: 12),
           const Text(
@@ -345,8 +347,8 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(60),
               backgroundColor: hasRunningTask
-                  ? const Color(0xFF2B2D31)
-                  : const Color(0xFFB7FF00),
+                  ? AppColors.dark2B2D31
+                  : AppColors.accent,
               foregroundColor: hasRunningTask ? Colors.white : Colors.black,
             ),
             onPressed: hasRunningTask
@@ -390,13 +392,13 @@ class _TaskCard extends StatelessWidget {
       child: Ink(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFF111317),
+          color: AppColors.surfacePanel,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: selected
-                ? const Color(0xFFB7FF00)
+                ? AppColors.accent
                 : isPartial
-                ? const Color(0xFFFFA726).withValues(alpha: 0.55)
+                ? AppColors.amber.withValues(alpha: 0.55)
                 : Colors.white12,
           ),
         ),
@@ -413,7 +415,7 @@ class _TaskCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 26,
                 color: isPartial
-                    ? const Color(0xFFFFA726)
+                    ? AppColors.amber
                     : Colors.white60,
               ),
             ),

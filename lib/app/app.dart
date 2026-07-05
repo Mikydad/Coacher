@@ -33,6 +33,8 @@ import '../features/settings/presentation/reminder_settings_screen.dart';
 import '../features/tasks_hub/presentation/tasks_hub_screen.dart';
 import '../features/timer/presentation/timer_session_screen.dart';
 
+import '../core/presentation/app_colors.dart';
+
 class CoachForLifeApp extends StatelessWidget {
   const CoachForLifeApp({super.key});
 
@@ -44,9 +46,9 @@ class CoachForLifeApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF050806),
+        scaffoldBackgroundColor: AppColors.scaffold,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFB7FF00),
+          seedColor: AppColors.accent,
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
@@ -157,7 +159,7 @@ class _CoachTabRedirect extends ConsumerWidget {
       Navigator.of(context).popUntil((route) => route.isFirst);
     });
     return const Scaffold(
-      backgroundColor: Color(0xFF050806),
+      backgroundColor: AppColors.scaffold,
       body: SizedBox.shrink(),
     );
   }

@@ -9,6 +9,8 @@ import 'auth_error_text.dart';
 import 'auth_primary_button.dart';
 import 'auth_text_field.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 /// Email + password sign-in fields shared by [LoginScreen] and landing.
 class AuthEmailPasswordForm extends ConsumerStatefulWidget {
   const AuthEmailPasswordForm({
@@ -134,7 +136,7 @@ class _AuthEmailPasswordFormState extends ConsumerState<AuthEmailPasswordForm> {
                 : null,
             child: const Text(
               'Forgot password?',
-              style: TextStyle(color: Color(0xFF888888), fontSize: 13),
+              style: TextStyle(color: AppColors.textGray, fontSize: 13),
             ),
           ),
         ),

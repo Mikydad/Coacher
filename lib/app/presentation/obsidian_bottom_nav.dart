@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/ai_assistant/application/ai_assistant_providers.dart';
 
+import '../../core/presentation/app_colors.dart';
+
 /// Translucent “watermark” footer shared across main tabs.
 class ObsidianBottomNav extends ConsumerWidget {
   const ObsidianBottomNav({
@@ -25,9 +27,9 @@ class ObsidianBottomNav extends ConsumerWidget {
     (icon: Icons.person_rounded, label: 'Profile'),
   ];
 
-  static const _kSurface = Color(0xFF0E0E0E);
-  static const _kVariant = Color(0xFFADAAAA);
-  static const _kActive = Color(0xFFB7FF00);
+  static const _kSurface = AppColors.ink;
+  static const _kVariant = AppColors.textSoft;
+  static const _kActive = AppColors.accent;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

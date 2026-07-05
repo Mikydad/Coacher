@@ -8,6 +8,8 @@ import '../../domain/models/accountability_circle.dart';
 import '../../domain/models/circle_enums.dart';
 import '../sheets/circle_notif_prefs_sheet.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 class CircleInfoView extends ConsumerWidget {
   const CircleInfoView({super.key, required this.circleId});
 
@@ -21,11 +23,11 @@ class CircleInfoView extends ConsumerWidget {
 
     return circleAsync.when(
       loading: () => const Center(
-        child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
+        child: CircularProgressIndicator(color: AppColors.accent),
       ),
       error: (_, __) => const Center(
         child: Text('Could not load circle info.',
-            style: TextStyle(color: Color(0xFF8A8FA8))),
+            style: TextStyle(color: AppColors.textMuted)),
       ),
       data: (circle) {
         if (circle == null) return const SizedBox.shrink();
@@ -44,9 +46,9 @@ class CircleInfoView extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF14171C),
+                color: AppColors.surfaceDark,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF2A2F3D)),
+                border: Border.all(color: AppColors.surfaceSlate),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -54,7 +56,7 @@ class CircleInfoView extends ConsumerWidget {
                   Text(
                     circle.name,
                     style: const TextStyle(
-                      color: Color(0xFFF0F4FF),
+                      color: AppColors.textPrimary,
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
                     ),
@@ -64,7 +66,7 @@ class CircleInfoView extends ConsumerWidget {
                     Text(
                       circle.description!,
                       style: const TextStyle(
-                        color: Color(0xFF8A8FA8),
+                        color: AppColors.textMuted,
                         fontSize: 14,
                       ),
                     ),
@@ -104,7 +106,7 @@ class CircleInfoView extends ConsumerWidget {
                     value: '${circle.currentStreak}',
                     suffix: 'days',
                     icon: Icons.local_fire_department_rounded,
-                    color: const Color(0xFFFF8C42),
+                    color: AppColors.orange,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -114,7 +116,7 @@ class CircleInfoView extends ConsumerWidget {
                     value: '${circle.longestStreak}',
                     suffix: 'days',
                     icon: Icons.emoji_events_rounded,
-                    color: const Color(0xFFFFD700),
+                    color: AppColors.gold,
                   ),
                 ),
               ],
@@ -127,7 +129,7 @@ class CircleInfoView extends ConsumerWidget {
             ...moderators.map(
               (m) => _InfoTile(
                 leading: const Icon(Icons.shield_rounded,
-                    color: Color(0xFFB7FF00), size: 18),
+                    color: AppColors.accent, size: 18),
                 title: m.userId == uid ? '${m.displayName} (you)' : m.displayName,
               ),
             ),
@@ -168,13 +170,13 @@ class CircleInfoView extends ConsumerWidget {
               OutlinedButton.icon(
                 onPressed: () => _confirmDelete(context, ref, circle.name),
                 icon: const Icon(Icons.delete_forever_rounded,
-                    color: Color(0xFFFF4D4D)),
+                    color: AppColors.danger),
                 label: const Text(
                   'Delete circle',
-                  style: TextStyle(color: Color(0xFFFF4D4D)),
+                  style: TextStyle(color: AppColors.danger),
                 ),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFFF4D4D)),
+                  side: const BorderSide(color: AppColors.danger),
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -185,13 +187,13 @@ class CircleInfoView extends ConsumerWidget {
               OutlinedButton.icon(
                 onPressed: () => _confirmLeave(context, ref, uid),
                 icon: const Icon(Icons.exit_to_app_rounded,
-                    color: Color(0xFFFF4D4D)),
+                    color: AppColors.danger),
                 label: const Text(
                   'Leave circle',
-                  style: TextStyle(color: Color(0xFFFF4D4D)),
+                  style: TextStyle(color: AppColors.danger),
                 ),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFFF4D4D)),
+                  side: const BorderSide(color: AppColors.danger),
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -210,24 +212,24 @@ class CircleInfoView extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF14171C),
+        backgroundColor: AppColors.surfaceDark,
         title: const Text('Delete circle?',
-            style: TextStyle(color: Color(0xFFF0F4FF))),
+            style: TextStyle(color: AppColors.textPrimary)),
         content: Text(
           'This will permanently delete "$circleName" and remove all members. '
           'This cannot be undone.',
-          style: const TextStyle(color: Color(0xFF8A8FA8)),
+          style: const TextStyle(color: AppColors.textMuted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF8A8FA8))),
+                style: TextStyle(color: AppColors.textMuted)),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFFF4D4D),
+              backgroundColor: AppColors.danger,
               foregroundColor: Colors.white,
             ),
             child: const Text('Delete'),
@@ -256,23 +258,23 @@ class CircleInfoView extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF14171C),
+        backgroundColor: AppColors.surfaceDark,
         title: const Text('Leave circle?',
-            style: TextStyle(color: Color(0xFFF0F4FF))),
+            style: TextStyle(color: AppColors.textPrimary)),
         content: const Text(
           'You will lose access to the chat, challenges, and activity feed.',
-          style: TextStyle(color: Color(0xFF8A8FA8)),
+          style: TextStyle(color: AppColors.textMuted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF8A8FA8))),
+                style: TextStyle(color: AppColors.textMuted)),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFFF4D4D),
+              backgroundColor: AppColors.danger,
               foregroundColor: Colors.white,
             ),
             child: const Text('Leave'),
@@ -307,7 +309,7 @@ class _SectionLabel extends StatelessWidget {
     return Text(
       text.toUpperCase(),
       style: const TextStyle(
-        color: Color(0xFF8A8FA8),
+        color: AppColors.textMuted,
         fontSize: 11,
         fontWeight: FontWeight.w600,
         letterSpacing: 0.8,
@@ -326,17 +328,17 @@ class _Chip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C2029),
+        color: AppColors.surfaceCard,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: const Color(0xFF8A8FA8)),
+          Icon(icon, size: 12, color: AppColors.textMuted),
           const SizedBox(width: 4),
           Text(
             label,
-            style: const TextStyle(color: Color(0xFF8A8FA8), fontSize: 12),
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
           ),
         ],
       ),
@@ -360,7 +362,7 @@ class _InfoTile extends StatelessWidget {
           Text(
             title,
             style: const TextStyle(
-                color: Color(0xFFF0F4FF), fontSize: 14),
+                color: AppColors.textPrimary, fontSize: 14),
           ),
         ],
       ),
@@ -386,24 +388,24 @@ class _SettingsTile extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF14171C),
+          color: AppColors.surfaceDark,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [
-            Icon(icon, color: const Color(0xFF8A8FA8), size: 18),
+            Icon(icon, color: AppColors.textMuted, size: 18),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 title,
                 style: const TextStyle(
-                  color: Color(0xFFF0F4FF),
+                  color: AppColors.textPrimary,
                   fontSize: 14,
                 ),
               ),
             ),
             const Icon(Icons.chevron_right_rounded,
-                color: Color(0xFF8A8FA8), size: 18),
+                color: AppColors.textMuted, size: 18),
           ],
         ),
       ),
@@ -430,9 +432,9 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF14171C),
+        color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2A2F3D)),
+        border: Border.all(color: AppColors.surfaceSlate),
       ),
       child: Row(
         children: [
@@ -444,7 +446,7 @@ class _StatCard extends StatelessWidget {
               Text(
                 label,
                 style: const TextStyle(
-                  color: Color(0xFF8A8FA8),
+                  color: AppColors.textMuted,
                   fontSize: 11,
                 ),
               ),
@@ -464,7 +466,7 @@ class _StatCard extends StatelessWidget {
                   Text(
                     suffix,
                     style: const TextStyle(
-                      color: Color(0xFF8A8FA8),
+                      color: AppColors.textMuted,
                       fontSize: 11,
                     ),
                   ),

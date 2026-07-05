@@ -8,6 +8,8 @@ import '../domain/models/user_goal.dart';
 import '../application/goal_period_helpers.dart';
 import 'goal_detail_screen.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 class GoalsArchiveScreen extends ConsumerWidget {
   const GoalsArchiveScreen({super.key});
 
@@ -58,7 +60,7 @@ class _ArchiveTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = goal.status == GoalStatus.paused ? 'Paused' : 'Completed';
     return Card(
-      color: const Color(0xFF1A1C1F),
+      color: AppColors.surfaceMuted,
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
         title: Text(goal.title, style: const TextStyle(fontWeight: FontWeight.w700)),

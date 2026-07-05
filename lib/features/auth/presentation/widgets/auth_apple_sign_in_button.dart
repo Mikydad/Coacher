@@ -7,6 +7,8 @@ import '../../domain/auth_failure.dart';
 import 'auth_error_text.dart';
 import 'auth_google_sign_in_button.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 /// Whether Sign in with Apple should be offered on this platform.
 bool get isAppleSignInSupported =>
     !kIsWeb &&
@@ -68,7 +70,7 @@ class _AuthAppleSignInButtonState extends ConsumerState<AuthAppleSignInButton> {
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
               backgroundColor: Colors.white,
-              side: const BorderSide(color: Color(0xFF2E2E2E), width: 1.5),
+              side: const BorderSide(color: AppColors.inkSoft, width: 1.5),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -79,7 +81,7 @@ class _AuthAppleSignInButtonState extends ConsumerState<AuthAppleSignInButton> {
                     width: 22,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Color(0xFF888888),
+                      color: AppColors.textGray,
                     ),
                   )
                 : const Row(

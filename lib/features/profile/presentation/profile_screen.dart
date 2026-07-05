@@ -17,21 +17,23 @@ import '../../settings/presentation/reminder_settings_screen.dart';
 import '../../analytics/application/discipline_score.dart';
 import '../application/profile_providers.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 // ─── Design tokens (Obsidian Pulse) ──────────────────────────────────────────
 
-const _kPrimary = Color(0xFFEAFFB8);
-const _kPrimaryDim = Color(0xFFB2ED00);
-const _kSecondary = Color(0xFF00E3FD);
-const _kSurface = Color(0xFF0E0E0E);
-const _kSurfaceLow = Color(0xFF131313);
-const _kSurfaceHigh = Color(0xFF201F1F);
-const _kSurfaceHighest = Color(0xFF262626);
-const _kOnSurface = Color(0xFFFFFFFF);
-const _kOnSurfaceVariant = Color(0xFFADAAAA);
-const _kOnPrimaryFixed = Color(0xFF354900);
-const _kError = Color(0xFFFF7351);
-const _kPrimaryContainer = Color(0xFFBEFC00);
-const _kOnPrimaryContainer = Color(0xFF445D00);
+const _kPrimary = AppColors.limeCream;
+const _kPrimaryDim = AppColors.accentDim;
+const _kSecondary = AppColors.cyan;
+const _kSurface = AppColors.ink;
+const _kSurfaceLow = AppColors.inkDeep;
+const _kSurfaceHigh = AppColors.inkWarm;
+const _kSurfaceHighest = AppColors.inkElevated;
+const _kOnSurface = AppColors.white;
+const _kOnSurfaceVariant = AppColors.textSoft;
+const _kOnPrimaryFixed = AppColors.limeShadow;
+const _kError = AppColors.coral;
+const _kPrimaryContainer = AppColors.accentBright;
+const _kOnPrimaryContainer = AppColors.accentDeep;
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});

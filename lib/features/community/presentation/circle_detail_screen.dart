@@ -18,6 +18,8 @@ import 'views/circle_challenges_view.dart';
 import 'views/circle_info_view.dart';
 import 'views/weekly_commitments_view.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 class CircleDetailScreen extends ConsumerStatefulWidget {
   const CircleDetailScreen({super.key, required this.circleId});
 
@@ -80,9 +82,9 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
 
     if (authAsync.isLoading && !authAsync.hasValue) {
       return const Scaffold(
-        backgroundColor: Color(0xFF0D0F12),
+        backgroundColor: AppColors.surfaceDeep,
         body: Center(
-          child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
+          child: CircularProgressIndicator(color: AppColors.accent),
         ),
       );
     }
@@ -101,10 +103,10 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0F12),
+      backgroundColor: AppColors.surfaceDeep,
       body: circleAsync.when(
         loading: () => const Center(
-          child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
+          child: CircularProgressIndicator(color: AppColors.accent),
         ),
         error: (e, _) => Center(
           child: Padding(
@@ -114,7 +116,7 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                   ? 'Could not load circle.\n$e'
                   : 'Could not load circle.',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF8A8FA8)),
+              style: const TextStyle(color: AppColors.textMuted),
             ),
           ),
         ),
@@ -123,7 +125,7 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
             // Navigation is handled by the listener above; show a brief
             // loading indicator while the pop animation plays.
             return const Center(
-              child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
+              child: CircularProgressIndicator(color: AppColors.accent),
             );
           }
 
@@ -136,8 +138,8 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
             child: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) => [
               SliverAppBar(
-                backgroundColor: const Color(0xFF14171C),
-                foregroundColor: const Color(0xFFF0F4FF),
+                backgroundColor: AppColors.surfaceDark,
+                foregroundColor: AppColors.textPrimary,
                 expandedHeight: 200,
                 pinned: true,
                 floating: false,
@@ -154,9 +156,9 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                   child: TabBar(
                     controller: _tabController,
                     isScrollable: true,
-                    labelColor: const Color(0xFFB7FF00),
-                    unselectedLabelColor: const Color(0xFF8A8FA8),
-                    indicatorColor: const Color(0xFFB7FF00),
+                    labelColor: AppColors.accent,
+                    unselectedLabelColor: AppColors.textMuted,
+                    indicatorColor: AppColors.accent,
                     indicatorSize: TabBarIndicatorSize.label,
                     tabAlignment: TabAlignment.start,
                     tabs: _tabs.map((t) => Tab(text: t)).toList(),
@@ -210,7 +212,7 @@ class _CircleHeader extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         // Dark background
-        Container(color: const Color(0xFF0D0F12)),
+        Container(color: AppColors.surfaceDeep),
         // Glass card
         Positioned.fill(
           child: ClipRRect(
@@ -234,7 +236,7 @@ class _CircleHeader extends StatelessWidget {
                       child: Text(
                         circleName,
                         style: const TextStyle(
-                          color: Color(0xFFF0F4FF),
+                          color: AppColors.textPrimary,
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
                         ),
@@ -249,7 +251,7 @@ class _CircleHeader extends StatelessWidget {
                 Text(
                   '$memberCount / ${AccountabilityCircleConst.kMaxMembers} members',
                   style: const TextStyle(
-                    color: Color(0xFF8A8FA8),
+                    color: AppColors.textMuted,
                     fontSize: 13,
                   ),
                 ),
@@ -274,10 +276,10 @@ class _StreakBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFB7FF00).withOpacity(0.15),
+        color: AppColors.accent.withOpacity(0.15),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFFB7FF00).withOpacity(0.3),
+          color: AppColors.accent.withOpacity(0.3),
         ),
       ),
       child: Row(
@@ -288,7 +290,7 @@ class _StreakBadge extends StatelessWidget {
           Text(
             '$streak day${streak == 1 ? '' : 's'}',
             style: const TextStyle(
-              color: Color(0xFFB7FF00),
+              color: AppColors.accent,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -304,14 +306,14 @@ class _MemberAvatarRow extends StatelessWidget {
   final List<CircleMember> members;
 
   static const _colors = [
-    Color(0xFFB7FF00),
-    Color(0xFF00CFFF),
-    Color(0xFFFF8C42),
-    Color(0xFFFF4D9E),
-    Color(0xFF7B61FF),
-    Color(0xFF00FF9F),
-    Color(0xFFFFD600),
-    Color(0xFFFF4D4D),
+    AppColors.accent,
+    AppColors.cyanDeep,
+    AppColors.orange,
+    AppColors.pink,
+    AppColors.violet,
+    AppColors.mint,
+    AppColors.yellow,
+    AppColors.danger,
   ];
 
   Color _colorFor(String userId) =>
@@ -364,7 +366,7 @@ class _PlaceholderTab extends StatelessWidget {
     return Center(
       child: Text(
         message,
-        style: const TextStyle(color: Color(0xFF8A8FA8), fontSize: 15),
+        style: const TextStyle(color: AppColors.textMuted, fontSize: 15),
       ),
     );
   }

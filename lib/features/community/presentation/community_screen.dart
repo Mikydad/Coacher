@@ -7,6 +7,8 @@ import 'circle_create_screen.dart';
 import 'circle_detail_screen.dart';
 import 'circle_discovery_screen.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 class CommunityScreen extends ConsumerWidget {
   const CommunityScreen({super.key});
 
@@ -18,14 +20,14 @@ class CommunityScreen extends ConsumerWidget {
     final circlesAsync = ref.watch(myCirclesProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0F12),
+      backgroundColor: AppColors.surfaceDeep,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF14171C),
-        foregroundColor: const Color(0xFFF0F4FF),
+        backgroundColor: AppColors.surfaceDark,
+        foregroundColor: AppColors.textPrimary,
         title: const Text(
           'My Circles',
           style: TextStyle(
-            color: Color(0xFFF0F4FF),
+            color: AppColors.textPrimary,
             fontWeight: FontWeight.w700,
             fontSize: 20,
           ),
@@ -34,7 +36,7 @@ class CommunityScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.explore_rounded,
-                color: Color(0xFF8A8FA8)),
+                color: AppColors.textMuted),
             tooltip: 'Discover circles',
             onPressed: () => Navigator.pushNamed(
                 context, CircleDiscoveryScreen.routeName),
@@ -43,16 +45,16 @@ class CommunityScreen extends ConsumerWidget {
       ),
       body: (idsAsync.isLoading && !idsAsync.hasValue)
           ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
+              child: CircularProgressIndicator(color: AppColors.accent),
             )
           : circlesAsync.when(
         loading: () => const Center(
-          child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
+          child: CircularProgressIndicator(color: AppColors.accent),
         ),
         error: (_, __) => const Center(
           child: Text(
             'Could not load circles.',
-            style: TextStyle(color: Color(0xFF8A8FA8)),
+            style: TextStyle(color: AppColors.textMuted),
           ),
         ),
         data: (circles) {
@@ -65,8 +67,8 @@ class CommunityScreen extends ConsumerWidget {
             );
           }
           return RefreshIndicator(
-            color: const Color(0xFFB7FF00),
-            backgroundColor: const Color(0xFF14171C),
+            color: AppColors.accent,
+            backgroundColor: AppColors.surfaceDark,
             onRefresh: () async => invalidateCircleScopedProviders(ref),
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
@@ -87,7 +89,7 @@ class CommunityScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'community_tab_fab',
         onPressed: () => _showCreateOrDiscover(context),
-        backgroundColor: const Color(0xFFB7FF00),
+        backgroundColor: AppColors.accent,
         foregroundColor: Colors.black,
         icon: const Icon(Icons.add_rounded),
         label: const Text(
@@ -101,7 +103,7 @@ class CommunityScreen extends ConsumerWidget {
   void _showCreateOrDiscover(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF14171C),
+      backgroundColor: AppColors.surfaceDark,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -121,19 +123,19 @@ class CommunityScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             ListTile(
               leading: const CircleAvatar(
-                backgroundColor: Color(0xFF1C2029),
-                child: Icon(Icons.add_rounded, color: Color(0xFFB7FF00)),
+                backgroundColor: AppColors.surfaceCard,
+                child: Icon(Icons.add_rounded, color: AppColors.accent),
               ),
               title: const Text(
                 'Create a circle',
                 style: TextStyle(
-                  color: Color(0xFFF0F4FF),
+                  color: AppColors.textPrimary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               subtitle: const Text(
                 'Start a new accountability circle',
-                style: TextStyle(color: Color(0xFF8A8FA8), fontSize: 13),
+                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
               ),
               onTap: () {
                 Navigator.pop(ctx);
@@ -142,19 +144,19 @@ class CommunityScreen extends ConsumerWidget {
             ),
             ListTile(
               leading: const CircleAvatar(
-                backgroundColor: Color(0xFF1C2029),
-                child: Icon(Icons.explore_rounded, color: Color(0xFF00CFFF)),
+                backgroundColor: AppColors.surfaceCard,
+                child: Icon(Icons.explore_rounded, color: AppColors.cyanDeep),
               ),
               title: const Text(
                 'Discover circles',
                 style: TextStyle(
-                  color: Color(0xFFF0F4FF),
+                  color: AppColors.textPrimary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               subtitle: const Text(
                 'Browse and join existing circles',
-                style: TextStyle(color: Color(0xFF8A8FA8), fontSize: 13),
+                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
               ),
               onTap: () {
                 Navigator.pop(ctx);
@@ -192,12 +194,12 @@ class _EmptyState extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: const Color(0xFF1C2029),
+                color: AppColors.surfaceCard,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Icon(
                 Icons.group_rounded,
-                color: Color(0xFF8A8FA8),
+                color: AppColors.textMuted,
                 size: 36,
               ),
             ),
@@ -206,7 +208,7 @@ class _EmptyState extends StatelessWidget {
               "You're not in any circles yet",
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Color(0xFFF0F4FF),
+                color: AppColors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
@@ -216,7 +218,7 @@ class _EmptyState extends StatelessWidget {
               'Join a circle to stay accountable with others who share your goals.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Color(0xFF8A8FA8),
+                color: AppColors.textMuted,
                 fontSize: 14,
                 height: 1.5,
               ),
@@ -227,7 +229,7 @@ class _EmptyState extends StatelessWidget {
               child: FilledButton(
                 onPressed: onCreate,
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFB7FF00),
+                  backgroundColor: AppColors.accent,
                   foregroundColor: Colors.black,
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
@@ -246,7 +248,7 @@ class _EmptyState extends StatelessWidget {
               child: OutlinedButton(
                 onPressed: onDiscover,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFF0F4FF),
+                  foregroundColor: AppColors.textPrimary,
                   side: BorderSide(color: Colors.white.withOpacity(0.12)),
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
@@ -281,7 +283,7 @@ class _MyCircleCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF14171C),
+          color: AppColors.surfaceDark,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: Colors.white.withOpacity(0.06)),
         ),
@@ -292,7 +294,7 @@ class _MyCircleCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: const Color(0xFFB7FF00).withOpacity(0.12),
+                color: AppColors.accent.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Center(
@@ -301,7 +303,7 @@ class _MyCircleCard extends StatelessWidget {
                       ? circle.category[0].toUpperCase()
                       : '?',
                   style: const TextStyle(
-                    color: Color(0xFFB7FF00),
+                    color: AppColors.accent,
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                   ),
@@ -316,7 +318,7 @@ class _MyCircleCard extends StatelessWidget {
                   Text(
                     circle.name,
                     style: const TextStyle(
-                      color: Color(0xFFF0F4FF),
+                      color: AppColors.textPrimary,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -327,12 +329,12 @@ class _MyCircleCard extends StatelessWidget {
                   Row(
                     children: [
                       const Icon(Icons.group_rounded,
-                          size: 13, color: Color(0xFF8A8FA8)),
+                          size: 13, color: AppColors.textMuted),
                       const SizedBox(width: 4),
                       Text(
                         '${circle.memberCount}/${AccountabilityCircle.kMaxMembers}',
                         style: const TextStyle(
-                          color: Color(0xFF8A8FA8),
+                          color: AppColors.textMuted,
                           fontSize: 13,
                         ),
                       ),
@@ -356,7 +358,7 @@ class _MyCircleCard extends StatelessWidget {
                       Text(
                         '${circle.currentStreak}',
                         style: const TextStyle(
-                          color: Color(0xFFB7FF00),
+                          color: AppColors.accent,
                           fontWeight: FontWeight.w700,
                           fontSize: 13,
                         ),
@@ -365,7 +367,7 @@ class _MyCircleCard extends StatelessWidget {
                   ),
                 const SizedBox(height: 4),
                 const Icon(Icons.chevron_right_rounded,
-                    color: Color(0xFF8A8FA8)),
+                    color: AppColors.textMuted),
               ],
             ),
           ],
@@ -384,13 +386,13 @@ class _CategoryBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C2029),
+        color: AppColors.surfaceCard,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         category[0].toUpperCase() + category.substring(1),
         style: const TextStyle(
-          color: Color(0xFF8A8FA8),
+          color: AppColors.textMuted,
           fontSize: 11,
         ),
       ),

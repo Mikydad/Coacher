@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 // ─── User bubble ─────────────────────────────────────────────────────────────
 
 class UserMessageBubble extends StatelessWidget {
@@ -18,7 +20,7 @@ class UserMessageBubble extends StatelessWidget {
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
         decoration: const BoxDecoration(
-          color: Color(0xFF262626),
+          color: AppColors.inkElevated,
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(16),
             topRight: Radius.circular(4),
@@ -57,7 +59,7 @@ class AssistantMessageBubble extends StatelessWidget {
         child: Text.rich(
           markdownLiteSpan(
             content,
-            const TextStyle(fontSize: 14, color: Color(0xFFADAAAA)),
+            const TextStyle(fontSize: 14, color: AppColors.textSoft),
           ),
         ),
       ),
@@ -167,7 +169,7 @@ class _ThinkingIndicatorState extends State<ThinkingIndicator>
                   height: 8,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFF00E3FD).withValues(alpha: opacity.clamp(0.3, 1.0)),
+                    color: AppColors.cyan.withValues(alpha: opacity.clamp(0.3, 1.0)),
                   ),
                 );
               },

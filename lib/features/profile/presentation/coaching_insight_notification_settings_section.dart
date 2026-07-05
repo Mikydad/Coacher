@@ -5,6 +5,8 @@ import '../../../core/di/providers.dart';
 import '../../analytics/application/coaching_insight_notification_policy.dart';
 import '../application/profile_providers.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 /// Toggle and copy for coaching insight push notifications (Profile / Settings).
 class CoachingInsightNotificationSettingsSection extends ConsumerWidget {
   const CoachingInsightNotificationSettingsSection({super.key});
@@ -52,7 +54,7 @@ class CoachingInsightNotificationSettingsSection extends ConsumerWidget {
                     style: const TextStyle(
                       fontSize: 12,
                       height: 1.35,
-                      color: Color(0xFFADAAAA),
+                      color: AppColors.textSoft,
                     ),
                   ),
                   if (enabled && sentToday > 0) ...[
@@ -61,7 +63,7 @@ class CoachingInsightNotificationSettingsSection extends ConsumerWidget {
                       'Sent today: $sentToday / $kMaxCoachingInsightNotificationsPerDay',
                       style: const TextStyle(
                         fontSize: 11,
-                        color: Color(0xFFB2ED00),
+                        color: AppColors.accentDim,
                       ),
                     ),
                   ],
@@ -70,8 +72,8 @@ class CoachingInsightNotificationSettingsSection extends ConsumerWidget {
             ),
             Switch.adaptive(
               value: enabled,
-              activeTrackColor: const Color(0xFFBEFC00).withValues(alpha: 0.5),
-              activeThumbColor: const Color(0xFFBEFC00),
+              activeTrackColor: AppColors.accentBright.withValues(alpha: 0.5),
+              activeThumbColor: AppColors.accentBright,
               onChanged: prefAsync.isLoading
                   ? null
                   : (v) async {

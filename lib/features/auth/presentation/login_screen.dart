@@ -6,6 +6,8 @@ import 'widgets/auth_apple_sign_in_button.dart';
 import 'widgets/auth_email_password_form.dart';
 import 'widgets/auth_google_sign_in_button.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 class LoginScreen extends ConsumerWidget {
   const LoginScreen({super.key, this.prefillEmail});
 
@@ -16,7 +18,7 @@ class LoginScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      backgroundColor: const Color(0xFF050806),
+      backgroundColor: AppColors.scaffold,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -42,7 +44,7 @@ class LoginScreen extends ConsumerWidget {
                 children: [
                   const Text(
                     "Don't have an account? ",
-                    style: TextStyle(color: Color(0xFF888888), fontSize: 14),
+                    style: TextStyle(color: AppColors.textGray, fontSize: 14),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.pushReplacementNamed(
@@ -52,7 +54,7 @@ class LoginScreen extends ConsumerWidget {
                     child: const Text(
                       'Create one',
                       style: TextStyle(
-                        color: Color(0xFFB2ED00),
+                        color: AppColors.accentDim,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),

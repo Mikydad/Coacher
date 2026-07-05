@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/quick_directives_provider.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 class QuickDirective {
   const QuickDirective({required this.label, required this.startingText});
 
@@ -133,7 +135,7 @@ class _DirectiveChip extends StatelessWidget {
           style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: Color(0xFFADAAAA),
+            color: AppColors.textSoft,
           ),
         ),
       ),

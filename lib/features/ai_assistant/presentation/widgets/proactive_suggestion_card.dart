@@ -7,6 +7,8 @@ import '../../../ai_assistant/presentation/ai_assistant_screen.dart';
 import '../../application/ai_assistant_providers.dart';
 import '../../domain/models/proactive_suggestion.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 /// Displays a single proactive suggestion with "Let's do it" and "Not now"
 /// actions. Slides in on mount and slides out on dismissal.
 class ProactiveSuggestionCard extends ConsumerStatefulWidget {
@@ -31,9 +33,9 @@ class _ProactiveSuggestionCardState
   late final Animation<double> _opacity;
   late final Animation<Offset> _slide;
 
-  static const _kAccent = Color(0xFFB2ED00);
-  static const _kSurface = Color(0xFF201f1f);
-  static const _kVariant = Color(0xFFADAAAA);
+  static const _kAccent = AppColors.accentDim;
+  static const _kSurface = AppColors.inkWarm;
+  static const _kVariant = AppColors.textSoft;
 
   @override
   void initState() {
@@ -193,7 +195,7 @@ class _ProactiveSuggestionCardState
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF1A2800),
+                            color: AppColors.limeInk,
                           ),
                         ),
                       ),

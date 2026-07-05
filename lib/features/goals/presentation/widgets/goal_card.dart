@@ -10,16 +10,18 @@ import '../../domain/models/goal_enums.dart';
 import '../../domain/models/user_goal.dart';
 import 'goal_counter_sheet.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 /// Color per category, used as the card fill color.
 Color goalCategoryColor(String categoryId) {
   return switch (categoryId) {
-    GoalCategories.study => const Color(0xFF3B6FD4),
-    GoalCategories.fitness => const Color(0xFFE07B2A),
-    GoalCategories.productivity => const Color(0xFF7BAF2A),
-    GoalCategories.focus => const Color(0xFF7B4FBF),
-    GoalCategories.habits => const Color(0xFF8B6B3D),
-    GoalCategories.mentalClarity => const Color(0xFF2A9B8B),
-    _ => const Color(0xFF444444),
+    GoalCategories.study => AppColors.categoryBlue,
+    GoalCategories.fitness => AppColors.categoryBurntOrange,
+    GoalCategories.productivity => AppColors.limeOlive,
+    GoalCategories.focus => AppColors.categoryPurple,
+    GoalCategories.habits => AppColors.categoryBrown,
+    GoalCategories.mentalClarity => AppColors.categoryTeal,
+    _ => AppColors.textDim,
   };
 }
 

@@ -8,6 +8,8 @@ import '../../../../core/utils/stable_id.dart';
 import '../../application/weekly_commitment_providers.dart';
 import '../../domain/models/weekly_commitment.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 class WeeklyCommitmentsView extends ConsumerWidget {
   const WeeklyCommitmentsView({super.key, required this.circleId});
 
@@ -21,12 +23,12 @@ class WeeklyCommitmentsView extends ConsumerWidget {
 
     return commitmentsAsync.when(
       loading: () => const Center(
-        child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
+        child: CircularProgressIndicator(color: AppColors.accent),
       ),
       error: (_, __) => const Center(
         child: Text(
           'Could not load commitments.',
-          style: TextStyle(color: Color(0xFF8A8FA8)),
+          style: TextStyle(color: AppColors.textMuted),
         ),
       ),
       data: (all) {
@@ -49,11 +51,11 @@ class WeeklyCommitmentsView extends ConsumerWidget {
               trailing: TextButton.icon(
                 onPressed: () => _showEditSheet(context, ref, uid, weekKey, mine),
                 icon: const Icon(Icons.edit_rounded, size: 14,
-                    color: Color(0xFFB7FF00)),
+                    color: AppColors.accent),
                 label: const Text(
                   'Edit',
                   style: TextStyle(
-                    color: Color(0xFFB7FF00),
+                    color: AppColors.accent,
                     fontSize: 13,
                   ),
                 ),
@@ -123,7 +125,7 @@ class WeeklyCommitmentsView extends ConsumerWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF14171C),
+      backgroundColor: AppColors.surfaceDark,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -269,7 +271,7 @@ class _EditCommitmentsSheetState extends State<_EditCommitmentsSheet> {
             const Text(
               'My commitments this week',
               style: TextStyle(
-                color: Color(0xFFF0F4FF),
+                color: AppColors.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
@@ -295,10 +297,10 @@ class _EditCommitmentsSheetState extends State<_EditCommitmentsSheet> {
               TextButton.icon(
                 onPressed: _addRow,
                 icon: const Icon(Icons.add_rounded,
-                    color: Color(0xFFB7FF00)),
+                    color: AppColors.accent),
                 label: const Text(
                   'Add commitment',
-                  style: TextStyle(color: Color(0xFFB7FF00)),
+                  style: TextStyle(color: AppColors.accent),
                 ),
               ),
             Padding(
@@ -308,7 +310,7 @@ class _EditCommitmentsSheetState extends State<_EditCommitmentsSheet> {
                 child: FilledButton(
                   onPressed: _saving ? null : _save,
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFB7FF00),
+                    backgroundColor: AppColors.accent,
                     foregroundColor: Colors.black,
                     minimumSize: const Size.fromHeight(48),
                     shape: RoundedRectangleBorder(
@@ -373,12 +375,12 @@ class _DraftRow extends StatelessWidget {
             child: TextField(
               controller: draft.titleController,
               onTapOutside: (_) => dismissKeyboard(context),
-              style: const TextStyle(color: Color(0xFFF0F4FF)),
+              style: const TextStyle(color: AppColors.textPrimary),
               decoration: InputDecoration(
                 hintText: 'e.g. Workout ×3',
-                hintStyle: const TextStyle(color: Color(0xFF8A8FA8)),
+                hintStyle: const TextStyle(color: AppColors.textMuted),
                 filled: true,
-                fillColor: const Color(0xFF1C2029),
+                fillColor: AppColors.surfaceCard,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
@@ -393,8 +395,8 @@ class _DraftRow extends StatelessWidget {
           const SizedBox(width: 8),
           DropdownButton<int>(
             value: draft.target,
-            dropdownColor: const Color(0xFF1C2029),
-            style: const TextStyle(color: Color(0xFFF0F4FF)),
+            dropdownColor: AppColors.surfaceCard,
+            style: const TextStyle(color: AppColors.textPrimary),
             underline: const SizedBox.shrink(),
             items: List.generate(
               7,
@@ -408,7 +410,7 @@ class _DraftRow extends StatelessWidget {
           if (canRemove)
             IconButton(
               icon: const Icon(Icons.remove_circle_outline_rounded,
-                  color: Color(0xFFFF4D4D), size: 20),
+                  color: AppColors.danger, size: 20),
               onPressed: onRemove,
             ),
         ],
@@ -436,7 +438,7 @@ class _CommitmentRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF14171C),
+        color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.06),
@@ -451,7 +453,7 @@ class _CommitmentRow extends StatelessWidget {
                 Text(
                   commitment.title,
                   style: const TextStyle(
-                    color: Color(0xFFF0F4FF),
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.w500,
                     fontSize: 14,
                   ),
@@ -471,7 +473,7 @@ class _CommitmentRow extends StatelessWidget {
               onPressed: onMarkProgress,
               icon: const Icon(
                 Icons.add_circle_rounded,
-                color: Color(0xFFB7FF00),
+                color: AppColors.accent,
                 size: 24,
               ),
               tooltip: 'Mark progress',
@@ -499,12 +501,12 @@ class _ProgressTicks extends StatelessWidget {
             height: 14,
             decoration: BoxDecoration(
               color: done
-                  ? const Color(0xFFB7FF00)
-                  : const Color(0xFF1C2029),
+                  ? AppColors.accent
+                  : AppColors.surfaceCard,
               shape: BoxShape.circle,
               border: Border.all(
                 color: done
-                    ? const Color(0xFFB7FF00)
+                    ? AppColors.accent
                     : Colors.white.withValues(alpha: 0.15),
               ),
             ),
@@ -542,7 +544,7 @@ class _MemberCommitmentsGroup extends StatelessWidget {
           child: Text(
             commitments.first.userId,
             style: const TextStyle(
-              color: Color(0xFF8A8FA8),
+              color: AppColors.textMuted,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -571,10 +573,10 @@ class _EndOfWeekBanner extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFB7FF00).withValues(alpha: 0.08),
+        color: AppColors.accent.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFFB7FF00).withValues(alpha: 0.25),
+          color: AppColors.accent.withValues(alpha: 0.25),
         ),
       ),
       child: Row(
@@ -585,7 +587,7 @@ class _EndOfWeekBanner extends StatelessWidget {
             child: Text(
               'You completed $done/$total commitments this week',
               style: const TextStyle(
-                color: Color(0xFFB7FF00),
+                color: AppColors.accent,
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
               ),
@@ -611,7 +613,7 @@ class _SectionHeader extends StatelessWidget {
         Text(
           title.toUpperCase(),
           style: const TextStyle(
-            color: Color(0xFF8A8FA8),
+            color: AppColors.textMuted,
             fontSize: 11,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.8,
@@ -637,23 +639,23 @@ class _EmptyMyCommitments extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF14171C),
+          color: AppColors.surfaceDark,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: const Color(0xFFB7FF00).withValues(alpha: 0.2),
+            color: AppColors.accent.withValues(alpha: 0.2),
             style: BorderStyle.none,
           ),
         ),
         child: Row(
           children: [
             const Icon(Icons.add_circle_outline_rounded,
-                color: Color(0xFFB7FF00)),
+                color: AppColors.accent),
             const SizedBox(width: 12),
             const Expanded(
               child: Text(
                 'Set your commitments for this week',
                 style: TextStyle(
-                  color: Color(0xFF8A8FA8),
+                  color: AppColors.textMuted,
                   fontSize: 14,
                 ),
               ),

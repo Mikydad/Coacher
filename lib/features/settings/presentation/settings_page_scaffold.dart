@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 // ─── Design tokens (Obsidian Pulse) ─────────────────────────────────────────
 
-const kSettingsSurface = Color(0xFF0E0E0E);
-const kSettingsSurfaceHigh = Color(0xFF201F1F);
-const kSettingsOnSurface = Color(0xFFFFFFFF);
-const kSettingsOnSurfaceVariant = Color(0xFFADAAAA);
+const kSettingsSurface = AppColors.ink;
+const kSettingsSurfaceHigh = AppColors.inkWarm;
+const kSettingsOnSurface = AppColors.white;
+const kSettingsOnSurfaceVariant = AppColors.textSoft;
 
 /// Shared chrome for Profile-linked settings sub-pages.
 class SettingsPageScaffold extends StatelessWidget {

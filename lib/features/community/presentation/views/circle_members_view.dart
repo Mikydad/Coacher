@@ -9,6 +9,8 @@ import '../../domain/models/circle_enums.dart';
 import '../../domain/models/circle_member.dart';
 import '../../domain/models/removal_vote.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 class CircleMembersView extends ConsumerWidget {
   const CircleMembersView({super.key, required this.circleId});
 
@@ -24,12 +26,12 @@ class CircleMembersView extends ConsumerWidget {
 
     return membersAsync.when(
       loading: () => const Center(
-        child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
+        child: CircularProgressIndicator(color: AppColors.accent),
       ),
       error: (_, __) => const Center(
         child: Text(
           'Could not load members.',
-          style: TextStyle(color: Color(0xFF8A8FA8)),
+          style: TextStyle(color: AppColors.textMuted),
         ),
       ),
       data: (members) {
@@ -108,7 +110,7 @@ class CircleMembersView extends ConsumerWidget {
                 padding: EdgeInsets.symmetric(vertical: 16),
                 child: Text(
                   'No active members yet.',
-                  style: TextStyle(color: Color(0xFF8A8FA8)),
+                  style: TextStyle(color: AppColors.textMuted),
                 ),
               )
             else
@@ -206,27 +208,27 @@ class CircleMembersView extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF14171C),
+        backgroundColor: AppColors.surfaceDark,
         title: const Text(
           'Remove member?',
-          style: TextStyle(color: Color(0xFFF0F4FF)),
+          style: TextStyle(color: AppColors.textPrimary),
         ),
         content: Text(
           'Are you sure you want to remove ${member.displayName} from this circle?',
-          style: const TextStyle(color: Color(0xFF8A8FA8)),
+          style: const TextStyle(color: AppColors.textMuted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text(
               'Cancel',
-              style: TextStyle(color: Color(0xFF8A8FA8)),
+              style: TextStyle(color: AppColors.textMuted),
             ),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFFF4D4D),
+              backgroundColor: AppColors.danger,
               foregroundColor: Colors.white,
             ),
             child: const Text('Remove'),
@@ -272,7 +274,7 @@ class _SectionHeader extends StatelessWidget {
         Text(
           title,
           style: const TextStyle(
-            color: Color(0xFF8A8FA8),
+            color: AppColors.textMuted,
             fontSize: 12,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.8,
@@ -284,13 +286,13 @@ class _SectionHeader extends StatelessWidget {
             padding:
                 const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             decoration: BoxDecoration(
-              color: const Color(0xFF1C2029),
+              color: AppColors.surfaceCard,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
               '$badge',
               style: const TextStyle(
-                color: Color(0xFF8A8FA8),
+                color: AppColors.textMuted,
                 fontSize: 11,
               ),
             ),
@@ -320,7 +322,7 @@ class _PendingMemberTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF14171C),
+        color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withOpacity(0.06)),
       ),
@@ -333,7 +335,7 @@ class _PendingMemberTile extends StatelessWidget {
             child: Text(
               member.displayName,
               style: const TextStyle(
-                color: Color(0xFFF0F4FF),
+                color: AppColors.textPrimary,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -341,7 +343,7 @@ class _PendingMemberTile extends StatelessWidget {
           TextButton(
             onPressed: onDecline,
             style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFFFF4D4D),
+              foregroundColor: AppColors.danger,
               padding: const EdgeInsets.symmetric(horizontal: 12),
             ),
             child: const Text('Decline'),
@@ -350,7 +352,7 @@ class _PendingMemberTile extends StatelessWidget {
           FilledButton(
             onPressed: onApprove,
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFB7FF00),
+              backgroundColor: AppColors.accent,
               foregroundColor: Colors.black,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               minimumSize: const Size(0, 36),
@@ -395,11 +397,11 @@ class _ActiveMemberTile extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF14171C),
+          color: AppColors.surfaceDark,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isMe
-                ? const Color(0xFFB7FF00).withOpacity(0.2)
+                ? AppColors.accent.withOpacity(0.2)
                 : Colors.white.withOpacity(0.06),
           ),
         ),
@@ -417,7 +419,7 @@ class _ActiveMemberTile extends StatelessWidget {
                       Text(
                         member.displayName + (isMe ? ' (you)' : ''),
                         style: const TextStyle(
-                          color: Color(0xFFF0F4FF),
+                          color: AppColors.textPrimary,
                           fontWeight: FontWeight.w500,
                           fontSize: 14,
                         ),
@@ -432,7 +434,7 @@ class _ActiveMemberTile extends StatelessWidget {
                   Text(
                     'Joined ${_formatDate(member.joinedAtMs)}',
                     style: const TextStyle(
-                      color: Color(0xFF8A8FA8),
+                      color: AppColors.textMuted,
                       fontSize: 12,
                     ),
                   ),
@@ -441,7 +443,7 @@ class _ActiveMemberTile extends StatelessWidget {
             ),
             if (canRemove || canVoteRemove)
               const Icon(Icons.more_vert_rounded,
-                  color: Color(0xFF8A8FA8), size: 18),
+                  color: AppColors.textMuted, size: 18),
           ],
         ),
       ),
@@ -451,7 +453,7 @@ class _ActiveMemberTile extends StatelessWidget {
   void _showRemoveMenu(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF14171C),
+      backgroundColor: AppColors.surfaceDark,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -463,10 +465,10 @@ class _ActiveMemberTile extends StatelessWidget {
             if (canRemove)
               ListTile(
                 leading: const Icon(Icons.person_remove_rounded,
-                    color: Color(0xFFFF4D4D)),
+                    color: AppColors.danger),
                 title: Text(
                   'Remove ${member.displayName}',
-                  style: const TextStyle(color: Color(0xFFFF4D4D)),
+                  style: const TextStyle(color: AppColors.danger),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -476,10 +478,10 @@ class _ActiveMemberTile extends StatelessWidget {
             if (canVoteRemove)
               ListTile(
                 leading: const Icon(Icons.how_to_vote_rounded,
-                    color: Color(0xFFFF9933)),
+                    color: AppColors.amberDeep),
                 title: Text(
                   'Vote to remove ${member.displayName}',
-                  style: const TextStyle(color: Color(0xFFFF9933)),
+                  style: const TextStyle(color: AppColors.amberDeep),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -546,10 +548,10 @@ class _RemovalVoteBannerState
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C2029),
+        color: AppColors.surfaceCard,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFFFF9933).withValues(alpha: 0.4),
+          color: AppColors.amberDeep.withValues(alpha: 0.4),
         ),
       ),
       child: Column(
@@ -558,12 +560,12 @@ class _RemovalVoteBannerState
           Row(
             children: [
               const Icon(Icons.how_to_vote_rounded,
-                  color: Color(0xFFFF9933), size: 16),
+                  color: AppColors.amberDeep, size: 16),
               const SizedBox(width: 6),
               const Text(
                 'Vote to remove',
                 style: TextStyle(
-                  color: Color(0xFFFF9933),
+                  color: AppColors.amberDeep,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.4,
@@ -573,7 +575,7 @@ class _RemovalVoteBannerState
               Text(
                 '$approvals/$total voted approve',
                 style: const TextStyle(
-                  color: Color(0xFF8A8FA8),
+                  color: AppColors.textMuted,
                   fontSize: 11,
                 ),
               ),
@@ -583,7 +585,7 @@ class _RemovalVoteBannerState
           Text(
             widget.targetName,
             style: const TextStyle(
-              color: Color(0xFFF0F4FF),
+              color: AppColors.textPrimary,
               fontSize: 15,
               fontWeight: FontWeight.w600,
             ),
@@ -601,13 +603,13 @@ class _RemovalVoteBannerState
                   label: const Text('Approve'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _hasVoted
-                        ? const Color(0xFF4ADE80).withValues(alpha: 0.35)
-                        : const Color(0xFF4ADE80),
+                        ? AppColors.success.withValues(alpha: 0.35)
+                        : AppColors.success,
                     side: BorderSide(
                       color: _hasVoted
-                          ? const Color(0xFF4ADE80)
+                          ? AppColors.success
                               .withValues(alpha: 0.2)
-                          : const Color(0xFF4ADE80),
+                          : AppColors.success,
                     ),
                     padding:
                         const EdgeInsets.symmetric(vertical: 8),
@@ -626,13 +628,13 @@ class _RemovalVoteBannerState
                   label: const Text('Reject'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _hasVoted
-                        ? const Color(0xFFFF4D4D).withValues(alpha: 0.35)
-                        : const Color(0xFFFF4D4D),
+                        ? AppColors.danger.withValues(alpha: 0.35)
+                        : AppColors.danger,
                     side: BorderSide(
                       color: _hasVoted
-                          ? const Color(0xFFFF4D4D)
+                          ? AppColors.danger
                               .withValues(alpha: 0.2)
-                          : const Color(0xFFFF4D4D),
+                          : AppColors.danger,
                     ),
                     padding:
                         const EdgeInsets.symmetric(vertical: 8),
@@ -649,7 +651,7 @@ class _RemovalVoteBannerState
               child: Text(
                 'Your vote has been recorded',
                 style: TextStyle(
-                  color: Color(0xFF8A8FA8),
+                  color: AppColors.textMuted,
                   fontSize: 11,
                 ),
               ),
@@ -666,13 +668,13 @@ class _ModeratorBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFFB7FF00).withOpacity(0.12),
+        color: AppColors.accent.withOpacity(0.12),
         borderRadius: BorderRadius.circular(6),
       ),
       child: const Text(
         'Mod',
         style: TextStyle(
-          color: Color(0xFFB7FF00),
+          color: AppColors.accent,
           fontSize: 10,
           fontWeight: FontWeight.w700,
         ),
@@ -689,14 +691,14 @@ class _AvatarInitial extends StatelessWidget {
   final String userId;
 
   static const _colors = [
-    Color(0xFFB7FF00),
-    Color(0xFF00CFFF),
-    Color(0xFFFF8C42),
-    Color(0xFFFF4D9E),
-    Color(0xFF7B61FF),
-    Color(0xFF00FF9F),
-    Color(0xFFFFD600),
-    Color(0xFFFF4D4D),
+    AppColors.accent,
+    AppColors.cyanDeep,
+    AppColors.orange,
+    AppColors.pink,
+    AppColors.violet,
+    AppColors.mint,
+    AppColors.yellow,
+    AppColors.danger,
   ];
 
   Color get _color => _colors[userId.hashCode.abs() % _colors.length];

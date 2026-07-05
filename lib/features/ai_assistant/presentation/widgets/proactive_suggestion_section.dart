@@ -7,6 +7,8 @@ import '../../application/ai_assistant_providers.dart';
 import '../../application/proactive_suggestion_display.dart';
 import 'proactive_suggestion_card.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 /// Shows proactive suggestions on Home: one card by default, expandable in place
 /// to reveal the full list (no Coach tab detour).
 class ProactiveSuggestionSection extends ConsumerStatefulWidget {
@@ -123,7 +125,7 @@ class _SuggestionsExpandLink extends StatelessWidget {
   final IconData icon;
   final VoidCallback onPressed;
 
-  static const _kAccent = Color(0xFFB2ED00);
+  static const _kAccent = AppColors.accentDim;
 
   @override
   Widget build(BuildContext context) {
@@ -170,11 +172,11 @@ class _SkeletonCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       height: 88,
       decoration: BoxDecoration(
-        color: const Color(0xFF201f1f),
+        color: AppColors.inkWarm,
         borderRadius: BorderRadius.circular(16),
         border: const Border(
           left: BorderSide(
-            color: Color(0xFF3A3A3A),
+            color: AppColors.gray3A,
             width: 3,
           ),
         ),
@@ -200,7 +202,7 @@ class _SkeletonCard extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: const Color(0xFF2E2E2E),
+        color: AppColors.inkSoft,
         borderRadius: BorderRadius.circular(4),
       ),
     );

@@ -13,6 +13,8 @@ import '../../data/circle_proof_storage.dart';
 import '../../domain/models/circle_enums.dart';
 import '../../domain/models/circle_message.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 const _kPresetEmojis = ['🔥', '💪', '👏', '✅', '😅', '❤️'];
 
 const _kProofCategories = [
@@ -131,7 +133,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
   Future<String?> _showProofCategorySheet() {
     return showModalBottomSheet<String>(
       context: context,
-      backgroundColor: const Color(0xFF14171C),
+      backgroundColor: AppColors.surfaceDark,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -153,7 +155,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
               const Text(
                 'Proof category',
                 style: TextStyle(
-                  color: Color(0xFFF0F4FF),
+                  color: AppColors.textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
@@ -163,7 +165,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
                 (cat) => ListTile(
                   title: Text(
                     cat,
-                    style: const TextStyle(color: Color(0xFFF0F4FF)),
+                    style: const TextStyle(color: AppColors.textPrimary),
                   ),
                   onTap: () => Navigator.pop(ctx, cat),
                 ),
@@ -214,12 +216,12 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
             onTap: () => dismissKeyboard(context),
             child: messagesAsync.when(
             loading: () => const Center(
-              child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
+              child: CircularProgressIndicator(color: AppColors.accent),
             ),
             error: (_, __) => const Center(
               child: Text(
                 'Could not load messages.',
-                style: TextStyle(color: Color(0xFF8A8FA8)),
+                style: TextStyle(color: AppColors.textMuted),
               ),
             ),
             data: (messages) {
@@ -229,7 +231,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
                     'No messages yet.\nSay hello to your circle!',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: Color(0xFF8A8FA8),
+                      color: AppColors.textMuted,
                       fontSize: 15,
                     ),
                   ),
@@ -321,7 +323,7 @@ class _TextMessageBubble extends StatelessWidget {
                       child: Text(
                         message.senderDisplayName,
                         style: const TextStyle(
-                          color: Color(0xFF8A8FA8),
+                          color: AppColors.textMuted,
                           fontSize: 11,
                         ),
                       ),
@@ -333,8 +335,8 @@ class _TextMessageBubble extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: isMe
-                          ? const Color(0xFFB7FF00).withOpacity(0.15)
-                          : const Color(0xFF1C2029),
+                          ? AppColors.accent.withOpacity(0.15)
+                          : AppColors.surfaceCard,
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(16),
                         topRight: const Radius.circular(16),
@@ -347,7 +349,7 @@ class _TextMessageBubble extends StatelessWidget {
                     child: Text(
                       message.content ?? '',
                       style: const TextStyle(
-                        color: Color(0xFFF0F4FF),
+                        color: AppColors.textPrimary,
                         fontSize: 15,
                       ),
                     ),
@@ -358,7 +360,7 @@ class _TextMessageBubble extends StatelessWidget {
                     child: Text(
                       _formatTime(message.createdAtMs),
                       style: const TextStyle(
-                        color: Color(0xFF8A8FA8),
+                        color: AppColors.textMuted,
                         fontSize: 10,
                       ),
                     ),
@@ -381,7 +383,7 @@ class _TextMessageBubble extends StatelessWidget {
   void _showEmojiBar(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF1C2029),
+      backgroundColor: AppColors.surfaceCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -409,7 +411,7 @@ class _ImageMessageBubble extends StatelessWidget {
       child: GestureDetector(
         onLongPress: () => showModalBottomSheet<void>(
           context: context,
-          backgroundColor: const Color(0xFF1C2029),
+          backgroundColor: AppColors.surfaceCard,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
@@ -439,7 +441,7 @@ class _ImageMessageBubble extends StatelessWidget {
                       child: Text(
                         message.senderDisplayName,
                         style: const TextStyle(
-                          color: Color(0xFF8A8FA8),
+                          color: AppColors.textMuted,
                           fontSize: 11,
                         ),
                       ),
@@ -462,9 +464,9 @@ class _ImageMessageBubble extends StatelessWidget {
                             errorBuilder: (_, __, ___) => Container(
                               width: 220,
                               height: 140,
-                              color: const Color(0xFF1C2029),
+                              color: AppColors.surfaceCard,
                               child: const Icon(Icons.broken_image_rounded,
-                                  color: Color(0xFF8A8FA8)),
+                                  color: AppColors.textMuted),
                             ),
                           ),
                         if (message.content != null &&
@@ -482,7 +484,7 @@ class _ImageMessageBubble extends StatelessWidget {
                               child: Text(
                                 message.content!,
                                 style: const TextStyle(
-                                  color: Color(0xFFB7FF00),
+                                  color: AppColors.accent,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -498,7 +500,7 @@ class _ImageMessageBubble extends StatelessWidget {
                     child: Text(
                       _formatTime(message.createdAtMs),
                       style: const TextStyle(
-                        color: Color(0xFF8A8FA8),
+                        color: AppColors.textMuted,
                         fontSize: 10,
                       ),
                     ),
@@ -531,13 +533,13 @@ class _SystemEventPill extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
           decoration: BoxDecoration(
-            color: const Color(0xFF1C2029),
+            color: AppColors.surfaceCard,
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
             text,
             style: const TextStyle(
-              color: Color(0xFF8A8FA8),
+              color: AppColors.textMuted,
               fontSize: 12,
             ),
           ),
@@ -574,12 +576,12 @@ class _ReactionRow extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(
                 color: reacted
-                    ? const Color(0xFFB7FF00).withOpacity(0.2)
-                    : const Color(0xFF1C2029),
+                    ? AppColors.accent.withOpacity(0.2)
+                    : AppColors.surfaceCard,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: reacted
-                      ? const Color(0xFFB7FF00).withOpacity(0.4)
+                      ? AppColors.accent.withOpacity(0.4)
                       : Colors.transparent,
                 ),
               ),
@@ -643,7 +645,7 @@ class _InputBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF14171C),
+        color: AppColors.surfaceDark,
         border: Border(
           top: BorderSide(color: Colors.white.withOpacity(0.06)),
         ),
@@ -655,14 +657,14 @@ class _InputBar extends StatelessWidget {
             // Image picker button
             IconButton(
               icon: const Icon(Icons.add_photo_alternate_outlined),
-              color: const Color(0xFF8A8FA8),
+              color: AppColors.textMuted,
               onPressed: sending ? null : onPickImage,
             ),
             // Text field
             Expanded(
               child: TextField(
                 controller: controller,
-                style: const TextStyle(color: Color(0xFFF0F4FF)),
+                style: const TextStyle(color: AppColors.textPrimary),
                 maxLines: 4,
                 minLines: 1,
                 textCapitalization: TextCapitalization.sentences,
@@ -675,9 +677,9 @@ class _InputBar extends StatelessWidget {
                 },
                 decoration: InputDecoration(
                   hintText: 'Message your circle…',
-                  hintStyle: const TextStyle(color: Color(0xFF8A8FA8)),
+                  hintStyle: const TextStyle(color: AppColors.textMuted),
                   filled: true,
-                  fillColor: const Color(0xFF1C2029),
+                  fillColor: AppColors.surfaceCard,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 10,
@@ -704,14 +706,14 @@ class _InputBar extends StatelessWidget {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Color(0xFFB7FF00),
+                              color: AppColors.accent,
                             ),
                           )
                         : Icon(
                             Icons.send_rounded,
                             color: canSend
-                                ? const Color(0xFFB7FF00)
-                                : const Color(0xFF8A8FA8),
+                                ? AppColors.accent
+                                : AppColors.textMuted,
                           ),
                     onPressed: canSend ? onSend : null,
                   ),
@@ -733,14 +735,14 @@ class _AvatarInitial extends StatelessWidget {
   final String userId;
 
   static const _colors = [
-    Color(0xFFB7FF00),
-    Color(0xFF00CFFF),
-    Color(0xFFFF8C42),
-    Color(0xFFFF4D9E),
-    Color(0xFF7B61FF),
-    Color(0xFF00FF9F),
-    Color(0xFFFFD600),
-    Color(0xFFFF4D4D),
+    AppColors.accent,
+    AppColors.cyanDeep,
+    AppColors.orange,
+    AppColors.pink,
+    AppColors.violet,
+    AppColors.mint,
+    AppColors.yellow,
+    AppColors.danger,
   ];
 
   Color get _color => _colors[userId.hashCode.abs() % _colors.length];

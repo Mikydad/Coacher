@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 /// Apple does not expose a public API for third-party apps to enable system
 /// Sleep Focus or Do Not Disturb. This sheet explains that and offers in-app
 /// quiet modes that mirror the schedule.
@@ -13,7 +15,7 @@ Future<void> showSleepTaskIosFocusGuidance(
   if (!Platform.isIOS) return;
   await showModalBottomSheet<void>(
     context: context,
-    backgroundColor: const Color(0xFF181818),
+    backgroundColor: AppColors.dark181818,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -43,7 +45,7 @@ Future<void> showSleepTaskIosFocusGuidance(
               style: TextStyle(
                 fontSize: 13,
                 height: 1.4,
-                color: Color(0xFFADAAAA),
+                color: AppColors.textSoft,
               ),
             ),
             const SizedBox(height: 16),

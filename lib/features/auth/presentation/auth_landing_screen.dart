@@ -10,6 +10,8 @@ import 'widgets/auth_apple_sign_in_button.dart';
 import 'widgets/auth_email_password_form.dart';
 import 'widgets/auth_google_sign_in_button.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 const String _kMigrationBannerDismissedKey = 'auth_migration_banner_dismissed';
 
 /// Landing screen shown when no user is signed in and [kRequireRegisteredAuth]
@@ -67,7 +69,7 @@ class _AuthLandingScreenState extends ConsumerState<AuthLandingScreen> {
     final showBanner = isAnonymous && !_bannerDismissed;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF050806),
+      backgroundColor: AppColors.scaffold,
       body: SafeArea(
         child: Column(
           children: [
@@ -98,7 +100,7 @@ class _AuthLandingScreenState extends ConsumerState<AuthLandingScreen> {
                       'Your personal productivity coach.\nBuild habits that last.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Color(0xFF888888),
+                        color: AppColors.textGray,
                         fontSize: 15,
                         height: 1.6,
                       ),
@@ -134,7 +136,7 @@ class _AuthLandingScreenState extends ConsumerState<AuthLandingScreen> {
                                 height: 22,
                                 width: 22,
                                 child: CircularProgressIndicator(
-                                  color: Color(0xFF888888),
+                                  color: AppColors.textGray,
                                   strokeWidth: 2,
                                 ),
                               ),
@@ -144,7 +146,7 @@ class _AuthLandingScreenState extends ConsumerState<AuthLandingScreen> {
                               child: const Text(
                                 'Continue as guest',
                                 style: TextStyle(
-                                  color: Color(0xFF666666),
+                                  color: AppColors.textFaint,
                                   fontSize: 13,
                                 ),
                               ),
@@ -171,15 +173,15 @@ class _AppLogo extends StatelessWidget {
       width: 72,
       height: 72,
       decoration: BoxDecoration(
-        color: const Color(0xFF0E0E0E),
+        color: AppColors.ink,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF1E1E1E), width: 1.5),
+        border: Border.all(color: AppColors.dark1E1E1E, width: 1.5),
       ),
       child: const Center(
         child: Text(
           'CL',
           style: TextStyle(
-            color: Color(0xFFB2ED00),
+            color: AppColors.accentDim,
             fontSize: 26,
             fontWeight: FontWeight.bold,
             letterSpacing: 1,
@@ -201,13 +203,13 @@ class _MigrationBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      color: const Color(0xFF0D1A00),
+      color: AppColors.limeInkDim,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(Icons.info_outline,
-              color: Color(0xFFB2ED00), size: 18),
+              color: AppColors.accentDim, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -216,7 +218,7 @@ class _MigrationBanner extends StatelessWidget {
                 const Text(
                   'Create an account to save your progress across devices.',
                   style: TextStyle(
-                    color: Color(0xFFD4F08A),
+                    color: AppColors.limeSoft,
                     fontSize: 13,
                     height: 1.4,
                   ),
@@ -228,7 +230,7 @@ class _MigrationBanner extends StatelessWidget {
                   child: const Text(
                     'Create account →',
                     style: TextStyle(
-                      color: Color(0xFFB2ED00),
+                      color: AppColors.accentDim,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -241,7 +243,7 @@ class _MigrationBanner extends StatelessWidget {
             onTap: onDismiss,
             child: const Padding(
               padding: EdgeInsets.only(left: 8),
-              child: Icon(Icons.close, color: Color(0xFF555555), size: 16),
+              child: Icon(Icons.close, color: AppColors.gray55, size: 16),
             ),
           ),
         ],
@@ -265,7 +267,7 @@ class _OutlinedAuthButton extends StatelessWidget {
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           foregroundColor: Colors.white,
-          side: const BorderSide(color: Color(0xFF2E2E2E), width: 1.5),
+          side: const BorderSide(color: AppColors.inkSoft, width: 1.5),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

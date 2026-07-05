@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 /// Full-width primary action button for auth screens.
 ///
 /// `#B2ED00` background, bold black text.
@@ -31,9 +33,9 @@ class AuthPrimaryButton extends StatelessWidget {
         child: ElevatedButton(
           onPressed: isDisabled ? null : onPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFB2ED00),
+            backgroundColor: AppColors.accentDim,
             foregroundColor: Colors.black,
-            disabledBackgroundColor: const Color(0xFFB2ED00),
+            disabledBackgroundColor: AppColors.accentDim,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),

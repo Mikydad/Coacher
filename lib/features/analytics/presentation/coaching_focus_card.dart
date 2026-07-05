@@ -10,6 +10,8 @@ import '../domain/models/current_coaching_focus.dart';
 import '../domain/models/generated_insight.dart';
 import '../../../core/utils/date_keys.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 // ─── Public entry-point widgets ───────────────────────────────────────────────
 
 /// Full coaching focus card for the Home screen.
@@ -152,7 +154,7 @@ class _FocusCard extends StatelessWidget {
                     const Text(
                       'COACHING FOCUS',
                       style: TextStyle(
-                        color: Color(0xFF00E6FF),
+                        color: AppColors.cyan,
                         fontWeight: FontWeight.w700,
                         fontSize: 11,
                         letterSpacing: 1.2,
@@ -234,12 +236,12 @@ class _FocusCard extends StatelessWidget {
               ),
               _Chip(
                 label: 'confidence ${(focus.focusConfidence * 100).round()}%',
-                color: const Color(0xFFB7FF00),
+                color: AppColors.accent,
               ),
               if (summary?.isFallback == false)
                 const _Chip(
                   label: 'AI',
-                  color: Color(0xFF00E6FF),
+                  color: AppColors.cyan,
                 ),
               if (summary?.isFallback == true)
                 const _Chip(
@@ -295,7 +297,7 @@ class _EmptyFocusCard extends StatelessWidget {
           const Text(
             'COACHING FOCUS',
             style: TextStyle(
-              color: Color(0xFF00E6FF),
+              color: AppColors.cyan,
               fontWeight: FontWeight.w700,
               fontSize: 11,
               letterSpacing: 1.2,
@@ -394,7 +396,7 @@ class _FocusScoreBar extends StatelessWidget {
           child: LinearProgressIndicator(
             value: score.clamp(0.0, 1.0),
             minHeight: 5,
-            backgroundColor: const Color(0xFF2A2D33),
+            backgroundColor: AppColors.dark2A2D33,
             valueColor: AlwaysStoppedAnimation<Color>(accentColor),
           ),
         ),
@@ -471,7 +473,7 @@ class _CardShell extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF111317),
+        color: AppColors.surfacePanel,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: accent.withAlpha(60)),
         boxShadow: [
@@ -492,15 +494,15 @@ class _CardShell extends StatelessWidget {
 Color _framingColor(CoachingFraming framing) {
   switch (framing) {
     case CoachingFraming.momentum:
-      return const Color(0xFFB7FF00);
+      return AppColors.accent;
     case CoachingFraming.recovery:
-      return const Color(0xFF00E6FF);
+      return AppColors.cyan;
     case CoachingFraming.protection:
-      return const Color(0xFFFF6D4E);
+      return AppColors.scoreCoral;
     case CoachingFraming.stabilization:
-      return const Color(0xFFFFD54F);
+      return AppColors.scoreAmber;
     case CoachingFraming.consistency:
-      return const Color(0xFF80CBC4);
+      return AppColors.tealSoft;
   }
 }
 

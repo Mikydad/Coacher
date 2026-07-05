@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/circle_notif_prefs_repository.dart';
 import '../../domain/models/circle_notif_prefs.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 final _notifPrefsRepositoryProvider =
     Provider<CircleNotifPrefsRepository>((ref) {
   return FirestoreCircleNotifPrefsRepository();
@@ -70,7 +72,7 @@ class _CircleNotifPrefsSheetState
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF14171C),
+        color: AppColors.surfaceDark,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
@@ -79,7 +81,7 @@ class _CircleNotifPrefsSheetState
                 padding: EdgeInsets.all(40),
                 child: Center(
                   child: CircularProgressIndicator(
-                      color: Color(0xFFB7FF00)),
+                      color: AppColors.accent),
                 ),
               )
             : SingleChildScrollView(
@@ -102,7 +104,7 @@ class _CircleNotifPrefsSheetState
                     const Text(
                       'Notification settings',
                       style: TextStyle(
-                        color: Color(0xFFF0F4FF),
+                        color: AppColors.textPrimary,
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                       ),
@@ -111,7 +113,7 @@ class _CircleNotifPrefsSheetState
                     const Text(
                       'Choose what you hear about from this circle.',
                       style: TextStyle(
-                        color: Color(0xFF8A8FA8),
+                        color: AppColors.textMuted,
                         fontSize: 13,
                       ),
                     ),
@@ -154,7 +156,7 @@ class _CircleNotifPrefsSheetState
                             () => _prefs = _prefs!.copyWith(reactions: v)),
                       ),
                       const SizedBox(height: 20),
-                      const Divider(color: Color(0xFF2A2F3D)),
+                      const Divider(color: AppColors.surfaceSlate),
                       const SizedBox(height: 12),
 
                       // Mute section
@@ -163,7 +165,7 @@ class _CircleNotifPrefsSheetState
                           const Text(
                             'Mute circle',
                             style: TextStyle(
-                              color: Color(0xFFF0F4FF),
+                              color: AppColors.textPrimary,
                               fontSize: 15,
                               fontWeight: FontWeight.w500,
                             ),
@@ -173,7 +175,7 @@ class _CircleNotifPrefsSheetState
                             value: _prefs!.isMuted,
                             onChanged: (v) =>
                                 v ? _setMuteUntilTomorrow() : _clearMute(),
-                            activeColor: const Color(0xFFFF4D4D),
+                            activeColor: AppColors.danger,
                           ),
                         ],
                       ),
@@ -183,7 +185,7 @@ class _CircleNotifPrefsSheetState
                           child: Text(
                             'Muted until ${_formatMs(_prefs!.muteUntilMs!)}',
                             style: const TextStyle(
-                              color: Color(0xFFFF4D4D),
+                              color: AppColors.danger,
                               fontSize: 12,
                             ),
                           ),
@@ -192,10 +194,10 @@ class _CircleNotifPrefsSheetState
                         TextButton.icon(
                           onPressed: _setMuteUntilTomorrow,
                           icon: const Icon(Icons.notifications_off_outlined,
-                              size: 16, color: Color(0xFF8A8FA8)),
+                              size: 16, color: AppColors.textMuted),
                           label: const Text(
                             'Mute until tomorrow',
-                            style: TextStyle(color: Color(0xFF8A8FA8)),
+                            style: TextStyle(color: AppColors.textMuted),
                           ),
                           style: TextButton.styleFrom(
                             padding: EdgeInsets.zero,
@@ -210,7 +212,7 @@ class _CircleNotifPrefsSheetState
                       child: FilledButton(
                         onPressed: _saving ? null : _save,
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFB7FF00),
+                          backgroundColor: AppColors.accent,
                           foregroundColor: Colors.black,
                           minimumSize: const Size.fromHeight(48),
                           shape: RoundedRectangleBorder(
@@ -272,7 +274,7 @@ class _ToggleRow extends StatelessWidget {
                 Text(
                   label,
                   style: const TextStyle(
-                    color: Color(0xFFF0F4FF),
+                    color: AppColors.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                   ),
@@ -280,7 +282,7 @@ class _ToggleRow extends StatelessWidget {
                 Text(
                   subtitle,
                   style: const TextStyle(
-                    color: Color(0xFF8A8FA8),
+                    color: AppColors.textMuted,
                     fontSize: 12,
                   ),
                 ),
@@ -290,7 +292,7 @@ class _ToggleRow extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: const Color(0xFFB7FF00),
+            activeColor: AppColors.accent,
           ),
         ],
       ),

@@ -10,6 +10,8 @@ import '../../domain/models/user_goal.dart';
 import 'goal_card.dart';
 import '../goal_detail_screen.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 /// Bottom sheet with:
 ///   - Action-based progress ring (doneActions / totalActions)
 ///   - Measurement-kind-specific counter (minutes presets / −+ for others)
@@ -200,7 +202,7 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
       builder: (context, scrollController) {
         return Container(
           decoration: const BoxDecoration(
-            color: Color(0xFF151718),
+            color: AppColors.dark151718,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: actionsAsync.when(
@@ -499,7 +501,7 @@ class _PresetButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF2A2D32),
+          color: AppColors.dark2A2D32,
           borderRadius: BorderRadius.circular(24),
         ),
         child: Text(
@@ -592,8 +594,8 @@ class _RoundButton extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: enabled
-              ? const Color(0xFF2A2D32)
-              : const Color(0xFF1A1C1F),
+              ? AppColors.dark2A2D32
+              : AppColors.surfaceMuted,
         ),
         child: Icon(
           icon,

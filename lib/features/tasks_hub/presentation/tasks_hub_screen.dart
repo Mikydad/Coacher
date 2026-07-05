@@ -19,6 +19,8 @@ import '../../scoring/application/scoring_controller.dart';
 import '../../time_blocks/application/time_block_providers.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 PlannedTask _hubTaskWithOrderIndex(PlannedTaskRow row, int orderIndex) {
   final t = row.task;
   return PlannedTask(
@@ -484,7 +486,7 @@ class _HubTaskTile extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      color: const Color(0xFF111317),
+      color: AppColors.surfacePanel,
       child: ListTile(
         title: Text(t.title),
         subtitle: Text(subtitle.toString(), style: const TextStyle(color: Colors.white54, fontSize: 12)),

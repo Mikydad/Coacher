@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'notification_response_handler.dart';
 import '../core/sync/sync_service.dart';
 
+import '../core/presentation/app_colors.dart';
+
 /// Set to `true` after the first successful [SyncService.syncFromRemote] seed (PRD §4.6).
 const String kIsarSeededV1PrefsKey = 'isar_seeded_v1';
 
@@ -75,12 +77,12 @@ class _FirstLaunchGateState extends State<FirstLaunchGate> {
       return const Directionality(
         textDirection: TextDirection.ltr,
         child: Material(
-          color: Color(0xFF050806),
+          color: AppColors.scaffold,
           child: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircularProgressIndicator(color: Color(0xFFB7FF00)),
+                CircularProgressIndicator(color: AppColors.accent),
                 SizedBox(height: 20),
                 Text(
                   'Loading your plan…',

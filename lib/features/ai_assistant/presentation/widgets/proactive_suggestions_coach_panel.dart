@@ -7,12 +7,14 @@ import '../../application/proactive_suggestion_display.dart';
 import '../ai_assistant_screen.dart';
 import 'proactive_suggestion_card.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 /// Full list of proactive suggestions at the top of the Coach screen.
 class ProactiveSuggestionsCoachPanel extends ConsumerWidget {
   const ProactiveSuggestionsCoachPanel({super.key});
 
-  static const _kAccent = Color(0xFFB2ED00);
-  static const _kVariant = Color(0xFFADAAAA);
+  static const _kAccent = AppColors.accentDim;
+  static const _kVariant = AppColors.textSoft;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -116,7 +118,7 @@ class SeeAllSuggestionsInCoachLink extends ConsumerWidget {
             );
           },
           style: TextButton.styleFrom(
-            foregroundColor: const Color(0xFFB2ED00),
+            foregroundColor: AppColors.accentDim,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             minimumSize: Size.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,

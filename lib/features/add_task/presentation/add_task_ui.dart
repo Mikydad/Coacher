@@ -1,21 +1,23 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 /// Visual tokens for Add / Edit Task (Obsidian Pulse).
 abstract final class AddTaskColors {
-  static const surface = Color(0xFF0E0E0E);
-  static const card = Color(0xFF1A1919);
-  static const cardElevated = Color(0xFF201F1F);
-  static const inputFill = Color(0xFF111111);
-  static const cardHighest = Color(0xFF262626);
-  static const border = Color(0x14FFFFFF);
-  static const borderActive = Color(0xFFB2ED00);
-  static const accent = Color(0xFFB7FF00);
-  static const accentContainer = Color(0xFFBEFC00);
-  static const accentDim = Color(0xFFB2ED00);
-  static const cyan = Color(0xFF00E3FD);
-  static const onSurface = Color(0xFFFFFFFF);
-  static const muted = Color(0xFFADAAAA);
-  static const faint = Color(0xFF6B6767);
+  static const surface = AppColors.ink;
+  static const card = AppColors.dark1A1919;
+  static const cardElevated = AppColors.inkWarm;
+  static const inputFill = AppColors.dark111111;
+  static const cardHighest = AppColors.inkElevated;
+  static const border = AppColors.whiteBorder8;
+  static const borderActive = AppColors.accentDim;
+  static const accent = AppColors.accent;
+  static const accentContainer = AppColors.accentBright;
+  static const accentDim = AppColors.accentDim;
+  static const cyan = AppColors.cyan;
+  static const onSurface = AppColors.white;
+  static const muted = AppColors.textSoft;
+  static const faint = AppColors.grayWarm;
 }
 
 class AddTaskHeroSectionLabel extends StatelessWidget {
@@ -721,7 +723,7 @@ class _DurationCell extends StatelessWidget {
             fontSize: 11,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.4,
-            color: selected ? const Color(0xFF445D00) : AddTaskColors.muted,
+            color: selected ? AppColors.accentDeep : AddTaskColors.muted,
           ),
         ),
       ),

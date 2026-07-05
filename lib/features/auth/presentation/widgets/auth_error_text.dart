@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 /// Small centred error label shown below forms on auth screens.
 class AuthErrorText extends StatelessWidget {
   const AuthErrorText(this.message, {super.key});
@@ -12,7 +14,7 @@ class AuthErrorText extends StatelessWidget {
       message,
       textAlign: TextAlign.center,
       style: const TextStyle(
-        color: Color(0xFFFF5252),
+        color: AppColors.danger,
         fontSize: 13,
         height: 1.4,
       ),

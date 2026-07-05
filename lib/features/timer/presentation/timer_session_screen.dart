@@ -20,6 +20,8 @@ import '../../scoring/presentation/score_task_dialog.dart';
 import '../../home/presentation/quittr_app_bar_title.dart';
 import '../../time_blocks/application/time_block_providers.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 class TimerLaunchArgs {
   const TimerLaunchArgs({this.autoStartDelaySeconds});
 
@@ -363,10 +365,10 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 40),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0B0D10),
+                      color: AppColors.dark0B0D10,
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
-                        color: const Color(0xFF00E6FF).withValues(alpha: 0.4),
+                        color: AppColors.cyan.withValues(alpha: 0.4),
                       ),
                     ),
                     child: Column(
@@ -385,7 +387,7 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1F2026),
+                            color: AppColors.dark1F2026,
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
@@ -409,7 +411,7 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF111317),
+                      color: AppColors.surfacePanel,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
@@ -430,7 +432,7 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1F2026),
+                        color: AppColors.dark1F2026,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.white24),
                       ),
@@ -464,8 +466,8 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                           style: FilledButton.styleFrom(
                             minimumSize: const Size.fromHeight(60),
                             backgroundColor: running
-                                ? const Color(0xFF2B2D31)
-                                : const Color(0xFFB7FF00),
+                                ? AppColors.dark2B2D31
+                                : AppColors.accent,
                             foregroundColor: running
                                 ? Colors.white
                                 : Colors.black,
@@ -500,7 +502,7 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                         child: FilledButton.icon(
                           style: FilledButton.styleFrom(
                             minimumSize: const Size.fromHeight(60),
-                            backgroundColor: const Color(0xFF2B2D31),
+                            backgroundColor: AppColors.dark2B2D31,
                             foregroundColor: Colors.white,
                           ),
                           onPressed:

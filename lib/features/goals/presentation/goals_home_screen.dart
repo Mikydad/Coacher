@@ -8,6 +8,8 @@ import 'goals_archive_screen.dart';
 import 'widgets/category_chip_row.dart';
 import 'widgets/goal_card.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 /// Goals tab — list with fill-bar cards, horizontal category chips,
 /// and a counter bottom sheet on tap.
 class GoalsHomeScreen extends ConsumerWidget {
@@ -33,7 +35,7 @@ class GoalsHomeScreen extends ConsumerWidget {
         heroTag: 'goals_tab_fab',
         onPressed: () =>
             Navigator.pushNamed(context, GoalTemplatePickerScreen.routeName),
-        backgroundColor: const Color(0xFFB7FF00),
+        backgroundColor: AppColors.accent,
         foregroundColor: Colors.black,
         icon: const Icon(Icons.add),
         label: const Text('New goal'),

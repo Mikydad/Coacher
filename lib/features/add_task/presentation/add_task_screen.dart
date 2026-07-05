@@ -37,6 +37,8 @@ import '../../time_blocks/domain/models/conflict_resolution_outcome.dart';
 import '../../time_blocks/presentation/scheduling_conflict_sheet.dart';
 import 'add_task_ui.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 class AddTaskEditArgs {
   const AddTaskEditArgs({
     required this.taskId,
@@ -1691,7 +1693,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(56),
                       backgroundColor: AddTaskColors.accentContainer,
-                      foregroundColor: const Color(0xFF445D00),
+                      foregroundColor: AppColors.accentDeep,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(28),

@@ -10,6 +10,8 @@ import '../domain/models/accountability_circle.dart';
 import '../domain/models/circle_enums.dart';
 import 'circle_detail_screen.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 const _kCategories = [
   'fitness',
   'learning',
@@ -107,14 +109,14 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0F12),
+      backgroundColor: AppColors.surfaceDeep,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF14171C),
-        foregroundColor: const Color(0xFFF0F4FF),
+        backgroundColor: AppColors.surfaceDark,
+        foregroundColor: AppColors.textPrimary,
         title: const Text(
           'Create circle',
           style: TextStyle(
-            color: Color(0xFFF0F4FF),
+            color: AppColors.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -158,7 +160,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
   Widget _buildNameField() {
     return TextFormField(
       controller: _nameController,
-      style: const TextStyle(color: Color(0xFFF0F4FF)),
+      style: const TextStyle(color: AppColors.textPrimary),
       maxLength: 40,
       onTapOutside: (_) => dismissKeyboard(context),
       decoration: _inputDecoration('e.g. Morning runners'),
@@ -174,7 +176,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
   Widget _buildDescField() {
     return TextFormField(
       controller: _descController,
-      style: const TextStyle(color: Color(0xFFF0F4FF)),
+      style: const TextStyle(color: AppColors.textPrimary),
       maxLines: 3,
       maxLength: 200,
       onTapOutside: (_) => dismissKeyboard(context),
@@ -192,17 +194,17 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
           label: Text(
             cat[0].toUpperCase() + cat.substring(1),
             style: TextStyle(
-              color: selected ? Colors.black : const Color(0xFF8A8FA8),
+              color: selected ? Colors.black : AppColors.textMuted,
               fontWeight:
                   selected ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
           selected: selected,
-          selectedColor: const Color(0xFFB7FF00),
-          backgroundColor: const Color(0xFF1C2029),
+          selectedColor: AppColors.accent,
+          backgroundColor: AppColors.surfaceCard,
           side: BorderSide(
             color: selected
-                ? const Color(0xFFB7FF00)
+                ? AppColors.accent
                 : Colors.white.withOpacity(0.06),
           ),
           onSelected: (_) => setState(() => _selectedCategory = cat),
@@ -255,7 +257,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
     return FilledButton(
       onPressed: _saving ? null : _save,
       style: FilledButton.styleFrom(
-        backgroundColor: const Color(0xFFB7FF00),
+        backgroundColor: AppColors.accent,
         foregroundColor: Colors.black,
         minimumSize: const Size.fromHeight(52),
         shape: RoundedRectangleBorder(
@@ -281,9 +283,9 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: Color(0xFF8A8FA8)),
+      hintStyle: const TextStyle(color: AppColors.textMuted),
       filled: true,
-      fillColor: const Color(0xFF14171C),
+      fillColor: AppColors.surfaceDark,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: Colors.white.withOpacity(0.06)),
@@ -294,13 +296,13 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFB7FF00)),
+        borderSide: const BorderSide(color: AppColors.accent),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFFF4D4D)),
+        borderSide: const BorderSide(color: AppColors.danger),
       ),
-      counterStyle: const TextStyle(color: Color(0xFF8A8FA8), fontSize: 12),
+      counterStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12),
     );
   }
 
@@ -308,13 +310,13 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
     return ButtonStyle(
       backgroundColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
-          return const Color(0xFFB7FF00);
+          return AppColors.accent;
         }
-        return const Color(0xFF1C2029);
+        return AppColors.surfaceCard;
       }),
       foregroundColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) return Colors.black;
-        return const Color(0xFF8A8FA8);
+        return AppColors.textMuted;
       }),
     );
   }
@@ -329,7 +331,7 @@ class _SectionLabel extends StatelessWidget {
     return Text(
       text,
       style: const TextStyle(
-        color: Color(0xFF8A8FA8),
+        color: AppColors.textMuted,
         fontSize: 13,
         fontWeight: FontWeight.w500,
         letterSpacing: 0.4,

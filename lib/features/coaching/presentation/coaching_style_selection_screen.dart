@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/coaching_style_providers.dart';
 import '../domain/models/coaching_style.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 /// Fullscreen coaching style selection — suitable for both onboarding
 /// and settings-initiated re-selection.
 ///
@@ -94,7 +96,7 @@ class _CoachingStyleSelectionScreenState
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E2E),
+        backgroundColor: AppColors.dark1E1E2E,
         title: const Text('Heads up'),
         content: Text(
           'Switching to ${style.displayName} will make reminders more persistent '
@@ -118,7 +120,7 @@ class _CoachingStyleSelectionScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F1A),
+      backgroundColor: AppColors.dark0F0F1A,
       appBar: widget.isOnboarding
           ? null
           : AppBar(
@@ -172,7 +174,7 @@ class _CoachingStyleSelectionScreenState
                 onPressed: _selected != null && !_saving ? _save : null,
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(52),
-                  backgroundColor: const Color(0xFF6C63FF),
+                  backgroundColor: AppColors.violetSoft,
                 ),
                 child: _saving
                     ? const SizedBox(
@@ -219,12 +221,12 @@ class _StyleCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF6C63FF).withAlpha(38)
+              ? AppColors.violetSoft.withAlpha(38)
               : Colors.white.withAlpha(8),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFF6C63FF)
+                ? AppColors.violetSoft
                 : Colors.white.withAlpha(20),
             width: isSelected ? 2 : 1,
           ),
@@ -241,11 +243,11 @@ class _StyleCard extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isSelected
-                    ? const Color(0xFF6C63FF)
+                    ? AppColors.violetSoft
                     : Colors.transparent,
                 border: Border.all(
                   color: isSelected
-                      ? const Color(0xFF6C63FF)
+                      ? AppColors.violetSoft
                       : Colors.white38,
                   width: 2,
                 ),

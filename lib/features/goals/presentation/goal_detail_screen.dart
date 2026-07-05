@@ -21,6 +21,8 @@ import '../domain/models/goal_milestone.dart';
 import '../domain/models/user_goal.dart';
 import 'goal_editor_screen.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 class GoalDetailScreen extends ConsumerWidget {
   const GoalDetailScreen({super.key, required this.goalId});
 
@@ -478,7 +480,7 @@ class _GoalActionTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Card(
-      color: const Color(0xFF1A1C1F),
+      color: AppColors.surfaceMuted,
       margin: const EdgeInsets.only(bottom: 6),
       child: CheckboxListTile(
         value: action.completed,
@@ -510,7 +512,7 @@ class _MilestoneTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Card(
-      color: const Color(0xFF1A1C1F),
+      color: AppColors.surfaceMuted,
       margin: const EdgeInsets.only(bottom: 6),
       child: CheckboxListTile(
         value: milestone.completed,

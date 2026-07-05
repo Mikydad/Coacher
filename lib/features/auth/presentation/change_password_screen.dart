@@ -7,6 +7,8 @@ import 'widgets/auth_error_text.dart';
 import 'widgets/auth_primary_button.dart';
 import 'widgets/auth_text_field.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 class ChangePasswordScreen extends ConsumerStatefulWidget {
   const ChangePasswordScreen({super.key});
 
@@ -109,7 +111,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF050806),
+      backgroundColor: AppColors.scaffold,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,

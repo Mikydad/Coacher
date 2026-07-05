@@ -21,6 +21,8 @@ import '../../../app/application/main_tab_navigation.dart';
 import '../../../app/presentation/main_tab_bar_inset.dart';
 import '../application/proactive_suggestion_display.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 /// Optional route arguments for pre-filling the input (e.g. from a proactive
 /// suggestion card on Home — see Phase 4).
 class CoachRouteArgs {
@@ -153,7 +155,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     final serviceAsync = ref.watch(resolvedAiAssistantProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0E0E0E),
+      backgroundColor: AppColors.ink,
       appBar: _buildAppBar(serviceAsync),
       body: serviceAsync.when(
         data: (service) => _buildBody(service),
@@ -168,7 +170,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   ) {
     final isReady = serviceAsync.hasValue;
     return AppBar(
-      backgroundColor: const Color(0xFF0E0E0E),
+      backgroundColor: AppColors.ink,
       elevation: 0,
       automaticallyImplyLeading: false,
       title: const Text(
@@ -249,7 +251,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         ),
         // Fixed bottom: input + quick directives
         Container(
-          color: const Color(0xFF0E0E0E),
+          color: AppColors.ink,
           padding: EdgeInsets.only(
             bottom: mainTabFooterPadding(context),
           ),
@@ -295,11 +297,11 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircularProgressIndicator(color: Color(0xFF00E3FD), strokeWidth: 2),
+          CircularProgressIndicator(color: AppColors.cyan, strokeWidth: 2),
           SizedBox(height: 16),
           Text(
             'Initialising Coach AI…',
-            style: TextStyle(color: Color(0xFFADAAAA), fontSize: 14),
+            style: TextStyle(color: AppColors.textSoft, fontSize: 14),
           ),
         ],
       ),
@@ -313,7 +315,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         child: Text(
           'Could not load Coach AI.\n$e',
           textAlign: TextAlign.center,
-          style: const TextStyle(color: Color(0xFFADAAAA), fontSize: 14),
+          style: const TextStyle(color: AppColors.textSoft, fontSize: 14),
         ),
       ),
     );
@@ -334,7 +336,7 @@ class _StatusPill extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border.all(
           color: isReady
-              ? const Color(0xFF00E3FD).withValues(alpha: 0.4)
+              ? AppColors.cyan.withValues(alpha: 0.4)
               : Colors.white.withValues(alpha: 0.1),
         ),
         borderRadius: BorderRadius.circular(999),
@@ -347,7 +349,7 @@ class _StatusPill extends StatelessWidget {
             height: 6,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isReady ? const Color(0xFF00E3FD) : const Color(0xFF666666),
+              color: isReady ? AppColors.cyan : AppColors.textFaint,
             ),
           ),
           const SizedBox(width: 6),
@@ -357,7 +359,7 @@ class _StatusPill extends StatelessWidget {
               fontSize: 11,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,
-              color: isReady ? const Color(0xFF00E3FD) : const Color(0xFF666666),
+              color: isReady ? AppColors.cyan : AppColors.textFaint,
             ),
           ),
         ],
@@ -410,9 +412,9 @@ class _EmptyState extends StatelessWidget {
                       example,
                       style: const TextStyle(fontSize: 12),
                     ),
-                    backgroundColor: const Color(0xFF1A1A1A),
+                    backgroundColor: AppColors.inkCard,
                     side: BorderSide(
-                      color: const Color(0xFF00E3FD).withValues(alpha: 0.25),
+                      color: AppColors.cyan.withValues(alpha: 0.25),
                     ),
                     onPressed: () => onPromptSelected(example),
                   ),
@@ -521,10 +523,10 @@ class _PickUpBannerState extends State<_PickUpBanner> {
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFA726).withValues(alpha: 0.12),
+        color: AppColors.amber.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: const Color(0xFFFFA726).withValues(alpha: 0.4),
+          color: AppColors.amber.withValues(alpha: 0.4),
         ),
       ),
       child: Row(
@@ -532,7 +534,7 @@ class _PickUpBannerState extends State<_PickUpBanner> {
           const Icon(
             Icons.history_rounded,
             size: 14,
-            color: Color(0xFFFFA726),
+            color: AppColors.amber,
           ),
           const SizedBox(width: 8),
           const Expanded(
@@ -541,7 +543,7 @@ class _PickUpBannerState extends State<_PickUpBanner> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: Color(0xFFFFA726),
+                color: AppColors.amber,
               ),
             ),
           ),
@@ -556,7 +558,7 @@ class _PickUpBannerState extends State<_PickUpBanner> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFFFFA726),
+                color: AppColors.amber,
               ),
             ),
           ),
@@ -566,7 +568,7 @@ class _PickUpBannerState extends State<_PickUpBanner> {
             child: const Icon(
               Icons.close,
               size: 14,
-              color: Color(0xFFADAAAA),
+              color: AppColors.textSoft,
             ),
           ),
         ],
@@ -597,12 +599,12 @@ class _ConflictSummaryBanner extends StatelessWidget {
 
     final bg = isHard
         ? Colors.red.withValues(alpha: 0.12)
-        : const Color(0xFFFFA726).withValues(alpha: 0.12);
+        : AppColors.amber.withValues(alpha: 0.12);
     final borderColor = isHard
         ? Colors.redAccent.withValues(alpha: 0.4)
-        : const Color(0xFFFFA726).withValues(alpha: 0.4);
+        : AppColors.amber.withValues(alpha: 0.4);
     final textColor =
-        isHard ? Colors.redAccent : const Color(0xFFFFA726);
+        isHard ? Colors.redAccent : AppColors.amber;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -693,9 +695,9 @@ class _MessageItem extends StatelessWidget {
                         prompt,
                         style: const TextStyle(fontSize: 12),
                       ),
-                      backgroundColor: const Color(0xFF1A1A1A),
+                      backgroundColor: AppColors.inkCard,
                       side: BorderSide(
-                        color: const Color(0xFF00E3FD).withValues(alpha: 0.25),
+                        color: AppColors.cyan.withValues(alpha: 0.25),
                       ),
                       onPressed: () => onSuggestedPrompt(prompt),
                     ),
@@ -711,8 +713,8 @@ class _MessageItem extends StatelessWidget {
                     ? null
                     : () => service.applySuggestedPlan(message.id),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFBEFC00),
-                  foregroundColor: const Color(0xFF445D00),
+                  backgroundColor: AppColors.accentBright,
+                  foregroundColor: AppColors.accentDeep,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(999),
@@ -755,9 +757,9 @@ class _MessageItem extends StatelessWidget {
                       prompt,
                       style: const TextStyle(fontSize: 12),
                     ),
-                    backgroundColor: const Color(0xFF1A1A1A),
+                    backgroundColor: AppColors.inkCard,
                     side: BorderSide(
-                      color: const Color(0xFF00E3FD).withValues(alpha: 0.25),
+                      color: AppColors.cyan.withValues(alpha: 0.25),
                     ),
                     onPressed: () => onSuggestedPrompt(prompt),
                   ),
@@ -796,7 +798,7 @@ class _AiActionBar extends ConsumerWidget {
               child: Text(
                 'View recent AI changes ($recentCount)',
                 style: const TextStyle(
-                  color: Color(0xFF888888),
+                  color: AppColors.textGray,
                   fontSize: 12,
                 ),
               ),
@@ -816,7 +818,7 @@ class _AiActionBar extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('AI changes have been undone.'),
-            backgroundColor: Color(0xFF1A1A1A),
+            backgroundColor: AppColors.inkCard,
           ),
         );
         ref.invalidate(lastAiBatchProvider);
@@ -827,7 +829,7 @@ class _AiActionBar extends ConsumerWidget {
         final proceed = await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
-            backgroundColor: const Color(0xFF1A1A1A),
+            backgroundColor: AppColors.inkCard,
             title: const Text(
               'Some tasks were completed',
               style: TextStyle(color: Colors.white),
@@ -836,7 +838,7 @@ class _AiActionBar extends ConsumerWidget {
               'The following tasks added by the AI have since been completed. '
               'Undoing will revert those completions:\n\n'
               '${completedTitles.map((t) => '• $t').join('\n')}',
-              style: const TextStyle(color: Color(0xFFCCCCCC)),
+              style: const TextStyle(color: AppColors.grayLight),
             ),
             actions: [
               TextButton(
@@ -847,7 +849,7 @@ class _AiActionBar extends ConsumerWidget {
                 onPressed: () => Navigator.pop(context, true),
                 child: const Text(
                   'Undo anyway',
-                  style: TextStyle(color: Color(0xFF00E3FD)),
+                  style: TextStyle(color: AppColors.cyan),
                 ),
               ),
             ],
@@ -858,7 +860,7 @@ class _AiActionBar extends ConsumerWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('AI changes undone (including completed tasks).'),
-              backgroundColor: Color(0xFF1A1A1A),
+              backgroundColor: AppColors.inkCard,
             ),
           );
           ref.invalidate(lastAiBatchProvider);
@@ -870,7 +872,7 @@ class _AiActionBar extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(reason),
-            backgroundColor: const Color(0xFF1A1A1A),
+            backgroundColor: AppColors.inkCard,
           ),
         );
     }
@@ -879,7 +881,7 @@ class _AiActionBar extends ConsumerWidget {
   void _showHistorySheet(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
+      backgroundColor: AppColors.inkCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -899,19 +901,19 @@ class _UndoChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E2A2A),
+          color: AppColors.dark1E2A2A,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0x3300E3FD)),
+          border: Border.all(color: AppColors.cyanBorder20),
         ),
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.undo_rounded, color: Color(0xFF00E3FD), size: 14),
+            Icon(Icons.undo_rounded, color: AppColors.cyan, size: 14),
             SizedBox(width: 6),
             Text(
               'Undo AI changes',
               style: TextStyle(
-                color: Color(0xFF00E3FD),
+                color: AppColors.cyan,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -942,7 +944,7 @@ class _AiHistorySheet extends ConsumerWidget {
           width: 36,
           height: 4,
           decoration: BoxDecoration(
-            color: const Color(0xFF444444),
+            color: AppColors.textDim,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
@@ -989,7 +991,7 @@ class _AiHistorySheet extends ConsumerWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(msg),
-                            backgroundColor: const Color(0xFF1A1A1A),
+                            backgroundColor: AppColors.inkCard,
                           ),
                         );
                         ref.invalidate(lastAiBatchProvider);
@@ -1004,7 +1006,7 @@ class _AiHistorySheet extends ConsumerWidget {
             child: Padding(
               padding: EdgeInsets.all(24),
               child: CircularProgressIndicator(
-                color: Color(0xFF00E3FD),
+                color: AppColors.cyan,
                 strokeWidth: 2,
               ),
             ),
@@ -1073,7 +1075,7 @@ class _BatchRow extends StatelessWidget {
               child: const Text(
                 'Undo',
                 style: TextStyle(
-                  color: Color(0xFF00E3FD),
+                  color: AppColors.cyan,
                   fontSize: 13,
                 ),
               ),
@@ -1085,15 +1087,15 @@ class _BatchRow extends StatelessWidget {
 
   Color _stateColor(String state) {
     if (state == AiActionBatchState.completed.name) {
-      return const Color(0xFF4CAF50);
+      return AppColors.statusGreen;
     }
     if (state == AiActionBatchState.rolledBack.name) {
-      return const Color(0xFFFF9800);
+      return AppColors.statusOrange;
     }
     if (state == AiActionBatchState.partialFailure.name) {
-      return const Color(0xFFFF5252);
+      return AppColors.danger;
     }
-    return const Color(0xFF888888);
+    return AppColors.textGray;
   }
 
   String _stateLabel(String state) {

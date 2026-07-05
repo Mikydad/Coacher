@@ -55,6 +55,8 @@ import '../../context_override/presentation/post_override_review_card.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 import 'quittr_app_bar_title.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 enum _PlansChangedAction { reshuffle, defer, skip }
 
 /// Tasks and goals shown on Home before "see more" links to the full hub.
@@ -331,11 +333,11 @@ class HomeScreen extends ConsumerWidget {
                             icon: const Icon(
                               Icons.add,
                               size: 20,
-                              color: Color(0xFFB7FF00),
+                              color: AppColors.accent,
                             ),
                             label: const Text('Create a goal'),
                             style: TextButton.styleFrom(
-                              foregroundColor: const Color(0xFFB7FF00),
+                              foregroundColor: AppColors.accent,
                             ),
                           ),
                         ],
@@ -398,7 +400,7 @@ class HomeScreen extends ConsumerWidget {
                   const Text(
                     'COACHING INSIGHTS',
                     style: TextStyle(
-                      color: Color(0xFF00E6FF),
+                      color: AppColors.cyan,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -493,7 +495,7 @@ void _maybeTriggerMorningBrief(BuildContext context, WidgetRef ref) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: const Color(0xFF201f1f),
+          backgroundColor: AppColors.inkWarm,
           behavior: SnackBarBehavior.floating,
           content: const Text(
             'Coach AI has suggestions for today — tap to review.',
@@ -501,7 +503,7 @@ void _maybeTriggerMorningBrief(BuildContext context, WidgetRef ref) {
           ),
           action: SnackBarAction(
             label: 'Open',
-            textColor: const Color(0xFFB2ED00),
+            textColor: AppColors.accentDim,
             onPressed: () => navigateToMainTab(
               context,
               ref,
@@ -573,9 +575,9 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
   }
 
   Color _scoreAccent(int scorePercent) {
-    if (scorePercent >= 80) return const Color(0xFFB7FF00);
-    if (scorePercent >= 50) return const Color(0xFFFFD54F);
-    return const Color(0xFFFF6D4E);
+    if (scorePercent >= 80) return AppColors.accent;
+    if (scorePercent >= 50) return AppColors.scoreAmber;
+    return AppColors.scoreCoral;
   }
 
   void _handleMilestones({required int streak, required int scorePercent}) {
@@ -952,7 +954,7 @@ class _SparklinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final base = Paint()
-      ..color = const Color(0x33FFFFFF)
+      ..color = AppColors.whiteGlow20
       ..strokeWidth = 1;
     canvas.drawLine(
       Offset(0, size.height),
@@ -960,8 +962,8 @@ class _SparklinePainter extends CustomPainter {
       base,
     );
 
-    _drawSeries(canvas, size, a, const Color(0xFFB7FF00), drawProgress);
-    _drawSeries(canvas, size, b, const Color(0xFF00E6FF), drawProgress);
+    _drawSeries(canvas, size, a, AppColors.accent, drawProgress);
+    _drawSeries(canvas, size, b, AppColors.cyan, drawProgress);
   }
 
   void _drawSeries(
@@ -1040,7 +1042,7 @@ class _ActionCircle extends StatelessWidget {
     fontWeight: FontWeight.w600,
     height: 1.1,
     letterSpacing: 0.15,
-    color: Color(0xFFADAAAA),
+    color: AppColors.textSoft,
   );
 
   @override
@@ -1054,14 +1056,14 @@ class _ActionCircle extends StatelessWidget {
           height: 72,
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           decoration: BoxDecoration(
-            color: const Color(0xFF1A1C1F),
+            color: AppColors.surfaceMuted,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(color: Colors.white10),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: const Color(0xFFB7FF00), size: 22),
+              Icon(icon, color: AppColors.accent, size: 22),
               const SizedBox(height: 4),
               SizedBox(
                 width: double.infinity,
@@ -1090,8 +1092,8 @@ class _FlowNowStrip extends ConsumerWidget {
 
   final AsyncValue<HomeFlowSnapshot> flowSnapshotAsync;
 
-  static const _kAccent = Color(0xFF00E6FF);
-  static const _kMuted = Color(0xFFADAAAA);
+  static const _kAccent = AppColors.cyan;
+  static const _kMuted = AppColors.textSoft;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1101,7 +1103,7 @@ class _FlowNowStrip extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF111317),
+        color: AppColors.surfacePanel,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white12),
       ),
@@ -1263,7 +1265,7 @@ class _FlowNowStrip extends ConsumerWidget {
         if (displayTask != null) ...[
           const SizedBox(height: 8),
           Material(
-            color: const Color(0xFF1A1D22),
+            color: AppColors.dark1A1D22,
             borderRadius: BorderRadius.circular(10),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -1396,7 +1398,7 @@ class _FlowNowTimerControl extends StatelessWidget {
   final ExecutionState execState;
   final VoidCallback onPressed;
 
-  static const _kAccent = Color(0xFF00E6FF);
+  static const _kAccent = AppColors.cyan;
 
   @override
   Widget build(BuildContext context) {
@@ -1472,7 +1474,7 @@ class _HomeSectionSeeMoreLink extends StatelessWidget {
       child: TextButton(
         onPressed: onTap,
         style: TextButton.styleFrom(
-          foregroundColor: const Color(0xFFB7FF00),
+          foregroundColor: AppColors.accent,
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           minimumSize: Size.zero,
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1519,7 +1521,7 @@ class _TodayGoalTile extends StatelessWidget {
           children: [
             const Icon(
               Icons.track_changes_outlined,
-              color: Color(0xFFB7FF00),
+              color: AppColors.accent,
               size: 22,
             ),
             const SizedBox(width: 12),
@@ -1595,7 +1597,7 @@ class _TaskItem extends StatelessWidget {
           if (value == null) return;
           onCheckedChange(value);
         },
-        activeColor: const Color(0xFFB7FF00),
+        activeColor: AppColors.accent,
       ),
       title: Text(
         title,
@@ -1997,7 +1999,7 @@ class _NeonCard extends StatelessWidget {
     return Container(
       padding: padding ?? const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF111317),
+        color: AppColors.surfacePanel,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.white12),
       ),
@@ -2319,7 +2321,7 @@ Future<void> _uncompleteTaskFromHome(
 class _CoachHomeFab extends ConsumerWidget {
   const _CoachHomeFab();
 
-  static const _accent = Color(0xFF00E3FD);
+  static const _accent = AppColors.cyan;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2332,7 +2334,7 @@ class _CoachHomeFab extends ConsumerWidget {
       elevation: 0,
       highlightElevation: 0,
       splashColor: _accent.withValues(alpha: 0.12),
-      backgroundColor: const Color(0xFF1A1A1A),
+      backgroundColor: AppColors.inkCard,
       shape: CircleBorder(
         side: BorderSide(color: _accent.withValues(alpha: 0.35)),
       ),

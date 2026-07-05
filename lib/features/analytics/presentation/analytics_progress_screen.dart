@@ -14,6 +14,8 @@ import 'progress/task_integrity_section.dart';
 import 'progress/weekly_summary_hero.dart';
 import '../domain/models/ai_summary_response.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 class AnalyticsProgressScreen extends ConsumerStatefulWidget {
   const AnalyticsProgressScreen({super.key});
 
@@ -220,7 +222,7 @@ class _AnalyticsProgressScreenState
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF111317),
+      backgroundColor: AppColors.surfacePanel,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -247,11 +249,11 @@ class _AiResultSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final sourceLabel = response.isFallback ? 'DETERMINISTIC FALLBACK' : 'AI RESPONSE';
     final sourceColor = response.isFallback
-        ? const Color(0xFFFFD54F)
-        : const Color(0xFFB7FF00);
+        ? AppColors.scoreAmber
+        : AppColors.accent;
     final validColor = response.isValid
-        ? const Color(0xFFB7FF00)
-        : const Color(0xFFFF6D4E);
+        ? AppColors.accent
+        : AppColors.scoreCoral;
 
     return DraggableScrollableSheet(
       expand: false,
@@ -338,7 +340,7 @@ class _AiResultSheet extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFFB7FF00),
+                color: AppColors.accent,
                 height: 1.4,
               ),
             ),
@@ -393,7 +395,7 @@ class _SheetSection extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            color: Color(0xFF00E6FF),
+            color: AppColors.cyan,
             fontSize: 10,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.2,

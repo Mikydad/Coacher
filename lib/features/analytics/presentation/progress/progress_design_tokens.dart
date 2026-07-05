@@ -1,21 +1,23 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 /// PRD Progress page — "Obsidian Pulse" palette.
 abstract final class ProgressDesignTokens {
-  static const surface = Color(0xFF0E0E0E);
-  static const surfaceContainerLow = Color(0xFF131313);
-  static const surfaceContainerHigh = Color(0xFF201F1F);
-  static const surfaceContainerHighest = Color(0xFF262626);
-  static const surfaceBright = Color(0xFF2C2C2C);
+  static const surface = AppColors.ink;
+  static const surfaceContainerLow = AppColors.inkDeep;
+  static const surfaceContainerHigh = AppColors.inkWarm;
+  static const surfaceContainerHighest = AppColors.inkElevated;
+  static const surfaceBright = AppColors.dark2C2C2C;
 
-  static const primary = Color(0xFFEAFFB8);
-  static const primaryDim = Color(0xFFB2ED00);
-  static const primaryContainer = Color(0xFFBEFC00);
-  static const onPrimaryContainer = Color(0xFF445D00);
+  static const primary = AppColors.limeCream;
+  static const primaryDim = AppColors.accentDim;
+  static const primaryContainer = AppColors.accentBright;
+  static const onPrimaryContainer = AppColors.accentDeep;
 
-  static const secondary = Color(0xFF00E3FD);
-  static const onSurface = Color(0xFFFFFFFF);
-  static const onSurfaceVariant = Color(0xFFADAAAA);
+  static const secondary = AppColors.cyan;
+  static const onSurface = AppColors.white;
+  static const onSurfaceVariant = AppColors.textSoft;
 
   static const ringGradient = LinearGradient(
     begin: Alignment.topLeft,

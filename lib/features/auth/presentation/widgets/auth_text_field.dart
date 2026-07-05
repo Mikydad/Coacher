@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 /// Styled text field for auth screens.
 ///
 /// Dark `#1A1A1A` fill, `#B2ED00` focused border, 12 px radius.
@@ -44,19 +46,19 @@ class AuthTextField extends StatelessWidget {
       style: const TextStyle(color: Colors.white, fontSize: 16),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Color(0xFF888888), fontSize: 14),
+        labelStyle: const TextStyle(color: AppColors.textGray, fontSize: 14),
         errorText: errorText,
-        errorStyle: const TextStyle(color: Color(0xFFFF5252), fontSize: 12),
+        errorStyle: const TextStyle(color: AppColors.danger, fontSize: 12),
         filled: true,
-        fillColor: const Color(0xFF1A1A1A),
+        fillColor: AppColors.inkCard,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: _border(Colors.transparent),
-        enabledBorder: _border(const Color(0xFF2E2E2E)),
-        focusedBorder: _border(const Color(0xFFB2ED00)),
-        errorBorder: _border(const Color(0xFFFF5252)),
-        focusedErrorBorder: _border(const Color(0xFFFF5252)),
-        disabledBorder: _border(const Color(0xFF1E1E1E)),
+        enabledBorder: _border(AppColors.inkSoft),
+        focusedBorder: _border(AppColors.accentDim),
+        errorBorder: _border(AppColors.danger),
+        focusedErrorBorder: _border(AppColors.danger),
+        disabledBorder: _border(AppColors.dark1E1E1E),
       ),
     );
   }

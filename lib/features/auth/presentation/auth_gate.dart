@@ -13,6 +13,8 @@ import 'forgot_password_screen.dart';
 import 'login_screen.dart';
 import 'sign_up_screen.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 /// Root auth gate — sits above [FirstLaunchGate] in the widget tree.
 ///
 /// ## Behaviour
@@ -169,13 +171,13 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     return const Directionality(
       textDirection: TextDirection.ltr,
       child: Material(
-        color: Color(0xFF050806),
+        color: AppColors.scaffold,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               CircularProgressIndicator(
-                color: Color(0xFFB7FF00),
+                color: AppColors.accent,
                 strokeWidth: 2,
               ),
               SizedBox(height: 20),
@@ -207,9 +209,9 @@ class _AuthFlowApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF050806),
+        scaffoldBackgroundColor: AppColors.scaffold,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFB7FF00),
+          seedColor: AppColors.accent,
           brightness: Brightness.dark,
         ),
         useMaterial3: true,

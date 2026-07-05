@@ -18,6 +18,8 @@ import '../../../features/auth/presentation/widgets/auth_error_text.dart';
 import '../../../features/auth/presentation/widgets/auth_text_field.dart';
 import 'settings_page_scaffold.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 /// Account-specific settings: password, data, and account deletion.
 class AccountSettingsScreen extends ConsumerStatefulWidget {
   const AccountSettingsScreen({super.key});
@@ -175,11 +177,11 @@ class _AccountSettingsScreenState
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1A1A1A),
+          backgroundColor: AppColors.inkCard,
           title: const Text(
             'Delete account?',
             style: TextStyle(
-                color: Color(0xFFFF7351), fontWeight: FontWeight.bold),
+                color: AppColors.coral, fontWeight: FontWeight.bold),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -187,7 +189,7 @@ class _AccountSettingsScreenState
             children: [
               const Text(
                 'This permanently deletes your account and all associated data. This cannot be undone.',
-                style: TextStyle(color: Color(0xFF888888), height: 1.5),
+                style: TextStyle(color: AppColors.textGray, height: 1.5),
               ),
               const SizedBox(height: 16),
               const Text(
@@ -201,25 +203,25 @@ class _AccountSettingsScreenState
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: const Color(0xFF111111),
+                  fillColor: AppColors.dark111111,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide:
-                        const BorderSide(color: Color(0xFF333333)),
+                        const BorderSide(color: AppColors.gray33),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide:
-                        const BorderSide(color: Color(0xFF333333)),
+                        const BorderSide(color: AppColors.gray33),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide:
-                        const BorderSide(color: Color(0xFFFF7351)),
+                        const BorderSide(color: AppColors.coral),
                   ),
                   hintText: 'DELETE',
                   hintStyle:
-                      const TextStyle(color: Color(0xFF444444)),
+                      const TextStyle(color: AppColors.textDim),
                 ),
                 onChanged: (v) =>
                     setDialogState(() => canConfirm = v == 'DELETE'),
@@ -230,7 +232,7 @@ class _AccountSettingsScreenState
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Cancel',
-                  style: TextStyle(color: Color(0xFF888888))),
+                  style: TextStyle(color: AppColors.textGray)),
             ),
             TextButton(
               onPressed: canConfirm
@@ -240,8 +242,8 @@ class _AccountSettingsScreenState
                 'Delete',
                 style: TextStyle(
                   color: canConfirm
-                      ? const Color(0xFFFF7351)
-                      : const Color(0xFF444444),
+                      ? AppColors.coral
+                      : AppColors.textDim,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -264,7 +266,7 @@ class _AccountSettingsScreenState
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1A1A1A),
+          backgroundColor: AppColors.inkCard,
           title: const Text(
             'Confirm your identity',
             style: TextStyle(
@@ -275,7 +277,7 @@ class _AccountSettingsScreenState
             children: [
               const Text(
                 'Re-enter your password to proceed.',
-                style: TextStyle(color: Color(0xFF888888), height: 1.5),
+                style: TextStyle(color: AppColors.textGray, height: 1.5),
               ),
               const SizedBox(height: 16),
               AuthTextField(
@@ -300,7 +302,7 @@ class _AccountSettingsScreenState
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Cancel',
-                  style: TextStyle(color: Color(0xFF888888))),
+                  style: TextStyle(color: AppColors.textGray)),
             ),
             TextButton(
               onPressed: () async {
@@ -318,7 +320,7 @@ class _AccountSettingsScreenState
               },
               child: const Text('Confirm',
                   style: TextStyle(
-                      color: Color(0xFFFF7351),
+                      color: AppColors.coral,
                       fontWeight: FontWeight.bold)),
             ),
           ],
@@ -400,7 +402,7 @@ class _AccountSettingsScreenState
                 title: 'Delete account',
                 subtitle: 'Permanently remove your account and data',
                 onTap: _deleteLoading ? null : _deleteAccount,
-                titleColor: const Color(0xFFFF7351),
+                titleColor: AppColors.coral,
                 trailing: _deleteLoading
                     ? const _LoadingIndicator()
                     : null,
@@ -492,7 +494,7 @@ class _Divider extends StatelessWidget {
       child: Divider(
         height: 1,
         thickness: 1,
-        color: Color(0xFF2A2A2A),
+        color: AppColors.gray2A,
       ),
     );
   }
@@ -508,7 +510,7 @@ class _LoadingIndicator extends StatelessWidget {
       height: 18,
       child: CircularProgressIndicator(
         strokeWidth: 2,
-        color: Color(0xFF888888),
+        color: AppColors.textGray,
       ),
     );
   }

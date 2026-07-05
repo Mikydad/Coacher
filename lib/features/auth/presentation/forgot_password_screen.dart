@@ -6,6 +6,8 @@ import 'widgets/auth_error_text.dart';
 import 'widgets/auth_primary_button.dart';
 import 'widgets/auth_text_field.dart';
 
+import '../../../core/presentation/app_colors.dart';
+
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key, this.prefillEmail});
 
@@ -62,7 +64,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF050806),
+      backgroundColor: AppColors.scaffold,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -88,7 +90,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         const SizedBox(height: 24),
         const Text(
           "Enter the email address linked to your account.\nWe'll send you a reset link.",
-          style: TextStyle(color: Color(0xFF888888), fontSize: 14, height: 1.5),
+          style: TextStyle(color: AppColors.textGray, fontSize: 14, height: 1.5),
         ),
         const SizedBox(height: 28),
         AuthTextField(
@@ -119,7 +121,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         const Icon(Icons.mark_email_read_outlined,
-            color: Color(0xFFB2ED00), size: 56),
+            color: AppColors.accentDim, size: 56),
         const SizedBox(height: 20),
         const Text(
           'Check your email',
@@ -131,14 +133,14 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           "We've sent a password reset link to ${_emailCtrl.text.trim()}.",
           textAlign: TextAlign.center,
           style:
-              const TextStyle(color: Color(0xFF888888), fontSize: 14, height: 1.5),
+              const TextStyle(color: AppColors.textGray, fontSize: 14, height: 1.5),
         ),
         const SizedBox(height: 32),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text(
             'Back to sign in',
-            style: TextStyle(color: Color(0xFFB2ED00), fontSize: 15),
+            style: TextStyle(color: AppColors.accentDim, fontSize: 15),
           ),
         ),
       ],

@@ -5,6 +5,8 @@ import '../../application/discipline_score.dart';
 import 'progress_design_tokens.dart';
 import 'progress_shared_widgets.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 String progressWeekDateRangeLabel() {
   final now = DateTime.now();
   final start = DateTime(now.year, now.month, now.day)
@@ -98,7 +100,7 @@ class WeeklySummaryHero extends StatelessWidget {
                     badge: deltaLabel,
                     badgeColor: delta >= 0
                         ? ProgressDesignTokens.primaryDim
-                        : const Color(0xFFFF7351),
+                        : AppColors.coral,
                   ),
                   const SizedBox(height: 10),
                   ProgressMiniStatCard(

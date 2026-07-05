@@ -7,6 +7,8 @@ import '../../domain/models/activity_feed_item.dart';
 import '../../domain/models/circle_enums.dart';
 import '../widgets/ai_pulse_banner.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 // Filter categories shown in the chip row.
 enum _FeedFilter { all, goals, habits, tasks }
 
@@ -42,12 +44,12 @@ class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
         Expanded(
           child: feedAsync.when(
             loading: () => const Center(
-              child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
+              child: CircularProgressIndicator(color: AppColors.accent),
             ),
             error: (_, __) => const Center(
               child: Text(
                 'Could not load activity.',
-                style: TextStyle(color: Color(0xFF8A8FA8)),
+                style: TextStyle(color: AppColors.textMuted),
               ),
             ),
             data: (items) {
@@ -129,16 +131,16 @@ class _FilterChipRow extends StatelessWidget {
               label: Text(
                 _filterLabel(f),
                 style: TextStyle(
-                  color: isSelected ? Colors.black : const Color(0xFF8A8FA8),
+                  color: isSelected ? Colors.black : AppColors.textMuted,
                   fontSize: 13,
                 ),
               ),
               selected: isSelected,
-              selectedColor: const Color(0xFFB7FF00),
-              backgroundColor: const Color(0xFF1C2029),
+              selectedColor: AppColors.accent,
+              backgroundColor: AppColors.surfaceCard,
               side: BorderSide(
                 color: isSelected
-                    ? const Color(0xFFB7FF00)
+                    ? AppColors.accent
                     : Colors.white.withValues(alpha: 0.06),
               ),
               onSelected: (_) => onChanged(f),
@@ -174,7 +176,7 @@ class _ActivityCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF14171C),
+        color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
             color: Colors.white.withValues(alpha: 0.06)),
@@ -192,7 +194,7 @@ class _ActivityCard extends StatelessWidget {
                 RichText(
                   text: TextSpan(
                     style: const TextStyle(
-                      color: Color(0xFFF0F4FF),
+                      color: AppColors.textPrimary,
                       fontSize: 14,
                       height: 1.4,
                     ),
@@ -211,7 +213,7 @@ class _ActivityCard extends StatelessWidget {
                 Text(
                   _relativeTime(item.createdAtMs),
                   style: const TextStyle(
-                    color: Color(0xFF8A8FA8),
+                    color: AppColors.textMuted,
                     fontSize: 12,
                   ),
                 ),
@@ -241,13 +243,13 @@ class _SystemActivityPill extends StatelessWidget {
         padding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFF1C2029),
+          color: AppColors.surfaceCard,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
           copy,
           style: const TextStyle(
-            color: Color(0xFF8A8FA8),
+            color: AppColors.textMuted,
             fontSize: 12,
           ),
         ),
@@ -279,21 +281,21 @@ class _EventIcon extends StatelessWidget {
   (IconData, Color) _iconFor(ActivityEventType t) {
     switch (t) {
       case ActivityEventType.goalCompleted:
-        return (Icons.flag_rounded, const Color(0xFFB7FF00));
+        return (Icons.flag_rounded, AppColors.accent);
       case ActivityEventType.habitStreakReached:
         return (Icons.local_fire_department_rounded,
-            const Color(0xFFFF8C42));
+            AppColors.orange);
       case ActivityEventType.taskFinished:
-        return (Icons.check_circle_rounded, const Color(0xFF00CFFF));
+        return (Icons.check_circle_rounded, AppColors.cyanDeep);
       case ActivityEventType.milestoneReached:
-        return (Icons.emoji_events_rounded, const Color(0xFFFFD600));
+        return (Icons.emoji_events_rounded, AppColors.yellow);
       case ActivityEventType.weeklyCommitmentMet:
-        return (Icons.calendar_today_rounded, const Color(0xFF7B61FF));
+        return (Icons.calendar_today_rounded, AppColors.violet);
       case ActivityEventType.challengeProgressUpdated:
-        return (Icons.bar_chart_rounded, const Color(0xFF00FF9F));
+        return (Icons.bar_chart_rounded, AppColors.mint);
       case ActivityEventType.memberJoined:
       case ActivityEventType.memberLeft:
-        return (Icons.group_rounded, const Color(0xFF8A8FA8));
+        return (Icons.group_rounded, AppColors.textMuted);
     }
   }
 }
@@ -306,14 +308,14 @@ class _AvatarInitial extends StatelessWidget {
   final String userId;
 
   static const _colors = [
-    Color(0xFFB7FF00),
-    Color(0xFF00CFFF),
-    Color(0xFFFF8C42),
-    Color(0xFFFF4D9E),
-    Color(0xFF7B61FF),
-    Color(0xFF00FF9F),
-    Color(0xFFFFD600),
-    Color(0xFFFF4D4D),
+    AppColors.accent,
+    AppColors.cyanDeep,
+    AppColors.orange,
+    AppColors.pink,
+    AppColors.violet,
+    AppColors.mint,
+    AppColors.yellow,
+    AppColors.danger,
   ];
 
   Color get _color => _colors[userId.hashCode.abs() % _colors.length];
@@ -350,7 +352,7 @@ class _EmptyState extends StatelessWidget {
           'No activity yet.\nComplete a goal or task to see progress here.',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: Color(0xFF8A8FA8),
+            color: AppColors.textMuted,
             fontSize: 15,
             height: 1.5,
           ),

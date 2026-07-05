@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 /// Obsidian Pulse tokens for attention mode sheet — visual only.
 abstract final class AttentionModeColors {
-  static const sheet = Color(0xFF121212);
-  static const card = Color(0xFF1A1A1A);
-  static const cardOverlay = Color(0x801A1A1A);
-  static const lime = Color(0xFFC0FF00);
-  static const cyan = Color(0xFF00E3FD);
-  static const label = Color(0xFF8E8E93);
-  static const handle = Color(0xFF333333);
+  static const sheet = AppColors.dark121212;
+  static const card = AppColors.inkCard;
+  static const cardOverlay = AppColors.blackScrim50;
+  static const lime = AppColors.accentBright;
+  static const cyan = AppColors.cyan;
+  static const label = AppColors.grayIos;
+  static const handle = AppColors.gray33;
 }
 
 class AttentionModeSheetHandle extends StatelessWidget {

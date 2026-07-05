@@ -6,6 +6,8 @@ import '../../application/auth_providers.dart';
 import '../../domain/auth_failure.dart';
 import 'auth_error_text.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 /// "Continue with Google" for auth screens.
 class AuthGoogleSignInButton extends ConsumerStatefulWidget {
   const AuthGoogleSignInButton({super.key, this.enabled = true});
@@ -67,7 +69,7 @@ class _AuthGoogleSignInButtonState extends ConsumerState<AuthGoogleSignInButton>
             onPressed: _loading || !widget.enabled ? null : _signIn,
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
-              side: const BorderSide(color: Color(0xFF2E2E2E), width: 1.5),
+              side: const BorderSide(color: AppColors.inkSoft, width: 1.5),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -78,7 +80,7 @@ class _AuthGoogleSignInButtonState extends ConsumerState<AuthGoogleSignInButton>
                     width: 22,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Color(0xFF888888),
+                      color: AppColors.textGray,
                     ),
                   )
                 : const Row(
@@ -122,15 +124,15 @@ class AuthOrDivider extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
         children: [
-          const Expanded(child: Divider(color: Color(0xFF2A2A2A))),
+          const Expanded(child: Divider(color: AppColors.gray2A)),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(
               label,
-              style: const TextStyle(color: Color(0xFF666666), fontSize: 13),
+              style: const TextStyle(color: AppColors.textFaint, fontSize: 13),
             ),
           ),
-          const Expanded(child: Divider(color: Color(0xFF2A2A2A))),
+          const Expanded(child: Divider(color: AppColors.gray2A)),
         ],
       ),
     );

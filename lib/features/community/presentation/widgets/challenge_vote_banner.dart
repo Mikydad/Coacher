@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/challenge_providers.dart';
 import '../../domain/models/challenge.dart';
 
+import '../../../../core/presentation/app_colors.dart';
+
 class ChallengeVoteBanner extends ConsumerStatefulWidget {
   const ChallengeVoteBanner({
     super.key,
@@ -74,10 +76,10 @@ class _ChallengeVoteBannerState
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C2029),
+        color: AppColors.surfaceCard,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFFB7FF00).withValues(alpha: 0.3),
+          color: AppColors.accent.withValues(alpha: 0.3),
         ),
       ),
       child: Column(
@@ -86,12 +88,12 @@ class _ChallengeVoteBannerState
           Row(
             children: [
               const Icon(Icons.how_to_vote_rounded,
-                  color: Color(0xFFB7FF00), size: 16),
+                  color: AppColors.accent, size: 16),
               const SizedBox(width: 6),
               const Text(
                 'Vote to approve',
                 style: TextStyle(
-                  color: Color(0xFFB7FF00),
+                  color: AppColors.accent,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.4,
@@ -101,7 +103,7 @@ class _ChallengeVoteBannerState
               Text(
                 '$_voteCount voted',
                 style: const TextStyle(
-                  color: Color(0xFF8A8FA8),
+                  color: AppColors.textMuted,
                   fontSize: 11,
                 ),
               ),
@@ -111,7 +113,7 @@ class _ChallengeVoteBannerState
           Text(
             widget.challenge.title,
             style: const TextStyle(
-              color: Color(0xFFF0F4FF),
+              color: AppColors.textPrimary,
               fontSize: 15,
               fontWeight: FontWeight.w600,
             ),
@@ -120,7 +122,7 @@ class _ChallengeVoteBannerState
             'Target: ${widget.challenge.targetValue} ${widget.challenge.unit}'
             ' · ${widget.challenge.mode.name[0].toUpperCase()}${widget.challenge.mode.name.substring(1)} mode',
             style: const TextStyle(
-              color: Color(0xFF8A8FA8),
+              color: AppColors.textMuted,
               fontSize: 12,
             ),
           ),
@@ -132,7 +134,7 @@ class _ChallengeVoteBannerState
                 height: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Color(0xFFB7FF00),
+                  color: AppColors.accent,
                 ),
               ),
             )
@@ -143,7 +145,7 @@ class _ChallengeVoteBannerState
                   child: _VoteButton(
                     label: 'Approve',
                     icon: Icons.check_circle_rounded,
-                    color: const Color(0xFF4ADE80),
+                    color: AppColors.success,
                     onPressed:
                         (_hasVoted || _casting) ? null : () => _castVote(true),
                   ),
@@ -153,7 +155,7 @@ class _ChallengeVoteBannerState
                   child: _VoteButton(
                     label: 'Reject',
                     icon: Icons.cancel_rounded,
-                    color: const Color(0xFFFF4D4D),
+                    color: AppColors.danger,
                     onPressed:
                         (_hasVoted || _casting) ? null : () => _castVote(false),
                   ),
@@ -166,7 +168,7 @@ class _ChallengeVoteBannerState
               child: Text(
                 'Your vote has been recorded',
                 style: TextStyle(
-                  color: Color(0xFF8A8FA8),
+                  color: AppColors.textMuted,
                   fontSize: 11,
                 ),
               ),
