@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/presentation/app_colors.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
@@ -10,19 +11,21 @@ import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/application/daily_analytics_providers.dart';
 import '../../analytics/application/delivery_providers.dart';
 import '../../analytics/domain/models/analytics_event.dart';
+import '../../home/presentation/quittr_app_bar_title.dart';
 import '../application/goal_intensity_mode.dart';
 import '../application/goal_period_helpers.dart';
 import '../application/goals_providers.dart';
 import '../domain/models/goal_categories.dart';
 import '../domain/models/goal_check_in.dart';
 import '../domain/models/goal_enums.dart';
-import '../domain/models/goal_action.dart';
 import '../domain/models/goal_milestone.dart';
 import '../domain/models/user_goal.dart';
 import 'goal_editor_screen.dart';
 
-import '../../../core/presentation/app_colors.dart';
-
+/// Obsidian Pulse goal detail — layered dark surfaces, no dividers, lime as
+/// the light source for achievement. Visual language follows the Stitch
+/// "productivity dashboard" mock (two-tone hero title, metadata pills,
+/// streak counter, gradient cycle progress, operational checklist).
 class GoalDetailScreen extends ConsumerWidget {
   const GoalDetailScreen({super.key, required this.goalId});
 
@@ -44,32 +47,53 @@ class GoalDetailScreen extends ConsumerWidget {
     return '${g.targetValue == g.targetValue.roundToDouble() ? g.targetValue.toInt() : g.targetValue} $unit ($suffix)';
   }
 
+  /// Consecutive days (ending today or yesterday) with a met check-in.
+  int _currentStreak(List<GoalCheckIn> checkIns) {
+    final met = <String>{
+      for (final c in checkIns)
+        if (c.metCommitment) c.dateKey,
+    };
+    var day = DateTime.now();
+    if (!met.contains(DateKeys.yyyymmdd(day))) {
+      day = day.subtract(const Duration(days: 1));
+    }
+    var streak = 0;
+    while (met.contains(DateKeys.yyyymmdd(day))) {
+      streak++;
+      day = day.subtract(const Duration(days: 1));
+    }
+    return streak;
+  }
+
+  Scaffold _messageScaffold(String message, {bool spinner = false}) {
+    return Scaffold(
+      backgroundColor: AppColors.ink,
+      appBar: AppBar(
+        backgroundColor: AppColors.ink,
+        title: const QuittrAppBarTitle(),
+      ),
+      body: Center(
+        child: spinner
+            ? const CircularProgressIndicator()
+            : Text(message, style: const TextStyle(color: AppColors.textSoft)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (goalId.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Goal')),
-        body: const Center(child: Text('Missing goal')),
-      );
+      return _messageScaffold('Missing goal');
     }
 
     final async = ref.watch(goalDetailProvider(goalId));
 
     return async.when(
-      loading: () => Scaffold(
-        appBar: AppBar(title: const Text('Goal')),
-        body: const Center(child: CircularProgressIndicator()),
-      ),
-      error: (e, _) => Scaffold(
-        appBar: AppBar(title: const Text('Goal')),
-        body: Center(child: Text('Error: $e')),
-      ),
+      loading: () => _messageScaffold('', spinner: true),
+      error: (e, _) => _messageScaffold('Error: $e'),
       data: (bundle) {
         if (bundle == null) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('Goal')),
-            body: const Center(child: Text('Goal not found')),
-          );
+          return _messageScaffold('Goal not found');
         }
         final g = bundle.goal;
         final todayKey = DateKeys.todayKey();
@@ -86,12 +110,9 @@ class GoalDetailScreen extends ConsumerWidget {
                   GoalPeriodHelpers.isDateKeyInPeriod(g, c.dateKey),
             )
             .length;
-        final doneMilestones = bundle.milestones
-            .where((m) => m.completed)
-            .length;
-        final totalMilestones = bundle.milestones.length;
         final doneActions = bundle.actions.where((a) => a.completed).length;
         final totalActions = bundle.actions.length;
+        final streak = _currentStreak(bundle.checkIns);
         GoalCheckIn? todayCheckIn;
         for (final c in bundle.checkIns) {
           if (c.dateKey == todayKey) {
@@ -99,12 +120,16 @@ class GoalDetailScreen extends ConsumerWidget {
             break;
           }
         }
+        final todayDone = todayCheckIn?.metCommitment == true;
 
         return Scaffold(
+          backgroundColor: AppColors.ink,
           appBar: AppBar(
-            title: Text(g.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+            backgroundColor: AppColors.ink,
+            title: const QuittrAppBarTitle(),
             actions: [
               PopupMenuButton<String>(
+                icon: const Icon(Icons.more_horiz),
                 onSelected: (value) => _onMenu(context, ref, g, value),
                 itemBuilder: (context) => [
                   const PopupMenuItem(value: 'edit', child: Text('Edit')),
@@ -123,152 +148,237 @@ class GoalDetailScreen extends ConsumerWidget {
             ],
           ),
           body: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
             children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              _HeroTitle(title: g.title),
+              const SizedBox(height: 14),
+              // Single-line metadata strip; scrolls horizontally on narrow
+              // screens instead of wrapping.
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _MetaPill(label: GoalCategories.label(g.categoryId)),
+                    const SizedBox(width: 6),
+                    _MetaPill(label: g.horizon.name),
+                    const SizedBox(width: 6),
+                    _MetaPill(label: 'Intensity ${g.intensity}/5'),
+                    const SizedBox(width: 6),
+                    _MetaPill(
+                      label: GoalIntensityMode.displayLabelForIntensity(
+                        g.intensity,
+                      ),
+                      color: AppColors.cyan,
+                    ),
+                    const SizedBox(width: 6),
+                    _MetaPill(
+                      label: switch (g.status) {
+                        GoalStatus.active => 'Active',
+                        GoalStatus.paused => 'Paused',
+                        GoalStatus.completed => 'Completed',
+                      },
+                      color: g.status == GoalStatus.active
+                          ? AppColors.accentBright
+                          : AppColors.textSoft,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Chip(label: Text(GoalCategories.label(g.categoryId))),
-                  Chip(label: Text(g.horizon.name)),
-                  Chip(label: Text('Intensity ${g.intensity}/5')),
-                  Chip(
-                    label: Text(
-                      'Mode: ${GoalIntensityMode.displayLabelForIntensity(g.intensity)}',
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          GoalPeriodHelpers.formatPeriodSummary(g),
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          _targetLine(g).toUpperCase(),
+                          style: const TextStyle(
+                            color: AppColors.cyan,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Chip(
-                    label: Text(
-                      g.status == GoalStatus.active
-                          ? 'Active'
-                          : g.status == GoalStatus.paused
-                          ? 'Paused'
-                          : 'Completed',
-                    ),
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text(
+                        'Current Streak',
+                        style: TextStyle(
+                          color: AppColors.textSoft,
+                          fontSize: 12,
+                        ),
+                      ),
+                      Text(
+                        streak.toString().padLeft(2, '0'),
+                        style: const TextStyle(
+                          color: AppColors.accentBright,
+                          fontSize: 34,
+                          height: 1.1,
+                          fontWeight: FontWeight.w800,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                GoalPeriodHelpers.formatPeriodSummary(g),
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _targetLine(g),
-                style: const TextStyle(color: Colors.white70),
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 28),
               if (g.status == GoalStatus.active && inPeriod) ...[
-                Text(
-                  todayCheckIn?.metCommitment == true
-                      ? 'You marked today done.'
-                      : 'Did you meet your commitment today?',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                _TodayCommitmentCard(
+                  done: todayDone,
+                  onToggle: () => _toggleToday(context, ref, g, todayDone),
                 ),
-                const SizedBox(height: 8),
-                FilledButton.tonal(
-                  onPressed: () => _toggleToday(
-                    context,
-                    ref,
-                    g,
-                    todayCheckIn?.metCommitment == true,
-                  ),
-                  child: Text(
-                    todayCheckIn?.metCommitment == true
-                        ? 'Undo today'
-                        : 'I did it today',
-                  ),
-                ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 32),
               ],
+              _SectionHeader(
+                title: 'Cycle Progress',
+                trailing: _EmphasisCount(
+                  strong: '$elapsed/$totalDays',
+                  soft: ' DAYS',
+                ),
+              ),
+              const SizedBox(height: 14),
+              _GradientProgressBar(
+                value: totalDays == 0 ? 0 : (elapsed / totalDays),
+              ),
+              const SizedBox(height: 10),
               Text(
                 elapsed > 0
-                    ? '$metInPeriod days marked done in this period ($elapsed day${elapsed == 1 ? '' : 's'} elapsed of $totalDays).'
+                    ? '$metInPeriod of $elapsed elapsed day${elapsed == 1 ? '' : 's'} marked done. Maintain the pulse to level up.'
                     : 'Period not started yet.',
-                style: const TextStyle(color: Colors.white70),
+                style: const TextStyle(color: AppColors.textSoft, fontSize: 13),
               ),
-              const SizedBox(height: 8),
-              if (totalMilestones > 0) ...[
-                Text(
-                  'Milestones: $doneMilestones of $totalMilestones done',
-                  style: const TextStyle(color: Colors.white70),
-                ),
-                LinearProgressIndicator(
-                  value: totalMilestones == 0
-                      ? 0
-                      : doneMilestones / totalMilestones,
-                  minHeight: 6,
-                ),
-                const SizedBox(height: 16),
-              ],
-              Row(
-                children: [
-                  const Text(
-                    'Actions',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-                  ),
-                  const Spacer(),
-                  if (totalActions > 0)
-                    Text(
-                      '$doneActions / $totalActions done',
-                      style: const TextStyle(color: Colors.white54, fontSize: 13),
-                    ),
-                ],
+              const SizedBox(height: 32),
+              _SectionHeader(
+                title: 'Actions',
+                subtitle: 'OPERATIONAL CHECKLIST',
+                trailing: totalActions > 0
+                    ? _EmphasisCount(
+                        strong: '$doneActions / $totalActions',
+                        soft: '  completed',
+                      )
+                    : null,
               ),
-              const SizedBox(height: 4),
-              const Text(
-                'Check off each step as you complete it.',
-                style: TextStyle(color: Colors.white54, fontSize: 12),
-              ),
-              const SizedBox(height: 8),
-              if (totalActions == 0)
-                const Text(
-                  'No actions yet. Edit this goal to add steps.',
-                  style: TextStyle(color: Colors.white54),
-                )
-              else ...[
-                if (totalActions > 0)
-                  LinearProgressIndicator(
-                    value: doneActions / totalActions,
-                    minHeight: 6,
-                  ),
-                const SizedBox(height: 8),
-                for (final a in bundle.actions)
-                  _GoalActionTile(goalId: g.id, action: a),
-              ],
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  const Text(
-                    'Milestones',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-                  ),
-                  const Spacer(),
-                  TextButton.icon(
-                    onPressed: () => _addMilestoneDialog(context, ref, g.id),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Add'),
-                  ),
-                ],
-              ),
-              if (bundle.milestones.isEmpty)
-                const Text(
-                  'No milestones yet.',
-                  style: TextStyle(color: Colors.white54),
+              if (totalActions == 0)
+                const _EmptyStateCard(
+                  icon: Icons.checklist_rounded,
+                  title: 'No actions yet.',
+                  subtitle: 'Edit this goal to add operational steps.',
                 )
               else
-                ...bundle.milestones.map(
-                  (m) => _MilestoneTile(goalId: g.id, milestone: m),
+                for (final a in bundle.actions)
+                  _ChecklistTile(
+                    title: a.title,
+                    completed: a.completed,
+                    metaLabel: a.completed ? 'COMPLETED' : 'TAP TO CHECK OFF',
+                    onToggle: () async {
+                      final repo = ref.read(goalsRepositoryProvider);
+                      await repo.upsertAction(
+                        a.copyWith(completed: !a.completed),
+                      );
+                      invalidateGoals(ref, goalId: g.id);
+                    },
+                  ),
+              const SizedBox(height: 32),
+              _SectionHeader(
+                title: 'Milestones',
+                trailing: TextButton.icon(
+                  onPressed: () => _addMilestoneDialog(context, ref, g.id),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.accentBright,
+                    padding: EdgeInsets.zero,
+                  ),
+                  icon: const Icon(Icons.add_circle_outline, size: 18),
+                  label: const Text(
+                    'ADD',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
                 ),
+              ),
+              const SizedBox(height: 12),
+              if (bundle.milestones.isEmpty)
+                const _EmptyStateCard(
+                  icon: Icons.flag_outlined,
+                  title: 'No strategic milestones defined yet.',
+                  subtitle: 'Set targets to visualize your evolution.',
+                )
+              else
+                for (final m in bundle.milestones)
+                  _ChecklistTile(
+                    title: m.title,
+                    completed: m.completed,
+                    metaLabel: m.completed ? 'REACHED' : 'IN PURSUIT',
+                    onToggle: () async {
+                      final repo = ref.read(goalsRepositoryProvider);
+                      await repo.upsertMilestone(
+                        m.copyWith(completed: !m.completed),
+                      );
+                      invalidateGoals(ref, goalId: g.id);
+                    },
+                    trailing: IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: AppColors.textFaint,
+                      ),
+                      onPressed: () =>
+                          _confirmDeleteMilestone(context, ref, g.id, m),
+                    ),
+                  ),
             ],
           ),
         );
       },
     );
+  }
+
+  Future<void> _confirmDeleteMilestone(
+    BuildContext context,
+    WidgetRef ref,
+    String gid,
+    GoalMilestone milestone,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove milestone?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) {
+      await ref
+          .read(goalsRepositoryProvider)
+          .deleteMilestone(goalId: gid, milestoneId: milestone.id);
+      invalidateGoals(ref, goalId: gid);
+    }
   }
 
   Future<void> _toggleToday(
@@ -423,6 +533,415 @@ class GoalDetailScreen extends ConsumerWidget {
   }
 }
 
+// ── Obsidian Pulse building blocks ──────────────────────────────────────────
+
+/// Magazine-headline title: everything white, the last word in lime.
+class _HeroTitle extends StatelessWidget {
+  const _HeroTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final words = title.trim().split(RegExp(r'\s+'));
+    final lead = words.length > 1
+        ? words.sublist(0, words.length - 1).join(' ')
+        : null;
+    final tail = words.isEmpty ? '' : words.last;
+    return Text.rich(
+      TextSpan(
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 34,
+          fontWeight: FontWeight.w800,
+          height: 1.08,
+          letterSpacing: -1,
+        ),
+        children: [
+          if (lead != null) TextSpan(text: '$lead '),
+          TextSpan(
+            text: tail,
+            style: const TextStyle(color: AppColors.accentBright),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// All-caps metadata tag — compact rectangle so the whole strip fits one
+/// line. Neutral by default; pass [color] for accent tags (cyan mode, lime
+/// active-status).
+class _MetaPill extends StatelessWidget {
+  const _MetaPill({required this.label, this.color});
+
+  final String label;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = color;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: accent?.withValues(alpha: 0.14) ?? AppColors.inkElevated,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          color: accent ?? AppColors.textSoft,
+          fontSize: 9.5,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.7,
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, this.subtitle, this.trailing});
+
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            ?trailing,
+          ],
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 3),
+          Text(
+            subtitle!,
+            style: const TextStyle(
+              color: AppColors.textFaint,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// "2 / 2 completed" style trailing: strong white number, soft caption.
+class _EmphasisCount extends StatelessWidget {
+  const _EmphasisCount({required this.strong, required this.soft});
+
+  final String strong;
+  final String soft;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: strong,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          TextSpan(
+            text: soft,
+            style: const TextStyle(color: AppColors.textSoft, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Today's commitment card — "Mission Accomplished." once done, call to
+/// action otherwise. Level-1 surface, no borders.
+class _TodayCommitmentCard extends StatelessWidget {
+  const _TodayCommitmentCard({required this.done, required this.onToggle});
+
+  final bool done;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.inkDeep,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                done ? Icons.verified_outlined : Icons.bolt_outlined,
+                color: done ? AppColors.accentBright : AppColors.cyan,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  done ? 'Mission Accomplished.' : 'Daily Commitment',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            done
+                ? 'You marked today as done. Your discipline is building momentum.'
+                : 'Did you meet your commitment today? Mark it to keep the pulse alive.',
+            style: const TextStyle(
+              color: AppColors.textSoft,
+              fontSize: 14,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: done
+                ? FilledButton(
+                    onPressed: onToggle,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.inkElevated,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: const Text(
+                      'UNDO TODAY',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                        fontSize: 12,
+                      ),
+                    ),
+                  )
+                : FilledButton(
+                    onPressed: onToggle,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.accentBright,
+                      foregroundColor: AppColors.accentDeep,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: const Text(
+                      'I DID IT TODAY',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Signature gradient bar: lime → cyan "heat" of the cycle.
+class _GradientProgressBar extends StatelessWidget {
+  const _GradientProgressBar({required this.value});
+
+  final double value;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        height: 10,
+        color: AppColors.inkElevated,
+        child: FractionallySizedBox(
+          alignment: Alignment.centerLeft,
+          widthFactor: value.clamp(0.0, 1.0),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              gradient: const LinearGradient(
+                colors: [AppColors.accentDim, AppColors.cyan],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Rounded checklist row with a circular check "LED": olive-filled with a
+/// lime check when done, hollow when pending. Tap anywhere to toggle.
+class _ChecklistTile extends StatelessWidget {
+  const _ChecklistTile({
+    required this.title,
+    required this.completed,
+    required this.metaLabel,
+    required this.onToggle,
+    this.trailing,
+  });
+
+  final String title;
+  final bool completed;
+  final String metaLabel;
+  final VoidCallback onToggle;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.inkWarm,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: onToggle,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: completed ? AppColors.accentDeep : null,
+                    border: completed
+                        ? null
+                        : Border.all(color: AppColors.textFaint, width: 1.5),
+                  ),
+                  child: completed
+                      ? const Icon(
+                          Icons.check,
+                          color: AppColors.accentBright,
+                          size: 20,
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: completed
+                              ? AppColors.textSoft
+                              : AppColors.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          decoration: completed
+                              ? TextDecoration.lineThrough
+                              : null,
+                          decorationColor: AppColors.textSoft,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        metaLabel,
+                        style: TextStyle(
+                          color: completed
+                              ? AppColors.limeOlive
+                              : AppColors.textFaint,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ?trailing,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Soft empty-state card (level-1 surface, centered icon + copy).
+class _EmptyStateCard extends StatelessWidget {
+  const _EmptyStateCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
+      decoration: BoxDecoration(
+        color: AppColors.inkDeep,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: AppColors.textFaint, size: 32),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.textSoft, fontSize: 14),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textFaint,
+              fontSize: 12,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Owns [TextEditingController] for the milestone title so it is disposed only
 /// after the dialog route is finished (avoids TextField use-after-dispose).
 class _NewMilestoneDialog extends StatefulWidget {
@@ -462,101 +981,8 @@ class _NewMilestoneDialogState extends State<_NewMilestoneDialog> {
           onPressed: () => Navigator.pop<String?>(context, null),
           child: const Text('Cancel'),
         ),
-        TextButton(
-          onPressed: _submit,
-          child: const Text('Add'),
-        ),
+        TextButton(onPressed: _submit, child: const Text('Add')),
       ],
-    );
-  }
-}
-
-class _GoalActionTile extends ConsumerWidget {
-  const _GoalActionTile({required this.goalId, required this.action});
-
-  final String goalId;
-  final GoalAction action;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Card(
-      color: AppColors.surfaceMuted,
-      margin: const EdgeInsets.only(bottom: 6),
-      child: CheckboxListTile(
-        value: action.completed,
-        onChanged: (v) async {
-          if (v == null) return;
-          final repo = ref.read(goalsRepositoryProvider);
-          await repo.upsertAction(action.copyWith(completed: v));
-          invalidateGoals(ref, goalId: goalId);
-        },
-        title: Text(
-          action.title,
-          style: TextStyle(
-            decoration: action.completed ? TextDecoration.lineThrough : null,
-            color: action.completed ? Colors.white38 : null,
-          ),
-        ),
-        controlAffinity: ListTileControlAffinity.leading,
-      ),
-    );
-  }
-}
-
-class _MilestoneTile extends ConsumerWidget {
-  const _MilestoneTile({required this.goalId, required this.milestone});
-
-  final String goalId;
-  final GoalMilestone milestone;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Card(
-      color: AppColors.surfaceMuted,
-      margin: const EdgeInsets.only(bottom: 6),
-      child: CheckboxListTile(
-        value: milestone.completed,
-        onChanged: (v) async {
-          if (v == null) return;
-          final repo = ref.read(goalsRepositoryProvider);
-          await repo.upsertMilestone(milestone.copyWith(completed: v));
-          invalidateGoals(ref, goalId: goalId);
-        },
-        title: Text(
-          milestone.title,
-          style: TextStyle(
-            decoration: milestone.completed ? TextDecoration.lineThrough : null,
-            color: milestone.completed ? Colors.white38 : null,
-          ),
-        ),
-        secondary: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.white38),
-          onPressed: () async {
-            final ok = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('Remove milestone?'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Cancel'),
-                  ),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('Remove'),
-                  ),
-                ],
-              ),
-            );
-            if (ok == true && context.mounted) {
-              await ref
-                  .read(goalsRepositoryProvider)
-                  .deleteMilestone(goalId: goalId, milestoneId: milestone.id);
-              invalidateGoals(ref, goalId: goalId);
-            }
-          },
-        ),
-      ),
     );
   }
 }
