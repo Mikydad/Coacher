@@ -30,6 +30,7 @@ import '../features/profile/presentation/profile_screen.dart';
 import '../features/settings/presentation/account_settings_screen.dart';
 import '../features/settings/presentation/notification_settings_screen.dart';
 import '../features/settings/presentation/reminder_settings_screen.dart';
+import '../features/tasks_hub/presentation/task_detail_screen.dart';
 import '../features/tasks_hub/presentation/tasks_hub_screen.dart';
 import '../features/timer/presentation/timer_session_screen.dart';
 
@@ -96,6 +97,14 @@ class CoachForLifeApp extends StatelessWidget {
           );
         },
         TasksHubScreen.routeName: (_) => const TasksHubScreen(),
+        TaskDetailScreen.routeName: (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is TaskDetailArgs) {
+            return TaskDetailScreen(args: args);
+          }
+          // Opened without arguments (should not happen) — land on the hub.
+          return const TasksHubScreen();
+        },
         AnalyticsProgressScreen.routeName: (_) =>
             const AnalyticsProgressScreen(),
         FocusSelectionScreen.routeName: (context) {

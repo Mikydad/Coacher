@@ -5,19 +5,14 @@ import '../../../core/di/providers.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
-import '../../../core/utils/stable_id.dart';
 import '../../add_task/presentation/add_task_screen.dart';
-import '../../analytics/application/analytics_event_logger.dart';
-import '../../analytics/domain/models/analytics_event.dart';
-import '../../planning/application/auto_next_task_flow.dart';
+import '../../planning/application/planned_task_actions.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
-import '../../planning/domain/models/accountability_log.dart';
-import '../../planning/domain/models/flow_transition_event.dart';
 import '../../planning/domain/models/task_item.dart';
 import '../../scoring/application/scoring_controller.dart';
-import '../../time_blocks/application/time_block_providers.dart';
 import '../../timer/presentation/timer_session_screen.dart';
+import 'task_detail_screen.dart';
 
 import '../../../core/presentation/app_colors.dart';
 
@@ -238,8 +233,10 @@ class TasksHubScreen extends ConsumerWidget {
                           onEdit: () {
                             _openEditTask(context, ref, row);
                           },
-                          onCompleteNow: () => _completeFromHub(context, ref, row),
-                          onPlansChanged: () => _plansChangedFromHub(context, ref, row),
+                          onCompleteNow: () => completePlannedTaskRow(context, ref, row,
+                              sourceSurface: 'tasks_hub',
+                              sourceContext: 'tasks_hub.complete'),
+                          onPlansChanged: () => promptPlansChangedForRow(context, ref, row),
                           onDelete: () => confirmDeletePlannedTask(context, ref, row),
                         ),
                     ],
@@ -273,8 +270,10 @@ class TasksHubScreen extends ConsumerWidget {
                           onEdit: () {
                             _openEditTask(context, ref, row);
                           },
-                          onCompleteNow: () => _completeFromHub(context, ref, row),
-                          onPlansChanged: () => _plansChangedFromHub(context, ref, row),
+                          onCompleteNow: () => completePlannedTaskRow(context, ref, row,
+                              sourceSurface: 'tasks_hub',
+                              sourceContext: 'tasks_hub.complete'),
+                          onPlansChanged: () => promptPlansChangedForRow(context, ref, row),
                           onDelete: () => confirmDeletePlannedTask(context, ref, row),
                         ),
                     ],
@@ -289,167 +288,6 @@ class TasksHubScreen extends ConsumerWidget {
       ),
     );
   }
-}
-
-Future<void> _completeFromHub(BuildContext context, WidgetRef ref, PlannedTaskRow row) async {
-  final t = row.task;
-  if (t.status == TaskStatus.completed) return;
-  final planning = ref.read(planningRepositoryProvider);
-  final now = DateTime.now().millisecondsSinceEpoch;
-  await planning.upsertTask(
-    PlannedTask(
-      id: t.id,
-      routineId: t.routineId,
-      blockId: t.blockId,
-      title: t.title,
-      durationMinutes: t.durationMinutes,
-      priority: t.priority,
-      orderIndex: t.orderIndex,
-      reminderEnabled: t.reminderEnabled,
-      reminderTimeIso: t.reminderTimeIso,
-      status: TaskStatus.completed,
-      createdAtMs: t.createdAtMs,
-      updatedAtMs: now,
-      category: t.category,
-      planDateKey: t.planDateKey,
-      notes: t.notes,
-      sequenceIndex: t.sequenceIndex,
-      isHabitAnchor: t.isHabitAnchor,
-      strictModeRequired: t.strictModeRequired,
-      modeRefId: t.modeRefId,
-    ),
-  );
-  fireAndForgetAnalyticsEvent(
-    ref,
-    type: AnalyticsEventType.taskCompleted,
-    entityId: t.id,
-    entityKind: 'task',
-    sourceSurface: 'tasks_hub',
-    idempotencyKey: 'task_completed_hub_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
-    modeRefId: t.modeRefId,
-  );
-  await ref.read(reminderSyncServiceProvider).markTaskStarted(t.id);
-  // migrated to coordinator
-  await ScheduleMutationCoordinator.instance.run(
-    TaskCompletedMutation(
-      entityId: t.id,
-      sourceContext: 'tasks_hub.complete',
-      dateStr: t.planDateKey ?? DateKeys.todayKey(),
-    ),
-    commitOverride: () async {}, // upsertTask already called above
-  );
-  if (!context.mounted) return;
-  invalidateTaskListProviders(ref);
-  await runAutoNextTaskFlow(
-    context,
-    ref,
-    completedTaskId: t.id,
-    completionPercent: 100,
-  );
-}
-
-Future<void> _plansChangedFromHub(BuildContext context, WidgetRef ref, PlannedTaskRow row) async {
-  final reason = await showDialog<OverrideReasonCategory>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Plans changed?'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final option in OverrideReasonCategory.values)
-            ListTile(
-              title: Text(option.label),
-              onTap: () => Navigator.pop(ctx, option),
-            ),
-        ],
-      ),
-    ),
-  );
-  if (reason == null || !context.mounted) return;
-  final noteCtrl = TextEditingController();
-  final note = await showDialog<String>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Short logical reason'),
-      content: TextField(
-        controller: noteCtrl,
-        maxLines: 2,
-        decoration: const InputDecoration(hintText: '1-2 sentences'),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-        FilledButton(
-          onPressed: () => Navigator.pop(ctx, noteCtrl.text.trim()),
-          child: const Text('Save'),
-        ),
-      ],
-    ),
-  );
-  noteCtrl.dispose();
-  if (note == null || note.trim().isEmpty) return;
-  final planning = ref.read(planningRepositoryProvider);
-  await planning.logFlowTransitionEvent(
-    FlowTransitionEvent(
-      id: StableId.generate('flowev'),
-      taskId: row.task.id,
-      type: FlowTransitionType.moveWithReason,
-      planChangeIntent: PlanChangeIntent.logical,
-      reasonCategory: reason,
-      reasonNote: note,
-      createdAtMs: DateTime.now().millisecondsSinceEpoch,
-    ),
-  );
-  await planning.logAccountability(
-    AccountabilityLog(
-      id: StableId.generate('acct'),
-      taskId: row.task.id,
-      action: AccountabilityAction.defer,
-      reasonCategory: reason,
-      reasonNote: note,
-      modeRefId: row.task.modeRefId,
-      taskPriority: row.task.priority,
-      createdAtMs: DateTime.now().millisecondsSinceEpoch,
-    ),
-  );
-  await ref.read(reminderSyncServiceProvider).markLogicalReasonProvided(row.task.id);
-  if (context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Plans change logged.')),
-    );
-  }
-}
-
-Future<void> confirmDeletePlannedTask(BuildContext context, WidgetRef ref, PlannedTaskRow row) async {
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Delete task?'),
-      content: Text('Remove "${row.task.title}"?'),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-        TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-      ],
-    ),
-  );
-  if (ok != true || !context.mounted) return;
-  await ref.read(planningRepositoryProvider).deleteTask(
-        routineId: row.routineId,
-        blockId: row.blockId,
-        taskId: row.task.id,
-      );
-  // Phase A — remove the time block when the task is deleted.
-  await ref
-      .read(timeBlockSyncServiceProvider)
-      .removeBlockForEntity(row.task.id);
-  // migrated to coordinator
-  await ScheduleMutationCoordinator.instance.run(
-    TaskDeletedMutation(
-      entityId: row.task.id,
-      sourceContext: 'tasks_hub.delete',
-      dateStr: row.task.planDateKey ?? DateKeys.todayKey(),
-    ),
-    commitOverride: () async {}, // delete already done above
-  );
 }
 
 class _HubTaskTile extends StatelessWidget {
@@ -472,6 +310,14 @@ class _HubTaskTile extends StatelessWidget {
   final int? scorePercent;
   final bool showDateKey;
 
+  void _openDetails(BuildContext context) {
+    Navigator.pushNamed(
+      context,
+      TaskDetailScreen.routeName,
+      arguments: TaskDetailArgs.fromRow(row),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = row.task;
@@ -488,17 +334,20 @@ class _HubTaskTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       color: AppColors.surfacePanel,
       child: ListTile(
+        onTap: () => _openDetails(context),
         title: Text(t.title),
         subtitle: Text(subtitle.toString(), style: const TextStyle(color: Colors.white54, fontSize: 12)),
         trailing: PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert),
           onSelected: (value) {
+            if (value == 'details') _openDetails(context);
             if (value == 'edit') onEdit();
             if (value == 'complete') onCompleteNow();
             if (value == 'plans_changed') onPlansChanged();
             if (value == 'delete') onDelete();
           },
           itemBuilder: (ctx) => const [
+            PopupMenuItem(value: 'details', child: Text('Details')),
             PopupMenuItem(value: 'edit', child: Text('Edit')),
             PopupMenuItem(value: 'complete', child: Text('Complete now')),
             PopupMenuItem(value: 'plans_changed', child: Text('Plans Changed?')),
