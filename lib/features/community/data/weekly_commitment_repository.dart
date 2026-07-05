@@ -48,11 +48,18 @@ class FirestoreWeeklyCommitmentRepository
     String? weekKey,
   }) {
     final key = weekKey ?? DateKeys.isoWeekKey(DateTime.now());
+    // No `.orderBy` on top of the equality filter — that combination needs a
+    // Firestore composite index (deploy-time config that silently breaks the
+    // whole commitments tab when missing). Sort client-side instead; a
+    // circle's commitments for one week are a handful of rows.
     return _col(circleId)
         .where('weekKey', isEqualTo: key)
-        .orderBy('updatedAtMs', descending: false)
         .snapshots()
-        .map((s) => s.docs.map(_fromDoc).toList());
+        .map((s) {
+      final list = s.docs.map(_fromDoc).toList()
+        ..sort((a, b) => a.updatedAtMs.compareTo(b.updatedAtMs));
+      return list;
+    });
   }
 
   @override

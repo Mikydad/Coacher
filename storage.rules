@@ -1,6 +1,13 @@
 rules_version = '2';
 
 // Deploy with: firebase deploy --only storage
+//
+// NOTE: isCircleMember() below reads Firestore from Storage rules
+// (cross-service rules). That only works when the project's Storage
+// service agent has the "Firebase Rules Firestore Service Agent" role —
+// the CLI provisions it automatically when a ruleset is *uploaded*.
+// Symptom when missing: uploads fail [firebase_storage/unauthorized]
+// even though the same membership check passes in firestore.rules.
 service firebase.storage {
   match /b/{bucket}/o {
 
