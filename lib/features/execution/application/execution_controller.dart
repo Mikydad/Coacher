@@ -32,6 +32,14 @@ class ExecutionState {
   final bool readyToScore;
   final int? targetDurationMinutes;
 
+  /// True while a task focus session is running or paused. Watch this via
+  /// `select()` — `elapsed` changes every second, so watching the whole state
+  /// rebuilds the subscriber once per tick for the entire session.
+  bool get hasActiveFocusTask =>
+      targetType == TimerSessionTargetType.task &&
+      taskId.isNotEmpty &&
+      (phase == ExecutionPhase.inProgress || phase == ExecutionPhase.paused);
+
   ExecutionState copyWith({
     TimerSessionTargetType? targetType,
     String? taskId,
@@ -83,22 +91,43 @@ class ExecutionController extends StateNotifier<ExecutionState> {
        ) {
     _sub = _engine.stream.listen((snapshot) {
       state = state.copyWith(phase: snapshot.phase, elapsed: snapshot.elapsed);
-      unawaited(
-        runtimeCache.save(
-          targetType: state.targetType,
-          taskId: state.taskId,
-          blockId: state.blockId,
-          label: state.targetType == TimerSessionTargetType.task
-              ? state.taskLabel
-              : state.blockLabel,
-          phase: snapshot.phase,
-          elapsed: snapshot.elapsed,
-          runningSince: snapshot.phase == ExecutionPhase.inProgress ? DateTime.now() : null,
-          targetDurationMinutes: state.targetDurationMinutes,
-        ),
-      );
+      _persistIfSessionShapeChanged(snapshot);
     });
     unawaited(_restoreFromCacheIfPossible());
+  }
+
+  /// Persists resume state only when the session "shape" changes (target,
+  /// phase, label, duration) — never on per-second `elapsed` ticks. Elapsed
+  /// is intentionally excluded from the signature: while running it is
+  /// derivable at restore time from the saved `runningSince` timestamp, so
+  /// writing it every tick bought no durability at the cost of continuous
+  /// disk I/O for the whole session.
+  void _persistIfSessionShapeChanged(TimerSnapshot snapshot) {
+    final signature = [
+      state.targetType.name,
+      state.taskId,
+      state.blockId,
+      state.taskLabel,
+      state.blockLabel,
+      snapshot.phase.name,
+      state.targetDurationMinutes,
+    ].join('|');
+    if (signature == _lastSavedSignature) return;
+    _lastSavedSignature = signature;
+    unawaited(
+      runtimeCache.save(
+        targetType: state.targetType,
+        taskId: state.taskId,
+        blockId: state.blockId,
+        label: state.targetType == TimerSessionTargetType.task
+            ? state.taskLabel
+            : state.blockLabel,
+        phase: snapshot.phase,
+        elapsed: snapshot.elapsed,
+        runningSince: snapshot.phase == ExecutionPhase.inProgress ? DateTime.now() : null,
+        targetDurationMinutes: state.targetDurationMinutes,
+      ),
+    );
   }
 
   final ExecutionRepository repository;
@@ -106,6 +135,7 @@ class ExecutionController extends StateNotifier<ExecutionState> {
   final FocusResumeStore resumeStore;
   final TaskTimerEngine _engine;
   StreamSubscription<TimerSnapshot>? _sub;
+  String? _lastSavedSignature;
 
   Future<void> _restoreFromCacheIfPossible() async {
     final data = await runtimeCache.load();

@@ -131,11 +131,14 @@ class SyncService {
   Future<void> _runRemotePull(Isar isar) async {
     isSyncingFromRemote.value = true;
     _lastRemotePullSucceeded = false;
+    // Conservative default for the test-override path, which can't report
+    // whether it applied rows.
+    var appliedAny = true;
     try {
       if (debugRemotePullForTests != null) {
         await debugRemotePullForTests!(isar);
       } else {
-        await RemoteIsarMerge(isar).run().timeout(
+        appliedAny = await RemoteIsarMerge(isar).run().timeout(
               remotePullTimeout,
               onTimeout: () => throw TimeoutException(
                 'RemoteIsarMerge exceeded ${remotePullTimeout.inSeconds}s',
@@ -151,7 +154,10 @@ class SyncService {
       debugPrint('syncFromRemote failed: $e\n$st');
     } finally {
       isSyncingFromRemote.value = false;
-      if (_lastRemotePullSucceeded) {
+      // A pull that changed no local rows (the common case for the periodic
+      // 30s pull) does not invalidate providers or schedule a full
+      // analytics/coaching recompute.
+      if (_lastRemotePullSucceeded && appliedAny) {
         PostSyncRefreshCoordinator.instance.scheduleAfterSuccessfulRemotePull();
       }
     }

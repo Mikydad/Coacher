@@ -1,4 +1,5 @@
 import 'package:coach_for_life/features/execution/application/execution_controller.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:coach_for_life/features/execution/data/execution_repository.dart';
 import 'package:coach_for_life/features/execution/data/timer_runtime_cache.dart';
 import 'package:coach_for_life/features/execution/domain/models/timer_session.dart';
@@ -77,7 +78,64 @@ class _FakeTimerRuntimeCache extends TimerRuntimeCache {
   }
 }
 
+class _CountingRuntimeCache extends _FakeTimerRuntimeCache {
+  int saveCount = 0;
+
+  @override
+  Future<void> save({
+    required TimerSessionTargetType targetType,
+    required String taskId,
+    required String blockId,
+    required String label,
+    required phase,
+    required Duration elapsed,
+    DateTime? runningSince,
+    int? targetDurationMinutes,
+  }) {
+    saveCount++;
+    return super.save(
+      targetType: targetType,
+      taskId: taskId,
+      blockId: blockId,
+      label: label,
+      phase: phase,
+      elapsed: elapsed,
+      runningSince: runningSince,
+      targetDurationMinutes: targetDurationMinutes,
+    );
+  }
+}
+
 void main() {
+  test('persists on phase transitions, never on per-second ticks', () {
+    fakeAsync((async) {
+      final cache = _CountingRuntimeCache();
+      final ctrl = ExecutionController(
+        repository: _FakeExecutionRepository(),
+        runtimeCache: cache,
+        resumeStore: _FakeFocusResumeStore(),
+        initialTaskId: 'task1',
+        initialTaskLabel: 'Task 1',
+      );
+      async.flushMicrotasks();
+      expect(cache.saveCount, 0);
+
+      ctrl.start();
+      async.flushMicrotasks();
+      expect(cache.saveCount, 1);
+
+      // Five seconds of ticks must not touch the cache.
+      async.elapse(const Duration(seconds: 5));
+      expect(cache.saveCount, 1);
+
+      ctrl.pause();
+      async.flushMicrotasks();
+      expect(cache.saveCount, 2);
+
+      ctrl.dispose();
+    });
+  });
+
   test('setBlock + stopAndPersist writes block-target timer session', () async {
     final repo = _FakeExecutionRepository();
     final cache = _FakeTimerRuntimeCache();

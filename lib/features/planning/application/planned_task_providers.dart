@@ -10,7 +10,6 @@ import '../../../core/local_db/isar_collections/isar_task.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../execution/application/execution_day_loader.dart';
 import '../data/planning_repository.dart';
-import '../domain/models/task_item.dart';
 import 'planned_task_collect.dart';
 import 'task_prioritizer.dart';
 
@@ -44,50 +43,37 @@ Future<List<PrioritizedTaskRow>> readFreshTodayPrioritizedRows(WidgetRef ref) as
   return prioritizePlannedTasks(rows, blockUrgencyById: urgencyByBlock);
 }
 
-Future<HomeFlowSnapshot> _computeHomeFlowSnapshot(PlanningRepository repo) async {
-  final dateKey = DateKeys.todayKey();
+/// Builds the home snapshot from the already-prioritized hub rows: the next
+/// task is the first open row available now, so home and hub agree by
+/// construction. Only the current-block label needs a (cheap) blocks read.
+Future<HomeFlowSnapshot> _snapshotFromTodayRows(
+  PlanningRepository repo,
+  List<PlannedTaskRow> rows,
+) async {
   final now = DateTime.now();
-  final minutes = now.hour * 60 + now.minute;
-  final routines = await repo.getRoutinesForDate(dateKey);
-  var blockLabel = 'No active block';
-  final openRows = <PlannedTaskRow>[];
-  final blockUrgencyById = <String, int>{};
+  final openRows = [
+    for (final row in rows)
+      if (taskIsOpenForHub(row.task)) row,
+  ];
+  PlannedTaskRow? next;
+  for (final row in openRows) {
+    if (isTaskAvailableForFocusNow(row, now: now)) {
+      next = row;
+      break;
+    }
+  }
 
+  final minutes = now.hour * 60 + now.minute;
+  var blockLabel = 'No active block';
+  final routines = await repo.getRoutinesForDate(DateKeys.todayKey());
   for (final r in routines) {
     final blocks = await repo.getBlocks(r.id);
     for (final b in blocks) {
-      blockUrgencyById[b.id] = b.urgencyScore;
       final start = b.startMinutesFromMidnight ?? 0;
       final end = b.endMinutesFromMidnight ?? 1439;
-      final inWindow = minutes >= start && minutes <= end;
-      if (inWindow) {
+      if (minutes >= start && minutes <= end) {
         blockLabel = b.title;
       }
-      final tasks = await repo.getTasks(routineId: r.id, blockId: b.id);
-      for (final t in tasks) {
-        if (t.status != TaskStatus.completed) {
-          openRows.add(
-            PlannedTaskRow(
-              dateKey: dateKey,
-              routineId: r.id,
-              blockId: b.id,
-              task: t,
-            ),
-          );
-        }
-      }
-    }
-  }
-  final prioritized = prioritizePlannedTasks(
-    openRows,
-    blockUrgencyById: blockUrgencyById,
-    now: now,
-  );
-  PlannedTaskRow? next;
-  for (final item in prioritized) {
-    if (isTaskAvailableForFocusNow(item.row, now: now)) {
-      next = item.row;
-      break;
     }
   }
   return HomeFlowSnapshot(
@@ -145,24 +131,18 @@ Stream<List<PlannedTaskRow>> _todayRowsWatchStream(Ref ref) {
   return controller.stream;
 }
 
+/// Derives the home snapshot from [todayAllTasksRowsProvider] instead of
+/// running its own Isar watchers + 1-minute poll over the same data: the
+/// source stream already re-reads and re-prioritizes on every task/routine/
+/// block change and once a minute, so this just recomputes the light
+/// snapshot on each upstream emission.
 Stream<HomeFlowSnapshot> _homeFlowWatchStream(Ref ref) {
-  final isar = ref.watch(offlineStoreProvider).isar;
   final repo = ref.read(planningRepositoryProvider);
-  if (isar == null) {
-    return Stream.value(
-      const HomeFlowSnapshot(
-        currentBlockLabel: 'No active block',
-        openTaskCount: 0,
-        nextTaskRow: null,
-      ),
-    );
-  }
-
   final controller = StreamController<HomeFlowSnapshot>.broadcast();
 
-  Future<void> emit() async {
+  Future<void> emitFrom(List<PlannedTaskRow> rows) async {
     try {
-      final snap = await _computeHomeFlowSnapshot(repo);
+      final snap = await _snapshotFromTodayRows(repo, rows);
       if (!controller.isClosed) {
         controller.add(snap);
       }
@@ -173,23 +153,21 @@ Stream<HomeFlowSnapshot> _homeFlowWatchStream(Ref ref) {
     }
   }
 
-  unawaited(emit());
+  ref.listen<AsyncValue<List<PlannedTaskRow>>>(
+    todayAllTasksRowsProvider,
+    (_, next) {
+      next.when(
+        data: (rows) => unawaited(emitFrom(rows)),
+        error: (e, st) {
+          if (!controller.isClosed) controller.addError(e, st);
+        },
+        loading: () {},
+      );
+    },
+    fireImmediately: true,
+  );
 
-  final subs = <StreamSubscription<void>>[
-    isar.isarTasks.watchLazy(fireImmediately: false).listen((_) => unawaited(emit())),
-    isar.isarRoutines.watchLazy(fireImmediately: false).listen((_) => unawaited(emit())),
-    isar.isarBlocks.watchLazy(fireImmediately: false).listen((_) => unawaited(emit())),
-  ];
-
-  final timer = Timer.periodic(const Duration(minutes: 1), (_) => unawaited(emit()));
-
-  ref.onDispose(() {
-    timer.cancel();
-    for (final s in subs) {
-      s.cancel();
-    }
-    controller.close();
-  });
+  ref.onDispose(controller.close);
 
   return controller.stream;
 }

@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/notification_response_handler.dart';
 import '../../features/auth/application/auth_session_policy.dart';
 import '../di/providers.dart';
-import '../firebase/auth_initializer.dart';
 import '../firebase/firebase_initializer.dart';
 import '../firebase/firestore_client.dart';
 import '../notifications/local_notifications_service.dart';
@@ -22,39 +21,45 @@ import '../../features/ai_assistant/application/ai_assistant_providers.dart';
 import '../../features/reminders/application/attention_orchestrator_providers.dart';
 import '../runtime/schedule_mutation_coordinator.dart';
 
+/// App startup is split in two so the first frame is never blocked on the
+/// network:
+///
+/// - [initializePreFrame] — awaited before `runApp`. Only what the first
+///   frame genuinely needs: Firebase (Crashlytics + AuthGate depend on it)
+///   and the Isar store the first screens read from.
+/// - [completeDeferred] — kicked off after the first frame. Notification
+///   wiring, sync, reminder scheduling, and per-user Firestore maintenance.
+///   AuthGate's spinner covers the async tail; per-user work waits for the
+///   user AuthGate signs in (bootstrap never signs in itself — a competing
+///   anonymous sign-in would look like a uid change and wipe local data).
 class AppBootstrap {
   const AppBootstrap._();
 
-  static Future<void> initialize(ProviderContainer container) async {
+  static Future<void> initializePreFrame(ProviderContainer container) async {
     // TEMP debug for notification-tap investigation.
     // ignore: avoid_print
     print('[NotifTap] bootstrap initialize start');
     await FirebaseInitializer.initialize();
-    // Auth flow is owned by AuthGate in the widget tree. However, bootstrap
-    // performs per-user Firestore work below (sync, goals, prune) that requires
-    // an authenticated user. In guest mode (the default), ensure an anonymous
-    // session exists here so that work succeeds. In registered-auth mode we do
-    // NOT sign in — the per-user calls below are guarded to skip when signed
-    // out, and AuthGate shows the landing screen instead.
-    if (!kRequireRegisteredAuth) {
-      await AuthInitializer.ensureSignedIn();
-    }
+    await OfflineStore.instance.initialize();
+    ScheduleMutationCoordinator.instance.attachContainer(container);
+  }
+
+  static Future<void> completeDeferred(ProviderContainer container) async {
     await LocalNotificationsService.instance.initialize(
       onDidReceiveNotificationResponse: (response) {
         unawaited(handleNotificationResponse(response, container));
       },
     );
-    // Handle cold-start notification taps as early as possible. Navigation may
-    // be deferred and flushed later when navigator is available.
+    // Cold-start notification taps: the plugin retains the launch response,
+    // so draining one frame after startup still catches it. Navigation is
+    // deferred internally until a navigator exists.
     await LocalNotificationsService.instance.drainLaunchNotificationResponse(
       (response) => handleNotificationResponse(response, container),
     );
     // ignore: avoid_print
     print('[NotifTap] bootstrap launch-drain done');
-    await OfflineStore.instance.initialize();
-    ScheduleMutationCoordinator.instance.attachContainer(container);
 
-    // Boot reconciliation — async, must not block app launch.
+    // Boot reconciliation — async, must not block anything.
     final ledger = NotificationLedgerRepository(OfflineStore.instance.isar!);
     unawaited(
       NotificationReconciliationService(
@@ -68,25 +73,6 @@ class AppBootstrap {
 
     await SyncService.instance.initialize();
     await container.read(reminderSyncServiceProvider).scheduleFromCache();
-
-    // Per-user Firestore work — only when signed in. In registered-auth mode the
-    // user may be signed out at boot (AuthGate shows the landing screen); these
-    // calls must be skipped to avoid permission-denied crashing app launch.
-    if (FirebaseAuth.instance.currentUser != null) {
-      try {
-        final goals =
-            await container.read(goalsRepositoryProvider).fetchGoalsOnce();
-        await container
-            .read(goalReminderSyncServiceProvider)
-            .applyForGoals(goals);
-        final planningRepo = FirestorePlanningRepository(FirestoreClient());
-        await AccountabilityRetentionWorker(
-          planningRepo.pruneOldAccountabilityLogs,
-        ).run(retentionDays: 30);
-      } catch (e) {
-        // Non-fatal maintenance work — never block app launch on failure.
-      }
-    }
 
     // Purge Coach AI interaction history older than 48 hours.
     unawaited(
@@ -108,5 +94,44 @@ class AppBootstrap {
     unawaited(
       CommunityBridgeCoordinator.instance.evaluateCircleStreaks(container),
     );
+
+    // Per-user Firestore maintenance — needs an authenticated user. In guest
+    // mode AuthGate signs in anonymously moments after the first frame; wait
+    // for that user instead of racing it with our own sign-in call.
+    final user = await _awaitSignedInUser();
+    if (user != null) {
+      try {
+        final goals =
+            await container.read(goalsRepositoryProvider).fetchGoalsOnce();
+        await container
+            .read(goalReminderSyncServiceProvider)
+            .applyForGoals(goals);
+        final planningRepo = FirestorePlanningRepository(FirestoreClient());
+        await AccountabilityRetentionWorker(
+          planningRepo.pruneOldAccountabilityLogs,
+        ).run(retentionDays: 30);
+      } catch (e) {
+        // Non-fatal maintenance work — never block on failure.
+      }
+    }
+  }
+
+  /// Waits for AuthGate to produce a signed-in user. In registered-auth mode
+  /// a signed-out boot shows the landing screen and no sign-in is imminent,
+  /// so skip immediately (matches the old behavior of skipping per-user work
+  /// when signed out). The timeout covers offline guest boots where the
+  /// anonymous sign-in fails.
+  static Future<User?> _awaitSignedInUser() async {
+    final current = FirebaseAuth.instance.currentUser;
+    if (current != null) return current;
+    if (kRequireRegisteredAuth) return null;
+    try {
+      return await FirebaseAuth.instance
+          .authStateChanges()
+          .firstWhere((u) => u != null)
+          .timeout(const Duration(seconds: 30));
+    } on TimeoutException {
+      return null;
+    }
   }
 }

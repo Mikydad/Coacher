@@ -45,6 +45,11 @@ class RemoteIsarMerge {
   final Isar _isar;
   final FirestoreClient _client = FirestoreClient();
 
+  /// Rows actually written this pull (LWW no-ops excluded). Lets callers skip
+  /// the post-sync provider refresh when the pull changed nothing — the
+  /// common case for the periodic 30s pull.
+  int _appliedCount = 0;
+
   bool get _uidStillCurrent {
     if (Firebase.apps.isEmpty) return true; // VM tests — no auth to compare
     return FirebaseAuth.instance.currentUser?.uid == _client.uid;
@@ -59,7 +64,8 @@ class RemoteIsarMerge {
     }
   }
 
-  Future<void> run() async {
+  /// Returns true when at least one row was applied to Isar.
+  Future<bool> run() async {
     await _pullRoutinesBlocksTasks();
     _abortIfUidChanged();
     await _pullReminders();
@@ -67,7 +73,8 @@ class RemoteIsarMerge {
     await _pullGoals();
     _abortIfUidChanged();
     await _pullAnalytics();
-    debugPrint('RemoteIsarMerge: pull finished');
+    debugPrint('RemoteIsarMerge: pull finished ($_appliedCount rows applied)');
+    return _appliedCount > 0;
   }
 
   Future<void> _pullRoutinesBlocksTasks() async {
@@ -184,6 +191,7 @@ class RemoteIsarMerge {
     await _isar.writeTxn(() async {
       await _isar.isarRoutines.putByRoutineId(IsarRoutine.fromDomain(incoming));
     });
+    _appliedCount++;
   }
 
   Future<void> _mergeBlock(TaskBlock incoming) async {
@@ -197,9 +205,14 @@ class RemoteIsarMerge {
     await _isar.writeTxn(() async {
       await _isar.isarBlocks.putByBlockId(IsarBlock.fromDomain(incoming));
     });
+    _appliedCount++;
   }
 
-  Future<void> _mergeTask(PlannedTask incoming) => mergePlannedTaskLwwIntoIsar(_isar, incoming);
+  Future<void> _mergeTask(PlannedTask incoming) async {
+    if (await mergePlannedTaskLwwIntoIsar(_isar, incoming)) {
+      _appliedCount++;
+    }
+  }
 
   Future<void> _mergeReminder(ReminderConfig incoming) async {
     final existing = await _isar.isarReminders.filter().reminderIdEqualTo(incoming.id).findFirst();
@@ -212,6 +225,7 @@ class RemoteIsarMerge {
     await _isar.writeTxn(() async {
       await _isar.isarReminders.putByReminderId(IsarReminder.fromDomain(incoming));
     });
+    _appliedCount++;
   }
 
   Future<void> _mergeGoal(UserGoal incoming) async {
@@ -225,6 +239,7 @@ class RemoteIsarMerge {
     await _isar.writeTxn(() async {
       await _isar.isarGoals.putByGoalId(IsarGoal.fromDomain(incoming));
     });
+    _appliedCount++;
   }
 
   Future<void> _mergeAnalyticsEvent(AnalyticsEvent incoming) async {
@@ -238,6 +253,7 @@ class RemoteIsarMerge {
     await _isar.writeTxn(() async {
       await _isar.isarAnalyticsEvents.putByEventId(IsarAnalyticsEvent.fromDomain(incoming));
     });
+    _appliedCount++;
   }
 
   Future<void> _mergeAnalyticsStats(AnalyticsStatsCache incoming) async {
@@ -251,5 +267,6 @@ class RemoteIsarMerge {
     await _isar.writeTxn(() async {
       await _isar.isarAnalyticsStats.putByStatsId(IsarAnalyticsStats.fromDomain(incoming));
     });
+    _appliedCount++;
   }
 }

@@ -634,7 +634,14 @@ class _ManualProgressSheetState
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final xFile = await picker.pickImage(source: ImageSource.gallery);
+    // Same compression as the chat proof picker — original camera images
+    // can hit the 10MB storage-rules limit and every member re-downloads
+    // them full size.
+    final xFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+      maxWidth: 1080,
+    );
     if (xFile == null) return;
     setState(() => _proofImage = File(xFile.path));
   }

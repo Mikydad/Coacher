@@ -17,8 +17,9 @@ Future<void> main() async {
     WidgetsFlutterBinding.ensureInitialized();
     final container = ProviderContainer();
     appRootProviderContainer = container;
-    // Initializes Firebase as its first step — required before Crashlytics.
-    await AppBootstrap.initialize(container);
+    // Minimal pre-frame phase: Firebase (required before Crashlytics) and
+    // the local Isar store. Everything network-bound runs after first frame.
+    await AppBootstrap.initializePreFrame(container);
 
     await FirebaseCrashlytics.instance
         .setCrashlyticsCollectionEnabled(!kDebugMode);
@@ -41,6 +42,12 @@ Future<void> main() async {
         ),
       ),
     );
+
+    // Notification wiring, sync, reminders, and per-user maintenance — after
+    // the first frame so a slow connection can't hold the splash hostage.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(AppBootstrap.completeDeferred(container));
+    });
   }, (error, stack) {
     // Uncaught async errors (e.g. unawaited futures). Crashlytics may not be
     // available if bootstrap itself failed before Firebase init.

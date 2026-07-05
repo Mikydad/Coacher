@@ -7,13 +7,10 @@ import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/domain/models/analytics_event.dart';
-import '../../execution/application/execution_controller.dart';
 import '../../execution/application/execution_day_loader.dart';
 import '../../planning/domain/models/task_item.dart';
 import '../../scoring/application/scoring_controller.dart';
 import '../../planning/domain/add_task_duration.dart';
-import '../../execution/domain/models/timer_session.dart';
-import '../../execution/domain/task_timer_engine.dart';
 import '../application/focus_quick_task.dart';
 import '../application/focus_task_resume.dart';
 import '../../timer/presentation/timer_session_screen.dart';
@@ -80,10 +77,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
       }
 
       final exec = ref.read(executionControllerProvider);
-      final hasRunningTask = exec.targetType == TimerSessionTargetType.task &&
-          exec.taskId.isNotEmpty &&
-          (exec.phase == ExecutionPhase.inProgress || exec.phase == ExecutionPhase.paused);
-      if (!hasRunningTask) return;
+      if (!exec.hasActiveFocusTask) return;
       _didHandleLaunchArgs = true;
       ref.read(activeExecutionTaskIdProvider.notifier).state = exec.taskId;
       ref.read(activeExecutionTaskLabelProvider.notifier).state = exec.taskLabel;
@@ -142,12 +136,9 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
     );
   }
 
-  Future<void> _selectTask(
-    ExecutionTaskItem task, {
-    required bool hasRunningTask,
-    required ExecutionState execState,
-  }) async {
-    if (hasRunningTask && execState.taskId != task.id) {
+  Future<void> _selectTask(ExecutionTaskItem task) async {
+    final execState = ref.read(executionControllerProvider);
+    if (execState.hasActiveFocusTask && execState.taskId != task.id) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -237,10 +228,11 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
     final selectedTask = ref.watch(activeExecutionTaskLabelProvider);
     final taskList = ref.watch(executionDayTasksProvider);
     final scores = ref.watch(scoredTaskStatusesProvider);
-    final execState = ref.watch(executionControllerProvider);
-    final hasRunningTask = execState.targetType == TimerSessionTargetType.task &&
-        execState.taskId.isNotEmpty &&
-        (execState.phase == ExecutionPhase.inProgress || execState.phase == ExecutionPhase.paused);
+    // Scoped watch: avoids rebuilding this screen on every 1-second
+    // `elapsed` tick while a session runs.
+    final hasRunningTask = ref.watch(
+      executionControllerProvider.select((s) => s.hasActiveFocusTask),
+    );
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
@@ -307,11 +299,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
                         ),
                         isPartial: task.status == TaskStatus.partial,
                         selected: selectedTask == task.title,
-                        onTap: () => _selectTask(
-                          task,
-                          hasRunningTask: hasRunningTask,
-                          execState: execState,
-                        ),
+                        onTap: () => _selectTask(task),
                       ),
                     ),
                   )

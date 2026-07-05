@@ -452,6 +452,12 @@ class _ImageMessageBubble extends StatelessWidget {
                           Image.network(
                             message.imageUrl!,
                             width: 220,
+                            // Decode at display size — without this each
+                            // ~1080px source is decoded full-res for a
+                            // 220-logical-px bubble (several MB RAM each).
+                            cacheWidth:
+                                (220 * MediaQuery.devicePixelRatioOf(context))
+                                    .round(),
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => Container(
                               width: 220,

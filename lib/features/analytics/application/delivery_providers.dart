@@ -134,8 +134,13 @@ final deliveryOrchestratorProvider = Provider<DeliveryOrchestrator>((ref) {
 });
 
 final layer4IsActiveFocusFlowProvider = Provider<bool>((ref) {
-  final phaseName = ref.watch(executionControllerProvider).phase.name;
-  return phaseName == 'inProgress' || phaseName == 'paused';
+  // Scoped watch: recompute only when the active/inactive answer flips, not
+  // on every 1-second `elapsed` tick of the execution state.
+  return ref.watch(
+    executionControllerProvider.select(
+      (s) => s.phase.name == 'inProgress' || s.phase.name == 'paused',
+    ),
+  );
 });
 
 final layer4RefreshTodayDeliveryProvider = FutureProvider<Layer4RefreshResult>((

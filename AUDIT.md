@@ -260,6 +260,11 @@ _Audited 2026-07-02. Scope: android/app/build.gradle.kts, AndroidManifest.xml, i
 
 _Audited 2026-07-02. Scope: home/timer/focus/community presentation, execution_controller.dart, planned_task_providers.dart, Isar schemas (lib/core/local_db/isar_collections/), app_bootstrap.dart, main.dart, image flows. Report-only; no fixes applied._
 
+> **RESOLVED 2026-07-05** — every finding in this section was fixed except
+> the community `ListView.builder` conversion (deferred per its own "when
+> list sizes become user-controlled" scoping). See [PERFORMANCE.md](PERFORMANCE.md)
+> for what/why/how each fix works and the invariants it introduced.
+
 ### [HIGH] Home screen rebuilds every second during a focus session — `select()` is never used anywhere in the app
 - `lib/features/execution/application/execution_controller.dart:84-85` (engine tick → `state = state.copyWith(elapsed: ...)` every second) + `lib/features/home/presentation/home_screen.dart:75` (`ref.watch(executionControllerProvider)` at the top of the HomeScreen build)
 - While a timer runs, the whole-object watch invalidates the entire home Scaffold — including the non-builder `ListView` body (`:107`) with the analytics card, goals, and task sections — **once per second**, even though the build only uses `targetType`/`taskId`/`phase`, never `elapsed`. The same whole-object watch appears in `focus_selection_screen.dart:240` and `delivery_providers.dart:137` (which needs only `.phase.name` but recomputes its provider subgraph every tick). Repo-wide grep for `.select(` returns **zero** matches — the primary Riverpod rebuild-scoping tool is unused.

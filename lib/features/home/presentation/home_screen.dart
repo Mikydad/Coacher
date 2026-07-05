@@ -72,16 +72,13 @@ class HomeScreen extends ConsumerWidget {
     final todaysGoalsAsync = ref.watch(todaysActiveGoalsProvider);
     final flowSnapshotAsync = ref.watch(homeFlowSnapshotProvider);
     final analyticsBundleAsync = ref.watch(analyticsPeriodBundleProvider);
-    final execState = ref.watch(executionControllerProvider);
+    // No execution-state watch here: the top-level build doesn't render
+    // session state ( _FlowNowStrip watches it itself), and the Focus button
+    // reads it at press time — so per-second `elapsed` ticks never rebuild
+    // the whole home Scaffold.
 
     // Morning brief: show snackbar once per day between 06:00–10:00 if enabled
     _maybeTriggerMorningBrief(context, ref);
-
-    final hasRunningFocusTask =
-        execState.targetType == TimerSessionTargetType.task &&
-        execState.taskId.isNotEmpty &&
-        (execState.phase == ExecutionPhase.inProgress ||
-            execState.phase == ExecutionPhase.paused);
 
     return Scaffold(
       floatingActionButton: const _CoachHomeFab(),
@@ -117,20 +114,22 @@ class HomeScreen extends ConsumerWidget {
                   icon: Icons.bolt,
                   label: 'Focus',
                   tooltip: 'Start focus',
-                  onTap: () => Navigator.pushNamed(
-                    context,
-                    FocusSelectionScreen.routeName,
-                    arguments: hasRunningFocusTask
-                        ? FocusLaunchArgs(
-                            taskId: execState.taskId,
-                            taskLabel: execState.taskLabel,
-                            taskDurationMinutes:
-                                execState.targetDurationMinutes,
-                            autoOpenTimer: true,
-                            autoStartDelaySeconds: 10,
-                          )
-                        : null,
-                  ),
+                  onTap: () {
+                    final exec = ref.read(executionControllerProvider);
+                    Navigator.pushNamed(
+                      context,
+                      FocusSelectionScreen.routeName,
+                      arguments: exec.hasActiveFocusTask
+                          ? FocusLaunchArgs(
+                              taskId: exec.taskId,
+                              taskLabel: exec.taskLabel,
+                              taskDurationMinutes: exec.targetDurationMinutes,
+                              autoOpenTimer: true,
+                              autoStartDelaySeconds: 10,
+                            )
+                          : null,
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 8),
@@ -466,14 +465,21 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
+/// Date key the morning brief was last scheduled for. Guards the build-phase
+/// trigger below: without it, every home rebuild during the morning window
+/// queues another post-frame callback and another snackbar.
+String? _morningBriefShownForDateKey;
+
 /// Shows a one-time morning brief snackbar when the feature is enabled.
 void _maybeTriggerMorningBrief(BuildContext context, WidgetRef ref) {
     final now = DateTime.now();
     final isMorningWindow = now.hour >= 6 && now.hour < 10;
     if (!isMorningWindow) return;
 
-    final coachOpenedToday = ref.read(coachLastOpenedDateKeyProvider);
     final todayKey = DateKeys.todayKey();
+    if (_morningBriefShownForDateKey == todayKey) return;
+
+    final coachOpenedToday = ref.read(coachLastOpenedDateKeyProvider);
     if (coachOpenedToday == todayKey) return;
 
     // Check preference asynchronously — best-effort, no blocking
@@ -482,6 +488,7 @@ void _maybeTriggerMorningBrief(BuildContext context, WidgetRef ref) {
         prefAsync.whenOrNull(data: (p) => p?.morningBriefEnabled) ?? false;
     if (!morningBriefEnabled) return;
 
+    _morningBriefShownForDateKey = todayKey;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
