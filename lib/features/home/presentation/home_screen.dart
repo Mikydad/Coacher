@@ -15,6 +15,7 @@ import '../../../core/sync/sync_service.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../execution/domain/models/timer_session.dart';
 import '../../execution/domain/task_timer_engine.dart';
+import '../../planning/application/effective_task_mode.dart';
 import '../../planning/application/override_rules.dart';
 import '../../planning/application/auto_next_task_flow.dart';
 import '../../execution/application/execution_controller.dart';
@@ -39,6 +40,7 @@ import '../../planning/presentation/accountability_history_screen.dart';
 import '../../scoring/application/scoring_controller.dart';
 import '../../scoring/presentation/score_task_dialog.dart';
 import '../../add_task/presentation/add_task_screen.dart';
+import '../../tasks_hub/presentation/task_detail_screen.dart';
 import '../../tasks_hub/presentation/tasks_hub_screen.dart';
 import '../../focus/presentation/focus_selection_screen.dart';
 import '../../goals/application/goals_providers.dart';
@@ -220,8 +222,7 @@ class HomeScreen extends ConsumerWidget {
                         style: TextStyle(color: Colors.white54),
                       );
                     }
-                    final visible =
-                        rows.take(kHomePreviewItemLimit).toList();
+                    final visible = rows.take(kHomePreviewItemLimit).toList();
                     final remaining = rows.length - visible.length;
                     return Column(
                       children: [
@@ -245,6 +246,11 @@ class HomeScreen extends ConsumerWidget {
                             },
                             onPlansChanged: () =>
                                 _openPlansChangedFlow(context, ref, row),
+                            onTap: () => Navigator.pushNamed(
+                              context,
+                              TaskDetailScreen.routeName,
+                              arguments: TaskDetailArgs.fromRow(row),
+                            ),
                           ),
                         if (remaining > 0)
                           _HomeSectionSeeMoreLink(
@@ -343,8 +349,7 @@ class HomeScreen extends ConsumerWidget {
                         ],
                       );
                     }
-                    final visible =
-                        goals.take(kHomePreviewItemLimit).toList();
+                    final visible = goals.take(kHomePreviewItemLimit).toList();
                     final remaining = goals.length - visible.length;
                     return Column(
                       children: [
@@ -474,50 +479,50 @@ String? _morningBriefShownForDateKey;
 
 /// Shows a one-time morning brief snackbar when the feature is enabled.
 void _maybeTriggerMorningBrief(BuildContext context, WidgetRef ref) {
-    final now = DateTime.now();
-    final isMorningWindow = now.hour >= 6 && now.hour < 10;
-    if (!isMorningWindow) return;
+  final now = DateTime.now();
+  final isMorningWindow = now.hour >= 6 && now.hour < 10;
+  if (!isMorningWindow) return;
 
-    final todayKey = DateKeys.todayKey();
-    if (_morningBriefShownForDateKey == todayKey) return;
+  final todayKey = DateKeys.todayKey();
+  if (_morningBriefShownForDateKey == todayKey) return;
 
-    final coachOpenedToday = ref.read(coachLastOpenedDateKeyProvider);
-    if (coachOpenedToday == todayKey) return;
+  final coachOpenedToday = ref.read(coachLastOpenedDateKeyProvider);
+  if (coachOpenedToday == todayKey) return;
 
-    // Check preference asynchronously — best-effort, no blocking
-    final prefAsync = ref.read(userProfilePreferenceStreamProvider);
-    final morningBriefEnabled =
-        prefAsync.whenOrNull(data: (p) => p?.morningBriefEnabled) ?? false;
-    if (!morningBriefEnabled) return;
+  // Check preference asynchronously — best-effort, no blocking
+  final prefAsync = ref.read(userProfilePreferenceStreamProvider);
+  final morningBriefEnabled =
+      prefAsync.whenOrNull(data: (p) => p?.morningBriefEnabled) ?? false;
+  if (!morningBriefEnabled) return;
 
-    _morningBriefShownForDateKey = todayKey;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.inkWarm,
-          behavior: SnackBarBehavior.floating,
-          content: const Text(
-            'Coach AI has suggestions for today — tap to review.',
-            style: TextStyle(color: Colors.white),
-          ),
-          action: SnackBarAction(
-            label: 'Open',
-            textColor: AppColors.accentDim,
-            onPressed: () => navigateToMainTab(
-              context,
-              ref,
-              index: MainTabIndex.coach,
-              coachArgs: const CoachRouteArgs(
-                openSuggestionsPanel: true,
-                preDraftedText: 'Give me a quick plan for today',
-              ),
+  _morningBriefShownForDateKey = todayKey;
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: AppColors.inkWarm,
+        behavior: SnackBarBehavior.floating,
+        content: const Text(
+          'Coach AI has suggestions for today — tap to review.',
+          style: TextStyle(color: Colors.white),
+        ),
+        action: SnackBarAction(
+          label: 'Open',
+          textColor: AppColors.accentDim,
+          onPressed: () => navigateToMainTab(
+            context,
+            ref,
+            index: MainTabIndex.coach,
+            coachArgs: const CoachRouteArgs(
+              openSuggestionsPanel: true,
+              preDraftedText: 'Give me a quick plan for today',
             ),
           ),
-          duration: const Duration(seconds: 5),
         ),
-      );
-    });
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  });
 }
 
 class _HomeTopAnalyticsCard extends ConsumerStatefulWidget {
@@ -688,8 +693,9 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
                                 borderRadius: BorderRadius.circular(999),
                                 color: _scoreAccent(scorePercent).withAlpha(24),
                                 border: Border.all(
-                                  color: _scoreAccent(scorePercent)
-                                      .withAlpha(110),
+                                  color: _scoreAccent(
+                                    scorePercent,
+                                  ).withAlpha(110),
                                 ),
                               ),
                               child: Text(
@@ -710,10 +716,7 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
                         alignment: Alignment.centerLeft,
                         child: Text(
                           '7-day trend',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 11,
-                          ),
+                          style: TextStyle(color: Colors.white70, fontSize: 11),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -853,7 +856,6 @@ class _MiniSparkline extends StatelessWidget {
   }
 }
 
-
 class _Layer4NotificationDispatchBridge extends ConsumerStatefulWidget {
   const _Layer4NotificationDispatchBridge();
 
@@ -910,8 +912,9 @@ class _Layer4NotificationDispatchBridgeState
       final insights =
           ref.read(layer3TodayDeliveryInsightsProvider).valueOrNull ??
           const <GeneratedInsight>[];
-      final selected =
-          insights.where((item) => item.insightId == primaryId).toList();
+      final selected = insights
+          .where((item) => item.insightId == primaryId)
+          .toList();
       final body = selected.isEmpty
           ? 'You have a coaching insight ready.'
           : selected.first.message;
@@ -920,7 +923,8 @@ class _Layer4NotificationDispatchBridgeState
       if (!granted) return;
 
       // Re-check budget in case another dispatch completed while awaiting permission.
-      final budgetAfter = await prefService.evaluateCoachingInsightNotificationSend();
+      final budgetAfter = await prefService
+          .evaluateCoachingInsightNotificationSend();
       if (!budgetAfter.allowed) return;
 
       await notifications.schedule(
@@ -1098,7 +1102,8 @@ class _FlowNowStrip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final execState = ref.watch(executionControllerProvider);
-    final todayRows = ref.watch(todayAllTasksRowsProvider).valueOrNull ?? const [];
+    final todayRows =
+        ref.watch(todayAllTasksRowsProvider).valueOrNull ?? const [];
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -1137,7 +1142,9 @@ class _FlowNowStrip extends ConsumerWidget {
   void _openTimerScreen(BuildContext context, WidgetRef ref, PlannedTask task) {
     ref.read(activeExecutionTaskIdProvider.notifier).state = task.id;
     ref.read(activeExecutionTaskLabelProvider.notifier).state = task.title;
-    ref.read(executionControllerProvider.notifier).setTask(
+    ref
+        .read(executionControllerProvider.notifier)
+        .setTask(
           id: task.id,
           label: task.title,
           durationMinutes: task.durationMinutes,
@@ -1152,7 +1159,8 @@ class _FlowNowStrip extends ConsumerWidget {
     ExecutionState execState,
   ) async {
     final ctrl = ref.read(executionControllerProvider.notifier);
-    final isThisTask = execState.targetType == TimerSessionTargetType.task &&
+    final isThisTask =
+        execState.targetType == TimerSessionTargetType.task &&
         execState.taskId == task.id;
 
     if (isThisTask) {
@@ -1173,7 +1181,8 @@ class _FlowNowStrip extends ConsumerWidget {
       return;
     }
 
-    final otherRunning = execState.targetType == TimerSessionTargetType.task &&
+    final otherRunning =
+        execState.targetType == TimerSessionTargetType.task &&
         execState.taskId.isNotEmpty &&
         execState.taskId != task.id &&
         (execState.phase == ExecutionPhase.inProgress ||
@@ -1223,7 +1232,8 @@ class _FlowNowStrip extends ConsumerWidget {
     final open = flow.openTaskCount;
     final next = flow.nextTaskRow?.task;
 
-    final focusActive = execState.targetType == TimerSessionTargetType.task &&
+    final focusActive =
+        execState.targetType == TimerSessionTargetType.task &&
         execState.taskId.isNotEmpty &&
         (execState.phase == ExecutionPhase.inProgress ||
             execState.phase == ExecutionPhase.paused);
@@ -1281,8 +1291,7 @@ class _FlowNowStrip extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: InkWell(
-                      onTap: () =>
-                          _openTimerScreen(context, ref, displayTask),
+                      onTap: () => _openTimerScreen(context, ref, displayTask),
                       borderRadius: BorderRadius.circular(8),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 2),
@@ -1290,11 +1299,10 @@ class _FlowNowStrip extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              focusActive &&
-                                      execState.taskId == displayTask.id
+                              focusActive && execState.taskId == displayTask.id
                                   ? (execState.phase == ExecutionPhase.paused
-                                      ? 'Focus paused'
-                                      : 'Focus active')
+                                        ? 'Focus paused'
+                                        : 'Focus active')
                                   : 'Next up',
                               style: const TextStyle(
                                 color: _kMuted,
@@ -1303,8 +1311,7 @@ class _FlowNowStrip extends ConsumerWidget {
                               ),
                             ),
                             Text(
-                              focusActive &&
-                                      execState.taskId == displayTask.id
+                              focusActive && execState.taskId == displayTask.id
                                   ? execState.taskLabel
                                   : displayTask.title,
                               maxLines: 1,
@@ -1320,7 +1327,8 @@ class _FlowNowStrip extends ConsumerWidget {
                               _FlowNowStrip._subtitleFor(
                                 task: displayTask,
                                 execState: execState,
-                                focusActive: focusActive &&
+                                focusActive:
+                                    focusActive &&
                                     execState.taskId == displayTask.id,
                               ),
                               maxLines: 1,
@@ -1373,8 +1381,7 @@ class _FlowNowStrip extends ConsumerWidget {
   }) {
     final parts = <String>[];
     if (focusActive) {
-      final targetMin =
-          execState.targetDurationMinutes ?? task.durationMinutes;
+      final targetMin = execState.targetDurationMinutes ?? task.durationMinutes;
       parts.add('${_formatElapsed(execState.elapsed)} / ${targetMin}m');
     } else {
       parts.add('${task.durationMinutes}m target');
@@ -1402,10 +1409,10 @@ class _FlowNowTimerControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isThisTask = execState.targetType == TimerSessionTargetType.task &&
+    final isThisTask =
+        execState.targetType == TimerSessionTargetType.task &&
         execState.taskId == task.id;
-    final running =
-        isThisTask && execState.phase == ExecutionPhase.inProgress;
+    final running = isThisTask && execState.phase == ExecutionPhase.inProgress;
     final paused = isThisTask && execState.phase == ExecutionPhase.paused;
     final showProgress = running || paused;
 
@@ -1443,9 +1450,7 @@ class _FlowNowTimerControl extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  running
-                      ? Icons.pause_rounded
-                      : Icons.play_arrow_rounded,
+                  running ? Icons.pause_rounded : Icons.play_arrow_rounded,
                   color: _kAccent,
                   size: 18,
                 ),
@@ -1459,10 +1464,7 @@ class _FlowNowTimerControl extends StatelessWidget {
 }
 
 class _HomeSectionSeeMoreLink extends StatelessWidget {
-  const _HomeSectionSeeMoreLink({
-    required this.label,
-    required this.onTap,
-  });
+  const _HomeSectionSeeMoreLink({required this.label, required this.onTap});
 
   final String label;
   final VoidCallback onTap;
@@ -1484,10 +1486,7 @@ class _HomeSectionSeeMoreLink extends StatelessWidget {
           children: [
             Text(
               label,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
             ),
             const SizedBox(width: 4),
             const Icon(Icons.chevron_right, size: 18),
@@ -1578,6 +1577,7 @@ class _TaskItem extends StatelessWidget {
     this.partial = false,
     required this.onCheckedChange,
     required this.onPlansChanged,
+    this.onTap,
   });
 
   final String title;
@@ -1586,37 +1586,45 @@ class _TaskItem extends StatelessWidget {
   final bool partial;
   final void Function(bool checked) onCheckedChange;
   final VoidCallback onPlansChanged;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Checkbox(
-        value: done,
-        onChanged: (value) {
-          if (value == null) return;
-          onCheckedChange(value);
-        },
-        activeColor: AppColors.accent,
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          decoration: done ? TextDecoration.lineThrough : null,
-          fontStyle: partial ? FontStyle.italic : FontStyle.normal,
-          color: Colors.white70,
+    // Transparent Material so the tap ripple renders above the decorated
+    // card behind this tile (otherwise Flutter warns splashes may be
+    // invisible on every build).
+    return Material(
+      type: MaterialType.transparency,
+      child: ListTile(
+        onTap: onTap,
+        contentPadding: EdgeInsets.zero,
+        leading: Checkbox(
+          value: done,
+          onChanged: (value) {
+            if (value == null) return;
+            onCheckedChange(value);
+          },
+          activeColor: AppColors.accent,
         ),
-      ),
-      subtitle: subtitle == null
-          ? null
-          : Text(
-              subtitle!,
-              style: const TextStyle(color: Colors.white38, fontSize: 12),
-            ),
-      trailing: IconButton(
-        tooltip: 'Plans Changed?',
-        icon: const Icon(Icons.swap_horiz, color: Colors.white54),
-        onPressed: onPlansChanged,
+        title: Text(
+          title,
+          style: TextStyle(
+            decoration: done ? TextDecoration.lineThrough : null,
+            fontStyle: partial ? FontStyle.italic : FontStyle.normal,
+            color: Colors.white70,
+          ),
+        ),
+        subtitle: subtitle == null
+            ? null
+            : Text(
+                subtitle!,
+                style: const TextStyle(color: Colors.white38, fontSize: 12),
+              ),
+        trailing: IconButton(
+          tooltip: 'Plans Changed?',
+          icon: const Icon(Icons.swap_horiz, color: Colors.white54),
+          onPressed: onPlansChanged,
+        ),
       ),
     );
   }
@@ -2055,11 +2063,9 @@ class _SyncFromCloudActionState extends State<_SyncFromCloudAction> {
           tooltip: syncing ? 'Syncing from cloud' : 'Sync from cloud',
           onPressed: syncing
               ? null
-              : () => unawaited(SyncService.instance.syncFromRemote(force: true)),
-          icon: Icon(
-            Icons.sync,
-            color: syncing ? Colors.white38 : null,
-          ),
+              : () =>
+                    unawaited(SyncService.instance.syncFromRemote(force: true)),
+          icon: Icon(Icons.sync, color: syncing ? Colors.white38 : null),
         );
       },
     );
@@ -2115,10 +2121,25 @@ Future<void> _completeTaskFromHome(
   final t = row.task;
   final routineForPolicy = await _routineForPlannedRow(ref, row);
   if (!context.mounted) return;
-  if (OverrideRules.requiresMandatoryTimer(t, routine: routineForPolicy)) {
-    final sessions = await ref
-        .read(executionRepositoryProvider)
-        .getSessionsForTask(t.id);
+  final mode = EffectiveTaskMode.effectiveModeRefId(
+    task: t,
+    routine: routineForPolicy,
+  );
+  // The mandatory-timer gate only applies to extreme (and explicitly
+  // strict-required) tasks on Home; disciplined tasks go straight to the
+  // rating card so the checkbox stays low-friction.
+  if (mode == 'extreme' || t.strictModeRequired) {
+    // A failed fetch (offline, rules, missing index) must not kill the
+    // completion flow — treat it as "no sessions" so the timer-required
+    // dialog still appears and the policy stays enforced.
+    List<TimerSession> sessions = const [];
+    try {
+      sessions = await ref
+          .read(executionRepositoryProvider)
+          .getSessionsForTask(t.id);
+    } catch (e) {
+      debugPrint('completeTaskFromHome: session fetch failed: $e');
+    }
     final ok = OverrideRules.hasSatisfiedMandatoryTimer(sessions);
     if (!ok) {
       if (!context.mounted) return;
@@ -2156,10 +2177,20 @@ Future<void> _completeTaskFromHome(
       return;
     }
   }
-  // Ask for the completion rate first — same score dialog the focus/timer flow
-  // uses. Cancelling (tap outside / back) leaves the task untouched.
-  final scoreResult = await ScoreTaskDialog.show(context, taskTitle: t.title);
-  if (scoreResult == null || !context.mounted) return;
+  // Ask for the completion rate — same score dialog the focus/timer flow
+  // uses, with the discipline-mode contract:
+  // flexible → dismissing the card (tap outside / back) accepts the default,
+  //   done at 100% (mis-taps are recoverable by unchecking the checkbox);
+  // disciplined → must submit a score (reason below 100%);
+  // extreme → must submit a score and a reason at any percentage.
+  final scoreResult = await ScoreTaskDialog.show(
+        context,
+        taskTitle: t.title,
+        requireSubmit: mode == 'disciplined' || mode == 'extreme',
+        requireReasonAlways: mode == 'extreme',
+      ) ??
+      const ScoreTaskDialogResult(completionPercent: 100, reason: null);
+  if (!context.mounted) return;
   final completionPercent = scoreResult.completionPercent;
   final isComplete = completionPercent >= 100;
 
@@ -2202,7 +2233,9 @@ Future<void> _completeTaskFromHome(
       modeRefId: t.modeRefId,
     );
     await ref.read(reminderSyncServiceProvider).markTaskStarted(t.id);
-    await ref.read(scoringControllerProvider).submit(
+    await ref
+        .read(scoringControllerProvider)
+        .submit(
           taskId: t.id,
           completionPercent: completionPercent,
           reason: scoreResult.reason,
@@ -2326,11 +2359,8 @@ class _CoachHomeFab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return FloatingActionButton(
-      onPressed: () => navigateToMainTab(
-        context,
-        ref,
-        index: MainTabIndex.coach,
-      ),
+      onPressed: () =>
+          navigateToMainTab(context, ref, index: MainTabIndex.coach),
       elevation: 0,
       highlightElevation: 0,
       splashColor: _accent.withValues(alpha: 0.12),
@@ -2338,12 +2368,7 @@ class _CoachHomeFab extends ConsumerWidget {
       shape: CircleBorder(
         side: BorderSide(color: _accent.withValues(alpha: 0.35)),
       ),
-      child: const Icon(
-        Icons.auto_awesome_rounded,
-        color: _accent,
-        size: 22,
-      ),
+      child: const Icon(Icons.auto_awesome_rounded, color: _accent, size: 22),
     );
   }
 }
-

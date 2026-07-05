@@ -18,6 +18,7 @@ import '../../analytics/domain/models/analytics_event.dart';
 import '../../scoring/application/scoring_controller.dart';
 import '../../scoring/presentation/score_task_dialog.dart';
 import '../../home/presentation/quittr_app_bar_title.dart';
+import '../../planning/application/planned_task_actions.dart';
 import '../../time_blocks/application/time_block_providers.dart';
 
 import '../../../core/presentation/app_colors.dart';
@@ -117,9 +118,17 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
         );
         return;
       }
+      // Discipline-mode contract for the post-session rating:
+      // flexible → dismissible, walking away saves nothing;
+      // disciplined → must submit a score (reason below 100%);
+      // extreme → must submit a score AND a reason at any percentage.
+      final mode = await effectiveModeRefIdForTaskId(ref, execState.taskId);
+      if (!mounted) return;
       final result = await ScoreTaskDialog.show(
         context,
         taskTitle: activeLabel,
+        requireSubmit: mode == 'disciplined' || mode == 'extreme',
+        requireReasonAlways: mode == 'extreme',
       );
       if (!mounted || result == null) return;
       await ref

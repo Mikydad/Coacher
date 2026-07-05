@@ -11,14 +11,49 @@ class ScoreTaskDialogResult {
 }
 
 class ScoreTaskDialog extends StatefulWidget {
-  const ScoreTaskDialog({super.key, required this.taskTitle});
+  const ScoreTaskDialog({
+    super.key,
+    required this.taskTitle,
+    this.requireSubmit = false,
+    this.requireReasonAlways = false,
+  });
 
   final String taskTitle;
 
-  static Future<ScoreTaskDialogResult?> show(BuildContext context, {required String taskTitle}) {
+  /// When true (disciplined / extreme) the Cancel button is hidden — Save is
+  /// the only way out. Keep in sync with the PopScope/barrier in [show].
+  final bool requireSubmit;
+
+  /// When true (extreme mode) a reason is required at any score, not only
+  /// below 100%.
+  final bool requireReasonAlways;
+
+  /// Dismissability is the task's discipline-mode contract:
+  ///
+  /// - [requireSubmit] false (flexible): tapping outside / back returns null.
+  ///   What null means is the caller's choice — the home checkbox flow treats
+  ///   it as "accept the default, done at 100%"; the timer flow treats it as
+  ///   "leave without rating".
+  /// - [requireSubmit] true (disciplined / extreme): no outside-tap, no back —
+  ///   the user must press Save. `show` never returns null in this case.
+  /// - [requireReasonAlways] (extreme): reason mandatory at any score.
+  static Future<ScoreTaskDialogResult?> show(
+    BuildContext context, {
+    required String taskTitle,
+    bool requireSubmit = false,
+    bool requireReasonAlways = false,
+  }) {
     return showDialog<ScoreTaskDialogResult>(
       context: context,
-      builder: (_) => ScoreTaskDialog(taskTitle: taskTitle),
+      barrierDismissible: !requireSubmit,
+      builder: (_) => PopScope(
+        canPop: !requireSubmit,
+        child: ScoreTaskDialog(
+          taskTitle: taskTitle,
+          requireSubmit: requireSubmit,
+          requireReasonAlways: requireReasonAlways,
+        ),
+      ),
     );
   }
 
@@ -40,8 +75,10 @@ class _ScoreTaskDialogState extends State<ScoreTaskDialog> {
   void _submit() {
     final value = _percent.round();
     final reason = _reasonCtrl.text.trim();
-    if (value < 100 && reason.isEmpty) {
-      setState(() => _error = 'Reason is required when completion is below 100%.');
+    if ((value < 100 || widget.requireReasonAlways) && reason.isEmpty) {
+      setState(() => _error = widget.requireReasonAlways
+          ? 'A reason is required in extreme mode.'
+          : 'Reason is required when completion is below 100%.');
       return;
     }
     Navigator.pop(
@@ -76,9 +113,13 @@ class _ScoreTaskDialogState extends State<ScoreTaskDialog> {
               controller: _reasonCtrl,
               minLines: 2,
               maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Reason (required if < 100%)',
-                hintText: 'Add context for partial completion',
+              decoration: InputDecoration(
+                labelText: widget.requireReasonAlways
+                    ? 'Reason (required)'
+                    : 'Reason (required if < 100%)',
+                hintText: widget.requireReasonAlways
+                    ? 'How did this session go?'
+                    : 'Add context for partial completion',
               ),
             ),
             if (_error != null) ...[
@@ -89,7 +130,8 @@ class _ScoreTaskDialogState extends State<ScoreTaskDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        if (!widget.requireSubmit)
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
         FilledButton(onPressed: _submit, child: const Text('Save Score')),
       ],
     );

@@ -11,15 +11,22 @@ abstract class ExecutionRepository {
 }
 
 class FirestoreExecutionRepository implements ExecutionRepository {
+  // NOTE: no `.orderBy('startedAtMs')` on these queries — combining it with
+  // the equality filters requires a Firestore composite index (deploy-time
+  // config that silently breaks task completion when missing). Sessions per
+  // task/block are few, so we sort client-side instead.
+
   @override
   Future<List<TimerSession>> getSessionsForTask(String taskId) async {
     final snap = await FirebaseFirestore.instance
         .collection(FirestorePaths.timerSessions)
         .where('targetType', isEqualTo: TimerSessionTargetType.task.storageValue)
         .where('taskId', isEqualTo: taskId)
-        .orderBy('startedAtMs')
         .get();
-    return snap.docs.map((d) => TimerSession.fromMap(d.data())).toList();
+    final sessions =
+        snap.docs.map((d) => TimerSession.fromMap(d.data())).toList()
+          ..sort((a, b) => a.startedAtMs.compareTo(b.startedAtMs));
+    return sessions;
   }
 
   @override
@@ -28,9 +35,11 @@ class FirestoreExecutionRepository implements ExecutionRepository {
         .collection(FirestorePaths.timerSessions)
         .where('targetType', isEqualTo: TimerSessionTargetType.block.storageValue)
         .where('blockId', isEqualTo: blockId)
-        .orderBy('startedAtMs')
         .get();
-    return snap.docs.map((d) => TimerSession.fromMap(d.data())).toList();
+    final sessions =
+        snap.docs.map((d) => TimerSession.fromMap(d.data())).toList()
+          ..sort((a, b) => a.startedAtMs.compareTo(b.startedAtMs));
+    return sessions;
   }
 
   @override
