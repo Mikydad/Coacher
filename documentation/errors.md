@@ -116,6 +116,27 @@ This file tracks implementation/runtime errors encountered during development of
 - **Fix applied**: Documented in `documentation/isar-local-first-and-notification-routing.md` (section 4); repo-root **`libisar.dylib`** is gitignored; use Isar’s recommended test initialization for your environment.
 - **Status**: Documented / environment-dependent
 
+## 16) Task checkbox “does nothing” — Firestore composite index (`failed-precondition`)
+- **Where**: Home task checkbox → `_completeTaskFromHome` → `FirestoreExecutionRepository.getSessionsForTask` (`lib/features/execution/data/execution_repository.dart`).
+- **Error / symptom**: Tapping a task checkbox appeared to do nothing (no rating card). Terminal showed `[cloud_firestore/failed-precondition] The query requires an index` (composite on `targetType` + `taskId` + `startedAtMs` for `timerSessions`).
+- **Root cause**: Combining two equality filters with `orderBy('startedAtMs')` needs a composite index that was never created. The thrown exception killed the completion flow before the score card could open, so the checkbox looked dead.
+- **Fix applied**: Removed `orderBy`, sort client-side; wrapped the fetch in try/catch so a failure degrades to “no sessions” instead of aborting (`execution_repository.dart`, `home_screen.dart`).
+- **Status**: Resolved. See `documentation/2026-07_features_fixes_and_incidents.md` §4a.
+
+## 17) Circle chat image upload `unauthorized` + images never open
+- **Where**: Circle chat image upload → Firebase Storage; then image render after adding disk cache.
+- **Error / symptom**: (a) `[firebase_storage/unauthorized] User is not authorized…` on upload even though text messages sent fine. (b) After adding `cached_network_image`, images spun forever with `MissingPluginException (… getDatabasesPath on channel com.tekartik.sqflite)`.
+- **Root cause**: (a) `storage.rules` reads Firestore via `firestore.exists()` (cross-service rules), which needs the **“Firebase Rules Firestore Service Agent”** IAM role on the Storage service agent; it was never provisioned because the rules deploy skipped the upload. (b) `cached_network_image` → `flutter_cache_manager` → native `sqflite`; native plugins only link on a full build, so hot restart leaves the implementation missing.
+- **Fix applied**: (a) Granted the role manually in Google Cloud IAM to `service-<PROJECT_NUMBER>@gcp-sa-firebasestorage.iam.gserviceaccount.com`; documented in a comment at the top of `storage.rules`. (b) Full stop + rebuild (`flutter run`), no code change.
+- **Status**: Resolved. See `documentation/2026-07_features_fixes_and_incidents.md` §8 (#17).
+
+## 18) “Could not load commitments” — Firestore composite index (again)
+- **Where**: Circle → Commitments tab → `FirestoreWeeklyCommitmentRepository.watchCommitments` (`lib/features/community/data/weekly_commitment_repository.dart`).
+- **Error / symptom**: Tab showed “Could not load commitments.” Underlying `[cloud_firestore/failed-precondition]` (composite on `weekKey` + `updatedAtMs`) was swallowed by the view’s `error: (_, _)` handler.
+- **Root cause**: Same as #16 — equality filter + `orderBy` without a composite index.
+- **Fix applied**: Dropped `orderBy`, sort client-side; declared the app’s genuinely-needed indexes in `firestore.indexes.json` (taskScores, aiPulse — both use `limit(1)`), wired into `firebase.json`, deployed.
+- **Status**: Resolved. See `documentation/2026-07_features_fixes_and_incidents.md` §7 and §9.
+
 ---
 
 ## How to use this log
