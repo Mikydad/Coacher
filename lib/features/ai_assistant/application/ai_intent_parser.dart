@@ -68,12 +68,28 @@ class AiIntentParser {
 
     final route = AiIntentRouter.classify(userInput);
 
-    // Build a human-readable summary of the previous plan for the AI context
-    final previousPlanSummary = previousPlan != null && previousPlan.actions.isNotEmpty
-        ? previousPlan.actions
-            .map((a) => '${a.actionType.name}: ${a.parameters}')
-            .join('; ')
-        : null;
+    // Human-readable context for the model about the turn we're refining.
+    // Must include the follow-up QUESTION (so a short answer like "9am" or
+    // "as it is" is understood as answering it), not just the raw actions —
+    // and must exist even when there are no partial actions, otherwise the
+    // model re-parses the answer bare and re-asks the same question.
+    String? previousPlanSummary;
+    if (previousPlan != null) {
+      final parts = <String>[];
+      final question = previousPlan.followUpQuestion;
+      if (question != null && question.isNotEmpty) {
+        parts.add('You just asked the user: "$question" — their new message '
+            'is the answer. Merge it into the pending plan; do not re-ask.');
+      } else if (previousPlan.isSuggest) {
+        parts.add('You proposed the plan below and the user is replying to '
+            'it. Refine that plan per their reply; keep everything they '
+            'did not change (including times). Do not start over.');
+      }
+      if (previousPlan.actions.isNotEmpty) {
+        parts.add('Pending plan: ${previousPlan.actions.map((a) => '${a.actionType.name}: ${a.parameters}').join('; ')}');
+      }
+      if (parts.isNotEmpty) previousPlanSummary = parts.join(' ');
+    }
 
     // Step 1 — Assemble payload
     late AiOperatingLayerPayload payload;

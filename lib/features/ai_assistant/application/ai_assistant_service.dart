@@ -107,6 +107,15 @@ class AiAssistantService extends ChangeNotifier {
       return;
     }
 
+    // 0b. Typed confirmation of a *suggested* plan ("confirm", "ok", "it's
+    // good"). Suggest responses park the plan on the message as draftPlan with
+    // no pending plan, so without this the affirmation would be re-parsed as a
+    // brand-new request — the "What should I call this task?" loop.
+    if (_pendingPlan == null &&
+        _tryConfirmLatestDraftOnAffirmation(userInput.trim())) {
+      return;
+    }
+
     // 1. Append user message
     _addMessage(AiChatMessage(
       id: StableId.generate('msg'),
@@ -170,8 +179,10 @@ class AiAssistantService extends ChangeNotifier {
         timestamp: DateTime.now(),
       ));
       _pendingPlan = null;
-      // Remember the partial plan (if any) so the user's answer refines it.
-      _pendingClarification = result.actions.isNotEmpty ? result : null;
+      // Remember the clarification — including the question itself — so the
+      // user's answer refines it. Kept even with no partial actions: dropping
+      // it made short answers parse bare and re-trigger the same question.
+      _pendingClarification = result;
     } else if (result.isInformational || result.isUnsupported) {
       final raw = result.informationalMessage ??
           "I couldn't find an answer for that right now.";
@@ -208,6 +219,9 @@ class AiAssistantService extends ChangeNotifier {
         suggestedPrompts: result.suggestedPrompts,
       ));
       _pendingPlan = null;
+      // A free-text reply to a suggestion ("make it 30 minutes", "move it to
+      // 9am") must refine THIS plan, not start from scratch.
+      _pendingClarification = result.actions.isNotEmpty ? result : null;
       _logEvent('aiSuggestPlanShown', {
         'sessionId': _sessionId,
         'actionCount': result.actions.length,
@@ -473,15 +487,44 @@ class AiAssistantService extends ChangeNotifier {
 
   static final _affirmationPattern = RegExp(
     r'^(y+e+s+|yes please|ye[ap]h?|yep|sure|ok(ay)?|confirm|apply( it| this)?|'
-    r'do it|go ahead|sounds? good|please do)[.!]*$',
+    r'do it|go ahead|sounds? good|please do|perfect|great|love it|looks good|'
+    r"(it|that|this)('?s| is) (all )?(good|great|fine|perfect)|as it is|"
+    r'(schedule|do) (it )?as (you )?suggested)[.!]*$',
   );
 
   /// Handles a short yes/no-style reply while a plan is pending.
   /// Returns true when the reply was consumed (confirmed or cancelled).
+  /// Typed affirmation while the latest assistant message carries an
+  /// un-adopted draft plan → adopt it and run the normal confirm flow.
+  bool _tryConfirmLatestDraftOnAffirmation(String input) {
+    final normalized = input.toLowerCase().trim();
+    if (normalized.split(RegExp(r'\s+')).length > 4) return false;
+    if (!_affirmationPattern.hasMatch(normalized)) return false;
+
+    // The draft must be the most recent assistant turn — never adopt a plan
+    // the conversation has already moved past.
+    for (var i = _messages.length - 1; i >= 0; i--) {
+      final m = _messages[i];
+      if (m.role != ChatRole.assistant) continue;
+      final plan = m.draftPlan;
+      if (plan == null || plan.actions.isEmpty) return false;
+      _addMessage(AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.user,
+        content: input,
+        timestamp: DateTime.now(),
+      ));
+      applySuggestedPlan(m.id);
+      unawaited(confirmPlan());
+      return true;
+    }
+    return false;
+  }
+
   bool _handlePendingPlanShortReply(String input) {
     final normalized = input.toLowerCase().trim();
     // Only intercept short replies — full sentences go to the parser.
-    if (normalized.split(RegExp(r'\s+')).length > 3) return false;
+    if (normalized.split(RegExp(r'\s+')).length > 4) return false;
 
     if (_rejectionPattern.hasMatch(normalized)) {
       _addMessage(AiChatMessage(
@@ -564,22 +607,27 @@ class AiAssistantService extends ChangeNotifier {
     );
   }
 
-  Future<void> _persistAssistantTurn(String summary) async {
-    final trimmed = summary.trim();
-    if (trimmed.isEmpty) return;
-    final capped = trimmed.length > 500 ? '${trimmed.substring(0, 497)}…' : trimmed;
-    await _historyRepository.saveAssistantSummary(_sessionId, capped);
-  }
-
   String? _assistantSummaryForHistory(AiPlannedChanges result) {
     if (result.requiresFollowUp) {
+      // Include the partial plan so the next turn's model context knows what
+      // the question was about (titles/times survive even when the visible
+      // chat text is just the question).
+      if (result.actions.isNotEmpty) {
+        return '${result.followUpQuestion} '
+            '(pending: ${_compactActionsSummary(result)})';
+      }
       return result.followUpQuestion;
     }
     if (result.isInformational || result.isUnsupported) {
       return result.informationalMessage;
     }
     if (result.isSuggest) {
-      return result.informationalMessage;
+      // The prose alone can lose the concrete times to the history cap; the
+      // compact action list keeps them recoverable on the next turn.
+      final msg = result.informationalMessage ?? '';
+      return result.actions.isEmpty
+          ? msg
+          : '$msg [Proposed: ${_compactActionsSummary(result)}]';
     }
     if (result.actions.isEmpty) {
       return "I can answer questions about your schedule or help you add and move tasks. "
@@ -596,6 +644,23 @@ class AiAssistantService extends ChangeNotifier {
       return '${a.actionType.name}: $title';
     }).join('; ');
     return 'Plan preview: $parts';
+  }
+
+  /// Compact, lossless-enough action list for model context: keeps titles AND
+  /// scheduling params (time/date/duration) that the prose summary can lose.
+  String _compactActionsSummary(AiPlannedChanges plan) {
+    const keys = [
+      'title', 'taskTitle', 'time', 'date', 'destinationDate',
+      'destinationTime', 'duration', 'reminderTime', 'goalTitle',
+    ];
+    return plan.actions.take(6).map((a) {
+      final kept = [
+        for (final k in keys)
+          if ((a.parameters[k]?.toString() ?? '').isNotEmpty)
+            '$k=${a.parameters[k]}',
+      ].join(', ');
+      return kept.isEmpty ? a.actionType.name : '${a.actionType.name}($kept)';
+    }).join('; ');
   }
 
   void _recordProactiveChatConversion() {
