@@ -347,3 +347,65 @@ _Audited 2026-07-02. Method: repo-wide reference counting for providers/classes/
 - **Isar collection schemas**: all 23 collections in `isar_schemas.dart` are referenced by live repositories/providers; no orphaned collections found.
 - **Interfaces with test seams** (`GoalsRepository`, `PlanningRepository`, `AuthRepositoryInterface`, `ExecutionRepository`, `TimeBlockRepository`, `ProfilePreferenceRepository`, `ReminderSyncService`'s notification port) are earning their keep — the pattern itself is fine; it's the blanket application to the community layer that isn't.
 - **Dev dependencies** are all in use (`isar_generator`/`build_runner` for codegen, `fake_cloud_firestore` in tests, `flutter_lints` via analysis_options.yaml).
+
+---
+
+## 7) Final audit — security, performance, reliability (2026-07-06)
+
+_Audited on branch `fix/ai-chat-context` at 1000 passing tests. Report-only;
+no fixes applied. Every finding was verified against the code, not assumed._
+
+> **Implementation spec:** [`AUDIT_FIX_PLAN.md`](AUDIT_FIX_PLAN.md) — exact
+> rule blocks, code changes, deploy commands, and verification per finding,
+> written to be executed mechanically by a lower-effort session.
+
+### 7.1 Security
+
+| # | Sev | Finding |
+|---|-----|---------|
+| S1 | **HIGH** | **`weeklyCommitments` writable by any circle member.** `firestore.rules` grants `allow read, write: if canAccessCircleContent(circleId)` — write covers create/update/delete of ANY member's commitment docs. A member (or holder of a stale `circleIds` index) can edit, delete, or inflate `completedCount` on other members' commitments. The client only writes its own (`setCommitments`, `markProgress`) but the rules don't enforce it. Fix direction: `create` requires `request.resource.data.userId == request.auth.uid`; `update/delete` require `resource.data.userId == request.auth.uid` (progress updates could additionally restrict `affectedKeys` to `completedCount`/`updatedAtMs`). |
+| S2 | **HIGH (cost abuse)** | **`aiChat` callable: no App Check, anonymous accounts accepted.** Guest mode is default (`kRequireRegisteredAuth` defaults `false`), the function only checks `request.auth != null`, and the 40/hour quota is **per uid**. Anonymous sign-up is free and scriptable → fresh uid = fresh quota → unbounded OpenAI spend. No App Check anywhere in the app or functions. Fix direction: enable Firebase App Check and enforce on the function; and/or reject or heavily throttle `sign_in_provider == 'anonymous'`; set a billing alert regardless. |
+| S3 | MED | **`challenges` docs updatable by any member** (`allow update: if isCircleMember`) — title/target/status of anyone's challenge can be rewritten by any member (votes subcollection is properly scoped). Restrict metadata updates to creator/moderator or whitelist fields. |
+| S4 | MED | **Any signed-in user can read all circle metadata and full member lists** (`/circles/{id}` and `/members` both `allow read: if isSignedIn()`). No private-circle flag exists today, so this is "public by design", but membership enumeration across all circles is a social-graph leak worth a deliberate decision before launch. |
+| S5 | MED | **Chat proof uploads not uid-namespaced and not write-once.** `storage.rules` lets any member write ANY filename under `circles/{id}/proofs/` — overwriting another member's proof is possible if the name is known (StableIds are timestamped+random, so hard to guess, but nothing enforces immutability). `challenge_proofs` got this right (uid-prefix). Mirror that, or make proofs create-only. |
+| S6 | LOW | **Reactions are blocked by the message-update rule (fails closed).** `updateReactions` writes to other members' message docs, but the rule requires `resource.data.senderId == request.auth.uid` → reacting to someone else's message is permission-denied (feature broken, not exploitable). Inverse gap: a sender can forge arbitrary uids inside `reactions` on their own message. Proper fix: dedicated rule allowing only the `reactions` key to change with the caller's own uid added/removed, or a reactions subcollection. |
+| S7 | LOW | **153 `debugPrint` call sites, no release override.** `debugPrint` is not stripped in release builds; task titles/uids leak into device logs. Override it to a no-op in release in `main()`. |
+| S8 | INFO | **Prompt injection surface** — task titles/notes flow into LLM prompts. Mitigated: model is pinned server-side, all mutations require the user to confirm a preview card, informational output is sanitized. Keep the confirm-gate invariant. |
+| S9 | INFO | Anonymous uid-change → local-data wipe (`AuthSessionPolicy`) remains the known data-loss trap; already documented. |
+
+**Verified OK:** `users/{uid}/**` rules airtight (owner-only); message `create` enforces `senderId == auth.uid`; `activityFeed` immutable after post; votes uid-scoped; OpenAI key via `defineSecret` (never in repo — grepped); model/token caps pinned server-side; per-turn quota accounting with loop bounds; offline queue drops foreign-uid ops; AI history has a 48h TTL purge.
+
+### 7.2 Performance & app speed
+
+| # | Sev | Finding |
+|---|-----|---------|
+| P1 | **HIGH (grows silently)** | **Every remote pull reads entire collections.** `RemoteIsarMerge` has no `updatedAtMs > lastSync` cursor: each pull (app open, connectivity change, 30s debounce window) re-downloads ALL routines→blocks→tasks (serial nested gets), reminders, goals, **analytics_events**, analytics_stats. Firestore read cost and pull latency grow with account age — analytics_events is unbounded. Fix direction: per-collection since-cursor + occasional full reconcile; flatten the nested routine/block/task walk with collection-group queries. |
+| P2 | MED | `goalDetailProvider` loads **all check-ins ever** per open (`getCheckInsForGoal` unbounded); streak/cycle math needs ~90 days at most. Cap the query window. |
+| P3 | MED | AI payload includes full week overview + schedule + patterns on **every** message → token cost per turn scales with schedule size. Consider trimming payload sections by intent route (the router already exists). |
+| P4 | LOW | Four community `ListView`s still non-builder — bounded by query caps (30–50), fine until caps lift (already documented). |
+| P5 | LOW | Duplicate-analytics "Unique index violated" skip logs every 30s pull — fix already in flight as a background task. |
+| P6 | INFO | July-5 perf pass verified still intact: `select()` scoping, shape-only timer persistence, pre-frame/deferred bootstrap split, no-op-pull refresh skip, disk-cached chat images. No regressions found. |
+
+### 7.3 Reliability & code quality
+
+| # | Sev | Finding |
+|---|-----|---------|
+| R1 | MED | **57 swallowed-error sites** (`error: (_, _) => genericText`, `catch (_) {}`). This exact pattern hid the commitments outage (incident #18). Minimum: log the error; better: surface a retry. |
+| R2 | MED | **4 `use_build_context_synchronously`** spots (add_task 1416, focus_selection 119, goal_editor 695, home 2187) — context used across async gaps without a mounted guard; latent use-after-dispose crashes. |
+| R3 | LOW | Deprecated API debt: ~9 `withOpacity` (→ `withValues`), `ReorderableListView.onReorder` (tasks hub), and `RoutineMode` is `@Deprecated` yet still core to `EffectiveTaskMode` — the migration it points to (CoachingStyle/EnforcementMode) is unfinished. |
+| R4 | LOW | Analyzer baseline: 105 infos/warnings (style-level; no errors). |
+| R5 | LOW | **Dependency staleness:** entire Firebase suite one major behind (`cloud_firestore` 5.6→6.6, `firebase_auth` 5.7→6.5, `firebase_core` 3→4, …), `flutter_local_notifications` 19→22, Riverpod 3 available. No pub-flagged advisories, but majors compound migration risk. |
+| R6 | INFO | Tests: 1000 passing, strong unit/widget coverage (AI pipeline, planning, scoring, rules-adjacent repos). Gaps: no integration test for the sync round-trip/LWW, the uid-change wipe path, notification scheduling e2e; no golden tests for the redesigned screens. |
+| R7 | LOW | **AI pulse write-rule mismatch:** any member's client triggers `savePulse`, but `aiPulse` writes are moderator-only in rules → silent permission-denied for non-moderator members (banner just never updates for them). Functional, fails closed. |
+
+### 7.4 Hygiene & other
+
+- **H1:** `ios/build/` is untracked but NOT gitignored (`.gitignore` has root `/build/` only) — add `ios/build/`. Stray root `package-lock.json` (npm lives only in `functions/`) — remove or ignore.
+- **H2:** `firestore.indexes.json` is now authoritative — keep console drift at zero (deploy indexes with rules in the same PR).
+- **H3 (accessibility):** near-zero `Semantics` usage outside the app bar brand; several 9.5–11px all-caps labels; `textFaint` (#666) on ink (#0E0E0E) ≈ 4.6:1 — AA-passing for large text only. Needs a deliberate a11y pass before store review.
+
+### 7.5 Priority order
+
+1. **Before any public/beta exposure:** S1, S2 (rules + cost abuse), H1 (one-liner).
+2. **Next sprint:** P1 (sync cursors — cost grows every day it waits), S3, S5, S6/R7 (circle integrity + broken reactions), R2.
+3. **Scheduled debt:** R1 error-surfacing sweep, P2, P3, R5 major upgrades, H3 a11y pass, R6 integration tests.
