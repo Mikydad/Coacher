@@ -17,8 +17,7 @@ enum EnforcementMode {
 
   /// Parses the stored string value from [ReminderConfig.modeRefId].
   /// Falls back to [disciplined] for unknown or null values.
-  static EnforcementMode fromStorage(String? value) =>
-      fromModeRefId(value);
+  static EnforcementMode fromStorage(String? value) => fromModeRefId(value);
 
   /// Alias for [fromStorage] — accepts the modeRefId string used on
   /// [ReminderConfig] and task/habit records.

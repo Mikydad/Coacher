@@ -7,11 +7,7 @@ import '../domain/models/user_attention_state.dart';
 /// `"07:00"` end). Handles midnight crossover correctly.
 ///
 /// Returns false when either [windowStart] or [windowEnd] is null or empty.
-bool isWithinSleepWindow(
-  DateTime now,
-  String? windowStart,
-  String? windowEnd,
-) {
+bool isWithinSleepWindow(DateTime now, String? windowStart, String? windowEnd) {
   if (windowStart == null || windowStart.isEmpty) return false;
   if (windowEnd == null || windowEnd.isEmpty) return false;
 
@@ -83,7 +79,14 @@ bool vacationWindowContains(UserAttentionState state, String dateKey) {
   final dateMs = DateTime(year, month, day).millisecondsSinceEpoch;
 
   // End of the date key day.
-  final dateEndMs = DateTime(year, month, day, 23, 59, 59).millisecondsSinceEpoch;
+  final dateEndMs = DateTime(
+    year,
+    month,
+    day,
+    23,
+    59,
+    59,
+  ).millisecondsSinceEpoch;
 
   final endMs =
       state.lastAttentionResetAt ?? DateTime.now().millisecondsSinceEpoch;

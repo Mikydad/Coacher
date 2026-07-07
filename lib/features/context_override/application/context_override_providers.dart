@@ -49,5 +49,6 @@ final effectiveOverrideProvider = Provider<ContextOverride>((ref) {
 
 /// Holds the [PostOverrideReview] that should be shown on the home screen
 /// after an override ends. Cleared when the user dismisses the card.
-final pendingRecoveryReviewProvider =
-    StateProvider<PostOverrideReview?>((ref) => null);
+final pendingRecoveryReviewProvider = StateProvider<PostOverrideReview?>(
+  (ref) => null,
+);

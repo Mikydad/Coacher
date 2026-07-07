@@ -70,7 +70,7 @@ String contentTypeForImageExtension(String ext) {
 /// Uploads proof images to Firebase Storage for circle chat.
 class CircleProofStorage {
   CircleProofStorage({FirebaseStorage? storage})
-      : _storage = storage ?? FirebaseStorage.instance;
+    : _storage = storage ?? FirebaseStorage.instance;
 
   final FirebaseStorage _storage;
 

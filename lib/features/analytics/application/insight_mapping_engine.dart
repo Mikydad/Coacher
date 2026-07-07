@@ -30,8 +30,9 @@ List<GeneratedInsight> mapPatternsToInsights({
 }) {
   final filtered = patterns
       .where(
-        (p) =>
-            !kDeferredLayer2PatternCodesForInsightMapping.contains(p.patternCode),
+        (p) => !kDeferredLayer2PatternCodesForInsightMapping.contains(
+          p.patternCode,
+        ),
       )
       .toList();
   if (filtered.isEmpty) return const <GeneratedInsight>[];
@@ -55,7 +56,8 @@ List<GeneratedInsight> mapPatternsToInsights({
   entityKindForScope ??= patterns.isNotEmpty ? patterns.first.entityKind : null;
 
   final presentCodes = byCode.keys.toSet();
-  final detectedAtMs = context.detectedAtMs ?? DateTime.now().millisecondsSinceEpoch;
+  final detectedAtMs =
+      context.detectedAtMs ?? DateTime.now().millisecondsSinceEpoch;
   final out = <GeneratedInsight>[];
 
   for (final rule in config.rules) {
@@ -93,8 +95,9 @@ List<GeneratedInsight> mapPatternsToInsights({
         messageKey: rule.messageKey,
         message: rule.fallbackMessage,
         action: rule.action,
-        linkedPatternCodes:
-            linkedCodes.map((code) => code.name).toList(growable: false),
+        linkedPatternCodes: linkedCodes
+            .map((code) => code.name)
+            .toList(growable: false),
         confidence: confidence,
         detectedAtMs: detectedAtMs,
         sourceWindowStartDateKey: context.sourceWindowStartDateKey,
@@ -105,8 +108,9 @@ List<GeneratedInsight> mapPatternsToInsights({
         supportingMetrics: supportingMetrics,
         metadata: <String, dynamic>{
           'ruleId': rule.ruleId,
-          'linkedPatternCodes':
-              linkedCodes.map((code) => code.name).toList(growable: false),
+          'linkedPatternCodes': linkedCodes
+              .map((code) => code.name)
+              .toList(growable: false),
           if (entityKindForScope != null) 'entityKind': entityKindForScope.name,
         },
       ),

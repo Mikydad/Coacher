@@ -17,7 +17,7 @@ abstract class AiPulseRepository {
 
 class FirestoreAiPulseRepository implements AiPulseRepository {
   FirestoreAiPulseRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
@@ -31,8 +31,7 @@ class FirestoreAiPulseRepository implements AiPulseRepository {
   }
 
   @override
-  Stream<AiPulse?> watchLatestPulse(
-      String circleId, AiPulseType type) {
+  Stream<AiPulse?> watchLatestPulse(String circleId, AiPulseType type) {
     return _col(circleId)
         .where('type', isEqualTo: type.storageValue)
         .orderBy('generatedAtMs', descending: true)

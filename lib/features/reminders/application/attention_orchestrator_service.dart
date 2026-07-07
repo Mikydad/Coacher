@@ -57,7 +57,9 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
       required String sourceSurface,
       required String idempotencyKey,
       String? reason,
-    }) logEvent,
+    })
+    logEvent,
+
     /// Callback to read the user's current [CoachingStyle] synchronously.
     /// Injected so this service stays free of Riverpod (FR-D-16).
     CoachingStyle Function()? getCoachingStyle,
@@ -84,7 +86,8 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
     required String sourceSurface,
     required String idempotencyKey,
     String? reason,
-  }) _logEvent;
+  })
+  _logEvent;
   final DateTime Function() _now;
 
   // ── In-memory state ────────────────────────────────────────────────────────
@@ -104,7 +107,8 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
   Future<AttentionDecision> evaluate(ReminderIntent intent) async {
     _trimRecentDeliveries();
 
-    final attentionState = await _overrideRepo.getAttentionState() ??
+    final attentionState =
+        await _overrideRepo.getAttentionState() ??
         UserAttentionState(
           id: kUserAttentionStateId,
           activeOverride: ContextOverride.none,
@@ -225,7 +229,8 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
       final followUp = intent.copyWith(
         reminderType: ReminderType.followUp,
         proposedAt: now,
-        sourceReason: 'Re-evaluated after override ended: '
+        sourceReason:
+            'Re-evaluated after override ended: '
             '${endedOverride.displayName}',
       );
       await evaluate(followUp);
@@ -289,8 +294,8 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
   /// [NotificationInteractionType.ignored] interaction to trigger a follow-up.
   Future<void> checkIgnoredTimeouts() async {
     final now = _now();
-    final cutoffMs = now.millisecondsSinceEpoch -
-        kIgnoredTimeoutMinutes * 60 * 1000;
+    final cutoffMs =
+        now.millisecondsSinceEpoch - kIgnoredTimeoutMinutes * 60 * 1000;
     final reminders = await _reminderRepo.listAllReminders();
 
     for (final reminder in reminders) {
@@ -379,7 +384,9 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
         entry.state != NotificationLedgerState.cancelled.name) {
       try {
         await _notifications.cancel(entry.notifId);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('attention_orchestrator_service: swallowed error: $e');
+      }
       await _ledger.markCancelled(entityId);
     }
   }
@@ -398,9 +405,7 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
 
   void _trimRecentDeliveries() {
     final cutoff = _now().subtract(const Duration(minutes: 30));
-    _recentDeliveries.removeWhere(
-      (d) => d.deliveredAt.isBefore(cutoff),
-    );
+    _recentDeliveries.removeWhere((d) => d.deliveredAt.isBefore(cutoff));
   }
 
   Future<void> _scheduleFollowUp(String entityId) async {
@@ -479,4 +484,3 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
     }
   }
 }
-

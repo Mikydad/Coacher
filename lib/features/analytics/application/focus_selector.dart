@@ -77,16 +77,21 @@ FocusSelectionResult selectFocus({
   final nowMs = ts.millisecondsSinceEpoch;
 
   // Score all candidates.
-  final scored = candidates
-      .map(
-        (c) => FocusScoredCandidate(
-          candidate: c,
-          breakdown: computeFocusScoreBreakdown(c, weights: scoringWeights),
-        ),
-      )
-      .where((s) => s.breakdown.focusScore >= policy.minFocusScoreToActivate)
-      .toList()
-    ..sort((a, b) => b.breakdown.focusScore.compareTo(a.breakdown.focusScore));
+  final scored =
+      candidates
+          .map(
+            (c) => FocusScoredCandidate(
+              candidate: c,
+              breakdown: computeFocusScoreBreakdown(c, weights: scoringWeights),
+            ),
+          )
+          .where(
+            (s) => s.breakdown.focusScore >= policy.minFocusScoreToActivate,
+          )
+          .toList()
+        ..sort(
+          (a, b) => b.breakdown.focusScore.compareTo(a.breakdown.focusScore),
+        );
 
   // If nothing passes the threshold, emit a stale/empty continuation.
   if (scored.isEmpty) {
@@ -156,8 +161,7 @@ FocusSelectionResult selectFocus({
     antiThrashApplied: antiThrashApplied,
   );
 
-  final activeUntilMs =
-      nowMs + policy.minActiveDurationMs.inMilliseconds;
+  final activeUntilMs = nowMs + policy.minActiveDurationMs.inMilliseconds;
 
   // Replacement reason: only set when we're replacing an existing active focus.
   FocusReplacementReason? replacementReason;
@@ -231,8 +235,8 @@ FocusLifecycleState _resolveLifecycle({
     return existing.lifecycleState == FocusLifecycleState.active
         ? FocusLifecycleState.reinforced
         : existing.lifecycleState == FocusLifecycleState.reinforced
-            ? FocusLifecycleState.reinforced
-            : FocusLifecycleState.active;
+        ? FocusLifecycleState.reinforced
+        : FocusLifecycleState.active;
   }
   return FocusLifecycleState.active;
 }

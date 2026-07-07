@@ -15,6 +15,7 @@ import 'progress/weekly_summary_hero.dart';
 import '../domain/models/ai_summary_response.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/presentation/async_value_ui.dart';
 
 class AnalyticsProgressScreen extends ConsumerStatefulWidget {
   const AnalyticsProgressScreen({super.key});
@@ -179,10 +180,16 @@ class _AnalyticsProgressScreenState
               ],
             ),
             loading: () => const ProgressBundleSkeleton(),
-            error: (_, _) => const ProgressTonalCard(
-              child: Text(
-                'Could not load progress analytics.',
-                style: TextStyle(color: ProgressDesignTokens.onSurfaceVariant),
+            error: (e, _) => swallowedAsyncError(
+              'analytics_progress_screen',
+              e,
+              const ProgressTonalCard(
+                child: Text(
+                  'Could not load progress analytics.',
+                  style: TextStyle(
+                    color: ProgressDesignTokens.onSurfaceVariant,
+                  ),
+                ),
               ),
             ),
           ),
@@ -212,9 +219,9 @@ class _AnalyticsProgressScreenState
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('AI test failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('AI test failed: $e')));
     }
   }
 
@@ -238,7 +245,6 @@ class _AnalyticsProgressScreenState
   }
 }
 
-
 // ─── AI test result bottom sheet ──────────────────────────────────────────────
 
 class _AiResultSheet extends StatelessWidget {
@@ -247,7 +253,9 @@ class _AiResultSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sourceLabel = response.isFallback ? 'DETERMINISTIC FALLBACK' : 'AI RESPONSE';
+    final sourceLabel = response.isFallback
+        ? 'DETERMINISTIC FALLBACK'
+        : 'AI RESPONSE';
     final sourceColor = response.isFallback
         ? AppColors.scoreAmber
         : AppColors.accent;
@@ -281,7 +289,10 @@ class _AiResultSheet extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: sourceColor.withAlpha(30),
                   borderRadius: BorderRadius.circular(999),
@@ -299,14 +310,19 @@ class _AiResultSheet extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: validColor.withAlpha(30),
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(color: validColor.withAlpha(120)),
                 ),
                 child: Text(
-                  response.isValid ? 'VALID' : response.validationOutcome.name.toUpperCase(),
+                  response.isValid
+                      ? 'VALID'
+                      : response.validationOutcome.name.toUpperCase(),
                   style: TextStyle(
                     color: validColor,
                     fontSize: 11,
@@ -324,7 +340,11 @@ class _AiResultSheet extends StatelessWidget {
             label: 'DAILY SUMMARY',
             child: Text(
               response.dailySummary.isEmpty ? '(empty)' : response.dailySummary,
-              style: const TextStyle(fontSize: 16, height: 1.5, color: Colors.white),
+              style: const TextStyle(
+                fontSize: 16,
+                height: 1.5,
+                color: Colors.white,
+              ),
             ),
           ),
 
@@ -363,10 +383,9 @@ class _AiResultSheet extends StatelessWidget {
                   'Generated',
                   response.generatedAtMs == 0
                       ? '—'
-                      : DateTime.fromMillisecondsSinceEpoch(response.generatedAtMs)
-                          .toLocal()
-                          .toString()
-                          .substring(0, 19),
+                      : DateTime.fromMillisecondsSinceEpoch(
+                          response.generatedAtMs,
+                        ).toLocal().toString().substring(0, 19),
                 ),
                 if (response.metadata.containsKey('fallbackReason'))
                   _MetaRow(

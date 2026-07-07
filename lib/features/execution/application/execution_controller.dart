@@ -86,7 +86,7 @@ class ExecutionController extends StateNotifier<ExecutionState> {
            phase: ExecutionPhase.notStarted,
            elapsed: Duration.zero,
            readyToScore: false,
-          targetDurationMinutes: null,
+           targetDurationMinutes: null,
          ),
        ) {
     _sub = _engine.stream.listen((snapshot) {
@@ -124,7 +124,9 @@ class ExecutionController extends StateNotifier<ExecutionState> {
             : state.blockLabel,
         phase: snapshot.phase,
         elapsed: snapshot.elapsed,
-        runningSince: snapshot.phase == ExecutionPhase.inProgress ? DateTime.now() : null,
+        runningSince: snapshot.phase == ExecutionPhase.inProgress
+            ? DateTime.now()
+            : null,
         targetDurationMinutes: state.targetDurationMinutes,
       ),
     );
@@ -177,9 +179,11 @@ class ExecutionController extends StateNotifier<ExecutionState> {
     int? durationMinutes,
     Duration resumeElapsed = Duration.zero,
   }) {
-    final sameRunningTask = state.targetType == TimerSessionTargetType.task &&
+    final sameRunningTask =
+        state.targetType == TimerSessionTargetType.task &&
         state.taskId == id &&
-        (state.phase == ExecutionPhase.inProgress || state.phase == ExecutionPhase.paused);
+        (state.phase == ExecutionPhase.inProgress ||
+            state.phase == ExecutionPhase.paused);
     if (sameRunningTask) {
       state = state.copyWith(
         taskLabel: label,
@@ -248,8 +252,7 @@ class ExecutionController extends StateNotifier<ExecutionState> {
 
   /// Clears the locally stored resume point for [taskId] (e.g. on full
   /// completion so a later re-add starts fresh).
-  Future<void> clearResumePoint(String taskId) =>
-      resumeStore.clear(taskId);
+  Future<void> clearResumePoint(String taskId) => resumeStore.clear(taskId);
 
   @override
   void dispose() {

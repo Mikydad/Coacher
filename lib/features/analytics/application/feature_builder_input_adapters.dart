@@ -104,10 +104,13 @@ class TaskFeatureSeed {
   /// Reference row (latest plan day in the loaded window by date key).
   final PlannedTaskRow row;
   final String entityKind;
+
   /// Latest plan date key in window (lexicographic max among occurrences).
   final String scheduledDateKey;
+
   /// All `yyyy-MM-dd` days this task appears in the plan within the feature window.
   final Set<String> scheduledDateKeysInWindow;
+
   /// Row for **today** (local), when the task is on today's plan — used for overdue.
   final PlannedTaskRow? rowPlannedForToday;
 }
@@ -236,7 +239,8 @@ class FeatureBuilderInputAdapters {
         final id = task.id;
         final acc = accum.putIfAbsent(id, _TaskSeedAccum.new);
         acc.keys.add(row.dateKey);
-        if (acc.maxDateKey.isEmpty || row.dateKey.compareTo(acc.maxDateKey) >= 0) {
+        if (acc.maxDateKey.isEmpty ||
+            row.dateKey.compareTo(acc.maxDateKey) >= 0) {
           acc.maxDateKey = row.dateKey;
           acc.referenceRow = row;
         }

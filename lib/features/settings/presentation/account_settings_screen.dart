@@ -31,8 +31,7 @@ class AccountSettingsScreen extends ConsumerStatefulWidget {
       _AccountSettingsScreenState();
 }
 
-class _AccountSettingsScreenState
-    extends ConsumerState<AccountSettingsScreen> {
+class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
   bool _exportLoading = false;
   bool _deleteLoading = false;
 
@@ -40,9 +39,7 @@ class _AccountSettingsScreenState
 
   bool get _hasEmailProvider {
     final user = ref.read(authStateProvider).valueOrNull;
-    return user?.providerData
-            .any((p) => p.providerId == 'password') ??
-        false;
+    return user?.providerData.any((p) => p.providerId == 'password') ?? false;
   }
 
   // ── Change password ───────────────────────────────────────────────────────────
@@ -81,34 +78,40 @@ class _AccountSettingsScreenState
       final payload = {
         'exportedAt': DateTime.now().toIso8601String(),
         'tasks': tasks
-            .map((t) => {
-                  'id': t.taskId,
-                  'title': t.title,
-                  'status': t.statusName,
-                  'priority': t.priority,
-                  'durationMinutes': t.durationMinutes,
-                  'createdAtMs': t.createdAtMs,
-                  'updatedAtMs': t.updatedAtMs,
-                })
+            .map(
+              (t) => {
+                'id': t.taskId,
+                'title': t.title,
+                'status': t.statusName,
+                'priority': t.priority,
+                'durationMinutes': t.durationMinutes,
+                'createdAtMs': t.createdAtMs,
+                'updatedAtMs': t.updatedAtMs,
+              },
+            )
             .toList(),
         'goals': goals
-            .map((g) => {
-                  'id': g.goalId,
-                  'title': g.title,
-                  'category': g.categoryId,
-                  'status': g.statusStorage,
-                  'horizon': g.horizonStorage,
-                  'createdAtMs': g.createdAtMs,
-                  'updatedAtMs': g.updatedAtMs,
-                })
+            .map(
+              (g) => {
+                'id': g.goalId,
+                'title': g.title,
+                'category': g.categoryId,
+                'status': g.statusStorage,
+                'horizon': g.horizonStorage,
+                'createdAtMs': g.createdAtMs,
+                'updatedAtMs': g.updatedAtMs,
+              },
+            )
             .toList(),
         'reminders': reminders
-            .map((r) => {
-                  'id': r.reminderId,
-                  'taskId': r.taskId,
-                  'enabled': r.enabled,
-                  'createdAtMs': r.createdAtMs,
-                })
+            .map(
+              (r) => {
+                'id': r.reminderId,
+                'taskId': r.taskId,
+                'enabled': r.enabled,
+                'createdAtMs': r.createdAtMs,
+              },
+            )
             .toList(),
       };
 
@@ -181,7 +184,9 @@ class _AccountSettingsScreenState
           title: const Text(
             'Delete account?',
             style: TextStyle(
-                color: AppColors.coral, fontWeight: FontWeight.bold),
+              color: AppColors.coral,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -206,22 +211,18 @@ class _AccountSettingsScreenState
                   fillColor: AppColors.dark111111,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide:
-                        const BorderSide(color: AppColors.gray33),
+                    borderSide: const BorderSide(color: AppColors.gray33),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide:
-                        const BorderSide(color: AppColors.gray33),
+                    borderSide: const BorderSide(color: AppColors.gray33),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide:
-                        const BorderSide(color: AppColors.coral),
+                    borderSide: const BorderSide(color: AppColors.coral),
                   ),
                   hintText: 'DELETE',
-                  hintStyle:
-                      const TextStyle(color: AppColors.textDim),
+                  hintStyle: const TextStyle(color: AppColors.textDim),
                 ),
                 onChanged: (v) =>
                     setDialogState(() => canConfirm = v == 'DELETE'),
@@ -231,19 +232,17 @@ class _AccountSettingsScreenState
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel',
-                  style: TextStyle(color: AppColors.textGray)),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: AppColors.textGray),
+              ),
             ),
             TextButton(
-              onPressed: canConfirm
-                  ? () => Navigator.pop(ctx, true)
-                  : null,
+              onPressed: canConfirm ? () => Navigator.pop(ctx, true) : null,
               child: Text(
                 'Delete',
                 style: TextStyle(
-                  color: canConfirm
-                      ? AppColors.coral
-                      : AppColors.textDim,
+                  color: canConfirm ? AppColors.coral : AppColors.textDim,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -269,8 +268,7 @@ class _AccountSettingsScreenState
           backgroundColor: AppColors.inkCard,
           title: const Text(
             'Confirm your identity',
-            style: TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -301,8 +299,10 @@ class _AccountSettingsScreenState
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel',
-                  style: TextStyle(color: AppColors.textGray)),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: AppColors.textGray),
+              ),
             ),
             TextButton(
               onPressed: () async {
@@ -318,10 +318,13 @@ class _AccountSettingsScreenState
                   if (ctx.mounted) Navigator.pop(ctx, true);
                 }
               },
-              child: const Text('Confirm',
-                  style: TextStyle(
-                      color: AppColors.coral,
-                      fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Confirm',
+                style: TextStyle(
+                  color: AppColors.coral,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         ),
@@ -332,10 +335,7 @@ class _AccountSettingsScreenState
 
   void _showSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 
@@ -344,9 +344,8 @@ class _AccountSettingsScreenState
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authStateProvider).valueOrNull;
-    final hasEmailProvider = user?.providerData
-            .any((p) => p.providerId == 'password') ??
-        false;
+    final hasEmailProvider =
+        user?.providerData.any((p) => p.providerId == 'password') ?? false;
 
     return SettingsPageScaffold(
       title: 'Account Settings',
@@ -393,9 +392,7 @@ class _AccountSettingsScreenState
                 title: 'Export my data',
                 subtitle: 'Download a copy of your coaching data',
                 onTap: _exportLoading ? null : _exportData,
-                trailing: _exportLoading
-                    ? const _LoadingIndicator()
-                    : null,
+                trailing: _exportLoading ? const _LoadingIndicator() : null,
               ),
               const _Divider(),
               _ActionRow(
@@ -403,9 +400,7 @@ class _AccountSettingsScreenState
                 subtitle: 'Permanently remove your account and data',
                 onTap: _deleteLoading ? null : _deleteAccount,
                 titleColor: AppColors.coral,
-                trailing: _deleteLoading
-                    ? const _LoadingIndicator()
-                    : null,
+                trailing: _deleteLoading ? const _LoadingIndicator() : null,
                 isLast: true,
               ),
             ],
@@ -491,11 +486,7 @@ class _Divider extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Padding(
       padding: EdgeInsets.only(bottom: 16),
-      child: Divider(
-        height: 1,
-        thickness: 1,
-        color: AppColors.gray2A,
-      ),
+      child: Divider(height: 1, thickness: 1, color: AppColors.gray2A),
     );
   }
 }

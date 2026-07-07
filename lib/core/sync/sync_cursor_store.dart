@@ -39,8 +39,7 @@ class SyncCursorStore {
   /// Removes every sync cursor (next pull is a full pull).
   static Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
-    final keys =
-        prefs.getKeys().where((k) => k.startsWith(_prefix)).toList();
+    final keys = prefs.getKeys().where((k) => k.startsWith(_prefix)).toList();
     for (final key in keys) {
       await prefs.remove(key);
     }

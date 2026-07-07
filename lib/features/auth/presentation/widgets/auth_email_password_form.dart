@@ -79,7 +79,11 @@ class _AuthEmailPasswordFormState extends ConsumerState<AuthEmailPasswordForm> {
       return;
     }
 
-    final name = ref.read(authRepositoryProvider).currentUser?.displayName?.trim();
+    final name = ref
+        .read(authRepositoryProvider)
+        .currentUser
+        ?.displayName
+        ?.trim();
     if (name != null && name.isNotEmpty) {
       await ref
           .read(profilePreferenceServiceProvider)

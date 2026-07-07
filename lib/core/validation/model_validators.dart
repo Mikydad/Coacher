@@ -26,7 +26,9 @@ class ModelValidators {
       fieldName: 'completionPercent',
     );
     if (completionPercent < 100 && (reason == null || reason.trim().isEmpty)) {
-      throw ArgumentError('reason is required when completionPercent is below 100');
+      throw ArgumentError(
+        'reason is required when completionPercent is below 100',
+      );
     }
   }
 }

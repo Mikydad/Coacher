@@ -23,7 +23,9 @@ DateTime? nextGoalDailyReminderLocal({
 
 bool goalShouldScheduleDailyReminder(UserGoal goal, DateTime now) {
   if (goal.status != GoalStatus.active) return false;
-  if (!goal.reminderEnabled || goal.reminderMinutesFromMidnight == null) return false;
+  if (!goal.reminderEnabled || goal.reminderMinutesFromMidnight == null) {
+    return false;
+  }
   if (goal.reminderStyle != GoalReminderStyle.dailyOnce) return false;
   final end = DateTime.fromMillisecondsSinceEpoch(goal.periodEndMs);
   if (now.isAfter(end)) return false;

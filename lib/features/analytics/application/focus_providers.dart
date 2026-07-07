@@ -21,7 +21,9 @@ import 'pattern_detection_orchestrator.dart';
 
 // ─── Read active focus ────────────────────────────────────────────────────────
 
-final currentCoachingFocusProvider = StreamProvider<CurrentCoachingFocus?>((ref) {
+final currentCoachingFocusProvider = StreamProvider<CurrentCoachingFocus?>((
+  ref,
+) {
   final isar = ref.watch(offlineStoreProvider).isar;
   if (isar == null) {
     return Stream.fromFuture(
@@ -70,8 +72,9 @@ final recomputeCoachingFocusProvider = FutureProvider<CurrentCoachingFocus?>((
   final now = DateTime.now();
 
   // Pull today's insights (Layer 3 output).
-  final insights =
-      await ref.read(layer3DeliveryDayInsightsProvider(today).future);
+  final insights = await ref.read(
+    layer3DeliveryDayInsightsProvider(today).future,
+  );
   if (insights.isEmpty) return null;
 
   // Pull today's canonical Layer 2 patterns.
@@ -97,12 +100,12 @@ final recomputeCoachingFocusProvider = FutureProvider<CurrentCoachingFocus?>((
     now: now,
     justCompletedTask: false,
   );
-  final ctx = FocusRealtimeContext(
-    timingProfile: timingProfile,
-  );
+  final ctx = FocusRealtimeContext(timingProfile: timingProfile);
 
   // Pre-load all reminder configs to resolve per-entity EnforcementMode.
-  final allReminders = await ref.read(reminderRepositoryProvider).listAllReminders();
+  final allReminders = await ref
+      .read(reminderRepositoryProvider)
+      .listAllReminders();
   final modeByEntityId = <String, EnforcementMode>{
     for (final r in allReminders)
       r.id: EnforcementMode.fromModeRefId(r.modeRefId),
@@ -110,7 +113,8 @@ final recomputeCoachingFocusProvider = FutureProvider<CurrentCoachingFocus?>((
 
   // Build candidates.
   final candidates = insights.map((insight) {
-    final patterns = patternsByEntityId[insight.scopeId] ??
+    final patterns =
+        patternsByEntityId[insight.scopeId] ??
         patternsByEntityId[insight.insightType.name] ??
         const <DetectedBehaviorPattern>[];
     final enforcementMode =

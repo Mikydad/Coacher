@@ -71,7 +71,10 @@ int addTaskDurationMinutes(
     case '1 HOUR':
       return 60;
     case 'CUSTOM':
-      return customMinutes.clamp(kAddTaskMinCustomMinutes, kAddTaskMaxCustomMinutes);
+      return customMinutes.clamp(
+        kAddTaskMinCustomMinutes,
+        kAddTaskMaxCustomMinutes,
+      );
     default:
       return 25;
   }

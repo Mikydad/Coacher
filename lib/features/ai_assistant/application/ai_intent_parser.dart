@@ -78,15 +78,21 @@ class AiIntentParser {
       final parts = <String>[];
       final question = previousPlan.followUpQuestion;
       if (question != null && question.isNotEmpty) {
-        parts.add('You just asked the user: "$question" — their new message '
-            'is the answer. Merge it into the pending plan; do not re-ask.');
+        parts.add(
+          'You just asked the user: "$question" — their new message '
+          'is the answer. Merge it into the pending plan; do not re-ask.',
+        );
       } else if (previousPlan.isSuggest) {
-        parts.add('You proposed the plan below and the user is replying to '
-            'it. Refine that plan per their reply; keep everything they '
-            'did not change (including times). Do not start over.');
+        parts.add(
+          'You proposed the plan below and the user is replying to '
+          'it. Refine that plan per their reply; keep everything they '
+          'did not change (including times). Do not start over.',
+        );
       }
       if (previousPlan.actions.isNotEmpty) {
-        parts.add('Pending plan: ${previousPlan.actions.map((a) => '${a.actionType.name}: ${a.parameters}').join('; ')}');
+        parts.add(
+          'Pending plan: ${previousPlan.actions.map((a) => '${a.actionType.name}: ${a.parameters}').join('; ')}',
+        );
       }
       if (parts.isNotEmpty) previousPlanSummary = parts.join(' ');
     }
@@ -121,8 +127,7 @@ class AiIntentParser {
     } catch (_) {
       return AiPlannedChanges(
         sessionId: sessionId,
-        followUpQuestion:
-            'I ran into an unexpected issue. Please try again.',
+        followUpQuestion: 'I ran into an unexpected issue. Please try again.',
       );
     }
 
@@ -135,8 +140,9 @@ class AiIntentParser {
     // Read-only or unsupported answers skip the mutation pipeline.
     if (result.isInformational || result.isUnsupported) {
       if (result.isInformational && chatSuggestionEnricher != null) {
-        final extra =
-            await chatSuggestionEnricher!.promptsForInformationalGaps(payload);
+        final extra = await chatSuggestionEnricher!.promptsForInformationalGaps(
+          payload,
+        );
         if (extra.isNotEmpty) {
           final merged = <String>[
             ...result.suggestedPrompts,
@@ -205,7 +211,8 @@ class AiIntentParser {
       conflicts: allConflicts,
       blockedByContext: allBlocked,
       informationalMessage: responseType == AiResponseType.suggest
-          ? (result.informationalMessage ?? _defaultSuggestMessage(enrichedActions))
+          ? (result.informationalMessage ??
+                _defaultSuggestMessage(enrichedActions))
           : result.informationalMessage,
     );
   }
@@ -275,11 +282,14 @@ class AiIntentParser {
     if (actions.isEmpty) {
       return 'Here\'s what I\'d suggest based on your schedule.';
     }
-    final parts = actions.take(3).map((a) {
-      final title = a.parameters['title']?.toString() ?? a.actionType.name;
-      final time = a.parameters['time']?.toString();
-      return time != null ? '$title at $time' : title;
-    }).join(', ');
+    final parts = actions
+        .take(3)
+        .map((a) {
+          final title = a.parameters['title']?.toString() ?? a.actionType.name;
+          final time = a.parameters['time']?.toString();
+          return time != null ? '$title at $time' : title;
+        })
+        .join(', ');
     return 'I\'d suggest: $parts. Tap Apply this plan when you\'re ready to preview.';
   }
 
@@ -287,9 +297,7 @@ class AiIntentParser {
 
   /// For each action that is still incomplete after the first missing-field
   /// check, runs the Assumption Engine and merges any confident suggestions.
-  Future<List<AiAction>> _enrichWithAssumptions(
-    List<AiAction> actions,
-  ) async {
+  Future<List<AiAction>> _enrichWithAssumptions(List<AiAction> actions) async {
     final results = <AiAction>[];
     for (final action in actions) {
       final check = AiMissingFieldDetector.check(action);
@@ -313,10 +321,12 @@ class AiIntentParser {
         }
       });
 
-      results.add(action.copyWith(
-        parameters: mergedParams,
-        reasonLabel: assumption.reasonLabel,
-      ));
+      results.add(
+        action.copyWith(
+          parameters: mergedParams,
+          reasonLabel: assumption.reasonLabel,
+        ),
+      );
     }
     return results;
   }

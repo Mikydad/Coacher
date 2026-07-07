@@ -95,8 +95,7 @@ class NotificationLedgerRepository {
   /// Delete entries whose [IsarNotificationLedgerEntry.scheduledForMs] is
   /// older than [age]. Called during bootstrap to keep the ledger small.
   Future<void> pruneOlderThan(Duration age) async {
-    final cutoffMs =
-        DateTime.now().subtract(age).millisecondsSinceEpoch;
+    final cutoffMs = DateTime.now().subtract(age).millisecondsSinceEpoch;
     await _isar.writeTxn(() async {
       await _isar.isarNotificationLedgerEntrys
           .where()

@@ -242,13 +242,9 @@ class _StyleCard extends StatelessWidget {
               margin: const EdgeInsets.only(top: 2, right: 14),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isSelected
-                    ? AppColors.violetSoft
-                    : Colors.transparent,
+                color: isSelected ? AppColors.violetSoft : Colors.transparent,
                 border: Border.all(
-                  color: isSelected
-                      ? AppColors.violetSoft
-                      : Colors.white38,
+                  color: isSelected ? AppColors.violetSoft : Colors.white38,
                   width: 2,
                 ),
               ),
@@ -271,10 +267,7 @@ class _StyleCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     style.description,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.white54,
-                    ),
+                    style: const TextStyle(fontSize: 13, color: Colors.white54),
                   ),
                   const SizedBox(height: 10),
                   Container(

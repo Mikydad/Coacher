@@ -54,10 +54,7 @@ class IsarFocusRepository implements FocusRepository {
     ];
     final rows = await _isar.isarCoachingFocus
         .filter()
-        .anyOf(
-          liveStates,
-          (q, state) => q.lifecycleStateEqualTo(state),
-        )
+        .anyOf(liveStates, (q, state) => q.lifecycleStateEqualTo(state))
         .sortByDetectedAtMsDesc()
         .findAll();
     if (rows.isEmpty) return null;
@@ -127,10 +124,7 @@ class IsarFocusRepository implements FocusRepository {
     ];
     final candidates = await _isar.isarCoachingFocus
         .filter()
-        .anyOf(
-          liveStates,
-          (q, state) => q.lifecycleStateEqualTo(state),
-        )
+        .anyOf(liveStates, (q, state) => q.lifecycleStateEqualTo(state))
         .activeUntilMsLessThan(nowMs)
         .findAll();
 

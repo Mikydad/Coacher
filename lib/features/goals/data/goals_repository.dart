@@ -32,7 +32,10 @@ abstract class GoalsRepository {
 
   Future<void> upsertMilestone(GoalMilestone milestone);
 
-  Future<void> deleteMilestone({required String goalId, required String milestoneId});
+  Future<void> deleteMilestone({
+    required String goalId,
+    required String milestoneId,
+  });
 
   Future<void> upsertCheckIn(GoalCheckIn checkIn);
 
@@ -50,7 +53,8 @@ class FirestoreGoalsRepository implements GoalsRepository {
 
   final FirestoreClient _client;
 
-  CollectionReference<Map<String, dynamic>> get _goals => _client.userCollection('goals');
+  CollectionReference<Map<String, dynamic>> get _goals =>
+      _client.userCollection('goals');
 
   Future<void> _upsertWithQueue({
     required String entityType,
@@ -58,7 +62,9 @@ class FirestoreGoalsRepository implements GoalsRepository {
     required Map<String, dynamic> payload,
   }) async {
     try {
-      await FirebaseFirestore.instance.doc(path).set(payload, SetOptions(merge: true));
+      await FirebaseFirestore.instance
+          .doc(path)
+          .set(payload, SetOptions(merge: true));
     } catch (_) {
       await SyncService.instance.enqueueUpsert(
         entityType: entityType,
@@ -82,7 +88,9 @@ class FirestoreGoalsRepository implements GoalsRepository {
     }
   }
 
-  static Future<void> _purgeCollection(CollectionReference<Map<String, dynamic>> col) async {
+  static Future<void> _purgeCollection(
+    CollectionReference<Map<String, dynamic>> col,
+  ) async {
     while (true) {
       final snap = await col.limit(400).get();
       if (snap.docs.isEmpty) return;
@@ -149,7 +157,11 @@ class FirestoreGoalsRepository implements GoalsRepository {
 
   @override
   Future<List<GoalAction>> getActions(String goalId) async {
-    final snap = await _goals.doc(goalId).collection('actions').orderBy('orderIndex').get();
+    final snap = await _goals
+        .doc(goalId)
+        .collection('actions')
+        .orderBy('orderIndex')
+        .get();
     return snap.docs.map((d) {
       final data = Map<String, dynamic>.from(d.data());
       data['id'] = d.id;
@@ -168,7 +180,10 @@ class FirestoreGoalsRepository implements GoalsRepository {
   }
 
   @override
-  Future<void> deleteAction({required String goalId, required String actionId}) async {
+  Future<void> deleteAction({
+    required String goalId,
+    required String actionId,
+  }) async {
     await _deleteWithQueue(
       entityType: 'goalAction',
       path: '${FirestorePaths.goalActions(goalId)}/$actionId',
@@ -177,7 +192,11 @@ class FirestoreGoalsRepository implements GoalsRepository {
 
   @override
   Future<List<GoalMilestone>> getMilestones(String goalId) async {
-    final snap = await _goals.doc(goalId).collection('milestones').orderBy('orderIndex').get();
+    final snap = await _goals
+        .doc(goalId)
+        .collection('milestones')
+        .orderBy('orderIndex')
+        .get();
     return snap.docs.map((d) {
       final data = Map<String, dynamic>.from(d.data());
       data['id'] = d.id;
@@ -187,7 +206,8 @@ class FirestoreGoalsRepository implements GoalsRepository {
 
   @override
   Future<void> upsertMilestone(GoalMilestone milestone) async {
-    final path = '${FirestorePaths.goalMilestones(milestone.goalId)}/${milestone.id}';
+    final path =
+        '${FirestorePaths.goalMilestones(milestone.goalId)}/${milestone.id}';
     await _upsertWithQueue(
       entityType: 'goalMilestone',
       path: path,
@@ -196,7 +216,10 @@ class FirestoreGoalsRepository implements GoalsRepository {
   }
 
   @override
-  Future<void> deleteMilestone({required String goalId, required String milestoneId}) async {
+  Future<void> deleteMilestone({
+    required String goalId,
+    required String milestoneId,
+  }) async {
     await _deleteWithQueue(
       entityType: 'goalMilestone',
       path: '${FirestorePaths.goalMilestones(goalId)}/$milestoneId',
@@ -205,7 +228,8 @@ class FirestoreGoalsRepository implements GoalsRepository {
 
   @override
   Future<void> upsertCheckIn(GoalCheckIn checkIn) async {
-    final path = '${FirestorePaths.goalCheckIns(checkIn.goalId)}/${checkIn.dateKey}';
+    final path =
+        '${FirestorePaths.goalCheckIns(checkIn.goalId)}/${checkIn.dateKey}';
     await _upsertWithQueue(
       entityType: 'goalCheckIn',
       path: path,
@@ -215,7 +239,11 @@ class FirestoreGoalsRepository implements GoalsRepository {
 
   @override
   Future<GoalCheckIn?> getTodayCheckIn(String goalId, String dateKey) async {
-    final doc = await _goals.doc(goalId).collection('checkIns').doc(dateKey).get();
+    final doc = await _goals
+        .doc(goalId)
+        .collection('checkIns')
+        .doc(dateKey)
+        .get();
     if (!doc.exists || doc.data() == null) return null;
     return GoalCheckIn.fromMap(Map<String, dynamic>.from(doc.data()!));
   }
@@ -226,7 +254,11 @@ class FirestoreGoalsRepository implements GoalsRepository {
     String? startDateKey,
     String? endDateKey,
   }) async {
-    final snap = await _goals.doc(goalId).collection('checkIns').orderBy('dateKey').get();
+    final snap = await _goals
+        .doc(goalId)
+        .collection('checkIns')
+        .orderBy('dateKey')
+        .get();
     var list = snap.docs.map((d) {
       final data = Map<String, dynamic>.from(d.data());
       return GoalCheckIn.fromMap(data);

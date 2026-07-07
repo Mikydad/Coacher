@@ -69,8 +69,9 @@ class SuppressedItem {
       entityTitle: map['entityTitle'] as String? ?? 'Unknown',
       originalScheduledAtMs:
           (map['originalScheduledAtMs'] as num?)?.toInt() ?? 0,
-      suggestedAction:
-          suggestedActionFromStorage(map['suggestedAction'] as String?),
+      suggestedAction: suggestedActionFromStorage(
+        map['suggestedAction'] as String?,
+      ),
     );
   }
 }

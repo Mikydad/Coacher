@@ -176,7 +176,8 @@ AnalyticsPeriodBundle _assembleBundle({
     goalHabitWeekSeries: weekGoalHabitRange
         .map((d) => d.weightedCompletionRate.clamp(0.0, 1.0))
         .toList(),
-    taskWeekSeries:
-        weekTaskRange.map((d) => d.weightedCompletionRate.clamp(0.0, 1.0)).toList(),
+    taskWeekSeries: weekTaskRange
+        .map((d) => d.weightedCompletionRate.clamp(0.0, 1.0))
+        .toList(),
   );
 }

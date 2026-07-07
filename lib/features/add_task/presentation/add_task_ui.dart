@@ -133,7 +133,8 @@ class AddTaskField extends StatelessWidget {
     return TextField(
       controller: controller,
       maxLines: maxLines,
-      style: style ??
+      style:
+          style ??
           const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w500,
@@ -321,7 +322,9 @@ class AddTaskSettingsToggleRow extends StatelessWidget {
               Switch.adaptive(
                 value: value,
                 onChanged: onChanged,
-                activeTrackColor: AddTaskColors.accentDim.withValues(alpha: 0.55),
+                activeTrackColor: AddTaskColors.accentDim.withValues(
+                  alpha: 0.55,
+                ),
                 activeThumbColor: AddTaskColors.accentContainer,
               ),
             ],
@@ -406,8 +409,9 @@ class AddTaskCollapsibleSection extends StatelessWidget {
           firstCurve: Curves.easeOutCubic,
           secondCurve: Curves.easeOutCubic,
           sizeCurve: Curves.easeOutCubic,
-          crossFadeState:
-              expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          crossFadeState: expanded
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
           duration: const Duration(milliseconds: 220),
           firstChild: const SizedBox.shrink(),
           secondChild: Padding(
@@ -568,7 +572,11 @@ class AddTaskPickerRow extends StatelessWidget {
                 ),
               ),
               if (interactive)
-                const Icon(Icons.chevron_right, color: AddTaskColors.faint, size: 20),
+                const Icon(
+                  Icons.chevron_right,
+                  color: AddTaskColors.faint,
+                  size: 20,
+                ),
             ],
           ),
         ),
@@ -635,7 +643,9 @@ class AddTaskCategoryTile extends StatelessWidget {
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.8,
-                  color: selected ? AddTaskColors.accentDim : AddTaskColors.muted,
+                  color: selected
+                      ? AddTaskColors.accentDim
+                      : AddTaskColors.muted,
                 ),
               ),
             ],
@@ -827,8 +837,11 @@ class AddTaskEnforcementTile extends StatelessWidget {
               ),
             ),
             if (isSelected)
-              const Icon(Icons.check_circle_rounded,
-                  color: AddTaskColors.accent, size: 20),
+              const Icon(
+                Icons.check_circle_rounded,
+                color: AddTaskColors.accent,
+                size: 20,
+              ),
           ],
         ),
       ),

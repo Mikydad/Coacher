@@ -5,13 +5,17 @@ import '../../../core/sync/sync_service.dart';
 import '../domain/models/analytics_event.dart';
 import '../domain/models/analytics_stats_cache.dart';
 
-AnalyticsEvent analyticsEventFromFirestoreDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+AnalyticsEvent analyticsEventFromFirestoreDoc(
+  QueryDocumentSnapshot<Map<String, dynamic>> doc,
+) {
   final map = Map<String, dynamic>.from(doc.data());
   map['id'] = map['id'] ?? doc.id;
   return AnalyticsEvent.fromMap(map);
 }
 
-AnalyticsStatsCache analyticsStatsFromFirestoreDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+AnalyticsStatsCache analyticsStatsFromFirestoreDoc(
+  QueryDocumentSnapshot<Map<String, dynamic>> doc,
+) {
   final map = Map<String, dynamic>.from(doc.data());
   map['id'] = map['id'] ?? doc.id;
   return AnalyticsStatsCache.fromMap(map);
@@ -43,7 +47,9 @@ class FirestoreAnalyticsRepository implements AnalyticsRepository {
     final path = '${FirestorePaths.analyticsEvents}/${event.id}';
     final payload = event.toMap();
     try {
-      await FirebaseFirestore.instance.doc(path).set(payload, SetOptions(merge: true));
+      await FirebaseFirestore.instance
+          .doc(path)
+          .set(payload, SetOptions(merge: true));
     } catch (_) {
       await SyncService.instance.enqueueUpsert(
         entityType: 'analyticsEvent',
@@ -89,7 +95,9 @@ class FirestoreAnalyticsRepository implements AnalyticsRepository {
     final path = '${FirestorePaths.analyticsStats}/${stats.id}';
     final payload = stats.toMap();
     try {
-      await FirebaseFirestore.instance.doc(path).set(payload, SetOptions(merge: true));
+      await FirebaseFirestore.instance
+          .doc(path)
+          .set(payload, SetOptions(merge: true));
     } catch (_) {
       await SyncService.instance.enqueueUpsert(
         entityType: 'analyticsStats',

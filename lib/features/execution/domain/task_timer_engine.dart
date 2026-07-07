@@ -3,10 +3,7 @@ import 'dart:async';
 enum ExecutionPhase { notStarted, inProgress, paused, finished }
 
 class TimerSnapshot {
-  const TimerSnapshot({
-    required this.phase,
-    required this.elapsed,
-  });
+  const TimerSnapshot({required this.phase, required this.elapsed});
 
   final ExecutionPhase phase;
   final Duration elapsed;
@@ -19,10 +16,12 @@ class TaskTimerEngine {
   DateTime? _runningSince;
   ExecutionPhase _phase = ExecutionPhase.notStarted;
   Timer? _ticker;
-  final StreamController<TimerSnapshot> _controller = StreamController.broadcast();
+  final StreamController<TimerSnapshot> _controller =
+      StreamController.broadcast();
 
   Stream<TimerSnapshot> get stream => _controller.stream;
-  TimerSnapshot get current => TimerSnapshot(phase: _phase, elapsed: _currentElapsed());
+  TimerSnapshot get current =>
+      TimerSnapshot(phase: _phase, elapsed: _currentElapsed());
 
   void start() {
     if (_phase == ExecutionPhase.inProgress) return;

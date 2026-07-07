@@ -8,7 +8,8 @@ import 'goal_reminder_schedule.dart';
 
 /// Maps [UserGoal] reminder fields to OS daily notifications (V1: [GoalReminderStyle.dailyOnce] only).
 class GoalReminderSyncService {
-  GoalReminderSyncService({required LocalNotificationsService notifications}) : _n = notifications;
+  GoalReminderSyncService({required LocalNotificationsService notifications})
+    : _n = notifications;
 
   final LocalNotificationsService _n;
 
@@ -21,7 +22,11 @@ class GoalReminderSyncService {
     await _n.cancel(id);
     if (!goalShouldScheduleDailyReminder(goal, DateTime.now())) return;
     final minutes = goal.reminderMinutesFromMidnight!;
-    final first = nextGoalDailyReminderLocal(goal: goal, minutesFromMidnight: minutes, now: DateTime.now());
+    final first = nextGoalDailyReminderLocal(
+      goal: goal,
+      minutesFromMidnight: minutes,
+      now: DateTime.now(),
+    );
     if (first == null) {
       debugPrint('Goal reminder skipped (no slot in period): goal=${goal.id}');
       return;
@@ -30,7 +35,8 @@ class GoalReminderSyncService {
     final body = switch (mode) {
       RoutineMode.flexible => 'Time for your planned actions.',
       RoutineMode.disciplined => 'Check in on your goal — stay with the plan.',
-      RoutineMode.extreme => 'Goal commitment: time to act or consciously adjust.',
+      RoutineMode.extreme =>
+        'Goal commitment: time to act or consciously adjust.',
     };
     try {
       await _n.scheduleDailyAtLocalTime(

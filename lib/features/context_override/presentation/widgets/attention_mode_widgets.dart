@@ -126,7 +126,11 @@ class AttentionModeTypeCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: AttentionModeColors.label, size: 18),
+              const Icon(
+                Icons.chevron_right,
+                color: AttentionModeColors.label,
+                size: 18,
+              ),
             ],
           ),
         ),
@@ -190,11 +194,15 @@ class AttentionModeActivateButton extends StatelessWidget {
         onPressed: enabled ? onPressed : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: AttentionModeColors.lime,
-          disabledBackgroundColor: AttentionModeColors.lime.withValues(alpha: 0.35),
+          disabledBackgroundColor: AttentionModeColors.lime.withValues(
+            alpha: 0.35,
+          ),
           foregroundColor: Colors.black,
           disabledForegroundColor: Colors.black54,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(26),
+          ),
         ),
         child: const Text(
           'Activate',

@@ -11,7 +11,8 @@ import '../runtime/unified_recompute_graph.dart';
 class PostSyncRefreshCoordinator {
   PostSyncRefreshCoordinator._();
 
-  static final PostSyncRefreshCoordinator instance = PostSyncRefreshCoordinator._();
+  static final PostSyncRefreshCoordinator instance =
+      PostSyncRefreshCoordinator._();
 
   /// Coalescing window for multiple schedule calls (resume + sync complete, etc.).
   static const Duration debounce = Duration(milliseconds: 450);
@@ -85,7 +86,9 @@ class PostSyncRefreshCoordinator {
 
     // Delegate analytics + coaching + notifications to UnifiedRecomputeGraph.
     if (pending.coachingDelivery || pending.todayAnalytics) {
-      UnifiedRecomputeGraph.instance.schedule(RecomputeScope.forFullRefresh()); // migrated to coordinator
+      UnifiedRecomputeGraph.instance.schedule(
+        RecomputeScope.forFullRefresh(),
+      ); // migrated to coordinator
     }
   }
 }

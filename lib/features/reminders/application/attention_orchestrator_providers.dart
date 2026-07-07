@@ -17,15 +17,17 @@ import 'attention_orchestrator_service.dart';
 
 /// Intents suppressed with retryAllowed = true, held in memory.
 /// Populated by [AttentionOrchestratorService] and flushed on override end.
-final suppressedIntentQueueProvider =
-    StateProvider<List<ReminderIntent>>((ref) => const []);
+final suppressedIntentQueueProvider = StateProvider<List<ReminderIntent>>(
+  (ref) => const [],
+);
 
 // ─── Recent deliveries ────────────────────────────────────────────────────────
 
 /// Notifications delivered in the last 30 minutes.
 /// Used by [AttentionOrchestrator] for collision gap management.
-final recentDeliveriesProvider =
-    StateProvider<List<RecentDelivery>>((ref) => const []);
+final recentDeliveriesProvider = StateProvider<List<RecentDelivery>>(
+  (ref) => const [],
+);
 
 // ─── AttentionOrchestratorService ─────────────────────────────────────────────
 
@@ -36,44 +38,45 @@ final recentDeliveriesProvider =
 /// recompute — keeping [AttentionOrchestratorService] free of Riverpod.
 final attentionOrchestratorServiceProvider =
     Provider<AttentionOrchestratorService>((ref) {
-  final analyticsRepo = ref.read(analyticsRepositoryProvider);
-  final featureBuilderRecompute =
-      ref.read(featureBuilderRecomputeServiceProvider);
+      final analyticsRepo = ref.read(analyticsRepositoryProvider);
+      final featureBuilderRecompute = ref.read(
+        featureBuilderRecomputeServiceProvider,
+      );
 
-  Future<void> logEvent({
-    required AnalyticsEventType type,
-    required String entityId,
-    required String entityKind,
-    required String sourceSurface,
-    required String idempotencyKey,
-    String? reason,
-  }) async {
-    final ts = DateTime.now();
-    final event = AnalyticsEvent(
-      id: StableId.generate('an_evt'),
-      type: type,
-      entityId: entityId,
-      entityKind: entityKind,
-      dateKey: DateKeys.todayKey(ts),
-      timestampLocalIso: ts.toIso8601String(),
-      sourceSurface: sourceSurface,
-      idempotencyKey: idempotencyKey,
-      reason: reason,
-      createdAtMs: ts.millisecondsSinceEpoch,
-      updatedAtMs: ts.millisecondsSinceEpoch,
-    );
-    await analyticsRepo.logEvent(event);
-    featureBuilderRecompute.onAnalyticsEventLogged(event);
-  }
+      Future<void> logEvent({
+        required AnalyticsEventType type,
+        required String entityId,
+        required String entityKind,
+        required String sourceSurface,
+        required String idempotencyKey,
+        String? reason,
+      }) async {
+        final ts = DateTime.now();
+        final event = AnalyticsEvent(
+          id: StableId.generate('an_evt'),
+          type: type,
+          entityId: entityId,
+          entityKind: entityKind,
+          dateKey: DateKeys.todayKey(ts),
+          timestampLocalIso: ts.toIso8601String(),
+          sourceSurface: sourceSurface,
+          idempotencyKey: idempotencyKey,
+          reason: reason,
+          createdAtMs: ts.millisecondsSinceEpoch,
+          updatedAtMs: ts.millisecondsSinceEpoch,
+        );
+        await analyticsRepo.logEvent(event);
+        featureBuilderRecompute.onAnalyticsEventLogged(event);
+      }
 
-  return AttentionOrchestratorService(
-    contextOverrideRepository: ref.read(contextOverrideRepositoryProvider),
-    focusRepository: ref.read(focusRepositoryProvider),
-    reminderRepository: ref.read(reminderRepositoryProvider),
-    notifications: ref.read(localNotificationsServiceProvider),
-    ledger: NotificationLedgerRepository(OfflineStore.instance.isar!),
-    logEvent: logEvent,
-    // Synchronous getter — reads cached Riverpod state without suspending.
-    getCoachingStyle: () => ref.read(activeCoachingStyleProvider),
-  );
-});
+      return AttentionOrchestratorService(
+        contextOverrideRepository: ref.read(contextOverrideRepositoryProvider),
+        focusRepository: ref.read(focusRepositoryProvider),
+        reminderRepository: ref.read(reminderRepositoryProvider),
+        notifications: ref.read(localNotificationsServiceProvider),
+        ledger: NotificationLedgerRepository(OfflineStore.instance.isar!),
+        logEvent: logEvent,
+        // Synchronous getter — reads cached Riverpod state without suspending.
+        getCoachingStyle: () => ref.read(activeCoachingStyleProvider),
+      );
+    });

@@ -26,10 +26,7 @@ class CoachingStyleSettingsSection extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 8),
-        _StyleTile(
-          style: style,
-          onTap: () => _openSelector(context),
-        ),
+        _StyleTile(style: style, onTap: () => _openSelector(context)),
       ],
     );
   }
@@ -78,19 +75,12 @@ class _StyleTile extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     style.description,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.white54,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: Colors.white54),
                   ),
                 ],
               ),
             ),
-            const Icon(
-              Icons.chevron_right,
-              color: Colors.white38,
-              size: 20,
-            ),
+            const Icon(Icons.chevron_right, color: Colors.white38, size: 20),
           ],
         ),
       ),

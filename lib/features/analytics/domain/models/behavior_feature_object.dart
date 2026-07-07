@@ -91,25 +91,39 @@ class BehaviorTimeMetrics {
   final int minutesOverdue;
 
   Map<String, dynamic> toMap() => {
-    'scheduledOccurrences7d': scheduledOccurrences7d < 0 ? 0 : scheduledOccurrences7d,
-    'scheduledOccurrences30d': scheduledOccurrences30d < 0 ? 0 : scheduledOccurrences30d,
-    'missedScheduledCount7d': missedScheduledCount7d < 0 ? 0 : missedScheduledCount7d,
-    'missedScheduledCount30d': missedScheduledCount30d < 0 ? 0 : missedScheduledCount30d,
+    'scheduledOccurrences7d': scheduledOccurrences7d < 0
+        ? 0
+        : scheduledOccurrences7d,
+    'scheduledOccurrences30d': scheduledOccurrences30d < 0
+        ? 0
+        : scheduledOccurrences30d,
+    'missedScheduledCount7d': missedScheduledCount7d < 0
+        ? 0
+        : missedScheduledCount7d,
+    'missedScheduledCount30d': missedScheduledCount30d < 0
+        ? 0
+        : missedScheduledCount30d,
     'completionRate7d': completionRate7d.clamp(0.0, 1.0),
     'completionRate30d': completionRate30d.clamp(0.0, 1.0),
     'flexCompletionFrequency7d': flexCompletionFrequency7d.clamp(0.0, 1.0),
     'flexCompletionFrequency30d': flexCompletionFrequency30d.clamp(0.0, 1.0),
     'lateCompletionRate7d': lateCompletionRate7d.clamp(0.0, 1.0),
     'lateCompletionRate30d': lateCompletionRate30d.clamp(0.0, 1.0),
-    'avgCompletionDelayMinutes': avgCompletionDelayMinutes < 0 ? 0 : avgCompletionDelayMinutes,
+    'avgCompletionDelayMinutes': avgCompletionDelayMinutes < 0
+        ? 0
+        : avgCompletionDelayMinutes,
     'isCurrentlyOverdue': isCurrentlyOverdue,
     'minutesOverdue': minutesOverdue < 0 ? 0 : minutesOverdue,
   };
 
   static BehaviorTimeMetrics fromMap(Map<String, dynamic>? map) {
     final source = map ?? const <String, dynamic>{};
-    final legacyLate = ((source['lateRate'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0);
-    final legacyDelay = ((source['avgDelayMinutes'] as num?)?.toInt() ?? 0).clamp(0, 999999);
+    final legacyLate = ((source['lateRate'] as num?)?.toDouble() ?? 0).clamp(
+      0.0,
+      1.0,
+    );
+    final legacyDelay = ((source['avgDelayMinutes'] as num?)?.toInt() ?? 0)
+        .clamp(0, 999999);
     final hasV2 = source.containsKey('missedScheduledCount7d');
     if (!hasV2) {
       return BehaviorTimeMetrics(
@@ -118,9 +132,15 @@ class BehaviorTimeMetrics {
         missedScheduledCount7d: 0,
         missedScheduledCount30d: 0,
         completionRate7d:
-            ((source['completionRate7d'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
+            ((source['completionRate7d'] as num?)?.toDouble() ?? 0).clamp(
+              0.0,
+              1.0,
+            ),
         completionRate30d:
-            ((source['completionRate30d'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
+            ((source['completionRate30d'] as num?)?.toDouble() ?? 0).clamp(
+              0.0,
+              1.0,
+            ),
         flexCompletionFrequency7d: 0,
         flexCompletionFrequency30d: 0,
         lateCompletionRate7d: legacyLate,
@@ -132,38 +152,53 @@ class BehaviorTimeMetrics {
     }
     return BehaviorTimeMetrics(
       scheduledOccurrences7d:
-          ((source['scheduledOccurrences7d'] as num?)?.toInt() ?? 0).clamp(0, 999999),
-      scheduledOccurrences30d:
-          ((source['scheduledOccurrences30d'] as num?)?.toInt() ?? 0).clamp(0, 999999),
-      missedScheduledCount7d:
-          ((source['missedScheduledCount7d'] as num?)?.toInt() ?? 0).clamp(0, 999999),
-      missedScheduledCount30d:
-          ((source['missedScheduledCount30d'] as num?)?.toInt() ?? 0).clamp(0, 999999),
-      completionRate7d:
-          ((source['completionRate7d'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
-      completionRate30d:
-          ((source['completionRate30d'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
-      flexCompletionFrequency7d:
-          ((source['flexCompletionFrequency7d'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
-      flexCompletionFrequency30d:
-          ((source['flexCompletionFrequency30d'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
-      lateCompletionRate7d:
-          ((source['lateCompletionRate7d'] as num?)?.toDouble() ?? legacyLate).clamp(
-            0.0,
-            1.0,
-          ),
-      lateCompletionRate30d:
-          ((source['lateCompletionRate30d'] as num?)?.toDouble() ?? legacyLate).clamp(
-            0.0,
-            1.0,
-          ),
-      avgCompletionDelayMinutes:
-          ((source['avgCompletionDelayMinutes'] as num?)?.toInt() ?? legacyDelay).clamp(
+          ((source['scheduledOccurrences7d'] as num?)?.toInt() ?? 0).clamp(
             0,
             999999,
           ),
+      scheduledOccurrences30d:
+          ((source['scheduledOccurrences30d'] as num?)?.toInt() ?? 0).clamp(
+            0,
+            999999,
+          ),
+      missedScheduledCount7d:
+          ((source['missedScheduledCount7d'] as num?)?.toInt() ?? 0).clamp(
+            0,
+            999999,
+          ),
+      missedScheduledCount30d:
+          ((source['missedScheduledCount30d'] as num?)?.toInt() ?? 0).clamp(
+            0,
+            999999,
+          ),
+      completionRate7d: ((source['completionRate7d'] as num?)?.toDouble() ?? 0)
+          .clamp(0.0, 1.0),
+      completionRate30d:
+          ((source['completionRate30d'] as num?)?.toDouble() ?? 0).clamp(
+            0.0,
+            1.0,
+          ),
+      flexCompletionFrequency7d:
+          ((source['flexCompletionFrequency7d'] as num?)?.toDouble() ?? 0)
+              .clamp(0.0, 1.0),
+      flexCompletionFrequency30d:
+          ((source['flexCompletionFrequency30d'] as num?)?.toDouble() ?? 0)
+              .clamp(0.0, 1.0),
+      lateCompletionRate7d:
+          ((source['lateCompletionRate7d'] as num?)?.toDouble() ?? legacyLate)
+              .clamp(0.0, 1.0),
+      lateCompletionRate30d:
+          ((source['lateCompletionRate30d'] as num?)?.toDouble() ?? legacyLate)
+              .clamp(0.0, 1.0),
+      avgCompletionDelayMinutes:
+          ((source['avgCompletionDelayMinutes'] as num?)?.toInt() ??
+                  legacyDelay)
+              .clamp(0, 999999),
       isCurrentlyOverdue: source['isCurrentlyOverdue'] as bool? ?? false,
-      minutesOverdue: ((source['minutesOverdue'] as num?)?.toInt() ?? 0).clamp(0, 999999),
+      minutesOverdue: ((source['minutesOverdue'] as num?)?.toInt() ?? 0).clamp(
+        0,
+        999999,
+      ),
     );
   }
 }

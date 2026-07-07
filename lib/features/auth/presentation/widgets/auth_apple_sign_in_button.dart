@@ -37,8 +37,9 @@ class _AuthAppleSignInButtonState extends ConsumerState<AuthAppleSignInButton> {
       _error = null;
     });
 
-    final (failure, _) =
-        await ref.read(authRepositoryProvider).signInWithApple();
+    final (failure, _) = await ref
+        .read(authRepositoryProvider)
+        .signInWithApple();
 
     if (!mounted) return;
 

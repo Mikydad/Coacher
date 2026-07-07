@@ -45,14 +45,17 @@ class AnalyticsStatsCache {
     'schemaVersion': schemaVersion,
   };
 
-  static AnalyticsStatsCache fromMap(Map<String, dynamic> map) => AnalyticsStatsCache(
-    id: map['id'] as String? ?? '',
-    scopeType: map['scopeType'] as String? ?? '',
-    scopeId: map['scopeId'] as String? ?? '',
-    dateKey: map['dateKey'] as String? ?? '',
-    payload: (map['payload'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{},
-    createdAtMs: (map['createdAtMs'] as num?)?.toInt() ?? 0,
-    updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
-    schemaVersion: (map['schemaVersion'] as num?)?.toInt() ?? 1,
-  );
+  static AnalyticsStatsCache fromMap(Map<String, dynamic> map) =>
+      AnalyticsStatsCache(
+        id: map['id'] as String? ?? '',
+        scopeType: map['scopeType'] as String? ?? '',
+        scopeId: map['scopeId'] as String? ?? '',
+        dateKey: map['dateKey'] as String? ?? '',
+        payload:
+            (map['payload'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
+        createdAtMs: (map['createdAtMs'] as num?)?.toInt() ?? 0,
+        updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
+        schemaVersion: (map['schemaVersion'] as num?)?.toInt() ?? 1,
+      );
 }

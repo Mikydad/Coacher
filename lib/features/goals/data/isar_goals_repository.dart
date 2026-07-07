@@ -26,7 +26,9 @@ class IsarGoalsRepository implements GoalsRepository {
     required Map<String, dynamic> payload,
   }) async {
     try {
-      await FirebaseFirestore.instance.doc(path).set(payload, SetOptions(merge: true));
+      await FirebaseFirestore.instance
+          .doc(path)
+          .set(payload, SetOptions(merge: true));
     } catch (_) {
       await SyncService.instance.enqueueUpsert(
         entityType: entityType,
@@ -47,13 +49,19 @@ class IsarGoalsRepository implements GoalsRepository {
 
   @override
   Future<List<UserGoal>> fetchGoalsOnce() async {
-    final rows = await _isar.isarGoals.where().sortByUpdatedAtMsDesc().findAll();
+    final rows = await _isar.isarGoals
+        .where()
+        .sortByUpdatedAtMsDesc()
+        .findAll();
     return rows.map((e) => e.toDomain()).toList();
   }
 
   @override
   Future<UserGoal?> getGoal(String goalId) async {
-    final row = await _isar.isarGoals.filter().goalIdEqualTo(goalId).findFirst();
+    final row = await _isar.isarGoals
+        .filter()
+        .goalIdEqualTo(goalId)
+        .findFirst();
     return row?.toDomain();
   }
 
@@ -73,7 +81,10 @@ class IsarGoalsRepository implements GoalsRepository {
   @override
   Future<void> deleteGoal(String goalId) async {
     await _isar.writeTxn(() async {
-      final row = await _isar.isarGoals.filter().goalIdEqualTo(goalId).findFirst();
+      final row = await _isar.isarGoals
+          .filter()
+          .goalIdEqualTo(goalId)
+          .findFirst();
       if (row != null) await _isar.isarGoals.delete(row.id);
       await _isar.isarScheduledTimeBlocks
           .filter()
@@ -84,27 +95,35 @@ class IsarGoalsRepository implements GoalsRepository {
   }
 
   @override
-  Future<List<GoalAction>> getActions(String goalId) => _remote.getActions(goalId);
+  Future<List<GoalAction>> getActions(String goalId) =>
+      _remote.getActions(goalId);
 
   @override
   Future<void> upsertAction(GoalAction action) => _remote.upsertAction(action);
 
   @override
-  Future<void> deleteAction({required String goalId, required String actionId}) =>
-      _remote.deleteAction(goalId: goalId, actionId: actionId);
+  Future<void> deleteAction({
+    required String goalId,
+    required String actionId,
+  }) => _remote.deleteAction(goalId: goalId, actionId: actionId);
 
   @override
-  Future<List<GoalMilestone>> getMilestones(String goalId) => _remote.getMilestones(goalId);
+  Future<List<GoalMilestone>> getMilestones(String goalId) =>
+      _remote.getMilestones(goalId);
 
   @override
-  Future<void> upsertMilestone(GoalMilestone milestone) => _remote.upsertMilestone(milestone);
+  Future<void> upsertMilestone(GoalMilestone milestone) =>
+      _remote.upsertMilestone(milestone);
 
   @override
-  Future<void> deleteMilestone({required String goalId, required String milestoneId}) =>
-      _remote.deleteMilestone(goalId: goalId, milestoneId: milestoneId);
+  Future<void> deleteMilestone({
+    required String goalId,
+    required String milestoneId,
+  }) => _remote.deleteMilestone(goalId: goalId, milestoneId: milestoneId);
 
   @override
-  Future<void> upsertCheckIn(GoalCheckIn checkIn) => _remote.upsertCheckIn(checkIn);
+  Future<void> upsertCheckIn(GoalCheckIn checkIn) =>
+      _remote.upsertCheckIn(checkIn);
 
   @override
   Future<GoalCheckIn?> getTodayCheckIn(String goalId, String dateKey) =>
@@ -115,5 +134,9 @@ class IsarGoalsRepository implements GoalsRepository {
     String goalId, {
     String? startDateKey,
     String? endDateKey,
-  }) => _remote.getCheckInsForGoal(goalId, startDateKey: startDateKey, endDateKey: endDateKey);
+  }) => _remote.getCheckInsForGoal(
+    goalId,
+    startDateKey: startDateKey,
+    endDateKey: endDateKey,
+  );
 }

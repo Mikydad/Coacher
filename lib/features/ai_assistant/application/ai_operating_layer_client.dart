@@ -181,11 +181,20 @@ const List<Map<String, dynamic>> kCoachAgentTools = [
                 'actionType': {
                   'type': 'string',
                   'enum': [
-                    'createTask', 'editTask', 'moveTask', 'deleteTask',
-                    'createGoal', 'modifyGoal', 'deleteGoal',
-                    'addReminder', 'removeReminder', 'rescheduleReminder',
-                    'activateContextOverride', 'endContextOverride',
-                    'suggestFreeTimeBlock', 'moveConflictingTasks',
+                    'createTask',
+                    'editTask',
+                    'moveTask',
+                    'deleteTask',
+                    'createGoal',
+                    'modifyGoal',
+                    'deleteGoal',
+                    'addReminder',
+                    'removeReminder',
+                    'rescheduleReminder',
+                    'activateContextOverride',
+                    'endContextOverride',
+                    'suggestFreeTimeBlock',
+                    'moveConflictingTasks',
                   ],
                 },
                 'parameters': {'type': 'object'},
@@ -209,10 +218,7 @@ const List<Map<String, dynamic>> kCoachAgentTools = [
       'parameters': {
         'type': 'object',
         'properties': {
-          'date': {
-            'type': 'string',
-            'description': 'YYYY-MM-DD',
-          },
+          'date': {'type': 'string', 'description': 'YYYY-MM-DD'},
         },
         'required': ['date'],
       },
@@ -305,9 +311,7 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
       for (final call in result.toolCalls) {
         Map<String, dynamic> args;
         try {
-          args = Map<String, dynamic>.from(
-            jsonDecode(call.arguments) as Map,
-          );
+          args = Map<String, dynamic>.from(jsonDecode(call.arguments) as Map);
         } catch (_) {
           args = const {};
         }
@@ -362,8 +366,8 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
     final message = (assistantText?.trim().isNotEmpty ?? false)
         ? assistantText!.trim()
         : (args['message']?.toString().trim().isNotEmpty ?? false)
-            ? args['message'].toString().trim()
-            : null;
+        ? args['message'].toString().trim()
+        : null;
 
     if (actions.isEmpty) {
       return AiPlannedChanges(
@@ -377,8 +381,9 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
     final isSuggestion = args['presentation'] != 'preview';
     return AiPlannedChanges(
       sessionId: sessionId,
-      responseType:
-          isSuggestion ? AiResponseType.suggest : AiResponseType.mutate,
+      responseType: isSuggestion
+          ? AiResponseType.suggest
+          : AiResponseType.mutate,
       informationalMessage: message,
       actions: actions,
     );
@@ -403,7 +408,9 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
     if (payload.activeTasks.isNotEmpty) {
       buffer.writeln("Today's tasks:");
       for (final t in payload.activeTasks) {
-        buffer.writeln('  - ${t['title']} at ${t['time'] ?? 'no time'} (${t['duration'] ?? '?'} min, ${t['status'] ?? 'pending'})');
+        buffer.writeln(
+          '  - ${t['title']} at ${t['time'] ?? 'no time'} (${t['duration'] ?? '?'} min, ${t['status'] ?? 'pending'})',
+        );
       }
       buffer.writeln();
     }
@@ -411,7 +418,9 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
     if (payload.goals.isNotEmpty) {
       buffer.writeln('Active goals:');
       for (final g in payload.goals) {
-        buffer.writeln('  - ${g['title']} (target: ${g['target'] ?? '?'}, deadline: ${g['deadline'] ?? '?'})');
+        buffer.writeln(
+          '  - ${g['title']} (target: ${g['target'] ?? '?'}, deadline: ${g['deadline'] ?? '?'})',
+        );
       }
       buffer.writeln();
     }
@@ -441,7 +450,9 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
     if (payload.tomorrowTasks.isNotEmpty) {
       buffer.writeln("Tomorrow's tasks:");
       for (final t in payload.tomorrowTasks) {
-        buffer.writeln('  - ${t['title']} at ${t['time'] ?? 'no time'} (${t['duration'] ?? '?'}, ${t['status'] ?? 'pending'})');
+        buffer.writeln(
+          '  - ${t['title']} at ${t['time'] ?? 'no time'} (${t['duration'] ?? '?'}, ${t['status'] ?? 'pending'})',
+        );
       }
       buffer.writeln();
     } else {
@@ -488,7 +499,9 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
     }
 
     if (payload.proactiveContext != null) {
-      buffer.writeln('Proactive suggestion context: ${payload.proactiveContext}');
+      buffer.writeln(
+        'Proactive suggestion context: ${payload.proactiveContext}',
+      );
       buffer.writeln();
     }
 
@@ -574,7 +587,9 @@ class MockAiOperatingLayerClient implements AiOperatingLayerClient {
       throw const AiOperatingLayerException('Mock forced failure');
     }
 
-    final unsupported = AiCapabilityRegistry.detectUnsupported(payload.userInput);
+    final unsupported = AiCapabilityRegistry.detectUnsupported(
+      payload.userInput,
+    );
     if (unsupported != null) {
       return AiPlannedChanges(
         sessionId: payload.userInput,
@@ -691,8 +706,9 @@ class MockAiOperatingLayerClient implements AiOperatingLayerClient {
     final lower = payload.userInput.toLowerCase();
     final forTomorrow = lower.contains('tomorrow');
     final tasks = forTomorrow ? payload.tomorrowTasks : payload.activeTasks;
-    final schedule =
-        forTomorrow ? payload.tomorrowSchedule : payload.todaySchedule;
+    final schedule = forTomorrow
+        ? payload.tomorrowSchedule
+        : payload.todaySchedule;
     final label = forTomorrow ? 'tomorrow' : 'today';
 
     final buffer = StringBuffer('Here\'s your plan for $label:\n');

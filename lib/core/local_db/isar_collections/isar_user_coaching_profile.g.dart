@@ -47,7 +47,7 @@ const IsarUserCoachingProfileSchema = CollectionSchema(
       id: 5,
       name: r'updatedAtMs',
       type: IsarType.long,
-    )
+    ),
   },
   estimateSize: _isarUserCoachingProfileEstimateSize,
   serialize: _isarUserCoachingProfileSerialize,
@@ -65,7 +65,7 @@ const IsarUserCoachingProfileSchema = CollectionSchema(
           name: r'profileId',
           type: IndexType.hash,
           caseSensitive: true,
-        )
+        ),
       ],
     ),
     r'coachingStyle': IndexSchema(
@@ -78,9 +78,9 @@ const IsarUserCoachingProfileSchema = CollectionSchema(
           name: r'coachingStyle',
           type: IndexType.hash,
           caseSensitive: true,
-        )
+        ),
       ],
-    )
+    ),
   },
   links: {},
   embeddedSchemas: {},
@@ -162,12 +162,16 @@ Id _isarUserCoachingProfileGetId(IsarUserCoachingProfile object) {
 }
 
 List<IsarLinkBase<dynamic>> _isarUserCoachingProfileGetLinks(
-    IsarUserCoachingProfile object) {
+  IsarUserCoachingProfile object,
+) {
   return [];
 }
 
 void _isarUserCoachingProfileAttach(
-    IsarCollection<dynamic> col, Id id, IsarUserCoachingProfile object) {
+  IsarCollection<dynamic> col,
+  Id id,
+  IsarUserCoachingProfile object,
+) {
   object.id = id;
 }
 
@@ -190,13 +194,15 @@ extension IsarUserCoachingProfileByIndex
   }
 
   Future<List<IsarUserCoachingProfile?>> getAllByProfileId(
-      List<String> profileIdValues) {
+    List<String> profileIdValues,
+  ) {
     final values = profileIdValues.map((e) => [e]).toList();
     return getAllByIndex(r'profileId', values);
   }
 
   List<IsarUserCoachingProfile?> getAllByProfileIdSync(
-      List<String> profileIdValues) {
+    List<String> profileIdValues,
+  ) {
     final values = profileIdValues.map((e) => [e]).toList();
     return getAllByIndexSync(r'profileId', values);
   }
@@ -215,8 +221,10 @@ extension IsarUserCoachingProfileByIndex
     return putByIndex(r'profileId', object);
   }
 
-  Id putByProfileIdSync(IsarUserCoachingProfile object,
-      {bool saveLinks = true}) {
+  Id putByProfileIdSync(
+    IsarUserCoachingProfile object, {
+    bool saveLinks = true,
+  }) {
     return putByIndexSync(r'profileId', object, saveLinks: saveLinks);
   }
 
@@ -224,8 +232,10 @@ extension IsarUserCoachingProfileByIndex
     return putAllByIndex(r'profileId', objects);
   }
 
-  List<Id> putAllByProfileIdSync(List<IsarUserCoachingProfile> objects,
-      {bool saveLinks = true}) {
+  List<Id> putAllByProfileIdSync(
+    List<IsarUserCoachingProfile> objects, {
+    bool saveLinks = true,
+  }) {
     return putAllByIndexSync(r'profileId', objects, saveLinks: saveLinks);
   }
 }
@@ -233,27 +243,37 @@ extension IsarUserCoachingProfileByIndex
 extension IsarUserCoachingProfileQueryWhereSort
     on QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QWhere> {
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterWhere>
-      anyId() {
+  anyId() {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(const IdWhereClause.any());
     });
   }
 }
 
-extension IsarUserCoachingProfileQueryWhere on QueryBuilder<
-    IsarUserCoachingProfile, IsarUserCoachingProfile, QWhereClause> {
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterWhereClause> idEqualTo(Id id) {
+extension IsarUserCoachingProfileQueryWhere
+    on
+        QueryBuilder<
+          IsarUserCoachingProfile,
+          IsarUserCoachingProfile,
+          QWhereClause
+        > {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterWhereClause
+  >
+  idEqualTo(Id id) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IdWhereClause.between(
-        lower: id,
-        upper: id,
-      ));
+      return query.addWhereClause(IdWhereClause.between(lower: id, upper: id));
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterWhereClause> idNotEqualTo(Id id) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterWhereClause
+  >
+  idNotEqualTo(Id id) {
     return QueryBuilder.apply(this, (query) {
       if (query.whereSort == Sort.asc) {
         return query
@@ -275,8 +295,12 @@ extension IsarUserCoachingProfileQueryWhere on QueryBuilder<
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterWhereClause> idGreaterThan(Id id, {bool include = false}) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterWhereClause
+  >
+  idGreaterThan(Id id, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(
         IdWhereClause.greaterThan(lower: id, includeLower: include),
@@ -284,8 +308,12 @@ extension IsarUserCoachingProfileQueryWhere on QueryBuilder<
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterWhereClause> idLessThan(Id id, {bool include = false}) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterWhereClause
+  >
+  idLessThan(Id id, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(
         IdWhereClause.lessThan(upper: id, includeUpper: include),
@@ -293,164 +321,227 @@ extension IsarUserCoachingProfileQueryWhere on QueryBuilder<
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterWhereClause> idBetween(
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterWhereClause
+  >
+  idBetween(
     Id lowerId,
     Id upperId, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IdWhereClause.between(
-        lower: lowerId,
-        includeLower: includeLower,
-        upper: upperId,
-        includeUpper: includeUpper,
-      ));
+      return query.addWhereClause(
+        IdWhereClause.between(
+          lower: lowerId,
+          includeLower: includeLower,
+          upper: upperId,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterWhereClause> profileIdEqualTo(String profileId) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterWhereClause
+  >
+  profileIdEqualTo(String profileId) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IndexWhereClause.equalTo(
-        indexName: r'profileId',
-        value: [profileId],
-      ));
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'profileId', value: [profileId]),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterWhereClause> profileIdNotEqualTo(String profileId) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterWhereClause
+  >
+  profileIdNotEqualTo(String profileId) {
     return QueryBuilder.apply(this, (query) {
       if (query.whereSort == Sort.asc) {
         return query
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'profileId',
-              lower: [],
-              upper: [profileId],
-              includeUpper: false,
-            ))
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'profileId',
-              lower: [profileId],
-              includeLower: false,
-              upper: [],
-            ));
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'profileId',
+                lower: [],
+                upper: [profileId],
+                includeUpper: false,
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'profileId',
+                lower: [profileId],
+                includeLower: false,
+                upper: [],
+              ),
+            );
       } else {
         return query
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'profileId',
-              lower: [profileId],
-              includeLower: false,
-              upper: [],
-            ))
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'profileId',
-              lower: [],
-              upper: [profileId],
-              includeUpper: false,
-            ));
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'profileId',
+                lower: [profileId],
+                includeLower: false,
+                upper: [],
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'profileId',
+                lower: [],
+                upper: [profileId],
+                includeUpper: false,
+              ),
+            );
       }
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterWhereClause> coachingStyleEqualTo(String coachingStyle) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterWhereClause
+  >
+  coachingStyleEqualTo(String coachingStyle) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IndexWhereClause.equalTo(
-        indexName: r'coachingStyle',
-        value: [coachingStyle],
-      ));
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(
+          indexName: r'coachingStyle',
+          value: [coachingStyle],
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterWhereClause> coachingStyleNotEqualTo(String coachingStyle) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterWhereClause
+  >
+  coachingStyleNotEqualTo(String coachingStyle) {
     return QueryBuilder.apply(this, (query) {
       if (query.whereSort == Sort.asc) {
         return query
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'coachingStyle',
-              lower: [],
-              upper: [coachingStyle],
-              includeUpper: false,
-            ))
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'coachingStyle',
-              lower: [coachingStyle],
-              includeLower: false,
-              upper: [],
-            ));
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'coachingStyle',
+                lower: [],
+                upper: [coachingStyle],
+                includeUpper: false,
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'coachingStyle',
+                lower: [coachingStyle],
+                includeLower: false,
+                upper: [],
+              ),
+            );
       } else {
         return query
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'coachingStyle',
-              lower: [coachingStyle],
-              includeLower: false,
-              upper: [],
-            ))
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'coachingStyle',
-              lower: [],
-              upper: [coachingStyle],
-              includeUpper: false,
-            ));
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'coachingStyle',
+                lower: [coachingStyle],
+                includeLower: false,
+                upper: [],
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'coachingStyle',
+                lower: [],
+                upper: [coachingStyle],
+                includeUpper: false,
+              ),
+            );
       }
     });
   }
 }
 
-extension IsarUserCoachingProfileQueryFilter on QueryBuilder<
-    IsarUserCoachingProfile, IsarUserCoachingProfile, QFilterCondition> {
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> coachingStyleEqualTo(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+extension IsarUserCoachingProfileQueryFilter
+    on
+        QueryBuilder<
+          IsarUserCoachingProfile,
+          IsarUserCoachingProfile,
+          QFilterCondition
+        > {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  coachingStyleEqualTo(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'coachingStyle',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'coachingStyle',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> coachingStyleGreaterThan(
-    String value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'coachingStyle',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> coachingStyleLessThan(
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  coachingStyleGreaterThan(
     String value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'coachingStyle',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'coachingStyle',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> coachingStyleBetween(
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  coachingStyleLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'coachingStyle',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  coachingStyleBetween(
     String lower,
     String upper, {
     bool includeLower = true,
@@ -458,249 +549,322 @@ extension IsarUserCoachingProfileQueryFilter on QueryBuilder<
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'coachingStyle',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'coachingStyle',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> coachingStyleStartsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  coachingStyleStartsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.startsWith(
-        property: r'coachingStyle',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'coachingStyle',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> coachingStyleEndsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  coachingStyleEndsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.endsWith(
-        property: r'coachingStyle',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'coachingStyle',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-          QAfterFilterCondition>
-      coachingStyleContains(String value, {bool caseSensitive = true}) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  coachingStyleContains(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.contains(
-        property: r'coachingStyle',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'coachingStyle',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-          QAfterFilterCondition>
-      coachingStyleMatches(String pattern, {bool caseSensitive = true}) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  coachingStyleMatches(String pattern, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.matches(
-        property: r'coachingStyle',
-        wildcard: pattern,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'coachingStyle',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> coachingStyleIsEmpty() {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  coachingStyleIsEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'coachingStyle',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'coachingStyle', value: ''),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> coachingStyleIsNotEmpty() {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  coachingStyleIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        property: r'coachingStyle',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'coachingStyle', value: ''),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> idEqualTo(Id value) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  idEqualTo(Id value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'id',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'id', value: value),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> idGreaterThan(
-    Id value, {
-    bool include = false,
-  }) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  idGreaterThan(Id value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'id',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'id',
+          value: value,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> idLessThan(
-    Id value, {
-    bool include = false,
-  }) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  idLessThan(Id value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'id',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'id',
+          value: value,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> idBetween(
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  idBetween(
     Id lower,
     Id upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'id',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'id',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> lastChangedAtMsEqualTo(int value) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  lastChangedAtMsEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'lastChangedAtMs',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'lastChangedAtMs', value: value),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> lastChangedAtMsGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  lastChangedAtMsGreaterThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'lastChangedAtMs',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'lastChangedAtMs',
+          value: value,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> lastChangedAtMsLessThan(
-    int value, {
-    bool include = false,
-  }) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  lastChangedAtMsLessThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'lastChangedAtMs',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'lastChangedAtMs',
+          value: value,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> lastChangedAtMsBetween(
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  lastChangedAtMsBetween(
     int lower,
     int upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'lastChangedAtMs',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'lastChangedAtMs',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> payloadJsonEqualTo(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  payloadJsonEqualTo(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'payloadJson',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'payloadJson',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> payloadJsonGreaterThan(
-    String value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'payloadJson',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> payloadJsonLessThan(
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  payloadJsonGreaterThan(
     String value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'payloadJson',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'payloadJson',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> payloadJsonBetween(
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  payloadJsonLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'payloadJson',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  payloadJsonBetween(
     String lower,
     String upper, {
     bool includeLower = true,
@@ -708,137 +872,180 @@ extension IsarUserCoachingProfileQueryFilter on QueryBuilder<
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'payloadJson',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'payloadJson',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> payloadJsonStartsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  payloadJsonStartsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.startsWith(
-        property: r'payloadJson',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'payloadJson',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> payloadJsonEndsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  payloadJsonEndsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.endsWith(
-        property: r'payloadJson',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'payloadJson',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-          QAfterFilterCondition>
-      payloadJsonContains(String value, {bool caseSensitive = true}) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  payloadJsonContains(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.contains(
-        property: r'payloadJson',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'payloadJson',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-          QAfterFilterCondition>
-      payloadJsonMatches(String pattern, {bool caseSensitive = true}) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  payloadJsonMatches(String pattern, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.matches(
-        property: r'payloadJson',
-        wildcard: pattern,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'payloadJson',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> payloadJsonIsEmpty() {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  payloadJsonIsEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'payloadJson',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'payloadJson', value: ''),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> payloadJsonIsNotEmpty() {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  payloadJsonIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        property: r'payloadJson',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'payloadJson', value: ''),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> profileIdEqualTo(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  profileIdEqualTo(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'profileId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> profileIdGreaterThan(
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  profileIdGreaterThan(
     String value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'profileId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> profileIdLessThan(
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  profileIdLessThan(
     String value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'profileId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> profileIdBetween(
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  profileIdBetween(
     String lower,
     String upper, {
     bool includeLower = true,
@@ -846,444 +1053,525 @@ extension IsarUserCoachingProfileQueryFilter on QueryBuilder<
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'profileId',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'profileId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> profileIdStartsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  profileIdStartsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.startsWith(
-        property: r'profileId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> profileIdEndsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  profileIdEndsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.endsWith(
-        property: r'profileId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-          QAfterFilterCondition>
-      profileIdContains(String value, {bool caseSensitive = true}) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  profileIdContains(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.contains(
-        property: r'profileId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'profileId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-          QAfterFilterCondition>
-      profileIdMatches(String pattern, {bool caseSensitive = true}) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  profileIdMatches(String pattern, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.matches(
-        property: r'profileId',
-        wildcard: pattern,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'profileId',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> profileIdIsEmpty() {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  profileIdIsEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'profileId',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'profileId', value: ''),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> profileIdIsNotEmpty() {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  profileIdIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        property: r'profileId',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'profileId', value: ''),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> schemaVersionEqualTo(int value) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  schemaVersionEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'schemaVersion',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'schemaVersion', value: value),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> schemaVersionGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  schemaVersionGreaterThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'schemaVersion',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'schemaVersion',
+          value: value,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> schemaVersionLessThan(
-    int value, {
-    bool include = false,
-  }) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  schemaVersionLessThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'schemaVersion',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'schemaVersion',
+          value: value,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> schemaVersionBetween(
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  schemaVersionBetween(
     int lower,
     int upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'schemaVersion',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'schemaVersion',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> updatedAtMsEqualTo(int value) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  updatedAtMsEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'updatedAtMs',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'updatedAtMs', value: value),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> updatedAtMsGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  updatedAtMsGreaterThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'updatedAtMs',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'updatedAtMs',
+          value: value,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> updatedAtMsLessThan(
-    int value, {
-    bool include = false,
-  }) {
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  updatedAtMsLessThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'updatedAtMs',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'updatedAtMs',
+          value: value,
+        ),
+      );
     });
   }
 
-  QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile,
-      QAfterFilterCondition> updatedAtMsBetween(
+  QueryBuilder<
+    IsarUserCoachingProfile,
+    IsarUserCoachingProfile,
+    QAfterFilterCondition
+  >
+  updatedAtMsBetween(
     int lower,
     int upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'updatedAtMs',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'updatedAtMs',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 }
 
-extension IsarUserCoachingProfileQueryObject on QueryBuilder<
-    IsarUserCoachingProfile, IsarUserCoachingProfile, QFilterCondition> {}
+extension IsarUserCoachingProfileQueryObject
+    on
+        QueryBuilder<
+          IsarUserCoachingProfile,
+          IsarUserCoachingProfile,
+          QFilterCondition
+        > {}
 
-extension IsarUserCoachingProfileQueryLinks on QueryBuilder<
-    IsarUserCoachingProfile, IsarUserCoachingProfile, QFilterCondition> {}
+extension IsarUserCoachingProfileQueryLinks
+    on
+        QueryBuilder<
+          IsarUserCoachingProfile,
+          IsarUserCoachingProfile,
+          QFilterCondition
+        > {}
 
 extension IsarUserCoachingProfileQuerySortBy
     on QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QSortBy> {
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      sortByCoachingStyle() {
+  sortByCoachingStyle() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'coachingStyle', Sort.asc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      sortByCoachingStyleDesc() {
+  sortByCoachingStyleDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'coachingStyle', Sort.desc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      sortByLastChangedAtMs() {
+  sortByLastChangedAtMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastChangedAtMs', Sort.asc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      sortByLastChangedAtMsDesc() {
+  sortByLastChangedAtMsDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastChangedAtMs', Sort.desc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      sortByPayloadJson() {
+  sortByPayloadJson() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'payloadJson', Sort.asc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      sortByPayloadJsonDesc() {
+  sortByPayloadJsonDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'payloadJson', Sort.desc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      sortByProfileId() {
+  sortByProfileId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'profileId', Sort.asc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      sortByProfileIdDesc() {
+  sortByProfileIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'profileId', Sort.desc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      sortBySchemaVersion() {
+  sortBySchemaVersion() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'schemaVersion', Sort.asc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      sortBySchemaVersionDesc() {
+  sortBySchemaVersionDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'schemaVersion', Sort.desc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      sortByUpdatedAtMs() {
+  sortByUpdatedAtMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'updatedAtMs', Sort.asc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      sortByUpdatedAtMsDesc() {
+  sortByUpdatedAtMsDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'updatedAtMs', Sort.desc);
     });
   }
 }
 
-extension IsarUserCoachingProfileQuerySortThenBy on QueryBuilder<
-    IsarUserCoachingProfile, IsarUserCoachingProfile, QSortThenBy> {
+extension IsarUserCoachingProfileQuerySortThenBy
+    on
+        QueryBuilder<
+          IsarUserCoachingProfile,
+          IsarUserCoachingProfile,
+          QSortThenBy
+        > {
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      thenByCoachingStyle() {
+  thenByCoachingStyle() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'coachingStyle', Sort.asc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      thenByCoachingStyleDesc() {
+  thenByCoachingStyleDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'coachingStyle', Sort.desc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      thenById() {
+  thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      thenByIdDesc() {
+  thenByIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.desc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      thenByLastChangedAtMs() {
+  thenByLastChangedAtMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastChangedAtMs', Sort.asc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      thenByLastChangedAtMsDesc() {
+  thenByLastChangedAtMsDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastChangedAtMs', Sort.desc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      thenByPayloadJson() {
+  thenByPayloadJson() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'payloadJson', Sort.asc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      thenByPayloadJsonDesc() {
+  thenByPayloadJsonDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'payloadJson', Sort.desc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      thenByProfileId() {
+  thenByProfileId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'profileId', Sort.asc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      thenByProfileIdDesc() {
+  thenByProfileIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'profileId', Sort.desc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      thenBySchemaVersion() {
+  thenBySchemaVersion() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'schemaVersion', Sort.asc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      thenBySchemaVersionDesc() {
+  thenBySchemaVersionDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'schemaVersion', Sort.desc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      thenByUpdatedAtMs() {
+  thenByUpdatedAtMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'updatedAtMs', Sort.asc);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QAfterSortBy>
-      thenByUpdatedAtMsDesc() {
+  thenByUpdatedAtMsDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'updatedAtMs', Sort.desc);
     });
   }
 }
 
-extension IsarUserCoachingProfileQueryWhereDistinct on QueryBuilder<
-    IsarUserCoachingProfile, IsarUserCoachingProfile, QDistinct> {
+extension IsarUserCoachingProfileQueryWhereDistinct
+    on
+        QueryBuilder<
+          IsarUserCoachingProfile,
+          IsarUserCoachingProfile,
+          QDistinct
+        > {
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QDistinct>
-      distinctByCoachingStyle({bool caseSensitive = true}) {
+  distinctByCoachingStyle({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(r'coachingStyle',
-          caseSensitive: caseSensitive);
+      return query.addDistinctBy(
+        r'coachingStyle',
+        caseSensitive: caseSensitive,
+      );
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QDistinct>
-      distinctByLastChangedAtMs() {
+  distinctByLastChangedAtMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'lastChangedAtMs');
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QDistinct>
-      distinctByPayloadJson({bool caseSensitive = true}) {
+  distinctByPayloadJson({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'payloadJson', caseSensitive: caseSensitive);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QDistinct>
-      distinctByProfileId({bool caseSensitive = true}) {
+  distinctByProfileId({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'profileId', caseSensitive: caseSensitive);
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QDistinct>
-      distinctBySchemaVersion() {
+  distinctBySchemaVersion() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'schemaVersion');
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, IsarUserCoachingProfile, QDistinct>
-      distinctByUpdatedAtMs() {
+  distinctByUpdatedAtMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'updatedAtMs');
     });
   }
 }
 
-extension IsarUserCoachingProfileQueryProperty on QueryBuilder<
-    IsarUserCoachingProfile, IsarUserCoachingProfile, QQueryProperty> {
+extension IsarUserCoachingProfileQueryProperty
+    on
+        QueryBuilder<
+          IsarUserCoachingProfile,
+          IsarUserCoachingProfile,
+          QQueryProperty
+        > {
   QueryBuilder<IsarUserCoachingProfile, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
@@ -1291,42 +1579,42 @@ extension IsarUserCoachingProfileQueryProperty on QueryBuilder<
   }
 
   QueryBuilder<IsarUserCoachingProfile, String, QQueryOperations>
-      coachingStyleProperty() {
+  coachingStyleProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'coachingStyle');
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, int, QQueryOperations>
-      lastChangedAtMsProperty() {
+  lastChangedAtMsProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastChangedAtMs');
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, String, QQueryOperations>
-      payloadJsonProperty() {
+  payloadJsonProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'payloadJson');
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, String, QQueryOperations>
-      profileIdProperty() {
+  profileIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'profileId');
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, int, QQueryOperations>
-      schemaVersionProperty() {
+  schemaVersionProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'schemaVersion');
     });
   }
 
   QueryBuilder<IsarUserCoachingProfile, int, QQueryOperations>
-      updatedAtMsProperty() {
+  updatedAtMsProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'updatedAtMs');
     });

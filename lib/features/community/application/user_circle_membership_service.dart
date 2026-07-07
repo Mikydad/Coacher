@@ -36,10 +36,10 @@ class UserCircleMembershipService {
     required CircleRepository circleRepo,
     required String Function() currentUserId,
     required String Function() currentDisplayName,
-  })  : _memberRepo = memberRepo,
-        _circleRepo = circleRepo,
-        _currentUserId = currentUserId,
-        _currentDisplayName = currentDisplayName;
+  }) : _memberRepo = memberRepo,
+       _circleRepo = circleRepo,
+       _currentUserId = currentUserId,
+       _currentDisplayName = currentDisplayName;
 
   static const int kMaxCirclesPerUser = 3;
 
@@ -81,10 +81,10 @@ class UserCircleMembershipService {
       db.doc(FirestorePaths.circleMemberDoc(circle.id, uid)),
       member.toMap(),
     );
-    batch.set(
-      db.doc(FirestorePaths.userCircleIdDoc(uid, circle.id)),
-      {'circleId': circle.id, 'joinedAtMs': now},
-    );
+    batch.set(db.doc(FirestorePaths.userCircleIdDoc(uid, circle.id)), {
+      'circleId': circle.id,
+      'joinedAtMs': now,
+    });
     await batch.commit();
   }
 
@@ -100,9 +100,9 @@ class UserCircleMembershipService {
     await FirebaseFirestore.instance
         .doc(FirestorePaths.userCircleIdDoc(uid, circleId))
         .set({
-      'circleId': circleId,
-      'joinedAtMs': member.joinedAtMs,
-    }, SetOptions(merge: true));
+          'circleId': circleId,
+          'joinedAtMs': member.joinedAtMs,
+        }, SetOptions(merge: true));
   }
 
   /// Join an open circle immediately.
@@ -118,12 +118,15 @@ class UserCircleMembershipService {
     await _guardLimit(uid);
 
     await FirebaseFirestore.instance.runTransaction((tx) async {
-      final circleRef =
-          FirebaseFirestore.instance.doc(FirestorePaths.circleDoc(circleId));
-      final memberRef =
-          FirebaseFirestore.instance.doc(FirestorePaths.circleMemberDoc(circleId, uid));
-      final userCircleRef = FirebaseFirestore.instance
-          .doc(FirestorePaths.userCircleIdDoc(uid, circleId));
+      final circleRef = FirebaseFirestore.instance.doc(
+        FirestorePaths.circleDoc(circleId),
+      );
+      final memberRef = FirebaseFirestore.instance.doc(
+        FirestorePaths.circleMemberDoc(circleId, uid),
+      );
+      final userCircleRef = FirebaseFirestore.instance.doc(
+        FirestorePaths.userCircleIdDoc(uid, circleId),
+      );
 
       final circleSnap = await tx.get(circleRef);
       final circle = AccountabilityCircle.fromMap(
@@ -162,10 +165,7 @@ class UserCircleMembershipService {
 
       tx.set(memberRef, member.toMap(), SetOptions(merge: true));
       tx.update(circleRef, {'memberCount': FieldValue.increment(1)});
-      tx.set(userCircleRef, {
-        'circleId': circleId,
-        'joinedAtMs': now,
-      });
+      tx.set(userCircleRef, {'circleId': circleId, 'joinedAtMs': now});
     });
   }
 
@@ -195,8 +195,9 @@ class UserCircleMembershipService {
   /// Activates the member and increments the circle's `memberCount`.
   Future<void> approveJoin(String circleId, String userId) async {
     await FirebaseFirestore.instance.runTransaction((tx) async {
-      final circleRef =
-          FirebaseFirestore.instance.doc(FirestorePaths.circleDoc(circleId));
+      final circleRef = FirebaseFirestore.instance.doc(
+        FirestorePaths.circleDoc(circleId),
+      );
       final circleSnap = await tx.get(circleRef);
       final circle = AccountabilityCircle.fromMap(
         Map<String, dynamic>.from(circleSnap.data() ?? {})..['id'] = circleId,
@@ -206,8 +207,9 @@ class UserCircleMembershipService {
         throw CircleFullException();
       }
 
-      final memberRef = FirebaseFirestore.instance
-          .doc(FirestorePaths.circleMemberDoc(circleId, userId));
+      final memberRef = FirebaseFirestore.instance.doc(
+        FirestorePaths.circleMemberDoc(circleId, userId),
+      );
       final now = DateTime.now().millisecondsSinceEpoch;
 
       tx.update(memberRef, {
@@ -217,12 +219,10 @@ class UserCircleMembershipService {
       tx.update(circleRef, {'memberCount': FieldValue.increment(1)});
 
       // Write circleId index under user doc
-      final userCircleRef = FirebaseFirestore.instance
-          .doc(FirestorePaths.userCircleIdDoc(userId, circleId));
-      tx.set(userCircleRef, {
-        'circleId': circleId,
-        'joinedAtMs': now,
-      });
+      final userCircleRef = FirebaseFirestore.instance.doc(
+        FirestorePaths.userCircleIdDoc(userId, circleId),
+      );
+      tx.set(userCircleRef, {'circleId': circleId, 'joinedAtMs': now});
     });
   }
 
@@ -265,8 +265,7 @@ class UserCircleMembershipService {
       // Remove the circleId index under each member's user doc.
       batch.delete(db.doc(FirestorePaths.userCircleIdDoc(memberId, circleId)));
       // Delete the member document itself.
-      batch.delete(
-          db.doc(FirestorePaths.circleMemberDoc(circleId, memberId)));
+      batch.delete(db.doc(FirestorePaths.circleMemberDoc(circleId, memberId)));
     }
 
     // Also ensure the creator's own index is removed (covers edge cases where
@@ -306,8 +305,8 @@ class UserCircleMembershipService {
       final member = await _memberRepo.getMember(circleId, uid);
       final circle = await _circleRepo.getCircle(circleId);
 
-      final keepIndex = member?.status == CircleMemberStatus.active &&
-          circle != null;
+      final keepIndex =
+          member?.status == CircleMemberStatus.active && circle != null;
       if (!keepIndex) {
         batch.delete(doc.reference);
         writes++;
@@ -350,12 +349,15 @@ class UserCircleMembershipService {
 
   Future<void> _removeMemberInternal(String circleId, String userId) async {
     await FirebaseFirestore.instance.runTransaction((tx) async {
-      final circleRef =
-          FirebaseFirestore.instance.doc(FirestorePaths.circleDoc(circleId));
-      final memberRef = FirebaseFirestore.instance
-          .doc(FirestorePaths.circleMemberDoc(circleId, userId));
-      final userCircleRef = FirebaseFirestore.instance
-          .doc(FirestorePaths.userCircleIdDoc(userId, circleId));
+      final circleRef = FirebaseFirestore.instance.doc(
+        FirestorePaths.circleDoc(circleId),
+      );
+      final memberRef = FirebaseFirestore.instance.doc(
+        FirestorePaths.circleMemberDoc(circleId, userId),
+      );
+      final userCircleRef = FirebaseFirestore.instance.doc(
+        FirestorePaths.userCircleIdDoc(userId, circleId),
+      );
 
       tx.update(memberRef, {
         'status': CircleMemberStatus.removed.storageValue,

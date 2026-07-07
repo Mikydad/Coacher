@@ -135,7 +135,9 @@ class ProgressGlassCard extends StatelessWidget {
             color: ProgressDesignTokens.surfaceContainerHighest.withValues(
               alpha: 0.45,
             ),
-            borderRadius: BorderRadius.circular(ProgressDesignTokens.cardRadius),
+            borderRadius: BorderRadius.circular(
+              ProgressDesignTokens.cardRadius,
+            ),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,7 +341,10 @@ class DisciplineHeroRing extends StatelessWidget {
             width: size,
             height: size,
             child: CustomPaint(
-              painter: _GradientRingPainter(progress: progress, strokeWidth: 10),
+              painter: _GradientRingPainter(
+                progress: progress,
+                strokeWidth: 10,
+              ),
             ),
           ),
           Column(

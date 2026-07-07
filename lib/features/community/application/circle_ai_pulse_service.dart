@@ -23,10 +23,10 @@ class CircleAiPulseService {
     required ActivityFeedRepository feedRepo,
     required ChallengeRepository challengeRepo,
     AiProxyClient? proxyClient,
-  })  : _pulseRepo = pulseRepo,
-        _feedRepo = feedRepo,
-        _challengeRepo = challengeRepo,
-        _proxy = proxyClient ?? AiProxyClient();
+  }) : _pulseRepo = pulseRepo,
+       _feedRepo = feedRepo,
+       _challengeRepo = challengeRepo,
+       _proxy = proxyClient ?? AiProxyClient();
 
   final AiPulseRepository _pulseRepo;
   final ActivityFeedRepository _feedRepo;
@@ -38,14 +38,17 @@ class CircleAiPulseService {
   Future<AiPulse?> generateDailyPulse(String circleId) async {
     try {
       if (await _pulseRepo.isOnCooldown(
-          circleId, AiPulseType.daily,
-          cooldownMinutes: 240)) {
+        circleId,
+        AiPulseType.daily,
+        cooldownMinutes: 240,
+      )) {
         return null;
       }
 
       final now = DateTime.now();
-      final cutoff =
-          now.subtract(const Duration(hours: 24)).millisecondsSinceEpoch;
+      final cutoff = now
+          .subtract(const Duration(hours: 24))
+          .millisecondsSinceEpoch;
       final feedItems = await _feedRepo.watchFeed(circleId).first;
       final recent = feedItems.where((f) => f.createdAtMs >= cutoff).toList();
 
@@ -55,7 +58,9 @@ class CircleAiPulseService {
         circleId: circleId,
         type: AiPulseType.daily,
         prompt: CircleAiPromptBuilder.buildDailyPulsePrompt(
-            circleId: circleId, feedItems: recent),
+          circleId: circleId,
+          feedItems: recent,
+        ),
       );
       if (pulse != null) await _pulseRepo.savePulse(pulse);
       return pulse;
@@ -69,21 +74,24 @@ class CircleAiPulseService {
   Future<AiPulse?> generateWeeklyPulse(String circleId) async {
     try {
       if (await _pulseRepo.isOnCooldown(
-          circleId, AiPulseType.weekly,
-          cooldownMinutes: 24 * 60)) {
+        circleId,
+        AiPulseType.weekly,
+        cooldownMinutes: 24 * 60,
+      )) {
         return null;
       }
 
       final now = DateTime.now();
-      final cutoff =
-          now.subtract(const Duration(days: 7)).millisecondsSinceEpoch;
+      final cutoff = now
+          .subtract(const Duration(days: 7))
+          .millisecondsSinceEpoch;
       final feedItems = await _feedRepo.watchFeed(circleId, limit: 100).first;
       final recent = feedItems.where((f) => f.createdAtMs >= cutoff).toList();
 
-      final challenges =
-          await _challengeRepo.watchChallenges(circleId).first;
-      final activeChallenges =
-          challenges.where((c) => c.status == ChallengeStatus.active).toList();
+      final challenges = await _challengeRepo.watchChallenges(circleId).first;
+      final activeChallenges = challenges
+          .where((c) => c.status == ChallengeStatus.active)
+          .toList();
 
       final pulse = await _callAi(
         circleId: circleId,
@@ -119,7 +127,7 @@ class CircleAiPulseService {
             'role': 'system',
             'content':
                 'You are an AI coaching assistant for small accountability circles. '
-                    'Respond ONLY with valid JSON matching the requested schema.'
+                'Respond ONLY with valid JSON matching the requested schema.',
           },
           {'role': 'user', 'content': prompt},
         ],
@@ -144,11 +152,10 @@ class CircleAiPulseService {
     try {
       final inner = jsonDecode(content) as Map<String, dynamic>;
 
-      final lines = ((inner['memberLines'] as List?)
-                  ?.cast<Map<String, dynamic>>() ??
-              [])
-          .map(MemberPulseLine.fromMap)
-          .toList();
+      final lines =
+          ((inner['memberLines'] as List?)?.cast<Map<String, dynamic>>() ?? [])
+              .map(MemberPulseLine.fromMap)
+              .toList();
 
       return AiPulse(
         id: StableId.generate('pulse'),
@@ -156,8 +163,7 @@ class CircleAiPulseService {
         type: type,
         summary: inner['summary'] as String? ?? '',
         memberLines: lines,
-        suggestedChallenge:
-            inner['suggestedChallenge'] as String?,
+        suggestedChallenge: inner['suggestedChallenge'] as String?,
         generatedAtMs: DateTime.now().millisecondsSinceEpoch,
       );
     } catch (e) {

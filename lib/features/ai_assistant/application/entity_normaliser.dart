@@ -121,10 +121,14 @@ class EntityNormaliser {
     if (catEntity != null && catEntity == catCandidate) return 0.9;
 
     // Partial word overlap on cleaned strings (word boundary match)
-    final entityWords =
-        cleanedEntity.split(RegExp(r'\s+')).where((w) => w.length > 2).toSet();
-    final candidateWords =
-        cleanedCandidate.split(RegExp(r'\s+')).where((w) => w.length > 2).toSet();
+    final entityWords = cleanedEntity
+        .split(RegExp(r'\s+'))
+        .where((w) => w.length > 2)
+        .toSet();
+    final candidateWords = cleanedCandidate
+        .split(RegExp(r'\s+'))
+        .where((w) => w.length > 2)
+        .toSet();
     if (entityWords.isNotEmpty &&
         candidateWords.isNotEmpty &&
         entityWords.intersection(candidateWords).isNotEmpty) {

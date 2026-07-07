@@ -10,8 +10,12 @@
 /// iOS client ID: `ios/Runner/GoogleService-Info.plist` → `CLIENT_ID`
 /// Web client ID: Firebase Console → Authentication → Google → Web SDK configuration
 abstract final class GoogleAuthConfig {
-  static const String iosClientId = String.fromEnvironment('GOOGLE_IOS_CLIENT_ID');
-  static const String webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+  static const String iosClientId = String.fromEnvironment(
+    'GOOGLE_IOS_CLIENT_ID',
+  );
+  static const String webClientId = String.fromEnvironment(
+    'GOOGLE_WEB_CLIENT_ID',
+  );
 
   static bool get hasIosClientId => iosClientId.trim().isNotEmpty;
   static bool get hasWebClientId => webClientId.trim().isNotEmpty;

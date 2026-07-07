@@ -20,10 +20,7 @@ const List<QuickDirective> kDefaultDirectives = [
 ];
 
 class QuickDirectivesRow extends ConsumerWidget {
-  const QuickDirectivesRow({
-    super.key,
-    required this.onSelected,
-  });
+  const QuickDirectivesRow({super.key, required this.onSelected});
 
   final void Function(String startingText) onSelected;
 
@@ -125,9 +122,7 @@ class _DirectiveChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.20),
-          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(

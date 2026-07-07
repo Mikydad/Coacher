@@ -106,8 +106,9 @@ class UserCoachingProfile {
     'lastChangedAtMs': lastChangedAtMs,
     if (onboardingCompletedAtMs != null)
       'onboardingCompletedAtMs': onboardingCompletedAtMs,
-    'styleChangeHistory':
-        styleChangeHistory.map((e) => e.toMap()).toList(growable: false),
+    'styleChangeHistory': styleChangeHistory
+        .map((e) => e.toMap())
+        .toList(growable: false),
     'updatedAtMs': updatedAtMs,
     'schemaVersion': schemaVersion,
   };
@@ -126,8 +127,8 @@ class UserCoachingProfile {
       id: map['id'] as String? ?? kUserCoachingProfileId,
       coachingStyle: CoachingStyle.fromStorage(map['coachingStyle'] as String?),
       lastChangedAtMs: (map['lastChangedAtMs'] as num?)?.toInt() ?? 0,
-      onboardingCompletedAtMs:
-          (map['onboardingCompletedAtMs'] as num?)?.toInt(),
+      onboardingCompletedAtMs: (map['onboardingCompletedAtMs'] as num?)
+          ?.toInt(),
       styleChangeHistory: history,
       updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
       schemaVersion:

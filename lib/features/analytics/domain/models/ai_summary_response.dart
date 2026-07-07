@@ -69,10 +69,7 @@ enum AiSummaryValidationOutcome {
 }
 
 class AiSummaryValidationResult {
-  const AiSummaryValidationResult({
-    required this.outcome,
-    this.detail = '',
-  });
+  const AiSummaryValidationResult({required this.outcome, this.detail = ''});
 
   final AiSummaryValidationOutcome outcome;
   final String detail;
@@ -80,8 +77,7 @@ class AiSummaryValidationResult {
   bool get passed => outcome == AiSummaryValidationOutcome.passed;
 
   @override
-  String toString() =>
-      passed ? 'passed' : '${outcome.name}: $detail';
+  String toString() => passed ? 'passed' : '${outcome.name}: $detail';
 }
 
 // ─── AI summary response ──────────────────────────────────────────────────────
@@ -186,10 +182,13 @@ class AiSummaryResponse {
       generatedAtMs: (map['generatedAtMs'] as num?)?.toInt() ?? 0,
       promptVersion: map['promptVersion'] as String? ?? '',
       secondaryNote: map['secondaryNote'] as String?,
-      validationOutcome: _outcomeFromStorage(map['validationOutcome'] as String?),
+      validationOutcome: _outcomeFromStorage(
+        map['validationOutcome'] as String?,
+      ),
       isFallback: map['isFallback'] as bool? ?? false,
       schemaVersion:
-          (map['schemaVersion'] as num?)?.toInt() ?? kAiSummaryResponseSchemaVersion,
+          (map['schemaVersion'] as num?)?.toInt() ??
+          kAiSummaryResponseSchemaVersion,
       metadata:
           (map['metadata'] as Map?)?.cast<String, dynamic>() ??
           const <String, dynamic>{},

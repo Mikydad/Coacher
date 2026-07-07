@@ -13,14 +13,18 @@ import 'notification_reconciliation_service.dart';
 class LocalNotificationsService implements ActiveNotificationsSource {
   LocalNotificationsService._();
 
-  static final LocalNotificationsService instance = LocalNotificationsService._();
-  final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
+  static final LocalNotificationsService instance =
+      LocalNotificationsService._();
+  final FlutterLocalNotificationsPlugin _plugin =
+      FlutterLocalNotificationsPlugin();
   String? _lastDrainedResponseSignature;
   Map<int, String>? _taskIdByNotificationIdCache;
-  static const _taskIdByNotificationIdPrefsKey = 'notification_task_id_index_v1';
+  static const _taskIdByNotificationIdPrefsKey =
+      'notification_task_id_index_v1';
 
   Future<void> initialize({
-    void Function(NotificationResponse response)? onDidReceiveNotificationResponse,
+    void Function(NotificationResponse response)?
+    onDidReceiveNotificationResponse,
   }) async {
     tz_data.initializeTimeZones();
     // Without this, `tz.local` stays UTC and every `zonedSchedule` below fires at
@@ -39,7 +43,8 @@ class LocalNotificationsService implements ActiveNotificationsSource {
 
   Future<void> _configureLocalTimeZone() async {
     try {
-      final timeZoneName = (await FlutterTimezone.getLocalTimezone()).identifier;
+      final timeZoneName =
+          (await FlutterTimezone.getLocalTimezone()).identifier;
       tz.setLocalLocation(tz.getLocation(timeZoneName));
       debugPrint('[Notif] local timezone set to $timeZoneName');
     } catch (e) {
@@ -78,10 +83,17 @@ class LocalNotificationsService implements ActiveNotificationsSource {
   }
 
   Future<bool> requestPermissionsIfNeeded() async {
-    final ios = _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
-    final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final ios = _plugin
+        .resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin
+        >();
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     final iosOk =
-        await ios?.requestPermissions(alert: true, badge: true, sound: true) ?? true;
+        await ios?.requestPermissions(alert: true, badge: true, sound: true) ??
+        true;
     final androidOk = await android?.requestNotificationsPermission() ?? true;
     return iosOk && androidOk;
   }
@@ -150,7 +162,8 @@ class LocalNotificationsService implements ActiveNotificationsSource {
       ('task:$taskId:$slot').hashCode.abs() % 2147483647;
 
   /// Distinct from [idFromTaskId] to reduce id collisions between modules.
-  int idFromGoalId(String goalId) => (goalId.hashCode ^ 0x474f414c).abs() % 2147483647;
+  int idFromGoalId(String goalId) =>
+      (goalId.hashCode ^ 0x474f414c).abs() % 2147483647;
 
   /// Repeats every day at the same local hour/minute (see [matchDateTimeComponents]).
   Future<void> scheduleDailyAtLocalTime({
@@ -162,7 +175,9 @@ class LocalNotificationsService implements ActiveNotificationsSource {
   }) async {
     final scheduled = _normalizeDailyFirstFire(firstFireLocal);
     final when = tz.TZDateTime.from(scheduled, tz.local);
-    debugPrint('Scheduling daily goal reminder: id=$id atLocal=$scheduled tz=$when');
+    debugPrint(
+      'Scheduling daily goal reminder: id=$id atLocal=$scheduled tz=$when',
+    );
     await _plugin.zonedSchedule(
       id,
       title,
@@ -195,7 +210,10 @@ class LocalNotificationsService implements ActiveNotificationsSource {
     await _saveNotificationTaskMapping();
   }
 
-  Future<void> _indexNotificationTaskMapping({required int id, required String? payload}) async {
+  Future<void> _indexNotificationTaskMapping({
+    required int id,
+    required String? payload,
+  }) async {
     final map = await _loadNotificationTaskMapping();
     String? taskId;
     if (payload != null && payload.startsWith('task:')) {
@@ -251,7 +269,9 @@ class LocalNotificationsService implements ActiveNotificationsSource {
         _taskIdByNotificationIdCache = out;
         return out;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('local_notifications_service: swallowed error: $e');
+    }
     _taskIdByNotificationIdCache = <int, String>{};
     return _taskIdByNotificationIdCache!;
   }

@@ -141,7 +141,8 @@ class DeliveryOrchestrator {
         );
         if (persist) {
           persisted += 1;
-          if (result.selectionResult.decision.selectedPrimaryInsightId != null) {
+          if (result.selectionResult.decision.selectedPrimaryInsightId !=
+              null) {
             historyLogged += 1;
           }
         }

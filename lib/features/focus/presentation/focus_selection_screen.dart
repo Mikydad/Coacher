@@ -61,18 +61,23 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
         _didHandleLaunchArgs = true;
         if (args.taskId.isNotEmpty) {
           ref.read(activeExecutionTaskIdProvider.notifier).state = args.taskId;
-          ref.read(activeExecutionTaskLabelProvider.notifier).state = args.taskLabel;
-          ref.read(executionControllerProvider.notifier).setTask(
-            id: args.taskId,
-            label: args.taskLabel,
-            durationMinutes: args.taskDurationMinutes,
-          );
+          ref.read(activeExecutionTaskLabelProvider.notifier).state =
+              args.taskLabel;
+          ref
+              .read(executionControllerProvider.notifier)
+              .setTask(
+                id: args.taskId,
+                label: args.taskLabel,
+                durationMinutes: args.taskDurationMinutes,
+              );
         }
         if (args.autoOpenTimer && mounted) {
           await Navigator.pushNamed(
             context,
             TimerSessionScreen.routeName,
-            arguments: TimerLaunchArgs(autoStartDelaySeconds: args.autoStartDelaySeconds),
+            arguments: TimerLaunchArgs(
+              autoStartDelaySeconds: args.autoStartDelaySeconds,
+            ),
           );
         }
         return;
@@ -82,7 +87,8 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
       if (!exec.hasActiveFocusTask) return;
       _didHandleLaunchArgs = true;
       ref.read(activeExecutionTaskIdProvider.notifier).state = exec.taskId;
-      ref.read(activeExecutionTaskLabelProvider.notifier).state = exec.taskLabel;
+      ref.read(activeExecutionTaskLabelProvider.notifier).state =
+          exec.taskLabel;
       if (mounted) {
         await Navigator.pushNamed(context, TimerSessionScreen.routeName);
       }
@@ -133,10 +139,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
     if (taskHasFocusDuration(task.durationMinutes)) {
       return task.durationMinutes;
     }
-    return showFocusSessionDurationPicker(
-      context,
-      taskTitle: task.title,
-    );
+    return showFocusSessionDurationPicker(context, taskTitle: task.title);
   }
 
   Future<void> _selectTask(ExecutionTaskItem task) async {
@@ -159,11 +162,9 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
     final focusMinutes = taskHasFocusDuration(task.durationMinutes)
         ? task.durationMinutes
         : null;
-    ref.read(executionControllerProvider.notifier).setTask(
-      id: task.id,
-      label: task.title,
-      durationMinutes: focusMinutes,
-    );
+    ref
+        .read(executionControllerProvider.notifier)
+        .setTask(id: task.id, label: task.title, durationMinutes: focusMinutes);
 
     fireAndForgetAnalyticsEvent(
       ref,
@@ -206,20 +207,20 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
       }
     }
 
-    ref.read(executionControllerProvider.notifier).setTask(
-      id: selected.id,
-      label: selected.title,
-      durationMinutes: targetMinutes,
-      resumeElapsed: resumeElapsed,
-    );
+    ref
+        .read(executionControllerProvider.notifier)
+        .setTask(
+          id: selected.id,
+          label: selected.title,
+          durationMinutes: targetMinutes,
+          resumeElapsed: resumeElapsed,
+        );
 
     if (!mounted) return;
     if (resumeElapsed > Duration.zero) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Continuing from ${formatFocusElapsed(resumeElapsed)}',
-          ),
+          content: Text('Continuing from ${formatFocusElapsed(resumeElapsed)}'),
         ),
       );
     }
@@ -250,121 +251,125 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
         }
       },
       child: Scaffold(
-      appBar: AppBar(
-        title: const QuittrAppBarTitle(),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh list',
-            onPressed: () => ref.invalidate(executionDayTasksProvider),
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text(
-            'SELECTION MODE',
-            style: TextStyle(letterSpacing: 3, color: AppColors.cyan),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'What task do you want\nto focus on?',
-            style: TextStyle(
-              fontSize: 48,
-              height: 1.1,
-              fontWeight: FontWeight.w700,
+        appBar: AppBar(
+          title: const QuittrAppBarTitle(),
+          actions: [
+            IconButton(
+              tooltip: 'Refresh list',
+              onPressed: () => ref.invalidate(executionDayTasksProvider),
+              icon: const Icon(Icons.refresh),
             ),
-          ),
-          const SizedBox(height: 20),
-          ...taskList.when(
-            data: (tasks) {
-              if (tasks.isEmpty) {
-                return [
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Text(
-                      'No tasks today.',
-                      style: TextStyle(color: Colors.white38, fontSize: 15),
-                    ),
-                  ),
-                ];
-              }
-              return tasks
-                  .map(
-                    (task) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _TaskCard(
-                        title: task.title,
-                        subtitle: focusTaskListSubtitle(
-                          task: task,
-                          scores: scores,
-                        ),
-                        isPartial: task.status == TaskStatus.partial,
-                        selected: selectedTask == task.title,
-                        onTap: () => _selectTask(task),
+          ],
+        ),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            const Text(
+              'SELECTION MODE',
+              style: TextStyle(letterSpacing: 3, color: AppColors.cyan),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'What task do you want\nto focus on?',
+              style: TextStyle(
+                fontSize: 48,
+                height: 1.1,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ...taskList.when(
+              data: (tasks) {
+                if (tasks.isEmpty) {
+                  return [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Text(
+                        'No tasks today.',
+                        style: TextStyle(color: Colors.white38, fontSize: 15),
                       ),
                     ),
-                  )
-                  .toList();
-            },
-            loading: () => const [
-              Padding(
-                padding: EdgeInsets.all(18),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            ],
-            error: (e, _) => [
-              Padding(
-                padding: const EdgeInsets.all(18),
-                child: Text(
-                  'Could not load tasks. Check your connection and try leaving this screen and opening Focus again.\n\n$e',
-                  style: TextStyle(color: Colors.red.shade200),
+                  ];
+                }
+                return tasks
+                    .map(
+                      (task) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _TaskCard(
+                          title: task.title,
+                          subtitle: focusTaskListSubtitle(
+                            task: task,
+                            scores: scores,
+                          ),
+                          isPartial: task.status == TaskStatus.partial,
+                          selected: selectedTask == task.title,
+                          onTap: () => _selectTask(task),
+                        ),
+                      ),
+                    )
+                    .toList();
+              },
+              loading: () => const [
+                Padding(
+                  padding: EdgeInsets.all(18),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              ],
+              error: (e, _) => [
+                Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Text(
+                    'Could not load tasks. Check your connection and try leaving this screen and opening Focus again.\n\n$e',
+                    style: TextStyle(color: Colors.red.shade200),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 22),
+            TextField(
+              controller: _quickController,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _onQuickAdd(),
+              decoration: InputDecoration(
+                hintText: 'Create Quick Task…',
+                suffixIcon: IconButton(
+                  onPressed: _quickBusy ? null : _onQuickAdd,
+                  icon: _quickBusy
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.add_circle),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 22),
-          TextField(
-            controller: _quickController,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _onQuickAdd(),
-            decoration: InputDecoration(
-              hintText: 'Create Quick Task…',
-              suffixIcon: IconButton(
-                onPressed: _quickBusy ? null : _onQuickAdd,
-                icon: _quickBusy
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.add_circle),
+            ),
+            const SizedBox(height: 24),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(60),
+                backgroundColor: hasRunningTask
+                    ? AppColors.dark2B2D31
+                    : AppColors.accent,
+                foregroundColor: hasRunningTask ? Colors.white : Colors.black,
+              ),
+              onPressed: hasRunningTask
+                  ? () => Navigator.pushNamed(
+                      context,
+                      TimerSessionScreen.routeName,
+                    )
+                  : taskList.maybeWhen(
+                      data: (tasks) =>
+                          () => _openTimerForSelectedTask(tasks),
+                      orElse: () => null,
+                    ),
+              child: Text(
+                hasRunningTask ? 'Running Focus' : 'Start Focus',
+                style: TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
-          ),
-          const SizedBox(height: 24),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(60),
-              backgroundColor: hasRunningTask
-                  ? AppColors.dark2B2D31
-                  : AppColors.accent,
-              foregroundColor: hasRunningTask ? Colors.white : Colors.black,
-            ),
-            onPressed: hasRunningTask
-                ? () => Navigator.pushNamed(context, TimerSessionScreen.routeName)
-                : taskList.maybeWhen(
-                    data: (tasks) => () => _openTimerForSelectedTask(tasks),
-                    orElse: () => null,
-                  ),
-            child: Text(
-              hasRunningTask ? 'Running Focus' : 'Start Focus',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -415,9 +420,7 @@ class _TaskCard extends StatelessWidget {
               subtitle,
               style: TextStyle(
                 fontSize: 26,
-                color: isPartial
-                    ? AppColors.amber
-                    : Colors.white60,
+                color: isPartial ? AppColors.amber : Colors.white60,
               ),
             ),
           ],

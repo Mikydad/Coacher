@@ -90,7 +90,11 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         const SizedBox(height: 24),
         const Text(
           "Enter the email address linked to your account.\nWe'll send you a reset link.",
-          style: TextStyle(color: AppColors.textGray, fontSize: 14, height: 1.5),
+          style: TextStyle(
+            color: AppColors.textGray,
+            fontSize: 14,
+            height: 1.5,
+          ),
         ),
         const SizedBox(height: 28),
         AuthTextField(
@@ -120,20 +124,29 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.mark_email_read_outlined,
-            color: AppColors.accentDim, size: 56),
+        const Icon(
+          Icons.mark_email_read_outlined,
+          color: AppColors.accentDim,
+          size: 56,
+        ),
         const SizedBox(height: 20),
         const Text(
           'Check your email',
           style: TextStyle(
-              color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 12),
         Text(
           "We've sent a password reset link to ${_emailCtrl.text.trim()}.",
           textAlign: TextAlign.center,
-          style:
-              const TextStyle(color: AppColors.textGray, fontSize: 14, height: 1.5),
+          style: const TextStyle(
+            color: AppColors.textGray,
+            fontSize: 14,
+            height: 1.5,
+          ),
         ),
         const SizedBox(height: 32),
         TextButton(

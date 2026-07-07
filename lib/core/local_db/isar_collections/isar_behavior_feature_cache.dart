@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 
 import 'package:isar/isar.dart';
@@ -39,7 +40,8 @@ class IsarBehaviorFeatureCache {
 
   BehaviorFeatureObject toDomain() {
     final payload = _decodePayload(payloadJson);
-    final rawVersion = (payload['schemaVersion'] as num?)?.toInt() ?? schemaVersion;
+    final rawVersion =
+        (payload['schemaVersion'] as num?)?.toInt() ?? schemaVersion;
     final compatiblePayload = rawVersion > kBehaviorFeatureSchemaVersion
         ? <String, dynamic>{
             ...payload,
@@ -55,6 +57,8 @@ Map<String, dynamic> _decodePayload(String raw) {
     final decoded = jsonDecode(raw);
     if (decoded is Map<String, dynamic>) return decoded;
     if (decoded is Map) return decoded.cast<String, dynamic>();
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('isar_behavior_feature_cache: swallowed error: $e');
+  }
   return const <String, dynamic>{};
 }

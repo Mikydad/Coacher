@@ -45,7 +45,8 @@ UserProfilePreference coachingNotificationBudgetForDay(
   );
 }
 
-CoachingInsightNotificationSendEvaluation evaluateCoachingInsightNotificationSend(
+CoachingInsightNotificationSendEvaluation
+evaluateCoachingInsightNotificationSend(
   UserProfilePreference pref,
   DateTime now,
 ) {
@@ -57,8 +58,7 @@ CoachingInsightNotificationSendEvaluation evaluateCoachingInsightNotificationSen
     );
   }
 
-  final sent = List<int>.from(normalized.coachingNotificationSentAtMs)
-    ..sort();
+  final sent = List<int>.from(normalized.coachingNotificationSentAtMs)..sort();
   final count = sent.length;
 
   if (count >= kMaxCoachingInsightNotificationsPerDay) {

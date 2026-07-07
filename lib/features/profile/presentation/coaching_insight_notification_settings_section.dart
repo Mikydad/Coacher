@@ -14,14 +14,19 @@ class CoachingInsightNotificationSettingsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final prefAsync = ref.watch(userProfilePreferenceStreamProvider);
-    final enabled = prefAsync.whenOrNull(
+    final enabled =
+        prefAsync.whenOrNull(
           data: (p) => p?.coachingInsightNotificationsEnabled,
         ) ??
         true;
-    final sentToday = prefAsync.whenOrNull(
+    final sentToday =
+        prefAsync.whenOrNull(
           data: (p) {
             if (p == null) return 0;
-            final normalized = coachingNotificationBudgetForDay(p, DateTime.now());
+            final normalized = coachingNotificationBudgetForDay(
+              p,
+              DateTime.now(),
+            );
             return normalized.coachingNotificationSentAtMs.length;
           },
         ) ??
@@ -48,8 +53,8 @@ class CoachingInsightNotificationSettingsSection extends ConsumerWidget {
                   Text(
                     enabled
                         ? 'Up to $kMaxCoachingInsightNotificationsPerDay per day, '
-                            'at least ${kMinGapBetweenCoachingInsightNotifications.inHours}h apart. '
-                            'Insights still show in Progress and on Home.'
+                              'at least ${kMinGapBetweenCoachingInsightNotifications.inHours}h apart. '
+                              'Insights still show in Progress and on Home.'
                         : 'Push notifications off. Open the app to see coaching insights.',
                     style: const TextStyle(
                       fontSize: 12,

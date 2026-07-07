@@ -59,24 +59,26 @@ class CoachForLifeApp extends StatelessWidget {
         // ── Auth ──────────────────────────────────────────────────────────
         AuthLandingScreen.routeName: (_) => const AuthLandingScreen(),
         LoginScreen.routeName: (context) {
-          final email =
-              ModalRoute.of(context)?.settings.arguments as String?;
+          final email = ModalRoute.of(context)?.settings.arguments as String?;
           return LoginScreen(prefillEmail: email);
         },
         SignUpScreen.routeName: (_) => const SignUpScreen(),
         ForgotPasswordScreen.routeName: (context) {
-          final email =
-              ModalRoute.of(context)?.settings.arguments as String?;
+          final email = ModalRoute.of(context)?.settings.arguments as String?;
           return ForgotPasswordScreen(prefillEmail: email);
         },
         ChangePasswordScreen.routeName: (_) => const ChangePasswordScreen(),
         MainTabShell.routeName: (_) => const MainTabShell(),
         GoalSelectionScreen.routeName: (_) => const GoalSelectionScreen(),
-        GoalTemplatePickerScreen.routeName: (_) => const GoalTemplatePickerScreen(),
+        GoalTemplatePickerScreen.routeName: (_) =>
+            const GoalTemplatePickerScreen(),
         GoalEditorScreen.routeName: (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
           if (args is GoalEditorArgs) {
-            return GoalEditorScreen(goalId: args.goalId, template: args.template);
+            return GoalEditorScreen(
+              goalId: args.goalId,
+              template: args.template,
+            );
           }
           return const GoalEditorScreen();
         },
@@ -131,9 +133,7 @@ class CoachForLifeApp extends StatelessWidget {
         // ── Coach AI ──────────────────────────────────────────────────────
         AiAssistantScreen.routeName: (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
-          return _CoachTabRedirect(
-            args: args is CoachRouteArgs ? args : null,
-          );
+          return _CoachTabRedirect(args: args is CoachRouteArgs ? args : null);
         },
         // ── Community / Accountability Circles ────────────────────────────
         CommunityScreen.routeName: (_) => const CommunityScreen(),

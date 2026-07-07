@@ -11,10 +11,11 @@ class FirestoreClient {
   /// even if the auth state changes mid-flight (e.g. during a long sync loop).
   /// Callers that need the latest uid should create a new [FirestoreClient].
   FirestoreClient({FirebaseFirestore? firestore, String? uid})
-      : _firestore = firestore ?? FirebaseFirestore.instance,
-        _uid = uid ??
-            FirebaseAuth.instance.currentUser?.uid ??
-            AppConfig.localUserId;
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _uid =
+          uid ??
+          FirebaseAuth.instance.currentUser?.uid ??
+          AppConfig.localUserId;
 
   final FirebaseFirestore _firestore;
   final String _uid;

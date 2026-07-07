@@ -48,8 +48,8 @@ class ContextOverrideExpiryPoller {
 /// Riverpod provider so the poller can be read anywhere.
 final contextOverrideExpiryPollerProvider =
     Provider<ContextOverrideExpiryPoller>((ref) {
-  final poller = ContextOverrideExpiryPoller(ref);
-  poller.start();
-  ref.onDispose(poller.dispose);
-  return poller;
-});
+      final poller = ContextOverrideExpiryPoller(ref);
+      poller.start();
+      ref.onDispose(poller.dispose);
+      return poller;
+    });

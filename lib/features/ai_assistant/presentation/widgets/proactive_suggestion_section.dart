@@ -8,6 +8,7 @@ import '../../application/proactive_suggestion_display.dart';
 import 'proactive_suggestion_card.dart';
 
 import '../../../../core/presentation/app_colors.dart';
+import '../../../../core/presentation/async_value_ui.dart';
 
 /// Shows proactive suggestions on Home: one card by default, expandable in place
 /// to reveal the full list (no Coach tab detour).
@@ -58,7 +59,11 @@ class _ProactiveSuggestionSectionState
 
     return suggestionsAsync.when(
       loading: () => const _SkeletonCard(),
-      error: (_, _) => const SizedBox.shrink(),
+      error: (e, _) => swallowedAsyncError(
+        'proactive_suggestion_section',
+        e,
+        const SizedBox.shrink(),
+      ),
       data: (suggestions) {
         final active = activeProactiveSuggestions(suggestions);
         if (active.isEmpty) return const SizedBox.shrink();
@@ -74,7 +79,8 @@ class _ProactiveSuggestionSectionState
             : active.take(kHomeProactiveSuggestionLimit).toList();
         final hiddenCount = active.length - kHomeProactiveSuggestionLimit;
         final showExpandLink = !_expanded && hiddenCount > 0;
-        final showCollapseLink = _expanded && active.length > kHomeProactiveSuggestionLimit;
+        final showCollapseLink =
+            _expanded && active.length > kHomeProactiveSuggestionLimit;
 
         return Listener(
           onPointerDown: (_) => _onExpandedInteraction(),
@@ -175,10 +181,7 @@ class _SkeletonCard extends StatelessWidget {
         color: AppColors.inkWarm,
         borderRadius: BorderRadius.circular(16),
         border: const Border(
-          left: BorderSide(
-            color: AppColors.gray3A,
-            width: 3,
-          ),
+          left: BorderSide(color: AppColors.gray3A, width: 3),
         ),
       ),
       child: Padding(

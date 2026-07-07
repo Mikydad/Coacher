@@ -52,10 +52,12 @@ BehaviorTimeMetrics computeBehaviorTimeMetrics({
   final s7 = scheduledDateKeysInFullWindow.where(keys7d.contains).length;
   final s30 = scheduledDateKeysInFullWindow.where(keys30d.contains).length;
 
-  final scheduledSet7 =
-      scheduledDateKeysInFullWindow.where(keys7d.contains).toSet();
-  final scheduledSet30 =
-      scheduledDateKeysInFullWindow.where(keys30d.contains).toSet();
+  final scheduledSet7 = scheduledDateKeysInFullWindow
+      .where(keys7d.contains)
+      .toSet();
+  final scheduledSet30 = scheduledDateKeysInFullWindow
+      .where(keys30d.contains)
+      .toSet();
 
   var completedOnScheduled7 = 0;
   for (final d in scheduledSet7) {
@@ -83,8 +85,7 @@ BehaviorTimeMetrics computeBehaviorTimeMetrics({
       : 0.0;
 
   final completionsIn7d = completionDateKeys.where(keys7d.contains).length;
-  final completionsIn30d =
-      completionDateKeys.where(keys30d.contains).length;
+  final completionsIn30d = completionDateKeys.where(keys30d.contains).length;
   final flex7 = completionsIn7d / 7.0;
   final flex30 = completionsIn30d / 30.0;
 

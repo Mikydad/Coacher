@@ -1,8 +1,5 @@
 /// How the goal period is chosen: calendar vs a fixed number of days from a start date.
-enum GoalPeriodMode {
-  calendar,
-  durationDays,
-}
+enum GoalPeriodMode { calendar, durationDays }
 
 extension GoalPeriodModeStorage on GoalPeriodMode {
   String get storageValue => name;
@@ -16,27 +13,13 @@ extension GoalPeriodModeStorage on GoalPeriodMode {
 }
 
 /// PRD: Goals — habit horizons (`prd-goals.md` §9).
-enum GoalHorizon {
-  daily,
-  weekly,
-  monthly,
-}
+enum GoalHorizon { daily, weekly, monthly }
 
 /// Stored on [UserGoal]; drives list vs archive (`prd-goals.md` §4.6).
-enum GoalStatus {
-  active,
-  paused,
-  completed,
-}
+enum GoalStatus { active, paused, completed }
 
 /// User-chosen unit for targets (`prd-goals.md` §4.2 item 4).
-enum MeasurementKind {
-  minutes,
-  sessions,
-  count,
-  distance,
-  custom,
-}
+enum MeasurementKind { minutes, sessions, count, distance, custom }
 
 extension GoalHorizonStorage on GoalHorizon {
   String get storageValue => name;
@@ -64,8 +47,10 @@ extension GoalStatusStorage on GoalStatus {
 enum GoalReminderStyle {
   /// Single local notification each day at [UserGoal.reminderMinutesFromMidnight].
   dailyOnce,
+
   /// Future: 2–3 spaced pings around the chosen time.
   tripleNudge,
+
   /// Future: repeat until session started or user logs a reason to skip.
   accountable,
 }

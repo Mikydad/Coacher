@@ -11,18 +11,11 @@ enum AiIntentKind {
 }
 
 /// Optional date focus detected in the user's message.
-enum AiFocusDate {
-  today,
-  tomorrow,
-  week,
-}
+enum AiFocusDate { today, tomorrow, week }
 
 /// Output of [AiIntentRouter.classify].
 class AiIntentRoute {
-  const AiIntentRoute({
-    required this.kind,
-    this.focusDate,
-  });
+  const AiIntentRoute({required this.kind, this.focusDate});
 
   final AiIntentKind kind;
   final AiFocusDate? focusDate;

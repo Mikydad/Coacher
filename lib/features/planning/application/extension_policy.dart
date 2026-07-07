@@ -23,7 +23,10 @@ abstract final class ExtensionPolicy {
     required int blockUrgencyScore,
     Routine? routine,
   }) {
-    final mode = EffectiveTaskMode.routineModeForTask(task: task, routine: routine);
+    final mode = EffectiveTaskMode.routineModeForTask(
+      task: task,
+      routine: routine,
+    );
     final config = RoutineModeConfig.defaults().firstWhere(
       (m) => m.baseMode == mode,
       orElse: () => RoutineModeConfig.defaults().first,

@@ -36,20 +36,27 @@ import '../../features/community/application/user_circle_membership_service.dart
 /// always use the correct uid-scoped Firestore path.
 final firestoreClientProvider = Provider<FirestoreClient>((ref) {
   // Watch auth state so this provider invalidates on uid change.
-  final uid = ref.watch(authStateProvider).valueOrNull?.uid ??
+  final uid =
+      ref.watch(authStateProvider).valueOrNull?.uid ??
       FirebaseAuth.instance.currentUser?.uid;
   return FirestoreClient(uid: uid);
 });
 final localNotificationsServiceProvider = Provider<LocalNotificationsService>(
   (ref) => LocalNotificationsService.instance,
 );
-final offlineStoreProvider = Provider<OfflineStore>((ref) => OfflineStore.instance);
-final syncServiceProvider = Provider<SyncService>((ref) => SyncService.instance);
+final offlineStoreProvider = Provider<OfflineStore>(
+  (ref) => OfflineStore.instance,
+);
+final syncServiceProvider = Provider<SyncService>(
+  (ref) => SyncService.instance,
+);
 
 final planningRepositoryProvider = Provider<PlanningRepository>((ref) {
   // watch (not read): rebuilds on uid change so the repository never holds a
   // FirestoreClient pinned to a previous account after a switch.
-  final firestore = FirestorePlanningRepository(ref.watch(firestoreClientProvider));
+  final firestore = FirestorePlanningRepository(
+    ref.watch(firestoreClientProvider),
+  );
   return IsarPlanningRepository(firestore);
 });
 final routineModePolicyResolverProvider = Provider<RoutineModePolicyResolver>(
@@ -60,25 +67,35 @@ final executionRepositoryProvider = Provider<ExecutionRepository>(
   (ref) => FirestoreExecutionRepository(),
 );
 
-final timerRuntimeCacheProvider = Provider<TimerRuntimeCache>((ref) => const TimerRuntimeCache());
+final timerRuntimeCacheProvider = Provider<TimerRuntimeCache>(
+  (ref) => const TimerRuntimeCache(),
+);
 
-final focusResumeStoreProvider =
-    Provider<FocusResumeStore>((ref) => const FocusResumeStore());
+final focusResumeStoreProvider = Provider<FocusResumeStore>(
+  (ref) => const FocusResumeStore(),
+);
 
-final activeExecutionTaskIdProvider = StateProvider<String>((ref) => 'task_ui_architecture');
-final activeExecutionTaskLabelProvider = StateProvider<String>((ref) => 'Deep Work: UI Architecture');
+final activeExecutionTaskIdProvider = StateProvider<String>(
+  (ref) => 'task_ui_architecture',
+);
+final activeExecutionTaskLabelProvider = StateProvider<String>(
+  (ref) => 'Deep Work: UI Architecture',
+);
 
-final executionControllerProvider = StateNotifierProvider<ExecutionController, ExecutionState>((ref) {
-  return ExecutionController(
-    repository: ref.read(executionRepositoryProvider),
-    runtimeCache: ref.read(timerRuntimeCacheProvider),
-    resumeStore: ref.read(focusResumeStoreProvider),
-    initialTaskId: ref.read(activeExecutionTaskIdProvider),
-    initialTaskLabel: ref.read(activeExecutionTaskLabelProvider),
-  );
-});
+final executionControllerProvider =
+    StateNotifierProvider<ExecutionController, ExecutionState>((ref) {
+      return ExecutionController(
+        repository: ref.read(executionRepositoryProvider),
+        runtimeCache: ref.read(timerRuntimeCacheProvider),
+        resumeStore: ref.read(focusResumeStoreProvider),
+        initialTaskId: ref.read(activeExecutionTaskIdProvider),
+        initialTaskLabel: ref.read(activeExecutionTaskLabelProvider),
+      );
+    });
 
-final scoringRepositoryProvider = Provider<ScoringRepository>((ref) => FirestoreScoringRepository());
+final scoringRepositoryProvider = Provider<ScoringRepository>(
+  (ref) => FirestoreScoringRepository(),
+);
 final scoringControllerProvider = Provider<ScoringController>(
   (ref) => ScoringController(ref.read(scoringRepositoryProvider)),
 );
@@ -87,8 +104,12 @@ final reminderRepositoryProvider = Provider<ReminderRepository>(
   (ref) => IsarReminderRepository(FirestoreReminderRepository()),
 );
 
-@Deprecated('Reminders live in Isar via ReminderRepository; this store is unused.')
-final reminderCacheStoreProvider = Provider<ReminderCacheStore>((ref) => const ReminderCacheStore());
+@Deprecated(
+  'Reminders live in Isar via ReminderRepository; this store is unused.',
+)
+final reminderCacheStoreProvider = Provider<ReminderCacheStore>(
+  (ref) => const ReminderCacheStore(),
+);
 final reminderSyncServiceProvider = Provider<ReminderSyncService>(
   (ref) => ReminderSyncService(
     repository: ref.read(reminderRepositoryProvider),
@@ -100,7 +121,9 @@ final reminderSyncServiceProvider = Provider<ReminderSyncService>(
 );
 
 final goalReminderSyncServiceProvider = Provider<GoalReminderSyncService>(
-  (ref) => GoalReminderSyncService(notifications: ref.read(localNotificationsServiceProvider)),
+  (ref) => GoalReminderSyncService(
+    notifications: ref.read(localNotificationsServiceProvider),
+  ),
 );
 
 final analyticsRepositoryProvider = Provider<AnalyticsRepository>((ref) {
@@ -131,18 +154,18 @@ final aiSummaryRepositoryProvider = Provider<AiSummaryRepository>((ref) {
 
 final aiInteractionHistoryRepositoryProvider =
     Provider<AiInteractionHistoryRepository>(
-  (ref) => AiInteractionHistoryRepository(ref.read(offlineStoreProvider)),
-);
+      (ref) => AiInteractionHistoryRepository(ref.read(offlineStoreProvider)),
+    );
 
 // ── Community / Accountability Circles ───────────────────────────────────────
 
 final userCircleMembershipServiceProvider =
     Provider<UserCircleMembershipService>((ref) {
-  return UserCircleMembershipService(
-    memberRepo: ref.read(circleMemberRepositoryProvider),
-    circleRepo: ref.read(circleRepositoryProvider),
-    currentUserId: () => FirebaseAuth.instance.currentUser?.uid ?? '',
-    currentDisplayName: () =>
-        FirebaseAuth.instance.currentUser?.displayName ?? 'User',
-  );
-});
+      return UserCircleMembershipService(
+        memberRepo: ref.read(circleMemberRepositoryProvider),
+        circleRepo: ref.read(circleRepositoryProvider),
+        currentUserId: () => FirebaseAuth.instance.currentUser?.uid ?? '',
+        currentDisplayName: () =>
+            FirebaseAuth.instance.currentUser?.displayName ?? 'User',
+      );
+    });

@@ -67,7 +67,8 @@ abstract final class AttentionOrchestrator {
         )) {
       return AttentionDecision.suppressed(
         intentId: intent.id,
-        reason: 'CoachingStyle back-off: '
+        reason:
+            'CoachingStyle back-off: '
             '${coachingStyle.name} after $consecutiveIgnoredCount ignored',
         retryAllowed: false,
       );

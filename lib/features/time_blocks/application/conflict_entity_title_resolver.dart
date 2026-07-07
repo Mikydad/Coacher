@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
@@ -18,13 +19,17 @@ Future<Map<String, String>> buildSchedulingConflictEntityTitles(
   final titles = <String, String>{};
   titles.addAll(ref.read(goalTitleMapProvider));
 
-  final rows = await collectTodayPlannedRows(ref.read(planningRepositoryProvider));
+  final rows = await collectTodayPlannedRows(
+    ref.read(planningRepositoryProvider),
+  );
   for (final row in rows) {
     titles[row.task.id] = row.task.title;
   }
 
   try {
-    final reminders = await ref.read(reminderRepositoryProvider).listAllReminders();
+    final reminders = await ref
+        .read(reminderRepositoryProvider)
+        .listAllReminders();
     for (final reminder in reminders) {
       final id = reminder.taskId;
       final name = reminder.taskTitle?.trim();
@@ -32,7 +37,9 @@ Future<Map<String, String>> buildSchedulingConflictEntityTitles(
         titles.putIfAbsent(id, () => name);
       }
     }
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('conflict_entity_title_resolver: swallowed error: $e');
+  }
 
   final isar = ref.read(offlineStoreProvider).isar;
   if (isar == null || overlapping == null) return titles;
@@ -53,7 +60,9 @@ Future<Map<String, String>> buildSchedulingConflictEntityTitles(
           titles[block.entityId] = name;
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('conflict_entity_title_resolver: swallowed error: $e');
+    }
   }
 
   return titles;

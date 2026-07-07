@@ -11,6 +11,7 @@ import 'goal_card.dart';
 import '../goal_detail_screen.dart';
 
 import '../../../../core/presentation/app_colors.dart';
+import '../../../../core/presentation/async_value_ui.dart';
 
 /// Bottom sheet with:
 ///   - Action-based progress ring (doneActions / totalActions)
@@ -51,6 +52,7 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
 
   UserGoal get _goal => widget.goal;
   double get _target => _goal.targetValue;
+
   /// Measurement-based progress (value / target) — drives the ring and card fill.
   double get _measureProgress =>
       _target > 0 ? (_value / _target).clamp(0.0, 1.0) : 0.0;
@@ -74,9 +76,8 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
     };
   }
 
-  double get _step => _goal.measurementKind == MeasurementKind.distance
-      ? 0.5
-      : 1.0;
+  double get _step =>
+      _goal.measurementKind == MeasurementKind.distance ? 0.5 : 1.0;
 
   String _formatValue(double v) =>
       v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
@@ -127,7 +128,10 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
 
   // ── Action toggle ───────────────────────────────────────────────────────────
 
-  Future<void> _toggleAction(GoalAction action, List<GoalAction> allActions) async {
+  Future<void> _toggleAction(
+    GoalAction action,
+    List<GoalAction> allActions,
+  ) async {
     final repo = ref.read(goalsRepositoryProvider);
     final nowDone = !action.completed;
     await repo.upsertAction(action.copyWith(completed: nowDone));
@@ -207,7 +211,11 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
           ),
           child: actionsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const Center(child: Text('Error loading actions')),
+            error: (e, _) => swallowedAsyncError(
+              'goal_counter_sheet',
+              e,
+              const Center(child: Text('Error loading actions')),
+            ),
             data: (actions) => ListView(
               controller: scrollController,
               padding: EdgeInsets.only(
@@ -264,8 +272,11 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
           icon: const Icon(Icons.trending_up_outlined, color: Colors.white54),
           onPressed: () {
             Navigator.of(context).pop();
-            Navigator.pushNamed(context, GoalDetailScreen.routeName,
-                arguments: _goal.id);
+            Navigator.pushNamed(
+              context,
+              GoalDetailScreen.routeName,
+              arguments: _goal.id,
+            );
           },
         ),
       ],
@@ -387,23 +398,29 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
       child: ElevatedButton(
         onPressed: _saving ? null : () => _complete(actions),
         style: ElevatedButton.styleFrom(
-          backgroundColor:
-              _allDone ? _accentColor : _accentColor.withValues(alpha: 0.85),
+          backgroundColor: _allDone
+              ? _accentColor
+              : _accentColor.withValues(alpha: 0.85),
           foregroundColor: Colors.black,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
         child: _saving
             ? const SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.black54),
+                  strokeWidth: 2,
+                  color: Colors.black54,
+                ),
               )
             : Text(
                 _allDone ? 'Completed ✓' : 'Mark all done',
                 style: const TextStyle(
-                    fontWeight: FontWeight.w700, fontSize: 16),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
               ),
       ),
     ),
@@ -428,15 +445,15 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
               const Text(
                 'Setup steps',
                 style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15),
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
               ),
               const Spacer(),
               Text(
                 '$done / ${actions.length}',
-                style:
-                    const TextStyle(color: Colors.white38, fontSize: 13),
+                style: const TextStyle(color: Colors.white38, fontSize: 13),
               ),
             ],
           ),
@@ -507,7 +524,10 @@ class _PresetButton extends StatelessWidget {
         child: Text(
           label,
           style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
         ),
       ),
     );
@@ -593,9 +613,7 @@ class _RoundButton extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: enabled
-              ? AppColors.dark2A2D32
-              : AppColors.surfaceMuted,
+          color: enabled ? AppColors.dark2A2D32 : AppColors.surfaceMuted,
         ),
         child: Icon(
           icon,

@@ -5,6 +5,7 @@ import '../../application/ai_pulse_providers.dart';
 import '../sheets/challenge_create_sheet.dart';
 
 import '../../../../core/presentation/app_colors.dart';
+import '../../../../core/presentation/async_value_ui.dart';
 
 class AiPulseBanner extends ConsumerStatefulWidget {
   const AiPulseBanner({
@@ -36,7 +37,9 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
           .generateDailyPulse(widget.circleId);
       if (mounted) {
         setState(() {
-          _updatedLabel = pulse != null ? 'Updated just now' : 'Nothing new yet';
+          _updatedLabel = pulse != null
+              ? 'Updated just now'
+              : 'Nothing new yet';
         });
       }
     } finally {
@@ -50,7 +53,8 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
 
     return pulseAsync.when(
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (e, _) =>
+          swallowedAsyncError('ai_pulse_banner', e, const SizedBox.shrink()),
       data: (pulse) {
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
@@ -61,9 +65,7 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: AppColors.accent.withValues(alpha: 0.25),
-            ),
+            border: Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,8 +83,7 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          pulse?.summary ??
-                              'No pulse yet — generate one below',
+                          pulse?.summary ?? 'No pulse yet — generate one below',
                           style: TextStyle(
                             color: pulse != null
                                 ? AppColors.textPrimary
@@ -116,9 +117,7 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
 
               // ── Expanded content ──────────────────────────────────────────
               if (_expanded && pulse != null) ...[
-                const Divider(
-                    height: 1,
-                    color: AppColors.surfaceSlate),
+                const Divider(height: 1, color: AppColors.surfaceSlate),
                 Padding(
                   padding: const EdgeInsets.all(14),
                   child: Column(
@@ -132,13 +131,13 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _MemberAvatar(
-                                  name: line.displayName,
-                                  userId: line.userId),
+                                name: line.displayName,
+                                userId: line.userId,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       line.displayName,
@@ -169,18 +168,19 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: AppColors.accent
-                                .withValues(alpha: 0.07),
+                            color: AppColors.accent.withValues(alpha: 0.07),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: AppColors.accent
-                                  .withValues(alpha: 0.3),
+                              color: AppColors.accent.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.lightbulb_outline,
-                                  color: AppColors.accent, size: 16),
+                              const Icon(
+                                Icons.lightbulb_outline,
+                                color: AppColors.accent,
+                                size: 16,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -247,9 +247,11 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                             )
                           : TextButton.icon(
                               onPressed: _generate,
-                              icon: const Icon(Icons.auto_awesome,
-                                  size: 14,
-                                  color: AppColors.accent),
+                              icon: const Icon(
+                                Icons.auto_awesome,
+                                size: 14,
+                                color: AppColors.accent,
+                              ),
                               label: const Text(
                                 'Generate now',
                                 style: TextStyle(
@@ -260,8 +262,7 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                               style: TextButton.styleFrom(
                                 minimumSize: Size.zero,
                                 padding: EdgeInsets.zero,
-                                tapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
                             ),
                     ],
@@ -311,8 +312,7 @@ class _PulsingDotState extends State<_PulsingDot>
         width: 8,
         height: 8,
         decoration: BoxDecoration(
-          color: Color.fromRGBO(
-              183, 255, 0, _anim.value),
+          color: Color.fromRGBO(183, 255, 0, _anim.value),
           shape: BoxShape.circle,
         ),
       ),

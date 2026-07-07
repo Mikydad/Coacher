@@ -9,6 +9,7 @@ import '../../application/weekly_commitment_providers.dart';
 import '../../domain/models/weekly_commitment.dart';
 
 import '../../../../core/presentation/app_colors.dart';
+import '../../../../core/presentation/async_value_ui.dart';
 
 class WeeklyCommitmentsView extends ConsumerWidget {
   const WeeklyCommitmentsView({super.key, required this.circleId});
@@ -18,17 +19,22 @@ class WeeklyCommitmentsView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    final commitmentsAsync =
-        ref.watch(circleWeeklyCommitmentsProvider(circleId));
+    final commitmentsAsync = ref.watch(
+      circleWeeklyCommitmentsProvider(circleId),
+    );
 
     return commitmentsAsync.when(
       loading: () => const Center(
         child: CircularProgressIndicator(color: AppColors.accent),
       ),
-      error: (_, __) => const Center(
-        child: Text(
-          'Could not load commitments.',
-          style: TextStyle(color: AppColors.textMuted),
+      error: (e, _) => swallowedAsyncError(
+        'weekly_commitments_view',
+        e,
+        const Center(
+          child: Text(
+            'Could not load commitments.',
+            style: TextStyle(color: AppColors.textMuted),
+          ),
         ),
       ),
       data: (all) {
@@ -49,23 +55,23 @@ class WeeklyCommitmentsView extends ConsumerWidget {
             _SectionHeader(
               'My commitments this week',
               trailing: TextButton.icon(
-                onPressed: () => _showEditSheet(context, ref, uid, weekKey, mine),
-                icon: const Icon(Icons.edit_rounded, size: 14,
-                    color: AppColors.accent),
+                onPressed: () =>
+                    _showEditSheet(context, ref, uid, weekKey, mine),
+                icon: const Icon(
+                  Icons.edit_rounded,
+                  size: 14,
+                  color: AppColors.accent,
+                ),
                 label: const Text(
                   'Edit',
-                  style: TextStyle(
-                    color: AppColors.accent,
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: AppColors.accent, fontSize: 13),
                 ),
               ),
             ),
             const SizedBox(height: 8),
             if (mine.isEmpty)
               _EmptyMyCommitments(
-                onAdd: () =>
-                    _showEditSheet(context, ref, uid, weekKey, mine),
+                onAdd: () => _showEditSheet(context, ref, uid, weekKey, mine),
               )
             else
               ...mine.map(
@@ -101,7 +107,8 @@ class WeeklyCommitmentsView extends ConsumerWidget {
   }
 
   Map<String, List<WeeklyCommitment>> _groupByUser(
-      List<WeeklyCommitment> commitments) {
+    List<WeeklyCommitment> commitments,
+  ) {
     final map = <String, List<WeeklyCommitment>>{};
     for (final c in commitments) {
       map.putIfAbsent(c.userId, () => []).add(c);
@@ -169,11 +176,13 @@ class _EditCommitmentsSheetState extends State<_EditCommitmentsSheet> {
   void initState() {
     super.initState();
     _drafts = widget.existing
-        .map((c) => _DraftCommitment(
-              id: c.id,
-              titleController: TextEditingController(text: c.title),
-              target: c.targetCount,
-            ))
+        .map(
+          (c) => _DraftCommitment(
+            id: c.id,
+            titleController: TextEditingController(text: c.title),
+            target: c.targetCount,
+          ),
+        )
         .toList();
     if (_drafts.isEmpty) _addRow();
   }
@@ -189,11 +198,13 @@ class _EditCommitmentsSheetState extends State<_EditCommitmentsSheet> {
   void _addRow() {
     if (_drafts.length >= 3) return;
     setState(() {
-      _drafts.add(_DraftCommitment(
-        id: StableId.generate('wc'),
-        titleController: TextEditingController(),
-        target: 3,
-      ));
+      _drafts.add(
+        _DraftCommitment(
+          id: StableId.generate('wc'),
+          titleController: TextEditingController(),
+          target: 3,
+        ),
+      );
     });
   }
 
@@ -203,7 +214,9 @@ class _EditCommitmentsSheetState extends State<_EditCommitmentsSheet> {
   }
 
   Future<void> _save() async {
-    final valid = _drafts.where((d) => d.titleController.text.trim().isNotEmpty);
+    final valid = _drafts.where(
+      (d) => d.titleController.text.trim().isNotEmpty,
+    );
     if (valid.isEmpty) {
       Navigator.pop(context);
       return;
@@ -213,22 +226,28 @@ class _EditCommitmentsSheetState extends State<_EditCommitmentsSheet> {
     try {
       final now = DateTime.now().millisecondsSinceEpoch;
       final commitments = valid
-          .map((d) => WeeklyCommitment(
-                id: d.id,
-                circleId: widget.circleId,
-                userId: widget.uid,
-                title: d.titleController.text.trim(),
-                targetCount: d.target,
-                completedCount: widget.existing
-                    .where((e) => e.id == d.id)
-                    .map((e) => e.completedCount)
-                    .firstOrNull ?? 0,
-                weekKey: widget.weekKey,
-                updatedAtMs: now,
-              ))
+          .map(
+            (d) => WeeklyCommitment(
+              id: d.id,
+              circleId: widget.circleId,
+              userId: widget.uid,
+              title: d.titleController.text.trim(),
+              targetCount: d.target,
+              completedCount:
+                  widget.existing
+                      .where((e) => e.id == d.id)
+                      .map((e) => e.completedCount)
+                      .firstOrNull ??
+                  0,
+              weekKey: widget.weekKey,
+              updatedAtMs: now,
+            ),
+          )
           .toList();
 
-      await widget.ref.read(weeklyCommitmentRepositoryProvider).setCommitments(
+      await widget.ref
+          .read(weeklyCommitmentRepositoryProvider)
+          .setCommitments(
             circleId: widget.circleId,
             userId: widget.uid,
             weekKey: widget.weekKey,
@@ -251,92 +270,91 @@ class _EditCommitmentsSheetState extends State<_EditCommitmentsSheet> {
   Widget build(BuildContext context) {
     return KeyboardDismissOnTap(
       child: Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'My commitments this week',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _drafts.length,
-                itemBuilder: (_, i) => _DraftRow(
-                  draft: _drafts[i],
-                  canRemove: _drafts.length > 1,
-                  onRemove: () => _removeRow(i),
-                  onTargetChanged: (v) =>
-                      setState(() => _drafts[i].target = v),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ),
-            if (_drafts.length < 3)
-              TextButton.icon(
-                onPressed: _addRow,
-                icon: const Icon(Icons.add_rounded,
-                    color: AppColors.accent),
-                label: const Text(
-                  'Add commitment',
-                  style: TextStyle(color: AppColors.accent),
+              const SizedBox(height: 16),
+              const Text(
+                'My commitments this week',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _saving ? null : _save,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: Colors.black,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _drafts.length,
+                  itemBuilder: (_, i) => _DraftRow(
+                    draft: _drafts[i],
+                    canRemove: _drafts.length > 1,
+                    onRemove: () => _removeRow(i),
+                    onTargetChanged: (v) =>
+                        setState(() => _drafts[i].target = v),
                   ),
-                  child: _saving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.black,
-                          ),
-                        )
-                      : const Text(
-                          'Save',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
                 ),
               ),
-            ),
-          ],
+              if (_drafts.length < 3)
+                TextButton.icon(
+                  onPressed: _addRow,
+                  icon: const Icon(Icons.add_rounded, color: AppColors.accent),
+                  label: const Text(
+                    'Add commitment',
+                    style: TextStyle(color: AppColors.accent),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _saving ? null : _save,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.black,
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.black,
+                            ),
+                          )
+                        : const Text(
+                            'Save',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 }
@@ -400,17 +418,17 @@ class _DraftRow extends StatelessWidget {
             underline: const SizedBox.shrink(),
             items: List.generate(
               7,
-              (i) => DropdownMenuItem(
-                value: i + 1,
-                child: Text('×${i + 1}'),
-              ),
+              (i) => DropdownMenuItem(value: i + 1, child: Text('×${i + 1}')),
             ),
             onChanged: (v) => onTargetChanged(v ?? 1),
           ),
           if (canRemove)
             IconButton(
-              icon: const Icon(Icons.remove_circle_outline_rounded,
-                  color: AppColors.danger, size: 20),
+              icon: const Icon(
+                Icons.remove_circle_outline_rounded,
+                color: AppColors.danger,
+                size: 20,
+              ),
               onPressed: onRemove,
             ),
         ],
@@ -440,9 +458,7 @@ class _CommitmentRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.06),
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: Row(
         children: [
@@ -500,9 +516,7 @@ class _ProgressTicks extends StatelessWidget {
             width: 14,
             height: 14,
             decoration: BoxDecoration(
-              color: done
-                  ? AppColors.accent
-                  : AppColors.surfaceCard,
+              color: done ? AppColors.accent : AppColors.surfaceCard,
               shape: BoxShape.circle,
               border: Border.all(
                 color: done
@@ -511,8 +525,7 @@ class _ProgressTicks extends StatelessWidget {
               ),
             ),
             child: done
-                ? const Icon(Icons.check_rounded,
-                    size: 9, color: Colors.black)
+                ? const Icon(Icons.check_rounded, size: 9, color: Colors.black)
                 : null,
           ),
         );
@@ -550,9 +563,7 @@ class _MemberCommitmentsGroup extends StatelessWidget {
             ),
           ),
         ),
-        ...commitments.map(
-          (c) => _CommitmentRow(commitment: c, isOwn: false),
-        ),
+        ...commitments.map((c) => _CommitmentRow(commitment: c, isOwn: false)),
       ],
     );
   }
@@ -567,7 +578,9 @@ class _EndOfWeekBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = commitments.length;
-    final done = commitments.where((c) => c.completedCount >= c.targetCount).length;
+    final done = commitments
+        .where((c) => c.completedCount >= c.targetCount)
+        .length;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -575,9 +588,7 @@ class _EndOfWeekBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.accent.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.25),
-        ),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
@@ -648,16 +659,15 @@ class _EmptyMyCommitments extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.add_circle_outline_rounded,
-                color: AppColors.accent),
+            const Icon(
+              Icons.add_circle_outline_rounded,
+              color: AppColors.accent,
+            ),
             const SizedBox(width: 12),
             const Expanded(
               child: Text(
                 'Set your commitments for this week',
-                style: TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: AppColors.textMuted, fontSize: 14),
               ),
             ),
           ],

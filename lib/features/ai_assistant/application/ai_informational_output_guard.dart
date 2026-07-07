@@ -24,9 +24,7 @@ abstract final class AiInformationalOutputGuard {
     if (text.trim().isEmpty) return false;
     if (_uuidPattern.hasMatch(text)) return true;
     final lower = text.toLowerCase();
-    return _forbiddenTokens.any(
-      (token) => lower.contains(token.toLowerCase()),
-    );
+    return _forbiddenTokens.any((token) => lower.contains(token.toLowerCase()));
   }
 
   /// Returns [text] unchanged, or a safe fallback when internal details leak.

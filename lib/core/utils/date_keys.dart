@@ -17,7 +17,11 @@ class DateKeys {
 
   static String tomorrowKey([DateTime? now]) {
     final base = now ?? DateTime.now();
-    final tmr = DateTime(base.year, base.month, base.day).add(const Duration(days: 1));
+    final tmr = DateTime(
+      base.year,
+      base.month,
+      base.day,
+    ).add(const Duration(days: 1));
     return yyyymmdd(tmr);
   }
 
@@ -27,15 +31,14 @@ class DateKeys {
   /// Thursday of the year. Monday is the start of the week.
   static String isoWeekKey(DateTime date) {
     // Shift to nearest Thursday to find the ISO year.
-    final thursday =
-        date.add(Duration(days: DateTime.thursday - date.weekday));
+    final thursday = date.add(Duration(days: DateTime.thursday - date.weekday));
     final year = thursday.year;
     // Week 1 starts on the Monday of the week containing Jan 4.
     final jan4 = DateTime(year, 1, 4);
-    final week1Monday =
-        jan4.subtract(Duration(days: jan4.weekday - DateTime.monday));
-    final weekNumber =
-        ((date.difference(week1Monday).inDays) ~/ 7) + 1;
+    final week1Monday = jan4.subtract(
+      Duration(days: jan4.weekday - DateTime.monday),
+    );
+    final weekNumber = ((date.difference(week1Monday).inDays) ~/ 7) + 1;
     return '$year-W${weekNumber.toString().padLeft(2, '0')}';
   }
 

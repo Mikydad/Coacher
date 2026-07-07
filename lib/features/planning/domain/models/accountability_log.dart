@@ -1,11 +1,7 @@
 import '../../../../core/validation/model_validators.dart';
 import 'flow_transition_event.dart';
 
-enum AccountabilityAction {
-  reshuffle,
-  defer,
-  skip,
-}
+enum AccountabilityAction { reshuffle, defer, skip }
 
 extension AccountabilityActionStorage on AccountabilityAction {
   String get storageValue => name;
@@ -50,7 +46,8 @@ class AccountabilityLog {
   };
 
   static AccountabilityLog fromMap(Map<String, dynamic> map) {
-    final rawAction = (map['action'] as String?) ?? AccountabilityAction.defer.storageValue;
+    final rawAction =
+        (map['action'] as String?) ?? AccountabilityAction.defer.storageValue;
     final action = AccountabilityAction.values.firstWhere(
       (a) => a.storageValue == rawAction,
       orElse: () => AccountabilityAction.defer,
@@ -59,7 +56,9 @@ class AccountabilityLog {
       id: map['id'] as String? ?? '',
       taskId: map['taskId'] as String? ?? '',
       action: action,
-      reasonCategory: OverrideReasonCategoryStorage.fromStorage(map['reasonCategory'] as String?),
+      reasonCategory: OverrideReasonCategoryStorage.fromStorage(
+        map['reasonCategory'] as String?,
+      ),
       reasonNote: map['reasonNote'] as String? ?? '',
       modeRefId: map['modeRefId'] as String?,
       taskPriority: (map['taskPriority'] as num?)?.toInt(),

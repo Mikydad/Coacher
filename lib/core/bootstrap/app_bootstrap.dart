@@ -101,8 +101,9 @@ class AppBootstrap {
     final user = await _awaitSignedInUser();
     if (user != null) {
       try {
-        final goals =
-            await container.read(goalsRepositoryProvider).fetchGoalsOnce();
+        final goals = await container
+            .read(goalsRepositoryProvider)
+            .fetchGoalsOnce();
         await container
             .read(goalReminderSyncServiceProvider)
             .applyForGoals(goals);

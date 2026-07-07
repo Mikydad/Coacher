@@ -12,11 +12,12 @@ import 'conflict_move_panel.dart';
 enum _SheetMode { chooseAction, moveOther }
 
 /// Fired when the user resolves a conflict inline (move existing / proposed).
-typedef OnOverlapResolvedInline = void Function({
-  required String movedEntity,
-  required Object suggestionIndex,
-  String? conflictingEntityId,
-});
+typedef OnOverlapResolvedInline =
+    void Function({
+      required String movedEntity,
+      required Object suggestionIndex,
+      String? conflictingEntityId,
+    });
 
 /// Inline resolver for moderate/severe scheduling conflicts.
 class SchedulingConflictSheet extends StatefulWidget {
@@ -42,7 +43,8 @@ class SchedulingConflictSheet extends StatefulWidget {
   final Future<Map<String, String>> Function() loadEntityTitles;
   final DateTime planDay;
   final Set<String> ignoreEntityIds;
-  final void Function(DateTime start, int durationMinutes)? onAdjustProposedSchedule;
+  final void Function(DateTime start, int durationMinutes)?
+  onAdjustProposedSchedule;
   final VoidCallback? onEntityMoved;
   final OnOverlapResolvedInline? onOverlapResolvedInline;
 
@@ -56,7 +58,8 @@ class SchedulingConflictSheet extends StatefulWidget {
     required Future<Map<String, String>> Function() loadEntityTitles,
     required DateTime planDay,
     Set<String> ignoreEntityIds = const {},
-    void Function(DateTime start, int durationMinutes)? onAdjustProposedSchedule,
+    void Function(DateTime start, int durationMinutes)?
+    onAdjustProposedSchedule,
     VoidCallback? onEntityMoved,
     OnOverlapResolvedInline? onOverlapResolvedInline,
   }) {
@@ -84,7 +87,8 @@ class SchedulingConflictSheet extends StatefulWidget {
   }
 
   @override
-  State<SchedulingConflictSheet> createState() => _SchedulingConflictSheetState();
+  State<SchedulingConflictSheet> createState() =>
+      _SchedulingConflictSheetState();
 }
 
 class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
@@ -149,9 +153,12 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
     setState(() {
       if (result.hasConflicts) {
         _conflicts = result.conflicts;
-        final stillSelected = _selectedConflict != null &&
+        final stillSelected =
+            _selectedConflict != null &&
             _conflicts.any(
-              (c) => c.conflictingEntityId == _selectedConflict!.conflictingEntityId,
+              (c) =>
+                  c.conflictingEntityId ==
+                  _selectedConflict!.conflictingEntityId,
             );
         if (!stillSelected && _conflicts.isNotEmpty) {
           _selectedConflict = _conflicts.first;
@@ -185,7 +192,8 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
     final blocks = await widget.resolutionPort.blocksForPlanDay(widget.planDay);
     if (!mounted) return;
 
-    final afterTime = block?.computedEndAt ??
+    final afterTime =
+        block?.computedEndAt ??
         widget.proposedBlock.startAt.add(
           Duration(minutes: target.overlapMinutes),
         );
@@ -266,9 +274,9 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not move: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not move: $e')));
     }
   }
 
@@ -285,10 +293,7 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
     );
 
     if (!mounted) return;
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: initial,
-    );
+    final picked = await showTimePicker(context: context, initialTime: initial);
     if (picked == null || !mounted) return;
 
     final newStart = roundDateTimeToFiveMinutes(
@@ -390,9 +395,9 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
     final worst = _conflicts
         .map((c) => c.severityLabel)
         .fold<ConflictSeverity?>(null, (prev, s) {
-      if (prev == null) return s;
-      return s.index > prev.index ? s : prev;
-    });
+          if (prev == null) return s;
+          return s.index > prev.index ? s : prev;
+        });
 
     return SafeArea(
       child: Padding(
@@ -430,8 +435,8 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
                     child: Text(
                       'Scheduling conflict',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -444,24 +449,25 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
                       ? widget.initialConflicts.length
                       : _conflicts.length,
                 ),
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: Colors.white60),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: Colors.white60),
               ),
-              if (_conflicts.length > 1 && _mode == _SheetMode.chooseAction) ...[
+              if (_conflicts.length > 1 &&
+                  _mode == _SheetMode.chooseAction) ...[
                 const SizedBox(height: 12),
                 Text(
                   'Resolve one at a time',
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: Colors.white54,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelMedium?.copyWith(color: Colors.white54),
                 ),
                 const SizedBox(height: 6),
                 for (final c in _visibleConflicts)
                   _ConflictPickRow(
                     conflict: c,
-                    selected: _selectedConflict?.conflictingEntityId ==
+                    selected:
+                        _selectedConflict?.conflictingEntityId ==
                         c.conflictingEntityId,
                     onTap: _busy
                         ? null
@@ -485,7 +491,11 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
               for (final chip in _appliedConfirmations) ...[
                 const SizedBox(height: 8),
                 Chip(
-                  avatar: const Icon(Icons.check, size: 16, color: Colors.greenAccent),
+                  avatar: const Icon(
+                    Icons.check,
+                    size: 16,
+                    color: Colors.greenAccent,
+                  ),
                   label: Text(chip, style: const TextStyle(fontSize: 12)),
                   backgroundColor: Colors.green.withAlpha(30),
                 ),
@@ -494,9 +504,9 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
               if (_mode == _SheetMode.chooseAction) ...[
                 Text(
                   'Choose an action',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Colors.white70,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(color: Colors.white70),
                 ),
                 const SizedBox(height: 10),
                 if (target != null)
@@ -530,10 +540,8 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
                   suggestions: _suggestions,
                   durationMinutes: _moveDurationMinutes,
                   busy: _busy,
-                  onApplySuggestion: (s) => _applyMove(
-                    s.startAt,
-                    suggestionIndex: s.suggestionIndex,
-                  ),
+                  onApplySuggestion: (s) =>
+                      _applyMove(s.startAt, suggestionIndex: s.suggestionIndex),
                   onCustomTime: _pickCustomTime,
                 ),
                 const SizedBox(height: 12),
@@ -541,9 +549,9 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
                   onPressed: _busy
                       ? null
                       : () => setState(() {
-                            _mode = _SheetMode.chooseAction;
-                            _activeConflict = null;
-                          }),
+                          _mode = _SheetMode.chooseAction;
+                          _activeConflict = null;
+                        }),
                   child: const Text('Back'),
                 ),
               ],
@@ -552,9 +560,9 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
                 Text(
                   'Ready to save',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Colors.greenAccent,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: Colors.greenAccent,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 8),
               ],
@@ -607,7 +615,9 @@ class _ConflictPickRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Material(
-        color: selected ? Colors.white.withAlpha(18) : Colors.white.withAlpha(6),
+        color: selected
+            ? Colors.white.withAlpha(18)
+            : Colors.white.withAlpha(6),
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           onTap: onTap,
@@ -617,7 +627,9 @@ class _ConflictPickRow extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                  selected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
                   size: 18,
                   color: selected ? Colors.blueAccent : Colors.white38,
                 ),

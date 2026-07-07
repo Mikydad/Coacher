@@ -48,18 +48,27 @@ class NotificationReconciliationService {
     try {
       await _reconcile();
     } catch (e, st) {
-      debugPrint('[NotificationReconciliation] error during reconcile: $e\n$st');
+      debugPrint(
+        '[NotificationReconciliation] error during reconcile: $e\n$st',
+      );
     }
   }
 
   Future<void> _reconcile() async {
     // 1. Read OS tray.
     final active = await notifications.getActiveNotifications();
-    final activeIds = {for (final n in active) if (n.id != null) n.id!};
+    final activeIds = {
+      for (final n in active)
+        if (n.id != null) n.id!,
+    };
 
     // 2. Fetch pending ledger entries.
-    final scheduled = await ledger.getByState(NotificationLedgerState.scheduled);
-    final delivered = await ledger.getByState(NotificationLedgerState.delivered);
+    final scheduled = await ledger.getByState(
+      NotificationLedgerState.scheduled,
+    );
+    final delivered = await ledger.getByState(
+      NotificationLedgerState.delivered,
+    );
     final pending = [...scheduled, ...delivered];
 
     // 3. Ledger entries missing from the OS tray.
@@ -85,7 +94,11 @@ class NotificationReconciliationService {
         );
         try {
           await notifications.cancel(id);
-        } catch (_) {}
+        } catch (e) {
+          debugPrint(
+            'notification_reconciliation_service: swallowed error: $e',
+          );
+        }
       }
     }
   }

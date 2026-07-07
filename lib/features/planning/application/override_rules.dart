@@ -4,10 +4,16 @@ import '../../execution/domain/models/timer_session.dart';
 import 'effective_task_mode.dart';
 
 abstract final class OverrideRules {
-  static bool requiresStrictOverrideConfirm(PlannedTask task, {Routine? routine}) {
+  static bool requiresStrictOverrideConfirm(
+    PlannedTask task, {
+    Routine? routine,
+  }) {
     if (task.priority <= 2) return true;
     if (task.strictModeRequired) return true;
-    final mode = EffectiveTaskMode.effectiveModeRefId(task: task, routine: routine);
+    final mode = EffectiveTaskMode.effectiveModeRefId(
+      task: task,
+      routine: routine,
+    );
     if (mode == 'disciplined' || mode == 'extreme') return true;
     return false;
   }
@@ -18,7 +24,10 @@ abstract final class OverrideRules {
 
   static bool requiresMandatoryTimer(PlannedTask task, {Routine? routine}) {
     if (task.strictModeRequired) return true;
-    final mode = EffectiveTaskMode.effectiveModeRefId(task: task, routine: routine);
+    final mode = EffectiveTaskMode.effectiveModeRefId(
+      task: task,
+      routine: routine,
+    );
     if (mode == 'disciplined' || mode == 'extreme') return true;
     return false;
   }

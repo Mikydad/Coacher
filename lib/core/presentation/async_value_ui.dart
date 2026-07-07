@@ -21,3 +21,12 @@ Widget asyncWhenStale<T>(
         : (_, __) => const SizedBox.shrink(),
   );
 }
+
+/// Logs an error that a UI error-handler would otherwise swallow silently,
+/// then returns the fallback. Silent handlers hid real outages (errors.md
+/// #18: a failed query showed only "Could not load…" with no diagnosable
+/// cause). Keep the log; keep the calm UI.
+T swallowedAsyncError<T>(String where, Object error, T fallback) {
+  debugPrint('$where: swallowed error: $error');
+  return fallback;
+}

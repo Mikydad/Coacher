@@ -100,28 +100,29 @@ class AiOperatingLayerPayload {
   final List<String> tomorrowFreeWindows;
 
   Map<String, dynamic> toJson() => {
-        'userInput': userInput,
-        'activeTasks': activeTasks,
-        'goals': goals,
-        'todaySchedule': todaySchedule,
-        'tomorrowTasks': tomorrowTasks,
-        'tomorrowSchedule': tomorrowSchedule,
-        if (weekOverview.isNotEmpty) 'weekOverview': weekOverview,
-        'focusState': focusState,
-        if (contextOverride != null) 'contextOverride': contextOverride,
-        'behaviorPreferences': behaviorPreferences,
-        'sessionHistory': sessionHistory,
-        if (recentPatterns.isNotEmpty) 'recentPatterns': recentPatterns,
-        if (conversationHistory.isNotEmpty) 'conversationHistory': conversationHistory,
-        if (completedInSession.isNotEmpty) 'completedInSession': completedInSession,
-        if (goalProgress.isNotEmpty) 'goalProgress': goalProgress,
-        if (capabilities.isNotEmpty) 'capabilities': capabilities,
-        if (intentHint != null) 'intentHint': intentHint,
-        if (intentKind != null) 'intentKind': intentKind,
-        if (proactiveContext != null) 'proactiveContext': proactiveContext,
-        if (previousPlan != null) 'previousPlan': previousPlan,
-        if (todayFreeWindows.isNotEmpty) 'todayFreeWindows': todayFreeWindows,
-        if (tomorrowFreeWindows.isNotEmpty)
-          'tomorrowFreeWindows': tomorrowFreeWindows,
-      };
+    'userInput': userInput,
+    'activeTasks': activeTasks,
+    'goals': goals,
+    'todaySchedule': todaySchedule,
+    'tomorrowTasks': tomorrowTasks,
+    'tomorrowSchedule': tomorrowSchedule,
+    if (weekOverview.isNotEmpty) 'weekOverview': weekOverview,
+    'focusState': focusState,
+    if (contextOverride != null) 'contextOverride': contextOverride,
+    'behaviorPreferences': behaviorPreferences,
+    'sessionHistory': sessionHistory,
+    if (recentPatterns.isNotEmpty) 'recentPatterns': recentPatterns,
+    if (conversationHistory.isNotEmpty)
+      'conversationHistory': conversationHistory,
+    if (completedInSession.isNotEmpty) 'completedInSession': completedInSession,
+    if (goalProgress.isNotEmpty) 'goalProgress': goalProgress,
+    if (capabilities.isNotEmpty) 'capabilities': capabilities,
+    if (intentHint != null) 'intentHint': intentHint,
+    if (intentKind != null) 'intentKind': intentKind,
+    if (proactiveContext != null) 'proactiveContext': proactiveContext,
+    if (previousPlan != null) 'previousPlan': previousPlan,
+    if (todayFreeWindows.isNotEmpty) 'todayFreeWindows': todayFreeWindows,
+    if (tomorrowFreeWindows.isNotEmpty)
+      'tomorrowFreeWindows': tomorrowFreeWindows,
+  };
 }

@@ -93,7 +93,8 @@ class PostOverrideReviewCard extends ConsumerWidget {
               for (final item in review.suppressedItems.take(5)) ...[
                 _SuppressedItemRow(
                   item: item,
-                  onAction: (action) => _handleAction(ref, review, item, action),
+                  onAction: (action) =>
+                      _handleAction(ref, review, item, action),
                 ),
                 const SizedBox(height: 6),
               ],
@@ -101,10 +102,7 @@ class PostOverrideReviewCard extends ConsumerWidget {
               if (review.suppressedItems.length > 5)
                 Text(
                   '+${review.suppressedItems.length - 5} more items',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.white38,
-                  ),
+                  style: const TextStyle(fontSize: 12, color: Colors.white38),
                 ),
             ],
 

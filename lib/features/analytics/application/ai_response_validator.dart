@@ -44,15 +44,11 @@ class AiResponseValidator {
       );
     }
     if (summaryWords > kAiSummaryMaxSummaryWords) {
-      return response.withValidationOutcome(
-        AiSummaryValidationOutcome.tooLong,
-      );
+      return response.withValidationOutcome(AiSummaryValidationOutcome.tooLong);
     }
     final recommendationWords = _wordCount(response.mainRecommendation);
     if (recommendationWords > kAiSummaryMaxRecommendationWords) {
-      return response.withValidationOutcome(
-        AiSummaryValidationOutcome.tooLong,
-      );
+      return response.withValidationOutcome(AiSummaryValidationOutcome.tooLong);
     }
 
     // 3. Tone must match expected framing tone

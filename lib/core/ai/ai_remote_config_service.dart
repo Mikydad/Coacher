@@ -27,16 +27,17 @@ class AiRemoteConfigService {
     if (_initialized) return;
     try {
       final rc = FirebaseRemoteConfig.instance;
-      await rc.setConfigSettings(RemoteConfigSettings(
-        fetchTimeout: const Duration(seconds: 10),
-        minimumFetchInterval: kDebugMode
-            ? Duration.zero         // instant refresh in debug
-            : kRemoteConfigFetchInterval,
-      ));
+      await rc.setConfigSettings(
+        RemoteConfigSettings(
+          fetchTimeout: const Duration(seconds: 10),
+          minimumFetchInterval: kDebugMode
+              ? Duration
+                    .zero // instant refresh in debug
+              : kRemoteConfigFetchInterval,
+        ),
+      );
       // Sensible defaults so the app never crashes before first fetch.
-      await rc.setDefaults(const {
-        kRemoteConfigAiEnabled: true,
-      });
+      await rc.setDefaults(const {kRemoteConfigAiEnabled: true});
       await rc.fetchAndActivate();
       _initialized = true;
       debugPrint('[AiRemoteConfigService] Initialized and activated.');

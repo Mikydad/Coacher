@@ -24,6 +24,7 @@ class PlannedTask {
     required this.createdAtMs,
     required this.updatedAtMs,
     this.category,
+
     /// Calendar day this task is planned for (`yyyy-MM-dd`). When set, lists for
     /// other days must ignore the task even if path data is inconsistent.
     this.planDateKey,
@@ -46,16 +47,21 @@ class PlannedTask {
   final TaskStatus status;
   final int createdAtMs;
   final int updatedAtMs;
+
   /// Optional label from Add Task classification chips (Study, Fitness, …).
   final String? category;
   final String? planDateKey;
   final String? notes;
+
   /// Optional user-defined order inside block (used by V2 sequence flow).
   final int? sequenceIndex;
+
   /// If true, this task behaves as a stable habit anchor in priority/overlap checks.
   final bool isHabitAnchor;
+
   /// Whether strict mode policy should be enforced for this task.
   final bool strictModeRequired;
+
   /// Optional policy/mode config id reference used during execution.
   final String? modeRefId;
 

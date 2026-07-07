@@ -112,7 +112,9 @@ class DeliveryDecision {
     return DeliveryDecision(
       selectedPrimaryInsightId: map['selectedPrimaryInsightId'] as String?,
       selectedSecondaryInsightId: map['selectedSecondaryInsightId'] as String?,
-      targetSurface: deliverySurfaceFromStorage(map['targetSurface'] as String?),
+      targetSurface: deliverySurfaceFromStorage(
+        map['targetSurface'] as String?,
+      ),
       shouldNotify: map['shouldNotify'] as bool? ?? false,
       decisionReasonCodes: reasonCodes,
       evaluatedAtMs: (map['evaluatedAtMs'] as num?)?.toInt() ?? 0,
@@ -149,7 +151,10 @@ class DeliveryHistoryEntry {
   final int schemaVersion;
 
   void validate() {
-    ModelValidators.requireNotBlank(insightId, 'deliveryHistoryEntry.insightId');
+    ModelValidators.requireNotBlank(
+      insightId,
+      'deliveryHistoryEntry.insightId',
+    );
     ModelValidators.requireNotBlank(scopeId, 'deliveryHistoryEntry.scopeId');
     ModelValidators.requireRange(
       value: schemaVersion,

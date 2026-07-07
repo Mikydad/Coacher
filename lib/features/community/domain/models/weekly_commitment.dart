@@ -39,24 +39,26 @@ class WeeklyCommitment {
     }
     if (targetCount < 1 || targetCount > 7) {
       throw ArgumentError(
-          'weekly_commitment.targetCount must be 1–7, got $targetCount');
+        'weekly_commitment.targetCount must be 1–7, got $targetCount',
+      );
     }
     if (completedCount > targetCount) {
       throw ArgumentError(
-          'weekly_commitment.completedCount ($completedCount) exceeds targetCount ($targetCount)');
+        'weekly_commitment.completedCount ($completedCount) exceeds targetCount ($targetCount)',
+      );
     }
   }
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'circleId': circleId,
-        'userId': userId,
-        'title': title,
-        'targetCount': targetCount,
-        'completedCount': completedCount,
-        'weekKey': weekKey,
-        'updatedAtMs': updatedAtMs,
-      };
+    'id': id,
+    'circleId': circleId,
+    'userId': userId,
+    'title': title,
+    'targetCount': targetCount,
+    'completedCount': completedCount,
+    'weekKey': weekKey,
+    'updatedAtMs': updatedAtMs,
+  };
 
   static WeeklyCommitment fromMap(Map<String, dynamic> map) {
     return WeeklyCommitment(

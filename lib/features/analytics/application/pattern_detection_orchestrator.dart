@@ -80,8 +80,8 @@ class PatternDetectionOrchestrator {
             note: 'batch_skipped_unchanged_input',
           ),
         );
-        final storedCanonical =
-            await _patternRepository.readGlobalBehaviorSnapshot(dateKey: dateKey);
+        final storedCanonical = await _patternRepository
+            .readGlobalBehaviorSnapshot(dateKey: dateKey);
         BehaviorPatternPhase2AggregateBuildResult? builtCanonical;
         if (storedCanonical == null) {
           builtCanonical = _buildCanonicalAggregate(
@@ -92,8 +92,7 @@ class PatternDetectionOrchestrator {
             detectedAtMs: ts.millisecondsSinceEpoch,
           );
         }
-        final canonicalSnapshot =
-            storedCanonical ?? builtCanonical!.snapshot;
+        final canonicalSnapshot = storedCanonical ?? builtCanonical!.snapshot;
         final canonicalMetadata = storedCanonical != null
             ? _canonicalMetaFromSnapshot(
                 storedCanonical,
@@ -209,7 +208,9 @@ class PatternDetectionOrchestrator {
         dateKey: dateKey,
       );
       if (behavior.isEmpty && existing.isNotEmpty) {
-        final ctx = PatternDetectionContext(detectedAtMs: ts.millisecondsSinceEpoch);
+        final ctx = PatternDetectionContext(
+          detectedAtMs: ts.millisecondsSinceEpoch,
+        );
         behavior = wrapDetectedPatternsWithEvidence(
           feature: feature,
           detected: detectPatternsForFeature(feature: feature, context: ctx),

@@ -52,10 +52,7 @@ class UnifiedRecomputeGraph {
     _pendingScope = _pendingScope.merge(scope);
     _generation++;
     _timer?.cancel();
-    _timer = Timer(
-      debugDurationOverride ?? kDebounce,
-      _flush,
-    );
+    _timer = Timer(debugDurationOverride ?? kDebounce, _flush);
   }
 
   Future<void> _flush() async {
@@ -68,7 +65,9 @@ class UnifiedRecomputeGraph {
 
     final container = _container;
     if (container == null) {
-      debugPrint('[UnifiedRecomputeGraph] flush called before attachContainer — skipping invalidations');
+      debugPrint(
+        '[UnifiedRecomputeGraph] flush called before attachContainer — skipping invalidations',
+      );
       return;
     }
 
@@ -76,7 +75,9 @@ class UnifiedRecomputeGraph {
     // Overlap re-check requires TimeBlockSyncService — deferred to Phase 1-A
     // T3 when the coordinator can inject it. Logged for now.
     if (scope.overlaps) {
-      debugPrint('[UnifiedRecomputeGraph] step:overlaps (pending coordinator wiring)');
+      debugPrint(
+        '[UnifiedRecomputeGraph] step:overlaps (pending coordinator wiring)',
+      );
     }
 
     if (_generationChanged(capturedGeneration)) return;
@@ -125,13 +126,17 @@ class UnifiedRecomputeGraph {
     // ── Step 7: Notification reconciliation ───────────────────────────────
     // Wired in Phase 1-B when NotificationLedger is in place.
     if (scope.notifications) {
-      debugPrint('[UnifiedRecomputeGraph] step:notifications (pending Phase 1-B wiring)');
+      debugPrint(
+        '[UnifiedRecomputeGraph] step:notifications (pending Phase 1-B wiring)',
+      );
     }
   }
 
   bool _generationChanged(int capturedGeneration) {
     if (_generation != capturedGeneration) {
-      debugPrint('[UnifiedRecomputeGraph] generation changed — aborting stale flush');
+      debugPrint(
+        '[UnifiedRecomputeGraph] generation changed — aborting stale flush',
+      );
       return true;
     }
     return false;

@@ -61,7 +61,9 @@ class IsarGoal {
       categoryId: categoryId,
       horizon: GoalHorizonStorage.fromStorage(horizonStorage),
       status: GoalStatusStorage.fromStorage(statusStorage),
-      measurementKind: MeasurementKindStorage.fromStorage(measurementKindStorage),
+      measurementKind: MeasurementKindStorage.fromStorage(
+        measurementKindStorage,
+      ),
       targetValue: targetValue,
       customLabel: customLabel,
       intensity: intensity,

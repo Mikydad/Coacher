@@ -5,16 +5,20 @@ import 'analytics_repository.dart';
 
 const String layer2EntityPatternsScope = 'layer2_entity_patterns';
 const String layer2GlobalPatternsScope = 'layer2_global_patterns';
-const String layer2CanonicalEntityPatternsScope = 'layer2_canonical_entity_patterns';
-const String layer2CanonicalGlobalPatternsScope = 'layer2_canonical_global_patterns';
+const String layer2CanonicalEntityPatternsScope =
+    'layer2_canonical_entity_patterns';
+const String layer2CanonicalGlobalPatternsScope =
+    'layer2_canonical_global_patterns';
 
 String _entityStatsId({required String entityId, required String dateKey}) =>
     'layer2::entity::$entityId::$dateKey';
 
 String _globalStatsId({required String dateKey}) => 'layer2::global::$dateKey';
 
-String _entityCanonicalStatsId({required String entityId, required String dateKey}) =>
-    'layer2::canonical_entity::$entityId::$dateKey';
+String _entityCanonicalStatsId({
+  required String entityId,
+  required String dateKey,
+}) => 'layer2::canonical_entity::$entityId::$dateKey';
 
 String _globalCanonicalStatsId({required String dateKey}) =>
     'layer2::canonical_global::$dateKey';
@@ -48,7 +52,9 @@ abstract class PatternDetectionRepository {
     required String dateKey,
   });
 
-  Future<void> upsertGlobalBehaviorSnapshot(GlobalBehaviorPatternSnapshot snapshot);
+  Future<void> upsertGlobalBehaviorSnapshot(
+    GlobalBehaviorPatternSnapshot snapshot,
+  );
 
   Future<GlobalBehaviorPatternSnapshot?> readGlobalBehaviorSnapshot({
     required String dateKey,

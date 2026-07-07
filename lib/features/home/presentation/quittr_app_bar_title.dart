@@ -11,10 +11,9 @@ class QuittrAppBarTitle extends StatelessWidget {
   static void goHome(BuildContext context) {
     final container = ProviderScope.containerOf(context);
     container.read(mainTabIndexProvider.notifier).state = MainTabIndex.home;
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      MainTabShell.routeName,
-      (route) => false,
-    );
+    Navigator.of(
+      context,
+    ).pushNamedAndRemoveUntil(MainTabShell.routeName, (route) => false);
   }
 
   @override
@@ -22,10 +21,7 @@ class QuittrAppBarTitle extends StatelessWidget {
     return Semantics(
       button: true,
       label: 'Go to home',
-      child: InkWell(
-        onTap: () => goHome(context),
-        child: const Text('Quittr'),
-      ),
+      child: InkWell(onTap: () => goHome(context), child: const Text('Quittr')),
     );
   }
 }

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,8 +36,7 @@ class CircleDiscoveryScreen extends ConsumerStatefulWidget {
       _CircleDiscoveryScreenState();
 }
 
-class _CircleDiscoveryScreenState
-    extends ConsumerState<CircleDiscoveryScreen>
+class _CircleDiscoveryScreenState extends ConsumerState<CircleDiscoveryScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   final _searchController = TextEditingController();
@@ -80,7 +78,9 @@ class _CircleDiscoveryScreenState
         alreadyJoinedIds: joinedIds,
       );
       if (mounted) setState(() => _recommendations = recs.take(5).toList());
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('circle_discovery_screen: swallowed error: $e');
+    }
   }
 
   @override
@@ -94,7 +94,9 @@ class _CircleDiscoveryScreenState
   Future<void> _fetchBrowse({String? category}) async {
     setState(() => _loadingBrowse = true);
     try {
-      final results = await ref.read(circleRepositoryProvider).searchCircles(
+      final results = await ref
+          .read(circleRepositoryProvider)
+          .searchCircles(
             category: (category == null || category == 'all') ? null : category,
           );
       if (mounted) setState(() => _browseCircles = results);
@@ -114,8 +116,9 @@ class _CircleDiscoveryScreenState
     _debounce = Timer(const Duration(milliseconds: 350), () async {
       setState(() => _loadingSearch = true);
       try {
-        final results =
-            await ref.read(circleRepositoryProvider).searchCircles(query: query.trim());
+        final results = await ref
+            .read(circleRepositoryProvider)
+            .searchCircles(query: query.trim());
         if (mounted) setState(() => _searchResults = results);
       } catch (_) {
         if (mounted) setState(() => _searchResults = []);
@@ -166,8 +169,9 @@ class _CircleDiscoveryScreenState
       return;
     }
 
-    final existingMember =
-        uid.isNotEmpty ? await service.isActiveMember(circle.id) : false;
+    final existingMember = uid.isNotEmpty
+        ? await service.isActiveMember(circle.id)
+        : false;
     if (existingMember) {
       _logJoin('Already active member — repairing index');
       await service.ensureCircleIndex(circle.id);
@@ -187,9 +191,9 @@ class _CircleDiscoveryScreenState
         _logJoin('joinCircle succeeded');
         invalidateCircleScopedProviders(ref);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Joined ${circle.name}!')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Joined ${circle.name}!')));
           Navigator.pushNamed(
             context,
             CircleDetailScreen.routeName,
@@ -207,26 +211,28 @@ class _CircleDiscoveryScreenState
     } on CircleLimitException catch (e) {
       _logJoin('CircleLimitException: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     } on CircleFullException catch (e) {
       _logJoin('CircleFullException: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     } catch (e, st) {
       _logJoin('join failed: $e\n$st');
       if (mounted) {
-        final isPermission = e is FirebaseException &&
-            e.code == 'permission-denied';
+        final isPermission =
+            e is FirebaseException && e.code == 'permission-denied';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               isPermission
                   ? 'Join blocked by Firestore rules. Deploy firestore.rules '
-                      '(firebase deploy --only firestore:rules), then retry.'
+                        '(firebase deploy --only firestore:rules), then retry.'
                   : 'Could not join: $e',
             ),
             duration: const Duration(seconds: 5),
@@ -239,15 +245,15 @@ class _CircleDiscoveryScreenState
   @override
   Widget build(BuildContext context) {
     // Always read live from Riverpod — no local copy needed.
-    final joinedIds =
-        ref.watch(myCircleIdsProvider).valueOrNull?.toSet() ?? {};
+    final joinedIds = ref.watch(myCircleIdsProvider).valueOrNull?.toSet() ?? {};
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     // Fetch recommendations once we have the joined-IDs list.
     if (!_recommendationsFetched && joinedIds.isNotEmpty) {
       _recommendationsFetched = true;
       WidgetsBinding.instance.addPostFrameCallback(
-          (_) => _fetchRecommendations(joinedIds.toList()));
+        (_) => _fetchRecommendations(joinedIds.toList()),
+      );
     }
 
     return Scaffold(
@@ -277,32 +283,32 @@ class _CircleDiscoveryScreenState
       ),
       body: KeyboardDismissOnTap(
         child: TabBarView(
-        controller: _tabController,
-        children: [
-          _BrowseTab(
-            circles: _browseCircles,
-            recommendations: _recommendations,
-            loading: _loadingBrowse,
-            selectedCategory: _selectedCategory,
-            joinedIds: joinedIds,
-            currentUid: currentUid,
-            onCategoryChanged: (cat) {
-              setState(() => _selectedCategory = cat);
-              _fetchBrowse(category: cat);
-            },
-            onJoin: _joinOrRequest,
-          ),
-          _SearchTab(
-            controller: _searchController,
-            results: _searchResults,
-            loading: _loadingSearch,
-            joinedIds: joinedIds,
-            currentUid: currentUid,
-            onChanged: _onSearchChanged,
-            onJoin: _joinOrRequest,
-          ),
-        ],
-      ),
+          controller: _tabController,
+          children: [
+            _BrowseTab(
+              circles: _browseCircles,
+              recommendations: _recommendations,
+              loading: _loadingBrowse,
+              selectedCategory: _selectedCategory,
+              joinedIds: joinedIds,
+              currentUid: currentUid,
+              onCategoryChanged: (cat) {
+                setState(() => _selectedCategory = cat);
+                _fetchBrowse(category: cat);
+              },
+              onJoin: _joinOrRequest,
+            ),
+            _SearchTab(
+              controller: _searchController,
+              results: _searchResults,
+              loading: _loadingSearch,
+              joinedIds: joinedIds,
+              currentUid: currentUid,
+              onChanged: _onSearchChanged,
+              onJoin: _joinOrRequest,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -346,9 +352,7 @@ class _BrowseTab extends StatelessWidget {
         Expanded(
           child: loading
               ? const Center(
-                  child: CircularProgressIndicator(
-                    color: AppColors.accent,
-                  ),
+                  child: CircularProgressIndicator(color: AppColors.accent),
                 )
               : ListView(
                   padding: const EdgeInsets.all(16),
@@ -374,8 +378,7 @@ class _BrowseTab extends StatelessWidget {
                           itemCount: recommendations.length,
                           separatorBuilder: (_, __) =>
                               const SizedBox(width: 10),
-                          itemBuilder: (_, i) =>
-                              _RecommendedCircleCard(
+                          itemBuilder: (_, i) => _RecommendedCircleCard(
                             scored: recommendations[i],
                             onJoin: onJoin,
                           ),
@@ -420,10 +423,7 @@ class _BrowseTab extends StatelessWidget {
 }
 
 class _RecommendedCircleCard extends StatelessWidget {
-  const _RecommendedCircleCard({
-    required this.scored,
-    required this.onJoin,
-  });
+  const _RecommendedCircleCard({required this.scored, required this.onJoin});
 
   final ScoredCircle scored;
   final Future<void> Function(AccountabilityCircle) onJoin;
@@ -443,9 +443,7 @@ class _RecommendedCircleCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surfaceDark,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: AppColors.accent.withValues(alpha: 0.3),
-          ),
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -469,18 +467,18 @@ class _RecommendedCircleCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               scored.matchReason,
-              style: const TextStyle(
-                color: AppColors.accent,
-                fontSize: 11,
-              ),
+              style: const TextStyle(color: AppColors.accent, fontSize: 11),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             const Spacer(),
             Row(
               children: [
-                const Icon(Icons.people_outline,
-                    color: AppColors.textMuted, size: 12),
+                const Icon(
+                  Icons.people_outline,
+                  color: AppColors.textMuted,
+                  size: 12,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   '${circle.memberCount}/${AccountabilityCircle.kMaxMembers}',
@@ -494,7 +492,9 @@ class _RecommendedCircleCard extends StatelessWidget {
                   onTap: () => onJoin(circle),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.accent,
                       borderRadius: BorderRadius.circular(6),
@@ -519,10 +519,7 @@ class _RecommendedCircleCard extends StatelessWidget {
 }
 
 class _CategoryChipRow extends StatelessWidget {
-  const _CategoryChipRow({
-    required this.selected,
-    required this.onChanged,
-  });
+  const _CategoryChipRow({required this.selected, required this.onChanged});
 
   final String selected;
   final ValueChanged<String> onChanged;
@@ -602,19 +599,19 @@ class _SearchTab extends StatelessWidget {
             decoration: InputDecoration(
               hintText: 'Search circles…',
               hintStyle: const TextStyle(color: AppColors.textMuted),
-              prefixIcon: const Icon(Icons.search_rounded,
-                  color: AppColors.textMuted),
+              prefixIcon: const Icon(
+                Icons.search_rounded,
+                color: AppColors.textMuted,
+              ),
               filled: true,
               fillColor: AppColors.surfaceDark,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    BorderSide(color: Colors.white.withOpacity(0.06)),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.06)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    BorderSide(color: Colors.white.withOpacity(0.06)),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.06)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -626,28 +623,24 @@ class _SearchTab extends StatelessWidget {
         Expanded(
           child: loading
               ? const Center(
-                  child: CircularProgressIndicator(
-                    color: AppColors.accent,
-                  ),
+                  child: CircularProgressIndicator(color: AppColors.accent),
                 )
               : controller.text.isEmpty
-                  ? const _EmptyState(message: 'Start typing to search…')
-                  : results.isEmpty
-                      ? _EmptyState(
-                          message:
-                              'No circles found for "${controller.text}"',
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: results.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 12),
-                          itemBuilder: (_, i) => _CircleCard(
-                            circle: results[i],
-                            joined: _isJoined(results[i]),
-                            onJoin: onJoin,
-                          ),
-                        ),
+              ? const _EmptyState(message: 'Start typing to search…')
+              : results.isEmpty
+              ? _EmptyState(
+                  message: 'No circles found for "${controller.text}"',
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: results.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (_, i) => _CircleCard(
+                    circle: results[i],
+                    joined: _isJoined(results[i]),
+                    onJoin: onJoin,
+                  ),
+                ),
         ),
       ],
     );
@@ -677,8 +670,7 @@ class _CircleCardState extends State<_CircleCard> {
   @override
   Widget build(BuildContext context) {
     final circle = widget.circle;
-    final isFull =
-        circle.memberCount >= AccountabilityCircle.kMaxMembers;
+    final isFull = circle.memberCount >= AccountabilityCircle.kMaxMembers;
     final isJoined = widget.joined;
 
     return Container(
@@ -712,17 +704,17 @@ class _CircleCardState extends State<_CircleCard> {
               circle.description!,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 13,
-              ),
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
             ),
           ],
           const SizedBox(height: 12),
           Row(
             children: [
-              const Icon(Icons.group_rounded,
-                  size: 14, color: AppColors.textMuted),
+              const Icon(
+                Icons.group_rounded,
+                size: 14,
+                color: AppColors.textMuted,
+              ),
               const SizedBox(width: 4),
               Text(
                 '${circle.memberCount}/${AccountabilityCircle.kMaxMembers}',
@@ -732,8 +724,11 @@ class _CircleCardState extends State<_CircleCard> {
                 ),
               ),
               const SizedBox(width: 12),
-              const Icon(Icons.schedule_rounded,
-                  size: 14, color: AppColors.textMuted),
+              const Icon(
+                Icons.schedule_rounded,
+                size: 14,
+                color: AppColors.textMuted,
+              ),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
@@ -766,9 +761,7 @@ class _CircleCardState extends State<_CircleCard> {
                       if (isFull) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text(
-                              'This circle is full (8/8 members).',
-                            ),
+                            content: Text('This circle is full (8/8 members).'),
                           ),
                         );
                         return;
@@ -781,13 +774,13 @@ class _CircleCardState extends State<_CircleCard> {
                 backgroundColor: isJoined
                     ? AppColors.surfaceCard
                     : isFull
-                        ? AppColors.surfaceCard
-                        : AppColors.accent,
+                    ? AppColors.surfaceCard
+                    : AppColors.accent,
                 foregroundColor: isJoined
                     ? AppColors.textMuted
                     : isFull
-                        ? AppColors.textMuted
-                        : Colors.black,
+                    ? AppColors.textMuted
+                    : Colors.black,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -798,16 +791,18 @@ class _CircleCardState extends State<_CircleCard> {
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.black),
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
                     )
                   : Text(
                       isJoined
                           ? 'Open'
                           : isFull
-                              ? 'Full'
-                              : circle.joinPolicy == JoinPolicy.open
-                                  ? 'Join'
-                                  : 'Request to join',
+                          ? 'Full'
+                          : circle.joinPolicy == JoinPolicy.open
+                          ? 'Join'
+                          : 'Request to join',
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
             ),
@@ -866,10 +861,7 @@ class _PolicyBadge extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             isOpen ? 'Open' : 'Approval',
-            style: const TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 11,
-            ),
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
           ),
         ],
       ),
@@ -889,10 +881,7 @@ class _EmptyState extends StatelessWidget {
         child: Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: AppColors.textMuted,
-            fontSize: 15,
-          ),
+          style: const TextStyle(color: AppColors.textMuted, fontSize: 15),
         ),
       ),
     );

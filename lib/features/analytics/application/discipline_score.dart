@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'analytics_period_bundle.dart';
 import 'analytics_period_bundle_notifier.dart';
+import '../../../core/presentation/async_value_ui.dart';
 
 /// Combined discipline rate for the weekly hero (0.0–1.0).
 ///
@@ -28,7 +29,8 @@ String disciplineTopCategoryLabel(AnalyticsPeriodBundle bundle) {
 
 /// Week vs today combined delta for the hero side card (percentage points).
 int disciplineWeekVsTodayDelta(AnalyticsPeriodBundle bundle) {
-  final todayAvg = (bundle.goalHabitDay.weightedCompletionRate +
+  final todayAvg =
+      (bundle.goalHabitDay.weightedCompletionRate +
           bundle.taskDay.weightedCompletionRate) /
       2.0;
   final week = disciplineRateWeek(bundle);
@@ -65,10 +67,12 @@ int homeDisplayStreakDays(AnalyticsPeriodBundle bundle) =>
 
 /// Shared streak count for Home and Profile heroes.
 final homeDisplayStreakDaysProvider = Provider<int>((ref) {
-  return ref.watch(analyticsPeriodBundleProvider).when(
+  return ref
+      .watch(analyticsPeriodBundleProvider)
+      .when(
         data: homeDisplayStreakDays,
         loading: () => 0,
-        error: (_, _) => 0,
+        error: (e, _) => swallowedAsyncError('discipline_score', e, 0),
       );
 });
 

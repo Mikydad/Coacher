@@ -181,8 +181,11 @@ abstract final class AdaptiveReminderPolicy {
       final end = elapsed + stage.durationMinutes;
       if (stage.nudges > 0 && stage.durationMinutes > 0) {
         for (var i = 1; i <= stage.nudges; i++) {
-          final offset = elapsed + ((stage.durationMinutes * i) ~/ stage.nudges);
-          if (offset > 0 && (out.isEmpty || out.last != offset)) out.add(offset);
+          final offset =
+              elapsed + ((stage.durationMinutes * i) ~/ stage.nudges);
+          if (offset > 0 && (out.isEmpty || out.last != offset)) {
+            out.add(offset);
+          }
         }
       }
       elapsed = end;
@@ -200,7 +203,10 @@ abstract final class AdaptiveReminderPolicy {
     required int currentEscalationLevel,
     required bool emergencyBypass,
   }) {
-    final nextLevel = (currentEscalationLevel + 1).clamp(1, cadence.maxEscalationLevel);
+    final nextLevel = (currentEscalationLevel + 1).clamp(
+      1,
+      cadence.maxEscalationLevel,
+    );
     final decayedSnooze = cadence.initialSnoozeMinutes - (nextLevel - 1) * 2;
     final snoozeMinutes = decayedSnooze < cadence.minSnoozeMinutes
         ? cadence.minSnoozeMinutes

@@ -20,8 +20,8 @@ class ChallengeProgressSyncService {
   ChallengeProgressSyncService({
     required ChallengeRepository challengeRepo,
     required String Function() currentUserId,
-  })  : _challengeRepo = challengeRepo,
-        _currentUserId = currentUserId;
+  }) : _challengeRepo = challengeRepo,
+       _currentUserId = currentUserId;
 
   final ChallengeRepository _challengeRepo;
   final String Function() _currentUserId;
@@ -55,13 +55,12 @@ class ChallengeProgressSyncService {
 
     // ── Goal check-ins ────────────────────────────────────────────────────────
     subs.add(
-      container.listen<AsyncValue<List<UserGoal>>>(
-        goalsStreamProvider,
-        (_, next) {
-          next.whenData((goals) => _onGoalsUpdated(container, goals));
-        },
-        fireImmediately: true,
-      ),
+      container.listen<AsyncValue<List<UserGoal>>>(goalsStreamProvider, (
+        _,
+        next,
+      ) {
+        next.whenData((goals) => _onGoalsUpdated(container, goals));
+      }, fireImmediately: true),
     );
 
     return () {
@@ -84,9 +83,7 @@ class ChallengeProgressSyncService {
       final circleIds = await _fetchCircleIds(uid);
 
       for (final circleId in circleIds) {
-        final challenges = await _challengeRepo
-            .watchChallenges(circleId)
-            .first;
+        final challenges = await _challengeRepo.watchChallenges(circleId).first;
 
         for (final challenge in challenges) {
           if (challenge.status != ChallengeStatus.active) continue;
@@ -107,7 +104,9 @@ class ChallengeProgressSyncService {
   }
 
   void _onGoalsUpdated(
-      ProviderContainer container, List<UserGoal> goals) async {
+    ProviderContainer container,
+    List<UserGoal> goals,
+  ) async {
     try {
       final uid = _currentUserId();
       if (uid.isEmpty) return;
@@ -141,8 +140,7 @@ class ChallengeProgressSyncService {
 
           for (final challenge in challenges) {
             if (challenge.status != ChallengeStatus.active) continue;
-            if (!_matchesChallengeUnit(
-                goal.categoryId, challenge.unit)) {
+            if (!_matchesChallengeUnit(goal.categoryId, challenge.unit)) {
               continue;
             }
             await _challengeRepo.updateProgress(

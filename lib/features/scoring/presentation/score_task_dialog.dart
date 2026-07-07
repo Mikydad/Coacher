@@ -76,9 +76,11 @@ class _ScoreTaskDialogState extends State<ScoreTaskDialog> {
     final value = _percent.round();
     final reason = _reasonCtrl.text.trim();
     if ((value < 100 || widget.requireReasonAlways) && reason.isEmpty) {
-      setState(() => _error = widget.requireReasonAlways
-          ? 'A reason is required in extreme mode.'
-          : 'Reason is required when completion is below 100%.');
+      setState(
+        () => _error = widget.requireReasonAlways
+            ? 'A reason is required in extreme mode.'
+            : 'Reason is required when completion is below 100%.',
+      );
       return;
     }
     Navigator.pop(
@@ -99,7 +101,10 @@ class _ScoreTaskDialogState extends State<ScoreTaskDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.taskTitle, style: const TextStyle(fontWeight: FontWeight.w700)),
+            Text(
+              widget.taskTitle,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 12),
             Text('Completion: ${_percent.round()}%'),
             Slider(
@@ -131,7 +136,10 @@ class _ScoreTaskDialogState extends State<ScoreTaskDialog> {
       ),
       actions: [
         if (!widget.requireSubmit)
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
         FilledButton(onPressed: _submit, child: const Text('Save Score')),
       ],
     );

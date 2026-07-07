@@ -104,8 +104,9 @@ bool _canMerge(GeneratedInsight a, GeneratedInsight b) {
   if (a.scopeType != b.scopeType || a.scopeId != b.scopeId) return false;
   if (a.priority != b.priority) return false;
   if (a.insightBucket != b.insightBucket) return false;
-  final overlappingCodes =
-      a.linkedPatternCodes.toSet().intersection(b.linkedPatternCodes.toSet());
+  final overlappingCodes = a.linkedPatternCodes.toSet().intersection(
+    b.linkedPatternCodes.toSet(),
+  );
   return overlappingCodes.isNotEmpty;
 }
 
@@ -114,20 +115,22 @@ GeneratedInsight _mergeInsights(GeneratedInsight a, GeneratedInsight b) {
   final mergedCodes = <String>{
     ...a.linkedPatternCodes,
     ...b.linkedPatternCodes,
-  }.toList()
-    ..sort();
+  }.toList()..sort();
   final mergedMetrics = <String, dynamic>{
     ...a.supportingMetrics,
     ...b.supportingMetrics,
   };
   final mergedConfidence =
-      (a.confidence > b.confidence ? a.confidence : b.confidence).clamp(0.0, 1.0);
+      (a.confidence > b.confidence ? a.confidence : b.confidence).clamp(
+        0.0,
+        1.0,
+      );
   // Lifecycle: if either side is reinforced the merged result is too.
   final mergedLifecycle =
       (a.lifecycleState == InsightLifecycleState.reinforced ||
-              b.lifecycleState == InsightLifecycleState.reinforced)
-          ? InsightLifecycleState.reinforced
-          : preferred.lifecycleState;
+          b.lifecycleState == InsightLifecycleState.reinforced)
+      ? InsightLifecycleState.reinforced
+      : preferred.lifecycleState;
   return GeneratedInsight(
     insightId: preferred.insightId,
     scopeType: preferred.scopeType,
@@ -145,15 +148,13 @@ GeneratedInsight _mergeInsights(GeneratedInsight a, GeneratedInsight b) {
     sourceWindowEndDateKey: preferred.sourceWindowEndDateKey,
     lifecycleState: mergedLifecycle,
     urgency: (a.urgency > b.urgency ? a.urgency : b.urgency).clamp(0.0, 1.0),
-    coachingImportance: (a.coachingImportance > b.coachingImportance
-            ? a.coachingImportance
-            : b.coachingImportance)
-        .clamp(0.0, 1.0),
+    coachingImportance:
+        (a.coachingImportance > b.coachingImportance
+                ? a.coachingImportance
+                : b.coachingImportance)
+            .clamp(0.0, 1.0),
     supportingMetrics: mergedMetrics,
-    metadata: <String, dynamic>{
-      ...preferred.metadata,
-      'merged': true,
-    },
+    metadata: <String, dynamic>{...preferred.metadata, 'merged': true},
     schemaVersion: preferred.schemaVersion,
   );
 }

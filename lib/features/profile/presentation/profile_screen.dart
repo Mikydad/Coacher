@@ -80,8 +80,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       builder: (_) => _ObsidianDialog(
         title: 'Log Out?',
-        body:
-            'Your local data will be cleared. You can sign back in any time.',
+        body: 'Your local data will be cleared. You can sign back in any time.',
         confirmLabel: 'Log Out',
         confirmColor: _kError,
       ),
@@ -134,8 +133,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               // ── Profile Hero ──────────────────────────────────────────────
               SliverToBoxAdapter(
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 4,
+                  ),
                   child: _ProfileHero(
                     initial: initial,
                     effectiveName: effectiveName,
@@ -403,7 +404,9 @@ class _ProfileHero extends StatelessWidget {
                         // Badge
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: _kPrimary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(99),
@@ -438,8 +441,9 @@ class _ProfileHero extends StatelessWidget {
                                   decoration: InputDecoration(
                                     hintText: 'Your name',
                                     hintStyle: TextStyle(
-                                      color: _kOnSurfaceVariant
-                                          .withValues(alpha: 0.5),
+                                      color: _kOnSurfaceVariant.withValues(
+                                        alpha: 0.5,
+                                      ),
                                     ),
                                     isDense: true,
                                     contentPadding: EdgeInsets.zero,
@@ -656,7 +660,9 @@ class _DisciplineTile extends StatelessWidget {
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: _kPrimary,
                             borderRadius: BorderRadius.circular(99),
@@ -809,10 +815,8 @@ class _CoreOptimizationSection extends StatelessWidget {
               color: _kOnSurfaceVariant,
               size: 20,
             ),
-            onTap: () => Navigator.pushNamed(
-              context,
-              AccountSettingsScreen.routeName,
-            ),
+            onTap: () =>
+                Navigator.pushNamed(context, AccountSettingsScreen.routeName),
           ),
           _SettingRow(
             icon: Icons.notifications_active_outlined,
@@ -840,10 +844,8 @@ class _CoreOptimizationSection extends StatelessWidget {
                 color: _kPrimary,
               ),
             ),
-            onTap: () => Navigator.pushNamed(
-              context,
-              ReminderSettingsScreen.routeName,
-            ),
+            onTap: () =>
+                Navigator.pushNamed(context, ReminderSettingsScreen.routeName),
             isLast: true,
           ),
         ],

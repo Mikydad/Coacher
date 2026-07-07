@@ -36,11 +36,14 @@ final timeBlockSyncServiceProvider = Provider<TimeBlockSyncService>((ref) {
 /// ```dart
 /// ref.invalidate(conflictCheckProvider);
 /// ```
-final conflictCheckProvider = FutureProvider.family<ConflictCheckResult,
-    ScheduledTimeBlock>((ref, proposed) async {
-  final service = ref.read(timeBlockSyncServiceProvider);
-  return service.checkConflicts(proposed);
-});
+final conflictCheckProvider =
+    FutureProvider.family<ConflictCheckResult, ScheduledTimeBlock>((
+      ref,
+      proposed,
+    ) async {
+      final service = ref.read(timeBlockSyncServiceProvider);
+      return service.checkConflicts(proposed);
+    });
 
 // ─── Reclaimed time service ───────────────────────────────────────────────────
 
@@ -50,7 +53,9 @@ final reclaimedTimeServiceProvider = Provider<ReclaimedTimeService>((ref) {
   );
 });
 
-final conflictResolutionServiceProvider = Provider<ConflictResolutionService>((ref) {
+final conflictResolutionServiceProvider = Provider<ConflictResolutionService>((
+  ref,
+) {
   return ConflictResolutionService(
     planning: ref.read(planningRepositoryProvider),
     goals: ref.read(goalsRepositoryProvider),

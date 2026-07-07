@@ -4,7 +4,9 @@ import 'dart:io';
 import '../../../core/storage/app_storage_dir.dart';
 import '../domain/models/reminder_config.dart';
 
-@Deprecated('Reminders are stored in Isar; this JSON file cache is no longer used by the app.')
+@Deprecated(
+  'Reminders are stored in Isar; this JSON file cache is no longer used by the app.',
+)
 class ReminderCacheStore {
   const ReminderCacheStore();
 
@@ -25,6 +27,10 @@ class ReminderCacheStore {
     final raw = await file.readAsString();
     if (raw.trim().isEmpty) return const [];
     final data = jsonDecode(raw) as List<dynamic>;
-    return data.map((it) => ReminderConfig.fromMap(Map<String, dynamic>.from(it as Map))).toList();
+    return data
+        .map(
+          (it) => ReminderConfig.fromMap(Map<String, dynamic>.from(it as Map)),
+        )
+        .toList();
   }
 }

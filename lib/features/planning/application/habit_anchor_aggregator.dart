@@ -87,7 +87,9 @@ Future<List<HabitAnchor>> readHabitAnchorsForDate(
         label: goal.title,
         dateKey: dateKey,
         startLocal: start,
-        endLocal: start.add(const Duration(minutes: goalHabitAnchorDefaultMinutes)),
+        endLocal: start.add(
+          const Duration(minutes: goalHabitAnchorDefaultMinutes),
+        ),
         goalId: goal.id,
       ),
     );
@@ -111,7 +113,8 @@ List<HabitAnchor> findOverlappingHabitAnchorsForTask(
   final end = start.add(Duration(minutes: task.durationMinutes));
   final overlaps = <HabitAnchor>[];
   for (final anchor in anchors) {
-    if (anchor.source == HabitAnchorSource.plannedTask && anchor.taskId == ignoredTaskId) {
+    if (anchor.source == HabitAnchorSource.plannedTask &&
+        anchor.taskId == ignoredTaskId) {
       continue;
     }
     if (_windowsOverlap(start, end, anchor.startLocal, anchor.endLocal)) {
@@ -125,7 +128,9 @@ List<HabitAnchor> findOverlappingHabitAnchorsForTask(
 bool _isActiveHabitGoalForDate(UserGoal goal, String dateKey) {
   if (goal.status != GoalStatus.active) return false;
   if (goal.categoryId != GoalCategories.habits) return false;
-  if (!goal.reminderEnabled || goal.reminderMinutesFromMidnight == null) return false;
+  if (!goal.reminderEnabled || goal.reminderMinutesFromMidnight == null) {
+    return false;
+  }
   return GoalPeriodHelpers.isDateKeyInPeriod(goal, dateKey);
 }
 

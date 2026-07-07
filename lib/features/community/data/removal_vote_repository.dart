@@ -19,8 +19,8 @@ class FirestoreRemovalVoteRepository implements RemovalVoteRepository {
   FirestoreRemovalVoteRepository({
     required UserCircleMembershipService membershipSvc,
     FirebaseFirestore? firestore,
-  })  : _membershipSvc = membershipSvc,
-        _firestore = firestore ?? FirebaseFirestore.instance;
+  }) : _membershipSvc = membershipSvc,
+       _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
   final UserCircleMembershipService _membershipSvc;
@@ -80,18 +80,14 @@ class FirestoreRemovalVoteRepository implements RemovalVoteRepository {
           'updatedAtMs': now,
         });
       } else {
-        tx.update(ref, {
-          'votes': updatedVotes,
-          'updatedAtMs': now,
-        });
+        tx.update(ref, {'votes': updatedVotes, 'updatedAtMs': now});
       }
 
       if (majorityApprove) {
         // Execute member removal outside the transaction to avoid nesting.
-        Future.microtask(() => _membershipSvc.removeMember(
-              circleId,
-              removalVote.targetUserId,
-            ));
+        Future.microtask(
+          () => _membershipSvc.removeMember(circleId, removalVote.targetUserId),
+        );
       }
     });
   }

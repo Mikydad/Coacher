@@ -75,9 +75,18 @@ class AnalyticsEvent {
     ModelValidators.requireNotBlank(entityId, 'analyticsEvent.entityId');
     ModelValidators.requireNotBlank(entityKind, 'analyticsEvent.entityKind');
     ModelValidators.requireNotBlank(dateKey, 'analyticsEvent.dateKey');
-    ModelValidators.requireNotBlank(timestampLocalIso, 'analyticsEvent.timestampLocalIso');
-    ModelValidators.requireNotBlank(sourceSurface, 'analyticsEvent.sourceSurface');
-    ModelValidators.requireNotBlank(idempotencyKey, 'analyticsEvent.idempotencyKey');
+    ModelValidators.requireNotBlank(
+      timestampLocalIso,
+      'analyticsEvent.timestampLocalIso',
+    );
+    ModelValidators.requireNotBlank(
+      sourceSurface,
+      'analyticsEvent.sourceSurface',
+    );
+    ModelValidators.requireNotBlank(
+      idempotencyKey,
+      'analyticsEvent.idempotencyKey',
+    );
     ModelValidators.requireRange(
       value: schemaVersion,
       min: 1,

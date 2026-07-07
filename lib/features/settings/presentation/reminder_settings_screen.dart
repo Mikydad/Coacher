@@ -16,9 +16,7 @@ class ReminderSettingsScreen extends StatelessWidget {
       children: [
         SettingsSectionHeader(label: 'Attention & Sleep'),
         SizedBox(height: 10),
-        SettingsObsidianCard(
-          child: OverrideSettingsSection(),
-        ),
+        SettingsObsidianCard(child: OverrideSettingsSection()),
         SizedBox(height: 40),
       ],
     );

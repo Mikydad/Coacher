@@ -54,7 +54,9 @@ class ActivityFeedItem {
       circleId: map['circleId'] as String? ?? '',
       userId: map['userId'] as String? ?? '',
       displayName: map['displayName'] as String? ?? '',
-      eventType: ActivityEventTypeStorage.fromStorage(map['eventType'] as String?),
+      eventType: ActivityEventTypeStorage.fromStorage(
+        map['eventType'] as String?,
+      ),
       entityId: map['entityId'] as String?,
       entityTitle: map['entityTitle'] as String?,
       value: map['value'] as String?,

@@ -28,12 +28,9 @@ class _ActiveOverrideBannerState extends ConsumerState<ActiveOverrideBanner> {
   void initState() {
     super.initState();
     // Refresh remaining-time label every 60 seconds.
-    _refreshTimer = Timer.periodic(
-      const Duration(seconds: 60),
-      (_) {
-        if (mounted) setState(() {});
-      },
-    );
+    _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -58,16 +55,11 @@ class _ActiveOverrideBannerState extends ConsumerState<ActiveOverrideBanner> {
         decoration: BoxDecoration(
           color: _overrideColor(effective).withAlpha(30),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: _overrideColor(effective).withAlpha(80),
-          ),
+          border: Border.all(color: _overrideColor(effective).withAlpha(80)),
         ),
         child: Row(
           children: [
-            Text(
-              effective.icon,
-              style: const TextStyle(fontSize: 18),
-            ),
+            Text(effective.icon, style: const TextStyle(fontSize: 18)),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -83,10 +75,7 @@ class _ActiveOverrideBannerState extends ConsumerState<ActiveOverrideBanner> {
                   ),
                   Text(
                     _subtitleText(state, effective),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.white54,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: Colors.white54),
                   ),
                 ],
               ),
@@ -94,16 +83,15 @@ class _ActiveOverrideBannerState extends ConsumerState<ActiveOverrideBanner> {
             // End now button
             TextButton(
               style: TextButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               onPressed: () => _endOverride(context),
-              child: const Text(
-                'End',
-                style: TextStyle(fontSize: 12),
-              ),
+              child: const Text('End', style: TextStyle(fontSize: 12)),
             ),
           ],
         ),
@@ -130,8 +118,7 @@ class _ActiveOverrideBannerState extends ConsumerState<ActiveOverrideBanner> {
   }
 
   Future<void> _endOverride(BuildContext context) async {
-    final review =
-        await ref.read(contextOverrideServiceProvider).endOverride();
+    final review = await ref.read(contextOverrideServiceProvider).endOverride();
     if (review.overrideType != ContextOverride.none) {
       ref.read(pendingRecoveryReviewProvider.notifier).state = review;
     }

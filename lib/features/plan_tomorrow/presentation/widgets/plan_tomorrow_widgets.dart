@@ -13,7 +13,8 @@ abstract final class PlanTomorrowColors {
   static const hint = AppColors.graySlate;
 }
 
-class PlanTomorrowHeader extends StatelessWidget implements PreferredSizeWidget {
+class PlanTomorrowHeader extends StatelessWidget
+    implements PreferredSizeWidget {
   const PlanTomorrowHeader({super.key});
 
   @override
@@ -204,7 +205,9 @@ class PlanTomorrowDoneButton extends StatelessWidget {
           backgroundColor: PlanTomorrowColors.lime,
           foregroundColor: Colors.black,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
         ),
         child: const Text(
           'Done — See Summary',

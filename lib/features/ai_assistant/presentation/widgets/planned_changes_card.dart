@@ -284,7 +284,11 @@ class _HighRiskWarning extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.delete_forever_rounded, size: 14, color: Colors.redAccent),
+          const Icon(
+            Icons.delete_forever_rounded,
+            size: 14,
+            color: Colors.redAccent,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -337,8 +341,7 @@ class _ActionButtons extends StatelessWidget {
     final confirmBg = isBlocked
         ? Colors.red.withValues(alpha: 0.85)
         : AppColors.accentBright;
-    final confirmFg =
-        isBlocked ? Colors.white : AppColors.accentDeep;
+    final confirmFg = isBlocked ? Colors.white : AppColors.accentDeep;
 
     return Column(
       children: [
@@ -376,45 +379,48 @@ class _ActionButtons extends StatelessWidget {
           ),
         ),
         if (showEditCancel) ...[
-        const SizedBox(height: 10),
-        // EDIT PLAN + CANCEL — side by side
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: isLoading ? null : onEdit,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textSoft,
-                  side: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.15),
+          const SizedBox(height: 10),
+          // EDIT PLAN + CANCEL — side by side
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: isLoading ? null : onEdit,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textSoft,
+                    side: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.15),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-                child: const Text('EDIT PLAN', style: TextStyle(fontSize: 12)),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: OutlinedButton(
-                onPressed: isLoading ? null : onCancel,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.redAccent,
-                  side: BorderSide(
-                    color: Colors.redAccent.withValues(alpha: 0.3),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+                  child: const Text(
+                    'EDIT PLAN',
+                    style: TextStyle(fontSize: 12),
                   ),
                 ),
-                child: const Text('CANCEL', style: TextStyle(fontSize: 12)),
               ),
-            ),
-          ],
-        ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: isLoading ? null : onCancel,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.redAccent,
+                    side: BorderSide(
+                      color: Colors.redAccent.withValues(alpha: 0.3),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  child: const Text('CANCEL', style: TextStyle(fontSize: 12)),
+                ),
+              ),
+            ],
+          ),
         ],
       ],
     );
@@ -451,7 +457,11 @@ class _ExecutedLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Row(
       children: [
-        Icon(Icons.check_circle_outline_rounded, size: 14, color: AppColors.textSoft),
+        Icon(
+          Icons.check_circle_outline_rounded,
+          size: 14,
+          color: AppColors.textSoft,
+        ),
         SizedBox(width: 6),
         Text(
           'Applied',

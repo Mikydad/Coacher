@@ -42,13 +42,12 @@ class _PendingRouteIntent {
     required String taskId,
     required String taskLabel,
     int? taskDurationMinutes,
-  })
-    : this._(
-        routeName: FocusSelectionScreen.routeName,
-        taskId: taskId,
-        taskLabel: taskLabel,
-        taskDurationMinutes: taskDurationMinutes,
-      );
+  }) : this._(
+         routeName: FocusSelectionScreen.routeName,
+         taskId: taskId,
+         taskLabel: taskLabel,
+         taskDurationMinutes: taskDurationMinutes,
+       );
 
   final String routeName;
   final String? goalId;
@@ -101,7 +100,9 @@ class _PendingRouteIntent {
       final taskDurationMinutes = (map['taskDurationMinutes'] as num?)?.toInt();
       return _PendingRouteIntent.focus(
         taskId: taskId,
-        taskLabel: taskLabel is String && taskLabel.isNotEmpty ? taskLabel : 'Task',
+        taskLabel: taskLabel is String && taskLabel.isNotEmpty
+            ? taskLabel
+            : 'Task',
         taskDurationMinutes: taskDurationMinutes,
       );
     }
@@ -124,7 +125,8 @@ bool _pushNowIfReady(
 
   if (routeName == AnalyticsProgressScreen.routeName) {
     final ctx = appNavigatorKey.currentContext;
-    final scope = container ??
+    final scope =
+        container ??
         (ctx != null ? ProviderScope.containerOf(ctx, listen: false) : null);
     if (scope != null) {
       debugPrint('[NotifTap] switching to Progress tab');
@@ -133,7 +135,9 @@ bool _pushNowIfReady(
     }
   }
 
-  debugPrint('[NotifTap] pushing route=$routeName argsType=${arguments.runtimeType}');
+  debugPrint(
+    '[NotifTap] pushing route=$routeName argsType=${arguments.runtimeType}',
+  );
   nav.pushNamed(routeName, arguments: arguments);
   return true;
 }
@@ -144,7 +148,10 @@ Future<void> _persistPendingIntent(_PendingRouteIntent? pending) async {
     await prefs.remove(_pendingNotificationIntentPrefsKey);
     return;
   }
-  await prefs.setString(_pendingNotificationIntentPrefsKey, jsonEncode(pending.toJson()));
+  await prefs.setString(
+    _pendingNotificationIntentPrefsKey,
+    jsonEncode(pending.toJson()),
+  );
 }
 
 Future<_PendingRouteIntent?> _loadPendingIntentFromPrefs() async {
@@ -221,7 +228,9 @@ Future<void> handleNotificationResponse(
   debugPrint('[NotifTap] resolved payload=$raw');
 
   if (raw.startsWith(_goalPayloadPrefix)) {
-    final goalId = Uri.decodeComponent(raw.substring(_goalPayloadPrefix.length));
+    final goalId = Uri.decodeComponent(
+      raw.substring(_goalPayloadPrefix.length),
+    );
     if (goalId.isEmpty) {
       debugPrint('[NotifTap] goal payload empty id -> abort');
       return;
@@ -246,10 +255,7 @@ Future<void> handleNotificationResponse(
     if (circleId.isNotEmpty) {
       debugPrint('[NotifTap] circle tap circleId=$circleId');
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _pushNowIfReady(
-          CircleDetailScreen.routeName,
-          arguments: circleId,
-        );
+        _pushNowIfReady(CircleDetailScreen.routeName, arguments: circleId);
       });
     }
     return;
@@ -293,7 +299,9 @@ Future<void> handleNotificationResponse(
   var label = 'Task';
   int? durationMinutes;
   try {
-    final rows = await collectTodayPlannedRows(container.read(planningRepositoryProvider));
+    final rows = await collectTodayPlannedRows(
+      container.read(planningRepositoryProvider),
+    );
     for (final r in rows) {
       if (r.task.id == taskId) {
         label = r.task.title;
@@ -301,16 +309,16 @@ Future<void> handleNotificationResponse(
         break;
       }
     }
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('notification_response_handler: swallowed error: $e');
+  }
   debugPrint('[NotifTap] resolved task label="$label" for taskId=$taskId');
 
   container.read(activeExecutionTaskIdProvider.notifier).state = taskId;
   container.read(activeExecutionTaskLabelProvider.notifier).state = label;
-  container.read(executionControllerProvider.notifier).setTask(
-    id: taskId,
-    label: label,
-    durationMinutes: durationMinutes,
-  );
+  container
+      .read(executionControllerProvider.notifier)
+      .setTask(id: taskId, label: label, durationMinutes: durationMinutes);
   debugPrint('[NotifTap] execution state primed for taskId=$taskId');
 
   final launch = FocusLaunchArgs(
@@ -330,7 +338,9 @@ Future<void> handleNotificationResponse(
         ),
       );
     } else {
-      debugPrint('[NotifTap] focus route pushed immediately for taskId=$taskId');
+      debugPrint(
+        '[NotifTap] focus route pushed immediately for taskId=$taskId',
+      );
     }
   });
 }
@@ -347,11 +357,16 @@ Future<void> _handleLayer4InsightTap(
     final entityId = parts[1].trim();
     if (entityId.isNotEmpty) {
       try {
-        final goal = await container.read(goalsRepositoryProvider).getGoal(entityId);
+        final goal = await container
+            .read(goalsRepositoryProvider)
+            .getGoal(entityId);
         if (goal != null) {
           debugPrint('[NotifTap] layer4 -> goal detail goalId=$entityId');
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!_pushNowIfReady(GoalDetailScreen.routeName, arguments: entityId)) {
+            if (!_pushNowIfReady(
+              GoalDetailScreen.routeName,
+              arguments: entityId,
+            )) {
               _queuePendingIntent(_PendingRouteIntent.goal(entityId));
             }
           });
@@ -383,12 +398,17 @@ Future<String?> _payloadFromNotificationId(
     final notifications = container.read(localNotificationsServiceProvider);
     final indexedTaskId = await notifications.taskIdForNotificationId(id);
     if (indexedTaskId != null && indexedTaskId.isNotEmpty) {
-      debugPrint('[NotifTap] id-map hit notificationId=$id -> taskId=$indexedTaskId');
+      debugPrint(
+        '[NotifTap] id-map hit notificationId=$id -> taskId=$indexedTaskId',
+      );
       return 'task:${Uri.encodeComponent(indexedTaskId)}';
     }
-    debugPrint('[NotifTap] id-map miss notificationId=$id, trying reminder scan');
-    final reminders =
-        await container.read(reminderRepositoryProvider).listAllReminders();
+    debugPrint(
+      '[NotifTap] id-map miss notificationId=$id, trying reminder scan',
+    );
+    final reminders = await container
+        .read(reminderRepositoryProvider)
+        .listAllReminders();
     // After Phase C each entity has at most 1 active OS notification (slot 0).
     for (final r in reminders) {
       if (notifications.idFromTaskId(r.taskId, slot: 0) == id) {

@@ -29,8 +29,10 @@ class EntityPatternDetectionResult {
   });
 
   final String entityId;
+
   /// Legacy compatibility projection for Layer 3 / delivery.
   final List<DetectedPattern> patterns;
+
   /// Canonical Layer 2 interpretation + metric evidence.
   final List<DetectedBehaviorPattern> behaviorPatterns;
   final List<RuleEvaluationDiagnostic> diagnostics;
@@ -72,10 +74,7 @@ EntityPatternDetectionResult runPatternDetectionForEntity({
   }
 
   try {
-    final raw = detectPatternsForFeature(
-      feature: feature,
-      context: context,
-    );
+    final raw = detectPatternsForFeature(feature: feature, context: context);
     final behaviorPatterns = wrapDetectedPatternsWithEvidence(
       feature: feature,
       detected: raw,

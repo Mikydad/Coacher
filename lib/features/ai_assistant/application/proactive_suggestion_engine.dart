@@ -79,15 +79,18 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
       byType[s.type.name] = (byType[s.type.name] ?? 0) + 1;
     }
     final now = DateTime.now();
-    final weekStart = DateTime(now.year, now.month, now.day)
-        .subtract(Duration(days: now.weekday - 1));
+    final weekStart = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: now.weekday - 1));
     lastProactiveSuggestionAnalyticsSummary =
         ProactiveSuggestionAnalyticsSummary(
-      weekStartKey: DateKeys.todayKey(weekStart),
-      totalGenerated: shown.length,
-      byType: byType,
-      chatConversionsByType: ProactiveChatConversionTracker.snapshot(),
-    );
+          weekStartKey: DateKeys.todayKey(weekStart),
+          totalGenerated: shown.length,
+          byType: byType,
+          chatConversionsByType: ProactiveChatConversionTracker.snapshot(),
+        );
   }
 
   // ─── Rule 1: Recurring task missing ────────────────────────────────────────
@@ -111,7 +114,10 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
         final day = today.subtract(Duration(days: daysBack));
         final dateKey = DateKeys.todayKey(day);
         try {
-          final rows = await collectTasksForDateKey(planningRepository, dateKey);
+          final rows = await collectTasksForDateKey(
+            planningRepository,
+            dateKey,
+          );
           final seenCategories = <String>{};
           for (final row in rows) {
             final category = normaliser.normalise(row.task.title);
@@ -121,8 +127,9 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
                   (categoryDayCount[category] ?? 0) + 1;
               categoryLastTitle[category] = row.task.title;
               if (row.task.reminderTimeIso != null) {
-                final dt = DateTime.tryParse(row.task.reminderTimeIso!)
-                    ?.toLocal();
+                final dt = DateTime.tryParse(
+                  row.task.reminderTimeIso!,
+                )?.toLocal();
                 if (dt != null) {
                   categoryLastTime[category] =
                       '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
@@ -140,8 +147,9 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
         planningRepository,
         todayKey,
       );
-      final todayCategories =
-          todayTasks.map((r) => normaliser.normalise(r.task.title)).toSet();
+      final todayCategories = todayTasks
+          .map((r) => normaliser.normalise(r.task.title))
+          .toSet();
 
       final suggestions = <ProactiveSuggestion>[];
       for (final entry in categoryDayCount.entries) {
@@ -160,7 +168,7 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
               type: ProactiveSuggestionType.recurringTaskMissing,
               title: 'You usually schedule a $category session',
               description:
-                  'It appeared on ${ entry.value} of the last $_lookbackDays days but isn\'t on today\'s plan yet.',
+                  'It appeared on ${entry.value} of the last $_lookbackDays days but isn\'t on today\'s plan yet.',
               preDraftedInput: preDrafted,
               confidence: 0.85,
               generatedAt: DateTime.now(),
@@ -202,14 +210,14 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
       var cursor = dayStart;
       for (final block in blocks) {
         if (block.startAt.isAfter(cursor)) {
-          final gapMinutes =
-              block.startAt.difference(cursor).inMinutes;
+          final gapMinutes = block.startAt.difference(cursor).inMinutes;
           if (gapMinutes >= _scheduleGapMinutes) {
             gaps.add((cursor, block.startAt));
           }
         }
-        final blockEnd =
-            block.startAt.add(Duration(minutes: block.expectedDurationMinutes));
+        final blockEnd = block.startAt.add(
+          Duration(minutes: block.expectedDurationMinutes),
+        );
         if (blockEnd.isAfter(cursor)) cursor = blockEnd;
       }
       // Gap after last block
@@ -233,8 +241,7 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
           description:
               'A ${_scheduleGapMinutes}+ min gap is available — '
               'great time to work on "${goal.title}".',
-          preDraftedInput:
-              'Add ${goal.title} at $gapTimeStr for 60 minutes',
+          preDraftedInput: 'Add ${goal.title} at $gapTimeStr for 60 minutes',
           confidence: 0.75,
           generatedAt: DateTime.now(),
         ),
@@ -260,8 +267,7 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
       for (final goal in goals) {
         if (goal.status != GoalStatus.active) continue;
 
-        final totalMs =
-            goal.periodEndMs - goal.periodStartMs;
+        final totalMs = goal.periodEndMs - goal.periodStartMs;
         if (totalMs <= 0) continue;
 
         final elapsedMs =
@@ -306,8 +312,7 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
     if (suppressed.contains(ProactiveSuggestionType.optimiseOrder)) return [];
     try {
       final todayKey = DateKeys.todayKey();
-      final rows =
-          await collectTasksForDateKey(planningRepository, todayKey);
+      final rows = await collectTasksForDateKey(planningRepository, todayKey);
 
       if (rows.length < 5) return [];
 
@@ -360,27 +365,29 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
     }
     try {
       final todayKey = DateKeys.todayKey();
-      final recommendations =
-          await optimisationService.analyse(todayKey);
+      final recommendations = await optimisationService.analyse(todayKey);
 
-      return recommendations.map((rec) {
-        final type = rec.ruleCode == 'A'
-            ? ProactiveSuggestionType.optimiseOrder
-            : ProactiveSuggestionType.lowEnergySlot;
+      return recommendations
+          .map((rec) {
+            final type = rec.ruleCode == 'A'
+                ? ProactiveSuggestionType.optimiseOrder
+                : ProactiveSuggestionType.lowEnergySlot;
 
-        if (suppressed.contains(type)) return null;
+            if (suppressed.contains(type)) return null;
 
-        return ProactiveSuggestion(
-          id: StableId.generate('ps'),
-          type: type,
-          title: _optimisationTitle(rec.ruleCode),
-          description: rec.description,
-          preDraftedInput: rec.preDraftedInput,
-          confidence: rec.ruleCode == 'A' ? 0.72 : 0.68,
-          generatedAt: DateTime.now(),
-          optimisationRuleCode: rec.ruleCode,
-        );
-      }).whereType<ProactiveSuggestion>().toList();
+            return ProactiveSuggestion(
+              id: StableId.generate('ps'),
+              type: type,
+              title: _optimisationTitle(rec.ruleCode),
+              description: rec.description,
+              preDraftedInput: rec.preDraftedInput,
+              confidence: rec.ruleCode == 'A' ? 0.72 : 0.68,
+              generatedAt: DateTime.now(),
+              optimisationRuleCode: rec.ruleCode,
+            );
+          })
+          .whereType<ProactiveSuggestion>()
+          .toList();
       // Note: scheduleOptimisationSuggested analytics is logged in the
       // ProactiveSuggestionSection when the card renders.
     } catch (_) {

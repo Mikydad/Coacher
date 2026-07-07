@@ -57,7 +57,9 @@ List<PrioritizedTaskRow> prioritizePlannedTasks(
 
   final doNowPool = List<PlannedTaskRow>.from(flexible)
     ..sort((a, b) {
-      final durationCmp = a.task.durationMinutes.compareTo(b.task.durationMinutes);
+      final durationCmp = a.task.durationMinutes.compareTo(
+        b.task.durationMinutes,
+      );
       if (durationCmp != 0) return durationCmp;
       final priorityCmp = a.task.priority.compareTo(b.task.priority);
       if (priorityCmp != 0) return priorityCmp;
@@ -74,7 +76,9 @@ List<PrioritizedTaskRow> prioritizePlannedTasks(
   final doNow = doNowPool.take(doNowCount).toList();
   final doNowIds = doNow.map((r) => r.task.id).toSet();
 
-  final remainingFlexible = flexible.where((r) => !doNowIds.contains(r.task.id)).toList();
+  final remainingFlexible = flexible
+      .where((r) => !doNowIds.contains(r.task.id))
+      .toList();
   remainingFlexible.sort((a, b) {
     final as = _flexScore(a, blockUrgencyById);
     final bs = _flexScore(b, blockUrgencyById);
@@ -88,10 +92,30 @@ List<PrioritizedTaskRow> prioritizePlannedTasks(
   });
 
   final out = <PrioritizedTaskRow>[];
-  out.addAll(habitAnchors.map((r) => PrioritizedTaskRow(row: r, layer: TaskPriorityLayer.habitAnchor)));
-  out.addAll(overdue.map((r) => PrioritizedTaskRow(row: r, layer: TaskPriorityLayer.overdueScheduled)));
-  out.addAll(upcoming.map((r) => PrioritizedTaskRow(row: r, layer: TaskPriorityLayer.upcomingScheduled)));
-  out.addAll(doNow.map((r) => PrioritizedTaskRow(row: r, layer: TaskPriorityLayer.doNow)));
+  out.addAll(
+    habitAnchors.map(
+      (r) => PrioritizedTaskRow(row: r, layer: TaskPriorityLayer.habitAnchor),
+    ),
+  );
+  out.addAll(
+    overdue.map(
+      (r) =>
+          PrioritizedTaskRow(row: r, layer: TaskPriorityLayer.overdueScheduled),
+    ),
+  );
+  out.addAll(
+    upcoming.map(
+      (r) => PrioritizedTaskRow(
+        row: r,
+        layer: TaskPriorityLayer.upcomingScheduled,
+      ),
+    ),
+  );
+  out.addAll(
+    doNow.map(
+      (r) => PrioritizedTaskRow(row: r, layer: TaskPriorityLayer.doNow),
+    ),
+  );
   out.addAll(
     remainingFlexible.map(
       (r) => PrioritizedTaskRow(

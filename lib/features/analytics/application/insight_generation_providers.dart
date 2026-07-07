@@ -107,10 +107,9 @@ final layer3EntityInsightsProvider =
       return _watchLayer3Insights(
         ref,
         loader: () {
-          return ref.read(insightCacheRepositoryProvider).listByScope(
-            scopeType: InsightScopeType.entity,
-            scopeId: key,
-          );
+          return ref
+              .read(insightCacheRepositoryProvider)
+              .listByScope(scopeType: InsightScopeType.entity, scopeId: key);
         },
       );
     });
@@ -122,57 +121,56 @@ final layer3GlobalDayInsightsProvider =
       return _watchLayer3Insights(
         ref,
         loader: () {
-          return ref.read(insightCacheRepositoryProvider).listByScope(
-            scopeType: InsightScopeType.global,
-            scopeId: key,
-          );
+          return ref
+              .read(insightCacheRepositoryProvider)
+              .listByScope(scopeType: InsightScopeType.global, scopeId: key);
         },
       );
     });
 
-final layer3RunMetadataProvider = StreamProvider.family<Layer3RunMetadata, ({
-  InsightScopeType scopeType,
-  String scopeId,
-})>((ref, query) {
-  final scopeId = query.scopeId.trim();
-  if (scopeId.isEmpty) {
-    return Stream.value(
-      Layer3RunMetadata(
-        scopeType: query.scopeType,
-        scopeId: scopeId,
-        lastRunAtMs: 0,
-        schemaVersion: kGeneratedInsightSchemaVersion,
-        insightsEmitted: 0,
-      ),
-    );
-  }
-  return _watchLayer3Insights(
-    ref,
-    loader: () async {
-      final insights = await ref.read(insightCacheRepositoryProvider).listByScope(
-        scopeType: query.scopeType,
-        scopeId: scopeId,
-      );
-      var lastRunAtMs = 0;
-      var schemaVersion = kGeneratedInsightSchemaVersion;
-      for (final insight in insights) {
-        if (insight.detectedAtMs > lastRunAtMs) {
-          lastRunAtMs = insight.detectedAtMs;
-        }
-        if (insight.schemaVersion > schemaVersion) {
-          schemaVersion = insight.schemaVersion;
-        }
+final layer3RunMetadataProvider =
+    StreamProvider.family<
+      Layer3RunMetadata,
+      ({InsightScopeType scopeType, String scopeId})
+    >((ref, query) {
+      final scopeId = query.scopeId.trim();
+      if (scopeId.isEmpty) {
+        return Stream.value(
+          Layer3RunMetadata(
+            scopeType: query.scopeType,
+            scopeId: scopeId,
+            lastRunAtMs: 0,
+            schemaVersion: kGeneratedInsightSchemaVersion,
+            insightsEmitted: 0,
+          ),
+        );
       }
-      return Layer3RunMetadata(
-        scopeType: query.scopeType,
-        scopeId: scopeId,
-        lastRunAtMs: lastRunAtMs,
-        schemaVersion: schemaVersion,
-        insightsEmitted: insights.length,
+      return _watchLayer3Insights(
+        ref,
+        loader: () async {
+          final insights = await ref
+              .read(insightCacheRepositoryProvider)
+              .listByScope(scopeType: query.scopeType, scopeId: scopeId);
+          var lastRunAtMs = 0;
+          var schemaVersion = kGeneratedInsightSchemaVersion;
+          for (final insight in insights) {
+            if (insight.detectedAtMs > lastRunAtMs) {
+              lastRunAtMs = insight.detectedAtMs;
+            }
+            if (insight.schemaVersion > schemaVersion) {
+              schemaVersion = insight.schemaVersion;
+            }
+          }
+          return Layer3RunMetadata(
+            scopeType: query.scopeType,
+            scopeId: scopeId,
+            lastRunAtMs: lastRunAtMs,
+            schemaVersion: schemaVersion,
+            insightsEmitted: insights.length,
+          );
+        },
       );
-    },
-  );
-});
+    });
 
 /// Layer 3 mapping rules are entity-scoped; global rows are often empty. Home,
 /// Progress, and Layer 4 need merged global-day + entity insights whose source
@@ -235,17 +233,16 @@ final layer3TodayRunMetadataProvider = Provider<AsyncValue<Layer3RunMetadata>>((
   );
 });
 
-final homeLayer3InsightsProvider = Provider<AsyncValue<HomeLayer3InsightViewModel>>((
-  ref,
-) {
-  final todayInsightsAsync = ref.watch(layer3TodayDeliveryInsightsProvider);
-  return todayInsightsAsync.whenData((insights) {
-    final sorted = List<GeneratedInsight>.from(insights)
-      ..sort(compareInsightOrdering);
-    final top = sorted.take(3).toList(growable: false);
-    return HomeLayer3InsightViewModel(
-      primary: top.isEmpty ? null : top.first,
-      topInsights: top,
-    );
-  });
-});
+final homeLayer3InsightsProvider =
+    Provider<AsyncValue<HomeLayer3InsightViewModel>>((ref) {
+      final todayInsightsAsync = ref.watch(layer3TodayDeliveryInsightsProvider);
+      return todayInsightsAsync.whenData((insights) {
+        final sorted = List<GeneratedInsight>.from(insights)
+          ..sort(compareInsightOrdering);
+        final top = sorted.take(3).toList(growable: false);
+        return HomeLayer3InsightViewModel(
+          primary: top.isEmpty ? null : top.first,
+          topInsights: top,
+        );
+      });
+    });

@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -16,6 +15,7 @@ import '../../domain/models/circle_message.dart';
 import '../widgets/full_screen_image_viewer.dart';
 
 import '../../../../core/presentation/app_colors.dart';
+import '../../../../core/presentation/async_value_ui.dart';
 
 const _kPresetEmojis = ['🔥', '💪', '👏', '✅', '😅', '❤️'];
 
@@ -69,9 +69,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
         content: text,
         createdAtMs: DateTime.now().millisecondsSinceEpoch,
       );
-      await ref
-          .read(circleMessageRepositoryProvider)
-          .sendMessage(msg);
+      await ref.read(circleMessageRepositoryProvider).sendMessage(msg);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -102,7 +100,9 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
     setState(() => _sending = true);
     try {
       final file = File(picked.path);
-      final url = await ref.read(circleProofStorageProvider).uploadChatProof(
+      final url = await ref
+          .read(circleProofStorageProvider)
+          .uploadChatProof(
             circleId: widget.circleId,
             userId: user.uid,
             file: file,
@@ -181,15 +181,12 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
     );
   }
 
-  Future<void> _toggleReaction(
-      CircleMessage message, String emoji) async {
+  Future<void> _toggleReaction(CircleMessage message, String emoji) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
     final current = Map<String, List<String>>.from(
-      message.reactions.map(
-        (k, v) => MapEntry(k, List<String>.from(v)),
-      ),
+      message.reactions.map((k, v) => MapEntry(k, List<String>.from(v))),
     );
 
     final users = current[emoji] ?? [];
@@ -208,8 +205,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
 
   @override
   Widget build(BuildContext context) {
-    final messagesAsync =
-        ref.watch(circleMessagesProvider(widget.circleId));
+    final messagesAsync = ref.watch(circleMessagesProvider(widget.circleId));
 
     return Column(
       children: [
@@ -218,56 +214,60 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
             behavior: HitTestBehavior.translucent,
             onTap: () => dismissKeyboard(context),
             child: messagesAsync.when(
-            loading: () => const Center(
-              child: CircularProgressIndicator(color: AppColors.accent),
-            ),
-            error: (_, __) => const Center(
-              child: Text(
-                'Could not load messages.',
-                style: TextStyle(color: AppColors.textMuted),
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppColors.accent),
               ),
-            ),
-            data: (messages) {
-              if (messages.isEmpty) {
-                return const Center(
+              error: (e, _) => swallowedAsyncError(
+                'circle_chat_view',
+                e,
+                const Center(
                   child: Text(
-                    'No messages yet.\nSay hello to your circle!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 15,
-                    ),
+                    'Could not load messages.',
+                    style: TextStyle(color: AppColors.textMuted),
                   ),
-                );
-              }
-              return ListView.builder(
-                controller: _scrollController,
-                reverse: true,
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
                 ),
-                itemCount: messages.length,
-                itemBuilder: (_, i) {
-                  final msg = messages[i];
-                  if (msg.type == MessageType.systemEvent) {
-                    return _SystemEventPill(msg.content ?? '');
-                  }
-                  if (msg.type == MessageType.image) {
-                    return _ImageMessageBubble(
+              ),
+              data: (messages) {
+                if (messages.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No messages yet.\nSay hello to your circle!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 15,
+                      ),
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  controller: _scrollController,
+                  reverse: true,
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  itemCount: messages.length,
+                  itemBuilder: (_, i) {
+                    final msg = messages[i];
+                    if (msg.type == MessageType.systemEvent) {
+                      return _SystemEventPill(msg.content ?? '');
+                    }
+                    if (msg.type == MessageType.image) {
+                      return _ImageMessageBubble(
+                        message: msg,
+                        onReaction: (emoji) => _toggleReaction(msg, emoji),
+                      );
+                    }
+                    return _TextMessageBubble(
                       message: msg,
                       onReaction: (emoji) => _toggleReaction(msg, emoji),
                     );
-                  }
-                  return _TextMessageBubble(
-                    message: msg,
-                    onReaction: (emoji) => _toggleReaction(msg, emoji),
-                  );
-                },
-              );
-            },
+                  },
+                );
+              },
             ),
           ),
         ),
@@ -285,10 +285,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
 // ── Message bubbles ───────────────────────────────────────────────────────────
 
 class _TextMessageBubble extends StatelessWidget {
-  const _TextMessageBubble({
-    required this.message,
-    required this.onReaction,
-  });
+  const _TextMessageBubble({required this.message, required this.onReaction});
 
   final CircleMessage message;
   final ValueChanged<String> onReaction;
@@ -303,8 +300,9 @@ class _TextMessageBubble extends StatelessWidget {
       child: GestureDetector(
         onLongPress: () => _showEmojiBar(context),
         child: Row(
-          mainAxisAlignment:
-              isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          mainAxisAlignment: isMe
+              ? MainAxisAlignment.end
+              : MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             if (!isMe) ...[
@@ -343,10 +341,8 @@ class _TextMessageBubble extends StatelessWidget {
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(16),
                         topRight: const Radius.circular(16),
-                        bottomLeft:
-                            Radius.circular(isMe ? 16 : 4),
-                        bottomRight:
-                            Radius.circular(isMe ? 4 : 16),
+                        bottomLeft: Radius.circular(isMe ? 16 : 4),
+                        bottomRight: Radius.circular(isMe ? 4 : 16),
                       ),
                     ),
                     child: Text(
@@ -396,10 +392,7 @@ class _TextMessageBubble extends StatelessWidget {
 }
 
 class _ImageMessageBubble extends StatelessWidget {
-  const _ImageMessageBubble({
-    required this.message,
-    required this.onReaction,
-  });
+  const _ImageMessageBubble({required this.message, required this.onReaction});
 
   final CircleMessage message;
   final ValueChanged<String> onReaction;
@@ -421,8 +414,9 @@ class _ImageMessageBubble extends StatelessWidget {
           builder: (_) => _EmojiReactionBar(onReaction: onReaction),
         ),
         child: Row(
-          mainAxisAlignment:
-              isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          mainAxisAlignment: isMe
+              ? MainAxisAlignment.end
+              : MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             if (!isMe) ...[
@@ -469,9 +463,12 @@ class _ImageMessageBubble extends StatelessWidget {
                                 // ~1080px source is decoded full-res for a
                                 // 220-logical-px bubble (several MB RAM
                                 // each). Disk cache: downloads once, ever.
-                                memCacheWidth: (220 *
-                                        MediaQuery.devicePixelRatioOf(context))
-                                    .round(),
+                                memCacheWidth:
+                                    (220 *
+                                            MediaQuery.devicePixelRatioOf(
+                                              context,
+                                            ))
+                                        .round(),
                                 fit: BoxFit.cover,
                                 placeholder: (_, _) => Container(
                                   width: 220,
@@ -493,8 +490,9 @@ class _ImageMessageBubble extends StatelessWidget {
                                   height: 140,
                                   color: AppColors.surfaceCard,
                                   child: const Icon(
-                                      Icons.broken_image_rounded,
-                                      color: AppColors.textMuted),
+                                    Icons.broken_image_rounded,
+                                    color: AppColors.textMuted,
+                                  ),
                                 ),
                               ),
                             ),
@@ -506,7 +504,9 @@ class _ImageMessageBubble extends StatelessWidget {
                             left: 8,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.black.withOpacity(0.6),
                                 borderRadius: BorderRadius.circular(6),
@@ -568,10 +568,7 @@ class _SystemEventPill extends StatelessWidget {
           ),
           child: Text(
             text,
-            style: const TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 12,
-            ),
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
           ),
         ),
       ),
@@ -582,10 +579,7 @@ class _SystemEventPill extends StatelessWidget {
 // ── Reactions ─────────────────────────────────────────────────────────────────
 
 class _ReactionRow extends StatelessWidget {
-  const _ReactionRow({
-    required this.reactions,
-    required this.onReaction,
-  });
+  const _ReactionRow({required this.reactions, required this.onReaction});
 
   final Map<String, List<String>> reactions;
   final ValueChanged<String> onReaction;
@@ -602,8 +596,7 @@ class _ReactionRow extends StatelessWidget {
           return GestureDetector(
             onTap: () => onReaction(e.key),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(
                 color: reacted
                     ? AppColors.accent.withOpacity(0.2)
@@ -676,9 +669,7 @@ class _InputBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       decoration: BoxDecoration(
         color: AppColors.surfaceDark,
-        border: Border(
-          top: BorderSide(color: Colors.white.withOpacity(0.06)),
-        ),
+        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.06))),
       ),
       child: SafeArea(
         top: false,

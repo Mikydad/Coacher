@@ -14,10 +14,12 @@ class AccountabilityHistoryScreen extends ConsumerStatefulWidget {
   static const routeName = '/accountability-history';
 
   @override
-  ConsumerState<AccountabilityHistoryScreen> createState() => _AccountabilityHistoryScreenState();
+  ConsumerState<AccountabilityHistoryScreen> createState() =>
+      _AccountabilityHistoryScreenState();
 }
 
-class _AccountabilityHistoryScreenState extends ConsumerState<AccountabilityHistoryScreen> {
+class _AccountabilityHistoryScreenState
+    extends ConsumerState<AccountabilityHistoryScreen> {
   DateTimeRange? _range;
   String? _modeRefId;
   OverrideReasonCategory? _reason;
@@ -66,7 +68,9 @@ class _AccountabilityHistoryScreenState extends ConsumerState<AccountabilityHist
 
   Future<void> _deleteRange() async {
     if (_range == null) return;
-    await ref.read(planningRepositoryProvider).deleteAccountabilityLogsInRange(
+    await ref
+        .read(planningRepositoryProvider)
+        .deleteAccountabilityLogsInRange(
           fromCreatedAtMs: _range!.start.millisecondsSinceEpoch,
           toCreatedAtMs: _range!.end.millisecondsSinceEpoch,
         );
@@ -74,7 +78,9 @@ class _AccountabilityHistoryScreenState extends ConsumerState<AccountabilityHist
   }
 
   Future<void> _export(String format) async {
-    final raw = await ref.read(planningRepositoryProvider).exportAccountabilityLogs(format: format);
+    final raw = await ref
+        .read(planningRepositoryProvider)
+        .exportAccountabilityLogs(format: format);
     final pretty = format == 'json'
         ? const JsonEncoder.withIndent('  ').convert(jsonDecode(raw) as Object)
         : raw;
@@ -117,10 +123,22 @@ class _AccountabilityHistoryScreenState extends ConsumerState<AccountabilityHist
                   value: _modeRefId,
                   hint: const Text('Mode'),
                   items: const [
-                    DropdownMenuItem<String?>(value: null, child: Text('All modes')),
-                    DropdownMenuItem<String?>(value: 'flexible', child: Text('Flexible')),
-                    DropdownMenuItem<String?>(value: 'disciplined', child: Text('Disciplined')),
-                    DropdownMenuItem<String?>(value: 'extreme', child: Text('Extreme')),
+                    DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('All modes'),
+                    ),
+                    DropdownMenuItem<String?>(
+                      value: 'flexible',
+                      child: Text('Flexible'),
+                    ),
+                    DropdownMenuItem<String?>(
+                      value: 'disciplined',
+                      child: Text('Disciplined'),
+                    ),
+                    DropdownMenuItem<String?>(
+                      value: 'extreme',
+                      child: Text('Extreme'),
+                    ),
                   ],
                   onChanged: (v) async {
                     setState(() => _modeRefId = v);
@@ -136,7 +154,10 @@ class _AccountabilityHistoryScreenState extends ConsumerState<AccountabilityHist
                       child: Text('All reasons'),
                     ),
                     ...OverrideReasonCategory.values.map(
-                      (e) => DropdownMenuItem(value: e, child: Text(e.storageValue)),
+                      (e) => DropdownMenuItem(
+                        value: e,
+                        child: Text(e.storageValue),
+                      ),
                     ),
                   ],
                   onChanged: (v) async {
@@ -157,24 +178,28 @@ class _AccountabilityHistoryScreenState extends ConsumerState<AccountabilityHist
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _logs.isEmpty
-                    ? const Center(child: Text('No accountability logs found.'))
-                    : ListView.builder(
-                        itemCount: _logs.length,
-                        itemBuilder: (context, index) {
-                          final l = _logs[index];
-                          final dt = DateTime.fromMillisecondsSinceEpoch(l.createdAtMs);
-                          return ListTile(
-                            title: Text('${l.action.storageValue} • ${l.reasonCategory.storageValue}'),
-                            subtitle: Text('${l.reasonNote}\n${dt.toLocal()}'),
-                            isThreeLine: true,
-                            trailing: IconButton(
-                              tooltip: 'Delete',
-                              icon: const Icon(Icons.delete_outline),
-                              onPressed: () => _deleteOne(l.id),
-                            ),
-                          );
-                        },
-                      ),
+                ? const Center(child: Text('No accountability logs found.'))
+                : ListView.builder(
+                    itemCount: _logs.length,
+                    itemBuilder: (context, index) {
+                      final l = _logs[index];
+                      final dt = DateTime.fromMillisecondsSinceEpoch(
+                        l.createdAtMs,
+                      );
+                      return ListTile(
+                        title: Text(
+                          '${l.action.storageValue} • ${l.reasonCategory.storageValue}',
+                        ),
+                        subtitle: Text('${l.reasonNote}\n${dt.toLocal()}'),
+                        isThreeLine: true,
+                        trailing: IconButton(
+                          tooltip: 'Delete',
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => _deleteOne(l.id),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),

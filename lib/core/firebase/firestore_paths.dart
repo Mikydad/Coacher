@@ -35,9 +35,11 @@ class FirestorePaths {
 
   static String goalActions(String goalId) => '${goalDocument(goalId)}/actions';
 
-  static String goalMilestones(String goalId) => '${goalDocument(goalId)}/milestones';
+  static String goalMilestones(String goalId) =>
+      '${goalDocument(goalId)}/milestones';
 
-  static String goalCheckIns(String goalId) => '${goalDocument(goalId)}/checkIns';
+  static String goalCheckIns(String goalId) =>
+      '${goalDocument(goalId)}/checkIns';
 
   // ── Community / Accountability Circles ──────────────────────────────────────
 

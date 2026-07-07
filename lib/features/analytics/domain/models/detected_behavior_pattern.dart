@@ -61,7 +61,10 @@ class DetectedBehaviorPattern {
   final int schemaVersion;
 
   void validate() {
-    ModelValidators.requireNotBlank(entityId, 'detectedBehaviorPattern.entityId');
+    ModelValidators.requireNotBlank(
+      entityId,
+      'detectedBehaviorPattern.entityId',
+    );
     ModelValidators.requireNotBlank(
       sourceWindowStartDateKey,
       'detectedBehaviorPattern.sourceWindowStartDateKey',
@@ -106,7 +109,9 @@ class DetectedBehaviorPattern {
         if (item is Map<String, dynamic>) {
           evidence.add(PatternMetricEvidence.fromMap(item));
         } else if (item is Map) {
-          evidence.add(PatternMetricEvidence.fromMap(item.cast<String, dynamic>()));
+          evidence.add(
+            PatternMetricEvidence.fromMap(item.cast<String, dynamic>()),
+          );
         }
       }
     }
@@ -117,7 +122,10 @@ class DetectedBehaviorPattern {
       patternGroup: group,
       taxonomyFamily: taxonomyFamily,
       severity: ((map['severity'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
-      confidence: ((map['confidence'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
+      confidence: ((map['confidence'] as num?)?.toDouble() ?? 0).clamp(
+        0.0,
+        1.0,
+      ),
       detectedAtMs: (map['detectedAtMs'] as num?)?.toInt() ?? 0,
       sourceWindowStartDateKey:
           map['sourceWindowStartDateKey'] as String? ?? '',
@@ -163,12 +171,20 @@ class GlobalBehaviorPatternAggregateEntry {
     return GlobalBehaviorPatternAggregateEntry(
       patternCode: patternCodeFromStorage(map['patternCode'] as String?),
       patternGroup: patternGroupFromStorage(map['patternGroup'] as String?),
-      entityCount: ((map['entityCount'] as num?)?.toInt() ?? 0).clamp(0, 999999),
-      occurrenceCount:
-          ((map['occurrenceCount'] as num?)?.toInt() ?? 0).clamp(0, 999999),
+      entityCount: ((map['entityCount'] as num?)?.toInt() ?? 0).clamp(
+        0,
+        999999,
+      ),
+      occurrenceCount: ((map['occurrenceCount'] as num?)?.toInt() ?? 0).clamp(
+        0,
+        999999,
+      ),
       averageSeverity: ((map['averageSeverity'] as num?)?.toDouble() ?? 0)
           .clamp(0.0, 1.0),
-      maxSeverity: ((map['maxSeverity'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
+      maxSeverity: ((map['maxSeverity'] as num?)?.toDouble() ?? 0).clamp(
+        0.0,
+        1.0,
+      ),
       averageConfidence: ((map['averageConfidence'] as num?)?.toDouble() ?? 0)
           .clamp(0.0, 1.0),
     );
@@ -195,7 +211,10 @@ class GlobalBehaviorPatternSnapshot {
   final int schemaVersion;
 
   void validate() {
-    ModelValidators.requireNotBlank(dateKey, 'globalBehaviorPatternSnapshot.dateKey');
+    ModelValidators.requireNotBlank(
+      dateKey,
+      'globalBehaviorPatternSnapshot.dateKey',
+    );
     ModelValidators.requireRange(
       value: schemaVersion,
       min: 1,
@@ -207,7 +226,9 @@ class GlobalBehaviorPatternSnapshot {
   Map<String, dynamic> toMap() => {
     'dateKey': dateKey,
     'entries': entries.map((e) => e.toMap()).toList(),
-    'totalEntitiesProcessed': totalEntitiesProcessed < 0 ? 0 : totalEntitiesProcessed,
+    'totalEntitiesProcessed': totalEntitiesProcessed < 0
+        ? 0
+        : totalEntitiesProcessed,
     'totalPatternsEmitted': totalPatternsEmitted < 0 ? 0 : totalPatternsEmitted,
     'weightedAverageSeverity': weightedAverageSeverity.clamp(0.0, 1.0),
     'detectedAtMs': detectedAtMs,
@@ -223,7 +244,9 @@ class GlobalBehaviorPatternSnapshot {
           entries.add(GlobalBehaviorPatternAggregateEntry.fromMap(item));
         } else if (item is Map) {
           entries.add(
-            GlobalBehaviorPatternAggregateEntry.fromMap(item.cast<String, dynamic>()),
+            GlobalBehaviorPatternAggregateEntry.fromMap(
+              item.cast<String, dynamic>(),
+            ),
           );
         }
       }
@@ -232,11 +255,20 @@ class GlobalBehaviorPatternSnapshot {
       dateKey: map['dateKey'] as String? ?? '',
       entries: entries,
       totalEntitiesProcessed:
-          ((map['totalEntitiesProcessed'] as num?)?.toInt() ?? 0).clamp(0, 999999),
+          ((map['totalEntitiesProcessed'] as num?)?.toInt() ?? 0).clamp(
+            0,
+            999999,
+          ),
       totalPatternsEmitted:
-          ((map['totalPatternsEmitted'] as num?)?.toInt() ?? 0).clamp(0, 999999),
+          ((map['totalPatternsEmitted'] as num?)?.toInt() ?? 0).clamp(
+            0,
+            999999,
+          ),
       weightedAverageSeverity:
-          ((map['weightedAverageSeverity'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
+          ((map['weightedAverageSeverity'] as num?)?.toDouble() ?? 0).clamp(
+            0.0,
+            1.0,
+          ),
       detectedAtMs: (map['detectedAtMs'] as num?)?.toInt() ?? 0,
       schemaVersion:
           (map['schemaVersion'] as num?)?.toInt() ??

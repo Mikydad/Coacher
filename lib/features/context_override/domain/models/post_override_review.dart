@@ -39,8 +39,9 @@ class PostOverrideReview {
       overrideType: overrideType,
       activeFromMs: activeFromMs,
       activeUntilMs: activeUntilMs,
-      suppressedItems:
-          suppressedItems.where((i) => i.entityId != entityId).toList(),
+      suppressedItems: suppressedItems
+          .where((i) => i.entityId != entityId)
+          .toList(),
     );
   }
 }

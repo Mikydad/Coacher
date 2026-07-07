@@ -28,10 +28,10 @@ class MemberPulseLine {
   final String insight;
 
   Map<String, dynamic> toMap() => {
-        'userId': userId,
-        'displayName': displayName,
-        'insight': insight,
-      };
+    'userId': userId,
+    'displayName': displayName,
+    'insight': insight,
+  };
 
   static MemberPulseLine fromMap(Map<String, dynamic> map) {
     return MemberPulseLine(
@@ -72,19 +72,20 @@ class AiPulse {
   final int generatedAtMs;
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'circleId': circleId,
-        'type': type.storageValue,
-        'summary': summary,
-        'memberLines': memberLines.map((l) => l.toMap()).toList(),
-        'suggestedChallenge': suggestedChallenge,
-        'generatedAtMs': generatedAtMs,
-      };
+    'id': id,
+    'circleId': circleId,
+    'type': type.storageValue,
+    'summary': summary,
+    'memberLines': memberLines.map((l) => l.toMap()).toList(),
+    'suggestedChallenge': suggestedChallenge,
+    'generatedAtMs': generatedAtMs,
+  };
 
   static AiPulse fromMap(Map<String, dynamic> map) {
-    final lines = ((map['memberLines'] as List?)?.cast<Map<String, dynamic>>() ?? [])
-        .map(MemberPulseLine.fromMap)
-        .toList();
+    final lines =
+        ((map['memberLines'] as List?)?.cast<Map<String, dynamic>>() ?? [])
+            .map(MemberPulseLine.fromMap)
+            .toList();
 
     return AiPulse(
       id: map['id'] as String? ?? '',

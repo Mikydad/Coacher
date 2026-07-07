@@ -42,8 +42,9 @@ const Map<ActionType, QuickDirective> _kActionDirectiveMap = {
 /// Computes the 3 most-used directive types from AI interaction history.
 ///
 /// Falls back to [kDefaultDirectives] when fewer than 5 history entries exist.
-final quickDirectivesProvider =
-    FutureProvider<List<QuickDirective>>((ref) async {
+final quickDirectivesProvider = FutureProvider<List<QuickDirective>>((
+  ref,
+) async {
   try {
     final historyRepo = ref.read(aiInteractionHistoryRepositoryProvider);
     final recent = await historyRepo.getRecent(limit: 100);
@@ -56,7 +57,8 @@ final quickDirectivesProvider =
       try {
         final list = jsonDecode(entry.parsedActionsJson) as List;
         for (final item in list) {
-          final typeStr = (item as Map<String, dynamic>)['actionType'] as String?;
+          final typeStr =
+              (item as Map<String, dynamic>)['actionType'] as String?;
           if (typeStr == null) continue;
           final type = ActionType.values.firstWhere(
             (e) => e.name == typeStr,

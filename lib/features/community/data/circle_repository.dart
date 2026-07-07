@@ -19,14 +19,16 @@ abstract class CircleRepository {
 
 class FirestoreCircleRepository implements CircleRepository {
   FirestoreCircleRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
   CollectionReference<Map<String, dynamic>> get _circles =>
       _firestore.collection(FirestorePaths.circles);
 
-  static AccountabilityCircle _fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+  static AccountabilityCircle _fromDoc(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     final data = Map<String, dynamic>.from(doc.data() ?? {});
     data['id'] = doc.id;
     return AccountabilityCircle.fromMap(data);
@@ -83,8 +85,10 @@ class FirestoreCircleRepository implements CircleRepository {
     String? query,
     String? category,
   }) async {
-    Query<Map<String, dynamic>> q = _circles
-        .where('visibility', isEqualTo: CircleVisibility.public.storageValue);
+    Query<Map<String, dynamic>> q = _circles.where(
+      'visibility',
+      isEqualTo: CircleVisibility.public.storageValue,
+    );
 
     if (category != null && category.isNotEmpty) {
       q = q.where('category', isEqualTo: category);

@@ -242,8 +242,7 @@ class ReminderSyncService {
           (reminder.modeRefId ?? '').toLowerCase() == 'extreme';
       if (isExtremeMode &&
           reminder.escalationLevel > cadence.maxEscalationLevel) {
-        final tailCount =
-            reminder.escalationLevel - cadence.maxEscalationLevel;
+        final tailCount = reminder.escalationLevel - cadence.maxEscalationLevel;
         if (tailCount >= kExtremeMaxTailFollowUps) {
           // Tail phase exhausted — stop scheduling follow-ups.
           return null;
@@ -333,4 +332,3 @@ class ReminderSyncService {
     return 'Time to start your planned task.';
   }
 }
-

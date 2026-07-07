@@ -11,7 +11,8 @@ import 'analytics_period_bundle.dart';
 import 'daily_analytics_providers.dart' show computeAnalyticsPeriodBundle;
 
 /// Local-first analytics bundle: cached Isar snapshots first, fresh compute in background.
-class AnalyticsPeriodBundleNotifier extends AsyncNotifier<AnalyticsPeriodBundle> {
+class AnalyticsPeriodBundleNotifier
+    extends AsyncNotifier<AnalyticsPeriodBundle> {
   int _refreshGeneration = 0;
 
   @override
@@ -45,5 +46,5 @@ class AnalyticsPeriodBundleNotifier extends AsyncNotifier<AnalyticsPeriodBundle>
 
 final analyticsPeriodBundleProvider =
     AsyncNotifierProvider<AnalyticsPeriodBundleNotifier, AnalyticsPeriodBundle>(
-  AnalyticsPeriodBundleNotifier.new,
-);
+      AnalyticsPeriodBundleNotifier.new,
+    );

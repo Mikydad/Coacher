@@ -111,8 +111,16 @@ class AiAssumptionEngine {
 
         // Boost for completed tasks
         final confidence = task.status.name == 'completed'
-            ? (score >= 0.9 ? 0.95 : score >= 0.7 ? 0.80 : score)
-            : (score >= 0.9 ? 0.80 : score >= 0.7 ? 0.65 : score);
+            ? (score >= 0.9
+                  ? 0.95
+                  : score >= 0.7
+                  ? 0.80
+                  : score)
+            : (score >= 0.9
+                  ? 0.80
+                  : score >= 0.7
+                  ? 0.65
+                  : score);
 
         if (confidence < 0.65) continue;
         if (best == null || confidence > best.confidence) {

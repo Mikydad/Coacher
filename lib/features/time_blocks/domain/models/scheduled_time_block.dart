@@ -74,7 +74,10 @@ class ScheduledTimeBlock {
   void validate() {
     ModelValidators.requireNotBlank(id, 'scheduledTimeBlock.id');
     ModelValidators.requireNotBlank(entityId, 'scheduledTimeBlock.entityId');
-    ModelValidators.requireNotBlank(entityKind, 'scheduledTimeBlock.entityKind');
+    ModelValidators.requireNotBlank(
+      entityKind,
+      'scheduledTimeBlock.entityKind',
+    );
     ModelValidators.requireRange(
       value: expectedDurationMinutes,
       min: 1,
@@ -115,8 +118,9 @@ class ScheduledTimeBlock {
       expectedDurationMinutes:
           (map['expectedDurationMinutes'] as num?)?.toInt() ?? 0,
       computedEndAt: DateTime.fromMillisecondsSinceEpoch(endAtMs),
-      flexibilityType:
-          flexibilityTypeFromStorage(map['flexibilityType'] as String?),
+      flexibilityType: flexibilityTypeFromStorage(
+        map['flexibilityType'] as String?,
+      ),
       allowOverlapOverride: map['allowOverlapOverride'] as bool? ?? false,
       importance: (map['importance'] as num?)?.toInt() ?? 30,
       createdAtMs: (map['createdAtMs'] as num?)?.toInt() ?? 0,

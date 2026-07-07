@@ -17,8 +17,10 @@ class Routine {
   final String title;
   final String dateKey; // yyyy-MM-dd for tomorrow-plan grouping
   final int orderIndex;
+
   /// Stable mode config id. Built-ins: `flexible`, `disciplined`, `extreme`.
   final String modeId;
+
   /// Base mode for policy derivation, independent from custom labels.
   final RoutineMode mode;
   final int createdAtMs;

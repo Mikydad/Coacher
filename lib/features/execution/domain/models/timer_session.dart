@@ -1,9 +1,6 @@
 import '../../../../core/validation/model_validators.dart';
 
-enum TimerSessionTargetType {
-  task,
-  block,
-}
+enum TimerSessionTargetType { task, block }
 
 extension TimerSessionTargetTypeStorage on TimerSessionTargetType {
   String get storageValue => name;
@@ -71,7 +68,9 @@ class TimerSession {
 
   static TimerSession fromMap(Map<String, dynamic> map) => TimerSession(
     id: map['id'] as String? ?? '',
-    targetType: TimerSessionTargetTypeStorage.fromStorage(map['targetType'] as String?),
+    targetType: TimerSessionTargetTypeStorage.fromStorage(
+      map['targetType'] as String?,
+    ),
     taskId: map['taskId'] as String?,
     blockId: map['blockId'] as String?,
     startedAtMs: (map['startedAtMs'] as num?)?.toInt() ?? 0,

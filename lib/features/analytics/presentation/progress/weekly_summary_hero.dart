@@ -9,16 +9,30 @@ import '../../../../core/presentation/app_colors.dart';
 
 String progressWeekDateRangeLabel() {
   final now = DateTime.now();
-  final start = DateTime(now.year, now.month, now.day)
-      .subtract(Duration(days: now.weekday - 1));
+  final start = DateTime(
+    now.year,
+    now.month,
+    now.day,
+  ).subtract(Duration(days: now.weekday - 1));
   final end = start.add(const Duration(days: 6));
   String fmt(DateTime d) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[d.month - 1]} ${d.day}';
   }
+
   return '${fmt(start)} — ${fmt(end)}';
 }
 
@@ -79,7 +93,9 @@ class WeeklySummaryHero extends StatelessWidget {
                   height: 120,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: ProgressDesignTokens.primaryDim.withValues(alpha: 0.08),
+                    color: ProgressDesignTokens.primaryDim.withValues(
+                      alpha: 0.08,
+                    ),
                   ),
                 ),
               ),
@@ -107,7 +123,8 @@ class WeeklySummaryHero extends StatelessWidget {
                     label: 'Streaks',
                     title:
                         'Habit ${streaks.goalHabitCurrentDays}d · Task ${streaks.taskCurrentDays}d',
-                    badge: streaks.goalHabitCurrentDays >= 3 &&
+                    badge:
+                        streaks.goalHabitCurrentDays >= 3 &&
                             streaks.taskCurrentDays >= 3
                         ? 'STABLE'
                         : 'BUILDING',

@@ -14,8 +14,8 @@ import 'auth_repository_interface.dart';
 /// Injected via [authRepositoryProvider].
 class AuthRepository implements AuthRepositoryInterface {
   AuthRepository({FirebaseAuth? auth, GoogleSignIn? googleSignIn})
-      : _auth = auth ?? FirebaseAuth.instance,
-        _googleSignIn = googleSignIn ?? GoogleSignIn.instance;
+    : _auth = auth ?? FirebaseAuth.instance,
+      _googleSignIn = googleSignIn ?? GoogleSignIn.instance;
 
   final FirebaseAuth _auth;
   final GoogleSignIn _googleSignIn;
@@ -40,10 +40,7 @@ class AuthRepository implements AuthRepositoryInterface {
   @override
   Future<void> signOut() async {
     debugPrint('[Auth] signOut uid=${_shortUid(_auth.currentUser?.uid)}');
-    await Future.wait([
-      _auth.signOut(),
-      _googleSignIn.signOut(),
-    ]);
+    await Future.wait([_auth.signOut(), _googleSignIn.signOut()]);
   }
 
   // ── Anonymous ────────────────────────────────────────────────────────────────
@@ -66,10 +63,12 @@ class AuthRepository implements AuthRepositoryInterface {
   Future<void> _ensureGoogleSignInInitialized() async {
     if (_googleSignInInitialized) return;
     await _googleSignIn.initialize(
-      clientId:
-          GoogleAuthConfig.hasIosClientId ? GoogleAuthConfig.iosClientId : null,
-      serverClientId:
-          GoogleAuthConfig.hasWebClientId ? GoogleAuthConfig.webClientId : null,
+      clientId: GoogleAuthConfig.hasIosClientId
+          ? GoogleAuthConfig.iosClientId
+          : null,
+      serverClientId: GoogleAuthConfig.hasWebClientId
+          ? GoogleAuthConfig.webClientId
+          : null,
     );
     _googleSignInInitialized = true;
   }
@@ -100,10 +99,13 @@ class AuthRepository implements AuthRepositoryInterface {
       if (current != null && current.isAnonymous) {
         result = await current.linkWithCredential(credential);
         debugPrint(
-            '[Auth] linkAnonymousWithGoogle uid=${_shortUid(result.user?.uid)}');
+          '[Auth] linkAnonymousWithGoogle uid=${_shortUid(result.user?.uid)}',
+        );
       } else {
         result = await _auth.signInWithCredential(credential);
-        debugPrint('[Auth] signInWithGoogle uid=${_shortUid(result.user?.uid)}');
+        debugPrint(
+          '[Auth] signInWithGoogle uid=${_shortUid(result.user?.uid)}',
+        );
       }
 
       final user = await _applyGoogleProfileToFirebaseUser(
@@ -165,17 +167,17 @@ class AuthRepository implements AuthRepositoryInterface {
         );
       }
 
-      final credential = OAuthProvider('apple.com').credential(
-        idToken: idToken,
-        rawNonce: rawNonce,
-      );
+      final credential = OAuthProvider(
+        'apple.com',
+      ).credential(idToken: idToken, rawNonce: rawNonce);
 
       final current = _auth.currentUser;
       final UserCredential result;
       if (current != null && current.isAnonymous) {
         result = await current.linkWithCredential(credential);
         debugPrint(
-            '[Auth] linkAnonymousWithApple uid=${_shortUid(result.user?.uid)}');
+          '[Auth] linkAnonymousWithApple uid=${_shortUid(result.user?.uid)}',
+        );
       } else {
         result = await _auth.signInWithCredential(credential);
         debugPrint('[Auth] signInWithApple uid=${_shortUid(result.user?.uid)}');
@@ -187,8 +189,10 @@ class AuthRepository implements AuthRepositoryInterface {
         final given = appleCredential.givenName;
         final family = appleCredential.familyName;
         if (given != null || family != null) {
-          final name =
-              [given, family].whereType<String>().where((s) => s.isNotEmpty).join(' ');
+          final name = [
+            given,
+            family,
+          ].whereType<String>().where((s) => s.isNotEmpty).join(' ');
           if (name.isNotEmpty) {
             await user.updateDisplayName(name);
           }
@@ -228,7 +232,8 @@ class AuthRepository implements AuthRepositoryInterface {
       return (null, result.user);
     } on FirebaseAuthException catch (e) {
       debugPrint(
-          '[Auth] signInWithEmail failed: code=${e.code} uid_prefix=${_shortUid(_auth.currentUser?.uid)}');
+        '[Auth] signInWithEmail failed: code=${e.code} uid_prefix=${_shortUid(_auth.currentUser?.uid)}',
+      );
       return (_mapException(e), null);
     }
   }
@@ -249,11 +254,14 @@ class AuthRepository implements AuthRepositoryInterface {
       }
       // Trigger email verification immediately after account creation.
       await result.user?.sendEmailVerification();
-      debugPrint('[Auth] createUserWithEmail uid=${_shortUid(result.user?.uid)} verificationSent=true');
+      debugPrint(
+        '[Auth] createUserWithEmail uid=${_shortUid(result.user?.uid)} verificationSent=true',
+      );
       return (null, result.user);
     } on FirebaseAuthException catch (e) {
       debugPrint(
-          '[Auth] createUserWithEmail failed: code=${e.code} uid_prefix=${_shortUid(_auth.currentUser?.uid)}');
+        '[Auth] createUserWithEmail failed: code=${e.code} uid_prefix=${_shortUid(_auth.currentUser?.uid)}',
+      );
       return (_mapException(e), null);
     }
   }
@@ -283,7 +291,8 @@ class AuthRepository implements AuthRepositoryInterface {
       return (null, result.user);
     } on FirebaseAuthException catch (e) {
       debugPrint(
-          '[Auth] linkAnonymous failed: code=${e.code} uid_prefix=${_shortUid(_auth.currentUser?.uid)}');
+        '[Auth] linkAnonymous failed: code=${e.code} uid_prefix=${_shortUid(_auth.currentUser?.uid)}',
+      );
       return (_mapException(e), null);
     }
   }
@@ -307,11 +316,13 @@ class AuthRepository implements AuthRepositoryInterface {
     try {
       await _auth.currentUser?.updatePassword(newPassword);
       debugPrint(
-          '[Auth] updatePassword success uid_prefix=${_shortUid(_auth.currentUser?.uid)}');
+        '[Auth] updatePassword success uid_prefix=${_shortUid(_auth.currentUser?.uid)}',
+      );
       return null;
     } on FirebaseAuthException catch (e) {
       debugPrint(
-          '[Auth] updatePassword failed: code=${e.code} uid_prefix=${_shortUid(_auth.currentUser?.uid)}');
+        '[Auth] updatePassword failed: code=${e.code} uid_prefix=${_shortUid(_auth.currentUser?.uid)}',
+      );
       return _mapException(e);
     }
   }
@@ -328,11 +339,13 @@ class AuthRepository implements AuthRepositoryInterface {
       );
       await _auth.currentUser?.reauthenticateWithCredential(credential);
       debugPrint(
-          '[Auth] reauthenticate success uid_prefix=${_shortUid(_auth.currentUser?.uid)}');
+        '[Auth] reauthenticate success uid_prefix=${_shortUid(_auth.currentUser?.uid)}',
+      );
       return null;
     } on FirebaseAuthException catch (e) {
       debugPrint(
-          '[Auth] reauthenticate failed: code=${e.code} uid_prefix=${_shortUid(_auth.currentUser?.uid)}');
+        '[Auth] reauthenticate failed: code=${e.code} uid_prefix=${_shortUid(_auth.currentUser?.uid)}',
+      );
       return _mapException(e);
     }
   }
@@ -347,7 +360,8 @@ class AuthRepository implements AuthRepositoryInterface {
       return null;
     } on FirebaseAuthException catch (e) {
       debugPrint(
-          '[Auth] deleteAccount failed: code=${e.code} uid_prefix=${_shortUid(uid)}');
+        '[Auth] deleteAccount failed: code=${e.code} uid_prefix=${_shortUid(uid)}',
+      );
       return _mapException(e);
     }
   }
@@ -356,10 +370,11 @@ class AuthRepository implements AuthRepositoryInterface {
 
   AuthFailure _mapException(FirebaseAuthException e) {
     return switch (e.code) {
-      'wrong-password' || 'user-not-found' || 'invalid-credential' =>
-        const InvalidCredentials(),
-      'email-already-in-use' || 'credential-already-in-use' =>
-        const EmailAlreadyInUse(),
+      'wrong-password' ||
+      'user-not-found' ||
+      'invalid-credential' => const InvalidCredentials(),
+      'email-already-in-use' ||
+      'credential-already-in-use' => const EmailAlreadyInUse(),
       'weak-password' => const WeakPassword(),
       'requires-recent-login' => const RequiresRecentLogin(),
       'network-request-failed' => const NetworkFailure(),
@@ -377,10 +392,12 @@ class AuthRepository implements AuthRepositoryInterface {
     final googleName = googleUser.displayName?.trim();
     final googlePhoto = googleUser.photoUrl?.trim();
 
-    final needsName = googleName != null &&
+    final needsName =
+        googleName != null &&
         googleName.isNotEmpty &&
         (user.displayName == null || user.displayName!.trim().isEmpty);
-    final needsPhoto = googlePhoto != null &&
+    final needsPhoto =
+        googlePhoto != null &&
         googlePhoto.isNotEmpty &&
         (user.photoURL == null || user.photoURL!.trim().isEmpty);
 

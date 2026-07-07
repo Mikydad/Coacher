@@ -75,7 +75,8 @@ class Layer3InsightPolicyConfig {
   final List<InsightMappingRule> rules;
 }
 
-const Layer3InsightPolicyConfig kLayer3InsightPolicyConfig = Layer3InsightPolicyConfig(
+const Layer3InsightPolicyConfig
+kLayer3InsightPolicyConfig = Layer3InsightPolicyConfig(
   version: kLayer3InsightPolicyConfigVersion,
   outputCaps: InsightOutputCaps(maxEntityInsights: 3, maxGlobalInsights: 3),
   mergePolicy: InsightMergePolicy(),
@@ -88,7 +89,8 @@ const Layer3InsightPolicyConfig kLayer3InsightPolicyConfig = Layer3InsightPolicy
       priority: InsightPriority.high,
       action: InsightAction.doNow,
       messageKey: 'streak_risk_1',
-      fallbackMessage: 'You are close to breaking momentum. Do one small action now.',
+      fallbackMessage:
+          'You are close to breaking momentum. Do one small action now.',
       scopeType: InsightScopeType.entity,
       requiredAllPatterns: <PatternCode>{PatternCode.streakRisk},
     ),
@@ -99,7 +101,8 @@ const Layer3InsightPolicyConfig kLayer3InsightPolicyConfig = Layer3InsightPolicy
       priority: InsightPriority.high,
       action: InsightAction.reduceIntensity,
       messageKey: 'habit_too_hard_1',
-      fallbackMessage: 'This habit may be too hard right now. Lower intensity to stay consistent.',
+      fallbackMessage:
+          'This habit may be too hard right now. Lower intensity to stay consistent.',
       scopeType: InsightScopeType.entity,
       requiredAllPatterns: <PatternCode>{PatternCode.tooHard},
     ),
@@ -121,7 +124,8 @@ const Layer3InsightPolicyConfig kLayer3InsightPolicyConfig = Layer3InsightPolicy
       priority: InsightPriority.high,
       action: InsightAction.focus,
       messageKey: 'goal_at_risk_1',
-      fallbackMessage: 'Your goal is at risk. Focus your effort on one key step today.',
+      fallbackMessage:
+          'Your goal is at risk. Focus your effort on one key step today.',
       scopeType: InsightScopeType.entity,
       requiredAllPatterns: <PatternCode>{PatternCode.inconsistentBehavior},
       requiredAnyPatterns: <PatternCode>{
@@ -138,7 +142,8 @@ const Layer3InsightPolicyConfig kLayer3InsightPolicyConfig = Layer3InsightPolicy
       priority: InsightPriority.medium,
       action: InsightAction.reschedule,
       messageKey: 'late_pattern_1',
-      fallbackMessage: 'You tend to complete this late. A schedule adjustment may help.',
+      fallbackMessage:
+          'You tend to complete this late. A schedule adjustment may help.',
       scopeType: InsightScopeType.entity,
       requiredAllPatterns: <PatternCode>{PatternCode.lateBehavior},
     ),
@@ -149,7 +154,8 @@ const Layer3InsightPolicyConfig kLayer3InsightPolicyConfig = Layer3InsightPolicy
       priority: InsightPriority.medium,
       action: InsightAction.focus,
       messageKey: 'inconsistency_notice_1',
-      fallbackMessage: 'Your consistency is unstable. Aim for one repeatable daily win.',
+      fallbackMessage:
+          'Your consistency is unstable. Aim for one repeatable daily win.',
       scopeType: InsightScopeType.entity,
       requiredAllPatterns: <PatternCode>{PatternCode.inconsistentBehavior},
       blockedPatterns: <PatternCode>{PatternCode.streakRisk},
@@ -161,7 +167,8 @@ const Layer3InsightPolicyConfig kLayer3InsightPolicyConfig = Layer3InsightPolicy
       priority: InsightPriority.medium,
       action: InsightAction.focus,
       messageKey: 'low_engagement_notice_1',
-      fallbackMessage: 'Engagement is dropping. Simplify and restart with a smaller step.',
+      fallbackMessage:
+          'Engagement is dropping. Simplify and restart with a smaller step.',
       scopeType: InsightScopeType.entity,
       requiredAllPatterns: <PatternCode>{PatternCode.lowEngagement},
     ),
@@ -174,7 +181,8 @@ const Layer3InsightPolicyConfig kLayer3InsightPolicyConfig = Layer3InsightPolicy
       priority: InsightPriority.low,
       action: InsightAction.keepGoing,
       messageKey: 'strong_streak_praise_1',
-      fallbackMessage: 'Great momentum. Keep your streak alive with one deliberate action.',
+      fallbackMessage:
+          'Great momentum. Keep your streak alive with one deliberate action.',
       scopeType: InsightScopeType.entity,
       requiredAllPatterns: <PatternCode>{PatternCode.strongStreak},
       blockedPatterns: <PatternCode>{PatternCode.streakRisk},
@@ -186,7 +194,8 @@ const Layer3InsightPolicyConfig kLayer3InsightPolicyConfig = Layer3InsightPolicy
       priority: InsightPriority.low,
       action: InsightAction.keepGoing,
       messageKey: 'consistent_behavior_praise_1',
-      fallbackMessage: 'Your behavior is becoming consistent. Keep this routine stable.',
+      fallbackMessage:
+          'Your behavior is becoming consistent. Keep this routine stable.',
       scopeType: InsightScopeType.entity,
       requiredAllPatterns: <PatternCode>{PatternCode.strongStreak},
       requiredAnyPatterns: <PatternCode>{PatternCode.timeMisalignment},
@@ -202,7 +211,8 @@ const Layer3InsightPolicyConfig kLayer3InsightPolicyConfig = Layer3InsightPolicy
       priority: InsightPriority.low,
       action: InsightAction.keepGoing,
       messageKey: 'goal_progress_success_1',
-      fallbackMessage: 'You are making progress toward your goal. Keep this pace.',
+      fallbackMessage:
+          'You are making progress toward your goal. Keep this pace.',
       scopeType: InsightScopeType.entity,
       requiredAllPatterns: <PatternCode>{PatternCode.strongStreak},
       requiredAnyPatterns: <PatternCode>{PatternCode.lateBehavior},
@@ -220,7 +230,8 @@ const Layer3InsightPolicyConfig kLayer3InsightPolicyConfig = Layer3InsightPolicy
       priority: InsightPriority.medium,
       action: InsightAction.keepGoing,
       messageKey: 'focus_highest_momentum_1',
-      fallbackMessage: 'This has your strongest momentum right now. Protect it.',
+      fallbackMessage:
+          'This has your strongest momentum right now. Protect it.',
       scopeType: InsightScopeType.entity,
       requiredAllPatterns: <PatternCode>{PatternCode.strongStreak},
       blockedPatterns: <PatternCode>{PatternCode.streakRisk},
@@ -244,10 +255,14 @@ const Layer3InsightPolicyConfig kLayer3InsightPolicyConfig = Layer3InsightPolicy
       priority: InsightPriority.medium,
       action: InsightAction.focus,
       messageKey: 'focus_best_recovery_1',
-      fallbackMessage: 'Behavior is inconsistent but recoverable. Start with one win.',
+      fallbackMessage:
+          'Behavior is inconsistent but recoverable. Start with one win.',
       scopeType: InsightScopeType.entity,
       requiredAllPatterns: <PatternCode>{PatternCode.inconsistentBehavior},
-      blockedPatterns: <PatternCode>{PatternCode.streakRisk, PatternCode.tooHard},
+      blockedPatterns: <PatternCode>{
+        PatternCode.streakRisk,
+        PatternCode.tooHard,
+      },
     ),
 
     // Global coaching summaries (Phase 3)
@@ -258,10 +273,14 @@ const Layer3InsightPolicyConfig kLayer3InsightPolicyConfig = Layer3InsightPolicy
       priority: InsightPriority.high,
       action: InsightAction.reduceLoad,
       messageKey: 'global_overload_trend_1',
-      fallbackMessage: 'Multiple items are at risk. Reduce scope to protect momentum.',
+      fallbackMessage:
+          'Multiple items are at risk. Reduce scope to protect momentum.',
       scopeType: InsightScopeType.global,
       requiredAllPatterns: <PatternCode>{PatternCode.streakRisk},
-      requiredAnyPatterns: <PatternCode>{PatternCode.tooHard, PatternCode.lowEngagement},
+      requiredAnyPatterns: <PatternCode>{
+        PatternCode.tooHard,
+        PatternCode.lowEngagement,
+      },
     ),
     InsightMappingRule(
       ruleId: 'global_improving_consistency',
@@ -270,7 +289,8 @@ const Layer3InsightPolicyConfig kLayer3InsightPolicyConfig = Layer3InsightPolicy
       priority: InsightPriority.low,
       action: InsightAction.keepGoing,
       messageKey: 'global_improving_consistency_1',
-      fallbackMessage: 'System-wide consistency is improving. Maintain current pace.',
+      fallbackMessage:
+          'System-wide consistency is improving. Maintain current pace.',
       scopeType: InsightScopeType.global,
       requiredAllPatterns: <PatternCode>{PatternCode.strongStreak},
       blockedPatterns: <PatternCode>{PatternCode.streakRisk},
@@ -282,7 +302,8 @@ const Layer3InsightPolicyConfig kLayer3InsightPolicyConfig = Layer3InsightPolicy
       priority: InsightPriority.medium,
       action: InsightAction.reschedule,
       messageKey: 'global_unstable_routine_1',
-      fallbackMessage: 'Routine instability detected across multiple habits. Pick one anchor.',
+      fallbackMessage:
+          'Routine instability detected across multiple habits. Pick one anchor.',
       scopeType: InsightScopeType.global,
       requiredAllPatterns: <PatternCode>{PatternCode.scheduleRhythmVolatile},
     ),
@@ -301,9 +322,9 @@ int priorityWeight(InsightPriority priority) {
 }
 
 int compareInsightOrdering(GeneratedInsight a, GeneratedInsight b) {
-  final priorityCompare = priorityWeight(b.priority).compareTo(
-    priorityWeight(a.priority),
-  );
+  final priorityCompare = priorityWeight(
+    b.priority,
+  ).compareTo(priorityWeight(a.priority));
   if (priorityCompare != 0) return priorityCompare;
   final confidenceCompare = b.confidence.compareTo(a.confidence);
   if (confidenceCompare != 0) return confidenceCompare;

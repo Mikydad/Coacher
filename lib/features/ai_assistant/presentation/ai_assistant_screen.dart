@@ -69,9 +69,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _applyCoachLaunchArgs(
-        ModalRoute.of(context)?.settings.arguments,
-      );
+      _applyCoachLaunchArgs(ModalRoute.of(context)?.settings.arguments);
       final pending = ref.read(coachTabArgsProvider);
       if (pending != null) {
         _applyCoachLaunchArgs(pending);
@@ -257,9 +255,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         // Fixed bottom: input + quick directives
         Container(
           color: AppColors.ink,
-          padding: EdgeInsets.only(
-            bottom: mainTabFooterPadding(context),
-          ),
+          padding: EdgeInsets.only(bottom: mainTabFooterPadding(context)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -413,10 +409,7 @@ class _EmptyState extends StatelessWidget {
               children: [
                 for (final example in _examples)
                   ActionChip(
-                    label: Text(
-                      example,
-                      style: const TextStyle(fontSize: 12),
-                    ),
+                    label: Text(example, style: const TextStyle(fontSize: 12)),
                     backgroundColor: AppColors.inkCard,
                     side: BorderSide(
                       color: AppColors.cyan.withValues(alpha: 0.25),
@@ -528,17 +521,11 @@ class _PickUpBannerState extends State<_PickUpBanner> {
       decoration: BoxDecoration(
         color: AppColors.amber.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: AppColors.amber.withValues(alpha: 0.4),
-        ),
+        border: Border.all(color: AppColors.amber.withValues(alpha: 0.4)),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.history_rounded,
-            size: 14,
-            color: AppColors.amber,
-          ),
+          const Icon(Icons.history_rounded, size: 14, color: AppColors.amber),
           const SizedBox(width: 8),
           const Expanded(
             child: Text(
@@ -568,11 +555,7 @@ class _PickUpBannerState extends State<_PickUpBanner> {
           const SizedBox(width: 12),
           GestureDetector(
             onTap: () => setState(() => _dismissed = true),
-            child: const Icon(
-              Icons.close,
-              size: 14,
-              color: AppColors.textSoft,
-            ),
+            child: const Icon(Icons.close, size: 14, color: AppColors.textSoft),
           ),
         ],
       ),
@@ -596,8 +579,8 @@ class _ConflictSummaryBanner extends StatelessWidget {
     final totalWarnings = blockedCount + conflictCount;
     final label = isHard
         ? '⛔ $blockedCount blocked item${blockedCount > 1 ? 's' : ''}'
-            '${conflictCount > 0 ? " + $conflictCount conflict${conflictCount > 1 ? 's' : ''}" : ""}'
-            ' — review below.'
+              '${conflictCount > 0 ? " + $conflictCount conflict${conflictCount > 1 ? 's' : ''}" : ""}'
+              ' — review below.'
         : '⚠ $totalWarnings conflict${totalWarnings > 1 ? 's' : ''} detected — review below before confirming.';
 
     final bg = isHard
@@ -606,8 +589,7 @@ class _ConflictSummaryBanner extends StatelessWidget {
     final borderColor = isHard
         ? Colors.redAccent.withValues(alpha: 0.4)
         : AppColors.amber.withValues(alpha: 0.4);
-    final textColor =
-        isHard ? Colors.redAccent : AppColors.amber;
+    final textColor = isHard ? Colors.redAccent : AppColors.amber;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -620,9 +602,7 @@ class _ConflictSummaryBanner extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            isHard
-                ? Icons.block_rounded
-                : Icons.warning_amber_rounded,
+            isHard ? Icons.block_rounded : Icons.warning_amber_rounded,
             size: 14,
             color: textColor,
           ),
@@ -694,10 +674,7 @@ class _MessageItem extends StatelessWidget {
                 children: [
                   for (final prompt in message.suggestedPrompts)
                     ActionChip(
-                      label: Text(
-                        prompt,
-                        style: const TextStyle(fontSize: 12),
-                      ),
+                      label: Text(prompt, style: const TextStyle(fontSize: 12)),
                       backgroundColor: AppColors.inkCard,
                       side: BorderSide(
                         color: AppColors.cyan.withValues(alpha: 0.25),
@@ -756,10 +733,7 @@ class _MessageItem extends StatelessWidget {
               children: [
                 for (final prompt in message.suggestedPrompts)
                   ActionChip(
-                    label: Text(
-                      prompt,
-                      style: const TextStyle(fontSize: 12),
-                    ),
+                    label: Text(prompt, style: const TextStyle(fontSize: 12)),
                     backgroundColor: AppColors.inkCard,
                     side: BorderSide(
                       color: AppColors.cyan.withValues(alpha: 0.25),
@@ -791,19 +765,14 @@ class _AiActionBar extends ConsumerWidget {
       child: Row(
         children: [
           if (canUndoAsync.valueOrNull == true)
-            _UndoChip(
-              onUndo: () => _handleUndo(context, ref),
-            ),
+            _UndoChip(onUndo: () => _handleUndo(context, ref)),
           const Spacer(),
           if (recentCount > 0)
             GestureDetector(
               onTap: () => _showHistorySheet(context, ref),
               child: Text(
                 'View recent AI changes ($recentCount)',
-                style: const TextStyle(
-                  color: AppColors.textGray,
-                  fontSize: 12,
-                ),
+                style: const TextStyle(color: AppColors.textGray, fontSize: 12),
               ),
             ),
         ],
@@ -873,10 +842,7 @@ class _AiActionBar extends ConsumerWidget {
 
       case UndoNotAvailable(:final reason):
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(reason),
-            backgroundColor: AppColors.inkCard,
-          ),
+          SnackBar(content: Text(reason), backgroundColor: AppColors.inkCard),
         );
     }
   }
@@ -888,7 +854,8 @@ class _AiActionBar extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => _AiHistorySheet(executor: ref.read(aiActionExecutorProvider)),
+      builder: (_) =>
+          _AiHistorySheet(executor: ref.read(aiActionExecutorProvider)),
     );
   }
 }
@@ -1023,11 +990,7 @@ class _AiHistorySheet extends ConsumerWidget {
 }
 
 class _BatchRow extends StatelessWidget {
-  const _BatchRow({
-    required this.batch,
-    required this.canUndo,
-    this.onUndo,
-  });
+  const _BatchRow({required this.batch, required this.canUndo, this.onUndo});
 
   final IsarAiActionBatch batch;
   final bool canUndo;
@@ -1036,7 +999,8 @@ class _BatchRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ts = DateTime.fromMillisecondsSinceEpoch(batch.createdAtMs);
-    final label = '${ts.hour.toString().padLeft(2, '0')}:${ts.minute.toString().padLeft(2, '0')}  '
+    final label =
+        '${ts.hour.toString().padLeft(2, '0')}:${ts.minute.toString().padLeft(2, '0')}  '
         '${ts.day}/${ts.month}';
     final stateColor = _stateColor(batch.state);
     final stateLabel = _stateLabel(batch.state);
@@ -1055,7 +1019,10 @@ class _BatchRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: stateColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
@@ -1077,10 +1044,7 @@ class _BatchRow extends StatelessWidget {
               onPressed: onUndo,
               child: const Text(
                 'Undo',
-                style: TextStyle(
-                  color: AppColors.cyan,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: AppColors.cyan, fontSize: 13),
               ),
             ),
         ],
@@ -1104,7 +1068,9 @@ class _BatchRow extends StatelessWidget {
   String _stateLabel(String state) {
     if (state == AiActionBatchState.completed.name) return 'Completed';
     if (state == AiActionBatchState.rolledBack.name) return 'Undone';
-    if (state == AiActionBatchState.partialFailure.name) return 'Partial failure';
+    if (state == AiActionBatchState.partialFailure.name) {
+      return 'Partial failure';
+    }
     if (state == AiActionBatchState.executing.name) return 'Executing';
     if (state == AiActionBatchState.pending.name) return 'Pending';
     return state;

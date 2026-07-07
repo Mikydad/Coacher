@@ -7,7 +7,8 @@ import '../../application/auth_providers.dart';
 
 import '../../../../core/presentation/app_colors.dart';
 
-const String _kDismissedUntilKey = 'email_verification_banner_dismissed_until_ms';
+const String _kDismissedUntilKey =
+    'email_verification_banner_dismissed_until_ms';
 
 /// Non-blocking banner shown at the top of the screen when the signed-in user
 /// has an unverified email address.
@@ -39,8 +40,7 @@ class _EmailVerificationBannerState
 
   Future<void> _loadDismissState() async {
     final prefs = await SharedPreferences.getInstance();
-    final dismissedUntilMs =
-        prefs.getInt(_kDismissedUntilKey) ?? 0;
+    final dismissedUntilMs = prefs.getInt(_kDismissedUntilKey) ?? 0;
     final now = DateTime.now().millisecondsSinceEpoch;
     if (mounted) setState(() => _dismissed = now < dismissedUntilMs);
   }
@@ -72,7 +72,9 @@ class _EmailVerificationBannerState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Could not send verification email. Try again later.'),
+            content: Text(
+              'Could not send verification email. Try again later.',
+            ),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -85,7 +87,8 @@ class _EmailVerificationBannerState
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authStateProvider).valueOrNull;
-    final showBanner = !_dismissed &&
+    final showBanner =
+        !_dismissed &&
         user != null &&
         !(user.isAnonymous) &&
         !(user.emailVerified);
@@ -138,14 +141,20 @@ class _Banner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          const Icon(Icons.mark_email_unread_outlined,
-              color: AppColors.accentDim, size: 16),
+          const Icon(
+            Icons.mark_email_unread_outlined,
+            color: AppColors.accentDim,
+            size: 16,
+          ),
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
               'Verify your email to unlock all features.',
               style: TextStyle(
-                  color: AppColors.limeSoft, fontSize: 12, height: 1.4),
+                color: AppColors.limeSoft,
+                fontSize: 12,
+                height: 1.4,
+              ),
             ),
           ),
           if (isLoading)
@@ -153,23 +162,25 @@ class _Banner extends StatelessWidget {
               width: 14,
               height: 14,
               child: CircularProgressIndicator(
-                  color: AppColors.accentDim, strokeWidth: 1.5),
+                color: AppColors.accentDim,
+                strokeWidth: 1.5,
+              ),
             )
           else
             TextButton(
               onPressed: onResend,
               style: TextButton.styleFrom(
                 minimumSize: Size.zero,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               child: const Text(
                 'Resend',
                 style: TextStyle(
-                    color: AppColors.accentDim,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600),
+                  color: AppColors.accentDim,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           GestureDetector(

@@ -43,7 +43,9 @@ class TimeBlockSyncService {
       return null;
     }
     final computedEndAt = startAt.add(Duration(minutes: durationMinutes));
-    final importance = ConflictDetectionEngine.importanceFromModeRefId(modeRefId);
+    final importance = ConflictDetectionEngine.importanceFromModeRefId(
+      modeRefId,
+    );
     final nowMs = _now().millisecondsSinceEpoch;
     return ScheduledTimeBlock(
       id: StableId.generate('tb'),
@@ -52,8 +54,9 @@ class TimeBlockSyncService {
       startAt: startAt,
       expectedDurationMinutes: durationMinutes,
       computedEndAt: computedEndAt,
-      flexibilityType:
-          isRigid ? FlexibilityType.rigid : FlexibilityType.flexible,
+      flexibilityType: isRigid
+          ? FlexibilityType.rigid
+          : FlexibilityType.flexible,
       allowOverlapOverride: allowOverlapOverride,
       importance: importance,
       createdAtMs: nowMs,

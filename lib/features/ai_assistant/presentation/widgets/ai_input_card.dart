@@ -38,16 +38,10 @@ class AiInputCard extends StatelessWidget {
             minLines: 1,
             textInputAction: TextInputAction.newline,
             onTapOutside: (_) => dismissKeyboard(context),
-            style: const TextStyle(
-              fontSize: 15,
-              color: Colors.white,
-            ),
+            style: const TextStyle(fontSize: 15, color: Colors.white),
             decoration: const InputDecoration(
               hintText: 'Ask about your schedule or tell me what to plan…',
-              hintStyle: TextStyle(
-                color: AppColors.textSoft,
-                fontSize: 15,
-              ),
+              hintStyle: TextStyle(color: AppColors.textSoft, fontSize: 15),
               border: InputBorder.none,
               isDense: true,
               contentPadding: EdgeInsets.zero,
@@ -58,10 +52,7 @@ class AiInputCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _VoiceInputButton(
-                controller: controller,
-                enabled: !isLoading,
-              ),
+              _VoiceInputButton(controller: controller, enabled: !isLoading),
               // Send button
               ValueListenableBuilder<TextEditingValue>(
                 valueListenable: controller,
@@ -120,10 +111,7 @@ class AiInputCard extends StatelessWidget {
 /// Tap-to-dictate mic button. Streams recognised words into [controller] so
 /// the user can review the text before sending.
 class _VoiceInputButton extends StatefulWidget {
-  const _VoiceInputButton({
-    required this.controller,
-    required this.enabled,
-  });
+  const _VoiceInputButton({required this.controller, required this.enabled});
 
   final TextEditingController controller;
   final bool enabled;
@@ -178,10 +166,8 @@ class _VoiceInputButtonState extends State<_VoiceInputButton> {
     await _speech.listen(
       onResult: (result) {
         final recognised = result.recognizedWords;
-        final needsSpace =
-            _baseText.isNotEmpty && !_baseText.endsWith(' ');
-        final combined =
-            '$_baseText${needsSpace ? ' ' : ''}$recognised';
+        final needsSpace = _baseText.isNotEmpty && !_baseText.endsWith(' ');
+        final combined = '$_baseText${needsSpace ? ' ' : ''}$recognised';
         widget.controller.value = TextEditingValue(
           text: combined,
           selection: TextSelection.collapsed(offset: combined.length),
@@ -204,10 +190,7 @@ class _VoiceInputButtonState extends State<_VoiceInputButton> {
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.inkCard,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppColors.inkCard),
     );
   }
 

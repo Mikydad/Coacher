@@ -88,10 +88,9 @@ class ConflictBottomSheet extends StatelessWidget {
                 proposedTitle: proposedEntityTitle,
                 conflictCount: conflicts.length,
               ),
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Colors.white60),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.white60),
             ),
             const SizedBox(height: 16),
 
@@ -145,8 +144,10 @@ class ConflictBottomSheet extends StatelessWidget {
   static String overlapSummary({
     required String? proposedTitle,
     required int conflictCount,
-  }) =>
-      _overlapSummary(proposedTitle: proposedTitle, conflictCount: conflictCount);
+  }) => _overlapSummary(
+    proposedTitle: proposedTitle,
+    conflictCount: conflictCount,
+  );
 
   static String _overlapSummary({
     required String? proposedTitle,
@@ -267,17 +268,11 @@ class _ActionButton extends StatelessWidget {
                 children: [
                   Text(
                     label,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: color,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w600, color: color),
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.white54,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: Colors.white54),
                   ),
                 ],
               ),

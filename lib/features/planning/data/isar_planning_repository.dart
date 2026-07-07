@@ -32,7 +32,9 @@ class IsarPlanningRepository implements PlanningRepository {
     required Map<String, dynamic> payload,
   }) async {
     try {
-      await FirebaseFirestore.instance.doc(path).set(payload, SetOptions(merge: true));
+      await FirebaseFirestore.instance
+          .doc(path)
+          .set(payload, SetOptions(merge: true));
     } catch (_) {
       await SyncService.instance.enqueueUpsert(
         entityType: entityType,
@@ -57,7 +59,9 @@ class IsarPlanningRepository implements PlanningRepository {
   }
 
   @override
-  Future<List<RoutineModeConfig>> getRoutineModeConfigs({GetOptions? getOptions}) {
+  Future<List<RoutineModeConfig>> getRoutineModeConfigs({
+    GetOptions? getOptions,
+  }) {
     return _remote.getRoutineModeConfigs(getOptions: getOptions);
   }
 
@@ -109,7 +113,10 @@ class IsarPlanningRepository implements PlanningRepository {
 
   @override
   Future<int> pruneOldAccountabilityLogs({int retentionDays = 30, int? nowMs}) {
-    return _remote.pruneOldAccountabilityLogs(retentionDays: retentionDays, nowMs: nowMs);
+    return _remote.pruneOldAccountabilityLogs(
+      retentionDays: retentionDays,
+      nowMs: nowMs,
+    );
   }
 
   @override
@@ -119,7 +126,10 @@ class IsarPlanningRepository implements PlanningRepository {
 
   @override
   Future<List<Routine>> getRoutinesForDate(String dateKey) async {
-    final rows = await _isar.isarRoutines.filter().dateKeyEqualTo(dateKey).findAll();
+    final rows = await _isar.isarRoutines
+        .filter()
+        .dateKeyEqualTo(dateKey)
+        .findAll();
     final list = rows.map((e) => e.toDomain()).toList()
       ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
     return list;
@@ -127,7 +137,10 @@ class IsarPlanningRepository implements PlanningRepository {
 
   @override
   Future<List<TaskBlock>> getBlocks(String routineId) async {
-    final rows = await _isar.isarBlocks.filter().routineIdEqualTo(routineId).findAll();
+    final rows = await _isar.isarBlocks
+        .filter()
+        .routineIdEqualTo(routineId)
+        .findAll();
     final list = rows.map((e) => e.toDomain()).toList()
       ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
     return list;
@@ -170,11 +183,7 @@ class IsarPlanningRepository implements PlanningRepository {
     await _isar.writeTxn(() async {
       await _isar.isarRoutines.putByRoutineId(IsarRoutine.fromDomain(stored));
     });
-    final payload = {
-      ...stored.toMap(),
-      'id': id,
-      'updatedAtMs': now,
-    };
+    final payload = {...stored.toMap(), 'id': id, 'updatedAtMs': now};
     await _enqueueUpsert(
       entityType: 'routine',
       path: '${FirestorePaths.routines}/$id',
@@ -185,11 +194,17 @@ class IsarPlanningRepository implements PlanningRepository {
   @override
   Future<void> deleteRoutine(String routineId) async {
     await _isar.writeTxn(() async {
-      final tasks = await _isar.isarTasks.filter().routineIdEqualTo(routineId).findAll();
+      final tasks = await _isar.isarTasks
+          .filter()
+          .routineIdEqualTo(routineId)
+          .findAll();
       for (final t in tasks) {
         await _isar.isarTasks.delete(t.id);
       }
-      final blocks = await _isar.isarBlocks.filter().routineIdEqualTo(routineId).findAll();
+      final blocks = await _isar.isarBlocks
+          .filter()
+          .routineIdEqualTo(routineId)
+          .findAll();
       for (final b in blocks) {
         await _isar.isarBlocks.delete(b.id);
       }
@@ -222,11 +237,7 @@ class IsarPlanningRepository implements PlanningRepository {
       await _isar.isarBlocks.putByBlockId(IsarBlock.fromDomain(stored));
     });
     final path = FirestorePaths.blocks(stored.routineId);
-    final payload = {
-      ...stored.toMap(),
-      'id': id,
-      'updatedAtMs': now,
-    };
+    final payload = {...stored.toMap(), 'id': id, 'updatedAtMs': now};
     await _enqueueUpsert(
       entityType: 'block',
       path: '$path/$id',
@@ -284,11 +295,7 @@ class IsarPlanningRepository implements PlanningRepository {
       await _isar.isarTasks.putByTaskId(IsarTask.fromDomain(stored));
     });
     final path = FirestorePaths.tasks(stored.routineId, stored.blockId);
-    final payload = {
-      ...stored.toMap(),
-      'id': id,
-      'updatedAtMs': now,
-    };
+    final payload = {...stored.toMap(), 'id': id, 'updatedAtMs': now};
     await _enqueueUpsert(
       entityType: 'task',
       path: '$path/$id',
@@ -315,7 +322,9 @@ class IsarPlanningRepository implements PlanningRepository {
   }
 
   @override
-  Future<({String routineId, String blockId})> ensureDefaultDayPlan(String dateKey) async {
+  Future<({String routineId, String blockId})> ensureDefaultDayPlan(
+    String dateKey,
+  ) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     final routines = await getRoutinesForDate(dateKey);
     late final String routineId;

@@ -58,28 +58,28 @@ class AddTaskFormDraft {
   }
 
   Map<String, dynamic> toJson() => {
-        'savedAtMs': savedAtMs,
-        'title': title,
-        'notes': notes,
-        'duration': duration,
-        'durationEnabled': durationEnabled,
-        'customDurationMinutes': customDurationMinutes,
-        'category': category,
-        'reminder': reminder,
-        'focusSession': focusSession,
-        'isHabitAnchor': isHabitAnchor,
-        'reminderTimeMs': reminderTimeMs,
-        'modeRefId': modeRefId,
-        'strictModeRequired': strictModeRequired,
-        'modeUserCustomized': modeUserCustomized,
-        'isRigid': isRigid,
-        'advancedExpanded': advancedExpanded,
-        'syncSleepWindowAndQuietMode': syncSleepWindowAndQuietMode,
-        'inAppQuietMode': inAppQuietMode,
-        'slotRoutineId': slotRoutineId,
-        'slotBlockId': slotBlockId,
-        'slotDateKey': slotDateKey,
-      };
+    'savedAtMs': savedAtMs,
+    'title': title,
+    'notes': notes,
+    'duration': duration,
+    'durationEnabled': durationEnabled,
+    'customDurationMinutes': customDurationMinutes,
+    'category': category,
+    'reminder': reminder,
+    'focusSession': focusSession,
+    'isHabitAnchor': isHabitAnchor,
+    'reminderTimeMs': reminderTimeMs,
+    'modeRefId': modeRefId,
+    'strictModeRequired': strictModeRequired,
+    'modeUserCustomized': modeUserCustomized,
+    'isRigid': isRigid,
+    'advancedExpanded': advancedExpanded,
+    'syncSleepWindowAndQuietMode': syncSleepWindowAndQuietMode,
+    'inAppQuietMode': inAppQuietMode,
+    'slotRoutineId': slotRoutineId,
+    'slotBlockId': slotBlockId,
+    'slotDateKey': slotDateKey,
+  };
 
   factory AddTaskFormDraft.fromJson(Map<String, dynamic> json) {
     return AddTaskFormDraft(
@@ -88,19 +88,22 @@ class AddTaskFormDraft {
       notes: json['notes'] as String? ?? '',
       duration: json['duration'] as String? ?? '25 MIN',
       durationEnabled: json['durationEnabled'] as bool? ?? false,
-      customDurationMinutes: json['customDurationMinutes'] as int? ??
-          kAddTaskDefaultCustomMinutes,
+      customDurationMinutes:
+          json['customDurationMinutes'] as int? ?? kAddTaskDefaultCustomMinutes,
       category: json['category'] as String?,
       reminder: json['reminder'] as bool? ?? false,
       focusSession: json['focusSession'] as bool? ?? false,
       isHabitAnchor: json['isHabitAnchor'] as bool? ?? false,
-      reminderTimeMs: json['reminderTimeMs'] as int? ?? DateTime.now().millisecondsSinceEpoch,
+      reminderTimeMs:
+          json['reminderTimeMs'] as int? ??
+          DateTime.now().millisecondsSinceEpoch,
       modeRefId: json['modeRefId'] as String? ?? 'flexible',
       strictModeRequired: json['strictModeRequired'] as bool? ?? false,
       modeUserCustomized: json['modeUserCustomized'] as bool? ?? false,
       isRigid: json['isRigid'] as bool? ?? false,
       advancedExpanded: json['advancedExpanded'] as bool? ?? false,
-      syncSleepWindowAndQuietMode: json['syncSleepWindowAndQuietMode'] as bool? ?? true,
+      syncSleepWindowAndQuietMode:
+          json['syncSleepWindowAndQuietMode'] as bool? ?? true,
       inAppQuietMode: json['inAppQuietMode'] as String? ?? 'sleep',
       slotRoutineId: json['slotRoutineId'] as String?,
       slotBlockId: json['slotBlockId'] as String?,

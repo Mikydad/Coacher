@@ -87,6 +87,7 @@ class Layer34RecomputeResult {
   final int triggeredAtMs;
   final bool layer1Refreshed;
   final bool layer2Refreshed;
+
   /// From persisted canonical global snapshot (0 if none).
   final int layer2CanonicalPatternsEmitted;
   final Layer4RefreshResult layer4Refresh;
@@ -130,7 +131,9 @@ Stream<T> _watchLayer4State<T>(
 }
 
 final deliveryOrchestratorProvider = Provider<DeliveryOrchestrator>((ref) {
-  return DeliveryOrchestrator(repository: ref.watch(deliveryRepositoryProvider));
+  return DeliveryOrchestrator(
+    repository: ref.watch(deliveryRepositoryProvider),
+  );
 });
 
 final layer4IsActiveFocusFlowProvider = Provider<bool>((ref) {
@@ -147,8 +150,9 @@ final layer4RefreshTodayDeliveryProvider = FutureProvider<Layer4RefreshResult>((
   ref,
 ) async {
   final today = DateKeys.todayKey();
-  final insights =
-      await ref.watch(layer3DeliveryDayInsightsProvider(today).future);
+  final insights = await ref.watch(
+    layer3DeliveryDayInsightsProvider(today).future,
+  );
   final orchestrator = ref.read(deliveryOrchestratorProvider);
   final repository = ref.read(deliveryRepositoryProvider);
   final isActiveFocusFlow = ref.read(layer4IsActiveFocusFlowProvider);
@@ -229,7 +233,9 @@ final layer4RefreshTodayDeliveryProvider = FutureProvider<Layer4RefreshResult>((
   );
 });
 
-final layer34RecomputeNowProvider = FutureProvider<Layer34RecomputeResult>((ref) async {
+final layer34RecomputeNowProvider = FutureProvider<Layer34RecomputeResult>((
+  ref,
+) async {
   final now = DateTime.now();
   final today = DateKeys.todayKey(now);
   final layer1Refreshed = await ref.read(layer34RunLayer1RefreshProvider)(now);
@@ -241,10 +247,11 @@ final layer34RecomputeNowProvider = FutureProvider<Layer34RecomputeResult>((ref)
   final layer4 = await ref.read(layer4RefreshTodayDeliveryProvider.future);
   var layer2CanonicalPatternsEmitted = 0;
   try {
-    layer2CanonicalPatternsEmitted = (await ref
-            .read(patternDetectionRepositoryProvider)
-            .readGlobalBehaviorSnapshot(dateKey: today))
-        ?.totalPatternsEmitted ??
+    layer2CanonicalPatternsEmitted =
+        (await ref
+                .read(patternDetectionRepositoryProvider)
+                .readGlobalBehaviorSnapshot(dateKey: today))
+            ?.totalPatternsEmitted ??
         0;
   } catch (_) {
     layer2CanonicalPatternsEmitted = 0;
@@ -277,10 +284,9 @@ final layer4DeliveryDecisionProvider =
       return _watchLayer4State(
         ref,
         loader: () {
-          return ref.read(deliveryRepositoryProvider).readDecision(
-            scopeId: scopeId,
-            surface: query.surface,
-          );
+          return ref
+              .read(deliveryRepositoryProvider)
+              .readDecision(scopeId: scopeId, surface: query.surface);
         },
       );
     });
@@ -292,9 +298,9 @@ final layer4HistoryProvider =
       return _watchLayer4State(
         ref,
         loader: () {
-          return ref.read(deliveryRepositoryProvider).listHistoryForScope(
-            scopeId: key,
-          );
+          return ref
+              .read(deliveryRepositoryProvider)
+              .listHistoryForScope(scopeId: key);
         },
       );
     });
@@ -355,17 +361,17 @@ final layer4RunMetadataProvider =
       );
     });
 
-final layer4TodayHomeDecisionProvider = Provider<AsyncValue<DeliveryDecision?>>((
-  ref,
-) {
-  ref.watch(layer4RefreshTodayDeliveryProvider);
-  final today = DateKeys.todayKey();
-  return ref.watch(
-    layer4DeliveryDecisionProvider(
-      Layer4DecisionQuery(scopeId: today, surface: DeliverySurface.home),
-    ),
-  );
-});
+final layer4TodayHomeDecisionProvider = Provider<AsyncValue<DeliveryDecision?>>(
+  (ref) {
+    ref.watch(layer4RefreshTodayDeliveryProvider);
+    final today = DateKeys.todayKey();
+    return ref.watch(
+      layer4DeliveryDecisionProvider(
+        Layer4DecisionQuery(scopeId: today, surface: DeliverySurface.home),
+      ),
+    );
+  },
+);
 
 final layer4TodayProgressDecisionProvider =
     Provider<AsyncValue<DeliveryDecision?>>((ref) {
@@ -373,7 +379,10 @@ final layer4TodayProgressDecisionProvider =
       final today = DateKeys.todayKey();
       return ref.watch(
         layer4DeliveryDecisionProvider(
-          Layer4DecisionQuery(scopeId: today, surface: DeliverySurface.progress),
+          Layer4DecisionQuery(
+            scopeId: today,
+            surface: DeliverySurface.progress,
+          ),
         ),
       );
     });
@@ -429,14 +438,19 @@ void invalidateTodayCoachingDeliveryFromContainer(ProviderContainer container) {
 
 /// Drop Layer 1 feature row, Layer 3 entity insights, and refresh Layer 4 for a goal
 /// that is no longer an active coaching subject (completed or deleted).
-Future<void> clearEntityCoachingCachesForGoal(WidgetRef ref, String goalId) async {
+Future<void> clearEntityCoachingCachesForGoal(
+  WidgetRef ref,
+  String goalId,
+) async {
   final id = goalId.trim();
   if (id.isEmpty) return;
   await ref.read(featureCacheRepositoryProvider).deleteByEntityId(id);
-  await ref.read(insightCacheRepositoryProvider).replaceScopeInsights(
-    scopeType: InsightScopeType.entity,
-    scopeId: id,
-    insights: const <GeneratedInsight>[],
-  );
+  await ref
+      .read(insightCacheRepositoryProvider)
+      .replaceScopeInsights(
+        scopeType: InsightScopeType.entity,
+        scopeId: id,
+        insights: const <GeneratedInsight>[],
+      );
   invalidateTodayCoachingDelivery(ref);
 }

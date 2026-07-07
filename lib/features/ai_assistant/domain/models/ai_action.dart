@@ -86,20 +86,18 @@ class AiAction {
     );
     return AiAction(
       actionType: type,
-      parameters: Map<String, dynamic>.from(
-        json['parameters'] as Map? ?? {},
-      ),
+      parameters: Map<String, dynamic>.from(json['parameters'] as Map? ?? {}),
       confidence: (json['confidence'] as num?)?.toDouble() ?? 1.0,
       reasonLabel: json['reasonLabel'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'actionType': actionType.name,
-        'parameters': parameters,
-        'confidence': confidence,
-        if (reasonLabel != null) 'reasonLabel': reasonLabel,
-      };
+    'actionType': actionType.name,
+    'parameters': parameters,
+    'confidence': confidence,
+    if (reasonLabel != null) 'reasonLabel': reasonLabel,
+  };
 
   AiAction copyWith({
     ActionType? actionType,

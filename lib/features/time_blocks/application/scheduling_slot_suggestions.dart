@@ -54,13 +54,15 @@ List<TimeSlotSuggestion> suggestAlternativeSlots({
   final dayStart = DateTime(planDay.year, planDay.month, planDay.day);
   final dayEnd = dayStart.add(const Duration(days: 1));
 
-  final occupied = blocksOnDay
-      .where((b) => !ignoreEntityIds.contains(b.entityId))
-      .map((b) => (start: b.startAt, end: b.computedEndAt))
-      .toList()
-    ..sort((a, b) => a.start.compareTo(b.start));
+  final occupied =
+      blocksOnDay
+          .where((b) => !ignoreEntityIds.contains(b.entityId))
+          .map((b) => (start: b.startAt, end: b.computedEndAt))
+          .toList()
+        ..sort((a, b) => a.start.compareTo(b.start));
 
-  if (direction == SlotSearchDirection.preferBeforeAnchor && anchorTime != null) {
+  if (direction == SlotSearchDirection.preferBeforeAnchor &&
+      anchorTime != null) {
     return _suggestPreferBeforeAnchor(
       dayStart: dayStart,
       dayEnd: dayEnd,
@@ -145,7 +147,8 @@ List<TimeSlotSuggestion> _suggestPreferBeforeAnchor({
     var start = endTarget.subtract(duration);
     if (start.isBefore(dayStart)) break;
     start = roundDateTimeToFiveMinutes(start);
-    if (!_overlaps(start, duration, occupied) && !start.add(duration).isAfter(anchor)) {
+    if (!_overlaps(start, duration, occupied) &&
+        !start.add(duration).isAfter(anchor)) {
       results.add(
         _toSuggestion(
           start: start,

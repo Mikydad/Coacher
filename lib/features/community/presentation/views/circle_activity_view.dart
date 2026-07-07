@@ -8,6 +8,7 @@ import '../../domain/models/circle_enums.dart';
 import '../widgets/ai_pulse_banner.dart';
 
 import '../../../../core/presentation/app_colors.dart';
+import '../../../../core/presentation/async_value_ui.dart';
 
 // Filter categories shown in the chip row.
 enum _FeedFilter { all, goals, habits, tasks }
@@ -18,8 +19,7 @@ class CircleActivityView extends ConsumerStatefulWidget {
   final String circleId;
 
   @override
-  ConsumerState<CircleActivityView> createState() =>
-      _CircleActivityViewState();
+  ConsumerState<CircleActivityView> createState() => _CircleActivityViewState();
 }
 
 class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
@@ -27,13 +27,11 @@ class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
 
   @override
   Widget build(BuildContext context) {
-    final feedAsync =
-        ref.watch(circleActivityFeedProvider(widget.circleId));
-    final circleAsync =
-        ref.watch(circleDetailProvider(widget.circleId));
+    final feedAsync = ref.watch(circleActivityFeedProvider(widget.circleId));
+    final circleAsync = ref.watch(circleDetailProvider(widget.circleId));
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    final isModerator = circleAsync.valueOrNull?.moderatorIds.contains(uid) ??
-        false;
+    final isModerator =
+        circleAsync.valueOrNull?.moderatorIds.contains(uid) ?? false;
 
     return Column(
       children: [
@@ -46,10 +44,14 @@ class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
             loading: () => const Center(
               child: CircularProgressIndicator(color: AppColors.accent),
             ),
-            error: (_, __) => const Center(
-              child: Text(
-                'Could not load activity.',
-                style: TextStyle(color: AppColors.textMuted),
+            error: (e, _) => swallowedAsyncError(
+              'circle_activity_view',
+              e,
+              const Center(
+                child: Text(
+                  'Could not load activity.',
+                  style: TextStyle(color: AppColors.textMuted),
+                ),
               ),
             ),
             data: (items) {
@@ -87,15 +89,16 @@ class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
         return items;
       case _FeedFilter.goals:
         return items
-            .where((i) =>
-                i.eventType == ActivityEventType.goalCompleted ||
-                i.eventType == ActivityEventType.milestoneReached ||
-                i.eventType == ActivityEventType.weeklyCommitmentMet)
+            .where(
+              (i) =>
+                  i.eventType == ActivityEventType.goalCompleted ||
+                  i.eventType == ActivityEventType.milestoneReached ||
+                  i.eventType == ActivityEventType.weeklyCommitmentMet,
+            )
             .toList();
       case _FeedFilter.habits:
         return items
-            .where(
-                (i) => i.eventType == ActivityEventType.habitStreakReached)
+            .where((i) => i.eventType == ActivityEventType.habitStreakReached)
             .toList();
       case _FeedFilter.tasks:
         return items
@@ -108,10 +111,7 @@ class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
 // ── Filter chip row ───────────────────────────────────────────────────────────
 
 class _FilterChipRow extends StatelessWidget {
-  const _FilterChipRow({
-    required this.selected,
-    required this.onChanged,
-  });
+  const _FilterChipRow({required this.selected, required this.onChanged});
 
   final _FeedFilter selected;
   final ValueChanged<_FeedFilter> onChanged;
@@ -178,14 +178,12 @@ class _ActivityCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color: Colors.white.withValues(alpha: 0.06)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _AvatarInitial(
-              name: item.displayName, userId: item.userId),
+          _AvatarInitial(name: item.displayName, userId: item.userId),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -201,9 +199,7 @@ class _ActivityCard extends StatelessWidget {
                     children: [
                       TextSpan(
                         text: '${item.displayName} ',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       TextSpan(text: _activityCopy(item)),
                     ],
@@ -240,18 +236,14 @@ class _SystemActivityPill extends StatelessWidget {
 
     return Center(
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           color: AppColors.surfaceCard,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
           copy,
-          style: const TextStyle(
-            color: AppColors.textMuted,
-            fontSize: 12,
-          ),
+          style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
         ),
       ),
     );
@@ -283,8 +275,7 @@ class _EventIcon extends StatelessWidget {
       case ActivityEventType.goalCompleted:
         return (Icons.flag_rounded, AppColors.accent);
       case ActivityEventType.habitStreakReached:
-        return (Icons.local_fire_department_rounded,
-            AppColors.orange);
+        return (Icons.local_fire_department_rounded, AppColors.orange);
       case ActivityEventType.taskFinished:
         return (Icons.check_circle_rounded, AppColors.cyanDeep);
       case ActivityEventType.milestoneReached:

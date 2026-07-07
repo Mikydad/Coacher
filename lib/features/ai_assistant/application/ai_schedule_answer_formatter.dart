@@ -89,8 +89,7 @@ abstract final class AiScheduleAnswerFormatter {
       'week',
       'on my',
     ];
-    return queryWords.any(lower.contains) &&
-        scheduleWords.any(lower.contains);
+    return queryWords.any(lower.contains) && scheduleWords.any(lower.contains);
   }
 
   static String _formatDay({

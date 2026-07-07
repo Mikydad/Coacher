@@ -5,10 +5,7 @@ String inlineConflictResolutionReason({
   String? conflictingEntityId,
 }) {
   final index = suggestionIndex.toString();
-  final parts = <String>[
-    'movedEntity=$movedEntity',
-    'suggestionIndex=$index',
-  ];
+  final parts = <String>['movedEntity=$movedEntity', 'suggestionIndex=$index'];
   if (conflictingEntityId != null && conflictingEntityId.isNotEmpty) {
     parts.add('conflictEntityId=$conflictingEntityId');
   }

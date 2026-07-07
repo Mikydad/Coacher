@@ -116,13 +116,14 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
               }),
               child: const Padding(
                 padding: EdgeInsets.only(right: 8),
-                child: Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.white70),
+                child: Icon(
+                  Icons.arrow_back_ios_new,
+                  size: 18,
+                  color: Colors.white70,
+                ),
               ),
             ),
-            Text(
-              type.icon,
-              style: const TextStyle(fontSize: 22),
-            ),
+            Text(type.icon, style: const TextStyle(fontSize: 22)),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -139,7 +140,10 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
         const SizedBox(height: 8),
         Text(
           OverrideAttentionPolicy.suppressionSummary(type),
-          style: const TextStyle(color: AttentionModeColors.label, fontSize: 14),
+          style: const TextStyle(
+            color: AttentionModeColors.label,
+            fontSize: 14,
+          ),
         ),
         const SizedBox(height: 20),
         Wrap(
@@ -161,7 +165,10 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
           const SizedBox(height: 16),
           Text(
             'Custom: $_customMinutes min',
-            style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
@@ -181,10 +188,7 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
           ),
         ],
         const SizedBox(height: 24),
-        AttentionModeActivateButton(
-          enabled: _canConfirm,
-          onPressed: _confirm,
-        ),
+        AttentionModeActivateButton(enabled: _canConfirm, onPressed: _confirm),
       ],
     );
   }

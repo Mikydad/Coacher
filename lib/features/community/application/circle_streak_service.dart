@@ -12,8 +12,8 @@ class CircleStreakService {
   CircleStreakService({
     required CircleRepository circleRepo,
     required ActivityFeedRepository feedRepo,
-  })  : _circleRepo = circleRepo,
-        _feedRepo = feedRepo;
+  }) : _circleRepo = circleRepo,
+       _feedRepo = feedRepo;
 
   final CircleRepository _circleRepo;
   final ActivityFeedRepository _feedRepo;
@@ -56,9 +56,7 @@ class CircleStreakService {
         ),
       );
     } else {
-      await _circleRepo.updateCircle(
-        circle.copyWith(currentStreak: 0),
-      );
+      await _circleRepo.updateCircle(circle.copyWith(currentStreak: 0));
     }
   }
 }

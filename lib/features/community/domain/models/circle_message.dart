@@ -53,10 +53,8 @@ class CircleMessage {
   static CircleMessage fromMap(Map<String, dynamic> map) {
     final rawReactions = map['reactions'] as Map<String, dynamic>? ?? {};
     final reactions = rawReactions.map(
-      (emoji, value) => MapEntry(
-        emoji,
-        List<String>.from(value as List? ?? []),
-      ),
+      (emoji, value) =>
+          MapEntry(emoji, List<String>.from(value as List? ?? [])),
     );
     return CircleMessage(
       id: map['id'] as String? ?? '',

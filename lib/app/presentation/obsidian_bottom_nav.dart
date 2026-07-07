@@ -34,7 +34,8 @@ class ObsidianBottomNav extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final aiServiceAsync = ref.watch(resolvedAiAssistantProvider);
-    final hasBlockedPlan = aiServiceAsync.whenOrNull(
+    final hasBlockedPlan =
+        aiServiceAsync.whenOrNull(
           data: (svc) => svc.pendingPlan?.isBlockedByContext == true,
         ) ??
         false;
@@ -51,9 +52,7 @@ class ObsidianBottomNav extends ConsumerWidget {
             decoration: BoxDecoration(
               color: _kSurface.withValues(alpha: 0.62),
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.08),
-              ),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),

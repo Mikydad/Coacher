@@ -109,14 +109,16 @@ final layer2GlobalSnapshotProvider =
     });
 
 final layer2EntityCanonicalPatternsProvider =
-    StreamProvider.family<List<DetectedBehaviorPattern>, Layer2EntityPatternsQuery>((
-      ref,
-      query,
-    ) {
+    StreamProvider.family<
+      List<DetectedBehaviorPattern>,
+      Layer2EntityPatternsQuery
+    >((ref, query) {
       return _watchLayer2Stats(
         ref,
         loader: () {
-          return ref.read(patternDetectionRepositoryProvider).readEntityBehaviorPatterns(
+          return ref
+              .read(patternDetectionRepositoryProvider)
+              .readEntityBehaviorPatterns(
                 entityId: query.entityId.trim(),
                 dateKey: query.dateKey.trim(),
               );
@@ -125,7 +127,10 @@ final layer2EntityCanonicalPatternsProvider =
     });
 
 final layer2GlobalCanonicalSnapshotProvider =
-    StreamProvider.family<GlobalBehaviorPatternSnapshot?, String>((ref, dateKey) {
+    StreamProvider.family<GlobalBehaviorPatternSnapshot?, String>((
+      ref,
+      dateKey,
+    ) {
       return _watchLayer2Stats(
         ref,
         loader: () {
@@ -176,7 +181,9 @@ final layer2TodayGlobalCanonicalSnapshotProvider =
       return ref.watch(layer2GlobalCanonicalSnapshotProvider(today));
     });
 
-final layer2TodayRunMetadataProvider = Provider<AsyncValue<Layer2RunMetadata>>((ref) {
+final layer2TodayRunMetadataProvider = Provider<AsyncValue<Layer2RunMetadata>>((
+  ref,
+) {
   final today = DateKeys.todayKey();
   return ref.watch(layer2RunMetadataProvider(today));
 });

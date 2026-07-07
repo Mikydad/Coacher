@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 
 import 'package:isar/isar.dart';
@@ -43,6 +44,8 @@ Map<String, dynamic> _decodePayload(String raw) {
     final decoded = jsonDecode(raw);
     if (decoded is Map<String, dynamic>) return decoded;
     if (decoded is Map) return decoded.cast<String, dynamic>();
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('isar_user_profile_preference: swallowed error: $e');
+  }
   return const <String, dynamic>{};
 }

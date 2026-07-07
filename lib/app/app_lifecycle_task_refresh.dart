@@ -19,10 +19,12 @@ class AppLifecycleTaskRefresh extends ConsumerStatefulWidget {
   final Widget child;
 
   @override
-  ConsumerState<AppLifecycleTaskRefresh> createState() => _AppLifecycleTaskRefreshState();
+  ConsumerState<AppLifecycleTaskRefresh> createState() =>
+      _AppLifecycleTaskRefreshState();
 }
 
-class _AppLifecycleTaskRefreshState extends ConsumerState<AppLifecycleTaskRefresh>
+class _AppLifecycleTaskRefreshState
+    extends ConsumerState<AppLifecycleTaskRefresh>
     with WidgetsBindingObserver {
   Timer? _dayCheckTimer;
   String? _lastTodayKey;
@@ -32,7 +34,10 @@ class _AppLifecycleTaskRefreshState extends ConsumerState<AppLifecycleTaskRefres
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _lastTodayKey = DateKeys.todayKey();
-    _dayCheckTimer = Timer.periodic(const Duration(minutes: 1), (_) => _invalidateIfDayChanged());
+    _dayCheckTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _invalidateIfDayChanged(),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_drainLaunchNotificationResponse());
     });

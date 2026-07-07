@@ -72,9 +72,7 @@ class InsightCooldownPolicy {
 
 /// Resolution rule: what pattern absence ends this insight.
 class InsightResolutionRule {
-  const InsightResolutionRule({
-    required this.resolvedWhenPatternsAbsent,
-  });
+  const InsightResolutionRule({required this.resolvedWhenPatternsAbsent});
 
   /// Insight transitions to [InsightLifecycleState.resolved] when ALL of
   /// these pattern codes are absent for the entity on the next recompute.
@@ -115,172 +113,180 @@ class CoachingInsightSpec {
   final bool isFocusOriented;
 }
 
-const Map<InsightType, CoachingInsightSpec> kCoachingInsightTaxonomy =
-    <InsightType, CoachingInsightSpec>{
-      InsightType.streakRiskWarning: CoachingInsightSpec(
-        insightType: InsightType.streakRiskWarning,
-        family: CoachingInsightFamily.risk,
-        description: 'Recent missed days risk ending current momentum streak.',
-        requiredPatternCodes: {PatternCode.streakRisk},
-        cooldown: InsightCooldownPolicy.oneDay,
-        resolutionRule: InsightResolutionRule(
-          resolvedWhenPatternsAbsent: {PatternCode.streakRisk},
-        ),
-        isFocusOriented: true,
-      ),
-      InsightType.habitTooHard: CoachingInsightSpec(
-        insightType: InsightType.habitTooHard,
-        family: CoachingInsightFamily.risk,
-        description: 'Effort demand + low completion signal: habit may be unsustainable.',
-        requiredPatternCodes: {PatternCode.tooHard},
-        cooldown: InsightCooldownPolicy.twoDays,
-        resolutionRule: InsightResolutionRule(
-          resolvedWhenPatternsAbsent: {PatternCode.tooHard},
-        ),
-      ),
-      InsightType.timingMisalignment: CoachingInsightSpec(
-        insightType: InsightType.timingMisalignment,
-        family: CoachingInsightFamily.timing,
-        description: 'Scheduled time block does not match observed completion block.',
-        requiredPatternCodes: {PatternCode.timeMisalignment},
-        cooldown: InsightCooldownPolicy.twoDays,
-        resolutionRule: InsightResolutionRule(
-          resolvedWhenPatternsAbsent: {PatternCode.timeMisalignment},
-        ),
-      ),
-      InsightType.goalAtRisk: CoachingInsightSpec(
-        insightType: InsightType.goalAtRisk,
-        family: CoachingInsightFamily.risk,
-        description:
-            'Inconsistent behavior + engagement drop signal goal is being deprioritized.',
-        requiredPatternCodes: {PatternCode.inconsistentBehavior},
-        cooldown: InsightCooldownPolicy.oneDay,
-        resolutionRule: InsightResolutionRule(
-          resolvedWhenPatternsAbsent: {
-            PatternCode.inconsistentBehavior,
-            PatternCode.lowEngagement,
-          },
-        ),
-        isFocusOriented: true,
-      ),
-      InsightType.latePattern: CoachingInsightSpec(
-        insightType: InsightType.latePattern,
-        family: CoachingInsightFamily.timing,
-        description: 'Consistent late completions — schedule drift detected.',
-        requiredPatternCodes: {PatternCode.lateBehavior},
-        cooldown: InsightCooldownPolicy.twoDays,
-        resolutionRule: InsightResolutionRule(
-          resolvedWhenPatternsAbsent: {PatternCode.lateBehavior},
-        ),
-      ),
-      InsightType.inconsistencyNotice: CoachingInsightSpec(
-        insightType: InsightType.inconsistencyNotice,
-        family: CoachingInsightFamily.momentum,
-        description: 'Short-window completion signal below stable baseline.',
-        requiredPatternCodes: {PatternCode.inconsistentBehavior},
-        cooldown: InsightCooldownPolicy.oneDay,
-        resolutionRule: InsightResolutionRule(
-          resolvedWhenPatternsAbsent: {PatternCode.inconsistentBehavior},
-        ),
-      ),
-      InsightType.lowEngagementNotice: CoachingInsightSpec(
-        insightType: InsightType.lowEngagementNotice,
-        family: CoachingInsightFamily.momentum,
-        description: 'Elevated snooze/defer pressure combined with weak completion.',
-        requiredPatternCodes: {PatternCode.lowEngagement},
-        cooldown: InsightCooldownPolicy.twoDays,
-        resolutionRule: InsightResolutionRule(
-          resolvedWhenPatternsAbsent: {PatternCode.lowEngagement},
-        ),
-      ),
-      InsightType.strongStreakPraise: CoachingInsightSpec(
-        insightType: InsightType.strongStreakPraise,
-        family: CoachingInsightFamily.reinforcement,
-        description: 'Current streak exceeds strong-streak threshold.',
-        requiredPatternCodes: {PatternCode.strongStreak},
-        cooldown: InsightCooldownPolicy.oneDay,
-        resolutionRule: InsightResolutionRule(
-          resolvedWhenPatternsAbsent: {PatternCode.strongStreak},
-        ),
-      ),
-      InsightType.consistentBehaviorPraise: CoachingInsightSpec(
-        insightType: InsightType.consistentBehaviorPraise,
-        family: CoachingInsightFamily.reinforcement,
-        description: 'Strong streak with timing signals — behavior becoming consistent.',
-        requiredPatternCodes: {PatternCode.strongStreak},
-        cooldown: InsightCooldownPolicy.twoDays,
-        resolutionRule: InsightResolutionRule(
-          resolvedWhenPatternsAbsent: {PatternCode.strongStreak},
-        ),
-      ),
-      InsightType.goalProgressSuccess: CoachingInsightSpec(
-        insightType: InsightType.goalProgressSuccess,
-        family: CoachingInsightFamily.reinforcement,
-        description: 'Strong streak while managing late completions — goal pacing good.',
-        requiredPatternCodes: {PatternCode.strongStreak},
-        cooldown: InsightCooldownPolicy.twoDays,
-        resolutionRule: InsightResolutionRule(
-          resolvedWhenPatternsAbsent: {PatternCode.strongStreak},
-        ),
-      ),
-      InsightType.highestMomentumLeverage: CoachingInsightSpec(
-        insightType: InsightType.highestMomentumLeverage,
-        family: CoachingInsightFamily.focus,
-        description: 'Entity with the strongest current streak — highest momentum to preserve.',
-        requiredPatternCodes: {PatternCode.strongStreak},
-        cooldown: InsightCooldownPolicy.oneDay,
-        resolutionRule: InsightResolutionRule(
-          resolvedWhenPatternsAbsent: {PatternCode.strongStreak},
-        ),
-        isFocusOriented: true,
-      ),
-      InsightType.fragileStreakAlert: CoachingInsightSpec(
-        insightType: InsightType.fragileStreakAlert,
-        family: CoachingInsightFamily.focus,
-        description:
-            'Entity with streak risk — earliest candidate for streak breakage.',
-        requiredPatternCodes: {PatternCode.streakRisk},
-        cooldown: InsightCooldownPolicy.oneDay,
-        resolutionRule: InsightResolutionRule(
-          resolvedWhenPatternsAbsent: {PatternCode.streakRisk},
-        ),
-        isFocusOriented: true,
-      ),
-      InsightType.bestRecoveryOpportunity: CoachingInsightSpec(
-        insightType: InsightType.bestRecoveryOpportunity,
-        family: CoachingInsightFamily.focus,
-        description:
-            'Inconsistent entity with prior strong streak — best candidate for rapid recovery.',
-        requiredPatternCodes: {PatternCode.inconsistentBehavior},
-        cooldown: InsightCooldownPolicy.twoDays,
-        resolutionRule: InsightResolutionRule(
-          resolvedWhenPatternsAbsent: {PatternCode.inconsistentBehavior},
-        ),
-        isFocusOriented: true,
-      ),
-      InsightType.overloadTrend: CoachingInsightSpec(
-        insightType: InsightType.overloadTrend,
-        family: CoachingInsightFamily.globalSummary,
-        description: 'Multiple entities showing streakRisk or tooHard simultaneously.',
-        requiredPatternCodes: {PatternCode.streakRisk},
-        cooldown: InsightCooldownPolicy.oneDay,
-        resolutionRule: InsightResolutionRule.noAutoResolve,
-      ),
-      InsightType.improvingConsistency: CoachingInsightSpec(
-        insightType: InsightType.improvingConsistency,
-        family: CoachingInsightFamily.reinforcement,
-        description: 'Multiple entities showing strongStreak — system-wide momentum improving.',
-        requiredPatternCodes: {PatternCode.strongStreak},
-        cooldown: InsightCooldownPolicy.oneDay,
-        resolutionRule: InsightResolutionRule.noAutoResolve,
-      ),
-      InsightType.unstableRoutinePattern: CoachingInsightSpec(
-        insightType: InsightType.unstableRoutinePattern,
-        family: CoachingInsightFamily.globalSummary,
-        description:
-            'Multiple entities showing scheduleRhythmVolatile — routine instability detected.',
-        requiredPatternCodes: {PatternCode.scheduleRhythmVolatile},
-        cooldown: InsightCooldownPolicy.twoDays,
-        resolutionRule: InsightResolutionRule.noAutoResolve,
-      ),
-    };
+const Map<InsightType, CoachingInsightSpec>
+kCoachingInsightTaxonomy = <InsightType, CoachingInsightSpec>{
+  InsightType.streakRiskWarning: CoachingInsightSpec(
+    insightType: InsightType.streakRiskWarning,
+    family: CoachingInsightFamily.risk,
+    description: 'Recent missed days risk ending current momentum streak.',
+    requiredPatternCodes: {PatternCode.streakRisk},
+    cooldown: InsightCooldownPolicy.oneDay,
+    resolutionRule: InsightResolutionRule(
+      resolvedWhenPatternsAbsent: {PatternCode.streakRisk},
+    ),
+    isFocusOriented: true,
+  ),
+  InsightType.habitTooHard: CoachingInsightSpec(
+    insightType: InsightType.habitTooHard,
+    family: CoachingInsightFamily.risk,
+    description:
+        'Effort demand + low completion signal: habit may be unsustainable.',
+    requiredPatternCodes: {PatternCode.tooHard},
+    cooldown: InsightCooldownPolicy.twoDays,
+    resolutionRule: InsightResolutionRule(
+      resolvedWhenPatternsAbsent: {PatternCode.tooHard},
+    ),
+  ),
+  InsightType.timingMisalignment: CoachingInsightSpec(
+    insightType: InsightType.timingMisalignment,
+    family: CoachingInsightFamily.timing,
+    description:
+        'Scheduled time block does not match observed completion block.',
+    requiredPatternCodes: {PatternCode.timeMisalignment},
+    cooldown: InsightCooldownPolicy.twoDays,
+    resolutionRule: InsightResolutionRule(
+      resolvedWhenPatternsAbsent: {PatternCode.timeMisalignment},
+    ),
+  ),
+  InsightType.goalAtRisk: CoachingInsightSpec(
+    insightType: InsightType.goalAtRisk,
+    family: CoachingInsightFamily.risk,
+    description:
+        'Inconsistent behavior + engagement drop signal goal is being deprioritized.',
+    requiredPatternCodes: {PatternCode.inconsistentBehavior},
+    cooldown: InsightCooldownPolicy.oneDay,
+    resolutionRule: InsightResolutionRule(
+      resolvedWhenPatternsAbsent: {
+        PatternCode.inconsistentBehavior,
+        PatternCode.lowEngagement,
+      },
+    ),
+    isFocusOriented: true,
+  ),
+  InsightType.latePattern: CoachingInsightSpec(
+    insightType: InsightType.latePattern,
+    family: CoachingInsightFamily.timing,
+    description: 'Consistent late completions — schedule drift detected.',
+    requiredPatternCodes: {PatternCode.lateBehavior},
+    cooldown: InsightCooldownPolicy.twoDays,
+    resolutionRule: InsightResolutionRule(
+      resolvedWhenPatternsAbsent: {PatternCode.lateBehavior},
+    ),
+  ),
+  InsightType.inconsistencyNotice: CoachingInsightSpec(
+    insightType: InsightType.inconsistencyNotice,
+    family: CoachingInsightFamily.momentum,
+    description: 'Short-window completion signal below stable baseline.',
+    requiredPatternCodes: {PatternCode.inconsistentBehavior},
+    cooldown: InsightCooldownPolicy.oneDay,
+    resolutionRule: InsightResolutionRule(
+      resolvedWhenPatternsAbsent: {PatternCode.inconsistentBehavior},
+    ),
+  ),
+  InsightType.lowEngagementNotice: CoachingInsightSpec(
+    insightType: InsightType.lowEngagementNotice,
+    family: CoachingInsightFamily.momentum,
+    description:
+        'Elevated snooze/defer pressure combined with weak completion.',
+    requiredPatternCodes: {PatternCode.lowEngagement},
+    cooldown: InsightCooldownPolicy.twoDays,
+    resolutionRule: InsightResolutionRule(
+      resolvedWhenPatternsAbsent: {PatternCode.lowEngagement},
+    ),
+  ),
+  InsightType.strongStreakPraise: CoachingInsightSpec(
+    insightType: InsightType.strongStreakPraise,
+    family: CoachingInsightFamily.reinforcement,
+    description: 'Current streak exceeds strong-streak threshold.',
+    requiredPatternCodes: {PatternCode.strongStreak},
+    cooldown: InsightCooldownPolicy.oneDay,
+    resolutionRule: InsightResolutionRule(
+      resolvedWhenPatternsAbsent: {PatternCode.strongStreak},
+    ),
+  ),
+  InsightType.consistentBehaviorPraise: CoachingInsightSpec(
+    insightType: InsightType.consistentBehaviorPraise,
+    family: CoachingInsightFamily.reinforcement,
+    description:
+        'Strong streak with timing signals — behavior becoming consistent.',
+    requiredPatternCodes: {PatternCode.strongStreak},
+    cooldown: InsightCooldownPolicy.twoDays,
+    resolutionRule: InsightResolutionRule(
+      resolvedWhenPatternsAbsent: {PatternCode.strongStreak},
+    ),
+  ),
+  InsightType.goalProgressSuccess: CoachingInsightSpec(
+    insightType: InsightType.goalProgressSuccess,
+    family: CoachingInsightFamily.reinforcement,
+    description:
+        'Strong streak while managing late completions — goal pacing good.',
+    requiredPatternCodes: {PatternCode.strongStreak},
+    cooldown: InsightCooldownPolicy.twoDays,
+    resolutionRule: InsightResolutionRule(
+      resolvedWhenPatternsAbsent: {PatternCode.strongStreak},
+    ),
+  ),
+  InsightType.highestMomentumLeverage: CoachingInsightSpec(
+    insightType: InsightType.highestMomentumLeverage,
+    family: CoachingInsightFamily.focus,
+    description:
+        'Entity with the strongest current streak — highest momentum to preserve.',
+    requiredPatternCodes: {PatternCode.strongStreak},
+    cooldown: InsightCooldownPolicy.oneDay,
+    resolutionRule: InsightResolutionRule(
+      resolvedWhenPatternsAbsent: {PatternCode.strongStreak},
+    ),
+    isFocusOriented: true,
+  ),
+  InsightType.fragileStreakAlert: CoachingInsightSpec(
+    insightType: InsightType.fragileStreakAlert,
+    family: CoachingInsightFamily.focus,
+    description:
+        'Entity with streak risk — earliest candidate for streak breakage.',
+    requiredPatternCodes: {PatternCode.streakRisk},
+    cooldown: InsightCooldownPolicy.oneDay,
+    resolutionRule: InsightResolutionRule(
+      resolvedWhenPatternsAbsent: {PatternCode.streakRisk},
+    ),
+    isFocusOriented: true,
+  ),
+  InsightType.bestRecoveryOpportunity: CoachingInsightSpec(
+    insightType: InsightType.bestRecoveryOpportunity,
+    family: CoachingInsightFamily.focus,
+    description:
+        'Inconsistent entity with prior strong streak — best candidate for rapid recovery.',
+    requiredPatternCodes: {PatternCode.inconsistentBehavior},
+    cooldown: InsightCooldownPolicy.twoDays,
+    resolutionRule: InsightResolutionRule(
+      resolvedWhenPatternsAbsent: {PatternCode.inconsistentBehavior},
+    ),
+    isFocusOriented: true,
+  ),
+  InsightType.overloadTrend: CoachingInsightSpec(
+    insightType: InsightType.overloadTrend,
+    family: CoachingInsightFamily.globalSummary,
+    description:
+        'Multiple entities showing streakRisk or tooHard simultaneously.',
+    requiredPatternCodes: {PatternCode.streakRisk},
+    cooldown: InsightCooldownPolicy.oneDay,
+    resolutionRule: InsightResolutionRule.noAutoResolve,
+  ),
+  InsightType.improvingConsistency: CoachingInsightSpec(
+    insightType: InsightType.improvingConsistency,
+    family: CoachingInsightFamily.reinforcement,
+    description:
+        'Multiple entities showing strongStreak — system-wide momentum improving.',
+    requiredPatternCodes: {PatternCode.strongStreak},
+    cooldown: InsightCooldownPolicy.oneDay,
+    resolutionRule: InsightResolutionRule.noAutoResolve,
+  ),
+  InsightType.unstableRoutinePattern: CoachingInsightSpec(
+    insightType: InsightType.unstableRoutinePattern,
+    family: CoachingInsightFamily.globalSummary,
+    description:
+        'Multiple entities showing scheduleRhythmVolatile — routine instability detected.',
+    requiredPatternCodes: {PatternCode.scheduleRhythmVolatile},
+    cooldown: InsightCooldownPolicy.twoDays,
+    resolutionRule: InsightResolutionRule.noAutoResolve,
+  ),
+};

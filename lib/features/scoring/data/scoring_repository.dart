@@ -28,7 +28,9 @@ class FirestoreScoringRepository implements ScoringRepository {
     final path = '${FirestorePaths.taskScores}/${score.id}';
     final payload = score.toMap();
     try {
-      await FirebaseFirestore.instance.doc(path).set(payload, SetOptions(merge: true));
+      await FirebaseFirestore.instance
+          .doc(path)
+          .set(payload, SetOptions(merge: true));
     } catch (_) {
       await SyncService.instance.enqueueUpsert(
         entityType: 'taskScore',

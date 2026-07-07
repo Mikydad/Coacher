@@ -36,7 +36,9 @@ Future<Map<String, int>> _readBlockUrgencyByRoutineIds(
   return map;
 }
 
-Future<List<PrioritizedTaskRow>> readFreshTodayPrioritizedRows(WidgetRef ref) async {
+Future<List<PrioritizedTaskRow>> readFreshTodayPrioritizedRows(
+  WidgetRef ref,
+) async {
   final repo = ref.read(planningRepositoryProvider);
   final rows = await collectTodayPlannedRows(repo);
   final urgencyByBlock = await _readBlockUrgencyByRoutineIds(repo, rows);
@@ -113,12 +115,21 @@ Stream<List<PlannedTaskRow>> _todayRowsWatchStream(Ref ref) {
   unawaited(emit());
 
   final subs = <StreamSubscription<void>>[
-    isar.isarTasks.watchLazy(fireImmediately: false).listen((_) => unawaited(emit())),
-    isar.isarRoutines.watchLazy(fireImmediately: false).listen((_) => unawaited(emit())),
-    isar.isarBlocks.watchLazy(fireImmediately: false).listen((_) => unawaited(emit())),
+    isar.isarTasks
+        .watchLazy(fireImmediately: false)
+        .listen((_) => unawaited(emit())),
+    isar.isarRoutines
+        .watchLazy(fireImmediately: false)
+        .listen((_) => unawaited(emit())),
+    isar.isarBlocks
+        .watchLazy(fireImmediately: false)
+        .listen((_) => unawaited(emit())),
   ];
 
-  final timer = Timer.periodic(const Duration(minutes: 1), (_) => unawaited(emit()));
+  final timer = Timer.periodic(
+    const Duration(minutes: 1),
+    (_) => unawaited(emit()),
+  );
 
   ref.onDispose(() {
     timer.cancel();
@@ -153,19 +164,18 @@ Stream<HomeFlowSnapshot> _homeFlowWatchStream(Ref ref) {
     }
   }
 
-  ref.listen<AsyncValue<List<PlannedTaskRow>>>(
-    todayAllTasksRowsProvider,
-    (_, next) {
-      next.when(
-        data: (rows) => unawaited(emitFrom(rows)),
-        error: (e, st) {
-          if (!controller.isClosed) controller.addError(e, st);
-        },
-        loading: () {},
-      );
-    },
-    fireImmediately: true,
-  );
+  ref.listen<AsyncValue<List<PlannedTaskRow>>>(todayAllTasksRowsProvider, (
+    _,
+    next,
+  ) {
+    next.when(
+      data: (rows) => unawaited(emitFrom(rows)),
+      error: (e, st) {
+        if (!controller.isClosed) controller.addError(e, st);
+      },
+      loading: () {},
+    );
+  }, fireImmediately: true);
 
   ref.onDispose(controller.close);
 

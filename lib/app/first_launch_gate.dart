@@ -62,7 +62,9 @@ class _FirstLaunchGateState extends State<FirstLaunchGate> {
       await SyncService.instance.syncFromRemote(force: true);
       await prefs.setBool(kIsarSeededV1PrefsKey, true);
     } catch (e, st) {
-      debugPrint('FirstLaunchGate: initial seed failed (showing app anyway): $e\n$st');
+      debugPrint(
+        'FirstLaunchGate: initial seed failed (showing app anyway): $e\n$st',
+      );
       unawaited(_retrySeedInBackground());
     }
 

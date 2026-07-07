@@ -15,6 +15,7 @@ import '../sheets/challenge_create_sheet.dart';
 import '../widgets/challenge_vote_banner.dart';
 
 import '../../../../core/presentation/app_colors.dart';
+import '../../../../core/presentation/async_value_ui.dart';
 
 class CircleChallengesView extends ConsumerWidget {
   const CircleChallengesView({super.key, required this.circleId});
@@ -23,12 +24,9 @@ class CircleChallengesView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pendingAsync =
-        ref.watch(pendingChallengesProvider(circleId));
-    final activeAsync =
-        ref.watch(activeChallengesProvider(circleId));
-    final completedAsync =
-        ref.watch(completedChallengesProvider(circleId));
+    final pendingAsync = ref.watch(pendingChallengesProvider(circleId));
+    final activeAsync = ref.watch(activeChallengesProvider(circleId));
+    final completedAsync = ref.watch(completedChallengesProvider(circleId));
 
     return Scaffold(
       backgroundColor: AppColors.dark0D1117,
@@ -42,8 +40,10 @@ class CircleChallengesView extends ConsumerWidget {
         backgroundColor: AppColors.accent,
         foregroundColor: Colors.black,
         icon: const Icon(Icons.add),
-        label: const Text('New challenge',
-            style: TextStyle(fontWeight: FontWeight.w700)),
+        label: const Text(
+          'New challenge',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
@@ -57,16 +57,18 @@ class CircleChallengesView extends ConsumerWidget {
                 children: [
                   const _SectionHeader('Waiting for votes'),
                   ...list.map(
-                    (c) => ChallengeVoteBanner(
-                      challenge: c,
-                      circleId: circleId,
-                    ),
+                    (c) =>
+                        ChallengeVoteBanner(challenge: c, circleId: circleId),
                   ),
                 ],
               );
             },
             loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (e, _) => swallowedAsyncError(
+              'circle_challenges_view',
+              e,
+              const SizedBox.shrink(),
+            ),
           ),
 
           // Active challenges
@@ -80,9 +82,10 @@ class CircleChallengesView extends ConsumerWidget {
                   ...list.map(
                     (c) => c.mode == ChallengeMode.competition
                         ? _CompetitionChallengeCard(
-                            challenge: c, circleId: circleId)
-                        : _TeamChallengeCard(
-                            challenge: c, circleId: circleId),
+                            challenge: c,
+                            circleId: circleId,
+                          )
+                        : _TeamChallengeCard(challenge: c, circleId: circleId),
                   ),
                 ],
               );
@@ -104,7 +107,11 @@ class CircleChallengesView extends ConsumerWidget {
               return _CompletedSection(challenges: list);
             },
             loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (e, _) => swallowedAsyncError(
+              'circle_challenges_view',
+              e,
+              const SizedBox.shrink(),
+            ),
           ),
 
           // Empty state
@@ -116,8 +123,7 @@ class CircleChallengesView extends ConsumerWidget {
                 context: context,
                 isScrollControlled: true,
                 backgroundColor: Colors.transparent,
-                builder: (_) =>
-                    ChallengeCreateSheet(circleId: circleId),
+                builder: (_) => ChallengeCreateSheet(circleId: circleId),
               ),
             ),
         ],
@@ -166,8 +172,7 @@ class _CompetitionChallengeCard extends ConsumerWidget {
     final sortedEntries = challenge.memberProgress.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    final endsAt =
-        DateTime.fromMillisecondsSinceEpoch(challenge.endsAtMs);
+    final endsAt = DateTime.fromMillisecondsSinceEpoch(challenge.endsAtMs);
     final daysLeft = endsAt.difference(DateTime.now()).inDays;
 
     return Container(
@@ -183,8 +188,11 @@ class _CompetitionChallengeCard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.emoji_events_rounded,
-                  color: AppColors.gold, size: 16),
+              const Icon(
+                Icons.emoji_events_rounded,
+                color: AppColors.gold,
+                size: 16,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -199,9 +207,7 @@ class _CompetitionChallengeCard extends ConsumerWidget {
               Text(
                 '$daysLeft d left',
                 style: TextStyle(
-                  color: daysLeft <= 3
-                      ? AppColors.danger
-                      : AppColors.textMuted,
+                  color: daysLeft <= 3 ? AppColors.danger : AppColors.textMuted,
                   fontSize: 12,
                 ),
               ),
@@ -210,10 +216,7 @@ class _CompetitionChallengeCard extends ConsumerWidget {
           const SizedBox(height: 4),
           Text(
             'Target: ${challenge.targetValue} ${challenge.unit}',
-            style: const TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 12,
-            ),
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
           ),
           const SizedBox(height: 12),
 
@@ -238,14 +241,14 @@ class _CompetitionChallengeCard extends ConsumerWidget {
           Center(
             child: TextButton.icon(
               onPressed: () => _showManualUpdate(context, ref, uid),
-              icon: const Icon(Icons.add_circle_outline,
-                  size: 16, color: AppColors.accent),
+              icon: const Icon(
+                Icons.add_circle_outline,
+                size: 16,
+                color: AppColors.accent,
+              ),
               label: const Text(
                 'Log progress',
-                style: TextStyle(
-                  color: AppColors.accent,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: AppColors.accent, fontSize: 13),
               ),
             ),
           ),
@@ -254,8 +257,7 @@ class _CompetitionChallengeCard extends ConsumerWidget {
     );
   }
 
-  void _showManualUpdate(
-      BuildContext context, WidgetRef ref, String uid) {
+  void _showManualUpdate(BuildContext context, WidgetRef ref, String uid) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -272,10 +274,7 @@ class _CompetitionChallengeCard extends ConsumerWidget {
 // ─── Team card ────────────────────────────────────────────────────────────────
 
 class _TeamChallengeCard extends ConsumerWidget {
-  const _TeamChallengeCard({
-    required this.challenge,
-    required this.circleId,
-  });
+  const _TeamChallengeCard({required this.challenge, required this.circleId});
 
   final Challenge challenge;
   final String circleId;
@@ -288,8 +287,7 @@ class _TeamChallengeCard extends ConsumerWidget {
         ? progress / challenge.targetValue
         : 0.0;
 
-    final endsAt =
-        DateTime.fromMillisecondsSinceEpoch(challenge.endsAtMs);
+    final endsAt = DateTime.fromMillisecondsSinceEpoch(challenge.endsAtMs);
     final daysLeft = endsAt.difference(DateTime.now()).inDays;
 
     return Container(
@@ -305,8 +303,11 @@ class _TeamChallengeCard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.group_rounded,
-                  color: AppColors.periwinkle, size: 16),
+              const Icon(
+                Icons.group_rounded,
+                color: AppColors.periwinkle,
+                size: 16,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -321,9 +322,7 @@ class _TeamChallengeCard extends ConsumerWidget {
               Text(
                 '$daysLeft d left',
                 style: TextStyle(
-                  color: daysLeft <= 3
-                      ? AppColors.danger
-                      : AppColors.textMuted,
+                  color: daysLeft <= 3 ? AppColors.danger : AppColors.textMuted,
                   fontSize: 12,
                 ),
               ),
@@ -370,8 +369,7 @@ class _TeamChallengeCard extends ConsumerWidget {
             children: challenge.memberProgress.entries.map((e) {
               final isMe = e.key == uid;
               return Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: isMe
                       ? AppColors.accent.withValues(alpha: 0.12)
@@ -379,16 +377,14 @@ class _TeamChallengeCard extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(20),
                   border: isMe
                       ? Border.all(
-                          color: AppColors.accent
-                              .withValues(alpha: 0.4))
+                          color: AppColors.accent.withValues(alpha: 0.4),
+                        )
                       : null,
                 ),
                 child: Text(
                   '${isMe ? "You" : e.key.substring(0, 4)}  ${e.value}',
                   style: TextStyle(
-                    color: isMe
-                        ? AppColors.accent
-                        : AppColors.textMuted,
+                    color: isMe ? AppColors.accent : AppColors.textMuted,
                     fontSize: 11,
                   ),
                 ),
@@ -408,14 +404,14 @@ class _TeamChallengeCard extends ConsumerWidget {
                   userId: uid,
                 ),
               ),
-              icon: const Icon(Icons.add_circle_outline,
-                  size: 16, color: AppColors.periwinkle),
+              icon: const Icon(
+                Icons.add_circle_outline,
+                size: 16,
+                color: AppColors.periwinkle,
+              ),
               label: const Text(
                 'Log team progress',
-                style: TextStyle(
-                  color: AppColors.periwinkle,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: AppColors.periwinkle, fontSize: 13),
               ),
             ),
           ),
@@ -449,10 +445,10 @@ class _RankRow extends StatelessWidget {
     final medal = rank == 1
         ? '🥇'
         : rank == 2
-            ? '🥈'
-            : rank == 3
-                ? '🥉'
-                : '#$rank';
+        ? '🥈'
+        : rank == 3
+        ? '🥉'
+        : '#$rank';
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -462,41 +458,31 @@ class _RankRow extends StatelessWidget {
             : AppColors.surfaceCard,
         borderRadius: BorderRadius.circular(8),
         border: isMe
-            ? Border.all(
-                color: AppColors.accent.withValues(alpha: 0.3))
+            ? Border.all(color: AppColors.accent.withValues(alpha: 0.3))
             : null,
       ),
       child: Row(
         children: [
           SizedBox(
             width: 28,
-            child: Text(
-              medal,
-              style: const TextStyle(fontSize: 14),
-            ),
+            child: Text(medal, style: const TextStyle(fontSize: 14)),
           ),
           Expanded(
             child: Text(
               isMe ? 'You' : userId.substring(0, 6),
               style: TextStyle(
-                color: isMe
-                    ? AppColors.accent
-                    : AppColors.textPrimary,
+                color: isMe ? AppColors.accent : AppColors.textPrimary,
                 fontSize: 13,
-                fontWeight:
-                    isMe ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: isMe ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
           ),
           Text(
             '$progress/$target $unit',
             style: TextStyle(
-              color: isMe
-                  ? AppColors.accent
-                  : AppColors.textMuted,
+              color: isMe ? AppColors.accent : AppColors.textMuted,
               fontSize: 12,
-              fontWeight:
-                  isMe ? FontWeight.w600 : FontWeight.normal,
+              fontWeight: isMe ? FontWeight.w600 : FontWeight.normal,
             ),
           ),
         ],
@@ -538,8 +524,7 @@ class _CompletedSectionState extends State<_CompletedSection> {
               ),
               const SizedBox(width: 6),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceCard,
                   borderRadius: BorderRadius.circular(10),
@@ -554,9 +539,7 @@ class _CompletedSectionState extends State<_CompletedSection> {
               ),
               const Spacer(),
               Icon(
-                _expanded
-                    ? Icons.keyboard_arrow_up
-                    : Icons.keyboard_arrow_down,
+                _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                 color: AppColors.textMuted,
                 size: 18,
               ),
@@ -574,8 +557,11 @@ class _CompletedSectionState extends State<_CompletedSection> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.check_circle,
-                      color: AppColors.success, size: 16),
+                  const Icon(
+                    Icons.check_circle,
+                    color: AppColors.success,
+                    size: 16,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -622,8 +608,7 @@ class _ManualProgressSheet extends ConsumerStatefulWidget {
       _ManualProgressSheetState();
 }
 
-class _ManualProgressSheetState
-    extends ConsumerState<_ManualProgressSheet> {
+class _ManualProgressSheetState extends ConsumerState<_ManualProgressSheet> {
   final _valueController = TextEditingController();
   File? _proofImage;
   bool _uploading = false;
@@ -654,14 +639,18 @@ class _ManualProgressSheetState
     setState(() => _uploading = true);
     try {
       if (_proofImage != null) {
-        await ref.read(circleProofStorageProvider).uploadChallengeProof(
+        await ref
+            .read(circleProofStorageProvider)
+            .uploadChallengeProof(
               circleId: widget.circleId,
               challengeId: widget.challenge.id,
               userId: widget.userId,
               file: _proofImage!,
             );
       }
-      await ref.read(challengeRepositoryProvider).updateProgress(
+      await ref
+          .read(challengeRepositoryProvider)
+          .updateProgress(
             circleId: widget.circleId,
             challengeId: widget.challenge.id,
             userId: widget.userId,
@@ -677,131 +666,134 @@ class _ManualProgressSheetState
   Widget build(BuildContext context) {
     return KeyboardDismissOnTap(
       child: Padding(
-      padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surfaceDark,
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(20)),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Log progress',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                widget.challenge.title,
-                style: const TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _valueController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly
-                ],
-                onTapOutside: (_) => dismissKeyboard(context),
-                style: const TextStyle(color: AppColors.textPrimary),
-                decoration: InputDecoration(
-                  hintText:
-                      'Amount (${widget.challenge.unit})',
-                  hintStyle: const TextStyle(
-                      color: AppColors.textMuted),
-                  filled: true,
-                  fillColor: AppColors.surfaceCard,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
-                ),
-              ),
-              const SizedBox(height: 12),
-              GestureDetector(
-                onTap: _pickImage,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 10, horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceCard,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.camera_alt_rounded,
-                          color: AppColors.textMuted, size: 18),
-                      const SizedBox(width: 8),
-                      Text(
-                        _proofImage == null
-                            ? 'Add proof photo (optional)'
-                            : 'Photo selected',
-                        style: TextStyle(
-                          color: _proofImage == null
-                              ? AppColors.textMuted
-                              : AppColors.success,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _uploading ? null : _submit,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: Colors.black,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.surfaceDark,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  child: _uploading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.black,
-                          ),
-                        )
-                      : const Text('Submit'),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                const Text(
+                  'Log progress',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.challenge.title,
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _valueController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  onTapOutside: (_) => dismissKeyboard(context),
+                  style: const TextStyle(color: AppColors.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'Amount (${widget.challenge.unit})',
+                    hintStyle: const TextStyle(color: AppColors.textMuted),
+                    filled: true,
+                    fillColor: AppColors.surfaceCard,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: _pickImage,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceCard,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.camera_alt_rounded,
+                          color: AppColors.textMuted,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _proofImage == null
+                              ? 'Add proof photo (optional)'
+                              : 'Photo selected',
+                          style: TextStyle(
+                            color: _proofImage == null
+                                ? AppColors.textMuted
+                                : AppColors.success,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _uploading ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.black,
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _uploading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.black,
+                            ),
+                          )
+                        : const Text('Submit'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
     );
   }
 }
@@ -819,8 +811,11 @@ class _EmptyState extends StatelessWidget {
         padding: const EdgeInsets.only(top: 60),
         child: Column(
           children: [
-            const Icon(Icons.emoji_events_outlined,
-                color: AppColors.textMuted, size: 48),
+            const Icon(
+              Icons.emoji_events_outlined,
+              color: AppColors.textMuted,
+              size: 48,
+            ),
             const SizedBox(height: 12),
             const Text(
               'No challenges yet',
@@ -833,10 +828,7 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 4),
             const Text(
               'Create a challenge to motivate your circle',
-              style: TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 13,
-              ),
+              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
             ),
             const SizedBox(height: 20),
             FilledButton.icon(

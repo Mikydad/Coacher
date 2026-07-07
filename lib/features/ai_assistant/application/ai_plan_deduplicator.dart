@@ -18,9 +18,7 @@ class AiPlanDeduplicator {
     }
 
     return actions
-        .where(
-          (a) => !_isRedundant(a, activeTasks, userInput),
-        )
+        .where((a) => !_isRedundant(a, activeTasks, userInput))
         .toList();
   }
 
@@ -82,8 +80,8 @@ class AiPlanDeduplicator {
     return (p['taskTitle'] as String?)?.trim().isNotEmpty == true
         ? (p['taskTitle'] as String).trim()
         : (p['title'] as String?)?.trim().isNotEmpty == true
-            ? (p['title'] as String).trim()
-            : null;
+        ? (p['title'] as String).trim()
+        : null;
   }
 
   static String? _actionTime(AiAction action) {

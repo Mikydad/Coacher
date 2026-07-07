@@ -64,8 +64,8 @@ class RemoteIsarMerge {
     FirestoreClient? client,
     SyncCursorStore? cursorStore,
     this.ignoreCursors = false,
-  })  : _client = client ?? FirestoreClient(),
-        _cursors = cursorStore ?? const SyncCursorStore();
+  }) : _client = client ?? FirestoreClient(),
+       _cursors = cursorStore ?? const SyncCursorStore();
 
   final Isar _isar;
   final FirestoreClient _client;
@@ -86,8 +86,7 @@ class RemoteIsarMerge {
   Query<Map<String, dynamic>> _afterCursor(
     Query<Map<String, dynamic>> query,
     int cursor,
-  ) =>
-      cursor > 0 ? query.where('updatedAtMs', isGreaterThan: cursor) : query;
+  ) => cursor > 0 ? query.where('updatedAtMs', isGreaterThan: cursor) : query;
 
   void _noteSeen(String key, int updatedAtMs) {
     if (updatedAtMs > (_maxSeen[key] ?? 0)) _maxSeen[key] = updatedAtMs;
@@ -138,13 +137,18 @@ class RemoteIsarMerge {
         final routine = Routine.fromMap(m);
         await _mergeRoutine(routine);
         final routineId = routine.id;
-        final blocksSnap = await routinesCol.doc(routineId).collection('blocks').get();
+        final blocksSnap = await routinesCol
+            .doc(routineId)
+            .collection('blocks')
+            .get();
         for (final bDoc in blocksSnap.docs) {
           try {
             final bm = Map<String, dynamic>.from(bDoc.data());
             bm['id'] = _docFieldId(bDoc, bm);
             final rid = bm['routineId'];
-            bm['routineId'] = rid is String && rid.trim().isNotEmpty ? rid.trim() : routineId;
+            bm['routineId'] = rid is String && rid.trim().isNotEmpty
+                ? rid.trim()
+                : routineId;
             final block = TaskBlock.fromMap(bm);
             await _mergeBlock(block);
             final tasksSnap = await _afterCursor(
@@ -160,9 +164,13 @@ class RemoteIsarMerge {
                 final tm = Map<String, dynamic>.from(tDoc.data());
                 tm['id'] = _docFieldId(tDoc, tm);
                 final tr = tm['routineId'];
-                tm['routineId'] = tr is String && tr.trim().isNotEmpty ? tr.trim() : routineId;
+                tm['routineId'] = tr is String && tr.trim().isNotEmpty
+                    ? tr.trim()
+                    : routineId;
                 final tb = tm['blockId'];
-                tm['blockId'] = tb is String && tb.trim().isNotEmpty ? tb.trim() : block.id;
+                tm['blockId'] = tb is String && tb.trim().isNotEmpty
+                    ? tb.trim()
+                    : block.id;
                 final task = PlannedTask.fromMap(tm);
                 _noteSeen('tasks', task.updatedAtMs);
                 await _mergeTask(task);
@@ -184,8 +192,10 @@ class RemoteIsarMerge {
     // Use the pinned client (not FirestorePaths, which resolves the uid at
     // call time) so a mid-pull account switch can't mix user trees.
     final cursor = await _cursorFor('reminders');
-    final snap =
-        await _afterCursor(_client.userCollection('reminders'), cursor).get();
+    final snap = await _afterCursor(
+      _client.userCollection('reminders'),
+      cursor,
+    ).get();
     for (final doc in snap.docs) {
       try {
         final r = reminderConfigFromFirestoreDoc(doc);
@@ -199,8 +209,10 @@ class RemoteIsarMerge {
 
   Future<void> _pullGoals() async {
     final cursor = await _cursorFor('goals');
-    final snap =
-        await _afterCursor(_client.userCollection('goals'), cursor).get();
+    final snap = await _afterCursor(
+      _client.userCollection('goals'),
+      cursor,
+    ).get();
     for (final doc in snap.docs) {
       try {
         final m = Map<String, dynamic>.from(doc.data());
@@ -251,7 +263,10 @@ class RemoteIsarMerge {
   }
 
   Future<void> _mergeRoutine(Routine incoming) async {
-    final existing = await _isar.isarRoutines.filter().routineIdEqualTo(incoming.id).findFirst();
+    final existing = await _isar.isarRoutines
+        .filter()
+        .routineIdEqualTo(incoming.id)
+        .findFirst();
     if (!shouldApplyRemoteUpdatedAt(
       localUpdatedAtMs: existing?.updatedAtMs,
       remoteUpdatedAtMs: incoming.updatedAtMs,
@@ -265,7 +280,10 @@ class RemoteIsarMerge {
   }
 
   Future<void> _mergeBlock(TaskBlock incoming) async {
-    final existing = await _isar.isarBlocks.filter().blockIdEqualTo(incoming.id).findFirst();
+    final existing = await _isar.isarBlocks
+        .filter()
+        .blockIdEqualTo(incoming.id)
+        .findFirst();
     if (!shouldApplyRemoteUpdatedAt(
       localUpdatedAtMs: existing?.updatedAtMs,
       remoteUpdatedAtMs: incoming.updatedAtMs,
@@ -285,7 +303,10 @@ class RemoteIsarMerge {
   }
 
   Future<void> _mergeReminder(ReminderConfig incoming) async {
-    final existing = await _isar.isarReminders.filter().reminderIdEqualTo(incoming.id).findFirst();
+    final existing = await _isar.isarReminders
+        .filter()
+        .reminderIdEqualTo(incoming.id)
+        .findFirst();
     if (!shouldApplyRemoteUpdatedAt(
       localUpdatedAtMs: existing?.updatedAtMs,
       remoteUpdatedAtMs: incoming.updatedAtMs,
@@ -293,13 +314,18 @@ class RemoteIsarMerge {
       return;
     }
     await _isar.writeTxn(() async {
-      await _isar.isarReminders.putByReminderId(IsarReminder.fromDomain(incoming));
+      await _isar.isarReminders.putByReminderId(
+        IsarReminder.fromDomain(incoming),
+      );
     });
     _appliedCount++;
   }
 
   Future<void> _mergeGoal(UserGoal incoming) async {
-    final existing = await _isar.isarGoals.filter().goalIdEqualTo(incoming.id).findFirst();
+    final existing = await _isar.isarGoals
+        .filter()
+        .goalIdEqualTo(incoming.id)
+        .findFirst();
     if (!shouldApplyRemoteUpdatedAt(
       localUpdatedAtMs: existing?.updatedAtMs,
       remoteUpdatedAtMs: incoming.updatedAtMs,
@@ -313,7 +339,10 @@ class RemoteIsarMerge {
   }
 
   Future<void> _mergeAnalyticsEvent(AnalyticsEvent incoming) async {
-    final existing = await _isar.isarAnalyticsEvents.filter().eventIdEqualTo(incoming.id).findFirst();
+    final existing = await _isar.isarAnalyticsEvents
+        .filter()
+        .eventIdEqualTo(incoming.id)
+        .findFirst();
     if (!shouldApplyRemoteUpdatedAt(
       localUpdatedAtMs: existing?.updatedAtMs,
       remoteUpdatedAtMs: incoming.updatedAtMs,
@@ -321,13 +350,18 @@ class RemoteIsarMerge {
       return;
     }
     await _isar.writeTxn(() async {
-      await _isar.isarAnalyticsEvents.putByEventId(IsarAnalyticsEvent.fromDomain(incoming));
+      await _isar.isarAnalyticsEvents.putByEventId(
+        IsarAnalyticsEvent.fromDomain(incoming),
+      );
     });
     _appliedCount++;
   }
 
   Future<void> _mergeAnalyticsStats(AnalyticsStatsCache incoming) async {
-    final existing = await _isar.isarAnalyticsStats.filter().statsIdEqualTo(incoming.id).findFirst();
+    final existing = await _isar.isarAnalyticsStats
+        .filter()
+        .statsIdEqualTo(incoming.id)
+        .findFirst();
     if (!shouldApplyRemoteUpdatedAt(
       localUpdatedAtMs: existing?.updatedAtMs,
       remoteUpdatedAtMs: incoming.updatedAtMs,
@@ -335,7 +369,9 @@ class RemoteIsarMerge {
       return;
     }
     await _isar.writeTxn(() async {
-      await _isar.isarAnalyticsStats.putByStatsId(IsarAnalyticsStats.fromDomain(incoming));
+      await _isar.isarAnalyticsStats.putByStatsId(
+        IsarAnalyticsStats.fromDomain(incoming),
+      );
     });
     _appliedCount++;
   }

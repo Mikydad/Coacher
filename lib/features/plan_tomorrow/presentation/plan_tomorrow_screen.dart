@@ -20,11 +20,27 @@ import 'widgets/plan_tomorrow_widgets.dart';
 
 String _formatDate(DateTime dt) {
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   const fullDays = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
   ];
   return '${fullDays[dt.weekday - 1]}, ${months[dt.month - 1]} ${dt.day}';
 }
@@ -73,7 +89,11 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
     setState(() => _expandedSlots.addAll(slots.map((s) => s.id)));
   }
 
-  Future<void> _onReorderSlots(List<Routine> slots, int oldIndex, int newIndex) async {
+  Future<void> _onReorderSlots(
+    List<Routine> slots,
+    int oldIndex,
+    int newIndex,
+  ) async {
     if (newIndex > oldIndex) newIndex--;
     final copy = List<Routine>.from(slots);
     final item = copy.removeAt(oldIndex);
@@ -114,7 +134,10 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
           onFieldSubmitted: (_) => Navigator.pop(ctx, true),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Add'),
@@ -126,7 +149,9 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
     final name = slotName.trim();
 
     final slots = await ref.read(tomorrowRoutineSlotsProvider.future);
-    final nextIndex = slots.isEmpty ? 0 : slots.map((s) => s.orderIndex).reduce((a, b) => a > b ? a : b) + 1;
+    final nextIndex = slots.isEmpty
+        ? 0
+        : slots.map((s) => s.orderIndex).reduce((a, b) => a > b ? a : b) + 1;
     final repo = ref.read(planningRepositoryProvider);
     final now = DateTime.now().millisecondsSinceEpoch;
     final routineId = StableId.generate('routine');
@@ -170,7 +195,10 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
     final blocks = await repo.getBlocks(chosen.id);
     if (blocks.isEmpty || !context.mounted) return;
     final blockId = blocks.first.id;
-    final existing = await repo.getTasks(routineId: chosen.id, blockId: blockId);
+    final existing = await repo.getTasks(
+      routineId: chosen.id,
+      blockId: blockId,
+    );
     final orderIndex = existing.isEmpty
         ? 0
         : existing.map((t) => t.orderIndex).reduce((a, b) => a > b ? a : b) + 1;
@@ -221,7 +249,9 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
     final slots = await ref.read(tomorrowRoutineSlotsProvider.future);
     final Map<String, List<PlannedTaskRow>> slotTasks = {};
     for (final slot in slots) {
-      final tasks = await ref.read(tomorrowTasksForRoutineProvider(slot.id).future);
+      final tasks = await ref.read(
+        tomorrowTasksForRoutineProvider(slot.id).future,
+      );
       slotTasks[slot.id] = tasks;
     }
     if (!mounted) return;
@@ -233,10 +263,7 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (ctx) => _PlanSummarySheet(
-        slots: slots,
-        slotTasks: slotTasks,
-      ),
+      builder: (ctx) => _PlanSummarySheet(slots: slots, slotTasks: slotTasks),
     );
     if (!mounted) return;
     Navigator.popUntil(context, ModalRoute.withName('/'));
@@ -284,7 +311,10 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
                         _CarryForwardSection(
                           todayAsync: todayAsync,
                           expanded: _carryForwardExpanded,
-                          onToggle: () => setState(() => _carryForwardExpanded = !_carryForwardExpanded),
+                          onToggle: () => setState(
+                            () =>
+                                _carryForwardExpanded = !_carryForwardExpanded,
+                          ),
                           onMove: (row) => _moveToTomorrow(context, row),
                         ),
                         const SizedBox(height: 100),
@@ -361,7 +391,10 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
           onFieldSubmitted: (_) => Navigator.pop(ctx, true),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Rename'),
@@ -419,13 +452,21 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
       builder: (ctx) => AlertDialog(
         title: Text('Delete "${widget.routine.title}"?'),
         content: taskCount > 0
-            ? Text('This will also delete $taskCount task${taskCount == 1 ? '' : 's'}.')
+            ? Text(
+                'This will also delete $taskCount task${taskCount == 1 ? '' : 's'}.',
+              )
             : const Text('This slot has no tasks.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.redAccent),
+            ),
           ),
         ],
       ),
@@ -461,7 +502,9 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
         dateKey: DateKeys.tomorrowKey(),
       ),
     );
-    if (mounted) ref.invalidate(tomorrowTasksForRoutineProvider(widget.routine.id));
+    if (mounted) {
+      ref.invalidate(tomorrowTasksForRoutineProvider(widget.routine.id));
+    }
   }
 
   Future<void> _editTask(PlannedTaskRow row) async {
@@ -475,7 +518,9 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
         dateKey: row.dateKey,
       ),
     );
-    if (mounted) ref.invalidate(tomorrowTasksForRoutineProvider(widget.routine.id));
+    if (mounted) {
+      ref.invalidate(tomorrowTasksForRoutineProvider(widget.routine.id));
+    }
   }
 
   Future<void> _deleteTask(PlannedTaskRow row) async {
@@ -485,16 +530,24 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
         title: const Text('Delete task?'),
         content: Text('Remove "${row.task.title}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.redAccent),
+            ),
           ),
         ],
       ),
     );
     if (ok != true || !mounted) return;
-    await ref.read(planningRepositoryProvider).deleteTask(
+    await ref
+        .read(planningRepositoryProvider)
+        .deleteTask(
           routineId: row.routineId,
           blockId: row.blockId,
           taskId: row.task.id,
@@ -545,7 +598,9 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
 
   @override
   Widget build(BuildContext context) {
-    final tasksAsync = ref.watch(tomorrowTasksForRoutineProvider(widget.routine.id));
+    final tasksAsync = ref.watch(
+      tomorrowTasksForRoutineProvider(widget.routine.id),
+    );
 
     return tasksAsync.when(
       loading: () => _buildShell(
@@ -559,7 +614,10 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
         taskCount: 0,
         body: Padding(
           padding: const EdgeInsets.all(16),
-          child: Text('Error: $e', style: TextStyle(color: Colors.red.shade200)),
+          child: Text(
+            'Error: $e',
+            style: TextStyle(color: Colors.red.shade200),
+          ),
         ),
       ),
       data: (rows) => _buildShell(
@@ -589,7 +647,8 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
                     ),
                   PlanTomorrowAddTaskButton(
                     onPressed: _addTask,
-                    accentColor: widget.routine.title.toLowerCase() == 'afternoon'
+                    accentColor:
+                        widget.routine.title.toLowerCase() == 'afternoon'
                         ? PlanTomorrowColors.cyan
                         : PlanTomorrowColors.lime,
                   ),
@@ -622,7 +681,11 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
                     index: widget.index,
                     child: const Padding(
                       padding: EdgeInsets.only(right: 8),
-                      child: Icon(Icons.drag_handle, color: Colors.white24, size: 18),
+                      child: Icon(
+                        Icons.drag_handle,
+                        color: Colors.white24,
+                        size: 18,
+                      ),
                     ),
                   ),
                   Expanded(
@@ -650,7 +713,10 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
                   if (taskCount > 0) ...[
                     Text(
                       '$taskCount',
-                      style: const TextStyle(color: PlanTomorrowColors.label, fontSize: 13),
+                      style: const TextStyle(
+                        color: PlanTomorrowColors.label,
+                        fontSize: 13,
+                      ),
                     ),
                     const SizedBox(width: 4),
                   ],
@@ -660,28 +726,48 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
                     child: const Icon(Icons.expand_more, color: Colors.white54),
                   ),
                   PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert, size: 20, color: Colors.white54),
+                    icon: const Icon(
+                      Icons.more_vert,
+                      size: 20,
+                      color: Colors.white54,
+                    ),
                     onSelected: (v) async {
                       final rows = await ref.read(
-                        tomorrowTasksForRoutineProvider(widget.routine.id).future,
+                        tomorrowTasksForRoutineProvider(
+                          widget.routine.id,
+                        ).future,
                       );
                       if (!mounted) return;
                       if (v == 'rename') _rename();
                       if (v == 'delete') _delete(rows);
                       if (v == 'mode_flexible') _setMode(RoutineMode.flexible);
-                      if (v == 'mode_disciplined') _setMode(RoutineMode.disciplined);
+                      if (v == 'mode_disciplined') {
+                        _setMode(RoutineMode.disciplined);
+                      }
                       if (v == 'mode_extreme') _setMode(RoutineMode.extreme);
                     },
                     itemBuilder: (_) => const [
                       PopupMenuItem(value: 'rename', child: Text('Rename')),
                       PopupMenuDivider(),
-                      PopupMenuItem(value: 'mode_flexible', child: Text('Mode: Flexible')),
-                      PopupMenuItem(value: 'mode_disciplined', child: Text('Mode: Disciplined')),
-                      PopupMenuItem(value: 'mode_extreme', child: Text('Mode: Extreme')),
+                      PopupMenuItem(
+                        value: 'mode_flexible',
+                        child: Text('Mode: Flexible'),
+                      ),
+                      PopupMenuItem(
+                        value: 'mode_disciplined',
+                        child: Text('Mode: Disciplined'),
+                      ),
+                      PopupMenuItem(
+                        value: 'mode_extreme',
+                        child: Text('Mode: Extreme'),
+                      ),
                       PopupMenuDivider(),
                       PopupMenuItem(
                         value: 'delete',
-                        child: Text('Delete', style: TextStyle(color: Colors.redAccent)),
+                        child: Text(
+                          'Delete',
+                          style: TextStyle(color: Colors.redAccent),
+                        ),
                       ),
                     ],
                   ),
@@ -731,7 +817,11 @@ class _TomorrowTaskTile extends StatelessWidget {
                 index: index,
                 child: const Padding(
                   padding: EdgeInsets.only(right: 8),
-                  child: Icon(Icons.drag_handle, size: 18, color: Colors.white24),
+                  child: Icon(
+                    Icons.drag_handle,
+                    size: 18,
+                    color: Colors.white24,
+                  ),
                 ),
               ),
               Expanded(
@@ -740,7 +830,10 @@ class _TomorrowTaskTile extends StatelessWidget {
                   children: [
                     Text(
                       t.title,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 5),
                     Wrap(
@@ -748,12 +841,19 @@ class _TomorrowTaskTile extends StatelessWidget {
                       runSpacing: 4,
                       children: [
                         _Chip('${t.durationMinutes} min', Colors.white24),
-                        _Chip(priorityLabel, priorityColor.withValues(alpha: 0.15),
-                            textColor: priorityColor),
-                        if (t.category != null) _Chip(t.category!, Colors.white10),
+                        _Chip(
+                          priorityLabel,
+                          priorityColor.withValues(alpha: 0.15),
+                          textColor: priorityColor,
+                        ),
+                        if (t.category != null)
+                          _Chip(t.category!, Colors.white10),
                         if (t.reminderEnabled)
-                          const Icon(Icons.notifications_active_outlined,
-                              size: 14, color: PlanTomorrowColors.cyan),
+                          const Icon(
+                            Icons.notifications_active_outlined,
+                            size: 14,
+                            color: PlanTomorrowColors.cyan,
+                          ),
                       ],
                     ),
                     if (t.notes != null && t.notes!.isNotEmpty)
@@ -763,14 +863,21 @@ class _TomorrowTaskTile extends StatelessWidget {
                           t.notes!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white38, fontSize: 12),
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                   ],
                 ),
               ),
               PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert, size: 18, color: Colors.white38),
+                icon: const Icon(
+                  Icons.more_vert,
+                  size: 18,
+                  color: Colors.white38,
+                ),
                 onSelected: (v) {
                   if (v == 'edit') onEdit();
                   if (v == 'delete') onDelete();
@@ -779,7 +886,10 @@ class _TomorrowTaskTile extends StatelessWidget {
                   PopupMenuItem(value: 'edit', child: Text('Edit')),
                   PopupMenuItem(
                     value: 'delete',
-                    child: Text('Delete', style: TextStyle(color: Colors.redAccent)),
+                    child: Text(
+                      'Delete',
+                      style: TextStyle(color: Colors.redAccent),
+                    ),
                   ),
                 ],
               ),
@@ -832,10 +942,12 @@ class _CarryForwardSection extends StatelessWidget {
       error: (e, s) => const SizedBox.shrink(),
       data: (rows) {
         final open = rows
-            .where((r) =>
-                r.task.status == TaskStatus.notStarted ||
-                r.task.status == TaskStatus.inProgress ||
-                r.task.status == TaskStatus.partial)
+            .where(
+              (r) =>
+                  r.task.status == TaskStatus.notStarted ||
+                  r.task.status == TaskStatus.inProgress ||
+                  r.task.status == TaskStatus.partial,
+            )
             .toList();
         if (open.isEmpty) return const SizedBox.shrink();
 
@@ -864,7 +976,10 @@ class _CarryForwardSection extends StatelessWidget {
                       AnimatedRotation(
                         turns: expanded ? 0.5 : 0,
                         duration: const Duration(milliseconds: 200),
-                        child: const Icon(Icons.expand_more, color: Colors.white38),
+                        child: const Icon(
+                          Icons.expand_more,
+                          color: Colors.white38,
+                        ),
                       ),
                     ],
                   ),
@@ -892,8 +1007,8 @@ class _CarryForwardTile extends StatelessWidget {
     final statusLabel = t.status == TaskStatus.inProgress
         ? 'In Progress'
         : t.status == TaskStatus.partial
-            ? 'Partial'
-            : 'Not Started';
+        ? 'Partial'
+        : 'Not Started';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -910,20 +1025,31 @@ class _CarryForwardTile extends StatelessWidget {
                   children: [
                     Text(
                       t.title,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       statusLabel,
-                      style: const TextStyle(color: PlanTomorrowColors.label, fontSize: 12),
+                      style: const TextStyle(
+                        color: PlanTomorrowColors.label,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
               ),
               TextButton(
                 onPressed: onMove,
-                style: TextButton.styleFrom(foregroundColor: PlanTomorrowColors.cyan),
-                child: const Text('Move →', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                style: TextButton.styleFrom(
+                  foregroundColor: PlanTomorrowColors.cyan,
+                ),
+                child: const Text(
+                  'Move →',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
               ),
             ],
           ),
@@ -960,8 +1086,15 @@ class _SlotPickerSheet extends StatelessWidget {
                   color: PlanTomorrowColors.cardRaised,
                   borderRadius: BorderRadius.circular(14),
                   child: ListTile(
-                    title: Text(slot.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: PlanTomorrowColors.label),
+                    title: Text(
+                      slot.title,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    trailing: const Icon(
+                      Icons.arrow_forward_ios,
+                      size: 14,
+                      color: PlanTomorrowColors.label,
+                    ),
                     onTap: () => Navigator.pop(context, slot),
                   ),
                 ),
@@ -1024,7 +1157,10 @@ class _PlanSummarySheet extends StatelessWidget {
             ),
             Text(
               '$totalTasks task${totalTasks == 1 ? '' : 's'} planned',
-              style: const TextStyle(color: PlanTomorrowColors.label, fontSize: 14),
+              style: const TextStyle(
+                color: PlanTomorrowColors.label,
+                fontSize: 14,
+              ),
             ),
             const SizedBox(height: 20),
             Expanded(
@@ -1051,11 +1187,17 @@ class _PlanSummarySheet extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(task.title, style: const TextStyle(fontSize: 14)),
+                              child: Text(
+                                task.title,
+                                style: const TextStyle(fontSize: 14),
+                              ),
                             ),
                             Text(
                               _formatTime(task.reminderTimeIso!),
-                              style: const TextStyle(color: Colors.white54, fontSize: 13),
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 13,
+                              ),
                             ),
                           ],
                         ),
@@ -1067,9 +1209,12 @@ class _PlanSummarySheet extends StatelessWidget {
                       minimumSize: const Size.fromHeight(56),
                       backgroundColor: PlanTomorrowColors.lime,
                       foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
                     ),
-                    onPressed: () => Navigator.popUntil(context, ModalRoute.withName('/')),
+                    onPressed: () =>
+                        Navigator.popUntil(context, ModalRoute.withName('/')),
                     child: const Text(
                       'Close',
                       style: TextStyle(fontWeight: FontWeight.w700),
@@ -1087,7 +1232,10 @@ class _PlanSummarySheet extends StatelessWidget {
 
   Widget _buildSlotSummary(Routine slot) {
     final tasks = slotTasks[slot.id] ?? [];
-    final totalMin = tasks.fold<int>(0, (sum, r) => sum + r.task.durationMinutes);
+    final totalMin = tasks.fold<int>(
+      0,
+      (sum, r) => sum + r.task.durationMinutes,
+    );
     final h = totalMin ~/ 60;
     final m = totalMin % 60;
     final durationStr = h > 0 ? '${h}h ${m}m' : '${m}m';
@@ -1117,7 +1265,10 @@ class _PlanSummarySheet extends StatelessWidget {
               color: Colors.white10,
               borderRadius: BorderRadius.circular(6),
             ),
-            child: Text(durationStr, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+            child: Text(
+              durationStr,
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
+            ),
           ),
         ],
       ),

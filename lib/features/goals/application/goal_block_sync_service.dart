@@ -13,7 +13,7 @@ import '../domain/models/user_goal.dart';
 /// All conflict detection is still handled by [TimeBlockSyncService].
 class GoalBlockSyncService {
   GoalBlockSyncService({required TimeBlockSyncService timeBlockSyncService})
-      : _tb = timeBlockSyncService;
+    : _tb = timeBlockSyncService;
 
   final TimeBlockSyncService _tb;
 

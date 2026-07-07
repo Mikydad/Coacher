@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 
 import '../../../core/local_db/isar_collections/isar_ai_action_batch.dart';
@@ -131,7 +132,9 @@ class AiActionExecutor {
       ..batchId = batchId
       ..state = AiActionBatchState.pending.name
       ..actionsJson = jsonEncode(
-        actions.map((a) => {'type': a.actionType.name, 'params': a.parameters}).toList(),
+        actions
+            .map((a) => {'type': a.actionType.name, 'params': a.parameters})
+            .toList(),
       )
       ..snapshotJson = snapshotJson
       ..succeededActionIds = []
@@ -147,7 +150,8 @@ class AiActionExecutor {
     final failedIds = <String>[];
 
     for (final action in actions) {
-      final actionId = action.parameters['_actionId'] as String? ??
+      final actionId =
+          action.parameters['_actionId'] as String? ??
           '${action.actionType.name}_${actions.indexOf(action)}';
       try {
         final message = await _dispatch(action);
@@ -202,7 +206,8 @@ class AiActionExecutor {
       return const UndoNotAvailable('No AI changes to undo.');
     }
 
-    final isUndoable = batch.state == AiActionBatchState.completed.name ||
+    final isUndoable =
+        batch.state == AiActionBatchState.completed.name ||
         batch.state == AiActionBatchState.partialFailure.name;
     if (!isUndoable) {
       return UndoNotAvailable(
@@ -210,8 +215,7 @@ class AiActionExecutor {
       );
     }
 
-    final ageMs =
-        DateTime.now().millisecondsSinceEpoch - batch.createdAtMs;
+    final ageMs = DateTime.now().millisecondsSinceEpoch - batch.createdAtMs;
     if (ageMs > const Duration(minutes: 30).inMilliseconds) {
       return const UndoNotAvailable(
         'This AI change is more than 30 minutes old and can no longer be undone.',
@@ -219,7 +223,9 @@ class AiActionExecutor {
     }
 
     // Check if any snapshotted tasks have been completed since the AI batch.
-    final completedTitles = await _findCompletedSnapshotTasks(batch.snapshotJson);
+    final completedTitles = await _findCompletedSnapshotTasks(
+      batch.snapshotJson,
+    );
 
     await _rollbackBatch(batch.batchId, batch.snapshotJson);
 
@@ -244,8 +250,9 @@ class AiActionExecutor {
     for (final action in actions) {
       final dateStr = _resolveDate(action.parameters['date'] as String?);
       dateKeys.add(dateStr);
-      final destDate =
-          _resolveDate(action.parameters['destinationDate'] as String?);
+      final destDate = _resolveDate(
+        action.parameters['destinationDate'] as String?,
+      );
       dateKeys.add(destDate);
     }
 
@@ -276,7 +283,9 @@ class AiActionExecutor {
             'updatedAtMs': t.updatedAtMs,
           });
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('ai_action_executor: swallowed error: $e');
+      }
     }
 
     return jsonEncode({'tasks': tasks});
@@ -289,8 +298,8 @@ class AiActionExecutor {
   Future<void> _rollbackBatch(String batchId, String snapshotJson) async {
     try {
       final snapshot = jsonDecode(snapshotJson) as Map<String, dynamic>?;
-      final taskList =
-          (snapshot?['tasks'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      final taskList = (snapshot?['tasks'] as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>();
 
       for (final taskMap in taskList) {
         final restored = PlannedTask(
@@ -328,7 +337,9 @@ class AiActionExecutor {
         AiActionBatchState.rolledBack,
         undoneAtMs: DateTime.now().millisecondsSinceEpoch,
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('ai_action_executor: swallowed error: $e');
+    }
   }
 
   /// Check if any tasks in the snapshot have since been completed by the user.
@@ -336,8 +347,8 @@ class AiActionExecutor {
     final titles = <String>[];
     try {
       final snapshot = jsonDecode(snapshotJson) as Map<String, dynamic>?;
-      final taskList =
-          (snapshot?['tasks'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      final taskList = (snapshot?['tasks'] as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>();
 
       // Collect unique date keys from snapshot to query current tasks.
       final dateKeys = <String>{};
@@ -364,7 +375,9 @@ class AiActionExecutor {
           }
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('ai_action_executor: swallowed error: $e');
+    }
     return titles;
   }
 
@@ -399,7 +412,8 @@ class AiActionExecutor {
     switch (action.actionType) {
       case ActionType.createTask:
       case ActionType.addReminder:
-        final taskId = action.parameters['_resolvedTaskId'] as String? ?? 'ai-task';
+        final taskId =
+            action.parameters['_resolvedTaskId'] as String? ?? 'ai-task';
         return TaskCreatedMutation(
           entityId: taskId,
           sourceContext: source,
@@ -407,15 +421,19 @@ class AiActionExecutor {
         );
       case ActionType.editTask:
       case ActionType.rescheduleReminder:
-        final taskId = action.parameters['_resolvedTaskId'] as String? ?? 'ai-task';
+        final taskId =
+            action.parameters['_resolvedTaskId'] as String? ?? 'ai-task';
         return TaskUpdatedMutation(
           entityId: taskId,
           sourceContext: source,
           dateStr: dateStr,
         );
       case ActionType.moveTask:
-        final taskId = action.parameters['_resolvedTaskId'] as String? ?? 'ai-task';
-        final toDate = _resolveDate(action.parameters['destinationDate'] as String?);
+        final taskId =
+            action.parameters['_resolvedTaskId'] as String? ?? 'ai-task';
+        final toDate = _resolveDate(
+          action.parameters['destinationDate'] as String?,
+        );
         return TaskDeferredMutation(
           entityId: taskId,
           sourceContext: source,
@@ -423,7 +441,8 @@ class AiActionExecutor {
           toDateStr: toDate,
         );
       case ActionType.deleteTask:
-        final taskId = action.parameters['_resolvedTaskId'] as String? ?? 'ai-task';
+        final taskId =
+            action.parameters['_resolvedTaskId'] as String? ?? 'ai-task';
         return TaskDeletedMutation(
           entityId: taskId,
           sourceContext: source,
@@ -432,18 +451,17 @@ class AiActionExecutor {
       case ActionType.createGoal:
       case ActionType.modifyGoal:
       case ActionType.deleteGoal:
-        final goalId = action.parameters['_resolvedGoalId'] as String? ?? 'ai-goal';
+        final goalId =
+            action.parameters['_resolvedGoalId'] as String? ?? 'ai-goal';
         return GoalChangedMutation(
           entityId: goalId,
           sourceContext: source,
           changeKind: action.actionType.name,
         );
       case ActionType.removeReminder:
-        final taskId = action.parameters['_resolvedTaskId'] as String? ?? 'ai-task';
-        return ReminderChangedMutation(
-          entityId: taskId,
-          sourceContext: source,
-        );
+        final taskId =
+            action.parameters['_resolvedTaskId'] as String? ?? 'ai-task';
+        return ReminderChangedMutation(entityId: taskId, sourceContext: source);
       case ActionType.activateContextOverride:
       case ActionType.endContextOverride:
         return ContextOverrideChangedMutation(
@@ -504,8 +522,8 @@ class AiActionExecutor {
     // Use action-provided modeRefId first, then executor default, then null.
     final modeRefId = p['modeRefId'] as String? ?? defaultModeRefId;
 
-    final (:routineId, :blockId) =
-        await planningRepository.ensureDefaultDayPlan(dateStr);
+    final (:routineId, :blockId) = await planningRepository
+        .ensureDefaultDayPlan(dateStr);
     final orderIndex = await _nextOrderIndexForDate(dateStr);
     final reminderTime = _parseReminderDateTime(dateStr, timeStr);
 
@@ -559,8 +577,8 @@ class AiActionExecutor {
     // For edit: find the task by title in today's plan and update it.
     // Simplified: upsert a new task with updated fields.
     // A full implementation would fetch the existing task by ID from Isar.
-    final (:routineId, :blockId) =
-        await planningRepository.ensureDefaultDayPlan(dateStr);
+    final (:routineId, :blockId) = await planningRepository
+        .ensureDefaultDayPlan(dateStr);
 
     DateTime? reminderTime;
     if (timeStr != null && timeStr.contains(':')) {
@@ -628,7 +646,9 @@ class AiActionExecutor {
     final periodEnd = deadlineStr != null
         ? (() {
             try {
-              return DateKeys.parseLocalDateKey(deadlineStr).millisecondsSinceEpoch;
+              return DateKeys.parseLocalDateKey(
+                deadlineStr,
+              ).millisecondsSinceEpoch;
             } catch (_) {
               return now;
             }
@@ -672,15 +692,13 @@ class AiActionExecutor {
   /// Adds or updates a reminder. If no matching task exists for [dateStr], creates
   /// a new task first (AI often returns addReminder instead of createTask).
   Future<String> _addReminder(Map<String, dynamic> p) async {
-    final taskTitle =
-        (p['taskTitle'] as String?)?.trim().isNotEmpty == true
-            ? (p['taskTitle'] as String).trim()
-            : (p['title'] as String?)?.trim().isNotEmpty == true
-                ? (p['title'] as String).trim()
-                : 'Reminder';
+    final taskTitle = (p['taskTitle'] as String?)?.trim().isNotEmpty == true
+        ? (p['taskTitle'] as String).trim()
+        : (p['title'] as String?)?.trim().isNotEmpty == true
+        ? (p['title'] as String).trim()
+        : 'Reminder';
     final dateStr = _resolveDate(p['date'] as String?);
-    final timeStr =
-        p['reminderTime'] as String? ?? p['time'] as String?;
+    final timeStr = p['reminderTime'] as String? ?? p['time'] as String?;
 
     final existing = await _findTaskRowByTitle(taskTitle, dateStr);
     if (existing != null) {
@@ -707,19 +725,17 @@ class AiActionExecutor {
   }
 
   Future<String> _rescheduleReminder(Map<String, dynamic> p) async {
-    final taskTitle =
-        (p['taskTitle'] as String?)?.trim().isNotEmpty == true
-            ? (p['taskTitle'] as String).trim()
-            : (p['title'] as String?)?.trim().isNotEmpty == true
-                ? (p['title'] as String).trim()
-                : '';
+    final taskTitle = (p['taskTitle'] as String?)?.trim().isNotEmpty == true
+        ? (p['taskTitle'] as String).trim()
+        : (p['title'] as String?)?.trim().isNotEmpty == true
+        ? (p['title'] as String).trim()
+        : '';
     if (taskTitle.isEmpty) {
       throw ArgumentError('taskTitle is required to reschedule a reminder');
     }
 
     final dateStr = _resolveDate(p['date'] as String?);
-    final timeStr =
-        p['reminderTime'] as String? ?? p['time'] as String?;
+    final timeStr = p['reminderTime'] as String? ?? p['time'] as String?;
 
     final existing = await _findTaskRowByTitle(taskTitle, dateStr);
     if (existing == null) {
@@ -886,12 +902,16 @@ class AiActionExecutor {
           break;
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('ai_action_executor: swallowed error: $e');
+    }
 
-    final existingReminders =
-        await reminderRepository.getRemindersForTasks([taskId]);
-    final existingConfig =
-        existingReminders.isNotEmpty ? existingReminders.first : null;
+    final existingReminders = await reminderRepository.getRemindersForTasks([
+      taskId,
+    ]);
+    final existingConfig = existingReminders.isNotEmpty
+        ? existingReminders.first
+        : null;
     final now = DateTime.now().millisecondsSinceEpoch;
 
     final reminder = ReminderConfig(
@@ -913,7 +933,8 @@ class AiActionExecutor {
   }
 
   String _humanLabel(AiAction action) {
-    final title = action.parameters['title'] as String? ??
+    final title =
+        action.parameters['title'] as String? ??
         action.parameters['taskTitle'] as String? ??
         action.parameters['goalTitle'] as String? ??
         action.actionType.name;
@@ -932,8 +953,9 @@ class AiActionExecutor {
 
   String _friendlyDate(String dateKey) {
     final today = DateKeys.todayKey();
-    final tomorrow =
-        DateKeys.todayKey(DateTime.now().add(const Duration(days: 1)));
+    final tomorrow = DateKeys.todayKey(
+      DateTime.now().add(const Duration(days: 1)),
+    );
     if (dateKey == today) return 'today';
     if (dateKey == tomorrow) return 'tomorrow';
     return dateKey;

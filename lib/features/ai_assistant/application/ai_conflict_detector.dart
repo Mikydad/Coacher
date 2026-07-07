@@ -85,8 +85,7 @@ class AiConflictDetector {
         final strictRequired =
             action.parameters['strictModeRequired'] as bool? ?? false;
         if (strictRequired) {
-          final taskTitle =
-              action.parameters['taskTitle'] as String? ?? 'Task';
+          final taskTitle = action.parameters['taskTitle'] as String? ?? 'Task';
           softConflicts.add(
             '"$taskTitle" uses a strict mode — moving it may require a typed CONFIRM override.',
           );
@@ -116,11 +115,13 @@ class AiConflictDetector {
 
       for (final existing in allReminders) {
         if (existing.scheduledAtIso == null) continue;
-        final existingDt =
-            DateTime.tryParse(existing.scheduledAtIso!)?.toLocal();
+        final existingDt = DateTime.tryParse(
+          existing.scheduledAtIso!,
+        )?.toLocal();
         if (existingDt == null) continue;
 
-        final diffMinutes = (existingDt.hour * 60 + existingDt.minute) -
+        final diffMinutes =
+            (existingDt.hour * 60 + existingDt.minute) -
             (proposedHour * 60 + proposedMin);
         if (diffMinutes.abs() <= _reminderCollisionMinutes &&
             diffMinutes.abs() > 0) {
@@ -161,13 +162,19 @@ class AiConflictDetector {
         attentionState.overrideEndMinutes != null) {
       final overlapStart = attentionState.overrideStartMinutes!;
       final overlapEnd = attentionState.overrideEndMinutes!;
-      if (_overlaps(proposedMinutes, proposedEndMinutes, overlapStart, overlapEnd)) {
+      if (_overlaps(
+        proposedMinutes,
+        proposedEndMinutes,
+        overlapStart,
+        overlapEnd,
+      )) {
         final overrideType = attentionState.activeOverride;
         final overrideName = overrideType.displayName;
         final startStr = _minsToTime(overlapStart);
         final endStr = _minsToTime(overlapEnd);
 
-        final isHard = overrideType == ContextOverride.sleep ||
+        final isHard =
+            overrideType == ContextOverride.sleep ||
             overrideType == ContextOverride.doNotDisturb;
 
         return _ContextConflict(
@@ -186,18 +193,15 @@ class AiConflictDetector {
       final sleepEnd = attentionState.sleepWindowEndMinutes!;
 
       // Sleep window may wrap midnight (e.g. 23:00–07:00)
-      final inSleep = _inSleepWindow(
-        proposedMinutes,
-        sleepStart,
-        sleepEnd,
-      );
+      final inSleep = _inSleepWindow(proposedMinutes, sleepStart, sleepEnd);
       if (inSleep) {
         final startStr = attentionState.sleepWindowStart!;
         final endStr = attentionState.sleepWindowEnd!;
         return _ContextConflict(
           message:
               '"$title" is scheduled during your sleep window ($startStr–$endStr).',
-          isHard: false, // sleep window is advisory unless active sleep override
+          isHard:
+              false, // sleep window is advisory unless active sleep override
         );
       }
     }

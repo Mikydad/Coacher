@@ -26,9 +26,8 @@ class ScoredCircle {
 ///
 /// Pure scoring logic — no network calls except loading circles from the repo.
 class CircleRecommendationService {
-  const CircleRecommendationService({
-    required CircleRepository circleRepo,
-  }) : _circleRepo = circleRepo;
+  const CircleRecommendationService({required CircleRepository circleRepo})
+    : _circleRepo = circleRepo;
 
   final CircleRepository _circleRepo;
 
@@ -49,14 +48,17 @@ class CircleRecommendationService {
       return true;
     }).toList();
 
-    final scored = eligible
-        .map((c) => _score(
-              circle: c,
-              activeGoalCategories: activeGoalCategories,
-              userTimezone: userTimezone,
-            ))
-        .toList()
-      ..sort((a, b) => b.score.compareTo(a.score));
+    final scored =
+        eligible
+            .map(
+              (c) => _score(
+                circle: c,
+                activeGoalCategories: activeGoalCategories,
+                userTimezone: userTimezone,
+              ),
+            )
+            .toList()
+          ..sort((a, b) => b.score.compareTo(a.score));
 
     return scored;
   }
@@ -69,9 +71,10 @@ class CircleRecommendationService {
     required String userTimezone,
   }) {
     // Category match (0.0 or 1.0)
-    final categoryMatch = activeGoalCategories.any(
-      (cat) => _normalise(cat) == _normalise(circle.category),
-    )
+    final categoryMatch =
+        activeGoalCategories.any(
+          (cat) => _normalise(cat) == _normalise(circle.category),
+        )
         ? 1.0
         : 0.0;
 
@@ -80,8 +83,8 @@ class CircleRecommendationService {
     final timezoneMatch = tzOffset <= 2.0
         ? 1.0
         : tzOffset <= 4.0
-            ? 0.5
-            : 0.0;
+        ? 0.5
+        : 0.0;
 
     // Activity level: memberCount / kMaxMembers
     final activityLevel = circle.memberCount / _kMaxMembers;
@@ -90,10 +93,11 @@ class CircleRecommendationService {
     final openPolicy = circle.joinPolicy == JoinPolicy.open
         ? 1.0
         : circle.joinPolicy == JoinPolicy.requestApproval
-            ? 0.5
-            : 0.0;
+        ? 0.5
+        : 0.0;
 
-    final score = categoryMatch * 0.4 +
+    final score =
+        categoryMatch * 0.4 +
         timezoneMatch * 0.3 +
         activityLevel * 0.2 +
         openPolicy * 0.1;

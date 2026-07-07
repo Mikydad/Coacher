@@ -19,10 +19,17 @@ class IsarReminderRepository implements ReminderRepository {
   Isar get _isar => OfflineStore.instance.isar!;
 
   Future<void> _mergeFromRemoteIfNewer(ReminderConfig incoming) async {
-    final existing = await _isar.isarReminders.filter().reminderIdEqualTo(incoming.id).findFirst();
-    if (existing != null && existing.updatedAtMs >= incoming.updatedAtMs) return;
+    final existing = await _isar.isarReminders
+        .filter()
+        .reminderIdEqualTo(incoming.id)
+        .findFirst();
+    if (existing != null && existing.updatedAtMs >= incoming.updatedAtMs) {
+      return;
+    }
     await _isar.writeTxn(() async {
-      await _isar.isarReminders.putByReminderId(IsarReminder.fromDomain(incoming));
+      await _isar.isarReminders.putByReminderId(
+        IsarReminder.fromDomain(incoming),
+      );
     });
   }
 
@@ -33,11 +40,16 @@ class IsarReminderRepository implements ReminderRepository {
   }
 
   @override
-  Future<List<ReminderConfig>> getRemindersForTasks(List<String> taskIds) async {
+  Future<List<ReminderConfig>> getRemindersForTasks(
+    List<String> taskIds,
+  ) async {
     if (taskIds.isEmpty) return const [];
     final idSet = taskIds.toSet();
     final rows = await _isar.isarReminders.where().findAll();
-    return rows.where((r) => idSet.contains(r.taskId)).map((e) => e.toDomain()).toList();
+    return rows
+        .where((r) => idSet.contains(r.taskId))
+        .map((e) => e.toDomain())
+        .toList();
   }
 
   @override
@@ -53,12 +65,16 @@ class IsarReminderRepository implements ReminderRepository {
   Future<void> upsertReminder(ReminderConfig reminder) async {
     reminder.validate();
     await _isar.writeTxn(() async {
-      await _isar.isarReminders.putByReminderId(IsarReminder.fromDomain(reminder));
+      await _isar.isarReminders.putByReminderId(
+        IsarReminder.fromDomain(reminder),
+      );
     });
     final path = '${FirestorePaths.reminders}/${reminder.id}';
     final payload = reminder.toMap();
     try {
-      await FirebaseFirestore.instance.doc(path).set(payload, SetOptions(merge: true));
+      await FirebaseFirestore.instance
+          .doc(path)
+          .set(payload, SetOptions(merge: true));
     } catch (_) {
       await SyncService.instance.enqueueUpsert(
         entityType: 'reminder',

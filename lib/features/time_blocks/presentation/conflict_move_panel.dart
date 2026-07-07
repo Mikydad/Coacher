@@ -72,11 +72,7 @@ class ConflictMovePanel extends StatelessWidget {
 }
 
 class _SuggestionChip extends StatelessWidget {
-  const _SuggestionChip({
-    required this.label,
-    required this.range,
-    this.onTap,
-  });
+  const _SuggestionChip({required this.label, required this.range, this.onTap});
 
   final String label;
   final String range;

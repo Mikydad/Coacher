@@ -16,7 +16,9 @@ abstract class PlanningRepository {
   Future<List<Routine>> getRoutinesForDate(String dateKey);
   Future<void> upsertRoutine(Routine routine);
   Future<void> deleteRoutine(String routineId);
-  Future<List<RoutineModeConfig>> getRoutineModeConfigs({GetOptions? getOptions});
+  Future<List<RoutineModeConfig>> getRoutineModeConfigs({
+    GetOptions? getOptions,
+  });
   Future<void> upsertRoutineModeConfig(RoutineModeConfig config);
 
   Future<List<TaskBlock>> getBlocks(String routineId);
@@ -53,7 +55,9 @@ abstract class PlanningRepository {
   Future<String> exportAccountabilityLogs({String format = 'json'});
 
   /// Ensures a [Routine] for [dateKey] and a default [TaskBlock] exist; returns their ids.
-  Future<({String routineId, String blockId})> ensureDefaultDayPlan(String dateKey);
+  Future<({String routineId, String blockId})> ensureDefaultDayPlan(
+    String dateKey,
+  );
 }
 
 class FirestorePlanningRepository implements PlanningRepository {
@@ -276,14 +280,24 @@ class FirestorePlanningRepository implements PlanningRepository {
         .orderBy('createdAtMs', descending: true);
     final snap = await q.get();
     final logs = snap.docs
-        .map((d) => AccountabilityLog.fromMap(Map<String, dynamic>.from(d.data())))
+        .map(
+          (d) => AccountabilityLog.fromMap(Map<String, dynamic>.from(d.data())),
+        )
         .where((l) {
-          if (fromCreatedAtMs != null && l.createdAtMs < fromCreatedAtMs) return false;
-          if (toCreatedAtMs != null && l.createdAtMs > toCreatedAtMs) return false;
-          if (modeRefId != null && modeRefId.trim().isNotEmpty && l.modeRefId != modeRefId) {
+          if (fromCreatedAtMs != null && l.createdAtMs < fromCreatedAtMs) {
             return false;
           }
-          if (reasonCategory != null && l.reasonCategory != reasonCategory) return false;
+          if (toCreatedAtMs != null && l.createdAtMs > toCreatedAtMs) {
+            return false;
+          }
+          if (modeRefId != null &&
+              modeRefId.trim().isNotEmpty &&
+              l.modeRefId != modeRefId) {
+            return false;
+          }
+          if (reasonCategory != null && l.reasonCategory != reasonCategory) {
+            return false;
+          }
           return true;
         })
         .toList();
@@ -314,7 +328,10 @@ class FirestorePlanningRepository implements PlanningRepository {
   }
 
   @override
-  Future<int> pruneOldAccountabilityLogs({int retentionDays = 30, int? nowMs}) async {
+  Future<int> pruneOldAccountabilityLogs({
+    int retentionDays = 30,
+    int? nowMs,
+  }) async {
     final now = nowMs ?? DateTime.now().millisecondsSinceEpoch;
     final cutOff = now - Duration(days: retentionDays).inMilliseconds;
     final oldLogs = await getAccountabilityLogs(toCreatedAtMs: cutOff);
@@ -334,7 +351,9 @@ class FirestorePlanningRepository implements PlanningRepository {
   }
 
   @override
-  Future<({String routineId, String blockId})> ensureDefaultDayPlan(String dateKey) async {
+  Future<({String routineId, String blockId})> ensureDefaultDayPlan(
+    String dateKey,
+  ) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     final routines = await getRoutinesForDate(dateKey);
     late final String routineId;

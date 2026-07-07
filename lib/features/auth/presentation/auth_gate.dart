@@ -123,7 +123,9 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     if (_signingInAnonymously) return;
     setState(() => _signingInAnonymously = true);
     try {
-      final (_, user) = await ref.read(authRepositoryProvider).signInAnonymously();
+      final (_, user) = await ref
+          .read(authRepositoryProvider)
+          .signInAnonymously();
       // Persist the new uid immediately so the next restart does not treat it
       // as a uid change (which would trigger an unnecessary local-data wipe).
       if (user != null) await AuthSessionPolicy.persistUid(user.uid);
@@ -219,14 +221,12 @@ class _AuthFlowApp extends StatelessWidget {
       home: const AuthLandingScreen(),
       routes: {
         LoginScreen.routeName: (context) {
-          final email =
-              ModalRoute.of(context)?.settings.arguments as String?;
+          final email = ModalRoute.of(context)?.settings.arguments as String?;
           return LoginScreen(prefillEmail: email);
         },
         SignUpScreen.routeName: (_) => const SignUpScreen(),
         ForgotPasswordScreen.routeName: (context) {
-          final email =
-              ModalRoute.of(context)?.settings.arguments as String?;
+          final email = ModalRoute.of(context)?.settings.arguments as String?;
           return ForgotPasswordScreen(prefillEmail: email);
         },
       },

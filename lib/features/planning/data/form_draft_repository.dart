@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,7 +24,9 @@ class FormDraftRepository {
       final decoded = jsonDecode(raw);
       if (decoded is Map<String, dynamic>) return decoded;
       if (decoded is Map) return Map<String, dynamic>.from(decoded);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('form_draft_repository: swallowed error: $e');
+    }
     return null;
   }
 
@@ -32,10 +35,7 @@ class FormDraftRepository {
     await prefs.remove('$_keyPrefix$key');
   }
 
-  bool isExpired(
-    int savedAtMs, {
-    int ttlMinutes = kFormDraftTtlMinutes,
-  }) {
+  bool isExpired(int savedAtMs, {int ttlMinutes = kFormDraftTtlMinutes}) {
     final ageMs = DateTime.now().millisecondsSinceEpoch - savedAtMs;
     return ageMs > ttlMinutes * 60 * 1000;
   }

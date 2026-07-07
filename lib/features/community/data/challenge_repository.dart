@@ -28,13 +28,12 @@ abstract class ChallengeRepository {
     required int memberCount,
   });
 
-  Future<List<ChallengeVote>> getVotes(
-      String circleId, String challengeId);
+  Future<List<ChallengeVote>> getVotes(String circleId, String challengeId);
 }
 
 class FirestoreChallengeRepository implements ChallengeRepository {
   FirestoreChallengeRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
@@ -42,13 +41,16 @@ class FirestoreChallengeRepository implements ChallengeRepository {
       _firestore.collection(FirestorePaths.circleChallenges(circleId));
 
   DocumentReference<Map<String, dynamic>> _challengeDoc(
-          String circleId, String challengeId) =>
-      _firestore.doc(FirestorePaths.challengeDoc(circleId, challengeId));
+    String circleId,
+    String challengeId,
+  ) => _firestore.doc(FirestorePaths.challengeDoc(circleId, challengeId));
 
   CollectionReference<Map<String, dynamic>> _votes(
-          String circleId, String challengeId) =>
-      _firestore
-          .collection(FirestorePaths.challengeVotes(circleId, challengeId));
+    String circleId,
+    String challengeId,
+  ) => _firestore.collection(
+    FirestorePaths.challengeVotes(circleId, challengeId),
+  );
 
   static Challenge _fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = Map<String, dynamic>.from(doc.data() ?? {});
@@ -57,7 +59,8 @@ class FirestoreChallengeRepository implements ChallengeRepository {
   }
 
   static ChallengeVote _voteFromDoc(
-      DocumentSnapshot<Map<String, dynamic>> doc) {
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     final data = Map<String, dynamic>.from(doc.data() ?? {});
     return ChallengeVote.fromMap(data);
   }
@@ -80,16 +83,18 @@ class FirestoreChallengeRepository implements ChallengeRepository {
   @override
   Future<void> createChallenge(Challenge challenge) async {
     challenge.validate();
-    await _challenges(challenge.circleId)
-        .doc(challenge.id)
-        .set(challenge.toMap());
+    await _challenges(
+      challenge.circleId,
+    ).doc(challenge.id).set(challenge.toMap());
   }
 
   @override
   Future<void> updateChallenge(Challenge challenge) async {
     challenge.validate();
-    await _challengeDoc(challenge.circleId, challenge.id)
-        .set(challenge.toMap(), SetOptions(merge: true));
+    await _challengeDoc(
+      challenge.circleId,
+      challenge.id,
+    ).set(challenge.toMap(), SetOptions(merge: true));
   }
 
   @override
@@ -105,12 +110,10 @@ class FirestoreChallengeRepository implements ChallengeRepository {
       if (!snap.exists || snap.data() == null) return;
 
       final challenge = _fromDoc(snap);
-      final updatedProgress =
-          Map<String, int>.from(challenge.memberProgress);
+      final updatedProgress = Map<String, int>.from(challenge.memberProgress);
       updatedProgress[userId] = (updatedProgress[userId] ?? 0) + delta;
 
-      final newTeamTotal =
-          updatedProgress.values.fold(0, (sum, v) => sum + v);
+      final newTeamTotal = updatedProgress.values.fold(0, (sum, v) => sum + v);
 
       tx.update(ref, {
         'memberProgress': updatedProgress,
@@ -133,12 +136,14 @@ class FirestoreChallengeRepository implements ChallengeRepository {
     final now = DateTime.now().millisecondsSinceEpoch;
 
     // Write this user's vote.
-    await voteRef.set(ChallengeVote(
-      challengeId: challengeId,
-      userId: userId,
-      approve: approve,
-      createdAtMs: now,
-    ).toMap());
+    await voteRef.set(
+      ChallengeVote(
+        challengeId: challengeId,
+        userId: userId,
+        approve: approve,
+        createdAtMs: now,
+      ).toMap(),
+    );
 
     // Check totals and flip status if majority reached.
     final allVotes = await getVotes(circleId, challengeId);
@@ -161,7 +166,9 @@ class FirestoreChallengeRepository implements ChallengeRepository {
 
   @override
   Future<List<ChallengeVote>> getVotes(
-      String circleId, String challengeId) async {
+    String circleId,
+    String challengeId,
+  ) async {
     final snap = await _votes(circleId, challengeId).get();
     return snap.docs.map(_voteFromDoc).toList();
   }

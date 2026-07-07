@@ -81,8 +81,8 @@ CoachingFraming deriveCoachingFraming({
 
     case FocusReason.consistencyBreakdownAlert:
       return switch (coachingStyle) {
-        CoachingStyle.disciplined || CoachingStyle.intense =>
-          CoachingFraming.protection,
+        CoachingStyle.disciplined ||
+        CoachingStyle.intense => CoachingFraming.protection,
         _ => CoachingFraming.stabilization,
       };
 
@@ -285,7 +285,10 @@ class CoachingAiPayload {
   final String promptVersion;
 
   void validate() {
-    assert(focusId.trim().isNotEmpty, 'CoachingAiPayload: focusId must not be blank');
+    assert(
+      focusId.trim().isNotEmpty,
+      'CoachingAiPayload: focusId must not be blank',
+    );
     assert(
       promptVersion.trim().isNotEmpty,
       'CoachingAiPayload: promptVersion must not be blank',
@@ -299,7 +302,8 @@ class CoachingAiPayload {
     'summaryType': summaryType.name,
     'coachingStyle': coachingStyle.toStorage(),
     'primaryInsightType': primaryInsightType,
-    if (secondaryInsightType != null) 'secondaryInsightType': secondaryInsightType,
+    if (secondaryInsightType != null)
+      'secondaryInsightType': secondaryInsightType,
     'focusScore': focusScore.clamp(0.0, 1.0),
     'urgencyScore': urgencyScore.clamp(0.0, 1.0),
     'evaluationTrace': evaluationTrace.take(5).toList(growable: false),

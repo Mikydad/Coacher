@@ -45,17 +45,16 @@ class UnknownAuthFailure extends AuthFailure {
 
 extension AuthFailureX on AuthFailure {
   String toUserMessage() => switch (this) {
-        InvalidCredentials() =>
-          "That email or password doesn't match. Try again or reset your password.",
-        EmailAlreadyInUse() =>
-          'An account with this email already exists. Sign in instead.',
-        WeakPassword() => 'Password must be at least 8 characters.',
-        NetworkFailure() =>
-          'No internet connection. Check your network and try again.',
-        RequiresRecentLogin() =>
-          'Please sign in again before making this change.',
-        AuthSignInCanceled() => '',
-        UnknownAuthFailure(:final message) =>
-          message.isEmpty ? 'Something went wrong. Please try again.' : message,
-      };
+    InvalidCredentials() =>
+      "That email or password doesn't match. Try again or reset your password.",
+    EmailAlreadyInUse() =>
+      'An account with this email already exists. Sign in instead.',
+    WeakPassword() => 'Password must be at least 8 characters.',
+    NetworkFailure() =>
+      'No internet connection. Check your network and try again.',
+    RequiresRecentLogin() => 'Please sign in again before making this change.',
+    AuthSignInCanceled() => '',
+    UnknownAuthFailure(:final message) =>
+      message.isEmpty ? 'Something went wrong. Please try again.' : message,
+  };
 }

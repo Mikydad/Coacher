@@ -140,14 +140,20 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.textGray)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textGray),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sign in instead',
-                style: TextStyle(
-                    color: AppColors.accentDim, fontWeight: FontWeight.w600)),
+            child: const Text(
+              'Sign in instead',
+              style: TextStyle(
+                color: AppColors.accentDim,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -252,14 +258,19 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         : (v) => setState(() => _tosAccepted = v ?? false),
                     activeColor: AppColors.accentDim,
                     checkColor: Colors.black,
-                    side: const BorderSide(color: AppColors.textDim, width: 1.5),
+                    side: const BorderSide(
+                      color: AppColors.textDim,
+                      width: 1.5,
+                    ),
                   ),
                   Expanded(
                     child: Text.rich(
                       TextSpan(
                         text: 'I agree to the ',
                         style: const TextStyle(
-                            color: AppColors.textGray, fontSize: 13),
+                          color: AppColors.textGray,
+                          fontSize: 13,
+                        ),
                         children: [
                           TextSpan(
                             text: 'Terms of Service',
@@ -316,9 +327,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           onTap: _loading
               ? null
               : () => Navigator.pushReplacementNamed(
-                    context,
-                    LoginScreen.routeName,
-                  ),
+                  context,
+                  LoginScreen.routeName,
+                ),
           child: const Text(
             'Sign in',
             style: TextStyle(

@@ -29,10 +29,10 @@ class CircleActivityBridgeService {
     required UserCircleMembershipService membershipSvc,
     required String Function() currentUserId,
     required String Function() currentDisplayName,
-  })  : _feedRepo = feedRepo,
-        _membershipSvc = membershipSvc,
-        _currentUserId = currentUserId,
-        _currentDisplayName = currentDisplayName;
+  }) : _feedRepo = feedRepo,
+       _membershipSvc = membershipSvc,
+       _currentUserId = currentUserId,
+       _currentDisplayName = currentDisplayName;
 
   final ActivityFeedRepository _feedRepo;
   // ignore: unused_field
@@ -55,13 +55,12 @@ class CircleActivityBridgeService {
 
     // ── 1. Goals: check-in metCommitment + milestones ──────────────────────
     subs.add(
-      container.listen<AsyncValue<List<UserGoal>>>(
-        goalsStreamProvider,
-        (_, next) {
-          next.whenData((goals) => _checkGoals(container, goals));
-        },
-        fireImmediately: true,
-      ),
+      container.listen<AsyncValue<List<UserGoal>>>(goalsStreamProvider, (
+        _,
+        next,
+      ) {
+        next.whenData((goals) => _checkGoals(container, goals));
+      }, fireImmediately: true),
     );
 
     // ── 2. Tasks: completed status ──────────────────────────────────────────
@@ -85,7 +84,9 @@ class CircleActivityBridgeService {
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   Future<void> _checkGoals(
-      ProviderContainer container, List<UserGoal> goals) async {
+    ProviderContainer container,
+    List<UserGoal> goals,
+  ) async {
     try {
       final today = DateKeys.todayKey();
       final goalsRepo = container.read(goalsRepositoryProvider);
@@ -220,7 +221,8 @@ class CircleActivityBridgeService {
           await _feedRepo.postFeedItem(item);
         } catch (e) {
           debugPrint(
-              '[CircleActivityBridge] fanOut circle=$circleId error: $e');
+            '[CircleActivityBridge] fanOut circle=$circleId error: $e',
+          );
         }
       }
     } catch (e) {

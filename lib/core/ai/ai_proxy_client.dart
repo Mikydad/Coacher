@@ -54,7 +54,7 @@ class AiProxyChatResult {
 /// same contract the previous direct-OpenAI clients used.
 class AiProxyClient {
   AiProxyClient({FirebaseFunctions? functions})
-      : _functions = functions ?? FirebaseFunctions.instance;
+    : _functions = functions ?? FirebaseFunctions.instance;
 
   final FirebaseFunctions _functions;
 
@@ -136,13 +136,15 @@ class AiProxyClient {
           final id = entry['id'];
           final name = entry['name'];
           if (id is! String || name is! String) continue;
-          toolCalls.add(AiProxyToolCall(
-            id: id,
-            name: name,
-            arguments: entry['arguments'] is String
-                ? entry['arguments'] as String
-                : '{}',
-          ));
+          toolCalls.add(
+            AiProxyToolCall(
+              id: id,
+              name: name,
+              arguments: entry['arguments'] is String
+                  ? entry['arguments'] as String
+                  : '{}',
+            ),
+          );
         }
       }
 

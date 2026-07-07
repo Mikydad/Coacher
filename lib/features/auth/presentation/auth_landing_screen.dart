@@ -121,9 +121,9 @@ class _AuthLandingScreenState extends ConsumerState<AuthLandingScreen> {
                       onPressed: _guestLoading
                           ? null
                           : () => Navigator.pushNamed(
-                                context,
-                                SignUpScreen.routeName,
-                              ),
+                              context,
+                              SignUpScreen.routeName,
+                            ),
                     ),
                     const AuthOrDivider(label: 'or continue with'),
                     AuthSocialSignInSection(enabled: !_guestLoading),
@@ -208,8 +208,7 @@ class _MigrationBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline,
-              color: AppColors.accentDim, size: 18),
+          const Icon(Icons.info_outline, color: AppColors.accentDim, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -274,10 +273,7 @@ class _OutlinedAuthButton extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
         ),
       ),
     );

@@ -12,7 +12,7 @@ abstract class CircleMemberRepository {
 
 class FirestoreCircleMemberRepository implements CircleMemberRepository {
   FirestoreCircleMemberRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
@@ -43,10 +43,9 @@ class FirestoreCircleMemberRepository implements CircleMemberRepository {
   @override
   Future<void> setMember(CircleMember member) async {
     final map = member.toMap();
-    await _members(member.circleId).doc(member.userId).set(
-          map,
-          SetOptions(merge: true),
-        );
+    await _members(
+      member.circleId,
+    ).doc(member.userId).set(map, SetOptions(merge: true));
   }
 
   @override

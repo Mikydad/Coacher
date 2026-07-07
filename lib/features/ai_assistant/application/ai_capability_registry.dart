@@ -76,10 +76,10 @@ abstract final class AiCapabilityRegistry {
 
   /// JSON section injected into every AI payload.
   static Map<String, dynamic> buildPayloadSection() => {
-        'read': supportedRead,
-        'mutate': supportedMutate,
-        'unsupported': _unsupportedDomains.map((d) => d.id).toList(),
-      };
+    'read': supportedRead,
+    'mutate': supportedMutate,
+    'unsupported': _unsupportedDomains.map((d) => d.id).toList(),
+  };
 
   /// Human-readable block for the LLM user prompt.
   static String formatForPrompt() {
@@ -87,7 +87,9 @@ abstract final class AiCapabilityRegistry {
       ..writeln('Coach AI capabilities:')
       ..writeln('  Read: ${supportedRead.join(', ')}')
       ..writeln('  Mutate: ${supportedMutate.join(', ')}')
-      ..writeln('  Not available yet: ${_unsupportedDomains.map((d) => d.id).join(', ')}')
+      ..writeln(
+        '  Not available yet: ${_unsupportedDomains.map((d) => d.id).join(', ')}',
+      )
       ..writeln(
         'If the user asks for an unsupported domain, respond with responseType '
         '"unsupported" only — do not invent data or actions.',

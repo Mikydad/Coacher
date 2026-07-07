@@ -89,7 +89,9 @@ class InsightGenerationRecomputeService {
     }
   }
 
-  Layer3FeatureContext? _toLayer3FeatureContext(BehaviorFeatureObject? feature) {
+  Layer3FeatureContext? _toLayer3FeatureContext(
+    BehaviorFeatureObject? feature,
+  ) {
     if (feature == null) return null;
     return Layer3FeatureContext(
       currentStreak: feature.streakMetrics.currentStreak,
@@ -110,11 +112,10 @@ class InsightGenerationRecomputeService {
   }
 }
 
-final insightGenerationOrchestratorProvider = Provider<InsightGenerationOrchestrator>((
-  ref,
-) {
-  return const InsightGenerationOrchestrator();
-});
+final insightGenerationOrchestratorProvider =
+    Provider<InsightGenerationOrchestrator>((ref) {
+      return const InsightGenerationOrchestrator();
+    });
 
 final insightGenerationRecomputeServiceProvider =
     Provider<InsightGenerationRecomputeService>((ref) {

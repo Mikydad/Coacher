@@ -34,11 +34,7 @@ const List<GoalTemplate> goalTemplates = [
     intensity: 4,
     reminderEnabled: true,
     reminderMinutesFromMidnight: 7 * 60,
-    setupSteps: [
-      'Pick workout days',
-      'Prepare gear',
-      'Set a warm-up routine',
-    ],
+    setupSteps: ['Pick workout days', 'Prepare gear', 'Set a warm-up routine'],
   ),
   GoalTemplate(
     id: 'learn_skill',
@@ -91,11 +87,7 @@ const List<GoalTemplate> goalTemplates = [
       'Define your focus block',
     ],
   ),
-  GoalTemplate(
-    id: 'custom',
-    label: 'Custom Goal',
-    emoji: '✨',
-  ),
+  GoalTemplate(id: 'custom', label: 'Custom Goal', emoji: '✨'),
 ];
 
 GoalTemplate? goalTemplateById(String id) {

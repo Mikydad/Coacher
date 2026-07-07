@@ -119,9 +119,7 @@ class ScheduleOptimisationService {
   // ─── Rule B: Fatigue stacking ─────────────────────────────────────────────
 
   /// ≥3 high-enforcement (strict / extreme) tasks scheduled back-to-back.
-  OptimisationRecommendation? _checkFatigueStacking(
-    List<PlannedTaskRow> rows,
-  ) {
+  OptimisationRecommendation? _checkFatigueStacking(List<PlannedTaskRow> rows) {
     // Consider tasks with strictModeRequired OR with disciplined/extreme modeRefId
     final strictTasks = rows.where((r) {
       final mode = r.task.modeRefId ?? '';
@@ -161,8 +159,7 @@ class ScheduleOptimisationService {
             ruleCode: 'B',
             description:
                 '3+ high-enforcement tasks are scheduled back-to-back with no break.',
-            preDraftedInput:
-                'Add a 15-minute break between my intense tasks',
+            preDraftedInput: 'Add a 15-minute break between my intense tasks',
           );
         }
       } else {
@@ -182,8 +179,7 @@ class ScheduleOptimisationService {
       final taskIds = rows.map((r) => r.task.id).toList();
       if (taskIds.isEmpty) return null;
 
-      final reminders =
-          await reminderRepository.getRemindersForTasks(taskIds);
+      final reminders = await reminderRepository.getRemindersForTasks(taskIds);
 
       // Build a list of reminder fire times in minutes-from-midnight
       final times = <int>[];
@@ -206,7 +202,8 @@ class ScheduleOptimisationService {
             ruleCode: 'C',
             description:
                 '4+ reminders fire within a 30-minute window — spreading them could reduce notification overload.',
-            preDraftedInput: 'Spread out my reminders to avoid notification overload',
+            preDraftedInput:
+                'Spread out my reminders to avoid notification overload',
           );
         }
       }

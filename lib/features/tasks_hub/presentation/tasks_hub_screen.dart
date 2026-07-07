@@ -41,7 +41,12 @@ PlannedTask _hubTaskWithOrderIndex(PlannedTaskRow row, int orderIndex) {
   );
 }
 
-enum _HubReorderLayer { habitAnchor, overdueScheduled, upcomingScheduled, flexible }
+enum _HubReorderLayer {
+  habitAnchor,
+  overdueScheduled,
+  upcomingScheduled,
+  flexible,
+}
 
 _HubReorderLayer _layerForHubRow(PlannedTaskRow row, DateTime now) {
   if (row.task.isHabitAnchor) {
@@ -83,7 +88,11 @@ class TasksHubScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _openEditTask(BuildContext context, WidgetRef ref, PlannedTaskRow row) async {
+  Future<void> _openEditTask(
+    BuildContext context,
+    WidgetRef ref,
+    PlannedTaskRow row,
+  ) async {
     await Navigator.pushNamed(
       context,
       AddTaskScreen.routeName,
@@ -128,15 +137,16 @@ class TasksHubScreen extends ConsumerWidget {
                 return;
               }
               final next = prioritized.first.row;
-              ref.read(activeExecutionTaskIdProvider.notifier).state = next.task.id;
-              ref.read(activeExecutionTaskLabelProvider.notifier).state = next.task.title;
-              await Navigator.pushNamed(
-                context,
-                TimerSessionScreen.routeName,
-              );
+              ref.read(activeExecutionTaskIdProvider.notifier).state =
+                  next.task.id;
+              ref.read(activeExecutionTaskLabelProvider.notifier).state =
+                  next.task.title;
+              await Navigator.pushNamed(context, TimerSessionScreen.routeName);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Next suggestion: ${next.task.title}')),
+                  SnackBar(
+                    content: Text('Next suggestion: ${next.task.title}'),
+                  ),
                 );
               }
             },
@@ -167,7 +177,10 @@ class TasksHubScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Today', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const Text(
+                'Today',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 8),
               todayAsync.when(
                 data: (rows) {
@@ -186,7 +199,8 @@ class TasksHubScreen extends ConsumerWidget {
                       final now = DateTime.now();
                       final moved = rows[oldIndex];
                       final movedLayer = _layerForHubRow(moved, now);
-                      final base = List<PlannedTaskRow>.from(rows)..removeAt(oldIndex);
+                      final base = List<PlannedTaskRow>.from(rows)
+                        ..removeAt(oldIndex);
                       if (base.isNotEmpty) {
                         final anchorIndex = newIndex.clamp(0, base.length - 1);
                         final anchor = base[anchorIndex];
@@ -210,15 +224,20 @@ class TasksHubScreen extends ConsumerWidget {
                       for (var i = 0; i < copy.length; i++) {
                         final row = copy[i];
                         if (row.task.orderIndex == i) continue;
-                        await planning.upsertTask(_hubTaskWithOrderIndex(row, i));
+                        await planning.upsertTask(
+                          _hubTaskWithOrderIndex(row, i),
+                        );
                       }
                       // migrated to coordinator
                       await ScheduleMutationCoordinator.instance.run(
                         TaskUpdatedMutation(
-                          entityId: copy.isNotEmpty ? copy.first.task.id : 'tasks_hub_reorder',
+                          entityId: copy.isNotEmpty
+                              ? copy.first.task.id
+                              : 'tasks_hub_reorder',
                           sourceContext: 'tasks_hub.drag_reorder',
                           dateStr: copy.isNotEmpty
-                              ? (copy.first.task.planDateKey ?? DateKeys.todayKey())
+                              ? (copy.first.task.planDateKey ??
+                                    DateKeys.todayKey())
                               : DateKeys.todayKey(),
                         ),
                         commitOverride: () async {},
@@ -233,11 +252,17 @@ class TasksHubScreen extends ConsumerWidget {
                           onEdit: () {
                             _openEditTask(context, ref, row);
                           },
-                          onCompleteNow: () => completePlannedTaskRow(context, ref, row,
-                              sourceSurface: 'tasks_hub',
-                              sourceContext: 'tasks_hub.complete'),
-                          onPlansChanged: () => promptPlansChangedForRow(context, ref, row),
-                          onDelete: () => confirmDeletePlannedTask(context, ref, row),
+                          onCompleteNow: () => completePlannedTaskRow(
+                            context,
+                            ref,
+                            row,
+                            sourceSurface: 'tasks_hub',
+                            sourceContext: 'tasks_hub.complete',
+                          ),
+                          onPlansChanged: () =>
+                              promptPlansChangedForRow(context, ref, row),
+                          onDelete: () =>
+                              confirmDeletePlannedTask(context, ref, row),
                         ),
                     ],
                   );
@@ -246,10 +271,16 @@ class TasksHubScreen extends ConsumerWidget {
                   padding: EdgeInsets.all(24),
                   child: Center(child: CircularProgressIndicator()),
                 ),
-                error: (e, _) => Text('Could not load: $e', style: TextStyle(color: Colors.red.shade200)),
+                error: (e, _) => Text(
+                  'Could not load: $e',
+                  style: TextStyle(color: Colors.red.shade200),
+                ),
               ),
               const SizedBox(height: 28),
-              const Text('Open on other days', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const Text(
+                'Open on other days',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 8),
               otherAsync.when(
                 data: (rows) {
@@ -270,17 +301,24 @@ class TasksHubScreen extends ConsumerWidget {
                           onEdit: () {
                             _openEditTask(context, ref, row);
                           },
-                          onCompleteNow: () => completePlannedTaskRow(context, ref, row,
-                              sourceSurface: 'tasks_hub',
-                              sourceContext: 'tasks_hub.complete'),
-                          onPlansChanged: () => promptPlansChangedForRow(context, ref, row),
-                          onDelete: () => confirmDeletePlannedTask(context, ref, row),
+                          onCompleteNow: () => completePlannedTaskRow(
+                            context,
+                            ref,
+                            row,
+                            sourceSurface: 'tasks_hub',
+                            sourceContext: 'tasks_hub.complete',
+                          ),
+                          onPlansChanged: () =>
+                              promptPlansChangedForRow(context, ref, row),
+                          onDelete: () =>
+                              confirmDeletePlannedTask(context, ref, row),
                         ),
                     ],
                   );
                 },
                 loading: () => const SizedBox.shrink(),
-                error: (e, _) => Text('$e', style: TextStyle(color: Colors.red.shade200)),
+                error: (e, _) =>
+                    Text('$e', style: TextStyle(color: Colors.red.shade200)),
               ),
             ],
           ),
@@ -336,7 +374,10 @@ class _HubTaskTile extends StatelessWidget {
       child: ListTile(
         onTap: () => _openDetails(context),
         title: Text(t.title),
-        subtitle: Text(subtitle.toString(), style: const TextStyle(color: Colors.white54, fontSize: 12)),
+        subtitle: Text(
+          subtitle.toString(),
+          style: const TextStyle(color: Colors.white54, fontSize: 12),
+        ),
         trailing: PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert),
           onSelected: (value) {
@@ -350,7 +391,10 @@ class _HubTaskTile extends StatelessWidget {
             PopupMenuItem(value: 'details', child: Text('Details')),
             PopupMenuItem(value: 'edit', child: Text('Edit')),
             PopupMenuItem(value: 'complete', child: Text('Complete now')),
-            PopupMenuItem(value: 'plans_changed', child: Text('Plans Changed?')),
+            PopupMenuItem(
+              value: 'plans_changed',
+              child: Text('Plans Changed?'),
+            ),
             PopupMenuItem(value: 'delete', child: Text('Delete')),
           ],
         ),

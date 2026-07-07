@@ -19,7 +19,10 @@ class OfflineSyncQueue {
     if (raw.trim().isEmpty) return const [];
     final arr = jsonDecode(raw) as List<dynamic>;
     return arr
-        .map((it) => OfflineOperation.fromMap(Map<String, dynamic>.from(it as Map)))
+        .map(
+          (it) =>
+              OfflineOperation.fromMap(Map<String, dynamic>.from(it as Map)),
+        )
         .toList();
   }
 

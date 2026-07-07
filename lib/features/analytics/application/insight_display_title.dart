@@ -41,10 +41,7 @@ Future<List<GeneratedInsight>> enrichInsightsWithDisplayTitles({
         detectedAtMs: insight.detectedAtMs,
         sourceWindowStartDateKey: insight.sourceWindowStartDateKey,
         sourceWindowEndDateKey: insight.sourceWindowEndDateKey,
-        metadata: <String, dynamic>{
-          ...insight.metadata,
-          'displayTitle': title,
-        },
+        metadata: <String, dynamic>{...insight.metadata, 'displayTitle': title},
         schemaVersion: insight.schemaVersion,
       ),
     );

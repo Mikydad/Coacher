@@ -27,16 +27,14 @@ abstract class WeeklyCommitmentRepository {
 class FirestoreWeeklyCommitmentRepository
     implements WeeklyCommitmentRepository {
   FirestoreWeeklyCommitmentRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
   CollectionReference<Map<String, dynamic>> _col(String circleId) =>
-      _firestore
-          .collection(FirestorePaths.circleWeeklyCommitments(circleId));
+      _firestore.collection(FirestorePaths.circleWeeklyCommitments(circleId));
 
-  static WeeklyCommitment _fromDoc(
-      DocumentSnapshot<Map<String, dynamic>> doc) {
+  static WeeklyCommitment _fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = Map<String, dynamic>.from(doc.data() ?? {});
     data['id'] = doc.id;
     return WeeklyCommitment.fromMap(data);
@@ -52,10 +50,7 @@ class FirestoreWeeklyCommitmentRepository
     // Firestore composite index (deploy-time config that silently breaks the
     // whole commitments tab when missing). Sort client-side instead; a
     // circle's commitments for one week are a handful of rows.
-    return _col(circleId)
-        .where('weekKey', isEqualTo: key)
-        .snapshots()
-        .map((s) {
+    return _col(circleId).where('weekKey', isEqualTo: key).snapshots().map((s) {
       final list = s.docs.map(_fromDoc).toList()
         ..sort((a, b) => a.updatedAtMs.compareTo(b.updatedAtMs));
       return list;

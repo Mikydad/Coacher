@@ -35,9 +35,7 @@ class CoachingStyleService {
     final existing = await _repository.getProfile();
     final base = existing ?? _defaultProfile(nowMs);
     final withStyle = base.withStyleChange(style, nowMs);
-    final withOnboarding = withStyle.copyWith(
-      onboardingCompletedAtMs: nowMs,
-    );
+    final withOnboarding = withStyle.copyWith(onboardingCompletedAtMs: nowMs);
     await _repository.upsertProfile(withOnboarding);
   }
 

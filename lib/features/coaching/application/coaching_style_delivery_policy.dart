@@ -22,10 +22,7 @@ abstract final class CoachingStyleDeliveryPolicy {
   /// [consecutiveIgnoredCount] is the number of consecutive notifications
   /// for this entity that were delivered but received no interaction (no tap,
   /// snooze, or dismiss) before the [kIgnoredTimeoutMinutes] window elapsed.
-  static bool shouldBackOff(
-    CoachingStyle style,
-    int consecutiveIgnoredCount,
-  ) {
+  static bool shouldBackOff(CoachingStyle style, int consecutiveIgnoredCount) {
     return switch (style) {
       CoachingStyle.supportive => consecutiveIgnoredCount >= 2,
       CoachingStyle.balanced => false,

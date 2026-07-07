@@ -8,8 +8,14 @@ import 'lww_updated_at.dart';
 ///
 /// Returns true when the incoming row was applied (local row was older or
 /// absent), false when the merge was a no-op.
-Future<bool> mergePlannedTaskLwwIntoIsar(Isar isar, PlannedTask incoming) async {
-  final existing = await isar.isarTasks.filter().taskIdEqualTo(incoming.id).findFirst();
+Future<bool> mergePlannedTaskLwwIntoIsar(
+  Isar isar,
+  PlannedTask incoming,
+) async {
+  final existing = await isar.isarTasks
+      .filter()
+      .taskIdEqualTo(incoming.id)
+      .findFirst();
   if (!shouldApplyRemoteUpdatedAt(
     localUpdatedAtMs: existing?.updatedAtMs,
     remoteUpdatedAtMs: incoming.updatedAtMs,

@@ -92,7 +92,9 @@ class AccountabilityCircle {
       description: map['description'] as String?,
       category: map['category'] as String? ?? '',
       joinPolicy: JoinPolicyStorage.fromStorage(map['joinPolicy'] as String?),
-      visibility: CircleVisibilityStorage.fromStorage(map['visibility'] as String?),
+      visibility: CircleVisibilityStorage.fromStorage(
+        map['visibility'] as String?,
+      ),
       creatorId: map['creatorId'] as String? ?? '',
       moderatorIds: List<String>.from(map['moderatorIds'] as List? ?? []),
       memberCount: (map['memberCount'] as num?)?.toInt() ?? 0,

@@ -55,10 +55,8 @@ class AiClientException implements Exception {
 /// }
 /// ```
 class ProxyCoachingAiClient implements CoachingAiClient {
-  ProxyCoachingAiClient({
-    AiProxyClient? proxy,
-    this.timeoutSeconds = 15,
-  }) : _proxy = proxy ?? AiProxyClient();
+  ProxyCoachingAiClient({AiProxyClient? proxy, this.timeoutSeconds = 15})
+    : _proxy = proxy ?? AiProxyClient();
 
   final AiProxyClient _proxy;
   final int timeoutSeconds;
@@ -233,7 +231,8 @@ class MockCoachingAiClient implements CoachingAiClient {
       focusId: payload.focusId,
       summaryType: payload.summaryType,
       tone: expectedToneForFraming(payload.framing),
-      dailySummary: '[mock] Coaching summary for focus: ${payload.focusReason}.',
+      dailySummary:
+          '[mock] Coaching summary for focus: ${payload.focusReason}.',
       mainRecommendation: '[mock] Take the next planned action.',
       framing: payload.framing,
       generatedAtMs: payload.generatedAtMs,

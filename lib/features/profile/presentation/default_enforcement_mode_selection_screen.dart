@@ -64,11 +64,13 @@ class _DefaultEnforcementModeSelectionScreenState
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: EnforcementMode.values
-                    .map((mode) => _ModeTile(
-                          mode: mode,
-                          selected: _selected == mode,
-                          onTap: () => setState(() => _selected = mode),
-                        ))
+                    .map(
+                      (mode) => _ModeTile(
+                        mode: mode,
+                        selected: _selected == mode,
+                        onTap: () => setState(() => _selected = mode),
+                      ),
+                    )
                     .toList(),
               ),
             ),
@@ -130,9 +132,7 @@ class _ModeTile extends StatelessWidget {
                   Text(
                     mode.displayName,
                     style: theme.textTheme.titleSmall?.copyWith(
-                      color: selected
-                          ? cs.onPrimaryContainer
-                          : cs.onSurface,
+                      color: selected ? cs.onPrimaryContainer : cs.onSurface,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -148,8 +148,7 @@ class _ModeTile extends StatelessWidget {
                 ],
               ),
             ),
-            if (selected)
-              Icon(Icons.check_circle_rounded, color: cs.primary),
+            if (selected) Icon(Icons.check_circle_rounded, color: cs.primary),
           ],
         ),
       ),

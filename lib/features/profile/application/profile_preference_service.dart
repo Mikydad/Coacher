@@ -66,9 +66,7 @@ class ProfilePreferenceService {
   }
 
   Future<coaching_notify_policy.CoachingInsightNotificationSendEvaluation>
-  evaluateCoachingInsightNotificationSend({
-    DateTime? now,
-  }) async {
+  evaluateCoachingInsightNotificationSend({DateTime? now}) async {
     final ts = now ?? _now();
     final existing = await _repository.getPreference();
     final base = existing ?? _defaultPreference(ts.millisecondsSinceEpoch);

@@ -37,11 +37,11 @@ class TaskDetailArgs {
   final String dateKey;
 
   static TaskDetailArgs fromRow(PlannedTaskRow row) => TaskDetailArgs(
-        taskId: row.task.id,
-        routineId: row.routineId,
-        blockId: row.blockId,
-        dateKey: row.dateKey,
-      );
+    taskId: row.task.id,
+    routineId: row.routineId,
+    blockId: row.blockId,
+    dateKey: row.dateKey,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -67,41 +67,41 @@ class TaskDetailBundle {
 /// (via [TaskDetailArgs.==]) keeps one provider instance per task page.
 final taskDetailProvider = FutureProvider.autoDispose
     .family<TaskDetailBundle?, TaskDetailArgs>((ref, args) async {
-  final repo = ref.watch(planningRepositoryProvider);
+      final repo = ref.watch(planningRepositoryProvider);
 
-  final tasks = await repo.getTasks(
-    routineId: args.routineId,
-    blockId: args.blockId,
-  );
-  PlannedTask? task;
-  for (final t in tasks) {
-    if (t.id == args.taskId) {
-      task = t;
-      break;
-    }
-  }
-  if (task == null) return null;
+      final tasks = await repo.getTasks(
+        routineId: args.routineId,
+        blockId: args.blockId,
+      );
+      PlannedTask? task;
+      for (final t in tasks) {
+        if (t.id == args.taskId) {
+          task = t;
+          break;
+        }
+      }
+      if (task == null) return null;
 
-  Routine? routine;
-  final routines = await repo.getRoutinesForDate(args.dateKey);
-  for (final r in routines) {
-    if (r.id == args.routineId) {
-      routine = r;
-      break;
-    }
-  }
+      Routine? routine;
+      final routines = await repo.getRoutinesForDate(args.dateKey);
+      for (final r in routines) {
+        if (r.id == args.routineId) {
+          routine = r;
+          break;
+        }
+      }
 
-  TaskBlock? block;
-  final blocks = await repo.getBlocks(args.routineId);
-  for (final b in blocks) {
-    if (b.id == args.blockId) {
-      block = b;
-      break;
-    }
-  }
+      TaskBlock? block;
+      final blocks = await repo.getBlocks(args.routineId);
+      for (final b in blocks) {
+        if (b.id == args.blockId) {
+          block = b;
+          break;
+        }
+      }
 
-  return TaskDetailBundle(task: task, routine: routine, block: block);
-});
+      return TaskDetailBundle(task: task, routine: routine, block: block);
+    });
 
 class TaskDetailScreen extends ConsumerWidget {
   const TaskDetailScreen({super.key, required this.args});
@@ -111,11 +111,11 @@ class TaskDetailScreen extends ConsumerWidget {
   final TaskDetailArgs args;
 
   PlannedTaskRow _rowFor(PlannedTask task) => PlannedTaskRow(
-        dateKey: args.dateKey,
-        routineId: args.routineId,
-        blockId: args.blockId,
-        task: task,
-      );
+    dateKey: args.dateKey,
+    routineId: args.routineId,
+    blockId: args.blockId,
+    task: task,
+  );
 
   Future<void> _openEdit(BuildContext context, WidgetRef ref) async {
     await Navigator.pushNamed(
@@ -155,9 +155,9 @@ class TaskDetailScreen extends ConsumerWidget {
     );
     ref.invalidate(taskDetailProvider(args));
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Task completed.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Task completed.')));
     }
   }
 
@@ -198,7 +198,9 @@ class TaskDetailScreen extends ConsumerWidget {
 
     ref.read(activeExecutionTaskIdProvider.notifier).state = task.id;
     ref.read(activeExecutionTaskLabelProvider.notifier).state = task.title;
-    ref.read(executionControllerProvider.notifier).setTask(
+    ref
+        .read(executionControllerProvider.notifier)
+        .setTask(
           id: task.id,
           label: task.title,
           durationMinutes: taskHasFocusDuration(task.durationMinutes)
@@ -389,8 +391,9 @@ class TaskDetailScreen extends ConsumerWidget {
                       foregroundColor: Colors.black,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    onPressed:
-                        completed ? null : () => _startFocus(context, ref, task),
+                    onPressed: completed
+                        ? null
+                        : () => _startFocus(context, ref, task),
                     icon: const Icon(Icons.play_arrow_rounded),
                     label: Text(completed ? 'Completed' : 'Start focus'),
                   ),
@@ -403,8 +406,9 @@ class TaskDetailScreen extends ConsumerWidget {
                       side: const BorderSide(color: AppColors.accentDeep),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    onPressed:
-                        completed ? null : () => _complete(context, ref, task),
+                    onPressed: completed
+                        ? null
+                        : () => _complete(context, ref, task),
                     icon: const Icon(Icons.check_rounded),
                     label: const Text('Mark done'),
                   ),
@@ -468,39 +472,53 @@ String _timestampLabel(int ms) {
   if (ms <= 0) return '—';
   final dt = DateTime.fromMillisecondsSinceEpoch(ms).toLocal();
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return '${months[dt.month - 1]} ${dt.day}, ${dt.year} · '
       '${_clockLabel(dt.hour, dt.minute)}';
 }
 
 String _priorityLabel(int priority) => switch (priority) {
-      1 => 'P1 · Highest',
-      2 => 'P2 · High',
-      3 => 'P3 · Normal',
-      4 => 'P4 · Low',
-      _ => 'P5 · Lowest',
-    };
+  1 => 'P1 · Highest',
+  2 => 'P2 · High',
+  3 => 'P3 · Normal',
+  4 => 'P4 · Low',
+  _ => 'P5 · Lowest',
+};
 
 /// Effective mode + where it came from, matching [EffectiveTaskMode]
 /// precedence (task override → routine → app default).
 String _modeLabel(PlannedTask task, Routine? routine) {
-  final effective =
-      EffectiveTaskMode.effectiveModeRefId(task: task, routine: routine);
+  final effective = EffectiveTaskMode.effectiveModeRefId(
+    task: task,
+    routine: routine,
+  );
   final name = effective[0].toUpperCase() + effective.substring(1);
   final taskRaw = task.modeRefId?.trim().toLowerCase();
   final source = (taskRaw != null && taskRaw == effective)
       ? 'set on task'
       : routine != null
-          ? 'from routine'
-          : 'default';
+      ? 'from routine'
+      : 'default';
   return '$name · $source';
 }
 
 Color _modeColor(PlannedTask task, Routine? routine) {
-  final effective =
-      EffectiveTaskMode.effectiveModeRefId(task: task, routine: routine);
+  final effective = EffectiveTaskMode.effectiveModeRefId(
+    task: task,
+    routine: routine,
+  );
   return switch (effective) {
     'extreme' => AppColors.danger,
     'disciplined' => AppColors.cyan,
@@ -516,11 +534,11 @@ class _StatusHeader extends StatelessWidget {
   final PlannedTask task;
 
   (String, Color) get _statusChip => switch (task.status) {
-        TaskStatus.completed => ('COMPLETED', AppColors.accent),
-        TaskStatus.inProgress => ('IN PROGRESS', AppColors.cyan),
-        TaskStatus.partial => ('PARTIAL', AppColors.amber),
-        TaskStatus.notStarted => ('NOT STARTED', AppColors.textMuted),
-      };
+    TaskStatus.completed => ('COMPLETED', AppColors.accent),
+    TaskStatus.inProgress => ('IN PROGRESS', AppColors.cyan),
+    TaskStatus.partial => ('PARTIAL', AppColors.amber),
+    TaskStatus.notStarted => ('NOT STARTED', AppColors.textMuted),
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -534,7 +552,10 @@ class _StatusHeader extends StatelessWidget {
           children: [
             _Pill(label: statusLabel, color: statusColor),
             if ((task.category ?? '').isNotEmpty)
-              _Pill(label: task.category!.toUpperCase(), color: AppColors.textMuted),
+              _Pill(
+                label: task.category!.toUpperCase(),
+                color: AppColors.textMuted,
+              ),
           ],
         ),
         const SizedBox(height: 12),

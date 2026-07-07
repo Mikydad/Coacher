@@ -1,12 +1,5 @@
 /// The type of context override currently active.
-enum ContextOverride {
-  none,
-  meeting,
-  focus,
-  sleep,
-  vacation,
-  doNotDisturb,
-}
+enum ContextOverride { none, meeting, focus, sleep, vacation, doNotDisturb }
 
 ContextOverride contextOverrideFromStorage(String? raw) {
   for (final v in ContextOverride.values) {

@@ -33,8 +33,9 @@ import 'schedule_optimisation_service.dart';
 // ─── AI client ────────────────────────────────────────────────────────────────
 
 /// Async because [buildAiOperatingLayerClient] fetches Remote Config.
-final aiOperatingLayerClientProvider =
-    FutureProvider<AiOperatingLayerClient>((ref) async {
+final aiOperatingLayerClientProvider = FutureProvider<AiOperatingLayerClient>((
+  ref,
+) async {
   final planning = ref.read(planningRepositoryProvider);
   return buildAiOperatingLayerClient(
     toolRunner: AiCoachToolRunner(
@@ -103,8 +104,9 @@ final aiConflictDetectorProvider = Provider<AiConflictDetector>((ref) {
 
 // ─── Chat suggestion enricher ─────────────────────────────────────────────────
 
-final aiChatSuggestionEnricherProvider =
-    Provider<AiChatSuggestionEnricher>((ref) {
+final aiChatSuggestionEnricherProvider = Provider<AiChatSuggestionEnricher>((
+  ref,
+) {
   return AiChatSuggestionEnricher(
     proactiveEngine: ref.read(proactiveSuggestionEngineProvider),
     dismissedRepo: ref.read(dismissedSuggestionRepositoryProvider),
@@ -130,7 +132,9 @@ final aiIntentParserProvider = FutureProvider<AiIntentParser>((ref) async {
 
 // ─── Batch repository provider ────────────────────────────────────────────────
 
-final aiActionBatchRepositoryProvider = Provider<AiActionBatchRepository>((ref) {
+final aiActionBatchRepositoryProvider = Provider<AiActionBatchRepository>((
+  ref,
+) {
   return AiActionBatchRepository(OfflineStore.instance.isar!);
 });
 
@@ -155,8 +159,9 @@ final canUndoLastAiBatchProvider = FutureProvider<bool>((ref) async {
 });
 
 /// Recent AI batch history — last 5 batches, newest first.
-final recentAiBatchesProvider =
-    FutureProvider<List<IsarAiActionBatch>>((ref) async {
+final recentAiBatchesProvider = FutureProvider<List<IsarAiActionBatch>>((
+  ref,
+) async {
   // Rebuild on account switch so cached values never leak across users.
   ref.watch(authUidProvider);
   return ref.read(aiActionBatchRepositoryProvider).listRecent();
@@ -187,43 +192,45 @@ final aiActionExecutorProvider = Provider<AiActionExecutor>((ref) {
 /// [ChangeNotifierProvider] so the UI can listen to fine-grained state updates
 /// without rebuilding the whole screen on every notifyListeners call.
 final aiAssistantServiceProvider =
-    ChangeNotifierProvider.family<AiAssistantService, AiIntentParser>(
-  (ref, parser) {
-    final analyticsRepo = ref.read(analyticsRepositoryProvider);
-    final assembler = ref.read(aiPayloadAssemblerProvider);
-    return AiAssistantService(
-      intentParser: parser,
-      actionExecutor: ref.read(aiActionExecutorProvider),
-      historyRepository: ref.read(aiInteractionHistoryRepositoryProvider),
-      onScheduleMutated: assembler.invalidateSessionCache,
-      analyticsLogger: (eventName, props) {
-        final type = AnalyticsEventType.values.firstWhere(
-          (e) => e.name == eventName,
-          orElse: () => AnalyticsEventType.aiCommandSubmitted,
-        );
-        final event = AnalyticsEvent(
-          id: StableId.generate('ai_evt'),
-          type: type,
-          entityId: props['sessionId']?.toString() ?? 'ai',
-          entityKind: 'aiSession',
-          dateKey: DateKeys.todayKey(),
-          timestampLocalIso: DateTime.now().toIso8601String(),
-          sourceSurface: 'coach_ai',
-          idempotencyKey: StableId.generate('ai_evt_idem'),
-          createdAtMs: DateTime.now().millisecondsSinceEpoch,
-          updatedAtMs: DateTime.now().millisecondsSinceEpoch,
-        );
-        analyticsRepo.logEvent(event);
-      },
-    );
-  },
-);
+    ChangeNotifierProvider.family<AiAssistantService, AiIntentParser>((
+      ref,
+      parser,
+    ) {
+      final analyticsRepo = ref.read(analyticsRepositoryProvider);
+      final assembler = ref.read(aiPayloadAssemblerProvider);
+      return AiAssistantService(
+        intentParser: parser,
+        actionExecutor: ref.read(aiActionExecutorProvider),
+        historyRepository: ref.read(aiInteractionHistoryRepositoryProvider),
+        onScheduleMutated: assembler.invalidateSessionCache,
+        analyticsLogger: (eventName, props) {
+          final type = AnalyticsEventType.values.firstWhere(
+            (e) => e.name == eventName,
+            orElse: () => AnalyticsEventType.aiCommandSubmitted,
+          );
+          final event = AnalyticsEvent(
+            id: StableId.generate('ai_evt'),
+            type: type,
+            entityId: props['sessionId']?.toString() ?? 'ai',
+            entityKind: 'aiSession',
+            dateKey: DateKeys.todayKey(),
+            timestampLocalIso: DateTime.now().toIso8601String(),
+            sourceSurface: 'coach_ai',
+            idempotencyKey: StableId.generate('ai_evt_idem'),
+            createdAtMs: DateTime.now().millisecondsSinceEpoch,
+            updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+          );
+          analyticsRepo.logEvent(event);
+        },
+      );
+    });
 
 /// Convenience provider that resolves the async parser and returns the service.
 /// The screen should watch this; while loading it shows the READY pill as
 /// "LOADING" or a skeleton.
-final resolvedAiAssistantProvider =
-    FutureProvider<AiAssistantService>((ref) async {
+final resolvedAiAssistantProvider = FutureProvider<AiAssistantService>((
+  ref,
+) async {
   final parser = await ref.watch(aiIntentParserProvider.future);
   return ref.watch(aiAssistantServiceProvider(parser));
 });
@@ -232,23 +239,24 @@ final resolvedAiAssistantProvider =
 
 final dismissedSuggestionRepositoryProvider =
     Provider<DismissedSuggestionRepository>((ref) {
-  return DismissedSuggestionRepository();
-});
+      return DismissedSuggestionRepository();
+    });
 
 // ─── Schedule optimisation service ───────────────────────────────────────────
 
 final scheduleOptimisationServiceProvider =
     Provider<ScheduleOptimisationService>((ref) {
-  return ScheduleOptimisationService(
-    planningRepository: ref.read(planningRepositoryProvider),
-    reminderRepository: ref.read(reminderRepositoryProvider),
-  );
-});
+      return ScheduleOptimisationService(
+        planningRepository: ref.read(planningRepositoryProvider),
+        reminderRepository: ref.read(reminderRepositoryProvider),
+      );
+    });
 
 // ─── Proactive suggestion engine ──────────────────────────────────────────────
 
-final proactiveSuggestionEngineProvider =
-    Provider<ProactiveSuggestionEngine>((ref) {
+final proactiveSuggestionEngineProvider = Provider<ProactiveSuggestionEngine>((
+  ref,
+) {
   return ProactiveSuggestionEngine(
     planningRepository: ref.read(planningRepositoryProvider),
     goalsRepository: ref.read(goalsRepositoryProvider),
@@ -261,8 +269,9 @@ final proactiveSuggestionEngineProvider =
 
 /// [FutureProvider] that triggers [ProactiveSuggestionEngine.generateForToday].
 /// Invalidated on task mutation and app foreground events.
-final proactiveSuggestionsProvider =
-    FutureProvider<List<ProactiveSuggestion>>((ref) async {
+final proactiveSuggestionsProvider = FutureProvider<List<ProactiveSuggestion>>((
+  ref,
+) async {
   final engine = ref.read(proactiveSuggestionEngineProvider);
   return engine.generateForToday();
 });
@@ -271,8 +280,7 @@ final proactiveSuggestionsProvider =
 
 /// Tracks the date key on which the Coach screen was last opened.
 /// Used by the morning brief to ensure the snackbar is only shown once per day.
-final coachLastOpenedDateKeyProvider =
-    StateProvider<String?>((ref) => null);
+final coachLastOpenedDateKeyProvider = StateProvider<String?>((ref) => null);
 
 // ─── Proactive analytics helper ───────────────────────────────────────────────
 

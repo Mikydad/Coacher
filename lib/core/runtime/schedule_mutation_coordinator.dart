@@ -15,7 +15,7 @@ class MutationResult {
 
   const MutationResult.ok() : this(success: true);
   const MutationResult.failed(String message)
-      : this(success: false, errorMessage: message);
+    : this(success: false, errorMessage: message);
 
   final bool success;
   final String? errorMessage;
@@ -72,7 +72,9 @@ class ScheduleMutationCoordinator {
     // ── 1. Validate ──────────────────────────────────────────────────────────
     final validationError = _validate(request);
     if (validationError != null) {
-      debugPrint('[ScheduleMutationCoordinator] validation failed: $validationError');
+      debugPrint(
+        '[ScheduleMutationCoordinator] validation failed: $validationError',
+      );
       return MutationResult.failed(validationError);
     }
 
@@ -190,7 +192,8 @@ class ScheduleMutationCoordinator {
       TaskDeferredMutation() => RecomputeScope.forTaskDeferred(),
       TimeBlockChangedMutation() => RecomputeScope.forTimeBlockChange(),
       ReminderChangedMutation() => RecomputeScope.forReminderChange(),
-      ContextOverrideChangedMutation() => RecomputeScope.forContextOverrideChange(),
+      ContextOverrideChangedMutation() =>
+        RecomputeScope.forContextOverrideChange(),
       GoalChangedMutation() => RecomputeScope.forGoalChange(),
     };
   }
@@ -200,24 +203,58 @@ class ScheduleMutationCoordinator {
   ScheduleDomainEvent? _eventFor(MutationRequest request) {
     final now = DateTime.now().millisecondsSinceEpoch;
     return switch (request) {
-      TaskCreatedMutation(:final entityId, :final dateStr) =>
-        TaskCreatedEvent(entityId: entityId, occurredAtMs: now, dateStr: dateStr),
-      TaskUpdatedMutation(:final entityId, :final dateStr) =>
-        TaskUpdatedEvent(entityId: entityId, occurredAtMs: now, dateStr: dateStr),
-      TaskDeletedMutation(:final entityId, :final dateStr) =>
-        TaskDeletedEvent(entityId: entityId, occurredAtMs: now, dateStr: dateStr),
+      TaskCreatedMutation(:final entityId, :final dateStr) => TaskCreatedEvent(
+        entityId: entityId,
+        occurredAtMs: now,
+        dateStr: dateStr,
+      ),
+      TaskUpdatedMutation(:final entityId, :final dateStr) => TaskUpdatedEvent(
+        entityId: entityId,
+        occurredAtMs: now,
+        dateStr: dateStr,
+      ),
+      TaskDeletedMutation(:final entityId, :final dateStr) => TaskDeletedEvent(
+        entityId: entityId,
+        occurredAtMs: now,
+        dateStr: dateStr,
+      ),
       TaskCompletedMutation(:final entityId, :final dateStr) =>
-        TaskCompletedEvent(entityId: entityId, occurredAtMs: now, dateStr: dateStr),
-      TaskDeferredMutation(:final entityId, :final fromDateStr, :final toDateStr) =>
-        TaskDeferredEvent(entityId: entityId, occurredAtMs: now, fromDateStr: fromDateStr, toDateStr: toDateStr),
+        TaskCompletedEvent(
+          entityId: entityId,
+          occurredAtMs: now,
+          dateStr: dateStr,
+        ),
+      TaskDeferredMutation(
+        :final entityId,
+        :final fromDateStr,
+        :final toDateStr,
+      ) =>
+        TaskDeferredEvent(
+          entityId: entityId,
+          occurredAtMs: now,
+          fromDateStr: fromDateStr,
+          toDateStr: toDateStr,
+        ),
       TimeBlockChangedMutation(:final entityId, :final dateStr) =>
-        TimeBlockChangedEvent(entityId: entityId, occurredAtMs: now, dateStr: dateStr),
-      ReminderChangedMutation(:final entityId) =>
-        ReminderChangedEvent(entityId: entityId, occurredAtMs: now),
+        TimeBlockChangedEvent(
+          entityId: entityId,
+          occurredAtMs: now,
+          dateStr: dateStr,
+        ),
+      ReminderChangedMutation(:final entityId) => ReminderChangedEvent(
+        entityId: entityId,
+        occurredAtMs: now,
+      ),
       ContextOverrideChangedMutation(:final entityId, :final overrideType) =>
-        ContextOverrideChangedEvent(entityId: entityId, occurredAtMs: now, overrideType: overrideType),
-      GoalChangedMutation(:final entityId) =>
-        FocusChangedEvent(entityId: entityId, occurredAtMs: now),
+        ContextOverrideChangedEvent(
+          entityId: entityId,
+          occurredAtMs: now,
+          overrideType: overrideType,
+        ),
+      GoalChangedMutation(:final entityId) => FocusChangedEvent(
+        entityId: entityId,
+        occurredAtMs: now,
+      ),
     };
   }
 

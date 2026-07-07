@@ -20,7 +20,10 @@ class FirestoreExecutionRepository implements ExecutionRepository {
   Future<List<TimerSession>> getSessionsForTask(String taskId) async {
     final snap = await FirebaseFirestore.instance
         .collection(FirestorePaths.timerSessions)
-        .where('targetType', isEqualTo: TimerSessionTargetType.task.storageValue)
+        .where(
+          'targetType',
+          isEqualTo: TimerSessionTargetType.task.storageValue,
+        )
         .where('taskId', isEqualTo: taskId)
         .get();
     final sessions =
@@ -33,7 +36,10 @@ class FirestoreExecutionRepository implements ExecutionRepository {
   Future<List<TimerSession>> getSessionsForBlock(String blockId) async {
     final snap = await FirebaseFirestore.instance
         .collection(FirestorePaths.timerSessions)
-        .where('targetType', isEqualTo: TimerSessionTargetType.block.storageValue)
+        .where(
+          'targetType',
+          isEqualTo: TimerSessionTargetType.block.storageValue,
+        )
         .where('blockId', isEqualTo: blockId)
         .get();
     final sessions =
@@ -48,7 +54,9 @@ class FirestoreExecutionRepository implements ExecutionRepository {
     final path = '${FirestorePaths.timerSessions}/${session.id}';
     final payload = session.toMap();
     try {
-      await FirebaseFirestore.instance.doc(path).set(payload, SetOptions(merge: true));
+      await FirebaseFirestore.instance
+          .doc(path)
+          .set(payload, SetOptions(merge: true));
     } catch (_) {
       await SyncService.instance.enqueueUpsert(
         entityType: 'timerSession',

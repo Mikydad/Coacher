@@ -280,7 +280,9 @@ DeliverySurface _targetSurfaceForPrimary({
     case DeliverySurface.progress:
       return preferredSurface;
     case DeliverySurface.notification:
-      return notifyEligible ? DeliverySurface.notification : DeliverySurface.home;
+      return notifyEligible
+          ? DeliverySurface.notification
+          : DeliverySurface.home;
     case DeliverySurface.none:
       return DeliverySurface.home;
   }

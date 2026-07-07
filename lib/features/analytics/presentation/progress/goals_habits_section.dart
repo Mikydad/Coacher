@@ -54,15 +54,9 @@ class GoalsHabitsSection extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              ProgressChip(
-                label: 'Today: ${(shownDay * 100).round()}%',
-              ),
-              ProgressChip(
-                label: 'Week: ${(shownWeek * 100).round()}%',
-              ),
-              ProgressChip(
-                label: 'Month: ${(shownMonth * 100).round()}%',
-              ),
+              ProgressChip(label: 'Today: ${(shownDay * 100).round()}%'),
+              ProgressChip(label: 'Week: ${(shownWeek * 100).round()}%'),
+              ProgressChip(label: 'Month: ${(shownMonth * 100).round()}%'),
               ProgressChip(
                 label:
                     'Streak: ${week.currentStreakDays}d (PB ${week.bestStreakDays}d)',

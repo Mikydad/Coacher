@@ -19,7 +19,9 @@ class CategoryChipRow extends ConsumerWidget {
 
     final categories = [
       (id: null, label: 'All'),
-      ...GoalCategories.all.map((id) => (id: id as String?, label: GoalCategories.label(id))),
+      ...GoalCategories.all.map(
+        (id) => (id: id as String?, label: GoalCategories.label(id)),
+      ),
     ];
 
     return SizedBox(
@@ -67,9 +69,7 @@ class _CategoryChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? AppColors.accent : AppColors.surfaceMuted,
           borderRadius: BorderRadius.circular(20),
-          border: selected
-              ? null
-              : Border.all(color: AppColors.dark2A2D32),
+          border: selected ? null : Border.all(color: AppColors.dark2A2D32),
         ),
         child: Text(
           label,

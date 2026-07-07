@@ -47,7 +47,9 @@ abstract final class EffectiveTaskMode {
     required PlannedTask task,
     Routine? routine,
   }) {
-    return routineModeFromRefId(effectiveModeRefId(task: task, routine: routine));
+    return routineModeFromRefId(
+      effectiveModeRefId(task: task, routine: routine),
+    );
   }
 
   static RoutineMode routineModeFromRefId(String refId) {

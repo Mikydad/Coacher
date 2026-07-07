@@ -38,10 +38,16 @@ StreakSummary computeStreakSummaryForEvents(
   final current = now ?? DateTime.now();
   final today = DateKeys.todayKey(current);
   final yesterday = DateKeys.yyyymmdd(
-    DateTime(current.year, current.month, current.day).subtract(const Duration(days: 1)),
+    DateTime(
+      current.year,
+      current.month,
+      current.day,
+    ).subtract(const Duration(days: 1)),
   );
 
-  final onlyOnTime = EnforcementModePolicy.onlyOnTimeCompletionsCountForStreak(enforcementMode);
+  final onlyOnTime = EnforcementModePolicy.onlyOnTimeCompletionsCountForStreak(
+    enforcementMode,
+  );
 
   final unique = <String>{};
   for (final event in events) {
@@ -60,7 +66,9 @@ StreakSummary computeStreakSummaryForEvents(
     );
   }
 
-  final gracePeriod = EnforcementModePolicy.missedDayGracePeriod(enforcementMode);
+  final gracePeriod = EnforcementModePolicy.missedDayGracePeriod(
+    enforcementMode,
+  );
   final sorted = unique.toList()..sort();
 
   // Compute longest streak respecting grace period.
@@ -88,7 +96,11 @@ StreakSummary computeStreakSummaryForEvents(
     // flexible: allow one missed day — anchor to day-before-yesterday if present.
     if (gracePeriod >= 1) {
       final dayBeforeYesterday = DateKeys.yyyymmdd(
-        DateTime(current.year, current.month, current.day).subtract(const Duration(days: 2)),
+        DateTime(
+          current.year,
+          current.month,
+          current.day,
+        ).subtract(const Duration(days: 2)),
       );
       anchorKey = keySet.contains(dayBeforeYesterday) ? dayBeforeYesterday : '';
     } else {
@@ -163,7 +175,11 @@ StreakSummary computeStreakSummaryWithVacationProtection(
   EnforcementMode enforcementMode = EnforcementMode.disciplined,
 }) {
   if (vacationState == null || !_hasVacationWindow(vacationState)) {
-    return computeStreakSummaryForEvents(events, now: now, enforcementMode: enforcementMode);
+    return computeStreakSummaryForEvents(
+      events,
+      now: now,
+      enforcementMode: enforcementMode,
+    );
   }
 
   // Build protected date keys: every date within the vacation window.

@@ -8,6 +8,7 @@ import '../ai_assistant_screen.dart';
 import 'proactive_suggestion_card.dart';
 
 import '../../../../core/presentation/app_colors.dart';
+import '../../../../core/presentation/async_value_ui.dart';
 
 /// Collapsible list of proactive suggestions at the top of the Coach screen.
 ///
@@ -51,7 +52,11 @@ class _ProactiveSuggestionsCoachPanelState
 
     return suggestionsAsync.when(
       loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
+      error: (e, _) => swallowedAsyncError(
+        'proactive_suggestions_coach_panel',
+        e,
+        const SizedBox.shrink(),
+      ),
       data: (all) {
         final active = activeProactiveSuggestions(all);
         if (active.isEmpty) return const SizedBox.shrink();
@@ -64,8 +69,10 @@ class _ProactiveSuggestionsCoachPanelState
               InkWell(
                 onTap: () => setState(() => _expanded = !_expanded),
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
                   child: Row(
                     children: [
                       const Text(
@@ -139,10 +146,7 @@ class _ProactiveSuggestionsCoachPanelState
 
 /// Link shown on Home when more than one suggestion exists.
 class SeeAllSuggestionsInCoachLink extends ConsumerWidget {
-  const SeeAllSuggestionsInCoachLink({
-    super.key,
-    required this.remainingCount,
-  });
+  const SeeAllSuggestionsInCoachLink({super.key, required this.remainingCount});
 
   final int remainingCount;
 

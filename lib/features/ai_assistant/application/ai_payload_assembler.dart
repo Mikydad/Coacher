@@ -31,8 +31,8 @@ class AiPayloadAssembler {
     this.profilePreferenceService,
     EntityNormaliser? normaliser,
     Duration scheduleCacheTtl = const Duration(seconds: 30),
-  })  : _normaliser = normaliser ?? const EntityNormaliser(),
-        _scheduleCacheTtl = scheduleCacheTtl;
+  }) : _normaliser = normaliser ?? const EntityNormaliser(),
+       _scheduleCacheTtl = scheduleCacheTtl;
 
   final PlanningRepository planningRepository;
   final GoalsRepository goalsRepository;
@@ -169,7 +169,9 @@ class AiPayloadAssembler {
     return windows.take(4).toList();
   }
 
-  Future<_CachedScheduleSlice> _scheduleSliceForSession(String sessionId) async {
+  Future<_CachedScheduleSlice> _scheduleSliceForSession(
+    String sessionId,
+  ) async {
     final cached = _scheduleCache[sessionId];
     if (cached != null && !cached.isExpired(_scheduleCacheTtl)) {
       return cached;
@@ -341,33 +343,27 @@ class AiPayloadAssembler {
       final endStr = endDt != null
           ? '${endDt.hour.toString().padLeft(2, '0')}:${endDt.minute.toString().padLeft(2, '0')}'
           : '?';
-      return {
-        'title': t.title,
-        'startTime': startStr,
-        'endTime': endStr,
-      };
+      return {'title': t.title, 'startTime': startStr, 'endTime': endStr};
     }).toList();
   }
 
   Future<List<Map<String, dynamic>>> _buildGoals() async {
     try {
       final goals = await goalsRepository.fetchGoalsOnce();
-      return goals
-          .where((g) => g.status == GoalStatus.active)
-          .take(5)
-          .map((g) {
-            final deadline = DateTime.fromMillisecondsSinceEpoch(g.periodEndMs)
-                .toLocal();
-            final deadlineStr =
-                '${deadline.year}-${deadline.month.toString().padLeft(2, '0')}-${deadline.day.toString().padLeft(2, '0')}';
-            return {
-              'title': g.title,
-              'target': '${g.targetValue.toStringAsFixed(0)} ${g.customLabel ?? g.measurementKind.name}',
-              'deadline': deadlineStr,
-              'category': g.categoryId,
-            };
-          })
-          .toList();
+      return goals.where((g) => g.status == GoalStatus.active).take(5).map((g) {
+        final deadline = DateTime.fromMillisecondsSinceEpoch(
+          g.periodEndMs,
+        ).toLocal();
+        final deadlineStr =
+            '${deadline.year}-${deadline.month.toString().padLeft(2, '0')}-${deadline.day.toString().padLeft(2, '0')}';
+        return {
+          'title': g.title,
+          'target':
+              '${g.targetValue.toStringAsFixed(0)} ${g.customLabel ?? g.measurementKind.name}',
+          'deadline': deadlineStr,
+          'category': g.categoryId,
+        };
+      }).toList();
     } catch (_) {
       return [];
     }
@@ -381,10 +377,12 @@ class AiPayloadAssembler {
       final progress = <Map<String, dynamic>>[];
 
       for (final g in active) {
-        final periodStart = DateTime.fromMillisecondsSinceEpoch(g.periodStartMs)
-            .toLocal();
-        final periodEnd = DateTime.fromMillisecondsSinceEpoch(g.periodEndMs)
-            .toLocal();
+        final periodStart = DateTime.fromMillisecondsSinceEpoch(
+          g.periodStartMs,
+        ).toLocal();
+        final periodEnd = DateTime.fromMillisecondsSinceEpoch(
+          g.periodEndMs,
+        ).toLocal();
 
         List<GoalCheckIn> checkIns;
         try {
@@ -464,7 +462,9 @@ class AiPayloadAssembler {
           final pref = await profilePreferenceService!.getPreference();
           defaultEnforcementMode =
               pref?.defaultEnforcementMode.name ?? 'disciplined';
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('ai_payload_assembler: swallowed error: $e');
+        }
       }
 
       // Compute behaviour stats from last 7 days
@@ -529,8 +529,7 @@ class AiPayloadAssembler {
         final topHour = hourCounts.entries
             .reduce((a, b) => a.value > b.value ? a : b)
             .key;
-        mostActiveHour =
-            '${topHour.toString().padLeft(2, '0')}:00';
+        mostActiveHour = '${topHour.toString().padLeft(2, '0')}:00';
       }
 
       String? mostUsedMode;
@@ -554,8 +553,10 @@ class AiPayloadAssembler {
     String sessionId,
   ) async {
     try {
-      final entries =
-          await historyRepository.getRecentForSession(sessionId, limit: 10);
+      final entries = await historyRepository.getRecentForSession(
+        sessionId,
+        limit: 10,
+      );
       // Build alternating user / assistant pairs for context
       final history = <Map<String, dynamic>>[];
       for (final e in entries.reversed) {
@@ -572,8 +573,10 @@ class AiPayloadAssembler {
   /// Summaries of plans already confirmed/executed in this Coach session.
   Future<List<String>> _buildCompletedInSession(String sessionId) async {
     try {
-      final entries =
-          await historyRepository.getRecentForSession(sessionId, limit: 10);
+      final entries = await historyRepository.getRecentForSession(
+        sessionId,
+        limit: 10,
+      );
       final lines = <String>[];
       for (final e in entries.reversed) {
         if (!e.executed) continue;
@@ -597,8 +600,10 @@ class AiPayloadAssembler {
     String sessionId,
   ) async {
     try {
-      final entries =
-          await historyRepository.getRecentForSession(sessionId, limit: 10);
+      final entries = await historyRepository.getRecentForSession(
+        sessionId,
+        limit: 10,
+      );
       final history = <Map<String, dynamic>>[];
       for (final e in entries.reversed) {
         history.add({'role': 'user', 'content': e.userInput});
@@ -664,7 +669,9 @@ class AiPayloadAssembler {
             categoryData[category] = existing.copyWith(
               count: existing.count + 1,
               // Keep most recent time (daysBack == 0 is today)
-              lastTime: daysBack == 0 ? (timeStr ?? existing.lastTime) : existing.lastTime,
+              lastTime: daysBack == 0
+                  ? (timeStr ?? existing.lastTime)
+                  : existing.lastTime,
               totalDuration: existing.totalDuration + task.durationMinutes,
               durationCount: existing.durationCount + 1,
             );
@@ -723,8 +730,7 @@ class _CachedScheduleSlice {
   final Map<String, dynamic> behaviorPreferences;
   final List<Map<String, dynamic>> recentPatterns;
 
-  bool isExpired(Duration ttl) =>
-      DateTime.now().difference(fetchedAt) > ttl;
+  bool isExpired(Duration ttl) => DateTime.now().difference(fetchedAt) > ttl;
 }
 
 // ─── Internal helper ──────────────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 
 import 'package:isar/isar.dart';
@@ -63,14 +64,18 @@ String decisionSnapshotId({
   return _snapshotId(scopeId: scopeId, surface: surface);
 }
 
-String _snapshotId({required String scopeId, required DeliverySurface surface}) =>
-    'delivery::decision::${surface.name}::$scopeId';
+String _snapshotId({
+  required String scopeId,
+  required DeliverySurface surface,
+}) => 'delivery::decision::${surface.name}::$scopeId';
 
 Map<String, dynamic> _decodePayload(String raw) {
   try {
     final decoded = jsonDecode(raw);
     if (decoded is Map<String, dynamic>) return decoded;
     if (decoded is Map) return decoded.cast<String, dynamic>();
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('isar_delivery_decision_snapshot: swallowed error: $e');
+  }
   return const <String, dynamic>{};
 }

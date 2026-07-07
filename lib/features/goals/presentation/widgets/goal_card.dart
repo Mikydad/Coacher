@@ -11,6 +11,7 @@ import '../../domain/models/user_goal.dart';
 import 'goal_counter_sheet.dart';
 
 import '../../../../core/presentation/app_colors.dart';
+import '../../../../core/presentation/async_value_ui.dart';
 
 /// Color per category, used as the card fill color.
 Color goalCategoryColor(String categoryId) {
@@ -38,7 +39,9 @@ class GoalCard extends ConsumerWidget {
     if (goal.colorHex != null && goal.colorHex!.length == 6) {
       try {
         return Color(int.parse('FF${goal.colorHex}', radix: 16));
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('goal_card: swallowed error: $e');
+      }
     }
     return goalCategoryColor(goal.categoryId);
   }
@@ -59,13 +62,13 @@ class GoalCard extends ConsumerWidget {
       MeasurementKind.sessions => 'sessions',
       MeasurementKind.count => 'count',
       MeasurementKind.distance => 'km',
-      MeasurementKind.custom => goal.measurementKind.displayLabel().toLowerCase(),
+      MeasurementKind.custom =>
+        goal.measurementKind.displayLabel().toLowerCase(),
     };
   }
 
-  String _formatValue(double v) => v == v.roundToDouble()
-      ? v.toInt().toString()
-      : v.toStringAsFixed(1);
+  String _formatValue(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
 
   String _targetLabel(double currentValue) {
     final current = _formatValue(currentValue);
@@ -73,8 +76,11 @@ class GoalCard extends ConsumerWidget {
     return '$current / $target $_unitLabel';
   }
 
-  Future<void> _quickIncrement(BuildContext context, WidgetRef ref,
-      GoalTodayProgress progress) async {
+  Future<void> _quickIncrement(
+    BuildContext context,
+    WidgetRef ref,
+    GoalTodayProgress progress,
+  ) async {
     final repo = ref.read(goalsRepositoryProvider);
     final dateKey = DateKeys.todayKey();
     final newValue = progress.currentValue + 1;
@@ -107,15 +113,19 @@ class GoalCard extends ConsumerWidget {
         onTap: () {},
         onQuickAdd: null,
       ),
-      error: (_, __) => _CardShell(
-        baseColor: _baseColor,
-        progress: 0,
-        goal: goal,
-        horizonLabel: _horizonLabel,
-        measurementLabel: _targetLabel(0),
-        metCommitment: false,
-        onTap: () {},
-        onQuickAdd: null,
+      error: (e, _) => swallowedAsyncError(
+        'goal_card',
+        e,
+        _CardShell(
+          baseColor: _baseColor,
+          progress: 0,
+          goal: goal,
+          horizonLabel: _horizonLabel,
+          measurementLabel: _targetLabel(0),
+          metCommitment: false,
+          onTap: () {},
+          onQuickAdd: null,
+        ),
       ),
       data: (p) => _CardShell(
         baseColor: _baseColor,
@@ -188,7 +198,9 @@ class _CardShell extends StatelessWidget {
                 widthFactor: progress.clamp(0.0, 1.0),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: fillColor.withValues(alpha: metCommitment ? 1.0 : 0.55),
+                    color: fillColor.withValues(
+                      alpha: metCommitment ? 1.0 : 0.55,
+                    ),
                     borderRadius: BorderRadius.circular(18),
                   ),
                 ),
@@ -235,8 +247,11 @@ class _CardShell extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (goal.intensity >= 4) ...[
-                        const Icon(Icons.local_fire_department,
-                            color: Colors.orange, size: 16),
+                        const Icon(
+                          Icons.local_fire_department,
+                          color: Colors.orange,
+                          size: 16,
+                        ),
                         Text(
                           '${goal.intensity}',
                           style: const TextStyle(
@@ -247,10 +262,7 @@ class _CardShell extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                       ],
-                      _ActionButton(
-                        done: metCommitment,
-                        onTap: onQuickAdd,
-                      ),
+                      _ActionButton(done: metCommitment, onTap: onQuickAdd),
                     ],
                   ),
                 ],

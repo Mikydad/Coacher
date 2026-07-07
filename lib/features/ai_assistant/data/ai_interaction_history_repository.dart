@@ -41,7 +41,9 @@ class AiInteractionHistoryRepository {
     final entry = IsarAiInteractionHistory()
       ..sessionId = sessionId
       ..userInput = userInput
-      ..parsedActionsJson = jsonEncode(parsedActions.map((a) => a.toJson()).toList())
+      ..parsedActionsJson = jsonEncode(
+        parsedActions.map((a) => a.toJson()).toList(),
+      )
       ..confirmed = false
       ..executed = false
       ..resolvedCategory = resolvedCategory
@@ -56,10 +58,7 @@ class AiInteractionHistoryRepository {
 
   /// Stores the assistant's execution summary for the most recent entry
   /// in [sessionId]. Used to build full conversationHistory for multi-turn context.
-  Future<void> saveAssistantSummary(
-    String sessionId,
-    String summary,
-  ) async {
+  Future<void> saveAssistantSummary(String sessionId, String summary) async {
     final entries = await _isar.isarAiInteractionHistorys
         .filter()
         .sessionIdEqualTo(sessionId)
@@ -75,10 +74,7 @@ class AiInteractionHistoryRepository {
 
   /// Updates the [resolvedCategory] for all entries in [sessionId].
   /// Called by [AiAssistantService] after successful plan execution.
-  Future<void> updateResolvedCategory(
-    String sessionId,
-    String category,
-  ) async {
+  Future<void> updateResolvedCategory(String sessionId, String category) async {
     final entries = await _isar.isarAiInteractionHistorys
         .filter()
         .sessionIdEqualTo(sessionId)

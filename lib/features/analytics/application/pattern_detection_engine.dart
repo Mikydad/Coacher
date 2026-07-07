@@ -103,8 +103,7 @@ List<_PatternCandidate> _detectStreakConsistency(
   final signal7d = layer1CompletionSignal7d(time);
 
   if (streak.missedLast2Days) {
-    final signal =
-        ((streak.missedCount7d / 7.0) + (1.0 - signal7d)) / 2.0;
+    final signal = ((streak.missedCount7d / 7.0) + (1.0 - signal7d)) / 2.0;
     final severity = computeHybridSeverity(
       patternCode: PatternCode.streakRisk,
       thresholdDistance: 1.0,
@@ -323,8 +322,7 @@ List<_PatternCandidate> _detectEffortDifficulty(
   }
 
   final lowEngagementTriggered =
-      effort.avgSnoozeCount > config.thresholds.avgSnoozeHigh &&
-      signal7d < 0.5;
+      effort.avgSnoozeCount > config.thresholds.avgSnoozeHigh && signal7d < 0.5;
   if (lowEngagementTriggered) {
     final completionDistance = normalizedDistance(
       value: signal7d,

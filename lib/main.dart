@@ -18,48 +18,50 @@ Future<void> main() async {
   if (kReleaseMode) {
     debugPrint = (String? message, {int? wrapWidth}) {};
   }
-  await runZonedGuarded<Future<void>>(() async {
-    WidgetsFlutterBinding.ensureInitialized();
-    final container = ProviderContainer();
-    appRootProviderContainer = container;
-    // Minimal pre-frame phase: Firebase (required before Crashlytics) and
-    // the local Isar store. Everything network-bound runs after first frame.
-    await AppBootstrap.initializePreFrame(container);
+  await runZonedGuarded<Future<void>>(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      final container = ProviderContainer();
+      appRootProviderContainer = container;
+      // Minimal pre-frame phase: Firebase (required before Crashlytics) and
+      // the local Isar store. Everything network-bound runs after first frame.
+      await AppBootstrap.initializePreFrame(container);
 
-    await FirebaseCrashlytics.instance
-        .setCrashlyticsCollectionEnabled(!kDebugMode);
-    FlutterError.onError =
-        FirebaseCrashlytics.instance.recordFlutterFatalError;
-    PlatformDispatcher.instance.onError = (error, stack) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-      return true;
-    };
+      await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
+        !kDebugMode,
+      );
+      FlutterError.onError =
+          FirebaseCrashlytics.instance.recordFlutterFatalError;
+      PlatformDispatcher.instance.onError = (error, stack) {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+        return true;
+      };
 
-    runApp(
-      UncontrolledProviderScope(
-        container: container,
-        child: const AuthGate(
-          child: FirstLaunchGate(
-            child: AppLifecycleTaskRefresh(
-              child: CoachForLifeApp(),
+      runApp(
+        UncontrolledProviderScope(
+          container: container,
+          child: const AuthGate(
+            child: FirstLaunchGate(
+              child: AppLifecycleTaskRefresh(child: CoachForLifeApp()),
             ),
           ),
         ),
-      ),
-    );
+      );
 
-    // Notification wiring, sync, reminders, and per-user maintenance — after
-    // the first frame so a slow connection can't hold the splash hostage.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(AppBootstrap.completeDeferred(container));
-    });
-  }, (error, stack) {
-    // Uncaught async errors (e.g. unawaited futures). Crashlytics may not be
-    // available if bootstrap itself failed before Firebase init.
-    try {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    } catch (_) {
-      debugPrint('Uncaught zone error (Crashlytics unavailable): $error');
-    }
-  });
+      // Notification wiring, sync, reminders, and per-user maintenance — after
+      // the first frame so a slow connection can't hold the splash hostage.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(AppBootstrap.completeDeferred(container));
+      });
+    },
+    (error, stack) {
+      // Uncaught async errors (e.g. unawaited futures). Crashlytics may not be
+      // available if bootstrap itself failed before Firebase init.
+      try {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      } catch (_) {
+        debugPrint('Uncaught zone error (Crashlytics unavailable): $error');
+      }
+    },
+  );
 }

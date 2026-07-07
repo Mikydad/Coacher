@@ -14,6 +14,7 @@ import '../../domain/models/generated_insight.dart';
 import '../coaching_insight_copy.dart';
 import 'progress_design_tokens.dart';
 import 'progress_shared_widgets.dart';
+import '../../../../core/presentation/async_value_ui.dart';
 
 /// Coaching Focus + Streak at Risk (replaces legacy Progress Delivery card).
 class ProgressInsightsRow extends ConsumerWidget {
@@ -30,10 +31,7 @@ class ProgressInsightsRow extends ConsumerWidget {
 
     return Column(
       children: [
-        _CoachingFocusGlass(
-          focusAsync: focusAsync,
-          summaryAsync: summaryAsync,
-        ),
+        _CoachingFocusGlass(focusAsync: focusAsync, summaryAsync: summaryAsync),
         const SizedBox(height: 12),
         _StreakAtRiskGlass(
           decisionAsync: decisionAsync,
@@ -70,11 +68,12 @@ class _CoachingFocusGlass extends StatelessWidget {
           );
         }
         final summary = summaryAsync.valueOrNull;
-        final headline = summary != null && summary.dailySummary.trim().isNotEmpty
+        final headline =
+            summary != null && summary.dailySummary.trim().isNotEmpty
             ? _firstSentence(summary.dailySummary)
             : 'Stay aligned with what matters today.';
-        final body = summary != null &&
-                summary.mainRecommendation.trim().isNotEmpty
+        final body =
+            summary != null && summary.mainRecommendation.trim().isNotEmpty
             ? summary.mainRecommendation.trim()
             : 'Protect this window — your highest-impact work lands here.';
 
@@ -87,12 +86,16 @@ class _CoachingFocusGlass extends StatelessWidget {
         );
       },
       loading: () => const _InsightLoadingPlaceholder(),
-      error: (_, _) => const ProgressGlassCard(
-        accentColor: ProgressDesignTokens.secondary,
-        icon: Icons.psychology_outlined,
-        title: 'Coaching Focus',
-        headline: 'Focus data unavailable.',
-        body: 'Pull to refresh or open Settings to recompute insights.',
+      error: (e, _) => swallowedAsyncError(
+        'progress_insights_row',
+        e,
+        const ProgressGlassCard(
+          accentColor: ProgressDesignTokens.secondary,
+          icon: Icons.psychology_outlined,
+          title: 'Coaching Focus',
+          headline: 'Focus data unavailable.',
+          body: 'Pull to refresh or open Settings to recompute insights.',
+        ),
       ),
     );
   }
@@ -114,7 +117,8 @@ class _StreakAtRiskGlass extends StatelessWidget {
     return decisionAsync.when(
       skipLoadingOnReload: true,
       data: (decision) {
-        final insights = insightsAsync.valueOrNull ?? const <GeneratedInsight>[];
+        final insights =
+            insightsAsync.valueOrNull ?? const <GeneratedInsight>[];
         final byId = {for (final i in insights) i.insightId: i};
         final primary = decision?.selectedPrimaryInsightId == null
             ? null
@@ -138,7 +142,9 @@ class _StreakAtRiskGlass extends StatelessWidget {
             icon: Icons.warning_amber_rounded,
             title: 'Streak at risk',
             headline: _firstSentence(riskInsight.message),
-            body: coachingDetailCaption(riskInsight) ?? _streakFallbackBody(bundle),
+            body:
+                coachingDetailCaption(riskInsight) ??
+                _streakFallbackBody(bundle),
           );
         }
 
@@ -151,12 +157,16 @@ class _StreakAtRiskGlass extends StatelessWidget {
         );
       },
       loading: () => const _InsightLoadingPlaceholder(),
-      error: (_, _) => ProgressGlassCard(
-        accentColor: ProgressDesignTokens.primaryDim,
-        icon: Icons.warning_amber_rounded,
-        title: 'Streak at risk',
-        headline: _streakHeadline(bundle),
-        body: _streakFallbackBody(bundle),
+      error: (e, _) => swallowedAsyncError(
+        'progress_insights_row',
+        e,
+        ProgressGlassCard(
+          accentColor: ProgressDesignTokens.primaryDim,
+          icon: Icons.warning_amber_rounded,
+          title: 'Streak at risk',
+          headline: _streakHeadline(bundle),
+          body: _streakFallbackBody(bundle),
+        ),
       ),
     );
   }

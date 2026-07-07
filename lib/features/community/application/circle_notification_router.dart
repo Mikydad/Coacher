@@ -19,8 +19,8 @@ class CircleNotificationRouter {
   CircleNotificationRouter({
     required LocalNotificationsService notifications,
     required CircleNotifPrefsRepository prefsRepo,
-  })  : _notifications = notifications,
-        _prefsRepo = prefsRepo;
+  }) : _notifications = notifications,
+       _prefsRepo = prefsRepo;
 
   final LocalNotificationsService _notifications;
   final CircleNotifPrefsRepository _prefsRepo;

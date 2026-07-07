@@ -63,7 +63,9 @@ class SyncService {
   Future<void> initialize() async {
     _queue = await _queueStore.load();
     pendingCount.value = _queue.length;
-    _connectivitySubscription ??= Connectivity().onConnectivityChanged.listen((results) {
+    _connectivitySubscription ??= Connectivity().onConnectivityChanged.listen((
+      results,
+    ) {
       final hasConnection = results.any((it) => it != ConnectivityResult.none);
       if (hasConnection) {
         unawaited(processQueue());
@@ -278,10 +280,9 @@ class SyncService {
           if (debugOpWriterForTests != null) {
             await debugOpWriterForTests!(op);
           } else if (op.operationType == 'upsert') {
-            await FirebaseFirestore.instance.doc(op.documentPath).set(
-              op.payload ?? const {},
-              SetOptions(merge: true),
-            );
+            await FirebaseFirestore.instance
+                .doc(op.documentPath)
+                .set(op.payload ?? const {}, SetOptions(merge: true));
           } else if (op.operationType == 'delete') {
             await FirebaseFirestore.instance.doc(op.documentPath).delete();
           }
@@ -303,7 +304,9 @@ class SyncService {
       if (!debugSkipQueuePersistenceForTests) {
         await _queueStore.save(_queue);
       }
-      debugPrint('Sync queue processed. Remaining operations: ${_queue.length}');
+      debugPrint(
+        'Sync queue processed. Remaining operations: ${_queue.length}',
+      );
     } finally {
       _isSyncing = false;
     }

@@ -28,15 +28,14 @@ class GoalCheckIn {
     int? updatedAtMs,
     double? value,
     String? note,
-  }) =>
-      GoalCheckIn(
-        goalId: goalId ?? this.goalId,
-        dateKey: dateKey ?? this.dateKey,
-        metCommitment: metCommitment ?? this.metCommitment,
-        updatedAtMs: updatedAtMs ?? this.updatedAtMs,
-        value: value ?? this.value,
-        note: note ?? this.note,
-      );
+  }) => GoalCheckIn(
+    goalId: goalId ?? this.goalId,
+    dateKey: dateKey ?? this.dateKey,
+    metCommitment: metCommitment ?? this.metCommitment,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+    value: value ?? this.value,
+    note: note ?? this.note,
+  );
 
   Map<String, dynamic> toMap() => {
     'goalId': goalId,

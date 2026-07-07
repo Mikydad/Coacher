@@ -80,13 +80,19 @@ class _CustomDurationDialogState extends State<_CustomDurationDialog> {
     }
     final total = h * 60 + m;
     if (total < widget.minMinutes) {
-      setState(() => _error = widget.minErrorMessage ??
-          'Duration must be at least ${widget.minMinutes} minutes');
+      setState(
+        () => _error =
+            widget.minErrorMessage ??
+            'Duration must be at least ${widget.minMinutes} minutes',
+      );
       return;
     }
     if (total > widget.maxMinutes) {
-      setState(() => _error = widget.maxErrorMessage ??
-          'Maximum duration is ${widget.maxMinutes ~/ 60} hours');
+      setState(
+        () => _error =
+            widget.maxErrorMessage ??
+            'Maximum duration is ${widget.maxMinutes ~/ 60} hours',
+      );
       return;
     }
     Navigator.pop(context, total);

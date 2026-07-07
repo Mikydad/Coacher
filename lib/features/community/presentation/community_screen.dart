@@ -8,6 +8,7 @@ import 'circle_detail_screen.dart';
 import 'circle_discovery_screen.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/presentation/async_value_ui.dart';
 
 class CommunityScreen extends ConsumerWidget {
   const CommunityScreen({super.key});
@@ -35,11 +36,10 @@ class CommunityScreen extends ConsumerWidget {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.explore_rounded,
-                color: AppColors.textMuted),
+            icon: const Icon(Icons.explore_rounded, color: AppColors.textMuted),
             tooltip: 'Discover circles',
-            onPressed: () => Navigator.pushNamed(
-                context, CircleDiscoveryScreen.routeName),
+            onPressed: () =>
+                Navigator.pushNamed(context, CircleDiscoveryScreen.routeName),
           ),
         ],
       ),
@@ -48,44 +48,52 @@ class CommunityScreen extends ConsumerWidget {
               child: CircularProgressIndicator(color: AppColors.accent),
             )
           : circlesAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.accent),
-        ),
-        error: (_, __) => const Center(
-          child: Text(
-            'Could not load circles.',
-            style: TextStyle(color: AppColors.textMuted),
-          ),
-        ),
-        data: (circles) {
-          if (circles.isEmpty) {
-            return _EmptyState(
-              onCreate: () =>
-                  Navigator.pushNamed(context, CircleCreateScreen.routeName),
-              onDiscover: () => Navigator.pushNamed(
-                  context, CircleDiscoveryScreen.routeName),
-            );
-          }
-          return RefreshIndicator(
-            color: AppColors.accent,
-            backgroundColor: AppColors.surfaceDark,
-            onRefresh: () async => invalidateCircleScopedProviders(ref),
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: circles.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (_, i) => _MyCircleCard(
-                circle: circles[i],
-                onTap: () => Navigator.pushNamed(
-                  context,
-                  CircleDetailScreen.routeName,
-                  arguments: circles[i].id,
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppColors.accent),
+              ),
+              error: (e, _) => swallowedAsyncError(
+                'community_screen',
+                e,
+                const Center(
+                  child: Text(
+                    'Could not load circles.',
+                    style: TextStyle(color: AppColors.textMuted),
+                  ),
                 ),
               ),
+              data: (circles) {
+                if (circles.isEmpty) {
+                  return _EmptyState(
+                    onCreate: () => Navigator.pushNamed(
+                      context,
+                      CircleCreateScreen.routeName,
+                    ),
+                    onDiscover: () => Navigator.pushNamed(
+                      context,
+                      CircleDiscoveryScreen.routeName,
+                    ),
+                  );
+                }
+                return RefreshIndicator(
+                  color: AppColors.accent,
+                  backgroundColor: AppColors.surfaceDark,
+                  onRefresh: () async => invalidateCircleScopedProviders(ref),
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: circles.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (_, i) => _MyCircleCard(
+                      circle: circles[i],
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        CircleDetailScreen.routeName,
+                        arguments: circles[i].id,
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'community_tab_fab',
         onPressed: () => _showCreateOrDiscover(context),
@@ -174,10 +182,7 @@ class CommunityScreen extends ConsumerWidget {
 // ── Empty state ───────────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.onCreate,
-    required this.onDiscover,
-  });
+  const _EmptyState({required this.onCreate, required this.onDiscover});
 
   final VoidCallback onCreate;
   final VoidCallback onDiscover;
@@ -268,10 +273,7 @@ class _EmptyState extends StatelessWidget {
 // ── Circle card ───────────────────────────────────────────────────────────────
 
 class _MyCircleCard extends StatelessWidget {
-  const _MyCircleCard({
-    required this.circle,
-    required this.onTap,
-  });
+  const _MyCircleCard({required this.circle, required this.onTap});
 
   final AccountabilityCircle circle;
   final VoidCallback onTap;
@@ -328,8 +330,11 @@ class _MyCircleCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.group_rounded,
-                          size: 13, color: AppColors.textMuted),
+                      const Icon(
+                        Icons.group_rounded,
+                        size: 13,
+                        color: AppColors.textMuted,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '${circle.memberCount}/${AccountabilityCircle.kMaxMembers}',
@@ -366,8 +371,10 @@ class _MyCircleCard extends StatelessWidget {
                     ],
                   ),
                 const SizedBox(height: 4),
-                const Icon(Icons.chevron_right_rounded,
-                    color: AppColors.textMuted),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textMuted,
+                ),
               ],
             ),
           ],
@@ -391,10 +398,7 @@ class _CategoryBadge extends StatelessWidget {
       ),
       child: Text(
         category[0].toUpperCase() + category.substring(1),
-        style: const TextStyle(
-          color: AppColors.textMuted,
-          fontSize: 11,
-        ),
+        style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
       ),
     );
   }

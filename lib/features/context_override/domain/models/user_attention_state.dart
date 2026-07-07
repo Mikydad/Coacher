@@ -100,14 +100,15 @@ class UserAttentionState {
     final expiresMs = (map['overrideExpiresAtMs'] as num?)?.toInt();
     return UserAttentionState(
       id: map['id'] as String? ?? kUserAttentionStateId,
-      activeOverride:
-          contextOverrideFromStorage(map['activeOverride'] as String?),
+      activeOverride: contextOverrideFromStorage(
+        map['activeOverride'] as String?,
+      ),
       overrideExpiresAt: expiresMs != null
           ? DateTime.fromMillisecondsSinceEpoch(expiresMs)
           : null,
       manuallyMuted: map['manuallyMuted'] as bool? ?? false,
-      lastOverrideActivatedAt:
-          (map['lastOverrideActivatedAt'] as num?)?.toInt(),
+      lastOverrideActivatedAt: (map['lastOverrideActivatedAt'] as num?)
+          ?.toInt(),
       lastAttentionResetAt: (map['lastAttentionResetAt'] as num?)?.toInt(),
       sleepWindowStart: map['sleepWindowStart'] as String?,
       sleepWindowEnd: map['sleepWindowEnd'] as String?,

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -42,10 +43,7 @@ class FocusResumeStore {
       };
       byTask[taskId] = elapsed.inSeconds;
       final file = await _file();
-      await file.writeAsString(
-        jsonEncode({todayKey: byTask}),
-        flush: true,
-      );
+      await file.writeAsString(jsonEncode({todayKey: byTask}), flush: true);
     } catch (_) {
       // Best-effort; resume is a convenience, never block the stop flow.
     }
@@ -73,10 +71,9 @@ class FocusResumeStore {
       if (!byTask.containsKey(taskId)) return;
       byTask.remove(taskId);
       final file = await _file();
-      await file.writeAsString(
-        jsonEncode({todayKey: byTask}),
-        flush: true,
-      );
-    } catch (_) {}
+      await file.writeAsString(jsonEncode({todayKey: byTask}), flush: true);
+    } catch (e) {
+      debugPrint('focus_resume_store: swallowed error: $e');
+    }
   }
 }

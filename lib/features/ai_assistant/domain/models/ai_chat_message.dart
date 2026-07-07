@@ -51,7 +51,8 @@ class AiChatMessage {
   final bool isExecuted;
 
   bool get hasPreviewCard => plannedChanges != null && !isLoading;
-  bool get hasDraftPlan => draftPlan != null && plannedChanges == null && !isLoading;
+  bool get hasDraftPlan =>
+      draftPlan != null && plannedChanges == null && !isLoading;
 
   AiChatMessage copyWith({
     String? id,
@@ -78,8 +79,8 @@ class AiChatMessage {
       draftPlan: clearDraftPlan
           ? null
           : (draftPlan == _sentinel
-              ? this.draftPlan
-              : draftPlan as AiPlannedChanges?),
+                ? this.draftPlan
+                : draftPlan as AiPlannedChanges?),
       suggestedPrompts: suggestedPrompts ?? this.suggestedPrompts,
       isLoading: isLoading ?? this.isLoading,
       isCurrentPlan: isCurrentPlan ?? this.isCurrentPlan,

@@ -63,7 +63,10 @@ class _ArchiveTile extends StatelessWidget {
       color: AppColors.surfaceMuted,
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
-        title: Text(goal.title, style: const TextStyle(fontWeight: FontWeight.w700)),
+        title: Text(
+          goal.title,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
         subtitle: Text(
           '$status · ${GoalCategories.label(goal.categoryId)} · ${GoalPeriodHelpers.formatPeriodSummary(goal)}',
           style: const TextStyle(color: Colors.white54),

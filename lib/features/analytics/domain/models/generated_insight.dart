@@ -3,13 +3,7 @@ import '../../../../core/validation/model_validators.dart';
 const int kGeneratedInsightSchemaVersion = 2;
 const int kGeneratedInsightSchemaVersionV1 = 1;
 
-enum InsightLifecycleState {
-  generated,
-  active,
-  reinforced,
-  resolved,
-  archived,
-}
+enum InsightLifecycleState { generated, active, reinforced, resolved, archived }
 
 InsightLifecycleState insightLifecycleStateFromStorage(String? raw) {
   for (final value in InsightLifecycleState.values) {
@@ -212,12 +206,16 @@ class GeneratedInsight {
   final int detectedAtMs;
   final String sourceWindowStartDateKey;
   final String sourceWindowEndDateKey;
+
   /// Phase 3 lifecycle.
   final InsightLifecycleState lifecycleState;
+
   /// 0–1 time-sensitivity derived from priority, confidence, and lifecycle.
   final double urgency;
+
   /// 0–1 strategic coaching significance derived from bucket + priority + confidence.
   final double coachingImportance;
+
   /// Flat key→value metrics from underlying pattern evidence (for explainability).
   final Map<String, dynamic> supportingMetrics;
   final Map<String, dynamic> metadata;
@@ -301,7 +299,10 @@ class GeneratedInsight {
       message: map['message'] as String? ?? '',
       action: insightActionFromStorage(map['action'] as String?),
       linkedPatternCodes: linkedPatternCodes,
-      confidence: ((map['confidence'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
+      confidence: ((map['confidence'] as num?)?.toDouble() ?? 0).clamp(
+        0.0,
+        1.0,
+      ),
       detectedAtMs: (map['detectedAtMs'] as num?)?.toInt() ?? 0,
       sourceWindowStartDateKey:
           map['sourceWindowStartDateKey'] as String? ?? '',
@@ -310,8 +311,8 @@ class GeneratedInsight {
         map['lifecycleState'] as String?,
       ),
       urgency: ((map['urgency'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
-      coachingImportance:
-          ((map['coachingImportance'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
+      coachingImportance: ((map['coachingImportance'] as num?)?.toDouble() ?? 0)
+          .clamp(0.0, 1.0),
       supportingMetrics: supportingMetrics,
       metadata:
           (map['metadata'] as Map?)?.cast<String, dynamic>() ??

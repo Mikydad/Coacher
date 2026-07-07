@@ -27,14 +27,14 @@ class CircleNotifPrefs {
       muteUntilMs! > DateTime.now().millisecondsSinceEpoch;
 
   Map<String, dynamic> toMap() => {
-        'circleId': circleId,
-        'mentions': mentions,
-        'challengeUpdates': challengeUpdates,
-        'weeklySummary': weeklySummary,
-        'accomplishments': accomplishments,
-        'reactions': reactions,
-        'muteUntilMs': muteUntilMs,
-      };
+    'circleId': circleId,
+    'mentions': mentions,
+    'challengeUpdates': challengeUpdates,
+    'weeklySummary': weeklySummary,
+    'accomplishments': accomplishments,
+    'reactions': reactions,
+    'muteUntilMs': muteUntilMs,
+  };
 
   static CircleNotifPrefs fromMap(Map<String, dynamic> map) {
     return CircleNotifPrefs(
@@ -64,8 +64,9 @@ class CircleNotifPrefs {
       weeklySummary: weeklySummary ?? this.weeklySummary,
       accomplishments: accomplishments ?? this.accomplishments,
       reactions: reactions ?? this.reactions,
-      muteUntilMs:
-          muteUntilMs == _sentinel ? this.muteUntilMs : muteUntilMs as int?,
+      muteUntilMs: muteUntilMs == _sentinel
+          ? this.muteUntilMs
+          : muteUntilMs as int?,
     );
   }
 }

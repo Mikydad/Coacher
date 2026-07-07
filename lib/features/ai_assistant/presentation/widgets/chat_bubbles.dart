@@ -30,10 +30,7 @@ class UserMessageBubble extends StatelessWidget {
         ),
         child: Text(
           content,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.white,
-          ),
+          style: const TextStyle(fontSize: 14, color: Colors.white),
         ),
       ),
     );
@@ -161,7 +158,8 @@ class _ThinkingIndicatorState extends State<ThinkingIndicator>
                 } else if (t < end) {
                   opacity = 0.3 + 0.7 * ((t - begin) / 0.4);
                 } else {
-                  opacity = 1.0 - 0.7 * ((t - end) / (1.0 - end).clamp(0.01, 1.0));
+                  opacity =
+                      1.0 - 0.7 * ((t - end) / (1.0 - end).clamp(0.01, 1.0));
                 }
                 return Container(
                   margin: const EdgeInsets.symmetric(horizontal: 3),
@@ -169,7 +167,9 @@ class _ThinkingIndicatorState extends State<ThinkingIndicator>
                   height: 8,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.cyan.withValues(alpha: opacity.clamp(0.3, 1.0)),
+                    color: AppColors.cyan.withValues(
+                      alpha: opacity.clamp(0.3, 1.0),
+                    ),
                   ),
                 );
               },

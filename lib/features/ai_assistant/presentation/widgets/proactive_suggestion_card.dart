@@ -113,9 +113,7 @@ class _ProactiveSuggestionCardState
           decoration: BoxDecoration(
             color: _kSurface,
             borderRadius: BorderRadius.circular(16),
-            border: Border(
-              left: const BorderSide(color: _kAccent, width: 3),
-            ),
+            border: Border(left: const BorderSide(color: _kAccent, width: 3)),
           ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 14, 12, 12),
@@ -158,8 +156,8 @@ class _ProactiveSuggestionCardState
                             .read(dismissedSuggestionRepositoryProvider)
                             .logDismissal(widget.suggestion.type)
                             .then((_) {
-                          ref.invalidate(proactiveSuggestionsProvider);
-                        });
+                              ref.invalidate(proactiveSuggestionsProvider);
+                            });
                         _dismiss();
                       },
                       child: const Padding(

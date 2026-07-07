@@ -105,21 +105,23 @@ class IsarInsightCacheRepository implements InsightCacheRepository {
     String? endDateKey,
   }) async {
     final byScope = await listByScope(scopeType: scopeType, scopeId: scopeId);
-    return byScope.where((insight) {
-      final start = startDateKey?.trim();
-      final end = endDateKey?.trim();
-      if (start != null &&
-          start.isNotEmpty &&
-          insight.sourceWindowEndDateKey.compareTo(start) < 0) {
-        return false;
-      }
-      if (end != null &&
-          end.isNotEmpty &&
-          insight.sourceWindowStartDateKey.compareTo(end) > 0) {
-        return false;
-      }
-      return true;
-    }).toList(growable: false);
+    return byScope
+        .where((insight) {
+          final start = startDateKey?.trim();
+          final end = endDateKey?.trim();
+          if (start != null &&
+              start.isNotEmpty &&
+              insight.sourceWindowEndDateKey.compareTo(start) < 0) {
+            return false;
+          }
+          if (end != null &&
+              end.isNotEmpty &&
+              insight.sourceWindowStartDateKey.compareTo(end) > 0) {
+            return false;
+          }
+          return true;
+        })
+        .toList(growable: false);
   }
 
   @override

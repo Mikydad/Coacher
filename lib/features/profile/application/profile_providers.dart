@@ -7,18 +7,20 @@ import '../../../features/coaching/domain/models/enforcement_mode.dart';
 import '../data/profile_preference_repository.dart';
 import '../domain/models/user_profile_preference.dart';
 import 'profile_preference_service.dart';
+import '../../../core/presentation/async_value_ui.dart';
 
 // ─── Repository ───────────────────────────────────────────────────────────────
 
 final profilePreferenceRepositoryProvider =
     Provider<ProfilePreferenceRepository>((ref) {
-  return IsarProfilePreferenceRepository();
-});
+      return IsarProfilePreferenceRepository();
+    });
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
-final profilePreferenceServiceProvider =
-    Provider<ProfilePreferenceService>((ref) {
+final profilePreferenceServiceProvider = Provider<ProfilePreferenceService>((
+  ref,
+) {
   final repo = ref.watch(profilePreferenceRepositoryProvider);
   return ProfilePreferenceService(repository: repo);
 });
@@ -29,9 +31,9 @@ final profilePreferenceServiceProvider =
 /// record exists yet (e.g. fresh install before the user has edited anything).
 final userProfilePreferenceStreamProvider =
     StreamProvider<UserProfilePreference?>((ref) {
-  final repo = ref.watch(profilePreferenceRepositoryProvider);
-  return repo.watchPreference();
-});
+      final repo = ref.watch(profilePreferenceRepositoryProvider);
+      return repo.watchPreference();
+    });
 
 // ─── Convenience providers ────────────────────────────────────────────────────
 
@@ -41,7 +43,7 @@ final displayNameProvider = Provider<String>((ref) {
   return async.when(
     data: (pref) => pref?.displayName ?? '',
     loading: () => '',
-    error: (_, _) => '',
+    error: (e, _) => swallowedAsyncError('profile_providers', e, ''),
   );
 });
 
@@ -51,7 +53,11 @@ final defaultEnforcementModeProvider = Provider<EnforcementMode>((ref) {
   return async.when(
     data: (pref) => pref?.defaultEnforcementMode ?? EnforcementMode.disciplined,
     loading: () => EnforcementMode.disciplined,
-    error: (_, _) => EnforcementMode.disciplined,
+    error: (e, _) => swallowedAsyncError(
+      'profile_providers',
+      e,
+      EnforcementMode.disciplined,
+    ),
   );
 });
 

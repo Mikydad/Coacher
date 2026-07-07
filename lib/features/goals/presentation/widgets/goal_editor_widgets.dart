@@ -36,11 +36,9 @@ InputDecoration goalEditorInputDecoration({
     filled: true,
     fillColor: GoalEditorColors.inputFill,
     isDense: isDense,
-    contentPadding: contentPadding ??
-        EdgeInsets.symmetric(
-          horizontal: 22,
-          vertical: isDense ? 12 : 18,
-        ),
+    contentPadding:
+        contentPadding ??
+        EdgeInsets.symmetric(horizontal: 22, vertical: isDense ? 12 : 18),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(radius),
       borderSide: BorderSide.none,
@@ -369,7 +367,11 @@ class _PeriodCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: selected ? Colors.white : Colors.white38, size: 20),
+            Icon(
+              icon,
+              color: selected ? Colors.white : Colors.white38,
+              size: 20,
+            ),
             const Spacer(),
             Text(
               title,
@@ -383,7 +385,11 @@ class _PeriodCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: const TextStyle(color: Colors.white38, fontSize: 10, height: 1.3),
+              style: const TextStyle(
+                color: Colors.white38,
+                fontSize: 10,
+                height: 1.3,
+              ),
             ),
           ],
         ),
@@ -443,7 +449,11 @@ class GoalEditorDateCard extends StatelessWidget {
                 color: GoalEditorColors.lime,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.calendar_month, color: Colors.black, size: 20),
+              child: const Icon(
+                Icons.calendar_month,
+                color: Colors.black,
+                size: 20,
+              ),
             ),
           ],
         ),
@@ -476,7 +486,11 @@ class GoalEditorMeasurementDropdown extends StatelessWidget {
           isExpanded: true,
           dropdownColor: GoalEditorColors.surfaceRaised,
           icon: const Icon(Icons.unfold_more, color: Colors.white38, size: 20),
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+          ),
           items: [
             for (final k in MeasurementKind.values)
               DropdownMenuItem(value: k, child: Text(k.displayLabel())),
@@ -503,7 +517,9 @@ class GoalEditorDisciplineSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final level = intensity.round().clamp(1, 5);
-    final label = GoalIntensityMode.displayLabelForIntensity(level).toUpperCase();
+    final label = GoalIntensityMode.displayLabelForIntensity(
+      level,
+    ).toUpperCase();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -563,8 +579,14 @@ class GoalEditorDisciplineSection extends StatelessWidget {
         const Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('FLEXIBLE', style: TextStyle(color: Colors.white38, fontSize: 10)),
-            Text('EXTREME', style: TextStyle(color: Colors.white38, fontSize: 10)),
+            Text(
+              'FLEXIBLE',
+              style: TextStyle(color: Colors.white38, fontSize: 10),
+            ),
+            Text(
+              'EXTREME',
+              style: TextStyle(color: Colors.white38, fontSize: 10),
+            ),
           ],
         ),
       ],
@@ -603,7 +625,11 @@ class GoalEditorReminderCard extends StatelessWidget {
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white24),
             ),
-            child: const Icon(Icons.notifications_outlined, color: Colors.white54, size: 20),
+            child: const Icon(
+              Icons.notifications_outlined,
+              color: Colors.white54,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -614,7 +640,10 @@ class GoalEditorReminderCard extends StatelessWidget {
                 children: [
                   const Text(
                     'Daily reminder',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   Text(
                     enabled ? 'Alert scheduled for $timeLabel' : 'Off',
@@ -686,7 +715,10 @@ class GoalEditorCollapsibleSection extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           subtitle!,
-                          style: const TextStyle(color: Colors.white38, fontSize: 11),
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ],
@@ -695,7 +727,10 @@ class GoalEditorCollapsibleSection extends StatelessWidget {
                 AnimatedRotation(
                   turns: expanded ? 0.5 : 0,
                   duration: const Duration(milliseconds: 200),
-                  child: const Icon(Icons.keyboard_arrow_down, color: Colors.white54),
+                  child: const Icon(
+                    Icons.keyboard_arrow_down,
+                    color: Colors.white54,
+                  ),
                 ),
               ],
             ),
@@ -705,8 +740,9 @@ class GoalEditorCollapsibleSection extends StatelessWidget {
           firstCurve: Curves.easeOutCubic,
           secondCurve: Curves.easeOutCubic,
           sizeCurve: Curves.easeOutCubic,
-          crossFadeState:
-              expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          crossFadeState: expanded
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
           duration: const Duration(milliseconds: 220),
           firstChild: const SizedBox.shrink(),
           secondChild: Padding(
@@ -746,7 +782,9 @@ class GoalEditorSetupStepsSection extends StatelessWidget {
             decoration: BoxDecoration(
               color: GoalEditorColors.cyan.withValues(alpha: 0.25),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: GoalEditorColors.cyan.withValues(alpha: 0.5)),
+              border: Border.all(
+                color: GoalEditorColors.cyan.withValues(alpha: 0.5),
+              ),
             ),
             child: Text(
               stepCount == 0 ? 'OPTIONAL' : '$stepCount ADDED',
@@ -783,7 +821,10 @@ class GoalEditorSetupStepsSection extends StatelessWidget {
                 SizedBox(width: 6),
                 Text(
                   'Add setup step',
-                  style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -819,8 +860,9 @@ class GoalEditorExampleStepsCard extends StatelessWidget {
       secondCurve: Curves.easeOutCubic,
       sizeCurve: Curves.easeOutCubic,
       duration: const Duration(milliseconds: 260),
-      crossFadeState:
-          visible ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+      crossFadeState: visible
+          ? CrossFadeState.showSecond
+          : CrossFadeState.showFirst,
       firstChild: const SizedBox.shrink(),
       secondChild: Container(
         width: double.infinity,
@@ -836,8 +878,10 @@ class GoalEditorExampleStepsCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: GoalEditorColors.cyan.withValues(alpha: 0.25),
                     borderRadius: BorderRadius.circular(6),
@@ -899,8 +943,10 @@ class GoalEditorExampleStepsCard extends StatelessWidget {
                 onPressed: onUseThese,
                 style: TextButton.styleFrom(
                   foregroundColor: GoalEditorColors.cyan,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                 ),
                 child: const Text(
                   'Use these steps',
@@ -1081,21 +1127,30 @@ class GoalEditorSaveButton extends StatelessWidget {
           backgroundColor: GoalEditorColors.lime,
           foregroundColor: Colors.black,
           disabledBackgroundColor: GoalEditorColors.lime.withValues(alpha: 0.4),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           elevation: 0,
         ),
         child: saving
             ? const SizedBox(
                 width: 22,
                 height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black54),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.black54,
+                ),
               )
             : const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     'SAVE GOAL',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: 0.5),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                   SizedBox(width: 6),
                   Icon(Icons.bolt, size: 18),

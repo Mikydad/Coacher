@@ -124,8 +124,8 @@ class AiMissingFieldDetector {
 
     for (final field in required) {
       final value = params[field.key];
-      final isEmpty = value == null ||
-          (value is String && value.trim().isEmpty);
+      final isEmpty =
+          value == null || (value is String && value.trim().isEmpty);
       if (isEmpty) {
         missing.add(field.key);
         firstQuestion ??= field.question;

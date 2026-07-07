@@ -109,9 +109,11 @@ class UserProfilePreference {
     defaultEnforcementMode:
         defaultEnforcementMode ?? this.defaultEnforcementMode,
     morningBriefEnabled: morningBriefEnabled ?? this.morningBriefEnabled,
-    coachingInsightNotificationsEnabled: coachingInsightNotificationsEnabled ??
+    coachingInsightNotificationsEnabled:
+        coachingInsightNotificationsEnabled ??
         this.coachingInsightNotificationsEnabled,
-    coachingNotificationBudgetDateKey: coachingNotificationBudgetDateKey ??
+    coachingNotificationBudgetDateKey:
+        coachingNotificationBudgetDateKey ??
         this.coachingNotificationBudgetDateKey,
     coachingNotificationSentAtMs:
         coachingNotificationSentAtMs ?? this.coachingNotificationSentAtMs,

@@ -38,7 +38,10 @@ Future<String> effectiveModeRefIdForTaskId(WidgetRef ref, String taskId) async {
         break;
       }
     }
-    return EffectiveTaskMode.effectiveModeRefId(task: row.task, routine: routine);
+    return EffectiveTaskMode.effectiveModeRefId(
+      task: row.task,
+      routine: routine,
+    );
   }
   return 'flexible';
 }
@@ -149,7 +152,10 @@ Future<void> promptPlansChangedForRow(
         decoration: const InputDecoration(hintText: '1-2 sentences'),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Cancel'),
+        ),
         FilledButton(
           onPressed: () => Navigator.pop(ctx, noteCtrl.text.trim()),
           child: const Text('Save'),
@@ -183,11 +189,13 @@ Future<void> promptPlansChangedForRow(
       createdAtMs: DateTime.now().millisecondsSinceEpoch,
     ),
   );
-  await ref.read(reminderSyncServiceProvider).markLogicalReasonProvided(row.task.id);
+  await ref
+      .read(reminderSyncServiceProvider)
+      .markLogicalReasonProvided(row.task.id);
   if (context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Plans change logged.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Plans change logged.')));
   }
 }
 
@@ -205,13 +213,21 @@ Future<bool> confirmDeletePlannedTask(
       title: const Text('Delete task?'),
       content: Text('Remove "${row.task.title}"?'),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-        TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Delete'),
+        ),
       ],
     ),
   );
   if (ok != true || !context.mounted) return false;
-  await ref.read(planningRepositoryProvider).deleteTask(
+  await ref
+      .read(planningRepositoryProvider)
+      .deleteTask(
         routineId: row.routineId,
         blockId: row.blockId,
         taskId: row.task.id,

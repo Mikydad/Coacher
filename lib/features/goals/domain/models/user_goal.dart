@@ -40,16 +40,20 @@ class UserGoal {
   /// Optional hex color string (e.g. `'FF5C35'`) chosen by the user.
   /// When null, the card uses the category's default color.
   final String? colorHex;
+
   /// 1–5 (`prd-goals.md` §4.2).
   final int intensity;
   final int periodStartMs;
   final int periodEndMs;
+
   /// [durationDays] is set when [periodMode] is [GoalPeriodMode.durationDays].
   final GoalPeriodMode periodMode;
   final int? durationDays;
+
   /// Local wall time as minutes since midnight (0–1439). Meaningful when [reminderEnabled].
   final int? reminderMinutesFromMidnight;
   final bool reminderEnabled;
+
   /// V1 schedules only [GoalReminderStyle.dailyOnce]; other values are stored for future work.
   final GoalReminderStyle reminderStyle;
   final int createdAtMs;
@@ -71,7 +75,9 @@ class UserGoal {
     if (reminderEnabled) {
       final m = reminderMinutesFromMidnight;
       if (m == null || m < 0 || m > 1439) {
-        throw ArgumentError('goal.reminderMinutesFromMidnight must be 0..1439 when reminderEnabled');
+        throw ArgumentError(
+          'goal.reminderMinutesFromMidnight must be 0..1439 when reminderEnabled',
+        );
       }
     }
   }
@@ -112,7 +118,8 @@ class UserGoal {
       periodMode: periodMode ?? this.periodMode,
       durationDays: durationDays ?? this.durationDays,
       reminderEnabled: reminderEnabled ?? this.reminderEnabled,
-      reminderMinutesFromMidnight: reminderMinutesFromMidnight ?? this.reminderMinutesFromMidnight,
+      reminderMinutesFromMidnight:
+          reminderMinutesFromMidnight ?? this.reminderMinutesFromMidnight,
       reminderStyle: reminderStyle ?? this.reminderStyle,
       createdAtMs: createdAtMs ?? this.createdAtMs,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
@@ -135,7 +142,8 @@ class UserGoal {
     'periodMode': periodMode.storageValue,
     if (durationDays != null) 'durationDays': durationDays,
     'reminderEnabled': reminderEnabled,
-    if (reminderMinutesFromMidnight != null) 'reminderMinutesFromMidnight': reminderMinutesFromMidnight,
+    if (reminderMinutesFromMidnight != null)
+      'reminderMinutesFromMidnight': reminderMinutesFromMidnight,
     'reminderStyle': reminderStyle.storageValue,
     'createdAtMs': createdAtMs,
     'updatedAtMs': updatedAtMs,
@@ -150,17 +158,24 @@ class UserGoal {
       categoryId: map['categoryId'] as String? ?? GoalCategories.study,
       horizon: GoalHorizonStorage.fromStorage(map['horizon'] as String?),
       status: GoalStatusStorage.fromStorage(map['status'] as String?),
-      measurementKind: MeasurementKindStorage.fromStorage(map['measurementKind'] as String?),
+      measurementKind: MeasurementKindStorage.fromStorage(
+        map['measurementKind'] as String?,
+      ),
       targetValue: (tv is num) ? tv.toDouble() : double.tryParse('$tv') ?? 0,
       customLabel: map['customLabel'] as String?,
       intensity: (map['intensity'] as num?)?.toInt() ?? 3,
       periodStartMs: (map['periodStartMs'] as num?)?.toInt() ?? 0,
       periodEndMs: (map['periodEndMs'] as num?)?.toInt() ?? 0,
-      periodMode: GoalPeriodModeStorage.fromStorage(map['periodMode'] as String?),
+      periodMode: GoalPeriodModeStorage.fromStorage(
+        map['periodMode'] as String?,
+      ),
       durationDays: (map['durationDays'] as num?)?.toInt(),
       reminderEnabled: map['reminderEnabled'] as bool? ?? false,
-      reminderMinutesFromMidnight: (map['reminderMinutesFromMidnight'] as num?)?.toInt(),
-      reminderStyle: GoalReminderStyleStorage.fromStorage(map['reminderStyle'] as String?),
+      reminderMinutesFromMidnight: (map['reminderMinutesFromMidnight'] as num?)
+          ?.toInt(),
+      reminderStyle: GoalReminderStyleStorage.fromStorage(
+        map['reminderStyle'] as String?,
+      ),
       createdAtMs: (map['createdAtMs'] as num?)?.toInt() ?? 0,
       updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
       colorHex: map['colorHex'] as String?,

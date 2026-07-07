@@ -52,7 +52,9 @@ Future<void> runAutoNextTaskFlow(
   );
   if (next == null) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Great work. No next task available right now.')),
+      const SnackBar(
+        content: Text('Great work. No next task available right now.'),
+      ),
     );
     return;
   }
@@ -67,7 +69,10 @@ Future<void> runAutoNextTaskFlow(
     return;
   }
   String? conflictNotice;
-  final anchors = await readHabitAnchorsForDate(ref, dateKey: selectedNext.dateKey);
+  final anchors = await readHabitAnchorsForDate(
+    ref,
+    dateKey: selectedNext.dateKey,
+  );
   if (!context.mounted) return;
   final now = DateTime.now();
   final overlaps = findOverlappingHabitAnchorsForTask(
@@ -106,7 +111,8 @@ Future<void> runAutoNextTaskFlow(
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, NextTaskDecision.moveWithReason),
+            onPressed: () =>
+                Navigator.pop(ctx, NextTaskDecision.moveWithReason),
             child: const Text('Move to later'),
           ),
           TextButton(
@@ -124,14 +130,16 @@ Future<void> runAutoNextTaskFlow(
   if (!context.mounted || decision == null) return;
   switch (decision) {
     case NextTaskDecision.startNow:
-      await ref.read(planningRepositoryProvider).logFlowTransitionEvent(
-        FlowTransitionEvent(
-          id: StableId.generate('flowev'),
-          taskId: selectedNext.task.id,
-          type: FlowTransitionType.startNow,
-          createdAtMs: DateTime.now().millisecondsSinceEpoch,
-        ),
-      );
+      await ref
+          .read(planningRepositoryProvider)
+          .logFlowTransitionEvent(
+            FlowTransitionEvent(
+              id: StableId.generate('flowev'),
+              taskId: selectedNext.task.id,
+              type: FlowTransitionType.startNow,
+              createdAtMs: DateTime.now().millisecondsSinceEpoch,
+            ),
+          );
       if (!context.mounted) return;
       fireAndForgetAnalyticsEvent(
         ref,
@@ -139,16 +147,21 @@ Future<void> runAutoNextTaskFlow(
         entityId: selectedNext.task.id,
         entityKind: 'task',
         sourceSurface: 'auto_next',
-        idempotencyKey: 'auto_next_started_${selectedNext.task.id}_${DateTime.now().millisecondsSinceEpoch}',
+        idempotencyKey:
+            'auto_next_started_${selectedNext.task.id}_${DateTime.now().millisecondsSinceEpoch}',
         modeRefId: selectedNext.task.modeRefId,
       );
-      ref.read(activeExecutionTaskIdProvider.notifier).state = selectedNext.task.id;
-      ref.read(activeExecutionTaskLabelProvider.notifier).state = selectedNext.task.title;
-      ref.read(executionControllerProvider.notifier).setTask(
-        id: selectedNext.task.id,
-        label: selectedNext.task.title,
-        durationMinutes: selectedNext.task.durationMinutes,
-      );
+      ref.read(activeExecutionTaskIdProvider.notifier).state =
+          selectedNext.task.id;
+      ref.read(activeExecutionTaskLabelProvider.notifier).state =
+          selectedNext.task.title;
+      ref
+          .read(executionControllerProvider.notifier)
+          .setTask(
+            id: selectedNext.task.id,
+            label: selectedNext.task.title,
+            durationMinutes: selectedNext.task.durationMinutes,
+          );
       await Navigator.pushNamed(
         context,
         TimerSessionScreen.routeName,
@@ -163,7 +176,11 @@ Future<void> runAutoNextTaskFlow(
       }
       return;
     case NextTaskDecision.moveWithReason:
-      final handled = await _handleMoveWithReason(context, ref, row: selectedNext);
+      final handled = await _handleMoveWithReason(
+        context,
+        ref,
+        row: selectedNext,
+      );
       if (!context.mounted) return;
       if (handled) {
         await _returnToFocusList(context, ref);
@@ -213,7 +230,9 @@ Future<void> _runHomeNextTaskSuggestion(
   ref.read(activeExecutionTaskIdProvider.notifier).state = selectedNext.task.id;
   ref.read(activeExecutionTaskLabelProvider.notifier).state =
       selectedNext.task.title;
-  ref.read(executionControllerProvider.notifier).setTask(
+  ref
+      .read(executionControllerProvider.notifier)
+      .setTask(
         id: selectedNext.task.id,
         label: selectedNext.task.title,
         durationMinutes: selectedNext.task.durationMinutes,
@@ -225,14 +244,19 @@ Future<void> _runHomeNextTaskSuggestion(
   );
 }
 
-Future<Routine?> _routineForPlannedRow(WidgetRef ref, PlannedTaskRow row) async {
+Future<Routine?> _routineForPlannedRow(
+  WidgetRef ref,
+  PlannedTaskRow row,
+) async {
   final planning = ref.read(planningRepositoryProvider);
   try {
     final routines = await planning.getRoutinesForDate(row.dateKey);
     for (final r in routines) {
       if (r.id == row.routineId) return r;
     }
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('auto_next_task_flow: swallowed error: $e');
+  }
   return null;
 }
 
@@ -306,11 +330,7 @@ Future<bool> _handleExtraTime(
       createdAtMs: DateTime.now().millisecondsSinceEpoch,
     ),
   );
-  await _scheduleExtensionReminder(
-    ref,
-    row: row,
-    minutesFromNow: extraMinutes,
-  );
+  await _scheduleExtensionReminder(ref, row: row, minutesFromNow: extraMinutes);
   // migrated to coordinator
   await ScheduleMutationCoordinator.instance.run(
     TaskUpdatedMutation(
@@ -322,113 +342,141 @@ Future<bool> _handleExtraTime(
   );
   if (!context.mounted) return false;
   ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('Added $extraMinutes minutes and scheduled a reminder.')),
+    SnackBar(
+      content: Text('Added $extraMinutes minutes and scheduled a reminder.'),
+    ),
   );
   return true;
 }
 
-Future<({int minutes, String reason, String? reflection})?> _promptExtensionRequest(
+Future<({int minutes, String reason, String? reflection})?>
+_promptExtensionRequest(
   BuildContext context, {
   required int allowedMaxMinutes,
   required bool requireReason,
   required bool requireReflection,
 }) async {
-  final options = [15, 30, 45, 60].where((m) => m <= allowedMaxMinutes).toList();
+  final options = [
+    15,
+    30,
+    45,
+    60,
+  ].where((m) => m <= allowedMaxMinutes).toList();
   if (options.isEmpty) return null;
   var selectedMinutes = options.first;
   var reasonText = '';
   var reflectionText = '';
   String? errorText;
-  final result = await showDialog<({int minutes, String reason, String? reflection})>(
-    context: context,
-    barrierDismissible: false,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setState) => PopScope(
-        canPop: false,
-        child: AlertDialog(
-          title: const Text('Request extra time'),
-          content: SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(ctx).size.height * 0.6,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Extension requires a clear reason. Choose extra minutes and explain why.',
-                      style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.3),
-                    ),
+  final result =
+      await showDialog<({int minutes, String reason, String? reflection})>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setState) => PopScope(
+            canPop: false,
+            child: AlertDialog(
+              title: const Text('Request extra time'),
+              content: SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(ctx).size.height * 0.6,
                   ),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<int>(
-                    initialValue: selectedMinutes,
-                    items: [
-                      for (final m in options) DropdownMenuItem(value: m, child: Text('+$m minutes')),
-                    ],
-                    onChanged: (v) => setState(() => selectedMinutes = v ?? options.first),
-                    decoration: InputDecoration(labelText: 'Allowed (max +$allowedMaxMinutes min)'),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    maxLines: 2,
-                    onChanged: (v) => reasonText = v,
-                    decoration: InputDecoration(
-                      labelText: requireReason ? 'Reason (required)' : 'Reason',
-                      hintText: 'Why do you need more time?',
-                    ),
-                  ),
-                  if (requireReflection) ...[
-                    const SizedBox(height: 10),
-                    TextField(
-                      maxLines: 2,
-                      onChanged: (v) => reflectionText = v,
-                      decoration: const InputDecoration(
-                        labelText: 'What did you promise yourself? (required)',
-                        hintText: 'Short commitment reminder to stay aligned.',
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Extension requires a clear reason. Choose extra minutes and explain why.',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                            height: 1.3,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
-                  if (errorText != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(errorText!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
-                    ),
-                ],
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<int>(
+                        initialValue: selectedMinutes,
+                        items: [
+                          for (final m in options)
+                            DropdownMenuItem(
+                              value: m,
+                              child: Text('+$m minutes'),
+                            ),
+                        ],
+                        onChanged: (v) => setState(
+                          () => selectedMinutes = v ?? options.first,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Allowed (max +$allowedMaxMinutes min)',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        maxLines: 2,
+                        onChanged: (v) => reasonText = v,
+                        decoration: InputDecoration(
+                          labelText: requireReason
+                              ? 'Reason (required)'
+                              : 'Reason',
+                          hintText: 'Why do you need more time?',
+                        ),
+                      ),
+                      if (requireReflection) ...[
+                        const SizedBox(height: 10),
+                        TextField(
+                          maxLines: 2,
+                          onChanged: (v) => reflectionText = v,
+                          decoration: const InputDecoration(
+                            labelText:
+                                'What did you promise yourself? (required)',
+                            hintText:
+                                'Short commitment reminder to stay aligned.',
+                          ),
+                        ),
+                      ],
+                      if (errorText != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            errorText!,
+                            style: const TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
+              actions: [
+                FilledButton(
+                  onPressed: () {
+                    final reason = reasonText.trim();
+                    final reflection = reflectionText.trim();
+                    if (requireReason && reason.isEmpty) {
+                      setState(() => errorText = 'Reason is required.');
+                      return;
+                    }
+                    if (requireReflection && reflection.isEmpty) {
+                      setState(() => errorText = 'Reflection is required.');
+                      return;
+                    }
+                    Navigator.pop(ctx, (
+                      minutes: selectedMinutes,
+                      reason: reason.isEmpty ? 'No reason provided' : reason,
+                      reflection: reflection.isEmpty ? null : reflection,
+                    ));
+                  },
+                  child: const Text('Approve extension'),
+                ),
+              ],
             ),
           ),
-          actions: [
-            FilledButton(
-              onPressed: () {
-                final reason = reasonText.trim();
-                final reflection = reflectionText.trim();
-                if (requireReason && reason.isEmpty) {
-                  setState(() => errorText = 'Reason is required.');
-                  return;
-                }
-                if (requireReflection && reflection.isEmpty) {
-                  setState(() => errorText = 'Reflection is required.');
-                  return;
-                }
-                Navigator.pop(
-                  ctx,
-                  (
-                    minutes: selectedMinutes,
-                    reason: reason.isEmpty ? 'No reason provided' : reason,
-                    reflection: reflection.isEmpty ? null : reflection,
-                  ),
-                );
-              },
-              child: const Text('Approve extension'),
-            ),
-          ],
         ),
-      ),
-    ),
-  );
+      );
   return result;
 }
 
@@ -441,66 +489,84 @@ Future<bool> _handleMoveWithReason(
   OverrideReasonCategory selectedReason = reasons.first;
   var noteText = '';
   String? errorText;
-  final choice = await showDialog<({OverrideReasonCategory reason, String note})>(
-    context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setState) {
-        return AlertDialog(
-          title: const Text('Move task with reason'),
-          content: SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(ctx).size.height * 0.6,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<OverrideReasonCategory>(
-                    initialValue: selectedReason,
-                    items: [
-                      for (final r in reasons) DropdownMenuItem(value: r, child: Text(r.label)),
+  final choice =
+      await showDialog<({OverrideReasonCategory reason, String note})>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setState) {
+            return AlertDialog(
+              title: const Text('Move task with reason'),
+              content: SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(ctx).size.height * 0.6,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      DropdownButtonFormField<OverrideReasonCategory>(
+                        initialValue: selectedReason,
+                        items: [
+                          for (final r in reasons)
+                            DropdownMenuItem(value: r, child: Text(r.label)),
+                        ],
+                        onChanged: (v) =>
+                            setState(() => selectedReason = v ?? reasons.first),
+                        decoration: const InputDecoration(
+                          labelText: 'Reason category',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        maxLines: 2,
+                        onChanged: (v) => noteText = v,
+                        decoration: const InputDecoration(
+                          labelText: 'Logical reason (1-2 sentences)',
+                          hintText:
+                              'Explain why this move is the best decision now.',
+                        ),
+                      ),
+                      if (errorText != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            errorText!,
+                            style: const TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
                     ],
-                    onChanged: (v) => setState(() => selectedReason = v ?? reasons.first),
-                    decoration: const InputDecoration(labelText: 'Reason category'),
                   ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    maxLines: 2,
-                    onChanged: (v) => noteText = v,
-                    decoration: const InputDecoration(
-                      labelText: 'Logical reason (1-2 sentences)',
-                      hintText: 'Explain why this move is the best decision now.',
-                    ),
-                  ),
-                  if (errorText != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(errorText!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
-                    ),
-                ],
+                ),
               ),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () {
-                final note = noteText.trim();
-                try {
-                  FlowTransitionEvent.validateReasonNote(note);
-                } catch (_) {
-                  setState(() => errorText = 'Give a clear reason in 1-2 sentences.');
-                  return;
-                }
-                Navigator.pop(ctx, (reason: selectedReason, note: note));
-              },
-              child: const Text('Move task'),
-            ),
-          ],
-        );
-      },
-    ),
-  );
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final note = noteText.trim();
+                    try {
+                      FlowTransitionEvent.validateReasonNote(note);
+                    } catch (_) {
+                      setState(
+                        () =>
+                            errorText = 'Give a clear reason in 1-2 sentences.',
+                      );
+                      return;
+                    }
+                    Navigator.pop(ctx, (reason: selectedReason, note: note));
+                  },
+                  child: const Text('Move task'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
   if (choice == null) return false;
 
   final t = row.task;
@@ -555,7 +621,9 @@ Future<bool> _handleMoveWithReason(
   );
   if (!context.mounted) return false;
   ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('Moved "${t.title}" to later: ${choice.reason.label}.')),
+    SnackBar(
+      content: Text('Moved "${t.title}" to later: ${choice.reason.label}.'),
+    ),
   );
   return true;
 }
@@ -579,7 +647,8 @@ String _appendExtraTimeNote({
 }) {
   final stamp = DateTime.now().toIso8601String();
   final reflectPart = reflection == null ? '' : ' | Reflection: $reflection';
-  final entry = '[ExtraTime $stamp] +${extraMinutes}m | Reason: $reason$reflectPart';
+  final entry =
+      '[ExtraTime $stamp] +${extraMinutes}m | Reason: $reason$reflectPart';
   if (existing == null || existing.trim().isEmpty) return entry;
   return '$existing\n$entry';
 }

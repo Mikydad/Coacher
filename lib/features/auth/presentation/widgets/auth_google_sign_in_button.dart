@@ -19,7 +19,8 @@ class AuthGoogleSignInButton extends ConsumerStatefulWidget {
       _AuthGoogleSignInButtonState();
 }
 
-class _AuthGoogleSignInButtonState extends ConsumerState<AuthGoogleSignInButton> {
+class _AuthGoogleSignInButtonState
+    extends ConsumerState<AuthGoogleSignInButton> {
   bool _loading = false;
   String? _error;
 
@@ -30,8 +31,9 @@ class _AuthGoogleSignInButtonState extends ConsumerState<AuthGoogleSignInButton>
       _error = null;
     });
 
-    final (failure, _) =
-        await ref.read(authRepositoryProvider).signInWithGoogle();
+    final (failure, _) = await ref
+        .read(authRepositoryProvider)
+        .signInWithGoogle();
 
     if (!mounted) return;
 
@@ -49,7 +51,11 @@ class _AuthGoogleSignInButtonState extends ConsumerState<AuthGoogleSignInButton>
     }
 
     // Profile UI reads from Isar — seed name after Google profile is on Firebase.
-    final name = ref.read(authRepositoryProvider).currentUser?.displayName?.trim();
+    final name = ref
+        .read(authRepositoryProvider)
+        .currentUser
+        ?.displayName
+        ?.trim();
     if (name != null && name.isNotEmpty) {
       await ref
           .read(profilePreferenceServiceProvider)

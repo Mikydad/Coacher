@@ -21,7 +21,7 @@ abstract class ActivityFeedRepository {
 
 class FirestoreActivityFeedRepository implements ActivityFeedRepository {
   FirestoreActivityFeedRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
@@ -35,10 +35,7 @@ class FirestoreActivityFeedRepository implements ActivityFeedRepository {
   }
 
   @override
-  Stream<List<ActivityFeedItem>> watchFeed(
-    String circleId, {
-    int limit = 30,
-  }) {
+  Stream<List<ActivityFeedItem>> watchFeed(String circleId, {int limit = 30}) {
     return _feed(circleId)
         .orderBy('createdAtMs', descending: true)
         .limit(limit)

@@ -28,8 +28,7 @@ class CircleDetailScreen extends ConsumerStatefulWidget {
   static const routeName = '/community/circle';
 
   @override
-  ConsumerState<CircleDetailScreen> createState() =>
-      _CircleDetailScreenState();
+  ConsumerState<CircleDetailScreen> createState() => _CircleDetailScreenState();
 }
 
 class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
@@ -54,9 +53,8 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
       if (_tabController.indexIsChanging) {
         dismissKeyboard(context);
       } else {
-        ref
-            .read(circleActiveTabProvider(widget.circleId).notifier)
-            .state = _tabController.index;
+        ref.read(circleActiveTabProvider(widget.circleId).notifier).state =
+            _tabController.index;
       }
     });
 
@@ -83,24 +81,24 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
     if (authAsync.isLoading && !authAsync.hasValue) {
       return const Scaffold(
         backgroundColor: AppColors.surfaceDeep,
-        body: Center(
-          child: CircularProgressIndicator(color: AppColors.accent),
-        ),
+        body: Center(child: CircularProgressIndicator(color: AppColors.accent)),
       );
     }
 
     // When the circle document is deleted (stream emits null), go back
     // immediately instead of showing a "not found" placeholder.
-    ref.listen<AsyncValue<dynamic>>(
-      circleDetailProvider(widget.circleId),
-      (_, next) {
-        if (next is AsyncData && next.value == null) {
-          if (context.mounted) Navigator.of(context).popUntil((r) {
+    ref.listen<AsyncValue<dynamic>>(circleDetailProvider(widget.circleId), (
+      _,
+      next,
+    ) {
+      if (next is AsyncData && next.value == null) {
+        if (context.mounted) {
+          Navigator.of(context).popUntil((r) {
             return r.settings.name == '/community' || r.isFirst;
           });
         }
-      },
-    );
+      }
+    });
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDeep,
@@ -129,61 +127,62 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
             );
           }
 
-          final activeMembers = membersAsync.valueOrNull
+          final activeMembers =
+              membersAsync.valueOrNull
                   ?.where((m) => m.status == CircleMemberStatus.active)
                   .toList() ??
               [];
 
           return KeyboardDismissOnTap(
             child: NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) => [
-              SliverAppBar(
-                backgroundColor: AppColors.surfaceDark,
-                foregroundColor: AppColors.textPrimary,
-                expandedHeight: 200,
-                pinned: true,
-                floating: false,
-                flexibleSpace: FlexibleSpaceBar(
-                  background: _CircleHeader(
-                    circleName: circle.name,
-                    streak: circle.currentStreak,
-                    memberCount: circle.memberCount,
-                    members: activeMembers,
+              headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                SliverAppBar(
+                  backgroundColor: AppColors.surfaceDark,
+                  foregroundColor: AppColors.textPrimary,
+                  expandedHeight: 200,
+                  pinned: true,
+                  floating: false,
+                  flexibleSpace: FlexibleSpaceBar(
+                    background: _CircleHeader(
+                      circleName: circle.name,
+                      streak: circle.currentStreak,
+                      memberCount: circle.memberCount,
+                      members: activeMembers,
+                    ),
+                  ),
+                  bottom: PreferredSize(
+                    preferredSize: const Size.fromHeight(48),
+                    child: TabBar(
+                      controller: _tabController,
+                      isScrollable: true,
+                      labelColor: AppColors.accent,
+                      unselectedLabelColor: AppColors.textMuted,
+                      indicatorColor: AppColors.accent,
+                      indicatorSize: TabBarIndicatorSize.label,
+                      tabAlignment: TabAlignment.start,
+                      tabs: _tabs.map((t) => Tab(text: t)).toList(),
+                    ),
                   ),
                 ),
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(48),
-                  child: TabBar(
-                    controller: _tabController,
-                    isScrollable: true,
-                    labelColor: AppColors.accent,
-                    unselectedLabelColor: AppColors.textMuted,
-                    indicatorColor: AppColors.accent,
-                    indicatorSize: TabBarIndicatorSize.label,
-                    tabAlignment: TabAlignment.start,
-                    tabs: _tabs.map((t) => Tab(text: t)).toList(),
-                  ),
-                ),
-              ),
-            ],
-            body: TabBarView(
-              controller: _tabController,
-              children: [
-                // Chat
-                CircleChatView(circleId: widget.circleId),
-                // Activity
-                CircleActivityView(circleId: widget.circleId),
-                // Commitments
-                WeeklyCommitmentsView(circleId: widget.circleId),
-                // Challenges
-                CircleChallengesView(circleId: widget.circleId),
-                // Members
-                CircleMembersView(circleId: widget.circleId),
-                // Info
-                CircleInfoView(circleId: widget.circleId),
               ],
+              body: TabBarView(
+                controller: _tabController,
+                children: [
+                  // Chat
+                  CircleChatView(circleId: widget.circleId),
+                  // Activity
+                  CircleActivityView(circleId: widget.circleId),
+                  // Commitments
+                  WeeklyCommitmentsView(circleId: widget.circleId),
+                  // Challenges
+                  CircleChallengesView(circleId: widget.circleId),
+                  // Members
+                  CircleMembersView(circleId: widget.circleId),
+                  // Info
+                  CircleInfoView(circleId: widget.circleId),
+                ],
+              ),
             ),
-          ),
           );
         },
       ),
@@ -218,9 +217,7 @@ class _CircleHeader extends StatelessWidget {
           child: ClipRRect(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(
-                color: Colors.white.withOpacity(0.05),
-              ),
+              child: Container(color: Colors.white.withOpacity(0.05)),
             ),
           ),
         ),
@@ -256,8 +253,7 @@ class _CircleHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                if (members.isNotEmpty)
-                  _MemberAvatarRow(members: members),
+                if (members.isNotEmpty) _MemberAvatarRow(members: members),
               ],
             ),
           ),
@@ -278,9 +274,7 @@ class _StreakBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.accent.withOpacity(0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.accent.withOpacity(0.3),
-        ),
+        border: Border.all(color: AppColors.accent.withOpacity(0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -327,8 +321,9 @@ class _MemberAvatarRow extends StatelessWidget {
 
     return Row(
       children: visible.map((m) {
-        final initial =
-            m.displayName.isNotEmpty ? m.displayName[0].toUpperCase() : '?';
+        final initial = m.displayName.isNotEmpty
+            ? m.displayName[0].toUpperCase()
+            : '?';
         final color = _colorFor(m.userId);
         final isMe = m.userId == uid;
 

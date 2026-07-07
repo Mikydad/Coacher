@@ -17,11 +17,7 @@ final tomorrowRoutineSlotsProvider = FutureProvider<List<Routine>>((ref) async {
 
   if (routines.isEmpty) {
     final now = DateTime.now().millisecondsSinceEpoch;
-    final defaults = [
-      ('Morning', 0),
-      ('Afternoon', 1),
-      ('Night', 2),
-    ];
+    final defaults = [('Morning', 0), ('Afternoon', 1), ('Night', 2)];
     final created = <Routine>[];
     for (final (title, idx) in defaults) {
       final routineId = StableId.generate('routine');
@@ -55,36 +51,36 @@ final tomorrowRoutineSlotsProvider = FutureProvider<List<Routine>>((ref) async {
 /// Tasks for a single tomorrow routine slot, keyed by [routineId].
 final tomorrowTasksForRoutineProvider =
     FutureProvider.family<List<PlannedTaskRow>, String>((ref, routineId) async {
-  final repo = ref.read(planningRepositoryProvider);
-  final tomorrow = DateKeys.tomorrowKey();
+      final repo = ref.read(planningRepositoryProvider);
+      final tomorrow = DateKeys.tomorrowKey();
 
-  final blocks = await repo.getBlocks(routineId);
+      final blocks = await repo.getBlocks(routineId);
 
-  final rows = <PlannedTaskRow>[];
-  for (final block in blocks) {
-    final tasks = await repo.getTasks(
-      routineId: routineId,
-      blockId: block.id,
-    );
-    for (final task in tasks) {
-      rows.add(
-        PlannedTaskRow(
-          dateKey: tomorrow,
+      final rows = <PlannedTaskRow>[];
+      for (final block in blocks) {
+        final tasks = await repo.getTasks(
           routineId: routineId,
           blockId: block.id,
-          task: task,
-        ),
-      );
-    }
-  }
+        );
+        for (final task in tasks) {
+          rows.add(
+            PlannedTaskRow(
+              dateKey: tomorrow,
+              routineId: routineId,
+              blockId: block.id,
+              task: task,
+            ),
+          );
+        }
+      }
 
-  rows.sort((a, b) {
-    final c = a.task.orderIndex.compareTo(b.task.orderIndex);
-    if (c != 0) return c;
-    return a.task.id.compareTo(b.task.id);
-  });
-  return rows;
-});
+      rows.sort((a, b) {
+        final c = a.task.orderIndex.compareTo(b.task.orderIndex);
+        if (c != 0) return c;
+        return a.task.id.compareTo(b.task.id);
+      });
+      return rows;
+    });
 
 void invalidateTomorrowProviders(WidgetRef ref) {
   ref.invalidate(tomorrowRoutineSlotsProvider);

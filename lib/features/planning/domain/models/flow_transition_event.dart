@@ -1,10 +1,6 @@
 import '../../../../core/validation/model_validators.dart';
 
-enum FlowTransitionType {
-  startNow,
-  extraTime,
-  moveWithReason,
-}
+enum FlowTransitionType { startNow, extraTime, moveWithReason }
 
 enum OverrideReasonCategory {
   dependencyBlocked,
@@ -13,10 +9,7 @@ enum OverrideReasonCategory {
   scheduleConflict,
 }
 
-enum PlanChangeIntent {
-  feeling,
-  logical,
-}
+enum PlanChangeIntent { feeling, logical }
 
 extension PlanChangeIntentStorage on PlanChangeIntent {
   String get storageValue => name;
@@ -99,9 +92,7 @@ class FlowTransitionEvent {
     ModelValidators.requireNotBlank(trimmed, 'flowTransition.reasonNote');
     final sentences = _countSentences(trimmed);
     if (sentences < 1 || sentences > 2) {
-      throw ArgumentError(
-        'flowTransition.reasonNote must be 1-2 sentences',
-      );
+      throw ArgumentError('flowTransition.reasonNote must be 1-2 sentences');
     }
   }
 
@@ -113,14 +104,16 @@ class FlowTransitionEvent {
   }
 
   PlanChangeIntent? get _effectiveIntent {
-    return planChangeIntent ?? (reasonCategory == null ? null : PlanChangeIntent.logical);
+    return planChangeIntent ??
+        (reasonCategory == null ? null : PlanChangeIntent.logical);
   }
 
   Map<String, dynamic> toMap() => {
     'id': id,
     'taskId': taskId,
     'type': type.storageValue,
-    if (_effectiveIntent != null) 'planChangeIntent': _effectiveIntent!.storageValue,
+    if (_effectiveIntent != null)
+      'planChangeIntent': _effectiveIntent!.storageValue,
     if (reasonCategory != null) 'reasonCategory': reasonCategory!.storageValue,
     if (reasonNote != null) 'reasonNote': reasonNote,
     'createdAtMs': createdAtMs,

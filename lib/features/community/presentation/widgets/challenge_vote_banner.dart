@@ -22,8 +22,7 @@ class ChallengeVoteBanner extends ConsumerStatefulWidget {
       _ChallengeVoteBannerState();
 }
 
-class _ChallengeVoteBannerState
-    extends ConsumerState<ChallengeVoteBanner> {
+class _ChallengeVoteBannerState extends ConsumerState<ChallengeVoteBanner> {
   bool _loading = true;
   bool _hasVoted = false;
   int _voteCount = 0;
@@ -37,8 +36,7 @@ class _ChallengeVoteBannerState
 
   Future<void> _loadVotes() async {
     final repo = ref.read(challengeRepositoryProvider);
-    final votes = await repo.getVotes(
-        widget.circleId, widget.challenge.id);
+    final votes = await repo.getVotes(widget.circleId, widget.challenge.id);
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     setState(() {
       _voteCount = votes.length;
@@ -52,13 +50,14 @@ class _ChallengeVoteBannerState
     if (uid == null || _casting) return;
     setState(() => _casting = true);
     try {
-      await ref.read(challengeRepositoryProvider).vote(
+      await ref
+          .read(challengeRepositoryProvider)
+          .vote(
             challengeId: widget.challenge.id,
             circleId: widget.circleId,
             userId: uid,
             approve: approve,
-            memberCount:
-                widget.challenge.memberProgress.length.clamp(1, 999),
+            memberCount: widget.challenge.memberProgress.length.clamp(1, 999),
           );
       setState(() => _hasVoted = true);
     } finally {
@@ -78,17 +77,18 @@ class _ChallengeVoteBannerState
       decoration: BoxDecoration(
         color: AppColors.surfaceCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.how_to_vote_rounded,
-                  color: AppColors.accent, size: 16),
+              const Icon(
+                Icons.how_to_vote_rounded,
+                color: AppColors.accent,
+                size: 16,
+              ),
               const SizedBox(width: 6),
               const Text(
                 'Vote to approve',
@@ -121,10 +121,7 @@ class _ChallengeVoteBannerState
           Text(
             'Target: ${widget.challenge.targetValue} ${widget.challenge.unit}'
             ' · ${widget.challenge.mode.name[0].toUpperCase()}${widget.challenge.mode.name.substring(1)} mode',
-            style: const TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 12,
-            ),
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
           ),
           const SizedBox(height: 12),
           if (_loading)
@@ -146,8 +143,9 @@ class _ChallengeVoteBannerState
                     label: 'Approve',
                     icon: Icons.check_circle_rounded,
                     color: AppColors.success,
-                    onPressed:
-                        (_hasVoted || _casting) ? null : () => _castVote(true),
+                    onPressed: (_hasVoted || _casting)
+                        ? null
+                        : () => _castVote(true),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -156,8 +154,9 @@ class _ChallengeVoteBannerState
                     label: 'Reject',
                     icon: Icons.cancel_rounded,
                     color: AppColors.danger,
-                    onPressed:
-                        (_hasVoted || _casting) ? null : () => _castVote(false),
+                    onPressed: (_hasVoted || _casting)
+                        ? null
+                        : () => _castVote(false),
                   ),
                 ),
               ],
@@ -167,10 +166,7 @@ class _ChallengeVoteBannerState
               padding: EdgeInsets.only(top: 8),
               child: Text(
                 'Your vote has been recorded',
-                style: TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 11,
-                ),
+                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
               ),
             ),
         ],
@@ -205,9 +201,7 @@ class _VoteButton extends StatelessWidget {
           color: disabled ? color.withValues(alpha: 0.2) : color,
         ),
         padding: const EdgeInsets.symmetric(vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }

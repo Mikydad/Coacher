@@ -18,11 +18,14 @@ class TaskBlock {
   final String routineId;
   final String title;
   final int orderIndex;
+
   /// Optional local-time schedule window for the block (0..1439).
   final int? startMinutesFromMidnight;
   final int? endMinutesFromMidnight;
+
   /// Snapshot urgency score (0..100) used for UI sorting/highlighting.
   final int urgencyScore;
+
   /// Optional policy reference to a mode config id.
   final String? modeRefId;
   final int createdAtMs;
@@ -50,8 +53,10 @@ class TaskBlock {
     'routineId': routineId,
     'title': title,
     'orderIndex': orderIndex,
-    if (startMinutesFromMidnight != null) 'startMinutesFromMidnight': startMinutesFromMidnight,
-    if (endMinutesFromMidnight != null) 'endMinutesFromMidnight': endMinutesFromMidnight,
+    if (startMinutesFromMidnight != null)
+      'startMinutesFromMidnight': startMinutesFromMidnight,
+    if (endMinutesFromMidnight != null)
+      'endMinutesFromMidnight': endMinutesFromMidnight,
     'urgencyScore': urgencyScore,
     if (modeRefId != null) 'modeRefId': modeRefId,
     'createdAtMs': createdAtMs,
@@ -63,7 +68,8 @@ class TaskBlock {
     routineId: map['routineId'] as String? ?? '',
     title: map['title'] as String? ?? 'Main',
     orderIndex: (map['orderIndex'] as num?)?.toInt() ?? 0,
-    startMinutesFromMidnight: (map['startMinutesFromMidnight'] as num?)?.toInt(),
+    startMinutesFromMidnight: (map['startMinutesFromMidnight'] as num?)
+        ?.toInt(),
     endMinutesFromMidnight: (map['endMinutesFromMidnight'] as num?)?.toInt(),
     urgencyScore: (map['urgencyScore'] as num?)?.toInt() ?? 0,
     modeRefId: map['modeRefId'] as String?,

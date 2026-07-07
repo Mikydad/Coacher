@@ -27,8 +27,10 @@ enum PatternCode {
   timeMisalignment,
   tooHard,
   lowEngagement,
+
   /// Goal entity: progress materially behind expected trajectory (Layer 1 goal metrics).
   goalProgressDrift,
+
   /// Task/habit: high share of missed scheduled days vs scheduled opportunities in 7d window.
   scheduleRhythmVolatile,
 }
@@ -61,10 +63,11 @@ const Set<PatternGroup> kLayer2V1PatternGroups = <PatternGroup>{
 };
 
 /// Layer 2 codes that are persisted/detectable but must not drive Layer 3 copy yet.
-const Set<PatternCode> kDeferredLayer2PatternCodesForInsightMapping = <PatternCode>{
-  PatternCode.goalProgressDrift,
-  PatternCode.scheduleRhythmVolatile,
-};
+const Set<PatternCode> kDeferredLayer2PatternCodesForInsightMapping =
+    <PatternCode>{
+      PatternCode.goalProgressDrift,
+      PatternCode.scheduleRhythmVolatile,
+    };
 
 class DetectedPattern {
   const DetectedPattern({

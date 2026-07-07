@@ -9,9 +9,9 @@ class FormDraftAutosave {
     required String key,
     required Map<String, dynamic> Function() capture,
     this.debounce = const Duration(seconds: 10),
-  })  : _repository = repository,
-        _key = key,
-        _capture = capture;
+  }) : _repository = repository,
+       _key = key,
+       _capture = capture;
 
   final FormDraftRepository _repository;
   final String _key;

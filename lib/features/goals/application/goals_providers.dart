@@ -16,7 +16,9 @@ import '../domain/models/user_goal.dart';
 final goalsRepositoryProvider = Provider<GoalsRepository>(
   // watch (not read): rebuilds on uid change so the repository never holds a
   // FirestoreClient pinned to a previous account after a switch.
-  (ref) => IsarGoalsRepository(FirestoreGoalsRepository(ref.watch(firestoreClientProvider))),
+  (ref) => IsarGoalsRepository(
+    FirestoreGoalsRepository(ref.watch(firestoreClientProvider)),
+  ),
 );
 
 /// Raw stream of all goals for the signed-in user (ordered by `updatedAtMs` desc).
@@ -24,7 +26,9 @@ final goalsStreamProvider = StreamProvider<List<UserGoal>>((ref) {
   return ref.watch(goalsRepositoryProvider).watchGoals();
 });
 
-final selectedGoalCategoryFilterProvider = StateProvider<String?>((ref) => null);
+final selectedGoalCategoryFilterProvider = StateProvider<String?>(
+  (ref) => null,
+);
 
 final activeGoalsProvider = Provider<AsyncValue<List<UserGoal>>>((ref) {
   final async = ref.watch(goalsStreamProvider);
@@ -53,16 +57,19 @@ final todaysActiveGoalsProvider = Provider<AsyncValue<List<UserGoal>>>((ref) {
   return async.when(
     data: (list) {
       final todayKey = DateKeys.todayKey();
-      final todayGoals = list
-          .where(
-            (g) => g.status == GoalStatus.active && GoalPeriodHelpers.isDateKeyInPeriod(g, todayKey),
-          )
-          .toList()
-        ..sort((a, b) {
-          final c = b.intensity.compareTo(a.intensity);
-          if (c != 0) return c;
-          return b.updatedAtMs.compareTo(a.updatedAtMs);
-        });
+      final todayGoals =
+          list
+              .where(
+                (g) =>
+                    g.status == GoalStatus.active &&
+                    GoalPeriodHelpers.isDateKeyInPeriod(g, todayKey),
+              )
+              .toList()
+            ..sort((a, b) {
+              final c = b.intensity.compareTo(a.intensity);
+              if (c != 0) return c;
+              return b.updatedAtMs.compareTo(a.updatedAtMs);
+            });
       return AsyncValue.data(todayGoals);
     },
     loading: () => const AsyncValue.loading(),
@@ -74,10 +81,15 @@ final archivedGoalsProvider = Provider<AsyncValue<List<UserGoal>>>((ref) {
   final async = ref.watch(goalsStreamProvider);
   return async.when(
     data: (list) {
-      final archived = list
-          .where((g) => g.status == GoalStatus.paused || g.status == GoalStatus.completed)
-          .toList()
-        ..sort((a, b) => b.updatedAtMs.compareTo(a.updatedAtMs));
+      final archived =
+          list
+              .where(
+                (g) =>
+                    g.status == GoalStatus.paused ||
+                    g.status == GoalStatus.completed,
+              )
+              .toList()
+            ..sort((a, b) => b.updatedAtMs.compareTo(a.updatedAtMs));
       return AsyncValue.data(archived);
     },
     loading: () => const AsyncValue.loading(),
@@ -99,7 +111,10 @@ class GoalDetailBundle {
   final List<GoalCheckIn> checkIns;
 }
 
-final goalDetailProvider = FutureProvider.family<GoalDetailBundle?, String>((ref, goalId) async {
+final goalDetailProvider = FutureProvider.family<GoalDetailBundle?, String>((
+  ref,
+  goalId,
+) async {
   // watch: re-runs when the repository re-scopes on account switch.
   final repo = ref.watch(goalsRepositoryProvider);
   final goal = await repo.getGoal(goalId);
@@ -117,8 +132,10 @@ final goalDetailProvider = FutureProvider.family<GoalDetailBundle?, String>((ref
 
 /// Lightweight fetch of actions for a single goal — used by the counter sheet
 /// to show the action checklist without loading milestones or check-in history.
-final goalActionsProvider =
-    FutureProvider.family<List<GoalAction>, String>((ref, goalId) async {
+final goalActionsProvider = FutureProvider.family<List<GoalAction>, String>((
+  ref,
+  goalId,
+) async {
   final repo = ref.watch(goalsRepositoryProvider);
   return repo.getActions(goalId);
 });
@@ -191,8 +208,10 @@ class GoalTodayProgress {
 ///
 /// [progress] is measurement-based: [currentValue] / [targetValue].
 /// [doneActions] / [totalActions] are carried separately for the actions bar.
-final goalTodayProgressProvider =
-    FutureProvider.family<GoalTodayProgress, String>((ref, goalId) async {
+final goalTodayProgressProvider = FutureProvider.family<GoalTodayProgress, String>((
+  ref,
+  goalId,
+) async {
   final repo = ref.watch(goalsRepositoryProvider);
   final goalAsync = ref.watch(goalsStreamProvider);
 

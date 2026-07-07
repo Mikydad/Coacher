@@ -28,8 +28,8 @@ abstract final class ConflictDetectionEngine {
       final overlapMinutes = _computeOverlapMinutes(proposed, other);
       if (overlapMinutes <= 0) continue;
 
-      final shorterDuration = proposed.expectedDurationMinutes <
-              other.expectedDurationMinutes
+      final shorterDuration =
+          proposed.expectedDurationMinutes < other.expectedDurationMinutes
           ? proposed.expectedDurationMinutes
           : other.expectedDurationMinutes;
 
@@ -78,10 +78,9 @@ abstract final class ConflictDetectionEngine {
     ScheduledTimeBlock b,
   ) {
     final overlapStart = a.startAt.isAfter(b.startAt) ? a.startAt : b.startAt;
-    final overlapEnd =
-        a.computedEndAt.isBefore(b.computedEndAt)
-            ? a.computedEndAt
-            : b.computedEndAt;
+    final overlapEnd = a.computedEndAt.isBefore(b.computedEndAt)
+        ? a.computedEndAt
+        : b.computedEndAt;
     if (!overlapEnd.isAfter(overlapStart)) return 0;
     return overlapEnd.difference(overlapStart).inMinutes;
   }
@@ -111,20 +110,20 @@ abstract final class ConflictDetectionEngine {
     ScheduledTimeBlock other,
     int overlapMinutes,
   ) {
-    final shorter = proposed.expectedDurationMinutes < other.expectedDurationMinutes
+    final shorter =
+        proposed.expectedDurationMinutes < other.expectedDurationMinutes
         ? proposed.expectedDurationMinutes
         : other.expectedDurationMinutes;
 
-    final overlapRatio =
-        shorter > 0 ? (overlapMinutes / shorter).clamp(0.0, 1.0) : 1.0;
+    final overlapRatio = shorter > 0
+        ? (overlapMinutes / shorter).clamp(0.0, 1.0)
+        : 1.0;
 
-    final hardnessMultiplier =
-        (proposed.isRigid || other.isRigid) ? 0.3 : 0.0;
+    final hardnessMultiplier = (proposed.isRigid || other.isRigid) ? 0.3 : 0.0;
 
-    final maxImportance =
-        proposed.importance > other.importance
-            ? proposed.importance
-            : other.importance;
+    final maxImportance = proposed.importance > other.importance
+        ? proposed.importance
+        : other.importance;
     final importanceWeight = (maxImportance / 100.0) * 0.2;
 
     return (overlapRatio + hardnessMultiplier + importanceWeight).clamp(

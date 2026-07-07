@@ -31,8 +31,9 @@ class ReclaimedTimeService {
     final finishedAt = completedAt ?? _now();
     if (!finishedAt.isBefore(block.computedEndAt)) return null;
 
-    final reclaimedMinutes =
-        block.computedEndAt.difference(finishedAt).inMinutes;
+    final reclaimedMinutes = block.computedEndAt
+        .difference(finishedAt)
+        .inMinutes;
     if (reclaimedMinutes < 1) return null;
 
     return AvailableTimeWindow(

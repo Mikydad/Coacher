@@ -188,7 +188,9 @@ BehaviorPatternPhase2AggregateBuildResult buildGlobalBehaviorPatternSnapshot({
 
   final grouped = <PatternCode, List<DetectedBehaviorPattern>>{};
   for (final p in merged) {
-    grouped.putIfAbsent(p.patternCode, () => <DetectedBehaviorPattern>[]).add(p);
+    grouped
+        .putIfAbsent(p.patternCode, () => <DetectedBehaviorPattern>[])
+        .add(p);
   }
 
   final entries = <GlobalBehaviorPatternAggregateEntry>[];

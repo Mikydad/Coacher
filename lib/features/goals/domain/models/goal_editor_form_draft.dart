@@ -13,10 +13,10 @@ class GoalEditorActionDraftRow {
   final bool completed;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'completed': completed,
-      };
+    'id': id,
+    'title': title,
+    'completed': completed,
+  };
 
   factory GoalEditorActionDraftRow.fromJson(Map<String, dynamic> json) {
     return GoalEditorActionDraftRow(
@@ -80,24 +80,24 @@ class GoalEditorFormDraft {
   }
 
   Map<String, dynamic> toJson() => {
-        'savedAtMs': savedAtMs,
-        'title': title,
-        'target': target,
-        'customLabel': customLabel,
-        'durationDays': durationDays,
-        'categoryId': categoryId,
-        'horizon': horizon,
-        'periodMode': periodMode,
-        'measurement': measurement,
-        'intensity': intensity,
-        'monthAnchorMs': monthAnchorMs,
-        'rangeStartMs': rangeStartMs,
-        'rangeEndMs': rangeEndMs,
-        'durationStartMs': durationStartMs,
-        'reminderEnabled': reminderEnabled,
-        'reminderMinutesFromMidnight': reminderMinutesFromMidnight,
-        'actions': actions.map((a) => a.toJson()).toList(),
-      };
+    'savedAtMs': savedAtMs,
+    'title': title,
+    'target': target,
+    'customLabel': customLabel,
+    'durationDays': durationDays,
+    'categoryId': categoryId,
+    'horizon': horizon,
+    'periodMode': periodMode,
+    'measurement': measurement,
+    'intensity': intensity,
+    'monthAnchorMs': monthAnchorMs,
+    'rangeStartMs': rangeStartMs,
+    'rangeEndMs': rangeEndMs,
+    'durationStartMs': durationStartMs,
+    'reminderEnabled': reminderEnabled,
+    'reminderMinutesFromMidnight': reminderMinutesFromMidnight,
+    'actions': actions.map((a) => a.toJson()).toList(),
+  };
 
   factory GoalEditorFormDraft.fromJson(Map<String, dynamic> json) {
     final rawActions = json['actions'];
@@ -107,7 +107,9 @@ class GoalEditorFormDraft {
         if (item is Map<String, dynamic>) {
           actions.add(GoalEditorActionDraftRow.fromJson(item));
         } else if (item is Map) {
-          actions.add(GoalEditorActionDraftRow.fromJson(Map<String, dynamic>.from(item)));
+          actions.add(
+            GoalEditorActionDraftRow.fromJson(Map<String, dynamic>.from(item)),
+          );
         }
       }
     }
@@ -120,15 +122,23 @@ class GoalEditorFormDraft {
       categoryId: json['categoryId'] as String? ?? GoalCategories.study,
       horizon: json['horizon'] as String? ?? GoalHorizon.monthly.name,
       periodMode: json['periodMode'] as String? ?? GoalPeriodMode.calendar.name,
-      measurement: json['measurement'] as String? ?? MeasurementKind.minutes.name,
+      measurement:
+          json['measurement'] as String? ?? MeasurementKind.minutes.name,
       intensity: (json['intensity'] as num?)?.toDouble() ?? 3,
-      monthAnchorMs: json['monthAnchorMs'] as int? ?? DateTime.now().millisecondsSinceEpoch,
-      rangeStartMs: json['rangeStartMs'] as int? ?? DateTime.now().millisecondsSinceEpoch,
-      rangeEndMs: json['rangeEndMs'] as int? ??
+      monthAnchorMs:
+          json['monthAnchorMs'] as int? ??
+          DateTime.now().millisecondsSinceEpoch,
+      rangeStartMs:
+          json['rangeStartMs'] as int? ?? DateTime.now().millisecondsSinceEpoch,
+      rangeEndMs:
+          json['rangeEndMs'] as int? ??
           DateTime.now().add(const Duration(days: 6)).millisecondsSinceEpoch,
-      durationStartMs: json['durationStartMs'] as int? ?? DateTime.now().millisecondsSinceEpoch,
+      durationStartMs:
+          json['durationStartMs'] as int? ??
+          DateTime.now().millisecondsSinceEpoch,
       reminderEnabled: json['reminderEnabled'] as bool? ?? false,
-      reminderMinutesFromMidnight: json['reminderMinutesFromMidnight'] as int? ?? 9 * 60,
+      reminderMinutesFromMidnight:
+          json['reminderMinutesFromMidnight'] as int? ?? 9 * 60,
       actions: actions,
     );
   }

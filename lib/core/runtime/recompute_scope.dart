@@ -60,67 +60,65 @@ class RecomputeScope {
 
   /// Task create / update / delete — all subsystems.
   factory RecomputeScope.forTaskMutation() => const RecomputeScope(
-        overlaps: true,
-        analytics: true,
-        focus: true,
-        suggestions: true,
-        layer34: true,
-        aiSummary: true,
-        notifications: true,
-      );
+    overlaps: true,
+    analytics: true,
+    focus: true,
+    suggestions: true,
+    layer34: true,
+    aiSummary: true,
+    notifications: true,
+  );
 
   /// Task completed — analytics + focus + suggestions + layer34 + notifications.
   factory RecomputeScope.forTaskCompletion() => const RecomputeScope(
-        analytics: true,
-        focus: true,
-        suggestions: true,
-        layer34: true,
-        aiSummary: true,
-        notifications: true,
-      );
+    analytics: true,
+    focus: true,
+    suggestions: true,
+    layer34: true,
+    aiSummary: true,
+    notifications: true,
+  );
 
   /// Task deferred — analytics + suggestions + notifications.
   factory RecomputeScope.forTaskDeferred() => const RecomputeScope(
-        analytics: true,
-        suggestions: true,
-        notifications: true,
-      );
+    analytics: true,
+    suggestions: true,
+    notifications: true,
+  );
 
   /// Time block changed — overlaps + suggestions + notifications.
   factory RecomputeScope.forTimeBlockChange() => const RecomputeScope(
-        overlaps: true,
-        suggestions: true,
-        notifications: true,
-      );
+    overlaps: true,
+    suggestions: true,
+    notifications: true,
+  );
 
   /// Reminder changed — notifications only.
-  factory RecomputeScope.forReminderChange() => const RecomputeScope(
-        notifications: true,
-      );
+  factory RecomputeScope.forReminderChange() =>
+      const RecomputeScope(notifications: true);
 
   /// Context override changed — notifications only.
-  factory RecomputeScope.forContextOverrideChange() => const RecomputeScope(
-        notifications: true,
-      );
+  factory RecomputeScope.forContextOverrideChange() =>
+      const RecomputeScope(notifications: true);
 
   /// Goal changed — analytics + focus + suggestions + layer34.
   factory RecomputeScope.forGoalChange() => const RecomputeScope(
-        analytics: true,
-        focus: true,
-        suggestions: true,
-        layer34: true,
-      );
+    analytics: true,
+    focus: true,
+    suggestions: true,
+    layer34: true,
+  );
 
   /// Full refresh — all flags true. Used by sync and lifecycle events.
   factory RecomputeScope.forFullRefresh() => const RecomputeScope(
-        overlaps: true,
-        analytics: true,
-        focus: true,
-        suggestions: true,
-        layer34: true,
-        aiSummary: true,
-        notifications: true,
-      );
+    overlaps: true,
+    analytics: true,
+    focus: true,
+    suggestions: true,
+    layer34: true,
+    aiSummary: true,
+    notifications: true,
+  );
 
   @override
   String toString() =>

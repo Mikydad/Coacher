@@ -110,12 +110,18 @@ final recomputeAiSummaryProvider = FutureProvider<AiSummaryResponse>((
 
   // Derive payload fields needed for TTL calculation.
   final today = DateKeys.todayKey();
-  final insights = await ref.read(layer3DeliveryDayInsightsProvider(today).future);
+  final insights = await ref.read(
+    layer3DeliveryDayInsightsProvider(today).future,
+  );
   final primaryInsight = _findPrimaryInsight(insights, focus);
-  final primaryInsightType = primaryInsight?.insightType ?? InsightType.latePattern;
+  final primaryInsightType =
+      primaryInsight?.insightType ?? InsightType.latePattern;
 
   final now = DateTime.now();
-  final timingProfile = resolveTimingProfile(now: now, justCompletedTask: false);
+  final timingProfile = resolveTimingProfile(
+    now: now,
+    justCompletedTask: false,
+  );
 
   final framing = deriveCoachingFraming(
     focusReason: focus.focusReason,
@@ -169,20 +175,26 @@ final recomputeAiSummaryProvider = FutureProvider<AiSummaryResponse>((
   AiSummaryResponse response;
   try {
     final aiResponse = await client.generateSummary(payload);
-    final validated = validator.validate(response: aiResponse, payload: payload);
+    final validated = validator.validate(
+      response: aiResponse,
+      payload: payload,
+    );
     if (validated.isValid) {
       response = validated;
     } else {
       // Semantic validation rejected — use fallback.
       response = renderer.render(
         payload: payload,
-        failureReason: 'semantic_validation: ${validated.validationOutcome.name}',
+        failureReason:
+            'semantic_validation: ${validated.validationOutcome.name}',
       );
     }
   } on AiClientException catch (e) {
     response = renderer.render(
       payload: payload,
-      failureReason: e.isRateLimit ? 'rate_limit' : 'client_error: ${e.message}',
+      failureReason: e.isRateLimit
+          ? 'rate_limit'
+          : 'client_error: ${e.message}',
     );
   } catch (e) {
     response = renderer.render(payload: payload, failureReason: 'unknown: $e');
@@ -224,8 +236,7 @@ AiSummaryResponse _buildGenericFallback() {
     focusId: '',
     summaryType: SummaryType.daily,
     tone: CoachingTone.informative,
-    dailySummary:
-        'Staying consistent with your habits builds lasting results.',
+    dailySummary: 'Staying consistent with your habits builds lasting results.',
     mainRecommendation: 'Complete one planned action today.',
     framing: CoachingFraming.consistency,
     generatedAtMs: 0,

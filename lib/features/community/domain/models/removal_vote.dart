@@ -37,19 +37,18 @@ class RemovalVote {
   final int updatedAtMs;
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'circleId': circleId,
-        'targetUserId': targetUserId,
-        'initiatorId': initiatorId,
-        'votes': votes,
-        'status': status.storageValue,
-        'createdAtMs': createdAtMs,
-        'updatedAtMs': updatedAtMs,
-      };
+    'id': id,
+    'circleId': circleId,
+    'targetUserId': targetUserId,
+    'initiatorId': initiatorId,
+    'votes': votes,
+    'status': status.storageValue,
+    'createdAtMs': createdAtMs,
+    'updatedAtMs': updatedAtMs,
+  };
 
   static RemovalVote fromMap(Map<String, dynamic> map) {
-    final rawVotes =
-        (map['votes'] as Map<String, dynamic>?) ?? {};
+    final rawVotes = (map['votes'] as Map<String, dynamic>?) ?? {};
     final votes = rawVotes.map((k, v) => MapEntry(k, v as bool));
 
     return RemovalVote(
@@ -58,8 +57,7 @@ class RemovalVote {
       targetUserId: map['targetUserId'] as String? ?? '',
       initiatorId: map['initiatorId'] as String? ?? '',
       votes: votes,
-      status:
-          RemovalVoteStatusStorage.fromStorage(map['status'] as String?),
+      status: RemovalVoteStatusStorage.fromStorage(map['status'] as String?),
       createdAtMs: (map['createdAtMs'] as num?)?.toInt() ?? 0,
       updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
     );

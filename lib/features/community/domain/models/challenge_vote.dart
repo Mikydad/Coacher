@@ -13,11 +13,11 @@ class ChallengeVote {
   final int createdAtMs;
 
   Map<String, dynamic> toMap() => {
-        'challengeId': challengeId,
-        'userId': userId,
-        'approve': approve,
-        'createdAtMs': createdAtMs,
-      };
+    'challengeId': challengeId,
+    'userId': userId,
+    'approve': approve,
+    'createdAtMs': createdAtMs,
+  };
 
   static ChallengeVote fromMap(Map<String, dynamic> map) {
     return ChallengeVote(

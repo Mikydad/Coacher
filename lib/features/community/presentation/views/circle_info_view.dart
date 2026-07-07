@@ -9,6 +9,7 @@ import '../../domain/models/circle_enums.dart';
 import '../sheets/circle_notif_prefs_sheet.dart';
 
 import '../../../../core/presentation/app_colors.dart';
+import '../../../../core/presentation/async_value_ui.dart';
 
 class CircleInfoView extends ConsumerWidget {
   const CircleInfoView({super.key, required this.circleId});
@@ -25,16 +26,23 @@ class CircleInfoView extends ConsumerWidget {
       loading: () => const Center(
         child: CircularProgressIndicator(color: AppColors.accent),
       ),
-      error: (_, __) => const Center(
-        child: Text('Could not load circle info.',
-            style: TextStyle(color: AppColors.textMuted)),
+      error: (e, _) => swallowedAsyncError(
+        'circle_info_view',
+        e,
+        const Center(
+          child: Text(
+            'Could not load circle info.',
+            style: TextStyle(color: AppColors.textMuted),
+          ),
+        ),
       ),
       data: (circle) {
         if (circle == null) return const SizedBox.shrink();
         final isCreator = circle.creatorId == uid;
         final isModerator = circle.moderatorIds.contains(uid);
 
-        final moderators = membersAsync.valueOrNull
+        final moderators =
+            membersAsync.valueOrNull
                 ?.where((m) => circle.moderatorIds.contains(m.userId))
                 .toList() ??
             [];
@@ -77,19 +85,22 @@ class CircleInfoView extends ConsumerWidget {
                     runSpacing: 6,
                     children: [
                       _Chip(
-                          label: circle.category,
-                          icon: Icons.category_outlined),
+                        label: circle.category,
+                        icon: Icons.category_outlined,
+                      ),
                       _Chip(
                         label: circle.joinPolicy == JoinPolicy.open
                             ? 'Open'
                             : circle.joinPolicy == JoinPolicy.requestApproval
-                                ? 'Approval'
-                                : 'Invite-only',
+                            ? 'Approval'
+                            : 'Invite-only',
                         icon: Icons.lock_outline_rounded,
                       ),
                       _Chip(
-                          label: '${circle.memberCount}/${AccountabilityCircle.kMaxMembers} members',
-                          icon: Icons.people_outline),
+                        label:
+                            '${circle.memberCount}/${AccountabilityCircle.kMaxMembers} members',
+                        icon: Icons.people_outline,
+                      ),
                     ],
                   ),
                 ],
@@ -128,9 +139,14 @@ class CircleInfoView extends ConsumerWidget {
             const SizedBox(height: 8),
             ...moderators.map(
               (m) => _InfoTile(
-                leading: const Icon(Icons.shield_rounded,
-                    color: AppColors.accent, size: 18),
-                title: m.userId == uid ? '${m.displayName} (you)' : m.displayName,
+                leading: const Icon(
+                  Icons.shield_rounded,
+                  color: AppColors.accent,
+                  size: 18,
+                ),
+                title: m.userId == uid
+                    ? '${m.displayName} (you)'
+                    : m.displayName,
               ),
             ),
             const SizedBox(height: 16),
@@ -145,8 +161,7 @@ class CircleInfoView extends ConsumerWidget {
                 context: context,
                 isScrollControlled: true,
                 backgroundColor: Colors.transparent,
-                builder: (_) =>
-                    CircleNotifPrefsSheet(circleId: circleId),
+                builder: (_) => CircleNotifPrefsSheet(circleId: circleId),
               ),
             ),
             if (isModerator && isCreator)
@@ -157,7 +172,8 @@ class CircleInfoView extends ConsumerWidget {
                   // Phase 5+: circle settings editor
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text('Circle settings coming soon')),
+                      content: Text('Circle settings coming soon'),
+                    ),
                   );
                 },
               ),
@@ -169,8 +185,10 @@ class CircleInfoView extends ConsumerWidget {
             if (isCreator)
               OutlinedButton.icon(
                 onPressed: () => _confirmDelete(context, ref, circle.name),
-                icon: const Icon(Icons.delete_forever_rounded,
-                    color: AppColors.danger),
+                icon: const Icon(
+                  Icons.delete_forever_rounded,
+                  color: AppColors.danger,
+                ),
                 label: const Text(
                   'Delete circle',
                   style: TextStyle(color: AppColors.danger),
@@ -186,8 +204,10 @@ class CircleInfoView extends ConsumerWidget {
             else
               OutlinedButton.icon(
                 onPressed: () => _confirmLeave(context, ref, uid),
-                icon: const Icon(Icons.exit_to_app_rounded,
-                    color: AppColors.danger),
+                icon: const Icon(
+                  Icons.exit_to_app_rounded,
+                  color: AppColors.danger,
+                ),
                 label: const Text(
                   'Leave circle',
                   style: TextStyle(color: AppColors.danger),
@@ -208,13 +228,18 @@ class CircleInfoView extends ConsumerWidget {
   }
 
   Future<void> _confirmDelete(
-      BuildContext context, WidgetRef ref, String circleName) async {
+    BuildContext context,
+    WidgetRef ref,
+    String circleName,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surfaceDark,
-        title: const Text('Delete circle?',
-            style: TextStyle(color: AppColors.textPrimary)),
+        title: const Text(
+          'Delete circle?',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
         content: Text(
           'This will permanently delete "$circleName" and remove all members. '
           'This cannot be undone.',
@@ -223,8 +248,10 @@ class CircleInfoView extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.textMuted)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textMuted),
+            ),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -246,21 +273,26 @@ class CircleInfoView extends ConsumerWidget {
       // which pops back when the circle document disappears from Firestore.
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not delete circle: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not delete circle: $e')));
       }
     }
   }
 
   Future<void> _confirmLeave(
-      BuildContext context, WidgetRef ref, String _) async {
+    BuildContext context,
+    WidgetRef ref,
+    String _,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surfaceDark,
-        title: const Text('Leave circle?',
-            style: TextStyle(color: AppColors.textPrimary)),
+        title: const Text(
+          'Leave circle?',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
         content: const Text(
           'You will lose access to the chat, challenges, and activity feed.',
           style: TextStyle(color: AppColors.textMuted),
@@ -268,8 +300,10 @@ class CircleInfoView extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.textMuted)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textMuted),
+            ),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -284,15 +318,13 @@ class CircleInfoView extends ConsumerWidget {
     );
     if (confirmed != true) return;
     try {
-      await ref
-          .read(userCircleMembershipServiceProvider)
-          .leaveCircle(circleId);
+      await ref.read(userCircleMembershipServiceProvider).leaveCircle(circleId);
       if (context.mounted) Navigator.pop(context);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not leave: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not leave: $e')));
       }
     }
   }
@@ -361,8 +393,7 @@ class _InfoTile extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             title,
-            style: const TextStyle(
-                color: AppColors.textPrimary, fontSize: 14),
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
           ),
         ],
       ),
@@ -404,8 +435,11 @@ class _SettingsTile extends StatelessWidget {
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textMuted, size: 18),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textMuted,
+              size: 18,
+            ),
           ],
         ),
       ),

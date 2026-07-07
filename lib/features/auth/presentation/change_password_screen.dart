@@ -72,8 +72,10 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
     final repo = ref.read(authRepositoryProvider);
 
     // Step 1 — re-authenticate to prove identity before the sensitive change.
-    final reAuthFailure =
-        await repo.reauthenticate(email: email, password: current);
+    final reAuthFailure = await repo.reauthenticate(
+      email: email,
+      password: current,
+    );
 
     if (!mounted) return;
     if (reAuthFailure != null) {

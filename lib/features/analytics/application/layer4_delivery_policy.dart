@@ -2,7 +2,13 @@ import '../domain/models/generated_insight.dart';
 
 const int kLayer4DeliveryPolicyConfigVersion = 1;
 
-enum DeliveryTimingProfile { morning, afternoon, evening, night, postCompletion }
+enum DeliveryTimingProfile {
+  morning,
+  afternoon,
+  evening,
+  night,
+  postCompletion,
+}
 
 class DeliveryThresholds {
   const DeliveryThresholds({
@@ -29,10 +35,7 @@ class AdaptiveCooldownPolicy {
 }
 
 class SelectionPolicy {
-  const SelectionPolicy({
-    required this.maxPrimary,
-    required this.maxSecondary,
-  });
+  const SelectionPolicy({required this.maxPrimary, required this.maxSecondary});
 
   final int maxPrimary;
   final int maxSecondary;
@@ -167,13 +170,14 @@ int compareDeliveryCandidates(
   GeneratedInsight b, {
   required DeliveryTimingProfile profile,
 }) {
-  final scoreCmp = scoreDeliveryCandidate(b, profile: profile).compareTo(
-    scoreDeliveryCandidate(a, profile: profile),
-  );
+  final scoreCmp = scoreDeliveryCandidate(
+    b,
+    profile: profile,
+  ).compareTo(scoreDeliveryCandidate(a, profile: profile));
   if (scoreCmp != 0) return scoreCmp;
-  final priorityCmp = basePriorityScore(b.priority).compareTo(
-    basePriorityScore(a.priority),
-  );
+  final priorityCmp = basePriorityScore(
+    b.priority,
+  ).compareTo(basePriorityScore(a.priority));
   if (priorityCmp != 0) return priorityCmp;
   final confidenceCmp = b.confidence.compareTo(a.confidence);
   if (confidenceCmp != 0) return confidenceCmp;

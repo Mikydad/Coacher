@@ -97,9 +97,9 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not create circle: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not create circle: $e')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -124,35 +124,35 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
       ),
       body: KeyboardDismissOnTap(
         child: Form(
-        key: _formKey,
-        child: ListView(
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: const EdgeInsets.all(20),
-          children: [
-            _SectionLabel('Circle name'),
-            const SizedBox(height: 8),
-            _buildNameField(),
-            const SizedBox(height: 24),
-            _SectionLabel('Description (optional)'),
-            const SizedBox(height: 8),
-            _buildDescField(),
-            const SizedBox(height: 24),
-            _SectionLabel('Category'),
-            const SizedBox(height: 12),
-            _buildCategoryChips(),
-            const SizedBox(height: 24),
-            _SectionLabel('Join policy'),
-            const SizedBox(height: 12),
-            _buildJoinPolicyToggle(),
-            const SizedBox(height: 24),
-            _SectionLabel('Visibility'),
-            const SizedBox(height: 12),
-            _buildVisibilityToggle(),
-            const SizedBox(height: 40),
-            _buildSaveButton(),
-          ],
+          key: _formKey,
+          child: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.all(20),
+            children: [
+              _SectionLabel('Circle name'),
+              const SizedBox(height: 8),
+              _buildNameField(),
+              const SizedBox(height: 24),
+              _SectionLabel('Description (optional)'),
+              const SizedBox(height: 8),
+              _buildDescField(),
+              const SizedBox(height: 24),
+              _SectionLabel('Category'),
+              const SizedBox(height: 12),
+              _buildCategoryChips(),
+              const SizedBox(height: 24),
+              _SectionLabel('Join policy'),
+              const SizedBox(height: 12),
+              _buildJoinPolicyToggle(),
+              const SizedBox(height: 24),
+              _SectionLabel('Visibility'),
+              const SizedBox(height: 12),
+              _buildVisibilityToggle(),
+              const SizedBox(height: 40),
+              _buildSaveButton(),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -195,17 +195,14 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
             cat[0].toUpperCase() + cat.substring(1),
             style: TextStyle(
               color: selected ? Colors.black : AppColors.textMuted,
-              fontWeight:
-                  selected ? FontWeight.w600 : FontWeight.w400,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
           selected: selected,
           selectedColor: AppColors.accent,
           backgroundColor: AppColors.surfaceCard,
           side: BorderSide(
-            color: selected
-                ? AppColors.accent
-                : Colors.white.withOpacity(0.06),
+            color: selected ? AppColors.accent : Colors.white.withOpacity(0.06),
           ),
           onSelected: (_) => setState(() => _selectedCategory = cat),
         );
@@ -260,9 +257,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
         backgroundColor: AppColors.accent,
         foregroundColor: Colors.black,
         minimumSize: const Size.fromHeight(52),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       child: _saving
           ? const SizedBox(

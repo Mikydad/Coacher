@@ -40,14 +40,10 @@ List<OverridePreset> presetDurations(ContextOverride type) {
 
     case ContextOverride.sleep:
       // Sleep is typically schedule-driven; manual start always indefinite.
-      return const [
-        OverridePreset(label: 'Until I end it'),
-      ];
+      return const [OverridePreset(label: 'Until I end it')];
 
     case ContextOverride.vacation:
-      return const [
-        OverridePreset(label: 'Until I end it'),
-      ];
+      return const [OverridePreset(label: 'Until I end it')];
 
     case ContextOverride.doNotDisturb:
       return const [
@@ -85,7 +81,10 @@ class ContextOverrideService {
     required ContextOverride type,
     DateTime? expiresAt,
   }) async {
-    assert(type != ContextOverride.none, 'Cannot activate ContextOverride.none');
+    assert(
+      type != ContextOverride.none,
+      'Cannot activate ContextOverride.none',
+    );
     final current = await _currentOrEmpty();
     final nowMs = _now().millisecondsSinceEpoch;
     final updated = current.copyWith(
@@ -127,7 +126,9 @@ class ContextOverrideService {
   /// Must be called:
   ///   - On app foreground resume
   ///   - Every 5 minutes while an override is active
-  Future<PostOverrideReview?> checkAndExpireIfNeeded([DateTime? nowOverride]) async {
+  Future<PostOverrideReview?> checkAndExpireIfNeeded([
+    DateTime? nowOverride,
+  ]) async {
     final now = nowOverride ?? _now();
     final current = await _currentOrEmpty();
     if (!current.hasActiveOverride) return null;

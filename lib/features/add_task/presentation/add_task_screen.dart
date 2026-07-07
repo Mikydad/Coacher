@@ -50,6 +50,7 @@ class AddTaskEditArgs {
   final String taskId;
   final String routineId;
   final String blockId;
+
   /// `Routine.dateKey` for this task’s current plan day.
   final String dateKey;
 }
@@ -80,7 +81,8 @@ class AddTaskScreen extends ConsumerStatefulWidget {
   ConsumerState<AddTaskScreen> createState() => _AddTaskScreenState();
 }
 
-class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindingObserver {
+class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
+    with WidgetsBindingObserver {
   static const _categoryOptions = [
     'Study',
     'Fitness',
@@ -114,6 +116,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
   /// Execution mode id: `flexible` | `disciplined` | `extreme`.
   String _modeRefId = 'flexible';
   bool _strictModeRequired = false;
+
   /// When false, new-task save may inherit [Routine.modeId] for the target routine.
   bool _modeUserCustomized = false;
 
@@ -143,8 +146,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
 
   bool get _isEdit => widget.editArgs != null;
 
-  String get _draftKey =>
-      _isEdit ? addTaskEditDraftKey(widget.editArgs!.taskId) : addTaskCreateDraftKey();
+  String get _draftKey => _isEdit
+      ? addTaskEditDraftKey(widget.editArgs!.taskId)
+      : addTaskCreateDraftKey();
 
   @override
   void initState() {
@@ -192,7 +196,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       unawaited(_draftAutosave?.persistIfDirty());
     }
   }
@@ -369,15 +374,23 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
           widget.editArgs?.dateKey ??
           DateKeys.todayKey();
     }
-    final rd = DateTime(_reminderTime.year, _reminderTime.month, _reminderTime.day);
+    final rd = DateTime(
+      _reminderTime.year,
+      _reminderTime.month,
+      _reminderTime.day,
+    );
     return DateKeys.yyyymmdd(rd);
   }
 
   Future<void> _seedModeFromRoutineSlot() async {
-    if (_isEdit || widget.slotArgs == null || _modeUserCustomized || !mounted) return;
+    if (_isEdit || widget.slotArgs == null || _modeUserCustomized || !mounted) {
+      return;
+    }
     try {
       final planning = ref.read(planningRepositoryProvider);
-      final routines = await planning.getRoutinesForDate(widget.slotArgs!.dateKey);
+      final routines = await planning.getRoutinesForDate(
+        widget.slotArgs!.dateKey,
+      );
       for (final r in routines) {
         if (r.id == widget.slotArgs!.routineId) {
           if (!mounted || _modeUserCustomized) return;
@@ -393,7 +406,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
           return;
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('add_task_screen: swallowed error: $e');
+    }
   }
 
   /// Seeds the mode from the profile-level Discipline Mode, scaled by the
@@ -422,7 +437,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       for (final b in blocks) {
         if (b.id == slot.blockId) return b.urgencyScore;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('add_task_screen: swallowed error: $e');
+    }
     return null;
   }
 
@@ -449,7 +466,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
           break;
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('add_task_screen: swallowed error: $e');
+    }
 
     final explicit = (!_isEdit && !_modeUserCustomized) ? null : _modeRefId;
     final task = PlannedTask(
@@ -483,7 +502,10 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
     final args = widget.editArgs!;
     final planning = ref.read(planningRepositoryProvider);
     try {
-      final tasks = await planning.getTasks(routineId: args.routineId, blockId: args.blockId);
+      final tasks = await planning.getTasks(
+        routineId: args.routineId,
+        blockId: args.blockId,
+      );
       PlannedTask? task;
       for (final t in tasks) {
         if (t.id == args.taskId) {
@@ -493,13 +515,17 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       }
       if (task == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Task not found.')));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Task not found.')));
           Navigator.pop(context);
         }
         return;
       }
 
-      final reminders = await ref.read(reminderRepositoryProvider).getRemindersForTasks([task.id]);
+      final reminders = await ref
+          .read(reminderRepositoryProvider)
+          .getRemindersForTasks([task.id]);
 
       if (!mounted) return;
       final loaded = task;
@@ -530,20 +556,23 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
           _existingReminderId = reminders.first.id;
           _reminderCreatedAtMs = reminders.first.createdAtMs;
         }
-        _modeRefId = loaded.modeRefId?.trim().isNotEmpty == true ? loaded.modeRefId! : 'flexible';
+        _modeRefId = loaded.modeRefId?.trim().isNotEmpty == true
+            ? loaded.modeRefId!
+            : 'flexible';
         _strictModeRequired = loaded.strictModeRequired;
         _isHabitAnchor = loaded.isHabitAnchor;
         // Phase A: _isRigid defaults to false; no field on PlannedTask yet.
         _modeUserCustomized = false;
-        _advancedExpanded =
-            _isHabitAnchor || _strictModeRequired || _isRigid;
+        _advancedExpanded = _isHabitAnchor || _strictModeRequired || _isRigid;
         _loaded = true;
       });
       _suppressDraftDirty = false;
     } catch (e) {
       _suppressDraftDirty = false;
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not load task: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not load task: $e')));
         Navigator.pop(context);
       }
     }
@@ -566,7 +595,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
           break;
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('add_task_screen: swallowed error: $e');
+    }
 
     final now = DateTime.now().millisecondsSinceEpoch;
     final createdAt = _reminderCreatedAtMs ?? now;
@@ -611,7 +642,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       updatedAtMs: DateTime.now().millisecondsSinceEpoch,
       category: _category,
       planDateKey: planDateKey,
-      notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      notes: _notesController.text.trim().isEmpty
+          ? null
+          : _notesController.text.trim(),
       sequenceIndex: _loadedTask?.sequenceIndex,
       isHabitAnchor: _isHabitAnchor,
       strictModeRequired: _strictModeRequired,
@@ -619,7 +652,10 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
     );
   }
 
-  Future<bool> _confirmOverlapIfNeeded(PlannedTask task, String planDateKey) async {
+  Future<bool> _confirmOverlapIfNeeded(
+    PlannedTask task,
+    String planDateKey,
+  ) async {
     if (!task.reminderEnabled || task.reminderTimeIso == null) return true;
     final anchors = await readHabitAnchorsForDate(ref, dateKey: planDateKey);
     if (!mounted) return false;
@@ -714,7 +750,10 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       overlapping: overlapping,
     );
 
-    final result = await service.checkConflicts(proposed, entityTitles: entityTitles);
+    final result = await service.checkConflicts(
+      proposed,
+      entityTitles: entityTitles,
+    );
     if (!result.hasConflicts) {
       // Still log overlapCreated = false (no event needed — clean save).
       return true;
@@ -761,7 +800,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       },
       planDay: planDay,
       ignoreEntityIds: {task.id},
-      onEntityMoved: () => ScheduleMutationCoordinator.instance.run( // migrated to coordinator
+      onEntityMoved: () => ScheduleMutationCoordinator.instance.run(
+        // migrated to coordinator
         TimeBlockChangedMutation(
           entityId: task.id,
           sourceContext: 'add_task_screen.conflict_resolution',
@@ -780,17 +820,17 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
         });
         _scrollToScheduleSection();
       },
-      onOverlapResolvedInline: ({
-        required movedEntity,
-        required suggestionIndex,
-        conflictingEntityId,
-      }) =>
-          _logOverlapResolvedInline(
-        taskId: task.id,
-        movedEntity: movedEntity,
-        suggestionIndex: suggestionIndex,
-        conflictingEntityId: conflictingEntityId,
-      ),
+      onOverlapResolvedInline:
+          ({
+            required movedEntity,
+            required suggestionIndex,
+            conflictingEntityId,
+          }) => _logOverlapResolvedInline(
+            taskId: task.id,
+            movedEntity: movedEntity,
+            suggestionIndex: suggestionIndex,
+            conflictingEntityId: conflictingEntityId,
+          ),
     );
 
     return _handleConflictResolutionOutcome(task, outcome);
@@ -854,12 +894,16 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
 
   Future<void> _syncTimeBlock(PlannedTask task) async {
     if (!taskHasFocusDuration(task.durationMinutes)) {
-      await ref.read(timeBlockSyncServiceProvider).removeBlockForEntity(task.id);
+      await ref
+          .read(timeBlockSyncServiceProvider)
+          .removeBlockForEntity(task.id);
       return;
     }
     final reminderIso = task.reminderTimeIso;
     if (reminderIso == null) {
-      await ref.read(timeBlockSyncServiceProvider).removeBlockForEntity(task.id);
+      await ref
+          .read(timeBlockSyncServiceProvider)
+          .removeBlockForEntity(task.id);
       return;
     }
     final startAt = DateTime.tryParse(reminderIso);
@@ -886,7 +930,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       entityId: task.id,
       entityKind: 'task',
       sourceSurface: _isEdit ? 'add_task_edit' : 'add_task_create',
-      idempotencyKey: 'overlap_created_${task.id}_${DateTime.now().millisecondsSinceEpoch}',
+      idempotencyKey:
+          'overlap_created_${task.id}_${DateTime.now().millisecondsSinceEpoch}',
       modeRefId: task.modeRefId,
       reason: overridden ? 'override' : 'detected',
     );
@@ -896,7 +941,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
     if (_saving || (_isEdit && !_loaded)) return;
     setState(() => _saving = true);
 
-    final title = _controller.text.trim().isEmpty ? 'Untitled Task' : _controller.text.trim();
+    final title = _controller.text.trim().isEmpty
+        ? 'Untitled Task'
+        : _controller.text.trim();
     final planning = ref.read(planningRepositoryProvider);
     final planKey = _planDateKey();
     final nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -922,10 +969,16 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
           final day = await planning.ensureDefaultDayPlan(planKey);
           routineId = day.routineId;
           blockId = day.blockId;
-          final existing = await planning.getTasks(routineId: routineId, blockId: blockId);
+          final existing = await planning.getTasks(
+            routineId: routineId,
+            blockId: blockId,
+          );
           orderIndex = existing.isEmpty
               ? 0
-              : existing.map((t) => t.orderIndex).reduce((a, b) => a > b ? a : b) + 1;
+              : existing
+                        .map((t) => t.orderIndex)
+                        .reduce((a, b) => a > b ? a : b) +
+                    1;
         } else {
           routineId = args.routineId;
           blockId = args.blockId;
@@ -938,18 +991,30 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
           // Save directly into the preset slot — no ensureDefaultDayPlan needed.
           routineId = widget.slotArgs!.routineId;
           blockId = widget.slotArgs!.blockId;
-          final existing = await planning.getTasks(routineId: routineId, blockId: blockId);
+          final existing = await planning.getTasks(
+            routineId: routineId,
+            blockId: blockId,
+          );
           orderIndex = existing.isEmpty
               ? 0
-              : existing.map((t) => t.orderIndex).reduce((a, b) => a > b ? a : b) + 1;
+              : existing
+                        .map((t) => t.orderIndex)
+                        .reduce((a, b) => a > b ? a : b) +
+                    1;
         } else {
           final day = await planning.ensureDefaultDayPlan(planKey);
           routineId = day.routineId;
           blockId = day.blockId;
-          final existing = await planning.getTasks(routineId: routineId, blockId: blockId);
+          final existing = await planning.getTasks(
+            routineId: routineId,
+            blockId: blockId,
+          );
           orderIndex = existing.isEmpty
               ? 0
-              : existing.map((t) => t.orderIndex).reduce((a, b) => a > b ? a : b) + 1;
+              : existing
+                        .map((t) => t.orderIndex)
+                        .reduce((a, b) => a > b ? a : b) +
+                    1;
         }
       }
 
@@ -1004,7 +1069,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
                 sourceContext: 'add_task_screen',
                 dateStr: planKey,
               ),
-        commitOverride: () async {}, // write already done above (upsertTask + syncTimeBlock + persistReminder)
+        commitOverride:
+            () async {}, // write already done above (upsertTask + syncTimeBlock + persistReminder)
       );
 
       _draftClearedOnSuccessfulSave = true;
@@ -1015,9 +1081,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not save task: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not save task: $e')));
       }
     } finally {
       if (mounted) {
@@ -1034,7 +1100,10 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
   List<String> get _activeDurationLabels {
     if (isSleepCategory(_category)) {
       return [
-        ...sleepDurationChipLabels.sublist(0, sleepDurationChipLabels.length - 1),
+        ...sleepDurationChipLabels.sublist(
+          0,
+          sleepDurationChipLabels.length - 1,
+        ),
         isCustomDurationKey(_duration)
             ? formatAddTaskDurationChipLabel(_customDurationMinutes)
             : sleepDurationChipLabels.last,
@@ -1199,8 +1268,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
                 subtitle: sleep
                     ? 'Choose a preset or tap Custom for your sleep length'
                     : _durationEnabled
-                        ? 'Define your focus sprint'
-                        : 'Reminder only — no calendar time block',
+                    ? 'Define your focus sprint'
+                    : 'Reminder only — no calendar time block',
               ),
             ),
             if (!sleep) ...[
@@ -1209,8 +1278,11 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
                 children: [
                   Switch.adaptive(
                     value: _durationEnabled,
-                    onChanged: (value) => setState(() => _durationEnabled = value),
-                    activeTrackColor: AddTaskColors.accentDim.withValues(alpha: 0.55),
+                    onChanged: (value) =>
+                        setState(() => _durationEnabled = value),
+                    activeTrackColor: AddTaskColors.accentDim.withValues(
+                      alpha: 0.55,
+                    ),
                     activeThumbColor: AddTaskColors.accentContainer,
                   ),
                   const Text(
@@ -1258,42 +1330,42 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
         ),
         const SizedBox(height: 16),
         LayoutBuilder(
-            builder: (context, constraints) {
-              const spacing = 8.0;
-              const columns = 3;
-              final tileWidth =
-                  (constraints.maxWidth - spacing * (columns - 1)) / columns;
-              return Wrap(
-                spacing: spacing,
-                runSpacing: spacing,
-                children: [
-                  for (final label in _categoryOptions)
-                    SizedBox(
-                      width: tileWidth,
-                      child: AddTaskCategoryTile(
-                        label: label,
-                        icon: addTaskCategoryIcon(label),
-                        selected: _category == label,
-                        onTap: () => setState(() {
-                          if (_category == label) {
-                            _category = null;
-                          } else {
-                            final wasSleep = isSleepCategory(_category);
-                            _category = label;
-                            if (isSleepCategory(label)) {
-                              _applySleepCategoryDefaults(label);
-                            } else if (wasSleep &&
-                                sleepDurationChipKeys.contains(_duration)) {
-                              _duration = '25 MIN';
-                            }
+          builder: (context, constraints) {
+            const spacing = 8.0;
+            const columns = 3;
+            final tileWidth =
+                (constraints.maxWidth - spacing * (columns - 1)) / columns;
+            return Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: [
+                for (final label in _categoryOptions)
+                  SizedBox(
+                    width: tileWidth,
+                    child: AddTaskCategoryTile(
+                      label: label,
+                      icon: addTaskCategoryIcon(label),
+                      selected: _category == label,
+                      onTap: () => setState(() {
+                        if (_category == label) {
+                          _category = null;
+                        } else {
+                          final wasSleep = isSleepCategory(_category);
+                          _category = label;
+                          if (isSleepCategory(label)) {
+                            _applySleepCategoryDefaults(label);
+                          } else if (wasSleep &&
+                              sleepDurationChipKeys.contains(_duration)) {
+                            _duration = '25 MIN';
                           }
-                        }),
-                      ),
+                        }
+                      }),
                     ),
-                ],
-              );
-            },
-          ),
+                  ),
+              ],
+            );
+          },
+        ),
       ],
     );
   }
@@ -1385,8 +1457,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
 
   Widget _buildReminderSection() {
     final timeLabel = TimeOfDay.fromDateTime(_reminderTime).format(context);
-    final dateLabel =
-        MaterialLocalizations.of(context).formatMediumDate(_reminderTime);
+    final dateLabel = MaterialLocalizations.of(
+      context,
+    ).formatMediumDate(_reminderTime);
     final planLabel = _planDateKey() == DateKeys.todayKey()
         ? 'Today'
         : _planDateKey();
@@ -1410,8 +1483,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
                 onChanged: (value) async {
                   setState(() => _reminder = value);
                   if (!value) return;
-                  final ok =
-                      await ref.read(reminderSyncServiceProvider).ensurePermissions();
+                  final ok = await ref
+                      .read(reminderSyncServiceProvider)
+                      .ensurePermissions();
                   if (!ok && mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -1433,10 +1507,12 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
                           final picked = await showDatePicker(
                             context: context,
                             initialDate: _reminderTime,
-                            firstDate:
-                                DateTime.now().subtract(const Duration(days: 365)),
-                            lastDate:
-                                DateTime.now().add(const Duration(days: 365)),
+                            firstDate: DateTime.now().subtract(
+                              const Duration(days: 365),
+                            ),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 365),
+                            ),
                           );
                           if (picked == null || !mounted) return;
                           setState(() {
@@ -1453,7 +1529,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
                       const SizedBox(height: 8),
                       AddTaskPickerRow(
                         icon: Icons.schedule_rounded,
-                        label: isSleepCategory(_category) ? 'Sleep start' : 'Time',
+                        label: isSleepCategory(_category)
+                            ? 'Sleep start'
+                            : 'Time',
                         value: timeLabel,
                         onTap: () async {
                           final picked = await showTimePicker(
@@ -1485,7 +1563,10 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
                         ),
                       ],
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 8,
+                          horizontal: 4,
+                        ),
                         child: Row(
                           children: [
                             const Icon(
@@ -1703,7 +1784,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
                     child: Text(
                       _saving
                           ? 'Saving…'
-                          : (_isEdit ? 'Save changes' : 'Add task').toUpperCase(),
+                          : (_isEdit ? 'Save changes' : 'Add task')
+                                .toUpperCase(),
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w900,

@@ -92,6 +92,7 @@ class FocusScoreBreakdown {
   final double feasibilityScore;
   final double riskScore;
   final double recoveryScore;
+
   /// Weighted composite of the above sub-scores (0–1).
   final double focusScore;
 
@@ -133,8 +134,10 @@ class FocusContextSnapshot {
 
   final List<String> insightTypes;
   final List<String> keyPatternCodes;
+
   /// Flat key→value evidence from supporting patterns (for explainability).
   final Map<String, dynamic> topEvidence;
+
   /// One-sentence human-readable rationale (engineering/debug, not user-facing).
   final String selectedRationale;
   final String timingProfile;
@@ -192,8 +195,10 @@ class FocusSuppressedCandidate {
     return FocusSuppressedCandidate(
       insightId: map['insightId'] as String? ?? '',
       insightType: map['insightType'] as String? ?? '',
-      focusScore:
-          ((map['focusScore'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
+      focusScore: ((map['focusScore'] as num?)?.toDouble() ?? 0).clamp(
+        0.0,
+        1.0,
+      ),
       rejectionReason: map['rejectionReason'] as String? ?? '',
     );
   }
@@ -231,19 +236,24 @@ class CurrentCoachingFocus {
   final String? secondaryInsightId;
   final FocusLifecycleState lifecycleState;
   final FocusReason focusReason;
+
   /// 0–1 composite focus score from the scoring engine.
   final double focusScore;
+
   /// 0–1 confidence in the prioritization decision itself (distinct from
   /// underlying insight confidence — evaluates "should THIS be current focus?").
   final double focusConfidence;
   final FocusScoreBreakdown scoreBreakdown;
   final FocusContextSnapshot contextSnapshot;
+
   /// Ordered list of human-readable trace entries explaining the decision.
   final List<String> evaluationTrace;
   final List<FocusSuppressedCandidate> suppressedCandidates;
+
   /// Insight types contributing to this focus (for AI summarization).
   final List<String> sourceInsightTypes;
   final int detectedAtMs;
+
   /// Earliest timestamp this focus can be replaced (minimum active duration).
   final int activeUntilMs;
   final int? resolvedAtMs;
@@ -276,14 +286,14 @@ class CurrentCoachingFocus {
     'scoreBreakdown': scoreBreakdown.toMap(),
     'contextSnapshot': contextSnapshot.toMap(),
     'evaluationTrace': evaluationTrace,
-    'suppressedCandidates':
-        suppressedCandidates.map((c) => c.toMap()).toList(growable: false),
+    'suppressedCandidates': suppressedCandidates
+        .map((c) => c.toMap())
+        .toList(growable: false),
     'sourceInsightTypes': sourceInsightTypes,
     'detectedAtMs': detectedAtMs,
     'activeUntilMs': activeUntilMs,
     if (resolvedAtMs != null) 'resolvedAtMs': resolvedAtMs,
-    if (replacementReason != null)
-      'replacementReason': replacementReason!.name,
+    if (replacementReason != null) 'replacementReason': replacementReason!.name,
     'metadata': metadata,
     'schemaVersion': schemaVersion,
   };
@@ -340,10 +350,12 @@ class CurrentCoachingFocus {
         map['lifecycleState'] as String?,
       ),
       focusReason: focusReasonFromStorage(map['focusReason'] as String?),
-      focusScore:
-          ((map['focusScore'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
-      focusConfidence:
-          ((map['focusConfidence'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
+      focusScore: ((map['focusScore'] as num?)?.toDouble() ?? 0).clamp(
+        0.0,
+        1.0,
+      ),
+      focusConfidence: ((map['focusConfidence'] as num?)?.toDouble() ?? 0)
+          .clamp(0.0, 1.0),
       scoreBreakdown: scoreBreakdown,
       contextSnapshot: contextSnapshot,
       evaluationTrace: stringList('evaluationTrace'),

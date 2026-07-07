@@ -8,11 +8,7 @@
   'RoutineMode will be removed in a future release. '
   'See RoutineModeAdapter for migration helpers.',
 )
-enum RoutineMode {
-  flexible,
-  disciplined,
-  extreme,
-}
+enum RoutineMode { flexible, disciplined, extreme }
 
 extension RoutineModeStorage on RoutineMode {
   String get storageValue => name;
@@ -79,11 +75,13 @@ class RoutineModePolicy {
   static RoutineModePolicy fromMap(Map<String, dynamic> map) {
     return RoutineModePolicy(
       mode: RoutineModeStorage.fromStorage(map['mode'] as String?),
-      requireTimerForCompletion: map['requireTimerForCompletion'] as bool? ?? false,
+      requireTimerForCompletion:
+          map['requireTimerForCompletion'] as bool? ?? false,
       allowHardGate: map['allowHardGate'] as bool? ?? false,
       baseSnoozeMinutes: (map['baseSnoozeMinutes'] as num?)?.toInt() ?? 10,
       maxExtensionMinutes: (map['maxExtensionMinutes'] as num?)?.toInt() ?? 60,
-      requireReasonForDeferral: map['requireReasonForDeferral'] as bool? ?? true,
+      requireReasonForDeferral:
+          map['requireReasonForDeferral'] as bool? ?? true,
     );
   }
 }
@@ -124,7 +122,9 @@ class RoutineModeConfig {
       isUserDefined: map['isUserDefined'] as bool? ?? false,
       policy: map['policy'] is Map<String, dynamic>
           ? RoutineModePolicy.fromMap(map['policy'] as Map<String, dynamic>)
-          : defaultPolicyFor(RoutineModeStorage.fromStorage(map['baseMode'] as String?)),
+          : defaultPolicyFor(
+              RoutineModeStorage.fromStorage(map['baseMode'] as String?),
+            ),
     );
   }
 

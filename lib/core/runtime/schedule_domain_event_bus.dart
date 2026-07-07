@@ -37,15 +37,13 @@ class ScheduleDomainEventBus {
   StreamSubscription<ScheduleDomainEvent> listen(
     void Function(ScheduleDomainEvent event) onEvent,
   ) {
-    return _controller.stream.listen(
-      (event) {
-        try {
-          onEvent(event);
-        } catch (e, st) {
-          debugPrint('[ScheduleDomainEventBus] subscriber error: $e\n$st');
-        }
-      },
-    );
+    return _controller.stream.listen((event) {
+      try {
+        onEvent(event);
+      } catch (e, st) {
+        debugPrint('[ScheduleDomainEventBus] subscriber error: $e\n$st');
+      }
+    });
   }
 
   /// Emit [event] to all current subscribers.

@@ -7,8 +7,8 @@ import 'sync_service.dart';
 /// Drives [CloudSyncGlobalIndicator] and can be watched in tests.
 final cloudSyncInProgressProvider =
     NotifierProvider<CloudSyncInProgressNotifier, bool>(
-  CloudSyncInProgressNotifier.new,
-);
+      CloudSyncInProgressNotifier.new,
+    );
 
 class CloudSyncInProgressNotifier extends Notifier<bool> {
   @override

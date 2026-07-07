@@ -46,7 +46,8 @@ class GoalEditorScreen extends ConsumerStatefulWidget {
   ConsumerState<GoalEditorScreen> createState() => _GoalEditorScreenState();
 }
 
-class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with WidgetsBindingObserver {
+class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
+    with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
   final _title = TextEditingController();
   final _target = TextEditingController();
@@ -99,11 +100,15 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (widget.goalId == null && widget.template != null && !widget.template!.isBlank) {
+    if (widget.goalId == null &&
+        widget.template != null &&
+        !widget.template!.isBlank) {
       _applyTemplate(widget.template!);
     }
     if (widget.goalId == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _offerDraftRestoreIfNeeded());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _offerDraftRestoreIfNeeded(),
+      );
     }
   }
 
@@ -122,7 +127,8 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       unawaited(_draftAutosave?.persistIfDirty());
     }
   }
@@ -224,7 +230,9 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
       _monthAnchor = DateTime.fromMillisecondsSinceEpoch(draft.monthAnchorMs);
       _rangeStart = DateTime.fromMillisecondsSinceEpoch(draft.rangeStartMs);
       _rangeEnd = DateTime.fromMillisecondsSinceEpoch(draft.rangeEndMs);
-      _durationStart = DateTime.fromMillisecondsSinceEpoch(draft.durationStartMs);
+      _durationStart = DateTime.fromMillisecondsSinceEpoch(
+        draft.durationStartMs,
+      );
       _reminderEnabled = draft.reminderEnabled;
       _reminderMinutesFromMidnight = draft.reminderMinutesFromMidnight;
     });
@@ -261,8 +269,12 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
         // Placeholder, not prefilled — applied on save when left blank.
         _suggestedTarget = t == t.roundToDouble() ? '${t.toInt()}' : '$t';
       }
-      if (template.intensity != null) _intensity = template.intensity!.toDouble();
-      if (template.reminderEnabled != null) _reminderEnabled = template.reminderEnabled!;
+      if (template.intensity != null) {
+        _intensity = template.intensity!.toDouble();
+      }
+      if (template.reminderEnabled != null) {
+        _reminderEnabled = template.reminderEnabled!;
+      }
       if (template.reminderMinutesFromMidnight != null) {
         _reminderMinutesFromMidnight = template.reminderMinutesFromMidnight!;
       }
@@ -392,7 +404,9 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
       lastDate: DateTime(2100),
       initialDatePickerMode: DatePickerMode.year,
     );
-    if (picked != null) setState(() => _monthAnchor = DateTime(picked.year, picked.month, 1));
+    if (picked != null) {
+      setState(() => _monthAnchor = DateTime(picked.year, picked.month, 1));
+    }
   }
 
   Future<void> _pickStart() async {
@@ -430,7 +444,9 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
     );
     final picked = await showTimePicker(context: context, initialTime: initial);
     if (picked != null) {
-      setState(() => _reminderMinutesFromMidnight = picked.hour * 60 + picked.minute);
+      setState(
+        () => _reminderMinutesFromMidnight = picked.hour * 60 + picked.minute,
+      );
     }
   }
 
@@ -446,12 +462,16 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
 
   ({int startMs, int endMs}) _periodBounds({required int? durationDayCount}) {
     if (_periodMode == GoalPeriodMode.durationDays) {
-      final n = durationDayCount ?? int.tryParse(_durationDays.text.trim()) ?? 1;
+      final n =
+          durationDayCount ?? int.tryParse(_durationDays.text.trim()) ?? 1;
       return GoalPeriodHelpers.localDurationDayCount(_durationStart, n);
     }
     switch (_horizon) {
       case GoalHorizon.monthly:
-        return GoalPeriodHelpers.localCalendarMonthBounds(_monthAnchor.year, _monthAnchor.month);
+        return GoalPeriodHelpers.localCalendarMonthBounds(
+          _monthAnchor.year,
+          _monthAnchor.month,
+        );
       case GoalHorizon.daily:
       case GoalHorizon.weekly:
         return GoalPeriodHelpers.localDayRangeBounds(_rangeStart, _rangeEnd);
@@ -507,10 +527,8 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
       proposedBlock: proposed,
       conflicts: checkResult.conflicts,
       resolutionPort: ref.read(conflictResolutionServiceProvider),
-      loadEntityTitles: () => buildSchedulingConflictEntityTitles(
-        ref,
-        overlapping: overlapping,
-      ),
+      loadEntityTitles: () =>
+          buildSchedulingConflictEntityTitles(ref, overlapping: overlapping),
       planDay: planDay,
       ignoreEntityIds: {goal.id},
       onEntityMoved: () {
@@ -532,17 +550,17 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
         });
         _scrollToReminderSection();
       },
-      onOverlapResolvedInline: ({
-        required movedEntity,
-        required suggestionIndex,
-        conflictingEntityId,
-      }) =>
-          _logGoalOverlapResolvedInline(
-        goalId: goal.id,
-        movedEntity: movedEntity,
-        suggestionIndex: suggestionIndex,
-        conflictingEntityId: conflictingEntityId,
-      ),
+      onOverlapResolvedInline:
+          ({
+            required movedEntity,
+            required suggestionIndex,
+            conflictingEntityId,
+          }) => _logGoalOverlapResolvedInline(
+            goalId: goal.id,
+            movedEntity: movedEntity,
+            suggestionIndex: suggestionIndex,
+            conflictingEntityId: conflictingEntityId,
+          ),
     );
 
     return _handleGoalConflictOutcome(outcome);
@@ -591,7 +609,9 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
     int? durationDayCount;
     if (_periodMode == GoalPeriodMode.durationDays) {
       durationDayCount = int.tryParse(_durationDays.text.trim());
-      if (durationDayCount == null || durationDayCount < 1 || durationDayCount > 3650) {
+      if (durationDayCount == null ||
+          durationDayCount < 1 ||
+          durationDayCount > 3650) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Enter number of days (1–3650)')),
         );
@@ -601,7 +621,11 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
       final rs = DateTime(_rangeStart.year, _rangeStart.month, _rangeStart.day);
       final re = DateTime(_rangeEnd.year, _rangeEnd.month, _rangeEnd.day);
       if (re.isBefore(rs)) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('End date must be on or after start date')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('End date must be on or after start date'),
+          ),
+        );
         return;
       }
     }
@@ -610,7 +634,9 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
         : (_suggestedTarget ?? '');
     final target = double.tryParse(targetText);
     if (target == null || target < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid target number')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid target number')),
+      );
       return;
     }
     setState(() => _saving = true);
@@ -620,24 +646,36 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
     final goalId = widget.goalId ?? StableId.generate('goal');
 
     try {
-      final existing = widget.goalId != null ? await repo.getGoal(goalId) : null;
+      final existing = widget.goalId != null
+          ? await repo.getGoal(goalId)
+          : null;
       final typedTitle = _title.text.trim();
       final goal = UserGoal(
         id: goalId,
-        title: typedTitle.isNotEmpty ? typedTitle : (_suggestedTitle?.trim() ?? ''),
+        title: typedTitle.isNotEmpty
+            ? typedTitle
+            : (_suggestedTitle?.trim() ?? ''),
         categoryId: _categoryId,
         horizon: _horizon,
         status: existing?.status ?? GoalStatus.active,
         measurementKind: _measurement,
         targetValue: target,
-        customLabel: _measurement == MeasurementKind.custom ? _customLabel.text.trim().isEmpty ? null : _customLabel.text.trim() : null,
+        customLabel: _measurement == MeasurementKind.custom
+            ? _customLabel.text.trim().isEmpty
+                  ? null
+                  : _customLabel.text.trim()
+            : null,
         intensity: _intensity.round().clamp(1, 5),
         periodStartMs: bounds.startMs,
         periodEndMs: bounds.endMs,
         periodMode: _periodMode,
-        durationDays: _periodMode == GoalPeriodMode.durationDays ? durationDayCount : null,
+        durationDays: _periodMode == GoalPeriodMode.durationDays
+            ? durationDayCount
+            : null,
         reminderEnabled: _reminderEnabled,
-        reminderMinutesFromMidnight: _reminderEnabled ? _reminderMinutesFromMidnight : null,
+        reminderMinutesFromMidnight: _reminderEnabled
+            ? _reminderMinutesFromMidnight
+            : null,
         reminderStyle: existing?.reminderStyle ?? GoalReminderStyle.dailyOnce,
         createdAtMs: existing?.createdAtMs ?? now,
         updatedAtMs: now,
@@ -696,7 +734,9 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not save: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not save: $e')));
     } finally {
       if (mounted) {
         if (_draftClearedOnSuccessfulSave) _suppressDraftDirty = true;
@@ -714,7 +754,9 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
     _categoryId = g.categoryId;
     _horizon = g.horizon;
     _measurement = g.measurementKind;
-    _target.text = g.targetValue == g.targetValue.roundToDouble() ? '${g.targetValue.toInt()}' : '${g.targetValue}';
+    _target.text = g.targetValue == g.targetValue.roundToDouble()
+        ? '${g.targetValue.toInt()}'
+        : '${g.targetValue}';
     if (g.customLabel != null) _customLabel.text = g.customLabel!;
     _intensity = g.intensity.toDouble();
     _periodMode = g.periodMode;
@@ -722,7 +764,8 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
     _rangeStart = DateTime.fromMillisecondsSinceEpoch(g.periodStartMs);
     _rangeEnd = DateTime.fromMillisecondsSinceEpoch(g.periodEndMs);
     _durationStart = DateTime.fromMillisecondsSinceEpoch(g.periodStartMs);
-    _durationDays.text = '${g.durationDays ?? GoalPeriodHelpers.totalCalendarDaysInPeriod(g)}';
+    _durationDays.text =
+        '${g.durationDays ?? GoalPeriodHelpers.totalCalendarDaysInPeriod(g)}';
     _reminderEnabled = g.reminderEnabled;
     _reminderMinutesFromMidnight = g.reminderMinutesFromMidnight ?? 9 * 60;
     for (final d in _actionDrafts) {
@@ -766,8 +809,18 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
 
   String _monthTitle() {
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     return '${months[_monthAnchor.month - 1]} ${_monthAnchor.year}';
   }
@@ -865,7 +918,9 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
                 if (!ok) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Allow notifications to get goal reminders.'),
+                      content: Text(
+                        'Allow notifications to get goal reminders.',
+                      ),
                     ),
                   );
                 }
@@ -918,7 +973,8 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
               validator: (v) {
                 // A blank field is fine when a template suggestion will be used.
                 if (v != null && v.trim().isNotEmpty) return null;
-                if (_suggestedTitle != null && _suggestedTitle!.trim().isNotEmpty) {
+                if (_suggestedTitle != null &&
+                    _suggestedTitle!.trim().isNotEmpty) {
                   return null;
                 }
                 return 'Required';

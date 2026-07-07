@@ -49,16 +49,16 @@ abstract final class DefaultModeResolver {
     final priorityBand = p <= 2
         ? _Band.low
         : p >= 4
-            ? _Band.high
-            : _Band.medium;
+        ? _Band.high
+        : _Band.medium;
     if (blockUrgencyScore == null) return priorityBand;
 
     final u = blockUrgencyScore.clamp(0, 100);
     final urgencyBand = u >= 80
         ? _Band.high
         : u < 40
-            ? _Band.low
-            : _Band.medium;
+        ? _Band.low
+        : _Band.medium;
     // The stronger signal wins so an urgent block lifts a default-priority
     // task, but a casual block never downgrades an explicitly important one.
     return priorityBand.index >= urgencyBand.index ? priorityBand : urgencyBand;

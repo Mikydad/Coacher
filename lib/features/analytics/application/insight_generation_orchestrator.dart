@@ -280,9 +280,14 @@ class InsightGenerationOrchestrator {
     );
     stopwatch.stop();
 
-    final entityErrors = entityResults.where((result) => result.hasFatalError).length;
+    final entityErrors = entityResults
+        .where((result) => result.hasFatalError)
+        .length;
     final totalInsightsEmitted =
-        entityResults.fold<int>(0, (sum, result) => sum + result.insights.length) +
+        entityResults.fold<int>(
+          0,
+          (sum, result) => sum + result.insights.length,
+        ) +
         globalResult.insights.length;
 
     return InsightGenerationBatchResult(

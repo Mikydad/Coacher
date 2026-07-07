@@ -10,8 +10,7 @@ final aiPulseRepositoryProvider = Provider<AiPulseRepository>((ref) {
   return FirestoreAiPulseRepository();
 });
 
-final circleAiPulseServiceProvider =
-    Provider<CircleAiPulseService>((ref) {
+final circleAiPulseServiceProvider = Provider<CircleAiPulseService>((ref) {
   return CircleAiPulseService(
     pulseRepo: ref.read(aiPulseRepositoryProvider),
     feedRepo: ref.read(activityFeedRepositoryProvider),
@@ -19,15 +18,19 @@ final circleAiPulseServiceProvider =
   );
 });
 
-final latestDailyPulseProvider =
-    StreamProvider.family<AiPulse?, String>((ref, circleId) {
+final latestDailyPulseProvider = StreamProvider.family<AiPulse?, String>((
+  ref,
+  circleId,
+) {
   return ref
       .watch(aiPulseRepositoryProvider)
       .watchLatestPulse(circleId, AiPulseType.daily);
 });
 
-final latestWeeklyPulseProvider =
-    StreamProvider.family<AiPulse?, String>((ref, circleId) {
+final latestWeeklyPulseProvider = StreamProvider.family<AiPulse?, String>((
+  ref,
+  circleId,
+) {
   return ref
       .watch(aiPulseRepositoryProvider)
       .watchLatestPulse(circleId, AiPulseType.weekly);

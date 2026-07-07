@@ -27,15 +27,15 @@ class ConflictResolutionService implements ConflictResolutionPort {
     required ReminderSyncService reminderSync,
     required GoalReminderSyncService goalReminderSync,
     required OfflineStore offlineStore,
-  })  : _planning = planning,
-        _goals = goals,
-        _timeBlocks = timeBlocks,
-        _timeBlockSync = timeBlockSync,
-        _goalBlockSync = goalBlockSync,
-        _reminderRepository = reminderRepository,
-        _reminderSync = reminderSync,
-        _goalReminderSync = goalReminderSync,
-        _offlineStore = offlineStore;
+  }) : _planning = planning,
+       _goals = goals,
+       _timeBlocks = timeBlocks,
+       _timeBlockSync = timeBlockSync,
+       _goalBlockSync = goalBlockSync,
+       _reminderRepository = reminderRepository,
+       _reminderSync = reminderSync,
+       _goalReminderSync = goalReminderSync,
+       _offlineStore = offlineStore;
 
   final PlanningRepository _planning;
   final GoalsRepository _goals;

@@ -58,6 +58,7 @@ import '../../timer/presentation/timer_session_screen.dart';
 import 'quittr_app_bar_title.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/presentation/async_value_ui.dart';
 
 enum _PlansChangedAction { reshuffle, defer, skip }
 
@@ -387,9 +388,13 @@ class HomeScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  error: (_, _) => Text(
-                    'Could not load goals.',
-                    style: TextStyle(color: Colors.red.shade200),
+                  error: (e, _) => swallowedAsyncError(
+                    'home_screen',
+                    e,
+                    Text(
+                      'Could not load goals.',
+                      style: TextStyle(color: Colors.red.shade200),
+                    ),
                   ),
                 ),
               ],
@@ -433,9 +438,13 @@ class HomeScreen extends ConsumerWidget {
                 padding: EdgeInsets.symmetric(vertical: 16),
                 child: Center(child: CircularProgressIndicator()),
               ),
-              error: (_, _) => const Text(
-                'Could not load analytics insights.',
-                style: TextStyle(color: Colors.white54),
+              error: (e, _) => swallowedAsyncError(
+                'home_screen',
+                e,
+                const Text(
+                  'Could not load analytics insights.',
+                  style: TextStyle(color: Colors.white54),
+                ),
               ),
             ),
           ),
@@ -743,18 +752,22 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
             ),
           ),
         ),
-        error: (_, _) => const Column(
-          children: [
-            SizedBox(height: 4),
-            Text(
-              '0',
-              style: TextStyle(fontSize: 68, fontWeight: FontWeight.w700),
-            ),
-            Text(
-              'day streak',
-              style: TextStyle(fontSize: 11, color: Colors.white54),
-            ),
-          ],
+        error: (e, _) => swallowedAsyncError(
+          'home_screen',
+          e,
+          const Column(
+            children: [
+              SizedBox(height: 4),
+              Text(
+                '0',
+                style: TextStyle(fontSize: 68, fontWeight: FontWeight.w700),
+              ),
+              Text(
+                'day streak',
+                style: TextStyle(fontSize: 11, color: Colors.white54),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -803,19 +816,23 @@ class _DailyDisciplineSection extends ConsumerWidget {
           ),
         ],
       ),
-      error: (_, _) => const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'WEEKLY DISCIPLINE',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.all(Radius.circular(999)),
-            child: LinearProgressIndicator(value: 0, minHeight: 8),
-          ),
-        ],
+      error: (e, _) => swallowedAsyncError(
+        'home_screen',
+        e,
+        const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'WEEKLY DISCIPLINE',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.all(Radius.circular(999)),
+              child: LinearProgressIndicator(value: 0, minHeight: 8),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1124,9 +1141,13 @@ class _FlowNowStrip extends ConsumerWidget {
             ),
           ),
         ),
-        error: (_, _) => const Text(
-          'Flow unavailable',
-          style: TextStyle(color: _kMuted, fontSize: 12),
+        error: (e, _) => swallowedAsyncError(
+          'home_screen',
+          e,
+          const Text(
+            'Flow unavailable',
+            style: TextStyle(color: _kMuted, fontSize: 12),
+          ),
         ),
       ),
     );
@@ -2082,7 +2103,9 @@ Future<Routine?> _routineForPlannedRow(
     for (final r in routines) {
       if (r.id == row.routineId) return r;
     }
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('home_screen: swallowed error: $e');
+  }
   return null;
 }
 
@@ -2184,7 +2207,8 @@ Future<void> _completeTaskFromHome(
   //   done at 100% (mis-taps are recoverable by unchecking the checkbox);
   // disciplined → must submit a score (reason below 100%);
   // extreme → must submit a score and a reason at any percentage.
-  final scoreResult = await ScoreTaskDialog.show(
+  final scoreResult =
+      await ScoreTaskDialog.show(
         context,
         taskTitle: t.title,
         requireSubmit: mode == 'disciplined' || mode == 'extreme',

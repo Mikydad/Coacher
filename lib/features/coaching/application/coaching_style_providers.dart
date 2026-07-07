@@ -4,6 +4,7 @@ import '../data/coaching_style_repository.dart';
 import '../domain/models/coaching_style.dart';
 import '../domain/models/user_coaching_profile.dart';
 import 'coaching_style_service.dart';
+import '../../../core/presentation/async_value_ui.dart';
 
 // ─── Repository ───────────────────────────────────────────────────────────────
 
@@ -24,12 +25,12 @@ final coachingStyleServiceProvider = Provider<CoachingStyleService>((ref) {
 
 /// Streams the full [UserCoachingProfile] from Isar. Emits null when no
 /// profile has been saved yet (e.g. fresh install before onboarding).
-final coachingProfileStreamProvider = StreamProvider<UserCoachingProfile?>(
-  (ref) {
-    final repo = ref.watch(coachingStyleRepositoryProvider);
-    return repo.watchProfile();
-  },
-);
+final coachingProfileStreamProvider = StreamProvider<UserCoachingProfile?>((
+  ref,
+) {
+  final repo = ref.watch(coachingStyleRepositoryProvider);
+  return repo.watchProfile();
+});
 
 // ─── Convenience: active CoachingStyle ───────────────────────────────────────
 
@@ -40,6 +41,10 @@ final activeCoachingStyleProvider = Provider<CoachingStyle>((ref) {
   return profileAsync.when(
     data: (profile) => profile?.coachingStyle ?? CoachingStyle.balanced,
     loading: () => CoachingStyle.balanced,
-    error: (_, _) => CoachingStyle.balanced,
+    error: (e, _) => swallowedAsyncError(
+      'coaching_style_providers',
+      e,
+      CoachingStyle.balanced,
+    ),
   );
 });

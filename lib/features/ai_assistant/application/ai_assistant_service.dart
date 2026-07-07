@@ -15,10 +15,8 @@ import 'proactive_chat_conversion_tracker.dart';
 import 'entity_normaliser.dart';
 
 /// Signature for fire-and-forget analytics logging from the service layer.
-typedef AiAnalyticsLogger = void Function(
-  String eventName,
-  Map<String, dynamic> properties,
-);
+typedef AiAnalyticsLogger =
+    void Function(String eventName, Map<String, dynamic> properties);
 
 typedef AiScheduleCacheInvalidator = void Function(String sessionId);
 
@@ -34,13 +32,13 @@ class AiAssistantService extends ChangeNotifier {
     AiAnalyticsLogger? analyticsLogger,
     EntityNormaliser? normaliser,
     AiScheduleCacheInvalidator? onScheduleMutated,
-  })  : _intentParser = intentParser,
-        _actionExecutor = actionExecutor,
-        _historyRepository = historyRepository,
-        _analyticsLogger = analyticsLogger,
-        _normaliser = normaliser ?? const EntityNormaliser(),
-        _onScheduleMutated = onScheduleMutated,
-        _sessionId = StableId.generate('session');
+  }) : _intentParser = intentParser,
+       _actionExecutor = actionExecutor,
+       _historyRepository = historyRepository,
+       _analyticsLogger = analyticsLogger,
+       _normaliser = normaliser ?? const EntityNormaliser(),
+       _onScheduleMutated = onScheduleMutated,
+       _sessionId = StableId.generate('session');
 
   final AiIntentParser _intentParser;
   final AiActionExecutor _actionExecutor;
@@ -80,10 +78,7 @@ class AiAssistantService extends ChangeNotifier {
   String get sessionId => _sessionId;
 
   /// Links this session to a proactive card the user tapped before opening Coach.
-  void setProactiveContext({
-    String? suggestionId,
-    String? suggestionType,
-  }) {
+  void setProactiveContext({String? suggestionId, String? suggestionType}) {
     _proactiveSuggestionId = suggestionId;
     _proactiveSuggestionType = suggestionType;
   }
@@ -105,23 +100,28 @@ class AiAssistantService extends ChangeNotifier {
     // Guests get a sign-in nudge instead of the server's permission error —
     // the aiChat function rejects anonymous accounts (cost-abuse guard).
     // Firebase.apps guard: VM tests construct this service without Firebase.
-    final currentUser =
-        Firebase.apps.isEmpty ? null : FirebaseAuth.instance.currentUser;
+    final currentUser = Firebase.apps.isEmpty
+        ? null
+        : FirebaseAuth.instance.currentUser;
     if (currentUser != null && currentUser.isAnonymous) {
-      _addMessage(AiChatMessage(
-        id: StableId.generate('msg'),
-        role: ChatRole.user,
-        content: userInput.trim(),
-        timestamp: DateTime.now(),
-      ));
-      _addMessage(AiChatMessage(
-        id: StableId.generate('msg'),
-        role: ChatRole.assistant,
-        content:
-            'Coach AI needs a registered account. Create a free account in '
-            'Profile → Sign in and your data comes with you.',
-        timestamp: DateTime.now(),
-      ));
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.user,
+          content: userInput.trim(),
+          timestamp: DateTime.now(),
+        ),
+      );
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content:
+              'Coach AI needs a registered account. Create a free account in '
+              'Profile → Sign in and your data comes with you.',
+          timestamp: DateTime.now(),
+        ),
+      );
       notifyListeners();
       return;
     }
@@ -129,7 +129,8 @@ class AiAssistantService extends ChangeNotifier {
     // 0. While a plan is awaiting confirmation, treat a plain yes/no as the
     // answer to "confirm changes?" — never send it to the parser, which would
     // re-propose the same plan.
-    if (_pendingPlan != null && _handlePendingPlanShortReply(userInput.trim())) {
+    if (_pendingPlan != null &&
+        _handlePendingPlanShortReply(userInput.trim())) {
       return;
     }
 
@@ -143,22 +144,26 @@ class AiAssistantService extends ChangeNotifier {
     }
 
     // 1. Append user message
-    _addMessage(AiChatMessage(
-      id: StableId.generate('msg'),
-      role: ChatRole.user,
-      content: userInput.trim(),
-      timestamp: DateTime.now(),
-    ));
+    _addMessage(
+      AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.user,
+        content: userInput.trim(),
+        timestamp: DateTime.now(),
+      ),
+    );
 
     // 2. Append loading message (thinking…)
     final loadingId = StableId.generate('msg');
-    _addMessage(AiChatMessage(
-      id: loadingId,
-      role: ChatRole.assistant,
-      content: '',
-      timestamp: DateTime.now(),
-      isLoading: true,
-    ));
+    _addMessage(
+      AiChatMessage(
+        id: loadingId,
+        role: ChatRole.assistant,
+        content: '',
+        timestamp: DateTime.now(),
+        isLoading: true,
+      ),
+    );
     _setLoading(true);
 
     // 3. Mark any existing plan as no longer current
@@ -197,29 +202,36 @@ class AiAssistantService extends ChangeNotifier {
     _setLoading(false);
 
     if (result.requiresFollowUp) {
-      final question = AiInformationalOutputGuard.sanitize(result.followUpQuestion!);
-      _addMessage(AiChatMessage(
-        id: StableId.generate('msg'),
-        role: ChatRole.assistant,
-        content: question,
-        timestamp: DateTime.now(),
-      ));
+      final question = AiInformationalOutputGuard.sanitize(
+        result.followUpQuestion!,
+      );
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content: question,
+          timestamp: DateTime.now(),
+        ),
+      );
       _pendingPlan = null;
       // Remember the clarification — including the question itself — so the
       // user's answer refines it. Kept even with no partial actions: dropping
       // it made short answers parse bare and re-trigger the same question.
       _pendingClarification = result;
     } else if (result.isInformational || result.isUnsupported) {
-      final raw = result.informationalMessage ??
+      final raw =
+          result.informationalMessage ??
           "I couldn't find an answer for that right now.";
       final message = AiInformationalOutputGuard.sanitize(raw);
-      _addMessage(AiChatMessage(
-        id: StableId.generate('msg'),
-        role: ChatRole.assistant,
-        content: message,
-        timestamp: DateTime.now(),
-        suggestedPrompts: result.suggestedPrompts,
-      ));
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content: message,
+          timestamp: DateTime.now(),
+          suggestedPrompts: result.suggestedPrompts,
+        ),
+      );
       _pendingPlan = null;
       if (result.isInformational) {
         _logEvent('aiInformationalAnswer', {
@@ -233,17 +245,20 @@ class AiAssistantService extends ChangeNotifier {
         });
       }
     } else if (result.isSuggest) {
-      final raw = result.informationalMessage ??
+      final raw =
+          result.informationalMessage ??
           'Here\'s what I\'d suggest based on your schedule.';
       final message = AiInformationalOutputGuard.sanitize(raw);
-      _addMessage(AiChatMessage(
-        id: StableId.generate('msg'),
-        role: ChatRole.assistant,
-        content: message,
-        timestamp: DateTime.now(),
-        draftPlan: result.actions.isNotEmpty ? result : null,
-        suggestedPrompts: result.suggestedPrompts,
-      ));
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content: message,
+          timestamp: DateTime.now(),
+          draftPlan: result.actions.isNotEmpty ? result : null,
+          suggestedPrompts: result.suggestedPrompts,
+        ),
+      );
       _pendingPlan = null;
       // A free-text reply to a suggestion ("make it 30 minutes", "move it to
       // 9am") must refine THIS plan, not start from scratch.
@@ -258,31 +273,32 @@ class AiAssistantService extends ChangeNotifier {
           "I didn't quite catch what you'd like me to do there. I'm best at "
           "planning your day, managing tasks and goals, and answering "
           "schedule questions — ask \"what can you do?\" for the full list.";
-      _addMessage(AiChatMessage(
-        id: StableId.generate('msg'),
-        role: ChatRole.assistant,
-        content: fallback,
-        timestamp: DateTime.now(),
-        suggestedPrompts: const [
-          'What can you do?',
-          'Help me plan tomorrow',
-        ],
-      ));
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content: fallback,
+          timestamp: DateTime.now(),
+          suggestedPrompts: const ['What can you do?', 'Help me plan tomorrow'],
+        ),
+      );
     } else {
       // Plan ready — show preview card. Prefer the model's own short
       // confirmation line when the agent provided one.
       _pendingPlan = result;
       final previewText = result.informationalMessage?.trim();
-      _addMessage(AiChatMessage(
-        id: StableId.generate('msg'),
-        role: ChatRole.assistant,
-        content: previewText?.isNotEmpty == true
-            ? previewText!
-            : 'Here\'s what I\'ll do:',
-        timestamp: DateTime.now(),
-        plannedChanges: result,
-        isCurrentPlan: true,
-      ));
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content: previewText?.isNotEmpty == true
+              ? previewText!
+              : 'Here\'s what I\'ll do:',
+          timestamp: DateTime.now(),
+          plannedChanges: result,
+          isCurrentPlan: true,
+        ),
+      );
     }
 
     // 6. Persist interaction (user turn + assistant summary for multi-turn context)
@@ -317,25 +333,29 @@ class AiAssistantService extends ChangeNotifier {
   ]) async {
     final plan = planFromCard ?? _pendingPlan;
     if (plan == null) {
-      _addMessage(AiChatMessage(
-        id: StableId.generate('msg'),
-        role: ChatRole.assistant,
-        content:
-            'That plan is no longer active. Send a new request and confirm the latest preview.',
-        timestamp: DateTime.now(),
-      ));
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content:
+              'That plan is no longer active. Send a new request and confirm the latest preview.',
+          timestamp: DateTime.now(),
+        ),
+      );
       notifyListeners();
       return;
     }
 
     if (plan.actions.isEmpty) {
-      _addMessage(AiChatMessage(
-        id: StableId.generate('msg'),
-        role: ChatRole.assistant,
-        content:
-            'There is nothing to apply in this plan. Try describing the change again.',
-        timestamp: DateTime.now(),
-      ));
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content:
+              'There is nothing to apply in this plan. Try describing the change again.',
+          timestamp: DateTime.now(),
+        ),
+      );
       notifyListeners();
       return;
     }
@@ -351,8 +371,8 @@ class AiAssistantService extends ChangeNotifier {
     final executionSummary = result.hasFailures
         ? 'Already applied (do not repeat): ${result.successes.join("; ")}. Issues: ${result.failures.take(2).join("; ")}'
         : result.successes.isNotEmpty
-            ? 'Already applied (do not repeat): ${result.successes.join("; ")}'
-            : 'Already applied (do not repeat): Done';
+        ? 'Already applied (do not repeat): ${result.successes.join("; ")}'
+        : 'Already applied (do not repeat): Done';
     unawaited(
       _historyRepository.saveAssistantSummary(_sessionId, executionSummary),
     );
@@ -380,15 +400,17 @@ class AiAssistantService extends ChangeNotifier {
     final summary = result.hasFailures
         ? 'Done with some issues:\n${result.toSummaryMessage()}'
         : result.successes.isNotEmpty
-            ? result.toSummaryMessage()
-            : 'No changes were applied. Try describing a specific task to add or update.';
+        ? result.toSummaryMessage()
+        : 'No changes were applied. Try describing a specific task to add or update.';
 
-    _addMessage(AiChatMessage(
-      id: StableId.generate('msg'),
-      role: ChatRole.assistant,
-      content: summary,
-      timestamp: DateTime.now(),
-    ));
+    _addMessage(
+      AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.assistant,
+        content: summary,
+        timestamp: DateTime.now(),
+      ),
+    );
 
     _logEvent('aiCommandExecuted', {
       'sessionId': _sessionId,
@@ -450,12 +472,15 @@ class AiAssistantService extends ChangeNotifier {
     _pendingPlan = null;
     _demoteCurrentPlan();
 
-    _addMessage(AiChatMessage(
-      id: StableId.generate('msg'),
-      role: ChatRole.assistant,
-      content: 'Plan cancelled. Let me know if you\'d like to try something else.',
-      timestamp: DateTime.now(),
-    ));
+    _addMessage(
+      AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.assistant,
+        content:
+            'Plan cancelled. Let me know if you\'d like to try something else.',
+        timestamp: DateTime.now(),
+      ),
+    );
 
     _logEvent('aiCommandCanceled', {'sessionId': _sessionId});
 
@@ -534,12 +559,14 @@ class AiAssistantService extends ChangeNotifier {
       if (m.role != ChatRole.assistant) continue;
       final plan = m.draftPlan;
       if (plan == null || plan.actions.isEmpty) return false;
-      _addMessage(AiChatMessage(
-        id: StableId.generate('msg'),
-        role: ChatRole.user,
-        content: input,
-        timestamp: DateTime.now(),
-      ));
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.user,
+          content: input,
+          timestamp: DateTime.now(),
+        ),
+      );
       applySuggestedPlan(m.id);
       unawaited(confirmPlan());
       return true;
@@ -553,23 +580,27 @@ class AiAssistantService extends ChangeNotifier {
     if (normalized.split(RegExp(r'\s+')).length > 4) return false;
 
     if (_rejectionPattern.hasMatch(normalized)) {
-      _addMessage(AiChatMessage(
-        id: StableId.generate('msg'),
-        role: ChatRole.user,
-        content: input,
-        timestamp: DateTime.now(),
-      ));
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.user,
+          content: input,
+          timestamp: DateTime.now(),
+        ),
+      );
       cancelPlan();
       return true;
     }
 
     if (_affirmationPattern.hasMatch(normalized)) {
-      _addMessage(AiChatMessage(
-        id: StableId.generate('msg'),
-        role: ChatRole.user,
-        content: input,
-        timestamp: DateTime.now(),
-      ));
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.user,
+          content: input,
+          timestamp: DateTime.now(),
+        ),
+      );
       notifyListeners();
       unawaited(confirmPlan());
       return true;
@@ -663,12 +694,16 @@ class AiAssistantService extends ChangeNotifier {
   }
 
   String _planPreviewSummary(AiPlannedChanges plan) {
-    final parts = plan.actions.take(4).map((a) {
-      final title = a.parameters['title']?.toString() ??
-          a.parameters['taskTitle']?.toString() ??
-          a.actionType.name;
-      return '${a.actionType.name}: $title';
-    }).join('; ');
+    final parts = plan.actions
+        .take(4)
+        .map((a) {
+          final title =
+              a.parameters['title']?.toString() ??
+              a.parameters['taskTitle']?.toString() ??
+              a.actionType.name;
+          return '${a.actionType.name}: $title';
+        })
+        .join('; ');
     return 'Plan preview: $parts';
   }
 
@@ -676,17 +711,29 @@ class AiAssistantService extends ChangeNotifier {
   /// scheduling params (time/date/duration) that the prose summary can lose.
   String _compactActionsSummary(AiPlannedChanges plan) {
     const keys = [
-      'title', 'taskTitle', 'time', 'date', 'destinationDate',
-      'destinationTime', 'duration', 'reminderTime', 'goalTitle',
+      'title',
+      'taskTitle',
+      'time',
+      'date',
+      'destinationDate',
+      'destinationTime',
+      'duration',
+      'reminderTime',
+      'goalTitle',
     ];
-    return plan.actions.take(6).map((a) {
-      final kept = [
-        for (final k in keys)
-          if ((a.parameters[k]?.toString() ?? '').isNotEmpty)
-            '$k=${a.parameters[k]}',
-      ].join(', ');
-      return kept.isEmpty ? a.actionType.name : '${a.actionType.name}($kept)';
-    }).join('; ');
+    return plan.actions
+        .take(6)
+        .map((a) {
+          final kept = [
+            for (final k in keys)
+              if ((a.parameters[k]?.toString() ?? '').isNotEmpty)
+                '$k=${a.parameters[k]}',
+          ].join(', ');
+          return kept.isEmpty
+              ? a.actionType.name
+              : '${a.actionType.name}($kept)';
+        })
+        .join('; ');
   }
 
   void _recordProactiveChatConversion() {

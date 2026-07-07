@@ -85,28 +85,25 @@ class Challenge {
   }
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'circleId': circleId,
-        'creatorId': creatorId,
-        'title': title,
-        'mode': mode.storageValue,
-        'status': status.storageValue,
-        'targetValue': targetValue,
-        'unit': unit,
-        'memberProgress': memberProgress,
-        'teamTotal': teamTotal,
-        'startsAtMs': startsAtMs,
-        'endsAtMs': endsAtMs,
-        'createdAtMs': createdAtMs,
-        'updatedAtMs': updatedAtMs,
-      };
+    'id': id,
+    'circleId': circleId,
+    'creatorId': creatorId,
+    'title': title,
+    'mode': mode.storageValue,
+    'status': status.storageValue,
+    'targetValue': targetValue,
+    'unit': unit,
+    'memberProgress': memberProgress,
+    'teamTotal': teamTotal,
+    'startsAtMs': startsAtMs,
+    'endsAtMs': endsAtMs,
+    'createdAtMs': createdAtMs,
+    'updatedAtMs': updatedAtMs,
+  };
 
   static Challenge fromMap(Map<String, dynamic> map) {
-    final rawProgress =
-        (map['memberProgress'] as Map<String, dynamic>?) ?? {};
-    final progress = rawProgress.map(
-      (k, v) => MapEntry(k, (v as num).toInt()),
-    );
+    final rawProgress = (map['memberProgress'] as Map<String, dynamic>?) ?? {};
+    final progress = rawProgress.map((k, v) => MapEntry(k, (v as num).toInt()));
 
     return Challenge(
       id: map['id'] as String? ?? '',

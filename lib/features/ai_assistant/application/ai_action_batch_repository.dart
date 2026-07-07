@@ -49,18 +49,12 @@ class AiActionBatchRepository {
 
   /// Find a batch by its UUID [batchId] (idempotency check).
   Future<IsarAiActionBatch?> findByBatchId(String batchId) async {
-    return _isar.isarAiActionBatchs
-        .where()
-        .batchIdEqualTo(batchId)
-        .findFirst();
+    return _isar.isarAiActionBatchs.where().batchIdEqualTo(batchId).findFirst();
   }
 
   /// Find the most recently created batch (for undo and history display).
   Future<IsarAiActionBatch?> findMostRecent() async {
-    return _isar.isarAiActionBatchs
-        .where()
-        .sortByCreatedAtMsDesc()
-        .findFirst();
+    return _isar.isarAiActionBatchs.where().sortByCreatedAtMsDesc().findFirst();
   }
 
   /// List the most recent [limit] batches, newest first (for history UI).
@@ -76,8 +70,9 @@ class AiActionBatchRepository {
 
   /// Delete batches older than 7 days or when total count exceeds 20.
   Future<void> pruneOld() async {
-    final cutoffMs =
-        DateTime.now().subtract(const Duration(days: 7)).millisecondsSinceEpoch;
+    final cutoffMs = DateTime.now()
+        .subtract(const Duration(days: 7))
+        .millisecondsSinceEpoch;
 
     // Delete by age first.
     await _isar.writeTxn(() async {

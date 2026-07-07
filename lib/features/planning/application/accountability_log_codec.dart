@@ -33,7 +33,10 @@ abstract final class AccountabilityLogCodec {
     required List<AccountabilityLog> logs,
     required int cutOffMs,
   }) {
-    return logs.where((l) => l.createdAtMs <= cutOffMs).map((l) => l.id).toList();
+    return logs
+        .where((l) => l.createdAtMs <= cutOffMs)
+        .map((l) => l.id)
+        .toList();
   }
 
   static String _csv(String value) => '"${value.replaceAll('"', '""')}"';

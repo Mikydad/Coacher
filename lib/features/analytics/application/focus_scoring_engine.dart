@@ -82,9 +82,7 @@ double computeMomentumScore({
   if (hasStrongStreak) score += 0.2;
 
   // Penalise if streak at risk.
-  final hasStreakRisk = patterns.any(
-    (p) => p.patternCode.name == 'streakRisk',
-  );
+  final hasStreakRisk = patterns.any((p) => p.patternCode.name == 'streakRisk');
   if (hasStreakRisk) score -= 0.15;
 
   return score.clamp(0.0, 1.0);
@@ -128,7 +126,8 @@ double computeRiskScore({
   var score = 0.0;
 
   if (insight.insightBucket == InsightBucket.risk) {
-    score = insight.confidence * 0.8 +
+    score =
+        insight.confidence * 0.8 +
         patterns
                 .where(
                   (p) =>
@@ -162,9 +161,7 @@ double computeRecoveryScore({
   final hasInconsistency = patterns.any(
     (p) => p.patternCode.name == 'inconsistentBehavior',
   );
-  final hasStreakRisk = patterns.any(
-    (p) => p.patternCode.name == 'streakRisk',
-  );
+  final hasStreakRisk = patterns.any((p) => p.patternCode.name == 'streakRisk');
 
   if (hasInconsistency || hasStreakRisk) {
     score += 0.5;
@@ -211,12 +208,13 @@ FocusScoreBreakdown computeFocusScoreBreakdown(
     insight: candidate.insight,
     patterns: candidate.supportingPatterns,
   );
-  final focusScore = (urgency * weights.urgency +
-          momentum * weights.momentum +
-          feasibility * weights.feasibility +
-          risk * weights.risk +
-          recovery * weights.recovery)
-      .clamp(0.0, 1.0);
+  final focusScore =
+      (urgency * weights.urgency +
+              momentum * weights.momentum +
+              feasibility * weights.feasibility +
+              risk * weights.risk +
+              recovery * weights.recovery)
+          .clamp(0.0, 1.0);
 
   return FocusScoreBreakdown(
     urgencyScore: urgency,

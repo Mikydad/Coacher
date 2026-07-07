@@ -49,22 +49,24 @@ final myCircleIdsProvider = StreamProvider.autoDispose<List<String>>((ref) {
 });
 
 /// Live stream of all circles the current user belongs to.
-final myCirclesProvider = StreamProvider.autoDispose<List<AccountabilityCircle>>((ref) {
-  final idsAsync = ref.watch(myCircleIdsProvider);
+final myCirclesProvider = StreamProvider.autoDispose<List<AccountabilityCircle>>(
+  (ref) {
+    final idsAsync = ref.watch(myCircleIdsProvider);
 
-  if (idsAsync.hasError) {
-    return Stream.error(idsAsync.error!, idsAsync.stackTrace);
-  }
+    if (idsAsync.hasError) {
+      return Stream.error(idsAsync.error!, idsAsync.stackTrace);
+    }
 
-  // While ids are loading after an account switch, avoid Stream.empty() which
-  // never emits and surfaces as a provider error in CommunityScreen.
-  final ids = idsAsync.value;
-  if (ids == null) return Stream.value([]);
+    // While ids are loading after an account switch, avoid Stream.empty() which
+    // never emits and surfaces as a provider error in CommunityScreen.
+    final ids = idsAsync.value;
+    if (ids == null) return Stream.value([]);
 
-  if (ids.isEmpty) return Stream.value([]);
+    if (ids.isEmpty) return Stream.value([]);
 
-  return ref.watch(circleRepositoryProvider).watchCircles(ids);
-});
+    return ref.watch(circleRepositoryProvider).watchCircles(ids);
+  },
+);
 
 // ── Per-circle providers ──────────────────────────────────────────────────────
 // Circle-scoped streams key off `authUidProvider` (auth_providers.dart) so
@@ -82,36 +84,37 @@ void invalidateCircleScopedProviders(WidgetRef ref) {
 }
 
 /// Live stream of a single circle document.
-final circleDetailProvider =
-    StreamProvider.autoDispose.family<AccountabilityCircle?, String>((ref, circleId) {
-  final uid = ref.watch(authUidProvider);
-  if (uid == null || uid.isEmpty) return Stream.value(null);
+final circleDetailProvider = StreamProvider.autoDispose
+    .family<AccountabilityCircle?, String>((ref, circleId) {
+      final uid = ref.watch(authUidProvider);
+      if (uid == null || uid.isEmpty) return Stream.value(null);
 
-  return ref.watch(circleRepositoryProvider).watchCircle(circleId);
-});
+      return ref.watch(circleRepositoryProvider).watchCircle(circleId);
+    });
 
 /// Live stream of all members in a circle (ordered by joinedAtMs asc).
-final circleMembersProvider =
-    StreamProvider.autoDispose.family<List<CircleMember>, String>((ref, circleId) {
-  final uid = ref.watch(authUidProvider);
-  if (uid == null || uid.isEmpty) return Stream.value([]);
+final circleMembersProvider = StreamProvider.autoDispose
+    .family<List<CircleMember>, String>((ref, circleId) {
+      final uid = ref.watch(authUidProvider);
+      if (uid == null || uid.isEmpty) return Stream.value([]);
 
-  return ref.watch(circleMemberRepositoryProvider).watchMembers(circleId);
-});
+      return ref.watch(circleMemberRepositoryProvider).watchMembers(circleId);
+    });
 
 /// Live stream of the latest 50 messages in a circle (ordered by createdAtMs desc).
-final circleMessagesProvider =
-    StreamProvider.autoDispose.family<List<CircleMessage>, String>((ref, circleId) {
-  final uid = ref.watch(authUidProvider);
-  if (uid == null || uid.isEmpty) return Stream.value([]);
+final circleMessagesProvider = StreamProvider.autoDispose
+    .family<List<CircleMessage>, String>((ref, circleId) {
+      final uid = ref.watch(authUidProvider);
+      if (uid == null || uid.isEmpty) return Stream.value([]);
 
-  return ref.watch(circleMessageRepositoryProvider).watchMessages(circleId);
-});
+      return ref.watch(circleMessageRepositoryProvider).watchMessages(circleId);
+    });
 
 /// Tracks the active bottom-tab index for a given circle detail screen.
 /// 0 = Chat, 1 = Activity, 2 = Commitments, 3 = Challenges, 4 = Members, 5 = Info
-final circleActiveTabProvider =
-    StateProvider.family<int, String>((ref, circleId) => 0);
+final circleActiveTabProvider = StateProvider.family<int, String>(
+  (ref, circleId) => 0,
+);
 
 // ── Activity feed ─────────────────────────────────────────────────────────────
 
@@ -120,13 +123,13 @@ final activityFeedRepositoryProvider = Provider<ActivityFeedRepository>(
 );
 
 /// Live stream of the latest 30 activity feed items for a circle.
-final circleActivityFeedProvider =
-    StreamProvider.autoDispose.family<List<ActivityFeedItem>, String>((ref, circleId) {
-  final uid = ref.watch(authUidProvider);
-  if (uid == null || uid.isEmpty) return Stream.value([]);
+final circleActivityFeedProvider = StreamProvider.autoDispose
+    .family<List<ActivityFeedItem>, String>((ref, circleId) {
+      final uid = ref.watch(authUidProvider);
+      if (uid == null || uid.isEmpty) return Stream.value([]);
 
-  return ref.watch(activityFeedRepositoryProvider).watchFeed(circleId);
-});
+      return ref.watch(activityFeedRepositoryProvider).watchFeed(circleId);
+    });
 
 // ── Removal votes ─────────────────────────────────────────────────────────────
 
@@ -137,12 +140,12 @@ final removalVoteRepositoryProvider = Provider<RemovalVoteRepository>((ref) {
 });
 
 /// Live stream of pending removal votes for a circle.
-final circleRemovalVotesProvider =
-    StreamProvider.autoDispose.family<List<RemovalVote>, String>((ref, circleId) {
-  final uid = ref.watch(authUidProvider);
-  if (uid == null || uid.isEmpty) return Stream.value([]);
+final circleRemovalVotesProvider = StreamProvider.autoDispose
+    .family<List<RemovalVote>, String>((ref, circleId) {
+      final uid = ref.watch(authUidProvider);
+      if (uid == null || uid.isEmpty) return Stream.value([]);
 
-  return ref
-      .watch(removalVoteRepositoryProvider)
-      .watchActiveVotes(circleId);
-});
+      return ref
+          .watch(removalVoteRepositoryProvider)
+          .watchActiveVotes(circleId);
+    });

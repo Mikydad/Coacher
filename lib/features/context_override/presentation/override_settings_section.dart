@@ -24,8 +24,10 @@ class OverrideSettingsSection extends ConsumerWidget {
 
     return stateAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) =>
-          Text('Error loading override state', style: TextStyle(color: Colors.red.shade300)),
+      error: (e, _) => Text(
+        'Error loading override state',
+        style: TextStyle(color: Colors.red.shade300),
+      ),
       data: (state) {
         final s = state ?? UserAttentionState.empty();
         return Column(
@@ -94,10 +96,7 @@ class _CurrentOverrideRow extends ConsumerWidget {
                 if (hasOverride && state.overrideExpiresAt != null)
                   Text(
                     _remainingLabel(state.overrideExpiresAt!),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.white54,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: Colors.white54),
                   ),
                 if (hasOverride && state.overrideExpiresAt == null)
                   const Text(
@@ -126,8 +125,7 @@ class _CurrentOverrideRow extends ConsumerWidget {
   }
 
   Future<void> _end(BuildContext context, WidgetRef ref) async {
-    final review =
-        await ref.read(contextOverrideServiceProvider).endOverride();
+    final review = await ref.read(contextOverrideServiceProvider).endOverride();
     if (review.overrideType != ContextOverride.none) {
       ref.read(pendingRecoveryReviewProvider.notifier).state = review;
       await persistPendingReviewFlag(true);
