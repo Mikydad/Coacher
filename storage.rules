@@ -27,10 +27,14 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
-    // Circle chat proof images
+    // Circle chat proof images — uid-prefixed (spoof/overwrite-proof) and
+    // create-only (immutable once written). Pre-existing objects with
+    // unprefixed names stay readable; only NEW uploads need the prefix.
     match /circles/{circleId}/proofs/{fileName} {
       allow read: if isCircleMember(circleId);
-      allow write: if isCircleMember(circleId) && isValidImageUpload();
+      allow create: if isCircleMember(circleId)
+        && isValidImageUpload()
+        && fileName.matches(request.auth.uid + '_.*');
     }
 
     // Challenge progress proof images — scoped to the circle; only members

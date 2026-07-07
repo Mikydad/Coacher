@@ -104,6 +104,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
       final file = File(picked.path);
       final url = await ref.read(circleProofStorageProvider).uploadChatProof(
             circleId: widget.circleId,
+            userId: user.uid,
             file: file,
             mimeType: picked.mimeType,
             sourcePath: picked.path,

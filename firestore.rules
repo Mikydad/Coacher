@@ -151,7 +151,18 @@ service cloud.firestore {
         allow read: if canAccessCircleContent(circleId);
         allow create: if isCircleMember(circleId)
           && request.resource.data.creatorId == request.auth.uid;
-        allow update: if isCircleMember(circleId);
+        // Creator/moderator may edit challenge metadata. Regular members may
+        // only touch the collaborative fields the app writes on their behalf:
+        // progress tallies (updateProgress) and the vote-driven status flip
+        // (vote). creatorId is immutable on every branch.
+        allow update: if isCircleMember(circleId)
+          && request.resource.data.creatorId == resource.data.creatorId
+          && (
+            resource.data.creatorId == request.auth.uid
+            || isCircleModerator(circleId)
+            || request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['memberProgress', 'teamTotal', 'status', 'updatedAtMs'])
+          );
         allow delete: if isCircleModerator(circleId);
 
         match /votes/{userId} {

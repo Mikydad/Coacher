@@ -76,14 +76,17 @@ class CircleProofStorage {
 
   Future<String> uploadChatProof({
     required String circleId,
+    required String userId,
     required File file,
     String? mimeType,
     String? sourcePath,
   }) async {
     final path = sourcePath ?? file.path;
     final ext = imageExtensionFromPath(path, mimeType: mimeType);
+    // Uid prefix is enforced by storage.rules (uploads are uid-namespaced
+    // and create-only so members can't overwrite each other's proofs).
     final objectRef = _storage.ref(
-      'circles/$circleId/proofs/${StableId.generate('proof')}.$ext',
+      'circles/$circleId/proofs/${userId}_${StableId.generate('proof')}.$ext',
     );
     await objectRef.putFile(
       file,
