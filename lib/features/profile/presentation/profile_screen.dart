@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/presentation/theme_brightness_controller.dart';
+
 import '../../../app/application/main_tab_navigation.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../auth/application/auth_session_policy.dart';
@@ -825,6 +827,30 @@ class _CoreOptimizationSection extends StatelessWidget {
               context,
               NotificationSettingsScreen.routeName,
             ),
+          ),
+          Consumer(
+            builder: (context, ref, _) {
+              final isDark =
+                  ref.watch(themeBrightnessProvider) == Brightness.dark;
+              return _SettingRow(
+                icon: isDark
+                    ? Icons.dark_mode_outlined
+                    : Icons.light_mode_outlined,
+                title: 'Appearance',
+                subtitle: 'Obsidian Pulse dark or light',
+                trailing: Text(
+                  isDark ? 'DARK' : 'LIGHT',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                    color: _kPrimary,
+                  ),
+                ),
+                onTap: () =>
+                    ref.read(themeBrightnessProvider.notifier).toggle(),
+              );
+            },
           ),
           _SettingRow(
             icon: Icons.alarm_on_rounded,

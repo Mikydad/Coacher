@@ -58,7 +58,6 @@ import '../../timer/presentation/timer_session_screen.dart';
 import 'quittr_app_bar_title.dart';
 
 import '../../../core/presentation/app_colors.dart';
-import '../../../core/presentation/theme_brightness_controller.dart';
 import '../../../core/presentation/async_value_ui.dart';
 
 enum _PlansChangedAction { reshuffle, defer, skip }
@@ -93,18 +92,6 @@ class HomeScreen extends ConsumerWidget {
         title: const QuittrAppBarTitle(),
         actions: [
           const _SyncFromCloudAction(),
-          IconButton(
-            tooltip: ref.watch(themeBrightnessProvider) == Brightness.dark
-                ? 'Switch to light mode'
-                : 'Switch to dark mode',
-            onPressed: () =>
-                ref.read(themeBrightnessProvider.notifier).toggle(),
-            icon: Icon(
-              ref.watch(themeBrightnessProvider) == Brightness.dark
-                  ? Icons.light_mode_outlined
-                  : Icons.dark_mode_outlined,
-            ),
-          ),
           IconButton(
             tooltip: 'Accountability history',
             onPressed: () => Navigator.pushNamed(
