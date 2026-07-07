@@ -2177,6 +2177,7 @@ Future<void> _completeTaskFromHome(
       return;
     }
   }
+  if (!context.mounted) return;
   // Ask for the completion rate — same score dialog the focus/timer flow
   // uses, with the discipline-mode contract:
   // flexible → dismissing the card (tap outside / back) accepts the default,

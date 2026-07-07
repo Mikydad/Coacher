@@ -116,6 +116,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
         ),
         commitOverride: () async {},
       );
+      if (!mounted) return;
       FocusScope.of(context).unfocus();
     } catch (e) {
       if (mounted) {

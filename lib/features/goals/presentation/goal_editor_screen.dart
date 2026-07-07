@@ -692,6 +692,7 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen> with Widget
       _draftAutosave?.cancel();
       await ref.read(formDraftRepositoryProvider).delete(_draftKey);
 
+      if (!mounted) return;
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;

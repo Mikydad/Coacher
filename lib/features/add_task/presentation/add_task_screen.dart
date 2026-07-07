@@ -1412,7 +1412,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
                   if (!value) return;
                   final ok =
                       await ref.read(reminderSyncServiceProvider).ensurePermissions();
-                  if (!ok && context.mounted) {
+                  if (!ok && mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Notification permission is disabled.'),
