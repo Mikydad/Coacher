@@ -215,7 +215,13 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
             onTap: () => dismissKeyboard(context),
             child: Column(
               children: [
-                if (showSuggestionsPanel) const ProactiveSuggestionsCoachPanel(),
+                // Expanded while the chat is empty (suggestions are the
+                // content); collapses to the slim header once a conversation
+                // is underway so the transcript gets the space.
+                if (showSuggestionsPanel)
+                  ProactiveSuggestionsCoachPanel(
+                    initiallyExpanded: _openSuggestionsPanel || !hasMessages,
+                  ),
                 // "Pick up where you left off" banner — shown when no active messages
                 // and there is a recent unconfirmed plan
                 if (!hasMessages)

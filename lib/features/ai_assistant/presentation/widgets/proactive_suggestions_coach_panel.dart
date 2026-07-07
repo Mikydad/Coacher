@@ -9,15 +9,44 @@ import 'proactive_suggestion_card.dart';
 
 import '../../../../core/presentation/app_colors.dart';
 
-/// Full list of proactive suggestions at the top of the Coach screen.
-class ProactiveSuggestionsCoachPanel extends ConsumerWidget {
-  const ProactiveSuggestionsCoachPanel({super.key});
+/// Collapsible list of proactive suggestions at the top of the Coach screen.
+///
+/// Starts expanded when [initiallyExpanded] (the chat is empty, so the
+/// suggestions ARE the content) and collapses to a single header row once a
+/// conversation is underway — the transcript gets the space back. Tapping the
+/// header toggles it any time.
+class ProactiveSuggestionsCoachPanel extends ConsumerStatefulWidget {
+  const ProactiveSuggestionsCoachPanel({
+    super.key,
+    this.initiallyExpanded = true,
+  });
 
+  final bool initiallyExpanded;
+
+  @override
+  ConsumerState<ProactiveSuggestionsCoachPanel> createState() =>
+      _ProactiveSuggestionsCoachPanelState();
+}
+
+class _ProactiveSuggestionsCoachPanelState
+    extends ConsumerState<ProactiveSuggestionsCoachPanel> {
   static const _kAccent = AppColors.accentDim;
   static const _kVariant = AppColors.textSoft;
 
+  late bool _expanded = widget.initiallyExpanded;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void didUpdateWidget(ProactiveSuggestionsCoachPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Follow intent changes (first message sent → collapse; "see all in
+    // Coach" → expand) while still letting the user toggle manually.
+    if (oldWidget.initiallyExpanded != widget.initiallyExpanded) {
+      _expanded = widget.initiallyExpanded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final suggestionsAsync = ref.watch(proactiveSuggestionsProvider);
 
     return suggestionsAsync.when(
@@ -32,52 +61,73 @@ class ProactiveSuggestionsCoachPanel extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    const Text(
-                      'SUGGESTIONS FOR TODAY',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.9,
+              InkWell(
+                onTap: () => setState(() => _expanded = !_expanded),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'SUGGESTIONS FOR TODAY',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.9,
+                          color: _kVariant,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${active.length}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _kAccent,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        _expanded
+                            ? Icons.expand_less_rounded
+                            : Icons.expand_more_rounded,
+                        size: 18,
                         color: _kVariant,
                       ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '${active.length}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: _kAccent,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 6),
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: active.length == 1 ? 140 : 320,
-                ),
-                child: ListView(
-                  shrinkWrap: true,
-                  padding: EdgeInsets.zero,
-                  physics: active.length <= 2
-                      ? const NeverScrollableScrollPhysics()
-                      : const BouncingScrollPhysics(),
-                  children: active
-                      .map(
-                        (s) => ProactiveSuggestionCard(
-                          key: ValueKey('coach_${s.id}'),
-                          suggestion: s,
-                          onDismiss: () {},
+              AnimatedSize(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: !_expanded
+                    ? const SizedBox(width: double.infinity)
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight: active.length == 1 ? 140 : 320,
+                          ),
+                          child: ListView(
+                            shrinkWrap: true,
+                            padding: EdgeInsets.zero,
+                            physics: active.length <= 2
+                                ? const NeverScrollableScrollPhysics()
+                                : const BouncingScrollPhysics(),
+                            children: active
+                                .map(
+                                  (s) => ProactiveSuggestionCard(
+                                    key: ValueKey('coach_${s.id}'),
+                                    suggestion: s,
+                                    onDismiss: () {},
+                                  ),
+                                )
+                                .toList(),
+                          ),
                         ),
-                      )
-                      .toList(),
-                ),
+                      ),
               ),
             ],
           ),

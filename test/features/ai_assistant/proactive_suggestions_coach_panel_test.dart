@@ -66,4 +66,49 @@ void main() {
     expect(find.text('Gap B'), findsOneWidget);
     expect(find.text('2'), findsOneWidget);
   });
+
+  testWidgets(
+      'collapsed panel shows only the header; tapping it expands the cards',
+      (tester) async {
+    final suggestions = [
+      ProactiveSuggestion(
+        id: 'a',
+        type: ProactiveSuggestionType.scheduleGap,
+        title: 'Gap A',
+        description: 'Desc A',
+        preDraftedInput: 'input A',
+        confidence: 0.9,
+        generatedAt: DateTime(2026, 7, 6),
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dismissedSuggestionRepositoryProvider
+              .overrideWithValue(_NoOpDismissedRepo()),
+          proactiveSuggestionsProvider.overrideWith((ref) async => suggestions),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: ProactiveSuggestionsCoachPanel(initiallyExpanded: false),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Collapsed: header row only, no cards.
+    expect(find.text('SUGGESTIONS FOR TODAY'), findsOneWidget);
+    expect(find.text('Gap A'), findsNothing);
+
+    await tester.tap(find.text('SUGGESTIONS FOR TODAY'));
+    await tester.pumpAndSettle();
+    expect(find.text('Gap A'), findsOneWidget);
+
+    // And collapses again on a second tap.
+    await tester.tap(find.text('SUGGESTIONS FOR TODAY'));
+    await tester.pumpAndSettle();
+    expect(find.text('Gap A'), findsNothing);
+  });
 }
