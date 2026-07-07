@@ -369,7 +369,7 @@ no fixes applied. Every finding was verified against the code, not assumed._
 | S4 | MED | **Any signed-in user can read all circle metadata and full member lists** (`/circles/{id}` and `/members` both `allow read: if isSignedIn()`). No private-circle flag exists today, so this is "public by design", but membership enumeration across all circles is a social-graph leak worth a deliberate decision before launch. |
 | S5 | MED → **FIXED** `ee82115` | **Chat proof uploads not uid-namespaced and not write-once.** `storage.rules` lets any member write ANY filename under `circles/{id}/proofs/` — overwriting another member's proof is possible if the name is known (StableIds are timestamped+random, so hard to guess, but nothing enforces immutability). `challenge_proofs` got this right (uid-prefix). Mirror that, or make proofs create-only. |
 | S6 | LOW → **FIXED** `9cd619d` | **Reactions are blocked by the message-update rule (fails closed).** `updateReactions` writes to other members' message docs, but the rule requires `resource.data.senderId == request.auth.uid` → reacting to someone else's message is permission-denied (feature broken, not exploitable). Inverse gap: a sender can forge arbitrary uids inside `reactions` on their own message. Proper fix: dedicated rule allowing only the `reactions` key to change with the caller's own uid added/removed, or a reactions subcollection. |
-| S7 | LOW | **153 `debugPrint` call sites, no release override.** `debugPrint` is not stripped in release builds; task titles/uids leak into device logs. Override it to a no-op in release in `main()`. |
+| S7 | LOW → **FIXED** `c10000d` | **153 `debugPrint` call sites, no release override.** `debugPrint` is not stripped in release builds; task titles/uids leak into device logs. Override it to a no-op in release in `main()`. |
 | S8 | INFO | **Prompt injection surface** — task titles/notes flow into LLM prompts. Mitigated: model is pinned server-side, all mutations require the user to confirm a preview card, informational output is sanitized. Keep the confirm-gate invariant. |
 | S9 | INFO | Anonymous uid-change → local-data wipe (`AuthSessionPolicy`) remains the known data-loss trap; already documented. |
 
@@ -379,7 +379,7 @@ no fixes applied. Every finding was verified against the code, not assumed._
 
 | # | Sev | Finding |
 |---|-----|---------|
-| P1 | **HIGH (grows silently)** | **Every remote pull reads entire collections.** `RemoteIsarMerge` has no `updatedAtMs > lastSync` cursor: each pull (app open, connectivity change, 30s debounce window) re-downloads ALL routines→blocks→tasks (serial nested gets), reminders, goals, **analytics_events**, analytics_stats. Firestore read cost and pull latency grow with account age — analytics_events is unbounded. Fix direction: per-collection since-cursor + occasional full reconcile; flatten the nested routine/block/task walk with collection-group queries. |
+| P1 | **HIGH (grows silently)** → **FIXED** `840de55` | **Every remote pull reads entire collections.** `RemoteIsarMerge` has no `updatedAtMs > lastSync` cursor: each pull (app open, connectivity change, 30s debounce window) re-downloads ALL routines→blocks→tasks (serial nested gets), reminders, goals, **analytics_events**, analytics_stats. Firestore read cost and pull latency grow with account age — analytics_events is unbounded. Fix direction: per-collection since-cursor + occasional full reconcile; flatten the nested routine/block/task walk with collection-group queries. |
 | P2 | MED | `goalDetailProvider` loads **all check-ins ever** per open (`getCheckInsForGoal` unbounded); streak/cycle math needs ~90 days at most. Cap the query window. |
 | P3 | MED | AI payload includes full week overview + schedule + patterns on **every** message → token cost per turn scales with schedule size. Consider trimming payload sections by intent route (the router already exists). |
 | P4 | LOW | Four community `ListView`s still non-builder — bounded by query caps (30–50), fine until caps lift (already documented). |
@@ -390,8 +390,8 @@ no fixes applied. Every finding was verified against the code, not assumed._
 
 | # | Sev | Finding |
 |---|-----|---------|
-| R1 | MED | **57 swallowed-error sites** (`error: (_, _) => genericText`, `catch (_) {}`). This exact pattern hid the commitments outage (incident #18). Minimum: log the error; better: surface a retry. |
-| R2 | MED | **4 `use_build_context_synchronously`** spots (add_task 1416, focus_selection 119, goal_editor 695, home 2187) — context used across async gaps without a mounted guard; latent use-after-dispose crashes. |
+| R1 | MED → **FIXED** `bbd93ea` | **57 swallowed-error sites** (`error: (_, _) => genericText`, `catch (_) {}`). This exact pattern hid the commitments outage (incident #18). Minimum: log the error; better: surface a retry. |
+| R2 | MED → **FIXED** `9d486c9` | **4 `use_build_context_synchronously`** spots (add_task 1416, focus_selection 119, goal_editor 695, home 2187) — context used across async gaps without a mounted guard; latent use-after-dispose crashes. |
 | R3 | LOW | Deprecated API debt: ~9 `withOpacity` (→ `withValues`), `ReorderableListView.onReorder` (tasks hub), and `RoutineMode` is `@Deprecated` yet still core to `EffectiveTaskMode` — the migration it points to (CoachingStyle/EnforcementMode) is unfinished. |
 | R4 | LOW | Analyzer baseline: 105 infos/warnings (style-level; no errors). |
 | R5 | LOW | **Dependency staleness:** entire Firebase suite one major behind (`cloud_firestore` 5.6→6.6, `firebase_auth` 5.7→6.5, `firebase_core` 3→4, …), `flutter_local_notifications` 19→22, Riverpod 3 available. No pub-flagged advisories, but majors compound migration risk. |
