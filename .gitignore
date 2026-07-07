@@ -61,3 +61,5 @@ lib/core/config/google_auth_config.local.dart
 
 # Isar VM tests may place a native library in the repo root; do not commit.
 /libisar.dylib
+ios/build/
+/package-lock.json
