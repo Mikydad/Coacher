@@ -124,8 +124,19 @@ service cloud.firestore {
       }
 
       // ── Weekly commitments ────────────────────────────────────────────────
+      // Docs carry userId + weekKey (see WeeklyCommitment.toMap). Only the
+      // owner may create/update/delete their commitments (the client's
+      // setCommitments/markProgress only ever touch the caller's own docs).
+      // Reads stay circle-wide.
       match /weeklyCommitments/{commitmentId} {
-        allow read, write: if canAccessCircleContent(circleId);
+        allow read: if canAccessCircleContent(circleId);
+        allow create: if isCircleMember(circleId)
+          && request.resource.data.userId == request.auth.uid;
+        allow update: if isCircleMember(circleId)
+          && resource.data.userId == request.auth.uid
+          && request.resource.data.userId == resource.data.userId;
+        allow delete: if isCircleMember(circleId)
+          && resource.data.userId == request.auth.uid;
       }
 
       // ── Challenges ────────────────────────────────────────────────────────
