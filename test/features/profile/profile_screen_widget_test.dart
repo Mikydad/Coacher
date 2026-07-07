@@ -170,6 +170,10 @@ void main() {
         200,
         scrollable: find.byType(Scrollable).first,
       );
+      // The row can land half-clipped at the viewport edge (the settings list
+      // grew an Appearance row); align it fully into view before tapping.
+      await tester.ensureVisible(find.text('Log Out'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Log Out'));
       await tester.pumpAndSettle();
       expect(find.text('Log Out?'), findsOneWidget);
