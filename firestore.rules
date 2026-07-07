@@ -106,10 +106,17 @@ service cloud.firestore {
         allow read: if canAccessCircleContent(circleId);
         allow create: if isCircleMember(circleId)
           && request.resource.data.senderId == request.auth.uid;
-        // Only the sender can edit their own message, and senderId is immutable.
+        // Sender edits their own message; ANY member may toggle reactions —
+        // but a reactions-only update may touch nothing except `reactions`.
+        // (Rules can't cheaply validate which uid changed inside the map;
+        // accepted residual risk — a member could alter others' reactions.)
         allow update: if isCircleMember(circleId)
-          && resource.data.senderId == request.auth.uid
-          && request.resource.data.senderId == resource.data.senderId;
+          && (
+            (resource.data.senderId == request.auth.uid
+              && request.resource.data.senderId == resource.data.senderId)
+            || request.resource.data.diff(resource.data)
+                 .affectedKeys().hasOnly(['reactions'])
+          );
         allow delete: if isCircleMember(circleId)
           && (resource.data.senderId == request.auth.uid || isCircleModerator(circleId));
       }
@@ -154,9 +161,12 @@ service cloud.firestore {
       }
 
       // ── AI Pulse ──────────────────────────────────────────────────────────
+      // Pulses are generated client-side by ANY member's device
+      // (CircleAiPulseService via the ai_pulse_banner) — moderator-only
+      // writes silently broke the banner for non-moderators.
       match /aiPulse/{pulseId} {
         allow read: if isCircleMember(circleId);
-        allow write: if isCircleModerator(circleId);
+        allow write: if isCircleMember(circleId);
       }
 
       // ── Removal votes ─────────────────────────────────────────────────────
