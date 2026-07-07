@@ -118,7 +118,7 @@ abstract final class AppColors {
   /// Pure white. Palette "onSurface" in settings_page_scaffold.dart,
   /// profile_screen.dart, progress_design_tokens.dart, add_task_ui.dart.
   static const white = Color(0xFFFFFFFF);
-  /// Bright gray text. suggested_prompts_section.dart, planned_changes_card.dart.
+  /// Bright gray text. planned_changes_card.dart.
   static const grayBright = Color(0xFFE0E0E0);
   /// Light gray text. ai_assistant_screen.dart.
   static const grayLight = Color(0xFFCCCCCC);

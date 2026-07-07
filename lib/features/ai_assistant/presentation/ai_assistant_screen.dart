@@ -16,7 +16,6 @@ import 'widgets/chat_bubbles.dart';
 import 'widgets/planned_changes_card.dart';
 import 'widgets/proactive_suggestions_coach_panel.dart';
 import 'widgets/quick_directives_row.dart';
-import 'widgets/suggested_prompts_section.dart';
 import '../../../app/application/main_tab_navigation.dart';
 import '../../../app/presentation/main_tab_bar_inset.dart';
 import '../application/proactive_suggestion_display.dart';
@@ -427,8 +426,6 @@ class _EmptyState extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 24),
-          SuggestedPromptsSection(onSelected: onPromptSelected),
         ],
       ),
     );
