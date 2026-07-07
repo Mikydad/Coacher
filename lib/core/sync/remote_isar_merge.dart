@@ -2,7 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
-import 'package:isar/isar.dart';
+// Query below always means the Firestore one (_afterCursor).
+import 'package:isar/isar.dart' hide Query;
 
 import '../../features/goals/domain/models/user_goal.dart';
 import '../../features/analytics/domain/models/analytics_event.dart';
@@ -21,6 +22,7 @@ import '../local_db/isar_collections/isar_reminder.dart';
 import '../local_db/isar_collections/isar_routine.dart';
 import 'isar_lww_merge.dart';
 import 'lww_updated_at.dart';
+import 'sync_cursor_store.dart';
 
 String _docFieldId(
   QueryDocumentSnapshot<Map<String, dynamic>> doc,
@@ -39,16 +41,57 @@ String _docFieldId(
 /// collection in a single pull reads from the same user tree — never a mix of
 /// two accounts when auth changes mid-pull. If the signed-in uid changes while
 /// the pull is running, the pull aborts before the next phase.
+///
+/// ## Incremental pulls (AUDIT §7 P1)
+///
+/// Task, reminder, goal, and analytics queries are filtered by a
+/// per-collection cursor (`updatedAtMs > lastMerged`, [SyncCursorStore]) so
+/// the periodic pull no longer re-reads the whole account. Routines and
+/// blocks are still walked in full — they are the cheap "skeleton", and
+/// filtering them would skip descending into unchanged parents and miss task
+/// edits underneath. Single-field ranges need no composite index (see
+/// errors.md #16/#18 before adding any orderBy here).
+///
+/// [ignoreCursors] (force pull) reads everything; cursors still advance
+/// afterwards. Cursor pulls cannot observe remote deletions — but the merge
+/// never deletes locally either (LWW upsert only), so behavior is unchanged
+/// and a force pull remains the reconcile escape hatch. Known edge: a second
+/// device with a skewed-back clock can write updatedAtMs below the cursor;
+/// such a doc is only picked up by a force pull.
 class RemoteIsarMerge {
-  RemoteIsarMerge(this._isar);
+  RemoteIsarMerge(
+    this._isar, {
+    FirestoreClient? client,
+    SyncCursorStore? cursorStore,
+    this.ignoreCursors = false,
+  })  : _client = client ?? FirestoreClient(),
+        _cursors = cursorStore ?? const SyncCursorStore();
 
   final Isar _isar;
-  final FirestoreClient _client = FirestoreClient();
+  final FirestoreClient _client;
+  final SyncCursorStore _cursors;
+  final bool ignoreCursors;
+
+  /// Max updatedAtMs seen per cursor key this pull; flushed on success only.
+  final Map<String, int> _maxSeen = {};
 
   /// Rows actually written this pull (LWW no-ops excluded). Lets callers skip
   /// the post-sync provider refresh when the pull changed nothing — the
   /// common case for the periodic 30s pull.
   int _appliedCount = 0;
+
+  Future<int> _cursorFor(String key) async =>
+      ignoreCursors ? 0 : _cursors.read(key);
+
+  Query<Map<String, dynamic>> _afterCursor(
+    Query<Map<String, dynamic>> query,
+    int cursor,
+  ) =>
+      cursor > 0 ? query.where('updatedAtMs', isGreaterThan: cursor) : query;
+
+  void _noteSeen(String key, int updatedAtMs) {
+    if (updatedAtMs > (_maxSeen[key] ?? 0)) _maxSeen[key] = updatedAtMs;
+  }
 
   bool get _uidStillCurrent {
     if (Firebase.apps.isEmpty) return true; // VM tests — no auth to compare
@@ -73,12 +116,20 @@ class RemoteIsarMerge {
     await _pullGoals();
     _abortIfUidChanged();
     await _pullAnalytics();
+    // Only reached when every phase succeeded — safe to advance cursors.
+    for (final entry in _maxSeen.entries) {
+      await _cursors.advance(entry.key, entry.value);
+    }
     debugPrint('RemoteIsarMerge: pull finished ($_appliedCount rows applied)');
     return _appliedCount > 0;
   }
 
   Future<void> _pullRoutinesBlocksTasks() async {
     final routinesCol = _client.userCollection('routines');
+    // Routines and blocks are walked in FULL on purpose: filtering the
+    // skeleton would skip descending into unchanged parents and miss task
+    // edits underneath. Only the leaf task queries use the cursor.
+    final tasksCursor = await _cursorFor('tasks');
     final routinesSnap = await routinesCol.get();
     for (final doc in routinesSnap.docs) {
       try {
@@ -96,12 +147,14 @@ class RemoteIsarMerge {
             bm['routineId'] = rid is String && rid.trim().isNotEmpty ? rid.trim() : routineId;
             final block = TaskBlock.fromMap(bm);
             await _mergeBlock(block);
-            final tasksSnap = await routinesCol
-                .doc(routineId)
-                .collection('blocks')
-                .doc(block.id)
-                .collection('tasks')
-                .get();
+            final tasksSnap = await _afterCursor(
+              routinesCol
+                  .doc(routineId)
+                  .collection('blocks')
+                  .doc(block.id)
+                  .collection('tasks'),
+              tasksCursor,
+            ).get();
             for (final tDoc in tasksSnap.docs) {
               try {
                 final tm = Map<String, dynamic>.from(tDoc.data());
@@ -111,6 +164,7 @@ class RemoteIsarMerge {
                 final tb = tm['blockId'];
                 tm['blockId'] = tb is String && tb.trim().isNotEmpty ? tb.trim() : block.id;
                 final task = PlannedTask.fromMap(tm);
+                _noteSeen('tasks', task.updatedAtMs);
                 await _mergeTask(task);
               } catch (e, st) {
                 debugPrint('RemoteIsarMerge: skip task ${tDoc.id}: $e\n$st');
@@ -129,10 +183,13 @@ class RemoteIsarMerge {
   Future<void> _pullReminders() async {
     // Use the pinned client (not FirestorePaths, which resolves the uid at
     // call time) so a mid-pull account switch can't mix user trees.
-    final snap = await _client.userCollection('reminders').get();
+    final cursor = await _cursorFor('reminders');
+    final snap =
+        await _afterCursor(_client.userCollection('reminders'), cursor).get();
     for (final doc in snap.docs) {
       try {
         final r = reminderConfigFromFirestoreDoc(doc);
+        _noteSeen('reminders', r.updatedAtMs);
         await _mergeReminder(r);
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip reminder ${doc.id}: $e\n$st');
@@ -141,12 +198,15 @@ class RemoteIsarMerge {
   }
 
   Future<void> _pullGoals() async {
-    final snap = await _client.userCollection('goals').get();
+    final cursor = await _cursorFor('goals');
+    final snap =
+        await _afterCursor(_client.userCollection('goals'), cursor).get();
     for (final doc in snap.docs) {
       try {
         final m = Map<String, dynamic>.from(doc.data());
         m['id'] = _docFieldId(doc, m);
         final g = UserGoal.fromMap(m);
+        _noteSeen('goals', g.updatedAtMs);
         await _mergeGoal(g);
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip goal ${doc.id}: $e\n$st');
@@ -155,24 +215,34 @@ class RemoteIsarMerge {
   }
 
   Future<void> _pullAnalytics() async {
-    final eventsSnap = await _client.userCollection('analytics_events').get();
+    final eventsCursor = await _cursorFor('analytics_events');
+    final eventsSnap = await _afterCursor(
+      _client.userCollection('analytics_events'),
+      eventsCursor,
+    ).get();
     for (final doc in eventsSnap.docs) {
       try {
         final m = Map<String, dynamic>.from(doc.data());
         m['id'] = _docFieldId(doc, m);
         final event = AnalyticsEvent.fromMap(m);
+        _noteSeen('analytics_events', event.updatedAtMs);
         await _mergeAnalyticsEvent(event);
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip analytics event ${doc.id}: $e\n$st');
       }
     }
 
-    final statsSnap = await _client.userCollection('analytics_stats').get();
+    final statsCursor = await _cursorFor('analytics_stats');
+    final statsSnap = await _afterCursor(
+      _client.userCollection('analytics_stats'),
+      statsCursor,
+    ).get();
     for (final doc in statsSnap.docs) {
       try {
         final m = Map<String, dynamic>.from(doc.data());
         m['id'] = _docFieldId(doc, m);
         final stats = AnalyticsStatsCache.fromMap(m);
+        _noteSeen('analytics_stats', stats.updatedAtMs);
         await _mergeAnalyticsStats(stats);
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip analytics stats ${doc.id}: $e\n$st');

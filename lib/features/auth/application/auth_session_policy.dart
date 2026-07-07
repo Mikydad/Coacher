@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/notifications/local_notifications_service.dart';
 import '../../../core/offline/offline_store.dart';
+import '../../../core/sync/sync_cursor_store.dart';
 import '../../../core/sync/sync_service.dart';
 
 // ── Feature flag ──────────────────────────────────────────────────────────────
@@ -71,6 +72,10 @@ abstract final class AuthSessionPolicy {
     // 3. Drop any queued offline writes — they belong to the previous user
     //    and must never replay into the next account's Firestore tree.
     await SyncService.instance.clearQueue();
+
+    // 3b. Drop sync cursors so the next account's first pull is a FULL pull
+    //     (cursors describe the previous account's merge progress).
+    await SyncCursorStore.clearAll();
 
     // 4. Clear the relevant SharedPreferences keys.
     //    NOTE: kLastSignedInUidPrefsKey is intentionally kept so that the next

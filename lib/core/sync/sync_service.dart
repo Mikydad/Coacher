@@ -118,7 +118,7 @@ class SyncService {
     _lastRemoteSyncStartedAt = now;
 
     _activeRemotePullUid = uid;
-    _activeRemotePullFuture = _runRemotePull(isar);
+    _activeRemotePullFuture = _runRemotePull(isar, force: force);
     try {
       await _activeRemotePullFuture!;
       return _lastRemotePullSucceeded;
@@ -128,7 +128,7 @@ class SyncService {
     }
   }
 
-  Future<void> _runRemotePull(Isar isar) async {
+  Future<void> _runRemotePull(Isar isar, {bool force = false}) async {
     isSyncingFromRemote.value = true;
     _lastRemotePullSucceeded = false;
     // Conservative default for the test-override path, which can't report
@@ -138,7 +138,10 @@ class SyncService {
       if (debugRemotePullForTests != null) {
         await debugRemotePullForTests!(isar);
       } else {
-        appliedAny = await RemoteIsarMerge(isar).run().timeout(
+        // force → ignore sync cursors: full reconcile pull.
+        appliedAny = await RemoteIsarMerge(isar, ignoreCursors: force)
+            .run()
+            .timeout(
               remotePullTimeout,
               onTimeout: () => throw TimeoutException(
                 'RemoteIsarMerge exceeded ${remotePullTimeout.inSeconds}s',
