@@ -27,16 +27,16 @@ Future<void> showSleepTaskIosFocusGuidance(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'iPhone Focus',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: Colors.white,
+                color: AppColors.fg,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'iOS does not let apps turn on Sleep Focus or Do Not Disturb '
               'automatically. You can enable them in Settings → Focus, or use '
               'Shortcuts automations.\n\n'

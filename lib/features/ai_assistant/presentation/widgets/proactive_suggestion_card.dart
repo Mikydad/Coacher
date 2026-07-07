@@ -33,9 +33,9 @@ class _ProactiveSuggestionCardState
   late final Animation<double> _opacity;
   late final Animation<Offset> _slide;
 
-  static const _kAccent = AppColors.accentDim;
-  static const _kSurface = AppColors.inkWarm;
-  static const _kVariant = AppColors.textSoft;
+  static Color get _kAccent => AppColors.accentDim;
+  static Color get _kSurface => AppColors.inkWarm;
+  static Color get _kVariant => AppColors.textSoft;
 
   @override
   void initState() {
@@ -113,7 +113,7 @@ class _ProactiveSuggestionCardState
           decoration: BoxDecoration(
             color: _kSurface,
             borderRadius: BorderRadius.circular(16),
-            border: Border(left: const BorderSide(color: _kAccent, width: 3)),
+            border: Border(left: BorderSide(color: _kAccent, width: 3)),
           ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 14, 12, 12),
@@ -122,21 +122,17 @@ class _ProactiveSuggestionCardState
               children: [
                 Text(
                   widget.suggestion.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: AppColors.fg,
                     height: 1.3,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   widget.suggestion.description,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: _kVariant,
-                    height: 1.4,
-                  ),
+                  style: TextStyle(fontSize: 12, color: _kVariant, height: 1.4),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -160,7 +156,7 @@ class _ProactiveSuggestionCardState
                             });
                         _dismiss();
                       },
-                      child: const Padding(
+                      child: Padding(
                         padding: EdgeInsets.symmetric(
                           horizontal: 10,
                           vertical: 6,
@@ -188,7 +184,7 @@ class _ProactiveSuggestionCardState
                           color: _kAccent,
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        child: const Text(
+                        child: Text(
                           "Let's do it",
                           style: TextStyle(
                             fontSize: 12,

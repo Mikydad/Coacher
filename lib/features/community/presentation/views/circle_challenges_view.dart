@@ -96,7 +96,7 @@ class CircleChallengesView extends ConsumerWidget {
             ),
             error: (e, _) => Text(
               'Error loading challenges: $e',
-              style: const TextStyle(color: AppColors.danger),
+              style: TextStyle(color: AppColors.danger),
             ),
           ),
 
@@ -144,7 +144,7 @@ class _SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10, top: 4),
       child: Text(
         text.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.textMuted,
           fontSize: 11,
           fontWeight: FontWeight.w600,
@@ -188,16 +188,12 @@ class _CompetitionChallengeCard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.emoji_events_rounded,
-                color: AppColors.gold,
-                size: 16,
-              ),
+              Icon(Icons.emoji_events_rounded, color: AppColors.gold, size: 16),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   challenge.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -216,7 +212,7 @@ class _CompetitionChallengeCard extends ConsumerWidget {
           const SizedBox(height: 4),
           Text(
             'Target: ${challenge.targetValue} ${challenge.unit}',
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
           ),
           const SizedBox(height: 12),
 
@@ -241,12 +237,12 @@ class _CompetitionChallengeCard extends ConsumerWidget {
           Center(
             child: TextButton.icon(
               onPressed: () => _showManualUpdate(context, ref, uid),
-              icon: const Icon(
+              icon: Icon(
                 Icons.add_circle_outline,
                 size: 16,
                 color: AppColors.accent,
               ),
-              label: const Text(
+              label: Text(
                 'Log progress',
                 style: TextStyle(color: AppColors.accent, fontSize: 13),
               ),
@@ -303,16 +299,12 @@ class _TeamChallengeCard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.group_rounded,
-                color: AppColors.periwinkle,
-                size: 16,
-              ),
+              Icon(Icons.group_rounded, color: AppColors.periwinkle, size: 16),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   challenge.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -334,7 +326,7 @@ class _TeamChallengeCard extends ConsumerWidget {
             children: [
               Text(
                 '${challenge.teamTotal}/${challenge.targetValue} ${challenge.unit}',
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -342,7 +334,7 @@ class _TeamChallengeCard extends ConsumerWidget {
               ),
               Text(
                 '${(ratio * 100).toStringAsFixed(0)}%',
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.accent,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -404,12 +396,12 @@ class _TeamChallengeCard extends ConsumerWidget {
                   userId: uid,
                 ),
               ),
-              icon: const Icon(
+              icon: Icon(
                 Icons.add_circle_outline,
                 size: 16,
                 color: AppColors.periwinkle,
               ),
-              label: const Text(
+              label: Text(
                 'Log team progress',
                 style: TextStyle(color: AppColors.periwinkle, fontSize: 13),
               ),
@@ -513,7 +505,7 @@ class _CompletedSectionState extends State<_CompletedSection> {
           onTap: () => setState(() => _expanded = !_expanded),
           child: Row(
             children: [
-              const Text(
+              Text(
                 'COMPLETED',
                 style: TextStyle(
                   color: AppColors.textMuted,
@@ -531,10 +523,7 @@ class _CompletedSectionState extends State<_CompletedSection> {
                 ),
                 child: Text(
                   '${widget.challenges.length}',
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 11,
-                  ),
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 11),
                 ),
               ),
               const Spacer(),
@@ -557,16 +546,12 @@ class _CompletedSectionState extends State<_CompletedSection> {
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.check_circle,
-                    color: AppColors.success,
-                    size: 16,
-                  ),
+                  Icon(Icons.check_circle, color: AppColors.success, size: 16),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       c.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.textMuted,
                         fontSize: 13,
                       ),
@@ -576,10 +561,7 @@ class _CompletedSectionState extends State<_CompletedSection> {
                     c.mode == ChallengeMode.team
                         ? '${c.teamTotal}/${c.targetValue} ${c.unit}'
                         : '${c.targetValue} ${c.unit}',
-                    style: const TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                   ),
                 ],
               ),
@@ -670,7 +652,7 @@ class _ManualProgressSheetState extends ConsumerState<_ManualProgressSheet> {
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
         child: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.surfaceDark,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
@@ -685,13 +667,13 @@ class _ManualProgressSheetState extends ConsumerState<_ManualProgressSheet> {
                     width: 36,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
+                      color: AppColors.fg.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Log progress',
                   style: TextStyle(
                     color: AppColors.textPrimary,
@@ -702,10 +684,7 @@ class _ManualProgressSheetState extends ConsumerState<_ManualProgressSheet> {
                 const SizedBox(height: 4),
                 Text(
                   widget.challenge.title,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -713,10 +692,10 @@ class _ManualProgressSheetState extends ConsumerState<_ManualProgressSheet> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   onTapOutside: (_) => dismissKeyboard(context),
-                  style: const TextStyle(color: AppColors.textPrimary),
+                  style: TextStyle(color: AppColors.textPrimary),
                   decoration: InputDecoration(
                     hintText: 'Amount (${widget.challenge.unit})',
-                    hintStyle: const TextStyle(color: AppColors.textMuted),
+                    hintStyle: TextStyle(color: AppColors.textMuted),
                     filled: true,
                     fillColor: AppColors.surfaceCard,
                     border: OutlineInputBorder(
@@ -743,7 +722,7 @@ class _ManualProgressSheetState extends ConsumerState<_ManualProgressSheet> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.camera_alt_rounded,
                           color: AppColors.textMuted,
                           size: 18,
@@ -811,13 +790,13 @@ class _EmptyState extends StatelessWidget {
         padding: const EdgeInsets.only(top: 60),
         child: Column(
           children: [
-            const Icon(
+            Icon(
               Icons.emoji_events_outlined,
               color: AppColors.textMuted,
               size: 48,
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'No challenges yet',
               style: TextStyle(
                 color: AppColors.textPrimary,
@@ -826,7 +805,7 @@ class _EmptyState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Create a challenge to motivate your circle',
               style: TextStyle(color: AppColors.textMuted, fontSize: 13),
             ),

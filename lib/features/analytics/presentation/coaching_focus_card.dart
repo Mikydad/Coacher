@@ -152,7 +152,7 @@ class _FocusCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'COACHING FOCUS',
                       style: TextStyle(
                         color: AppColors.cyan,
@@ -168,11 +168,7 @@ class _FocusCard extends StatelessWidget {
               ),
               if (onRefresh != null)
                 IconButton(
-                  icon: const Icon(
-                    Icons.refresh,
-                    size: 18,
-                    color: Colors.white38,
-                  ),
+                  icon: Icon(Icons.refresh, size: 18, color: AppColors.fg38),
                   tooltip: 'Refresh coaching',
                   onPressed: onRefresh,
                   padding: EdgeInsets.zero,
@@ -190,11 +186,7 @@ class _FocusCard extends StatelessWidget {
           if (hasSummary) ...[
             Text(
               summary!.dailySummary,
-              style: const TextStyle(
-                fontSize: 16,
-                height: 1.45,
-                color: Colors.white,
-              ),
+              style: TextStyle(fontSize: 16, height: 1.45, color: AppColors.fg),
             ),
             const SizedBox(height: 8),
             Text(
@@ -211,10 +203,10 @@ class _FocusCard extends StatelessWidget {
             if (focus.evaluationTrace.isNotEmpty)
               Text(
                 focus.evaluationTrace.first,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontStyle: FontStyle.italic,
-                  color: Colors.white,
+                  color: AppColors.fg,
                 ),
               ),
           ],
@@ -241,9 +233,9 @@ class _FocusCard extends StatelessWidget {
                 color: AppColors.accent,
               ),
               if (summary?.isFallback == false)
-                const _Chip(label: 'AI', color: AppColors.cyan),
+                _Chip(label: 'AI', color: AppColors.cyan),
               if (summary?.isFallback == true)
-                const _Chip(label: 'template', color: Colors.white38),
+                _Chip(label: 'template', color: AppColors.fg38),
               if (!compact) ..._secondaryInsightChips(ref),
             ],
           ),
@@ -272,7 +264,7 @@ class _FocusCard extends StatelessWidget {
     return [
       _Chip(
         label: 'Also · ${_shortInsightType(secondary.insightType)}',
-        color: Colors.white54,
+        color: AppColors.fg54,
       ),
     ];
   }
@@ -290,7 +282,7 @@ class _EmptyFocusCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'COACHING FOCUS',
             style: TextStyle(
               color: AppColors.cyan,
@@ -300,16 +292,16 @@ class _EmptyFocusCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'No active focus right now. Keep completing actions to unlock coaching.',
-            style: TextStyle(color: Colors.white70),
+            style: TextStyle(color: AppColors.fg70),
           ),
           if (!compact) ...[
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Coaching focuses are generated once enough behavioral data has been collected for the day.',
               style: TextStyle(
-                color: Colors.white38,
+                color: AppColors.fg38,
                 fontSize: 12,
                 height: 1.4,
               ),
@@ -381,7 +373,7 @@ class _FocusScoreBar extends StatelessWidget {
           children: [
             Text(
               'Focus score',
-              style: const TextStyle(color: Colors.white54, fontSize: 11),
+              style: TextStyle(color: AppColors.fg54, fontSize: 11),
             ),
             const Spacer(),
             Text(
@@ -418,10 +410,10 @@ class _TraceSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Why this focus',
           style: TextStyle(
-            color: Colors.white38,
+            color: AppColors.fg38,
             fontSize: 11,
             letterSpacing: 0.5,
           ),
@@ -433,15 +425,15 @@ class _TraceSection extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   '· ',
-                  style: TextStyle(color: Colors.white38, fontSize: 12),
+                  style: TextStyle(color: AppColors.fg38, fontSize: 12),
                 ),
                 Expanded(
                   child: Text(
                     trace,
-                    style: const TextStyle(
-                      color: Colors.white38,
+                    style: TextStyle(
+                      color: AppColors.fg38,
                       fontSize: 12,
                       height: 1.4,
                     ),
@@ -488,7 +480,7 @@ class _CardShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = accentColor ?? Colors.white12;
+    final accent = accentColor ?? AppColors.fg12;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(

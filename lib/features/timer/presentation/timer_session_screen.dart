@@ -360,9 +360,9 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
               child: Column(
                 children: [
                   const SizedBox(height: 24),
-                  const Text(
+                  Text(
                     'PHASE',
-                    style: TextStyle(letterSpacing: 3, color: Colors.white70),
+                    style: TextStyle(letterSpacing: 3, color: AppColors.fg70),
                   ),
                   const SizedBox(height: 8),
                   const Text(
@@ -411,9 +411,9 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                     ),
                   ),
                   const SizedBox(height: 26),
-                  const Text(
+                  Text(
                     'Currently engaged in',
-                    style: TextStyle(color: Colors.white70),
+                    style: TextStyle(color: AppColors.fg70),
                   ),
                   const SizedBox(height: 8),
                   Container(
@@ -443,14 +443,14 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.dark1F2026,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white24),
+                        border: Border.all(color: AppColors.fg24),
                       ),
                       child: Row(
                         children: [
                           Expanded(
                             child: Text(
                               'Auto-starting in ${_remainingAutoStartSeconds}s',
-                              style: const TextStyle(color: Colors.white70),
+                              style: TextStyle(color: AppColors.fg70),
                             ),
                           ),
                           TextButton(
@@ -478,7 +478,7 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                                 ? AppColors.dark2B2D31
                                 : AppColors.accent,
                             foregroundColor: running
-                                ? Colors.white
+                                ? AppColors.fg
                                 : Colors.black,
                           ),
                           onPressed: () {
@@ -512,7 +512,7 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                           style: FilledButton.styleFrom(
                             minimumSize: const Size.fromHeight(60),
                             backgroundColor: AppColors.dark2B2D31,
-                            foregroundColor: Colors.white,
+                            foregroundColor: AppColors.fg,
                           ),
                           onPressed:
                               execState.phase == ExecutionPhase.notStarted ||
@@ -532,9 +532,9 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                   ),
                   if (execState.readyToScore) ...[
                     const SizedBox(height: 10),
-                    const Text(
+                    Text(
                       'Task is now marked as ready for scoring.',
-                      style: TextStyle(color: Colors.white70),
+                      style: TextStyle(color: AppColors.fg70),
                     ),
                   ],
                   const SizedBox(height: 12),

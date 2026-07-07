@@ -205,7 +205,7 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
       expand: false,
       builder: (context, scrollController) {
         return Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.dark151718,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
@@ -251,7 +251,7 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
         width: 40,
         height: 4,
         decoration: BoxDecoration(
-          color: Colors.white24,
+          color: AppColors.fg24,
           borderRadius: BorderRadius.circular(2),
         ),
       ),
@@ -263,13 +263,13 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
     child: Row(
       children: [
         IconButton(
-          icon: const Icon(Icons.close, color: Colors.white54),
+          icon: Icon(Icons.close, color: AppColors.fg54),
           onPressed: () => Navigator.of(context).pop(),
         ),
         const Spacer(),
         IconButton(
           tooltip: 'View full detail',
-          icon: const Icon(Icons.trending_up_outlined, color: Colors.white54),
+          icon: Icon(Icons.trending_up_outlined, color: AppColors.fg54),
           onPressed: () {
             Navigator.of(context).pop();
             Navigator.pushNamed(
@@ -289,8 +289,8 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
       children: [
         Text(
           _goal.title,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: AppColors.fg,
             fontWeight: FontWeight.w800,
             fontSize: 22,
           ),
@@ -299,7 +299,7 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
         const SizedBox(height: 4),
         Text(
           _horizonLabel,
-          style: const TextStyle(color: Colors.white54, fontSize: 13),
+          style: TextStyle(color: AppColors.fg54, fontSize: 13),
         ),
       ],
     ),
@@ -322,8 +322,8 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
         ),
         Text(
           '${(_measureProgress * 100).round()}%',
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: AppColors.fg,
             fontWeight: FontWeight.w800,
             fontSize: 40,
           ),
@@ -433,19 +433,19 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 28),
-        const Padding(
+        Padding(
           padding: EdgeInsets.symmetric(horizontal: 24),
-          child: Divider(color: Colors.white12),
+          child: Divider(color: AppColors.fg12),
         ),
         const SizedBox(height: 12),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Row(
             children: [
-              const Text(
+              Text(
                 'Setup steps',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: AppColors.fg,
                   fontWeight: FontWeight.w700,
                   fontSize: 15,
                 ),
@@ -453,7 +453,7 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
               const Spacer(),
               Text(
                 '$done / ${actions.length}',
-                style: const TextStyle(color: Colors.white38, fontSize: 13),
+                style: TextStyle(color: AppColors.fg38, fontSize: 13),
               ),
             ],
           ),
@@ -472,7 +472,7 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
                     width: constraints.maxWidth,
                     height: 14,
                     decoration: BoxDecoration(
-                      color: Colors.white10,
+                      color: AppColors.fg10,
                       borderRadius: BorderRadius.circular(7),
                     ),
                   ),
@@ -523,8 +523,8 @@ class _PresetButton extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: AppColors.fg,
             fontWeight: FontWeight.w600,
             fontSize: 14,
           ),
@@ -574,12 +574,12 @@ class _ActionTile extends StatelessWidget {
               child: Text(
                 action.title,
                 style: TextStyle(
-                  color: action.completed ? Colors.white38 : Colors.white,
+                  color: action.completed ? AppColors.fg38 : AppColors.fg,
                   fontSize: 14,
                   decoration: action.completed
                       ? TextDecoration.lineThrough
                       : TextDecoration.none,
-                  decorationColor: Colors.white38,
+                  decorationColor: AppColors.fg38,
                 ),
               ),
             ),
@@ -618,7 +618,7 @@ class _RoundButton extends StatelessWidget {
         child: Icon(
           icon,
           size: small ? 18 : 24,
-          color: enabled ? Colors.white : Colors.white24,
+          color: enabled ? AppColors.fg : AppColors.fg24,
         ),
       ),
     );

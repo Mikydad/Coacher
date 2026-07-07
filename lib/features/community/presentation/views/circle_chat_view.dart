@@ -150,12 +150,12 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.12),
+                  color: AppColors.fg.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Proof category',
                 style: TextStyle(
                   color: AppColors.textPrimary,
@@ -168,7 +168,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
                 (cat) => ListTile(
                   title: Text(
                     cat,
-                    style: const TextStyle(color: AppColors.textPrimary),
+                    style: TextStyle(color: AppColors.textPrimary),
                   ),
                   onTap: () => Navigator.pop(ctx, cat),
                 ),
@@ -214,13 +214,13 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
             behavior: HitTestBehavior.translucent,
             onTap: () => dismissKeyboard(context),
             child: messagesAsync.when(
-              loading: () => const Center(
+              loading: () => Center(
                 child: CircularProgressIndicator(color: AppColors.accent),
               ),
               error: (e, _) => swallowedAsyncError(
                 'circle_chat_view',
                 e,
-                const Center(
+                Center(
                   child: Text(
                     'Could not load messages.',
                     style: TextStyle(color: AppColors.textMuted),
@@ -229,7 +229,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
               ),
               data: (messages) {
                 if (messages.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
                       'No messages yet.\nSay hello to your circle!',
                       textAlign: TextAlign.center,
@@ -323,7 +323,7 @@ class _TextMessageBubble extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 2, left: 4),
                       child: Text(
                         message.senderDisplayName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.textMuted,
                           fontSize: 11,
                         ),
@@ -347,7 +347,7 @@ class _TextMessageBubble extends StatelessWidget {
                     ),
                     child: Text(
                       message.content ?? '',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.textPrimary,
                         fontSize: 15,
                       ),
@@ -358,7 +358,7 @@ class _TextMessageBubble extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Text(
                       _formatTime(message.createdAtMs),
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.textMuted,
                         fontSize: 10,
                       ),
@@ -437,7 +437,7 @@ class _ImageMessageBubble extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 2, left: 4),
                       child: Text(
                         message.senderDisplayName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.textMuted,
                           fontSize: 11,
                         ),
@@ -474,7 +474,7 @@ class _ImageMessageBubble extends StatelessWidget {
                                   width: 220,
                                   height: 140,
                                   color: AppColors.surfaceCard,
-                                  child: const Center(
+                                  child: Center(
                                     child: SizedBox(
                                       width: 20,
                                       height: 20,
@@ -489,7 +489,7 @@ class _ImageMessageBubble extends StatelessWidget {
                                   width: 220,
                                   height: 140,
                                   color: AppColors.surfaceCard,
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.broken_image_rounded,
                                     color: AppColors.textMuted,
                                   ),
@@ -513,7 +513,7 @@ class _ImageMessageBubble extends StatelessWidget {
                               ),
                               child: Text(
                                 message.content!,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: AppColors.accent,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
@@ -529,7 +529,7 @@ class _ImageMessageBubble extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Text(
                       _formatTime(message.createdAtMs),
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.textMuted,
                         fontSize: 10,
                       ),
@@ -568,7 +568,7 @@ class _SystemEventPill extends StatelessWidget {
           ),
           child: Text(
             text,
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
           ),
         ),
       ),
@@ -669,7 +669,7 @@ class _InputBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       decoration: BoxDecoration(
         color: AppColors.surfaceDark,
-        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.06))),
+        border: Border(top: BorderSide(color: AppColors.fg.withOpacity(0.06))),
       ),
       child: SafeArea(
         top: false,
@@ -685,7 +685,7 @@ class _InputBar extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: controller,
-                style: const TextStyle(color: AppColors.textPrimary),
+                style: TextStyle(color: AppColors.textPrimary),
                 maxLines: 4,
                 minLines: 1,
                 textCapitalization: TextCapitalization.sentences,
@@ -698,7 +698,7 @@ class _InputBar extends StatelessWidget {
                 },
                 decoration: InputDecoration(
                   hintText: 'Message your circle…',
-                  hintStyle: const TextStyle(color: AppColors.textMuted),
+                  hintStyle: TextStyle(color: AppColors.textMuted),
                   filled: true,
                   fillColor: AppColors.surfaceCard,
                   contentPadding: const EdgeInsets.symmetric(
@@ -722,7 +722,7 @@ class _InputBar extends StatelessWidget {
                   duration: const Duration(milliseconds: 150),
                   child: IconButton(
                     icon: sending
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
@@ -751,11 +751,11 @@ class _InputBar extends StatelessWidget {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 class _AvatarInitial extends StatelessWidget {
-  const _AvatarInitial({required this.name, required this.userId});
+  _AvatarInitial({required this.name, required this.userId});
   final String name;
   final String userId;
 
-  static const _colors = [
+  static final _colors = [
     AppColors.accent,
     AppColors.cyanDeep,
     AppColors.orange,

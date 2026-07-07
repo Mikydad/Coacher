@@ -75,7 +75,7 @@ class GoalDetailScreen extends ConsumerWidget {
       body: Center(
         child: spinner
             ? const CircularProgressIndicator()
-            : Text(message, style: const TextStyle(color: AppColors.textSoft)),
+            : Text(message, style: TextStyle(color: AppColors.textSoft)),
       ),
     );
   }
@@ -194,7 +194,7 @@ class GoalDetailScreen extends ConsumerWidget {
                       children: [
                         Text(
                           GoalPeriodHelpers.formatPeriodSummary(g),
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -203,7 +203,7 @@ class GoalDetailScreen extends ConsumerWidget {
                         const SizedBox(height: 5),
                         Text(
                           _targetLine(g).toUpperCase(),
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.cyan,
                             fontSize: 9.5,
                             fontWeight: FontWeight.w600,
@@ -217,7 +217,7 @@ class GoalDetailScreen extends ConsumerWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      const Text(
+                      Text(
                         'Current Streak',
                         style: TextStyle(
                           color: AppColors.textSoft,
@@ -226,7 +226,7 @@ class GoalDetailScreen extends ConsumerWidget {
                       ),
                       Text(
                         streak.toString().padLeft(2, '0'),
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.accentBright,
                           fontSize: 34,
                           height: 1.1,
@@ -262,7 +262,7 @@ class GoalDetailScreen extends ConsumerWidget {
                 elapsed > 0
                     ? '$metInPeriod of $elapsed elapsed day${elapsed == 1 ? '' : 's'} marked done. Maintain the pulse to level up.'
                     : 'Period not started yet.',
-                style: const TextStyle(color: AppColors.textSoft, fontSize: 13),
+                style: TextStyle(color: AppColors.textSoft, fontSize: 13),
               ),
               const SizedBox(height: 32),
               _SectionHeader(
@@ -336,7 +336,7 @@ class GoalDetailScreen extends ConsumerWidget {
                       invalidateGoals(ref, goalId: g.id);
                     },
                     trailing: IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.delete_outline,
                         color: AppColors.textFaint,
                       ),
@@ -550,8 +550,8 @@ class _HeroTitle extends StatelessWidget {
     final tail = words.isEmpty ? '' : words.last;
     return Text.rich(
       TextSpan(
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: AppColors.fg,
           fontSize: 34,
           fontWeight: FontWeight.w800,
           height: 1.08,
@@ -561,7 +561,7 @@ class _HeroTitle extends StatelessWidget {
           if (lead != null) TextSpan(text: '$lead '),
           TextSpan(
             text: tail,
-            style: const TextStyle(color: AppColors.accentBright),
+            style: TextStyle(color: AppColors.accentBright),
           ),
         ],
       ),
@@ -618,8 +618,8 @@ class _SectionHeader extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: AppColors.fg,
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                 ),
@@ -632,7 +632,7 @@ class _SectionHeader extends StatelessWidget {
           const SizedBox(height: 3),
           Text(
             subtitle!,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.textFaint,
               fontSize: 10,
               fontWeight: FontWeight.w700,
@@ -659,15 +659,15 @@ class _EmphasisCount extends StatelessWidget {
         children: [
           TextSpan(
             text: strong,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: AppColors.fg,
               fontSize: 14,
               fontWeight: FontWeight.w800,
             ),
           ),
           TextSpan(
             text: soft,
-            style: const TextStyle(color: AppColors.textSoft, fontSize: 12),
+            style: TextStyle(color: AppColors.textSoft, fontSize: 12),
           ),
         ],
       ),
@@ -705,8 +705,8 @@ class _TodayCommitmentCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   done ? 'Mission Accomplished.' : 'Daily Commitment',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: AppColors.fg,
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                   ),
@@ -719,7 +719,7 @@ class _TodayCommitmentCard extends StatelessWidget {
             done
                 ? 'You marked today as done. Your discipline is building momentum.'
                 : 'Did you meet your commitment today? Mark it to keep the pulse alive.',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.textSoft,
               fontSize: 14,
               height: 1.45,
@@ -733,9 +733,11 @@ class _TodayCommitmentCard extends StatelessWidget {
                     onPressed: onToggle,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.inkElevated,
-                      foregroundColor: Colors.white,
+                      foregroundColor: AppColors.fg,
                       padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: const StadiumBorder(),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                     child: const Text(
                       'UNDO TODAY',
@@ -752,7 +754,9 @@ class _TodayCommitmentCard extends StatelessWidget {
                       backgroundColor: AppColors.accentBright,
                       foregroundColor: AppColors.accentDeep,
                       padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: const StadiumBorder(),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                     child: const Text(
                       'I DID IT TODAY',
@@ -789,7 +793,7 @@ class _GradientProgressBar extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 colors: [AppColors.accentDim, AppColors.cyan],
               ),
             ),
@@ -845,7 +849,7 @@ class _ChecklistTile extends StatelessWidget {
                         : Border.all(color: AppColors.textFaint, width: 1.5),
                   ),
                   child: completed
-                      ? const Icon(
+                      ? Icon(
                           Icons.check,
                           color: AppColors.accentBright,
                           size: 20,
@@ -924,13 +928,13 @@ class _EmptyStateCard extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.textSoft, fontSize: 14),
+            style: TextStyle(color: AppColors.textSoft, fontSize: 14),
           ),
           const SizedBox(height: 4),
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.textFaint,
               fontSize: 12,
               fontStyle: FontStyle.italic,

@@ -4,13 +4,13 @@ import '../../../../core/presentation/app_colors.dart';
 
 /// Obsidian Pulse tokens for attention mode sheet — visual only.
 abstract final class AttentionModeColors {
-  static const sheet = AppColors.dark121212;
-  static const card = AppColors.inkCard;
-  static const cardOverlay = AppColors.blackScrim50;
-  static const lime = AppColors.accentBright;
-  static const cyan = AppColors.cyan;
-  static const label = AppColors.grayIos;
-  static const handle = AppColors.gray33;
+  static Color get sheet => AppColors.dark121212;
+  static Color get card => AppColors.inkCard;
+  static Color get cardOverlay => AppColors.blackScrim50;
+  static Color get lime => AppColors.accentBright;
+  static Color get cyan => AppColors.cyan;
+  static Color get label => AppColors.grayIos;
+  static Color get handle => AppColors.gray33;
 }
 
 class AttentionModeSheetHandle extends StatelessWidget {
@@ -42,10 +42,10 @@ class AttentionModeSheetHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Set attention mode',
           style: TextStyle(
-            color: Colors.white,
+            color: AppColors.fg,
             fontSize: 24,
             fontWeight: FontWeight.w600,
             height: 1.2,
@@ -55,7 +55,7 @@ class AttentionModeSheetHeader extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             subtitle!,
-            style: const TextStyle(
+            style: TextStyle(
               color: AttentionModeColors.label,
               fontSize: 14,
               height: 1.35,
@@ -107,8 +107,8 @@ class AttentionModeTypeCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: AppColors.fg,
                         fontWeight: FontWeight.w500,
                         fontSize: 16,
                       ),
@@ -118,7 +118,7 @@ class AttentionModeTypeCard extends StatelessWidget {
                       subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AttentionModeColors.label,
                         fontSize: 12,
                       ),
@@ -126,7 +126,7 @@ class AttentionModeTypeCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right,
                 color: AttentionModeColors.label,
                 size: 18,
@@ -165,7 +165,7 @@ class AttentionModeDurationChip extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.black : Colors.white70,
+            color: selected ? Colors.black : AppColors.fg70,
             fontWeight: FontWeight.w600,
             fontSize: 13,
           ),

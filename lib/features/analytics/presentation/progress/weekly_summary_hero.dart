@@ -60,7 +60,7 @@ class WeeklySummaryHero extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            const Text(
+            Text(
               'Weekly Summary',
               style: TextStyle(
                 color: ProgressDesignTokens.onSurface,
@@ -71,7 +71,7 @@ class WeeklySummaryHero extends StatelessWidget {
             const Spacer(),
             Text(
               progressWeekDateRangeLabel().toUpperCase(),
-              style: const TextStyle(
+              style: TextStyle(
                 color: ProgressDesignTokens.onSurfaceVariant,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,

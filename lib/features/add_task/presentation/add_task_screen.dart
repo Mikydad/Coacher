@@ -681,12 +681,12 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
               Text(
                 '• ${c.label} (${_timeLabel(c.startLocal)}-${_timeLabel(c.endLocal)})'
                 ' ${c.source == HabitAnchorSource.goal ? '[Goal]' : '[Task Habit]'}',
-                style: const TextStyle(fontSize: 12, color: Colors.white70),
+                style: TextStyle(fontSize: 12, color: AppColors.fg70),
               ),
             if (conflicts.length > 3)
               Text(
                 '• +${conflicts.length - 3} more',
-                style: const TextStyle(fontSize: 12, color: Colors.white54),
+                style: TextStyle(fontSize: 12, color: AppColors.fg54),
               ),
           ],
         ),
@@ -1285,7 +1285,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                     ),
                     activeThumbColor: AddTaskColors.accentContainer,
                   ),
-                  const Text(
+                  Text(
                     'Use duration',
                     style: TextStyle(
                       color: AddTaskColors.muted,
@@ -1391,12 +1391,12 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: AppColors.fg.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-              const Text(
+              Text(
                 'Accountability',
                 style: TextStyle(
                   fontSize: 17,
@@ -1405,7 +1405,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'How we remind you and follow up on this task',
                 style: TextStyle(fontSize: 12, color: AddTaskColors.muted),
               ),
@@ -1569,7 +1569,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                         ),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.event_available_outlined,
                               size: 18,
                               color: AddTaskColors.muted,
@@ -1579,7 +1579,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Plan day',
                                     style: TextStyle(
                                       fontSize: 11,
@@ -1589,7 +1589,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                                   ),
                                   Text(
                                     planLabel,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500,
                                       color: AddTaskColors.onSurface,
@@ -1700,7 +1700,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         centerTitle: true,
         title: Text(
           (_isEdit ? 'Edit task' : 'Add task').toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 14,
             letterSpacing: 2,
@@ -1709,7 +1709,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         ),
       ),
       body: !_loaded
-          ? const Center(
+          ? Center(
               child: CircularProgressIndicator(color: AddTaskColors.accent),
             )
           : Column(
@@ -1732,7 +1732,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                         controller: _notesController,
                         hint: 'Notes (optional)',
                         maxLines: 2,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                           color: AddTaskColors.muted,

@@ -58,7 +58,7 @@ class FullScreenImageViewer extends StatelessWidget {
                           color: AppColors.accent,
                         ),
                       ),
-                      errorWidget: (_, _, _) => const Icon(
+                      errorWidget: (_, _, _) => Icon(
                         Icons.broken_image_rounded,
                         color: AppColors.textMuted,
                         size: 48,

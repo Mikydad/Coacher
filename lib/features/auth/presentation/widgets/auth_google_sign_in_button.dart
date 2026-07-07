@@ -75,13 +75,13 @@ class _AuthGoogleSignInButtonState
             onPressed: _loading || !widget.enabled ? null : _signIn,
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
-              side: const BorderSide(color: AppColors.inkSoft, width: 1.5),
+              side: BorderSide(color: AppColors.inkSoft, width: 1.5),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
             child: _loading
-                ? const SizedBox(
+                ? SizedBox(
                     height: 22,
                     width: 22,
                     child: CircularProgressIndicator(
@@ -130,15 +130,15 @@ class AuthOrDivider extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
         children: [
-          const Expanded(child: Divider(color: AppColors.gray2A)),
+          Expanded(child: Divider(color: AppColors.gray2A)),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(
               label,
-              style: const TextStyle(color: AppColors.textFaint, fontSize: 13),
+              style: TextStyle(color: AppColors.textFaint, fontSize: 13),
             ),
           ),
-          const Expanded(child: Divider(color: AppColors.gray2A)),
+          Expanded(child: Divider(color: AppColors.gray2A)),
         ],
       ),
     );

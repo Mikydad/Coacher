@@ -58,7 +58,7 @@ class _CoachingFocusGlass extends StatelessWidget {
       skipLoadingOnReload: true,
       data: (focus) {
         if (focus == null || !isFocusLive(focus.lifecycleState)) {
-          return const ProgressGlassCard(
+          return ProgressGlassCard(
             accentColor: ProgressDesignTokens.secondary,
             icon: Icons.psychology_outlined,
             title: 'Coaching Focus',
@@ -89,7 +89,7 @@ class _CoachingFocusGlass extends StatelessWidget {
       error: (e, _) => swallowedAsyncError(
         'progress_insights_row',
         e,
-        const ProgressGlassCard(
+        ProgressGlassCard(
           accentColor: ProgressDesignTokens.secondary,
           icon: Icons.psychology_outlined,
           title: 'Coaching Focus',
@@ -225,7 +225,7 @@ class _InsightLoadingPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const ProgressTonalCard(
+    return ProgressTonalCard(
       padding: EdgeInsets.symmetric(vertical: 28),
       color: ProgressDesignTokens.surfaceContainerHigh,
       child: Center(

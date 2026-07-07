@@ -8,6 +8,7 @@ import '../domain/models/scheduled_time_block.dart';
 import '../domain/models/time_conflict.dart';
 import 'conflict_bottom_sheet.dart';
 import 'conflict_move_panel.dart';
+import '../../../core/presentation/app_colors.dart';
 
 enum _SheetMode { chooseAction, moveOther }
 
@@ -418,7 +419,7 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: Colors.white24,
+                    color: AppColors.fg24,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -451,7 +452,7 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
                 ),
                 style: Theme.of(
                   context,
-                ).textTheme.bodySmall?.copyWith(color: Colors.white60),
+                ).textTheme.bodySmall?.copyWith(color: AppColors.fg60),
               ),
               if (_conflicts.length > 1 &&
                   _mode == _SheetMode.chooseAction) ...[
@@ -460,7 +461,7 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
                   'Resolve one at a time',
                   style: Theme.of(
                     context,
-                  ).textTheme.labelMedium?.copyWith(color: Colors.white54),
+                  ).textTheme.labelMedium?.copyWith(color: AppColors.fg54),
                 ),
                 const SizedBox(height: 6),
                 for (final c in _visibleConflicts)
@@ -485,7 +486,7 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
                 Text(
                   'Overlaps ${target.conflictingEntityTitle} '
                   '(${target.overlapMinutes}m)',
-                  style: const TextStyle(fontSize: 13, color: Colors.white70),
+                  style: TextStyle(fontSize: 13, color: AppColors.fg70),
                 ),
               ],
               for (final chip in _appliedConfirmations) ...[
@@ -506,7 +507,7 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
                   'Choose an action',
                   style: Theme.of(
                     context,
-                  ).textTheme.labelLarge?.copyWith(color: Colors.white70),
+                  ).textTheme.labelLarge?.copyWith(color: AppColors.fg70),
                 ),
                 const SizedBox(height: 10),
                 if (target != null)
@@ -616,8 +617,8 @@ class _ConflictPickRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 6),
       child: Material(
         color: selected
-            ? Colors.white.withAlpha(18)
-            : Colors.white.withAlpha(6),
+            ? AppColors.fg.withAlpha(18)
+            : AppColors.fg.withAlpha(6),
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           onTap: onTap,
@@ -631,7 +632,7 @@ class _ConflictPickRow extends StatelessWidget {
                       ? Icons.radio_button_checked
                       : Icons.radio_button_off,
                   size: 18,
-                  color: selected ? Colors.blueAccent : Colors.white38,
+                  color: selected ? Colors.blueAccent : AppColors.fg38,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -643,7 +644,7 @@ class _ConflictPickRow extends StatelessWidget {
                 ),
                 Text(
                   '${conflict.overlapMinutes}m · ${conflict.severityLabel.name}',
-                  style: const TextStyle(fontSize: 11, color: Colors.white54),
+                  style: TextStyle(fontSize: 11, color: AppColors.fg54),
                 ),
               ],
             ),
@@ -678,9 +679,9 @@ class _ActionTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(10),
+          color: AppColors.fg.withAlpha(10),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white12),
+          border: Border.all(color: AppColors.fg12),
         ),
         child: Row(
           children: [
@@ -699,7 +700,7 @@ class _ActionTile extends StatelessWidget {
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontSize: 12, color: Colors.white54),
+                    style: TextStyle(fontSize: 12, color: AppColors.fg54),
                   ),
                 ],
               ),

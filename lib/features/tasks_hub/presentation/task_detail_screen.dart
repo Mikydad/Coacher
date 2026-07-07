@@ -237,7 +237,7 @@ class TaskDetailScreen extends ConsumerWidget {
         if (bundle == null) {
           return Scaffold(
             appBar: AppBar(title: const Text('Task')),
-            body: const Center(
+            body: Center(
               child: Text(
                 'Task not found. It may have been deleted.',
                 style: TextStyle(color: AppColors.textMuted),
@@ -347,7 +347,7 @@ class TaskDetailScreen extends ConsumerWidget {
                   title: 'NOTES',
                   child: Text(
                     task.notes!.trim(),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 14,
                       height: 1.5,
@@ -403,7 +403,7 @@ class TaskDetailScreen extends ConsumerWidget {
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.accent,
-                      side: const BorderSide(color: AppColors.accentDeep),
+                      side: BorderSide(color: AppColors.accentDeep),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     onPressed: completed
@@ -561,7 +561,7 @@ class _StatusHeader extends StatelessWidget {
         const SizedBox(height: 12),
         Text(
           task.title,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.textPrimary,
             fontSize: 26,
             fontWeight: FontWeight.w800,
@@ -620,7 +620,7 @@ class _DetailCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.textMuted,
               fontSize: 11,
               fontWeight: FontWeight.w700,
@@ -663,7 +663,7 @@ class _DetailRow extends StatelessWidget {
         Expanded(
           child: Text(
             label,
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
           ),
         ),
         const SizedBox(width: 12),

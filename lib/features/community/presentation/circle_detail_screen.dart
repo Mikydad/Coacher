@@ -79,7 +79,7 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
     final membersAsync = ref.watch(circleMembersProvider(widget.circleId));
 
     if (authAsync.isLoading && !authAsync.hasValue) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppColors.surfaceDeep,
         body: Center(child: CircularProgressIndicator(color: AppColors.accent)),
       );
@@ -103,9 +103,8 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
     return Scaffold(
       backgroundColor: AppColors.surfaceDeep,
       body: circleAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.accent),
-        ),
+        loading: () =>
+            Center(child: CircularProgressIndicator(color: AppColors.accent)),
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -114,7 +113,7 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                   ? 'Could not load circle.\n$e'
                   : 'Could not load circle.',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textMuted),
+              style: TextStyle(color: AppColors.textMuted),
             ),
           ),
         ),
@@ -122,7 +121,7 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
           if (circle == null) {
             // Navigation is handled by the listener above; show a brief
             // loading indicator while the pop animation plays.
-            return const Center(
+            return Center(
               child: CircularProgressIndicator(color: AppColors.accent),
             );
           }
@@ -217,7 +216,7 @@ class _CircleHeader extends StatelessWidget {
           child: ClipRRect(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(color: Colors.white.withOpacity(0.05)),
+              child: Container(color: AppColors.fg.withOpacity(0.05)),
             ),
           ),
         ),
@@ -232,7 +231,7 @@ class _CircleHeader extends StatelessWidget {
                     Expanded(
                       child: Text(
                         circleName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
@@ -247,10 +246,7 @@ class _CircleHeader extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   '$memberCount / ${AccountabilityCircleConst.kMaxMembers} members',
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                 ),
                 const SizedBox(height: 12),
                 if (members.isNotEmpty) _MemberAvatarRow(members: members),
@@ -283,7 +279,7 @@ class _StreakBadge extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             '$streak day${streak == 1 ? '' : 's'}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.accent,
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -296,10 +292,10 @@ class _StreakBadge extends StatelessWidget {
 }
 
 class _MemberAvatarRow extends StatelessWidget {
-  const _MemberAvatarRow({required this.members});
+  _MemberAvatarRow({required this.members});
   final List<CircleMember> members;
 
-  static const _colors = [
+  static final _colors = [
     AppColors.accent,
     AppColors.cyanDeep,
     AppColors.orange,
@@ -361,7 +357,7 @@ class _PlaceholderTab extends StatelessWidget {
     return Center(
       child: Text(
         message,
-        style: const TextStyle(color: AppColors.textMuted, fontSize: 15),
+        style: TextStyle(color: AppColors.textMuted, fontSize: 15),
       ),
     );
   }

@@ -181,7 +181,7 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           backgroundColor: AppColors.inkCard,
-          title: const Text(
+          title: Text(
             'Delete account?',
             style: TextStyle(
               color: AppColors.coral,
@@ -192,37 +192,37 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'This permanently deletes your account and all associated data. This cannot be undone.',
                 style: TextStyle(color: AppColors.textGray, height: 1.5),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Type DELETE to confirm:',
-                style: TextStyle(color: Colors.white, fontSize: 13),
+                style: TextStyle(color: AppColors.fg, fontSize: 13),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: controller,
                 autofocus: true,
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: AppColors.fg),
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: AppColors.dark111111,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppColors.gray33),
+                    borderSide: BorderSide(color: AppColors.gray33),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppColors.gray33),
+                    borderSide: BorderSide(color: AppColors.gray33),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppColors.coral),
+                    borderSide: BorderSide(color: AppColors.coral),
                   ),
                   hintText: 'DELETE',
-                  hintStyle: const TextStyle(color: AppColors.textDim),
+                  hintStyle: TextStyle(color: AppColors.textDim),
                 ),
                 onChanged: (v) =>
                     setDialogState(() => canConfirm = v == 'DELETE'),
@@ -232,7 +232,7 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text(
+              child: Text(
                 'Cancel',
                 style: TextStyle(color: AppColors.textGray),
               ),
@@ -266,14 +266,14 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           backgroundColor: AppColors.inkCard,
-          title: const Text(
+          title: Text(
             'Confirm your identity',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: TextStyle(color: AppColors.fg, fontWeight: FontWeight.bold),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 'Re-enter your password to proceed.',
                 style: TextStyle(color: AppColors.textGray, height: 1.5),
               ),
@@ -299,7 +299,7 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text(
+              child: Text(
                 'Cancel',
                 style: TextStyle(color: AppColors.textGray),
               ),
@@ -318,7 +318,7 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
                   if (ctx.mounted) Navigator.pop(ctx, true);
                 }
               },
-              child: const Text(
+              child: Text(
                 'Confirm',
                 style: TextStyle(
                   color: AppColors.coral,
@@ -456,7 +456,7 @@ class _ActionRow extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         height: 1.35,
                         color: kSettingsOnSurfaceVariant,
@@ -466,7 +466,7 @@ class _ActionRow extends StatelessWidget {
                 ),
               ),
               trailing ??
-                  const Icon(
+                  Icon(
                     Icons.chevron_right_rounded,
                     color: kSettingsOnSurfaceVariant,
                     size: 20,
@@ -484,7 +484,7 @@ class _Divider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
+    return Padding(
       padding: EdgeInsets.only(bottom: 16),
       child: Divider(height: 1, thickness: 1, color: AppColors.gray2A),
     );
@@ -496,7 +496,7 @@ class _LoadingIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
+    return SizedBox(
       width: 18,
       height: 18,
       child: CircularProgressIndicator(

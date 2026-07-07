@@ -10,6 +10,7 @@ import 'app/app_lifecycle_task_refresh.dart';
 import 'app/application/main_tab_navigation.dart';
 import 'app/first_launch_gate.dart';
 import 'core/bootstrap/app_bootstrap.dart';
+import 'core/presentation/theme_brightness_controller.dart';
 import 'features/auth/presentation/auth_gate.dart';
 
 Future<void> main() async {
@@ -26,6 +27,9 @@ Future<void> main() async {
       // Minimal pre-frame phase: Firebase (required before Crashlytics) and
       // the local Isar store. Everything network-bound runs after first frame.
       await AppBootstrap.initializePreFrame(container);
+      // Resolve persisted dark/light BEFORE the first frame (prefs is local
+      // disk, not network) so the app never flashes the wrong mode.
+      await loadPersistedBrightness();
 
       await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
         !kDebugMode,

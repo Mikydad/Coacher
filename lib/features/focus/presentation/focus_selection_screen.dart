@@ -264,7 +264,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const Text(
+            Text(
               'SELECTION MODE',
               style: TextStyle(letterSpacing: 3, color: AppColors.cyan),
             ),
@@ -282,11 +282,11 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
               data: (tasks) {
                 if (tasks.isEmpty) {
                   return [
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.symmetric(vertical: 16),
                       child: Text(
                         'No tasks today.',
-                        style: TextStyle(color: Colors.white38, fontSize: 15),
+                        style: TextStyle(color: AppColors.fg38, fontSize: 15),
                       ),
                     ),
                   ];
@@ -351,7 +351,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
                 backgroundColor: hasRunningTask
                     ? AppColors.dark2B2D31
                     : AppColors.accent,
-                foregroundColor: hasRunningTask ? Colors.white : Colors.black,
+                foregroundColor: hasRunningTask ? AppColors.fg : Colors.black,
               ),
               onPressed: hasRunningTask
                   ? () => Navigator.pushNamed(
@@ -405,7 +405,7 @@ class _TaskCard extends StatelessWidget {
                 ? AppColors.accent
                 : isPartial
                 ? AppColors.amber.withValues(alpha: 0.55)
-                : Colors.white12,
+                : AppColors.fg12,
           ),
         ),
         child: Column(
@@ -420,7 +420,7 @@ class _TaskCard extends StatelessWidget {
               subtitle,
               style: TextStyle(
                 fontSize: 26,
-                color: isPartial ? AppColors.amber : Colors.white60,
+                color: isPartial ? AppColors.amber : AppColors.fg60,
               ),
             ),
           ],

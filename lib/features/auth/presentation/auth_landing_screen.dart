@@ -85,18 +85,18 @@ class _AuthLandingScreenState extends ConsumerState<AuthLandingScreen> {
                     const SizedBox(height: 24),
                     _AppLogo(),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Coach for Life',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppColors.fg,
                         fontSize: 30,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.5,
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'Your personal productivity coach.\nBuild habits that last.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -131,7 +131,7 @@ class _AuthLandingScreenState extends ConsumerState<AuthLandingScreen> {
                     if (!kRequireRegisteredAuth) ...[
                       const SizedBox(height: 16),
                       _guestLoading
-                          ? const Center(
+                          ? Center(
                               child: SizedBox(
                                 height: 22,
                                 width: 22,
@@ -143,7 +143,7 @@ class _AuthLandingScreenState extends ConsumerState<AuthLandingScreen> {
                             )
                           : TextButton(
                               onPressed: _continueAsGuest,
-                              child: const Text(
+                              child: Text(
                                 'Continue as guest',
                                 style: TextStyle(
                                   color: AppColors.textFaint,
@@ -177,7 +177,7 @@ class _AppLogo extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.dark1E1E1E, width: 1.5),
       ),
-      child: const Center(
+      child: Center(
         child: Text(
           'CL',
           style: TextStyle(
@@ -208,13 +208,13 @@ class _MigrationBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline, color: AppColors.accentDim, size: 18),
+          Icon(Icons.info_outline, color: AppColors.accentDim, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Create an account to save your progress across devices.',
                   style: TextStyle(
                     color: AppColors.limeSoft,
@@ -226,7 +226,7 @@ class _MigrationBanner extends StatelessWidget {
                 GestureDetector(
                   onTap: () =>
                       Navigator.pushNamed(context, SignUpScreen.routeName),
-                  child: const Text(
+                  child: Text(
                     'Create account →',
                     style: TextStyle(
                       color: AppColors.accentDim,
@@ -240,7 +240,7 @@ class _MigrationBanner extends StatelessWidget {
           ),
           GestureDetector(
             onTap: onDismiss,
-            child: const Padding(
+            child: Padding(
               padding: EdgeInsets.only(left: 8),
               child: Icon(Icons.close, color: AppColors.gray55, size: 16),
             ),
@@ -265,8 +265,8 @@ class _OutlinedAuthButton extends StatelessWidget {
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.white,
-          side: const BorderSide(color: AppColors.inkSoft, width: 1.5),
+          foregroundColor: AppColors.fg,
+          side: BorderSide(color: AppColors.inkSoft, width: 1.5),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

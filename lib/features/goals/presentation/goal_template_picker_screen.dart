@@ -6,6 +6,7 @@ import '../domain/models/goal_enums.dart';
 import '../domain/models/goal_template.dart';
 import 'goal_editor_screen.dart';
 import 'widgets/goal_editor_widgets.dart';
+import '../../../core/presentation/app_colors.dart';
 
 /// Entry point for creating a goal — pick a template or start blank.
 class GoalTemplatePickerScreen extends StatelessWidget {
@@ -28,14 +29,14 @@ class GoalTemplatePickerScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white70),
+          icon: Icon(Icons.arrow_back, color: AppColors.fg70),
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
-        title: const Text(
+        title: Text(
           'NEW GOAL',
           style: TextStyle(
-            color: Colors.white,
+            color: AppColors.fg,
             fontWeight: FontWeight.w800,
             fontSize: 14,
             letterSpacing: 1.5,
@@ -45,18 +46,18 @@ class GoalTemplatePickerScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
-          const Text(
+          Text(
             'Popular goals',
             style: TextStyle(
-              color: Colors.white,
+              color: AppColors.fg,
               fontWeight: FontWeight.w800,
               fontSize: 22,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Pick a starting point — you can change anything on the next screen.',
-            style: TextStyle(color: Colors.white54, height: 1.4),
+            style: TextStyle(color: AppColors.fg54, height: 1.4),
           ),
           const SizedBox(height: 24),
           GridView.builder(
@@ -108,7 +109,7 @@ class _TemplateCard extends StatelessWidget {
             color: isCustom ? Colors.transparent : GoalEditorColors.surface,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isCustom ? Colors.white24 : GoalEditorColors.border,
+              color: isCustom ? AppColors.fg24 : GoalEditorColors.border,
             ),
           ),
           child: Padding(
@@ -121,7 +122,7 @@ class _TemplateCard extends StatelessWidget {
                 Text(
                   template.label,
                   style: TextStyle(
-                    color: isCustom ? GoalEditorColors.lime : Colors.white,
+                    color: isCustom ? GoalEditorColors.lime : AppColors.fg,
                     fontWeight: FontWeight.w800,
                     fontSize: 15,
                   ),
@@ -130,7 +131,7 @@ class _TemplateCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     _subtitle(template),
-                    style: const TextStyle(color: Colors.white38, fontSize: 11),
+                    style: TextStyle(color: AppColors.fg38, fontSize: 11),
                   ),
                 ],
               ],

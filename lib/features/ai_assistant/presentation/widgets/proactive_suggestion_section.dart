@@ -131,7 +131,7 @@ class _SuggestionsExpandLink extends StatelessWidget {
   final IconData icon;
   final VoidCallback onPressed;
 
-  static const _kAccent = AppColors.accentDim;
+  static Color get _kAccent => AppColors.accentDim;
 
   @override
   Widget build(BuildContext context) {
@@ -180,9 +180,7 @@ class _SkeletonCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.inkWarm,
         borderRadius: BorderRadius.circular(16),
-        border: const Border(
-          left: BorderSide(color: AppColors.gray3A, width: 3),
-        ),
+        border: Border(left: BorderSide(color: AppColors.gray3A, width: 3)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),

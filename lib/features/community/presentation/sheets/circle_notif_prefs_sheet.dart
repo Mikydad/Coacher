@@ -73,13 +73,13 @@ class _CircleNotifPrefsSheetState extends ConsumerState<CircleNotifPrefsSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.surfaceDark,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
         child: _loading
-            ? const Padding(
+            ? Padding(
                 padding: EdgeInsets.all(40),
                 child: Center(
                   child: CircularProgressIndicator(color: AppColors.accent),
@@ -95,13 +95,13 @@ class _CircleNotifPrefsSheetState extends ConsumerState<CircleNotifPrefsSheet> {
                         width: 36,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.12),
+                          color: AppColors.fg.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Notification settings',
                       style: TextStyle(
                         color: AppColors.textPrimary,
@@ -110,7 +110,7 @@ class _CircleNotifPrefsSheetState extends ConsumerState<CircleNotifPrefsSheet> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
+                    Text(
                       'Choose what you hear about from this circle.',
                       style: TextStyle(
                         color: AppColors.textMuted,
@@ -161,13 +161,13 @@ class _CircleNotifPrefsSheetState extends ConsumerState<CircleNotifPrefsSheet> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const Divider(color: AppColors.surfaceSlate),
+                      Divider(color: AppColors.surfaceSlate),
                       const SizedBox(height: 12),
 
                       // Mute section
                       Row(
                         children: [
-                          const Text(
+                          Text(
                             'Mute circle',
                             style: TextStyle(
                               color: AppColors.textPrimary,
@@ -189,7 +189,7 @@ class _CircleNotifPrefsSheetState extends ConsumerState<CircleNotifPrefsSheet> {
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             'Muted until ${_formatMs(_prefs!.muteUntilMs!)}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.danger,
                               fontSize: 12,
                             ),
@@ -198,12 +198,12 @@ class _CircleNotifPrefsSheetState extends ConsumerState<CircleNotifPrefsSheet> {
                       ] else ...[
                         TextButton.icon(
                           onPressed: _setMuteUntilTomorrow,
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.notifications_off_outlined,
                             size: 16,
                             color: AppColors.textMuted,
                           ),
-                          label: const Text(
+                          label: Text(
                             'Mute until tomorrow',
                             style: TextStyle(color: AppColors.textMuted),
                           ),
@@ -289,7 +289,7 @@ class _ToggleRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
@@ -297,10 +297,7 @@ class _ToggleRow extends StatelessWidget {
                 ),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                 ),
               ],
             ),

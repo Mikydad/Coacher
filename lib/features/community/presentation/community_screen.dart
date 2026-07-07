@@ -25,7 +25,7 @@ class CommunityScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: AppColors.surfaceDark,
         foregroundColor: AppColors.textPrimary,
-        title: const Text(
+        title: Text(
           'My Circles',
           style: TextStyle(
             color: AppColors.textPrimary,
@@ -36,7 +36,7 @@ class CommunityScreen extends ConsumerWidget {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.explore_rounded, color: AppColors.textMuted),
+            icon: Icon(Icons.explore_rounded, color: AppColors.textMuted),
             tooltip: 'Discover circles',
             onPressed: () =>
                 Navigator.pushNamed(context, CircleDiscoveryScreen.routeName),
@@ -44,17 +44,15 @@ class CommunityScreen extends ConsumerWidget {
         ],
       ),
       body: (idsAsync.isLoading && !idsAsync.hasValue)
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.accent),
-            )
+          ? Center(child: CircularProgressIndicator(color: AppColors.accent))
           : circlesAsync.when(
-              loading: () => const Center(
+              loading: () => Center(
                 child: CircularProgressIndicator(color: AppColors.accent),
               ),
               error: (e, _) => swallowedAsyncError(
                 'community_screen',
                 e,
-                const Center(
+                Center(
                   child: Text(
                     'Could not load circles.',
                     style: TextStyle(color: AppColors.textMuted),
@@ -124,24 +122,24 @@ class CommunityScreen extends ConsumerWidget {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
+                color: AppColors.fg.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 16),
             ListTile(
-              leading: const CircleAvatar(
+              leading: CircleAvatar(
                 backgroundColor: AppColors.surfaceCard,
                 child: Icon(Icons.add_rounded, color: AppColors.accent),
               ),
-              title: const Text(
+              title: Text(
                 'Create a circle',
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              subtitle: const Text(
+              subtitle: Text(
                 'Start a new accountability circle',
                 style: TextStyle(color: AppColors.textMuted, fontSize: 13),
               ),
@@ -151,18 +149,18 @@ class CommunityScreen extends ConsumerWidget {
               },
             ),
             ListTile(
-              leading: const CircleAvatar(
+              leading: CircleAvatar(
                 backgroundColor: AppColors.surfaceCard,
                 child: Icon(Icons.explore_rounded, color: AppColors.cyanDeep),
               ),
-              title: const Text(
+              title: Text(
                 'Discover circles',
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              subtitle: const Text(
+              subtitle: Text(
                 'Browse and join existing circles',
                 style: TextStyle(color: AppColors.textMuted, fontSize: 13),
               ),
@@ -202,14 +200,14 @@ class _EmptyState extends StatelessWidget {
                 color: AppColors.surfaceCard,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.group_rounded,
                 color: AppColors.textMuted,
                 size: 36,
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               "You're not in any circles yet",
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -219,7 +217,7 @@ class _EmptyState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
+            Text(
               'Join a circle to stay accountable with others who share your goals.',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -254,7 +252,7 @@ class _EmptyState extends StatelessWidget {
                 onPressed: onDiscover,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.textPrimary,
-                  side: BorderSide(color: Colors.white.withOpacity(0.12)),
+                  side: BorderSide(color: AppColors.fg.withOpacity(0.12)),
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -287,7 +285,7 @@ class _MyCircleCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surfaceDark,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withOpacity(0.06)),
+          border: Border.all(color: AppColors.fg.withOpacity(0.06)),
         ),
         child: Row(
           children: [
@@ -304,7 +302,7 @@ class _MyCircleCard extends StatelessWidget {
                   circle.category.isNotEmpty
                       ? circle.category[0].toUpperCase()
                       : '?',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.accent,
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -319,7 +317,7 @@ class _MyCircleCard extends StatelessWidget {
                 children: [
                   Text(
                     circle.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -330,7 +328,7 @@ class _MyCircleCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.group_rounded,
                         size: 13,
                         color: AppColors.textMuted,
@@ -338,7 +336,7 @@ class _MyCircleCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         '${circle.memberCount}/${AccountabilityCircle.kMaxMembers}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.textMuted,
                           fontSize: 13,
                         ),
@@ -362,7 +360,7 @@ class _MyCircleCard extends StatelessWidget {
                       const SizedBox(width: 2),
                       Text(
                         '${circle.currentStreak}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.accent,
                           fontWeight: FontWeight.w700,
                           fontSize: 13,
@@ -371,10 +369,7 @@ class _MyCircleCard extends StatelessWidget {
                     ],
                   ),
                 const SizedBox(height: 4),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textMuted,
-                ),
+                Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
               ],
             ),
           ],
@@ -398,7 +393,7 @@ class _CategoryBadge extends StatelessWidget {
       ),
       child: Text(
         category[0].toUpperCase() + category.substring(1),
-        style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+        style: TextStyle(color: AppColors.textMuted, fontSize: 11),
       ),
     );
   }

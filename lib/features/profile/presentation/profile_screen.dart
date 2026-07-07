@@ -21,19 +21,19 @@ import '../../../core/presentation/app_colors.dart';
 
 // ─── Design tokens (Obsidian Pulse) ──────────────────────────────────────────
 
-const _kPrimary = AppColors.limeCream;
-const _kPrimaryDim = AppColors.accentDim;
-const _kSecondary = AppColors.cyan;
-const _kSurface = AppColors.ink;
-const _kSurfaceLow = AppColors.inkDeep;
-const _kSurfaceHigh = AppColors.inkWarm;
-const _kSurfaceHighest = AppColors.inkElevated;
-const _kOnSurface = AppColors.white;
-const _kOnSurfaceVariant = AppColors.textSoft;
-const _kOnPrimaryFixed = AppColors.limeShadow;
-const _kError = AppColors.coral;
-const _kPrimaryContainer = AppColors.accentBright;
-const _kOnPrimaryContainer = AppColors.accentDeep;
+Color get _kPrimary => AppColors.limeCream;
+Color get _kPrimaryDim => AppColors.accentDim;
+Color get _kSecondary => AppColors.cyan;
+Color get _kSurface => AppColors.ink;
+Color get _kSurfaceLow => AppColors.inkDeep;
+Color get _kSurfaceHigh => AppColors.inkWarm;
+Color get _kSurfaceHighest => AppColors.inkElevated;
+Color get _kOnSurface => AppColors.white;
+Color get _kOnSurfaceVariant => AppColors.textSoft;
+Color get _kOnPrimaryFixed => AppColors.limeShadow;
+Color get _kError => AppColors.coral;
+Color get _kPrimaryContainer => AppColors.accentBright;
+Color get _kOnPrimaryContainer => AppColors.accentDeep;
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -270,14 +270,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       children: [
                         GestureDetector(
                           onTap: _onBackPressed,
-                          child: const Icon(
+                          child: Icon(
                             Icons.arrow_back_ios_new_rounded,
                             color: _kOnSurface,
                             size: 20,
                           ),
                         ),
                         const SizedBox(width: 16),
-                        const Text(
+                        Text(
                           'Profile',
                           style: TextStyle(
                             fontSize: 18,
@@ -369,7 +369,7 @@ class _ProfileHero extends StatelessWidget {
                         child: Center(
                           child: Text(
                             initial,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 30,
                               fontWeight: FontWeight.bold,
                               color: _kPrimary,
@@ -387,7 +387,7 @@ class _ProfileHero extends StatelessWidget {
                             color: _kPrimary,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.verified_rounded,
                             size: 14,
                             color: _kOnPrimaryFixed,
@@ -416,7 +416,7 @@ class _ProfileHero extends StatelessWidget {
                           ),
                           child: Text(
                             coachingStyle.displayName.toUpperCase(),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 1.2,
@@ -433,7 +433,7 @@ class _ProfileHero extends StatelessWidget {
                                 child: TextField(
                                   controller: nameController,
                                   autofocus: true,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.bold,
                                     color: _kOnSurface,
@@ -454,7 +454,7 @@ class _ProfileHero extends StatelessWidget {
                               ),
                               GestureDetector(
                                 onTap: onSaveName,
-                                child: const Icon(
+                                child: Icon(
                                   Icons.check_rounded,
                                   color: _kPrimaryDim,
                                   size: 20,
@@ -465,7 +465,7 @@ class _ProfileHero extends StatelessWidget {
                         else
                           Text(
                             effectiveName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                               color: _kOnSurface,
@@ -487,7 +487,7 @@ class _ProfileHero extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              const Icon(
+                              Icon(
                                 Icons.north_east_rounded,
                                 size: 13,
                                 color: _kPrimaryDim,
@@ -524,7 +524,7 @@ class _ProfileHero extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
+              Icon(
                 Icons.local_fire_department_rounded,
                 color: _kOnPrimaryContainer,
                 size: 28,
@@ -532,7 +532,7 @@ class _ProfileHero extends StatelessWidget {
               const SizedBox(height: 10),
               Text(
                 streakCount.toString(),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 42,
                   fontWeight: FontWeight.w800,
                   color: _kOnPrimaryContainer,
@@ -541,7 +541,7 @@ class _ProfileHero extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 2),
-              const Text(
+              Text(
                 'DAY STREAK',
                 style: TextStyle(
                   fontSize: 11,
@@ -667,7 +667,7 @@ class _DisciplineTile extends StatelessWidget {
                             color: _kPrimary,
                             borderRadius: BorderRadius.circular(99),
                           ),
-                          child: const Text(
+                          child: Text(
                             'ACTIVE',
                             style: TextStyle(
                               fontSize: 9,
@@ -682,10 +682,7 @@ class _DisciplineTile extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     mode.description,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: _kOnSurfaceVariant,
-                    ),
+                    style: TextStyle(fontSize: 12, color: _kOnSurfaceVariant),
                   ),
                 ],
               ),
@@ -750,10 +747,7 @@ class _CoachToneSection extends ConsumerWidget {
                 const SizedBox(height: 3),
                 Text(
                   _styleCopy(style),
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: _kOnSurfaceVariant,
-                  ),
+                  style: TextStyle(fontSize: 10, color: _kOnSurfaceVariant),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -810,7 +804,7 @@ class _CoreOptimizationSection extends StatelessWidget {
             icon: Icons.account_circle_outlined,
             title: 'Account Settings',
             subtitle: 'Security, Privacy & Data',
-            trailing: const Icon(
+            trailing: Icon(
               Icons.chevron_right_rounded,
               color: _kOnSurfaceVariant,
               size: 20,
@@ -822,7 +816,7 @@ class _CoreOptimizationSection extends StatelessWidget {
             icon: Icons.notifications_active_outlined,
             title: 'Notifications',
             subtitle: 'Coaching insights & push alerts',
-            trailing: const Icon(
+            trailing: Icon(
               Icons.chevron_right_rounded,
               color: _kOnSurfaceVariant,
               size: 20,
@@ -838,7 +832,7 @@ class _CoreOptimizationSection extends StatelessWidget {
             subtitle: 'Sleep window & attention modes',
             trailing: Text(
               quietLabel,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
                 color: _kPrimary,
@@ -891,7 +885,7 @@ class _SettingRow extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                         color: _kOnSurface,
@@ -900,10 +894,7 @@ class _SettingRow extends StatelessWidget {
                     const SizedBox(height: 1),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: _kOnSurfaceVariant,
-                      ),
+                      style: TextStyle(fontSize: 11, color: _kOnSurfaceVariant),
                     ),
                   ],
                 ),
@@ -940,9 +931,9 @@ class _LogOutButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.logout_rounded, color: _kError, size: 18),
+              Icon(Icons.logout_rounded, color: _kError, size: 18),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Log Out',
                 style: TextStyle(
                   fontSize: 15,
@@ -970,7 +961,7 @@ class _SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Text(
         label.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 2,
@@ -1009,7 +1000,7 @@ class _ObsidianDialog extends StatelessWidget {
           children: [
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
                 color: _kOnSurface,
@@ -1018,7 +1009,7 @@ class _ObsidianDialog extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               body,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 color: _kOnSurfaceVariant,
                 height: 1.5,
@@ -1036,7 +1027,7 @@ class _ObsidianDialog extends StatelessWidget {
                         color: _kSurfaceHighest,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Center(
+                      child: Center(
                         child: Text(
                           'Cancel',
                           style: TextStyle(

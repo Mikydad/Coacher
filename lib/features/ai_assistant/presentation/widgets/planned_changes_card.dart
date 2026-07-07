@@ -37,7 +37,7 @@ class PlannedChangesCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'PLANNED CHANGES PREVIEW',
             style: TextStyle(
               fontSize: 11,
@@ -116,10 +116,7 @@ class _ActionRow extends StatelessWidget {
               Expanded(
                 child: Text(
                   description,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.grayBright,
-                  ),
+                  style: TextStyle(fontSize: 14, color: AppColors.grayBright),
                 ),
               ),
             ],
@@ -129,7 +126,7 @@ class _ActionRow extends StatelessWidget {
               padding: const EdgeInsets.only(left: 24, top: 2),
               child: Text(
                 action.reasonLabel!,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontStyle: FontStyle.italic,
                   color: AppColors.textSoft,
@@ -341,7 +338,7 @@ class _ActionButtons extends StatelessWidget {
     final confirmBg = isBlocked
         ? Colors.red.withValues(alpha: 0.85)
         : AppColors.accentBright;
-    final confirmFg = isBlocked ? Colors.white : AppColors.accentDeep;
+    final confirmFg = isBlocked ? AppColors.fg : AppColors.accentDeep;
 
     return Column(
       children: [
@@ -389,7 +386,7 @@ class _ActionButtons extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.textSoft,
                     side: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.15),
+                      color: AppColors.fg.withValues(alpha: 0.15),
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -455,7 +452,7 @@ class _ExecutedLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       children: [
         Icon(
           Icons.check_circle_outline_rounded,

@@ -31,8 +31,8 @@ class ProactiveSuggestionsCoachPanel extends ConsumerStatefulWidget {
 
 class _ProactiveSuggestionsCoachPanelState
     extends ConsumerState<ProactiveSuggestionsCoachPanel> {
-  static const _kAccent = AppColors.accentDim;
-  static const _kVariant = AppColors.textSoft;
+  static Color get _kAccent => AppColors.accentDim;
+  static Color get _kVariant => AppColors.textSoft;
 
   late bool _expanded = widget.initiallyExpanded;
 
@@ -75,7 +75,7 @@ class _ProactiveSuggestionsCoachPanelState
                   ),
                   child: Row(
                     children: [
-                      const Text(
+                      Text(
                         'SUGGESTIONS FOR TODAY',
                         style: TextStyle(
                           fontSize: 11,
@@ -87,7 +87,7 @@ class _ProactiveSuggestionsCoachPanelState
                       const Spacer(),
                       Text(
                         '${active.length}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: _kAccent,

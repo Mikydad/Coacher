@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/coaching_style_providers.dart';
 import '../domain/models/coaching_style.dart';
 import 'coaching_style_selection_screen.dart';
+import '../../../core/presentation/app_colors.dart';
 
 /// Settings section widget that shows the user's current [CoachingStyle] and
 /// provides a tap-to-change action. Embed directly in the settings screen.
@@ -17,12 +18,12 @@ class CoachingStyleSettingsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'COACHING STYLE',
           style: TextStyle(
             letterSpacing: 2,
             fontSize: 11,
-            color: Colors.white54,
+            color: AppColors.fg54,
           ),
         ),
         const SizedBox(height: 8),
@@ -54,9 +55,9 @@ class _StyleTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(10),
+          color: AppColors.fg.withAlpha(10),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white12),
+          border: Border.all(color: AppColors.fg12),
         ),
         child: Row(
           children: [
@@ -66,21 +67,21 @@ class _StyleTile extends StatelessWidget {
                 children: [
                   Text(
                     style.displayName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: AppColors.fg,
                     ),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     style.description,
-                    style: const TextStyle(fontSize: 12, color: Colors.white54),
+                    style: TextStyle(fontSize: 12, color: AppColors.fg54),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.white38, size: 20),
+            Icon(Icons.chevron_right, color: AppColors.fg38, size: 20),
           ],
         ),
       ),

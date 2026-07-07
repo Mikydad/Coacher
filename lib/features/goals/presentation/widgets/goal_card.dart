@@ -223,7 +223,7 @@ class _CardShell extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: metCommitment ? Colors.black : Colors.white,
+                            color: metCommitment ? Colors.black : AppColors.fg,
                             fontWeight: FontWeight.w700,
                             fontSize: 15,
                           ),
@@ -234,7 +234,7 @@ class _CardShell extends StatelessWidget {
                           style: TextStyle(
                             color: metCommitment
                                 ? Colors.black54
-                                : Colors.white70,
+                                : AppColors.fg70,
                             fontSize: 12,
                           ),
                         ),
@@ -291,17 +291,17 @@ class _ActionButton extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: done
-              ? Colors.white.withValues(alpha: 0.25)
-              : Colors.white.withValues(alpha: 0.15),
+              ? AppColors.fg.withValues(alpha: 0.25)
+              : AppColors.fg.withValues(alpha: 0.15),
           border: Border.all(
-            color: Colors.white.withValues(alpha: done ? 0.6 : 0.4),
+            color: AppColors.fg.withValues(alpha: done ? 0.6 : 0.4),
             width: 1.5,
           ),
         ),
         child: Icon(
           done ? Icons.check : Icons.add,
           size: 18,
-          color: done ? Colors.white : Colors.white70,
+          color: done ? AppColors.fg : AppColors.fg70,
         ),
       ),
     );

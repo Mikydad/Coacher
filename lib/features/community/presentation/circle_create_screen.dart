@@ -113,7 +113,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.surfaceDark,
         foregroundColor: AppColors.textPrimary,
-        title: const Text(
+        title: Text(
           'Create circle',
           style: TextStyle(
             color: AppColors.textPrimary,
@@ -160,7 +160,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
   Widget _buildNameField() {
     return TextFormField(
       controller: _nameController,
-      style: const TextStyle(color: AppColors.textPrimary),
+      style: TextStyle(color: AppColors.textPrimary),
       maxLength: 40,
       onTapOutside: (_) => dismissKeyboard(context),
       decoration: _inputDecoration('e.g. Morning runners'),
@@ -176,7 +176,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
   Widget _buildDescField() {
     return TextFormField(
       controller: _descController,
-      style: const TextStyle(color: AppColors.textPrimary),
+      style: TextStyle(color: AppColors.textPrimary),
       maxLines: 3,
       maxLength: 200,
       onTapOutside: (_) => dismissKeyboard(context),
@@ -202,7 +202,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
           selectedColor: AppColors.accent,
           backgroundColor: AppColors.surfaceCard,
           side: BorderSide(
-            color: selected ? AppColors.accent : Colors.white.withOpacity(0.06),
+            color: selected ? AppColors.accent : AppColors.fg.withOpacity(0.06),
           ),
           onSelected: (_) => setState(() => _selectedCategory = cat),
         );
@@ -278,26 +278,26 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: AppColors.textMuted),
+      hintStyle: TextStyle(color: AppColors.textMuted),
       filled: true,
       fillColor: AppColors.surfaceDark,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.06)),
+        borderSide: BorderSide(color: AppColors.fg.withOpacity(0.06)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.06)),
+        borderSide: BorderSide(color: AppColors.fg.withOpacity(0.06)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.accent),
+        borderSide: BorderSide(color: AppColors.accent),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.danger),
+        borderSide: BorderSide(color: AppColors.danger),
       ),
-      counterStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+      counterStyle: TextStyle(color: AppColors.textMuted, fontSize: 12),
     );
   }
 
@@ -325,7 +325,7 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         color: AppColors.textMuted,
         fontSize: 13,
         fontWeight: FontWeight.w500,

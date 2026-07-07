@@ -261,7 +261,7 @@ class _CircleDiscoveryScreenState extends ConsumerState<CircleDiscoveryScreen>
       appBar: AppBar(
         backgroundColor: AppColors.surfaceDark,
         foregroundColor: AppColors.textPrimary,
-        title: const Text(
+        title: Text(
           'Discover circles',
           style: TextStyle(
             color: AppColors.textPrimary,
@@ -351,7 +351,7 @@ class _BrowseTab extends StatelessWidget {
         ),
         Expanded(
           child: loading
-              ? const Center(
+              ? Center(
                   child: CircularProgressIndicator(color: AppColors.accent),
                 )
               : ListView(
@@ -359,7 +359,7 @@ class _BrowseTab extends StatelessWidget {
                   children: [
                     // Recommendations section
                     if (recommendations.isNotEmpty) ...[
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.only(bottom: 10),
                         child: Text(
                           'RECOMMENDED FOR YOU',
@@ -385,7 +385,7 @@ class _BrowseTab extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const Text(
+                      Text(
                         'ALL CIRCLES',
                         style: TextStyle(
                           color: AppColors.textMuted,
@@ -453,7 +453,7 @@ class _RecommendedCircleCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     circle.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -467,14 +467,14 @@ class _RecommendedCircleCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               scored.matchReason,
-              style: const TextStyle(color: AppColors.accent, fontSize: 11),
+              style: TextStyle(color: AppColors.accent, fontSize: 11),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             const Spacer(),
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.people_outline,
                   color: AppColors.textMuted,
                   size: 12,
@@ -482,10 +482,7 @@ class _RecommendedCircleCard extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   '${circle.memberCount}/${AccountabilityCircle.kMaxMembers}',
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 11,
-                  ),
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 11),
                 ),
                 const Spacer(),
                 GestureDetector(
@@ -550,7 +547,7 @@ class _CategoryChipRow extends StatelessWidget {
             side: BorderSide(
               color: isSelected
                   ? AppColors.accent
-                  : Colors.white.withOpacity(0.06),
+                  : AppColors.fg.withOpacity(0.06),
             ),
             onSelected: (_) => onChanged(cat),
           );
@@ -595,11 +592,11 @@ class _SearchTab extends StatelessWidget {
             controller: controller,
             onChanged: onChanged,
             onTapOutside: (_) => dismissKeyboard(context),
-            style: const TextStyle(color: AppColors.textPrimary),
+            style: TextStyle(color: AppColors.textPrimary),
             decoration: InputDecoration(
               hintText: 'Search circles…',
-              hintStyle: const TextStyle(color: AppColors.textMuted),
-              prefixIcon: const Icon(
+              hintStyle: TextStyle(color: AppColors.textMuted),
+              prefixIcon: Icon(
                 Icons.search_rounded,
                 color: AppColors.textMuted,
               ),
@@ -607,22 +604,22 @@ class _SearchTab extends StatelessWidget {
               fillColor: AppColors.surfaceDark,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.06)),
+                borderSide: BorderSide(color: AppColors.fg.withOpacity(0.06)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.06)),
+                borderSide: BorderSide(color: AppColors.fg.withOpacity(0.06)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.accent),
+                borderSide: BorderSide(color: AppColors.accent),
               ),
             ),
           ),
         ),
         Expanded(
           child: loading
-              ? const Center(
+              ? Center(
                   child: CircularProgressIndicator(color: AppColors.accent),
                 )
               : controller.text.isEmpty
@@ -678,7 +675,7 @@ class _CircleCardState extends State<_CircleCard> {
       decoration: BoxDecoration(
         color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
+        border: Border.all(color: AppColors.fg.withOpacity(0.06)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -688,7 +685,7 @@ class _CircleCardState extends State<_CircleCard> {
               Expanded(
                 child: Text(
                   circle.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
                     fontSize: 16,
@@ -704,27 +701,20 @@ class _CircleCardState extends State<_CircleCard> {
               circle.description!,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
             ),
           ],
           const SizedBox(height: 12),
           Row(
             children: [
-              const Icon(
-                Icons.group_rounded,
-                size: 14,
-                color: AppColors.textMuted,
-              ),
+              Icon(Icons.group_rounded, size: 14, color: AppColors.textMuted),
               const SizedBox(width: 4),
               Text(
                 '${circle.memberCount}/${AccountabilityCircle.kMaxMembers}',
-                style: const TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
               ),
               const SizedBox(width: 12),
-              const Icon(
+              Icon(
                 Icons.schedule_rounded,
                 size: 14,
                 color: AppColors.textMuted,
@@ -733,10 +723,7 @@ class _CircleCardState extends State<_CircleCard> {
               Expanded(
                 child: Text(
                   circle.timezone,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -827,7 +814,7 @@ class _CategoryBadge extends StatelessWidget {
       ),
       child: Text(
         category[0].toUpperCase() + category.substring(1),
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.accent,
           fontSize: 11,
           fontWeight: FontWeight.w600,
@@ -861,7 +848,7 @@ class _PolicyBadge extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             isOpen ? 'Open' : 'Approval',
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+            style: TextStyle(color: AppColors.textMuted, fontSize: 11),
           ),
         ],
       ),
@@ -881,7 +868,7 @@ class _EmptyState extends StatelessWidget {
         child: Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.textMuted, fontSize: 15),
+          style: TextStyle(color: AppColors.textMuted, fontSize: 15),
         ),
       ),
     );

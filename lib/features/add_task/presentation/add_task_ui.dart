@@ -4,20 +4,20 @@ import '../../../core/presentation/app_colors.dart';
 
 /// Visual tokens for Add / Edit Task (Obsidian Pulse).
 abstract final class AddTaskColors {
-  static const surface = AppColors.ink;
-  static const card = AppColors.dark1A1919;
-  static const cardElevated = AppColors.inkWarm;
-  static const inputFill = AppColors.dark111111;
-  static const cardHighest = AppColors.inkElevated;
-  static const border = AppColors.whiteBorder8;
-  static const borderActive = AppColors.accentDim;
-  static const accent = AppColors.accent;
-  static const accentContainer = AppColors.accentBright;
-  static const accentDim = AppColors.accentDim;
-  static const cyan = AppColors.cyan;
-  static const onSurface = AppColors.white;
-  static const muted = AppColors.textSoft;
-  static const faint = AppColors.grayWarm;
+  static Color get surface => AppColors.ink;
+  static Color get card => AppColors.dark1A1919;
+  static Color get cardElevated => AppColors.inkWarm;
+  static Color get inputFill => AppColors.dark111111;
+  static Color get cardHighest => AppColors.inkElevated;
+  static Color get border => AppColors.whiteBorder8;
+  static Color get borderActive => AppColors.accentDim;
+  static Color get accent => AppColors.accent;
+  static Color get accentContainer => AppColors.accentBright;
+  static Color get accentDim => AppColors.accentDim;
+  static Color get cyan => AppColors.cyan;
+  static Color get onSurface => AppColors.white;
+  static Color get muted => AppColors.textSoft;
+  static Color get faint => AppColors.grayWarm;
 }
 
 class AddTaskHeroSectionLabel extends StatelessWidget {
@@ -37,7 +37,7 @@ class AddTaskHeroSectionLabel extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
             color: AddTaskColors.onSurface,
@@ -49,7 +49,7 @@ class AddTaskHeroSectionLabel extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             subtitle!,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
               color: AddTaskColors.muted,
@@ -85,7 +85,7 @@ class AddTaskSectionLabel extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: AddTaskColors.onSurface,
@@ -96,7 +96,7 @@ class AddTaskSectionLabel extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   subtitle!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     height: 1.35,
                     color: AddTaskColors.muted,
@@ -135,7 +135,7 @@ class AddTaskField extends StatelessWidget {
       maxLines: maxLines,
       style:
           style ??
-          const TextStyle(
+          TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w500,
             color: AddTaskColors.onSurface,
@@ -180,11 +180,11 @@ class AddTaskSettingsActionRow extends StatelessWidget {
     required this.subtitle,
     required this.actionLabel,
     required this.onTap,
-    this.iconColor = AddTaskColors.cyan,
+    this.iconColor,
   });
 
   final IconData icon;
-  final Color iconColor;
+  final Color? iconColor;
   final String title;
   final String subtitle;
   final String actionLabel;
@@ -205,11 +205,15 @@ class AddTaskSettingsActionRow extends StatelessWidget {
               Container(
                 width: 48,
                 height: 48,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AddTaskColors.cardHighest,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, size: 22, color: iconColor),
+                child: Icon(
+                  icon,
+                  size: 22,
+                  color: iconColor ?? AddTaskColors.cyan,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -218,7 +222,7 @@ class AddTaskSettingsActionRow extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: AddTaskColors.onSurface,
@@ -227,7 +231,7 @@ class AddTaskSettingsActionRow extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.8,
@@ -239,7 +243,7 @@ class AddTaskSettingsActionRow extends StatelessWidget {
               ),
               Text(
                 actionLabel,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.6,
@@ -262,11 +266,11 @@ class AddTaskSettingsToggleRow extends StatelessWidget {
     required this.subtitle,
     required this.value,
     required this.onChanged,
-    this.iconColor = AddTaskColors.cyan,
+    this.iconColor,
   });
 
   final IconData icon;
-  final Color iconColor;
+  final Color? iconColor;
   final String title;
   final String subtitle;
   final bool value;
@@ -287,11 +291,15 @@ class AddTaskSettingsToggleRow extends StatelessWidget {
               Container(
                 width: 48,
                 height: 48,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AddTaskColors.cardHighest,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, size: 22, color: iconColor),
+                child: Icon(
+                  icon,
+                  size: 22,
+                  color: iconColor ?? AddTaskColors.cyan,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -300,7 +308,7 @@ class AddTaskSettingsToggleRow extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: AddTaskColors.onSurface,
@@ -309,7 +317,7 @@ class AddTaskSettingsToggleRow extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.8,
@@ -373,7 +381,7 @@ class AddTaskCollapsibleSection extends StatelessWidget {
                     children: [
                       Text(
                         title.toUpperCase(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AddTaskColors.onSurface,
                           fontWeight: FontWeight.w800,
                           fontSize: 12,
@@ -384,7 +392,7 @@ class AddTaskCollapsibleSection extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           subtitle!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AddTaskColors.muted,
                             fontSize: 11,
                           ),
@@ -396,7 +404,7 @@ class AddTaskCollapsibleSection extends StatelessWidget {
                 AnimatedRotation(
                   turns: expanded ? 0.5 : 0,
                   duration: const Duration(milliseconds: 200),
-                  child: const Icon(
+                  child: Icon(
                     Icons.keyboard_arrow_down,
                     color: AddTaskColors.muted,
                   ),
@@ -435,11 +443,11 @@ class AddTaskToggleRow extends StatelessWidget {
     required this.subtitle,
     required this.value,
     required this.onChanged,
-    this.iconColor = AddTaskColors.accent,
+    this.iconColor,
   });
 
   final IconData icon;
-  final Color iconColor;
+  final Color? iconColor;
   final String title;
   final String subtitle;
   final bool value;
@@ -458,10 +466,16 @@ class AddTaskToggleRow extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.12),
+                color: (iconColor ?? AddTaskColors.accent).withValues(
+                  alpha: 0.12,
+                ),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, size: 20, color: iconColor),
+              child: Icon(
+                icon,
+                size: 20,
+                color: iconColor ?? AddTaskColors.accent,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -470,7 +484,7 @@ class AddTaskToggleRow extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: AddTaskColors.onSurface,
@@ -479,10 +493,7 @@ class AddTaskToggleRow extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AddTaskColors.muted,
-                    ),
+                    style: TextStyle(fontSize: 12, color: AddTaskColors.muted),
                   ),
                 ],
               ),
@@ -554,7 +565,7 @@ class AddTaskPickerRow extends StatelessWidget {
                   children: [
                     Text(
                       label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         color: AddTaskColors.faint,
                         fontWeight: FontWeight.w500,
@@ -562,7 +573,7 @@ class AddTaskPickerRow extends StatelessWidget {
                     ),
                     Text(
                       value,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                         color: AddTaskColors.onSurface,
@@ -572,11 +583,7 @@ class AddTaskPickerRow extends StatelessWidget {
                 ),
               ),
               if (interactive)
-                const Icon(
-                  Icons.chevron_right,
-                  color: AddTaskColors.faint,
-                  size: 20,
-                ),
+                Icon(Icons.chevron_right, color: AddTaskColors.faint, size: 20),
             ],
           ),
         ),
@@ -798,7 +805,7 @@ class AddTaskEnforcementTile extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isSelected
                     ? AddTaskColors.accent.withValues(alpha: 0.2)
-                    : Colors.white.withValues(alpha: 0.05),
+                    : AppColors.fg.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
@@ -826,7 +833,7 @@ class AddTaskEnforcementTile extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       description,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         height: 1.3,
                         color: AddTaskColors.muted,
@@ -837,7 +844,7 @@ class AddTaskEnforcementTile extends StatelessWidget {
               ),
             ),
             if (isSelected)
-              const Icon(
+              Icon(
                 Icons.check_circle_rounded,
                 color: AddTaskColors.accent,
                 size: 20,

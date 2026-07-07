@@ -33,13 +33,13 @@ class GoalsHabitsSection extends StatelessWidget {
               Container(
                 width: 10,
                 height: 10,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: ProgressDesignTokens.primaryDim,
                   shape: BoxShape.circle,
                 ),
               ),
               const SizedBox(width: 10),
-              const Text(
+              Text(
                 'Goals & Habits',
                 style: TextStyle(
                   color: ProgressDesignTokens.onSurface,

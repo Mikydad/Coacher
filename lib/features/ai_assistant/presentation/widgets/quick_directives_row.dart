@@ -97,7 +97,7 @@ class _ShimmerRowState extends State<_ShimmerRow>
           itemBuilder: (c, i) => Container(
             width: 90,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: alpha),
+              color: AppColors.fg.withValues(alpha: alpha),
               borderRadius: BorderRadius.circular(999),
             ),
           ),
@@ -122,12 +122,12 @@ class _DirectiveChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
+          border: Border.all(color: AppColors.fg.withValues(alpha: 0.20)),
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
             color: AppColors.textSoft,

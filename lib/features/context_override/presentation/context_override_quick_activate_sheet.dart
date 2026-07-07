@@ -6,6 +6,7 @@ import '../application/context_override_service.dart';
 import '../application/override_attention_policy.dart';
 import '../domain/models/context_override.dart';
 import 'widgets/attention_mode_widgets.dart';
+import '../../../core/presentation/app_colors.dart';
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
@@ -114,12 +115,12 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
                 _selectedPreset = null;
                 _showCustomSlider = false;
               }),
-              child: const Padding(
+              child: Padding(
                 padding: EdgeInsets.only(right: 8),
                 child: Icon(
                   Icons.arrow_back_ios_new,
                   size: 18,
-                  color: Colors.white70,
+                  color: AppColors.fg70,
                 ),
               ),
             ),
@@ -128,8 +129,8 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
             Expanded(
               child: Text(
                 type.displayName,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: AppColors.fg,
                   fontSize: 22,
                   fontWeight: FontWeight.w600,
                 ),
@@ -140,10 +141,7 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
         const SizedBox(height: 8),
         Text(
           OverrideAttentionPolicy.suppressionSummary(type),
-          style: const TextStyle(
-            color: AttentionModeColors.label,
-            fontSize: 14,
-          ),
+          style: TextStyle(color: AttentionModeColors.label, fontSize: 14),
         ),
         const SizedBox(height: 20),
         Wrap(
@@ -165,8 +163,8 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
           const SizedBox(height: 16),
           Text(
             'Custom: $_customMinutes min',
-            style: const TextStyle(
-              color: Colors.white70,
+            style: TextStyle(
+              color: AppColors.fg70,
               fontWeight: FontWeight.w600,
             ),
           ),

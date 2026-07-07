@@ -76,7 +76,7 @@ class _FirstLaunchGateState extends State<FirstLaunchGate> {
     if (!_ready) {
       // Default [Material] uses a light surface — reads as a "blank white screen"
       // with a tiny spinner. Match the app shell so launch reads as intentional loading.
-      return const Directionality(
+      return Directionality(
         textDirection: TextDirection.ltr,
         child: Material(
           color: AppColors.scaffold,
@@ -88,7 +88,7 @@ class _FirstLaunchGateState extends State<FirstLaunchGate> {
                 SizedBox(height: 20),
                 Text(
                   'Loading your plan…',
-                  style: TextStyle(color: Colors.white70, fontSize: 15),
+                  style: TextStyle(color: AppColors.fg70, fontSize: 15),
                 ),
               ],
             ),

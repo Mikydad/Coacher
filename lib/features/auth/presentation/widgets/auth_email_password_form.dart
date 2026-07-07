@@ -138,7 +138,7 @@ class _AuthEmailPasswordFormState extends ConsumerState<AuthEmailPasswordForm> {
                     }
                   }
                 : null,
-            child: const Text(
+            child: Text(
               'Forgot password?',
               style: TextStyle(color: AppColors.textGray, fontSize: 13),
             ),

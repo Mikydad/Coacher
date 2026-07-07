@@ -35,25 +35,62 @@ import '../features/tasks_hub/presentation/tasks_hub_screen.dart';
 import '../features/timer/presentation/timer_session_screen.dart';
 
 import '../core/presentation/app_colors.dart';
+import '../core/presentation/theme_brightness_controller.dart';
 
-class CoachForLifeApp extends StatelessWidget {
+class CoachForLifeApp extends ConsumerWidget {
   const CoachForLifeApp({super.key});
 
+  static ThemeData _theme(Brightness brightness) {
+    // Rectangular button language (Obsidian Pulse Light DESIGN.md: small
+    // radii, no pills) — applied to BOTH modes so the app stays consistent.
+    final buttonShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(10),
+    );
+    return ThemeData(
+      brightness: brightness,
+      scaffoldBackgroundColor: AppColors.scaffold,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: brightness == Brightness.dark
+            ? const Color(0xFFB7FF00)
+            : const Color(0xFF4C6700),
+        brightness: brightness,
+      ),
+      useMaterial3: true,
+      appBarTheme: AppBarTheme(
+        backgroundColor: AppColors.scaffold,
+        foregroundColor: AppColors.textPrimary,
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(shape: buttonShape),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(shape: buttonShape),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(shape: buttonShape),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(shape: buttonShape),
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final brightness = ref.watch(themeBrightnessProvider);
+    // Point the static token table at the right palette BEFORE any child
+    // builds; the ValueKey rebuilds the entire tree on toggle so every
+    // AppColors read repaints. (Navigation stack resets on toggle — accepted.)
+    AppColors.palette = brightness == Brightness.light
+        ? AppPalette.light
+        : AppPalette.dark;
+
     return MaterialApp(
+      key: ValueKey(brightness),
       navigatorKey: appNavigatorKey,
       title: 'Coach for Life',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: AppColors.scaffold,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.accent,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
+      theme: _theme(brightness),
       initialRoute: MainTabShell.routeName,
       routes: {
         // ── Auth ──────────────────────────────────────────────────────────
@@ -167,7 +204,7 @@ class _CoachTabRedirect extends ConsumerWidget {
       );
       Navigator.of(context).popUntil((route) => route.isFirst);
     });
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: AppColors.scaffold,
       body: SizedBox.shrink(),
     );

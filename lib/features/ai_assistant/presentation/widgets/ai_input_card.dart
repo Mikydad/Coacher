@@ -38,8 +38,8 @@ class AiInputCard extends StatelessWidget {
             minLines: 1,
             textInputAction: TextInputAction.newline,
             onTapOutside: (_) => dismissKeyboard(context),
-            style: const TextStyle(fontSize: 15, color: Colors.white),
-            decoration: const InputDecoration(
+            style: TextStyle(fontSize: 15, color: AppColors.fg),
+            decoration: InputDecoration(
               hintText: 'Ask about your schedule or tell me what to plan…',
               hintStyle: TextStyle(color: AppColors.textSoft, fontSize: 15),
               border: InputBorder.none,
@@ -210,7 +210,7 @@ class _VoiceInputButtonState extends State<_VoiceInputButton> {
           border: Border.all(
             color: _listening
                 ? accent.withValues(alpha: 0.8)
-                : Colors.white.withValues(alpha: 0.12),
+                : AppColors.fg.withValues(alpha: 0.12),
           ),
           borderRadius: BorderRadius.circular(999),
         ),

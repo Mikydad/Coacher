@@ -58,6 +58,7 @@ import '../../timer/presentation/timer_session_screen.dart';
 import 'quittr_app_bar_title.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/presentation/theme_brightness_controller.dart';
 import '../../../core/presentation/async_value_ui.dart';
 
 enum _PlansChangedAction { reshuffle, defer, skip }
@@ -93,6 +94,18 @@ class HomeScreen extends ConsumerWidget {
         actions: [
           const _SyncFromCloudAction(),
           IconButton(
+            tooltip: ref.watch(themeBrightnessProvider) == Brightness.dark
+                ? 'Switch to light mode'
+                : 'Switch to dark mode',
+            onPressed: () =>
+                ref.read(themeBrightnessProvider.notifier).toggle(),
+            icon: Icon(
+              ref.watch(themeBrightnessProvider) == Brightness.dark
+                  ? Icons.light_mode_outlined
+                  : Icons.dark_mode_outlined,
+            ),
+          ),
+          IconButton(
             tooltip: 'Accountability history',
             onPressed: () => Navigator.pushNamed(
               context,
@@ -117,8 +130,9 @@ class HomeScreen extends ConsumerWidget {
               Expanded(
                 child: _ActionCircle(
                   icon: Icons.bolt,
-                  label: 'Focus',
+                  label: 'Start Focus',
                   tooltip: 'Start focus',
+                  active: true,
                   onTap: () {
                     final exec = ref.read(executionControllerProvider);
                     Navigator.pushNamed(
@@ -141,7 +155,7 @@ class HomeScreen extends ConsumerWidget {
               Expanded(
                 child: _ActionCircle(
                   icon: Icons.add,
-                  label: 'Add',
+                  label: 'Add Task',
                   tooltip: 'Add task',
                   onTap: () =>
                       Navigator.pushNamed(context, AddTaskScreen.routeName),
@@ -151,7 +165,7 @@ class HomeScreen extends ConsumerWidget {
               Expanded(
                 child: _ActionCircle(
                   icon: Icons.calendar_today,
-                  label: 'Plan',
+                  label: 'Plan Tomorrow',
                   tooltip: 'Plan tomorrow',
                   onTap: () => Navigator.pushNamed(
                     context,
@@ -163,7 +177,7 @@ class HomeScreen extends ConsumerWidget {
               Expanded(
                 child: _ActionCircle(
                   icon: Icons.do_not_disturb_on_outlined,
-                  label: 'Mode',
+                  label: 'Set Mode',
                   tooltip: 'Set mode',
                   onTap: () => showContextOverrideQuickActivateSheet(context),
                 ),
@@ -202,10 +216,7 @@ class HomeScreen extends ConsumerWidget {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(
-                          Icons.chevron_right,
-                          color: Colors.white54,
-                        ),
+                        icon: Icon(Icons.chevron_right, color: AppColors.fg54),
                         onPressed: () => Navigator.pushNamed(
                           context,
                           TasksHubScreen.routeName,
@@ -218,9 +229,9 @@ class HomeScreen extends ConsumerWidget {
                 tasksAsync.when(
                   data: (rows) {
                     if (rows.isEmpty) {
-                      return const Text(
+                      return Text(
                         'No tasks yet. Tap ADD TASK to create one.',
-                        style: TextStyle(color: Colors.white54),
+                        style: TextStyle(color: AppColors.fg54),
                       );
                     }
                     final visible = rows.take(kHomePreviewItemLimit).toList();
@@ -302,10 +313,7 @@ class HomeScreen extends ConsumerWidget {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(
-                          Icons.chevron_right,
-                          color: Colors.white54,
-                        ),
+                        icon: Icon(Icons.chevron_right, color: AppColors.fg54),
                         onPressed: () => navigateToMainTab(
                           context,
                           ref,
@@ -316,9 +324,9 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Commitments active today — tap a goal to log progress.',
-                  style: TextStyle(color: Colors.white54, fontSize: 13),
+                  style: TextStyle(color: AppColors.fg54, fontSize: 13),
                 ),
                 const SizedBox(height: 8),
                 todaysGoalsAsync.when(
@@ -327,9 +335,9 @@ class HomeScreen extends ConsumerWidget {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'No goals in progress for today.',
-                            style: TextStyle(color: Colors.white54),
+                            style: TextStyle(color: AppColors.fg54),
                           ),
                           const SizedBox(height: 8),
                           TextButton.icon(
@@ -337,7 +345,7 @@ class HomeScreen extends ConsumerWidget {
                               context,
                               GoalTemplatePickerScreen.routeName,
                             ),
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.add,
                               size: 20,
                               color: AppColors.accent,
@@ -407,7 +415,7 @@ class HomeScreen extends ConsumerWidget {
               data: (bundle) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'COACHING INSIGHTS',
                     style: TextStyle(
                       color: AppColors.cyan,
@@ -425,12 +433,12 @@ class HomeScreen extends ConsumerWidget {
                   const SizedBox(height: 4),
                   Text(
                     'Tasks today: ${(bundle.taskDay.weightedCompletionRate * 100).round()}%',
-                    style: const TextStyle(color: Colors.white70),
+                    style: TextStyle(color: AppColors.fg70),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'This week: Goals/Habits ${(bundle.goalHabitWeek.weightedCompletionRate * 100).round()}% · Tasks ${(bundle.taskWeek.weightedCompletionRate * 100).round()}%',
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                    style: TextStyle(color: AppColors.fg70, fontSize: 13),
                   ),
                 ],
               ),
@@ -441,9 +449,9 @@ class HomeScreen extends ConsumerWidget {
               error: (e, _) => swallowedAsyncError(
                 'home_screen',
                 e,
-                const Text(
+                Text(
                   'Could not load analytics insights.',
-                  style: TextStyle(color: Colors.white54),
+                  style: TextStyle(color: AppColors.fg54),
                 ),
               ),
             ),
@@ -455,12 +463,12 @@ class HomeScreen extends ConsumerWidget {
               final partial = _partialForRows(rows, scores);
               return Text(
                 'Completed: $completed • Partial: $partial',
-                style: const TextStyle(color: Colors.white70),
+                style: TextStyle(color: AppColors.fg70),
               );
             },
-            loading: () => const Text(
+            loading: () => Text(
               'Completed: … • Partial: …',
-              style: TextStyle(color: Colors.white70),
+              style: TextStyle(color: AppColors.fg70),
             ),
             error: (Object? error, StackTrace? stackTrace) =>
                 const SizedBox.shrink(),
@@ -472,7 +480,7 @@ class HomeScreen extends ConsumerWidget {
               pending > 0
                   ? 'Pending sync operations: $pending'
                   : 'All changes synced',
-              style: const TextStyle(color: Colors.white54),
+              style: TextStyle(color: AppColors.fg54),
             ),
           ),
         ],
@@ -511,9 +519,9 @@ void _maybeTriggerMorningBrief(BuildContext context, WidgetRef ref) {
       SnackBar(
         backgroundColor: AppColors.inkWarm,
         behavior: SnackBarBehavior.floating,
-        content: const Text(
+        content: Text(
           'Coach AI has suggestions for today — tap to review.',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: AppColors.fg),
         ),
         action: SnackBarAction(
           label: 'Open',
@@ -667,12 +675,12 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
                                 ),
                               ),
                               const SizedBox(height: 3),
-                              const Text(
+                              Text(
                                 'day streak',
                                 style: TextStyle(
                                   fontSize: 11,
                                   letterSpacing: 1.2,
-                                  color: Colors.white54,
+                                  color: AppColors.fg54,
                                 ),
                               ),
                             ],
@@ -683,11 +691,11 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
                       Center(
                         child: Column(
                           children: [
-                            const Text(
+                            Text(
                               "Today's Progress",
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.white70,
+                                color: AppColors.fg70,
                               ),
                             ),
                             const SizedBox(height: 5),
@@ -721,11 +729,11 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
                         ),
                       ),
                       const SizedBox(height: 9),
-                      const Align(
+                      Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
                           '7-day trend',
-                          style: TextStyle(color: Colors.white70, fontSize: 11),
+                          style: TextStyle(color: AppColors.fg70, fontSize: 11),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -755,7 +763,7 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
         error: (e, _) => swallowedAsyncError(
           'home_screen',
           e,
-          const Column(
+          Column(
             children: [
               SizedBox(height: 4),
               Text(
@@ -764,7 +772,7 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
               ),
               Text(
                 'day streak',
-                style: TextStyle(fontSize: 11, color: Colors.white54),
+                style: TextStyle(fontSize: 11, color: AppColors.fg54),
               ),
             ],
           ),
@@ -1045,63 +1053,70 @@ class _SparklinePainter extends CustomPainter {
   }
 }
 
+/// Quick-action tile per the light-design mock: rounded-square tile with a
+/// centered glyph and an all-caps label BELOW it. The primary action
+/// ([active]) uses the inverse fill (ink tile in light mode, lime in dark).
 class _ActionCircle extends StatelessWidget {
   const _ActionCircle({
     required this.icon,
     required this.label,
     required this.onTap,
     this.tooltip,
+    this.active = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final String? tooltip;
-
-  static const _kLabelStyle = TextStyle(
-    fontSize: 10,
-    fontWeight: FontWeight.w600,
-    height: 1.1,
-    letterSpacing: 0.15,
-    color: AppColors.textSoft,
-  );
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
+    final tileColor = active
+        ? AppColors.actionTileActive
+        : AppColors.actionTile;
+    final glyphColor = active
+        ? AppColors.onActionTileActive
+        : AppColors.onActionTile;
     return Tooltip(
       message: tooltip ?? label,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Ink(
-          height: 72,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceMuted,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white10),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(22),
+            child: Ink(
+              height: 64,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: tileColor,
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: Center(child: Icon(icon, color: glyphColor, size: 26)),
+            ),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: AppColors.accent, size: 22),
-              const SizedBox(height: 4),
-              SizedBox(
-                width: double.infinity,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: _kLabelStyle,
-                  ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label.toUpperCase(),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  height: 1.1,
+                  letterSpacing: 0.4,
+                  color: AppColors.fg,
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -1113,8 +1128,8 @@ class _FlowNowStrip extends ConsumerWidget {
 
   final AsyncValue<HomeFlowSnapshot> flowSnapshotAsync;
 
-  static const _kAccent = AppColors.cyan;
-  static const _kMuted = AppColors.textSoft;
+  static Color get _kAccent => AppColors.cyan;
+  static Color get _kMuted => AppColors.textSoft;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1127,7 +1142,7 @@ class _FlowNowStrip extends ConsumerWidget {
       decoration: BoxDecoration(
         color: AppColors.surfacePanel,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: AppColors.fg12),
       ),
       child: flowSnapshotAsync.when(
         data: (flow) => _buildContent(context, ref, flow, execState, todayRows),
@@ -1144,7 +1159,7 @@ class _FlowNowStrip extends ConsumerWidget {
         error: (e, _) => swallowedAsyncError(
           'home_screen',
           e,
-          const Text(
+          Text(
             'Flow unavailable',
             style: TextStyle(color: _kMuted, fontSize: 12),
           ),
@@ -1269,7 +1284,7 @@ class _FlowNowStrip extends ConsumerWidget {
       children: [
         Row(
           children: [
-            const Text(
+            Text(
               'FLOW NOW',
               style: TextStyle(
                 color: _kAccent,
@@ -1284,8 +1299,8 @@ class _FlowNowStrip extends ConsumerWidget {
                 '$block · $open open',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: AppColors.fg,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1325,7 +1340,7 @@ class _FlowNowStrip extends ConsumerWidget {
                                         ? 'Focus paused'
                                         : 'Focus active')
                                   : 'Next up',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: _kMuted,
                                 fontSize: 10,
                                 fontWeight: FontWeight.w500,
@@ -1337,8 +1352,8 @@ class _FlowNowStrip extends ConsumerWidget {
                                   : displayTask.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: AppColors.fg,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -1354,10 +1369,7 @@ class _FlowNowStrip extends ConsumerWidget {
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: _kMuted,
-                                fontSize: 11,
-                              ),
+                              style: TextStyle(color: _kMuted, fontSize: 11),
                             ),
                           ],
                         ),
@@ -1373,18 +1385,14 @@ class _FlowNowStrip extends ConsumerWidget {
                     ),
                     onPressed: () =>
                         _openTimerScreen(context, ref, displayTask),
-                    icon: const Icon(
-                      Icons.chevron_right,
-                      color: _kMuted,
-                      size: 20,
-                    ),
+                    icon: Icon(Icons.chevron_right, color: _kMuted, size: 20),
                   ),
                 ],
               ),
             ),
           ),
         ] else
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(top: 6),
             child: Text(
               'No next task — add one or check Tasks.',
@@ -1426,7 +1434,7 @@ class _FlowNowTimerControl extends StatelessWidget {
   final ExecutionState execState;
   final VoidCallback onPressed;
 
-  static const _kAccent = AppColors.cyan;
+  static Color get _kAccent => AppColors.cyan;
 
   @override
   Widget build(BuildContext context) {
@@ -1460,7 +1468,7 @@ class _FlowNowTimerControl extends StatelessWidget {
                 CircularProgressIndicator(
                   value: progress,
                   strokeWidth: 3,
-                  backgroundColor: Colors.white12,
+                  backgroundColor: AppColors.fg12,
                   color: _kAccent,
                 ),
               Container(
@@ -1539,7 +1547,7 @@ class _TodayGoalTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(
+            Icon(
               Icons.track_changes_outlined,
               color: AppColors.accent,
               size: 22,
@@ -1551,20 +1559,20 @@ class _TodayGoalTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: AppColors.fg,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(color: Colors.white38, fontSize: 12),
+                    style: TextStyle(color: AppColors.fg38, fontSize: 12),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.white24, size: 20),
+            Icon(Icons.chevron_right, color: AppColors.fg24, size: 20),
           ],
         ),
       ),
@@ -1632,18 +1640,18 @@ class _TaskItem extends StatelessWidget {
           style: TextStyle(
             decoration: done ? TextDecoration.lineThrough : null,
             fontStyle: partial ? FontStyle.italic : FontStyle.normal,
-            color: Colors.white70,
+            color: AppColors.fg70,
           ),
         ),
         subtitle: subtitle == null
             ? null
             : Text(
                 subtitle!,
-                style: const TextStyle(color: Colors.white38, fontSize: 12),
+                style: TextStyle(color: AppColors.fg38, fontSize: 12),
               ),
         trailing: IconButton(
           tooltip: 'Plans Changed?',
-          icon: const Icon(Icons.swap_horiz, color: Colors.white54),
+          icon: Icon(Icons.swap_horiz, color: AppColors.fg54),
           onPressed: onPlansChanged,
         ),
       ),
@@ -1897,9 +1905,9 @@ Future<bool?> _confirmStrictOverride(
               'You are choosing to ${action.name}.',
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Type CONFIRM to proceed.',
-              style: TextStyle(color: Colors.white70),
+              style: TextStyle(color: AppColors.fg70),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -2030,7 +2038,7 @@ class _NeonCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surfacePanel,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: AppColors.fg12),
       ),
       child: child,
     );
@@ -2086,7 +2094,7 @@ class _SyncFromCloudActionState extends State<_SyncFromCloudAction> {
               ? null
               : () =>
                     unawaited(SyncService.instance.syncFromRemote(force: true)),
-          icon: Icon(Icons.sync, color: syncing ? Colors.white38 : null),
+          icon: Icon(Icons.sync, color: syncing ? AppColors.fg38 : null),
         );
       },
     );
@@ -2379,7 +2387,7 @@ Future<void> _uncompleteTaskFromHome(
 class _CoachHomeFab extends ConsumerWidget {
   const _CoachHomeFab();
 
-  static const _accent = AppColors.cyan;
+  static Color get _accent => AppColors.cyan;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2393,7 +2401,7 @@ class _CoachHomeFab extends ConsumerWidget {
       shape: CircleBorder(
         side: BorderSide(color: _accent.withValues(alpha: 0.35)),
       ),
-      child: const Icon(Icons.auto_awesome_rounded, color: _accent, size: 22),
+      child: Icon(Icons.auto_awesome_rounded, color: _accent, size: 22),
     );
   }
 }

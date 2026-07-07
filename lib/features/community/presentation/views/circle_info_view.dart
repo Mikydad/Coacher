@@ -23,13 +23,12 @@ class CircleInfoView extends ConsumerWidget {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return circleAsync.when(
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: AppColors.accent),
-      ),
+      loading: () =>
+          Center(child: CircularProgressIndicator(color: AppColors.accent)),
       error: (e, _) => swallowedAsyncError(
         'circle_info_view',
         e,
-        const Center(
+        Center(
           child: Text(
             'Could not load circle info.',
             style: TextStyle(color: AppColors.textMuted),
@@ -63,7 +62,7 @@ class CircleInfoView extends ConsumerWidget {
                 children: [
                   Text(
                     circle.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
@@ -73,7 +72,7 @@ class CircleInfoView extends ConsumerWidget {
                     const SizedBox(height: 6),
                     Text(
                       circle.description!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.textMuted,
                         fontSize: 14,
                       ),
@@ -139,7 +138,7 @@ class CircleInfoView extends ConsumerWidget {
             const SizedBox(height: 8),
             ...moderators.map(
               (m) => _InfoTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.shield_rounded,
                   color: AppColors.accent,
                   size: 18,
@@ -185,16 +184,16 @@ class CircleInfoView extends ConsumerWidget {
             if (isCreator)
               OutlinedButton.icon(
                 onPressed: () => _confirmDelete(context, ref, circle.name),
-                icon: const Icon(
+                icon: Icon(
                   Icons.delete_forever_rounded,
                   color: AppColors.danger,
                 ),
-                label: const Text(
+                label: Text(
                   'Delete circle',
                   style: TextStyle(color: AppColors.danger),
                 ),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.danger),
+                  side: BorderSide(color: AppColors.danger),
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -204,16 +203,13 @@ class CircleInfoView extends ConsumerWidget {
             else
               OutlinedButton.icon(
                 onPressed: () => _confirmLeave(context, ref, uid),
-                icon: const Icon(
-                  Icons.exit_to_app_rounded,
-                  color: AppColors.danger,
-                ),
-                label: const Text(
+                icon: Icon(Icons.exit_to_app_rounded, color: AppColors.danger),
+                label: Text(
                   'Leave circle',
                   style: TextStyle(color: AppColors.danger),
                 ),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.danger),
+                  side: BorderSide(color: AppColors.danger),
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -236,28 +232,25 @@ class CircleInfoView extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surfaceDark,
-        title: const Text(
+        title: Text(
           'Delete circle?',
           style: TextStyle(color: AppColors.textPrimary),
         ),
         content: Text(
           'This will permanently delete "$circleName" and remove all members. '
           'This cannot be undone.',
-          style: const TextStyle(color: AppColors.textMuted),
+          style: TextStyle(color: AppColors.textMuted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: AppColors.textMuted),
-            ),
+            child: Text('Cancel', style: TextStyle(color: AppColors.textMuted)),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.danger,
-              foregroundColor: Colors.white,
+              foregroundColor: AppColors.fg,
             ),
             child: const Text('Delete'),
           ),
@@ -289,27 +282,24 @@ class CircleInfoView extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surfaceDark,
-        title: const Text(
+        title: Text(
           'Leave circle?',
           style: TextStyle(color: AppColors.textPrimary),
         ),
-        content: const Text(
+        content: Text(
           'You will lose access to the chat, challenges, and activity feed.',
           style: TextStyle(color: AppColors.textMuted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: AppColors.textMuted),
-            ),
+            child: Text('Cancel', style: TextStyle(color: AppColors.textMuted)),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.danger,
-              foregroundColor: Colors.white,
+              foregroundColor: AppColors.fg,
             ),
             child: const Text('Leave'),
           ),
@@ -340,7 +330,7 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text.toUpperCase(),
-      style: const TextStyle(
+      style: TextStyle(
         color: AppColors.textMuted,
         fontSize: 11,
         fontWeight: FontWeight.w600,
@@ -370,7 +360,7 @@ class _Chip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             label,
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
           ),
         ],
       ),
@@ -393,7 +383,7 @@ class _InfoTile extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             title,
-            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
           ),
         ],
       ),
@@ -429,13 +419,10 @@ class _SettingsTile extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
               ),
             ),
-            const Icon(
+            Icon(
               Icons.chevron_right_rounded,
               color: AppColors.textMuted,
               size: 18,
@@ -479,10 +466,7 @@ class _StatCard extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 11,
-                ),
+                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
               ),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -499,10 +483,7 @@ class _StatCard extends StatelessWidget {
                   const SizedBox(width: 3),
                   Text(
                     suffix,
-                    style: const TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 11),
                   ),
                 ],
               ),

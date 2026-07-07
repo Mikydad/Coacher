@@ -27,9 +27,9 @@ class ObsidianBottomNav extends ConsumerWidget {
     (icon: Icons.person_rounded, label: 'Profile'),
   ];
 
-  static const _kSurface = AppColors.ink;
-  static const _kVariant = AppColors.textSoft;
-  static const _kActive = AppColors.accent;
+  static Color get _kSurface => AppColors.ink;
+  static Color get _kVariant => AppColors.textSoft;
+  static Color get _kActive => AppColors.accent;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -52,7 +52,7 @@ class ObsidianBottomNav extends ConsumerWidget {
             decoration: BoxDecoration(
               color: _kSurface.withValues(alpha: 0.62),
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              border: Border.all(color: AppColors.fg.withValues(alpha: 0.08)),
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),

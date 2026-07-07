@@ -4,13 +4,13 @@ import '../../../../core/presentation/app_colors.dart';
 
 /// Obsidian Pulse tokens for Plan Tomorrow — visual only.
 abstract final class PlanTomorrowColors {
-  static const lime = AppColors.accent;
-  static const cyan = AppColors.cyan;
-  static const surface = AppColors.ink;
-  static const card = AppColors.inkDeep;
-  static const cardRaised = AppColors.inkWarm;
-  static const label = AppColors.textSoft;
-  static const hint = AppColors.graySlate;
+  static Color get lime => AppColors.accent;
+  static Color get cyan => AppColors.cyan;
+  static Color get surface => AppColors.ink;
+  static Color get card => AppColors.inkDeep;
+  static Color get cardRaised => AppColors.inkWarm;
+  static Color get label => AppColors.textSoft;
+  static Color get hint => AppColors.graySlate;
 }
 
 class PlanTomorrowHeader extends StatelessWidget
@@ -26,11 +26,11 @@ class PlanTomorrowHeader extends StatelessWidget
       backgroundColor: Colors.transparent,
       elevation: 0,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white70),
+        icon: Icon(Icons.arrow_back, color: AppColors.fg70),
         onPressed: () => Navigator.maybePop(context),
       ),
       centerTitle: true,
-      title: const Text(
+      title: Text(
         'Plan Tomorrow',
         style: TextStyle(
           color: PlanTomorrowColors.lime,
@@ -52,7 +52,7 @@ class PlanTomorrowHero extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'PLAN TOMORROW',
           style: TextStyle(
             letterSpacing: 3,
@@ -62,19 +62,19 @@ class PlanTomorrowHero extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        const Text(
+        Text(
           'Design your tomorrow.',
           style: TextStyle(
             fontSize: 36,
             fontWeight: FontWeight.w800,
             height: 1.1,
-            color: Colors.white,
+            color: AppColors.fg,
           ),
         ),
         const SizedBox(height: 6),
         Text(
           dateLabel,
-          style: const TextStyle(color: PlanTomorrowColors.label, fontSize: 15),
+          style: TextStyle(color: PlanTomorrowColors.label, fontSize: 15),
         ),
       ],
     );
@@ -92,7 +92,7 @@ class PlanTomorrowDashedEmpty extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: CustomPaint(
         painter: _DashedBorderPainter(
-          color: Colors.white.withValues(alpha: 0.18),
+          color: AppColors.fg.withValues(alpha: 0.18),
           radius: 16,
         ),
         child: Container(
@@ -102,7 +102,7 @@ class PlanTomorrowDashedEmpty extends StatelessWidget {
           child: Text(
             message,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.35),
+              color: AppColors.fg.withValues(alpha: 0.35),
               fontSize: 14,
               fontStyle: FontStyle.italic,
             ),
@@ -114,14 +114,14 @@ class PlanTomorrowDashedEmpty extends StatelessWidget {
 }
 
 class PlanTomorrowAddTaskButton extends StatelessWidget {
-  const PlanTomorrowAddTaskButton({
+  PlanTomorrowAddTaskButton({
     super.key,
     required this.onPressed,
-    this.accentColor = PlanTomorrowColors.lime,
+    this.accentColor,
   });
 
   final VoidCallback onPressed;
-  final Color accentColor;
+  final Color? accentColor;
 
   @override
   Widget build(BuildContext context) {
@@ -131,11 +131,15 @@ class PlanTomorrowAddTaskButton extends StatelessWidget {
         alignment: Alignment.centerLeft,
         child: TextButton.icon(
           onPressed: onPressed,
-          icon: Icon(Icons.add, size: 18, color: accentColor),
+          icon: Icon(
+            Icons.add,
+            size: 18,
+            color: accentColor ?? PlanTomorrowColors.lime,
+          ),
           label: Text(
             'ADD TASK',
             style: TextStyle(
-              color: accentColor,
+              color: accentColor ?? PlanTomorrowColors.lime,
               fontWeight: FontWeight.w800,
               fontSize: 12,
               letterSpacing: 0.8,
@@ -161,21 +165,21 @@ class PlanTomorrowAddSlotButton extends StatelessWidget {
       onTap: onPressed,
       child: CustomPaint(
         painter: _DashedBorderPainter(
-          color: Colors.white.withValues(alpha: 0.22),
+          color: AppColors.fg.withValues(alpha: 0.22),
           radius: 20,
         ),
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 18),
-          child: const Row(
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.add, color: Colors.white54, size: 18),
+              Icon(Icons.add, color: AppColors.fg54, size: 18),
               SizedBox(width: 8),
               Text(
                 'ADD A NEW SLOT',
                 style: TextStyle(
-                  color: Colors.white54,
+                  color: AppColors.fg54,
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
                   letterSpacing: 1,
@@ -227,7 +231,7 @@ class PlanTomorrowSectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text.toUpperCase(),
-      style: const TextStyle(
+      style: TextStyle(
         letterSpacing: 2,
         color: PlanTomorrowColors.cyan,
         fontSize: 11,

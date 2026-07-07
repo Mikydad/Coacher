@@ -84,13 +84,13 @@ class _ChallengeVoteBannerState extends ConsumerState<ChallengeVoteBanner> {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.how_to_vote_rounded,
                 color: AppColors.accent,
                 size: 16,
               ),
               const SizedBox(width: 6),
-              const Text(
+              Text(
                 'Vote to approve',
                 style: TextStyle(
                   color: AppColors.accent,
@@ -102,17 +102,14 @@ class _ChallengeVoteBannerState extends ConsumerState<ChallengeVoteBanner> {
               const Spacer(),
               Text(
                 '$_voteCount voted',
-                style: const TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 11,
-                ),
+                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
             widget.challenge.title,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 15,
               fontWeight: FontWeight.w600,
@@ -121,11 +118,11 @@ class _ChallengeVoteBannerState extends ConsumerState<ChallengeVoteBanner> {
           Text(
             'Target: ${widget.challenge.targetValue} ${widget.challenge.unit}'
             ' · ${widget.challenge.mode.name[0].toUpperCase()}${widget.challenge.mode.name.substring(1)} mode',
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
           ),
           const SizedBox(height: 12),
           if (_loading)
-            const Center(
+            Center(
               child: SizedBox(
                 width: 18,
                 height: 18,
@@ -162,7 +159,7 @@ class _ChallengeVoteBannerState extends ConsumerState<ChallengeVoteBanner> {
               ],
             ),
           if (_hasVoted)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(top: 8),
               child: Text(
                 'Your vote has been recorded',

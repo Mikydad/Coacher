@@ -12,7 +12,7 @@ import 'app_colors.dart';
 class CloudSyncGlobalIndicator extends ConsumerWidget {
   const CloudSyncGlobalIndicator({super.key});
 
-  static const _accent = AppColors.accent;
+  static Color get _accent => AppColors.accent;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,7 +31,7 @@ class CloudSyncGlobalIndicator extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(height: top),
-            const LinearProgressIndicator(
+            LinearProgressIndicator(
               minHeight: 2,
               backgroundColor: Colors.transparent,
               color: _accent,

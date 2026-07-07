@@ -6,6 +6,7 @@ import '../application/context_override_providers.dart';
 import '../domain/models/context_override.dart';
 import '../domain/models/post_override_review.dart';
 import '../domain/models/suppressed_item.dart';
+import '../../../core/presentation/app_colors.dart';
 
 const String _kPendingReviewKey = 'pending_override_review';
 
@@ -43,7 +44,7 @@ class PostOverrideReviewCard extends ConsumerWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: Colors.white.withAlpha(12),
+      color: AppColors.fg.withAlpha(12),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         child: Column(
@@ -78,15 +79,15 @@ class PostOverrideReviewCard extends ConsumerWidget {
 
             if (!review.hasSuppressedItems) ...[
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'No items were held back. You\'re all caught up.',
-                style: TextStyle(fontSize: 12, color: Colors.white54),
+                style: TextStyle(fontSize: 12, color: AppColors.fg54),
               ),
             ],
 
             if (review.hasSuppressedItems) ...[
               const SizedBox(height: 10),
-              const Divider(height: 1, color: Colors.white12),
+              Divider(height: 1, color: AppColors.fg12),
               const SizedBox(height: 8),
 
               // Items list (max 5 + "show more")
@@ -102,7 +103,7 @@ class PostOverrideReviewCard extends ConsumerWidget {
               if (review.suppressedItems.length > 5)
                 Text(
                   '+${review.suppressedItems.length - 5} more items',
-                  style: const TextStyle(fontSize: 12, color: Colors.white38),
+                  style: TextStyle(fontSize: 12, color: AppColors.fg38),
                 ),
             ],
 

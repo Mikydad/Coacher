@@ -41,13 +41,13 @@ class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
         ),
         Expanded(
           child: feedAsync.when(
-            loading: () => const Center(
+            loading: () => Center(
               child: CircularProgressIndicator(color: AppColors.accent),
             ),
             error: (e, _) => swallowedAsyncError(
               'circle_activity_view',
               e,
-              const Center(
+              Center(
                 child: Text(
                   'Could not load activity.',
                   style: TextStyle(color: AppColors.textMuted),
@@ -141,7 +141,7 @@ class _FilterChipRow extends StatelessWidget {
               side: BorderSide(
                 color: isSelected
                     ? AppColors.accent
-                    : Colors.white.withValues(alpha: 0.06),
+                    : AppColors.fg.withValues(alpha: 0.06),
               ),
               onSelected: (_) => onChanged(f),
             ),
@@ -178,7 +178,7 @@ class _ActivityCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        border: Border.all(color: AppColors.fg.withValues(alpha: 0.06)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,7 +191,7 @@ class _ActivityCard extends StatelessWidget {
               children: [
                 RichText(
                   text: TextSpan(
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 14,
                       height: 1.4,
@@ -208,10 +208,7 @@ class _ActivityCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   _relativeTime(item.createdAtMs),
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                 ),
               ],
             ),
@@ -243,7 +240,7 @@ class _SystemActivityPill extends StatelessWidget {
         ),
         child: Text(
           copy,
-          style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+          style: TextStyle(color: AppColors.textMuted, fontSize: 12),
         ),
       ),
     );
@@ -294,11 +291,11 @@ class _EventIcon extends StatelessWidget {
 // ── Avatar ────────────────────────────────────────────────────────────────────
 
 class _AvatarInitial extends StatelessWidget {
-  const _AvatarInitial({required this.name, required this.userId});
+  _AvatarInitial({required this.name, required this.userId});
   final String name;
   final String userId;
 
-  static const _colors = [
+  static final _colors = [
     AppColors.accent,
     AppColors.cyanDeep,
     AppColors.orange,
@@ -336,7 +333,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Padding(
         padding: EdgeInsets.all(32),
         child: Text(

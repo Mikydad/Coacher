@@ -26,6 +26,7 @@ import '../domain/models/goal_editor_form_draft.dart';
 import '../domain/models/goal_template.dart';
 import '../domain/models/user_goal.dart';
 import 'widgets/goal_editor_widgets.dart';
+import '../../../core/presentation/app_colors.dart';
 
 class GoalEditorArgs {
   const GoalEditorArgs({this.goalId, this.template});
@@ -858,11 +859,11 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
             ),
           ],
         ] else
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(top: 10),
             child: Text(
               'Day count mode — set start date and duration in Advanced settings.',
-              style: TextStyle(color: Colors.white38, fontSize: 12),
+              style: TextStyle(color: AppColors.fg38, fontSize: 12),
             ),
           ),
       ],

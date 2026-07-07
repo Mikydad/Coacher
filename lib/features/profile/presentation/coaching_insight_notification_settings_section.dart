@@ -41,12 +41,12 @@ class CoachingInsightNotificationSettingsSection extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Coaching insight notifications',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: AppColors.fg,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -56,7 +56,7 @@ class CoachingInsightNotificationSettingsSection extends ConsumerWidget {
                               'at least ${kMinGapBetweenCoachingInsightNotifications.inHours}h apart. '
                               'Insights still show in Progress and on Home.'
                         : 'Push notifications off. Open the app to see coaching insights.',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       height: 1.35,
                       color: AppColors.textSoft,
@@ -66,7 +66,7 @@ class CoachingInsightNotificationSettingsSection extends ConsumerWidget {
                     const SizedBox(height: 6),
                     Text(
                       'Sent today: $sentToday / $kMaxCoachingInsightNotificationsPerDay',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         color: AppColors.accentDim,
                       ),

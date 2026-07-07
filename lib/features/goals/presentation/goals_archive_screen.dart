@@ -26,13 +26,13 @@ class GoalsArchiveScreen extends ConsumerWidget {
         error: (e, _) => Center(child: Text('Could not load: $e')),
         data: (goals) {
           if (goals.isEmpty) {
-            return const Center(
+            return Center(
               child: Padding(
                 padding: EdgeInsets.all(24),
                 child: Text(
                   'Nothing archived yet. Pause or complete a goal from its detail screen.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white54),
+                  style: TextStyle(color: AppColors.fg54),
                 ),
               ),
             );
@@ -69,9 +69,9 @@ class _ArchiveTile extends StatelessWidget {
         ),
         subtitle: Text(
           '$status · ${GoalCategories.label(goal.categoryId)} · ${GoalPeriodHelpers.formatPeriodSummary(goal)}',
-          style: const TextStyle(color: Colors.white54),
+          style: TextStyle(color: AppColors.fg54),
         ),
-        trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+        trailing: Icon(Icons.chevron_right, color: AppColors.fg38),
         onTap: () => Navigator.pushNamed(
           context,
           GoalDetailScreen.routeName,

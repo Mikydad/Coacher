@@ -13,11 +13,7 @@ class AuthErrorText extends StatelessWidget {
     return Text(
       message,
       textAlign: TextAlign.center,
-      style: const TextStyle(
-        color: AppColors.danger,
-        fontSize: 13,
-        height: 1.4,
-      ),
+      style: TextStyle(color: AppColors.danger, fontSize: 13, height: 1.4),
     );
   }
 }

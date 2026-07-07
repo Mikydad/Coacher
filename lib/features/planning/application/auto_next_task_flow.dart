@@ -19,6 +19,7 @@ import 'habit_anchor_aggregator.dart';
 import 'planned_task_collect.dart';
 import 'planned_task_providers.dart';
 import 'task_prioritizer.dart';
+import '../../../core/presentation/app_colors.dart';
 
 enum NextTaskDecision { startNow, extraTime, moveWithReason }
 
@@ -384,12 +385,12 @@ _promptExtensionRequest(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Align(
+                      Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
                           'Extension requires a clear reason. Choose extra minutes and explain why.',
                           style: TextStyle(
-                            color: Colors.white70,
+                            color: AppColors.fg70,
                             fontSize: 13,
                             height: 1.3,
                           ),

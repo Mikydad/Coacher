@@ -69,15 +69,15 @@ class _AuthAppleSignInButtonState extends ConsumerState<AuthAppleSignInButton> {
           child: OutlinedButton(
             onPressed: _loading || !widget.enabled ? null : _signIn,
             style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              backgroundColor: Colors.white,
-              side: const BorderSide(color: AppColors.inkSoft, width: 1.5),
+              foregroundColor: AppColors.fg,
+              backgroundColor: AppColors.fg,
+              side: BorderSide(color: AppColors.inkSoft, width: 1.5),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
             child: _loading
-                ? const SizedBox(
+                ? SizedBox(
                     height: 22,
                     width: 22,
                     child: CircularProgressIndicator(

@@ -88,7 +88,7 @@ class _AnalyticsProgressScreenState
         backgroundColor: ProgressDesignTokens.surface,
         elevation: 0,
         foregroundColor: ProgressDesignTokens.onSurfaceVariant,
-        title: const Text(
+        title: Text(
           'Progress',
           style: TextStyle(
             color: ProgressDesignTokens.primaryDim,
@@ -183,7 +183,7 @@ class _AnalyticsProgressScreenState
             error: (e, _) => swallowedAsyncError(
               'analytics_progress_screen',
               e,
-              const ProgressTonalCard(
+              ProgressTonalCard(
                 child: Text(
                   'Could not load progress analytics.',
                   style: TextStyle(
@@ -279,7 +279,7 @@ class _AiResultSheet extends StatelessWidget {
               height: 4,
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                color: Colors.white24,
+                color: AppColors.fg24,
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -340,11 +340,7 @@ class _AiResultSheet extends StatelessWidget {
             label: 'DAILY SUMMARY',
             child: Text(
               response.dailySummary.isEmpty ? '(empty)' : response.dailySummary,
-              style: const TextStyle(
-                fontSize: 16,
-                height: 1.5,
-                color: Colors.white,
-              ),
+              style: TextStyle(fontSize: 16, height: 1.5, color: AppColors.fg),
             ),
           ),
 
@@ -357,7 +353,7 @@ class _AiResultSheet extends StatelessWidget {
               response.mainRecommendation.isEmpty
                   ? '(empty)'
                   : response.mainRecommendation,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: AppColors.accent,
@@ -413,7 +409,7 @@ class _SheetSection extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.cyan,
             fontSize: 10,
             fontWeight: FontWeight.w700,
@@ -443,13 +439,13 @@ class _MetaRow extends StatelessWidget {
             width: 120,
             child: Text(
               label,
-              style: const TextStyle(color: Colors.white38, fontSize: 12),
+              style: TextStyle(color: AppColors.fg38, fontSize: 12),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
+              style: TextStyle(color: AppColors.fg70, fontSize: 12),
             ),
           ),
         ],

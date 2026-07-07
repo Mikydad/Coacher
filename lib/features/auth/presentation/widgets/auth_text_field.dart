@@ -43,12 +43,12 @@ class AuthTextField extends StatelessWidget {
       autofillHints: autofillHints,
       focusNode: focusNode,
       enabled: enabled,
-      style: const TextStyle(color: Colors.white, fontSize: 16),
+      style: TextStyle(color: AppColors.fg, fontSize: 16),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: AppColors.textGray, fontSize: 14),
+        labelStyle: TextStyle(color: AppColors.textGray, fontSize: 14),
         errorText: errorText,
-        errorStyle: const TextStyle(color: AppColors.danger, fontSize: 12),
+        errorStyle: TextStyle(color: AppColors.danger, fontSize: 12),
         filled: true,
         fillColor: AppColors.inkCard,
         contentPadding: const EdgeInsets.symmetric(

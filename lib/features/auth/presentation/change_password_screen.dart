@@ -117,7 +117,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        foregroundColor: Colors.white,
+        foregroundColor: AppColors.fg,
         title: const Text(
           'Change Password',
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),

@@ -51,7 +51,7 @@ class _ChallengeCreateSheetState extends ConsumerState<ChallengeCreateSheet> {
       lastDate: DateTime.now().add(const Duration(days: 365)),
       builder: (ctx, child) => Theme(
         data: ThemeData.dark().copyWith(
-          colorScheme: const ColorScheme.dark(
+          colorScheme: ColorScheme.dark(
             primary: AppColors.accent,
             onPrimary: Colors.black,
             surface: AppColors.surfaceCard,
@@ -127,7 +127,7 @@ class _ChallengeCreateSheetState extends ConsumerState<ChallengeCreateSheet> {
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.surfaceDark,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
@@ -146,13 +146,13 @@ class _ChallengeCreateSheetState extends ConsumerState<ChallengeCreateSheet> {
                         width: 36,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.12),
+                          color: AppColors.fg.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'New challenge',
                       style: TextStyle(
                         color: AppColors.textPrimary,
@@ -167,7 +167,7 @@ class _ChallengeCreateSheetState extends ConsumerState<ChallengeCreateSheet> {
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _titleController,
-                      style: const TextStyle(color: AppColors.textPrimary),
+                      style: TextStyle(color: AppColors.textPrimary),
                       onTapOutside: (_) => dismissKeyboard(context),
                       decoration: _inputDeco('e.g. Run 30 miles this month'),
                       validator: (v) {
@@ -214,9 +214,7 @@ class _ChallengeCreateSheetState extends ConsumerState<ChallengeCreateSheet> {
                               const SizedBox(height: 8),
                               TextFormField(
                                 controller: _targetController,
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                ),
+                                style: TextStyle(color: AppColors.textPrimary),
                                 onTapOutside: (_) => dismissKeyboard(context),
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
@@ -244,9 +242,7 @@ class _ChallengeCreateSheetState extends ConsumerState<ChallengeCreateSheet> {
                               const SizedBox(height: 8),
                               TextFormField(
                                 controller: _unitController,
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                ),
+                                style: TextStyle(color: AppColors.textPrimary),
                                 onTapOutside: (_) => dismissKeyboard(context),
                                 decoration: _inputDeco('miles / sessions'),
                                 validator: (v) {
@@ -275,7 +271,7 @@ class _ChallengeCreateSheetState extends ConsumerState<ChallengeCreateSheet> {
                             onTap: () => _pickDate(isStart: true),
                           ),
                         ),
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.symmetric(horizontal: 8),
                           child: Text(
                             '→',
@@ -332,7 +328,7 @@ class _ChallengeCreateSheetState extends ConsumerState<ChallengeCreateSheet> {
 
   InputDecoration _inputDeco(String hint) => InputDecoration(
     hintText: hint,
-    hintStyle: const TextStyle(color: AppColors.textMuted),
+    hintStyle: TextStyle(color: AppColors.textMuted),
     filled: true,
     fillColor: AppColors.surfaceCard,
     border: OutlineInputBorder(
@@ -341,7 +337,7 @@ class _ChallengeCreateSheetState extends ConsumerState<ChallengeCreateSheet> {
     ),
     errorBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: AppColors.danger),
+      borderSide: BorderSide(color: AppColors.danger),
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
   );
@@ -368,7 +364,7 @@ class _Label extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         color: AppColors.textMuted,
         fontSize: 12,
         fontWeight: FontWeight.w500,
@@ -402,7 +398,7 @@ class _DateButton extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(
+            Icon(
               Icons.calendar_today_rounded,
               size: 14,
               color: AppColors.textMuted,
@@ -413,14 +409,11 @@ class _DateButton extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 10,
-                  ),
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 10),
                 ),
                 Text(
                   formatted,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,

@@ -32,15 +32,15 @@ Future<int?> showFocusSessionDurationPicker(
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: Colors.white24,
+                    color: AppColors.fg24,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-              const Text(
+              Text(
                 'Focus session length',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: AppColors.fg,
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
                 ),
@@ -48,7 +48,7 @@ Future<int?> showFocusSessionDurationPicker(
               const SizedBox(height: 6),
               Text(
                 taskTitle,
-                style: const TextStyle(color: Colors.white54, fontSize: 14),
+                style: TextStyle(color: AppColors.fg54, fontSize: 14),
               ),
               const SizedBox(height: 20),
               Wrap(
@@ -105,7 +105,7 @@ class _DurationChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           child: Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.accent,
               fontWeight: FontWeight.w800,
               fontSize: 13,

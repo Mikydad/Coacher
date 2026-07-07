@@ -76,11 +76,11 @@ class _GoalList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (goals.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(horizontal: 24, vertical: 32),
         child: Text(
           'No goals here yet.\nTap "New goal" to define something you\'re working toward over time.',
-          style: TextStyle(color: Colors.white54, height: 1.6),
+          style: TextStyle(color: AppColors.fg54, height: 1.6),
         ),
       );
     }

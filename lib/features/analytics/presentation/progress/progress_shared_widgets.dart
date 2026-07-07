@@ -5,16 +5,16 @@ import 'package:flutter/material.dart';
 import 'progress_design_tokens.dart';
 
 class ProgressTonalCard extends StatelessWidget {
-  const ProgressTonalCard({
+  ProgressTonalCard({
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(20),
-    this.color = ProgressDesignTokens.surfaceContainerLow,
+    this.color,
   });
 
   final Widget child;
   final EdgeInsets padding;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +22,7 @@ class ProgressTonalCard extends StatelessWidget {
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: color,
+        color: color ?? ProgressDesignTokens.surfaceContainerLow,
         borderRadius: BorderRadius.circular(ProgressDesignTokens.cardRadius),
       ),
       child: child,
@@ -31,18 +31,18 @@ class ProgressTonalCard extends StatelessWidget {
 }
 
 class ProgressMiniStatCard extends StatelessWidget {
-  const ProgressMiniStatCard({
+  ProgressMiniStatCard({
     super.key,
     required this.label,
     required this.title,
     this.badge,
-    this.badgeColor = ProgressDesignTokens.primaryDim,
+    this.badgeColor,
   });
 
   final String label;
   final String title;
   final String? badge;
-  final Color badgeColor;
+  final Color? badgeColor;
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +63,7 @@ class ProgressMiniStatCard extends StatelessWidget {
                   label.toUpperCase(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: ProgressDesignTokens.onSurfaceVariant,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
@@ -80,7 +80,7 @@ class ProgressMiniStatCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
                     style: TextStyle(
-                      color: badgeColor,
+                      color: badgeColor ?? ProgressDesignTokens.primaryDim,
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                     ),
@@ -94,7 +94,7 @@ class ProgressMiniStatCard extends StatelessWidget {
             title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               color: ProgressDesignTokens.onSurface,
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -117,7 +117,7 @@ class ProgressGlassCard extends StatelessWidget {
     required this.body,
   });
 
-  final Color accentColor;
+  final Color? accentColor;
   final IconData icon;
   final String title;
   final String headline;
@@ -146,7 +146,7 @@ class ProgressGlassCard extends StatelessWidget {
                 width: 3,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: accentColor,
+                  color: accentColor ?? ProgressDesignTokens.primaryDim,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -157,12 +157,17 @@ class ProgressGlassCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(icon, color: accentColor, size: 18),
+                        Icon(
+                          icon,
+                          color: accentColor ?? ProgressDesignTokens.primaryDim,
+                          size: 18,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           title.toUpperCase(),
                           style: TextStyle(
-                            color: accentColor,
+                            color:
+                                accentColor ?? ProgressDesignTokens.primaryDim,
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.9,
@@ -173,7 +178,7 @@ class ProgressGlassCard extends StatelessWidget {
                     const SizedBox(height: 10),
                     Text(
                       headline,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: ProgressDesignTokens.onSurface,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -183,7 +188,7 @@ class ProgressGlassCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       body,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: ProgressDesignTokens.onSurfaceVariant,
                         fontSize: 13,
                         height: 1.45,
@@ -201,16 +206,16 @@ class ProgressGlassCard extends StatelessWidget {
 }
 
 class ProgressChip extends StatelessWidget {
-  const ProgressChip({
+  ProgressChip({
     super.key,
     required this.label,
     this.highlighted = false,
-    this.accentColor = ProgressDesignTokens.primaryDim,
+    this.accentColor,
   });
 
   final String label;
   final bool highlighted;
-  final Color accentColor;
+  final Color? accentColor;
 
   @override
   Widget build(BuildContext context) {
@@ -218,14 +223,18 @@ class ProgressChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: highlighted
-            ? accentColor.withValues(alpha: 0.12)
+            ? (accentColor ?? ProgressDesignTokens.primaryDim).withValues(
+                alpha: 0.12,
+              )
             : ProgressDesignTokens.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: highlighted ? accentColor : ProgressDesignTokens.onSurface,
+          color: highlighted
+              ? accentColor ?? ProgressDesignTokens.primaryDim
+              : ProgressDesignTokens.onSurface,
           fontSize: 13,
           fontWeight: highlighted ? FontWeight.w700 : FontWeight.w500,
         ),
@@ -261,7 +270,7 @@ class ProgressThinBar extends StatelessWidget {
           children: [
             Text(
               label.toUpperCase(),
-              style: const TextStyle(
+              style: TextStyle(
                 color: ProgressDesignTokens.onSurfaceVariant,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
@@ -295,7 +304,7 @@ class ProgressThinBar extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             detail!,
-            style: const TextStyle(
+            style: TextStyle(
               color: ProgressDesignTokens.onSurfaceVariant,
               fontSize: 10,
             ),
@@ -361,7 +370,7 @@ class DisciplineHeroRing extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 2),
-              const Text(
+              Text(
                 'DISCIPLINE',
                 style: TextStyle(
                   color: ProgressDesignTokens.onSurfaceVariant,

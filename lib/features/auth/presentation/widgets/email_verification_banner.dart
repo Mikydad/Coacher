@@ -141,13 +141,13 @@ class _Banner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.mark_email_unread_outlined,
             color: AppColors.accentDim,
             size: 16,
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
               'Verify your email to unlock all features.',
               style: TextStyle(
@@ -158,7 +158,7 @@ class _Banner extends StatelessWidget {
             ),
           ),
           if (isLoading)
-            const SizedBox(
+            SizedBox(
               width: 14,
               height: 14,
               child: CircularProgressIndicator(
@@ -174,7 +174,7 @@ class _Banner extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: const Text(
+              child: Text(
                 'Resend',
                 style: TextStyle(
                   color: AppColors.accentDim,
@@ -185,7 +185,7 @@ class _Banner extends StatelessWidget {
             ),
           GestureDetector(
             onTap: onDismiss,
-            child: const Padding(
+            child: Padding(
               padding: EdgeInsets.only(left: 4),
               child: Icon(Icons.close, color: AppColors.gray55, size: 14),
             ),

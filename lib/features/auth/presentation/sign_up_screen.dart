@@ -127,11 +127,11 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.inkCard,
-        title: const Text(
+        title: Text(
           'Account already exists',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(color: AppColors.fg, fontWeight: FontWeight.bold),
         ),
-        content: const Text(
+        content: Text(
           'An account with this email already exists. '
           'Sign in to it instead? '
           'Your offline guest data won\'t be merged automatically.',
@@ -140,14 +140,11 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: AppColors.textGray),
-            ),
+            child: Text('Cancel', style: TextStyle(color: AppColors.textGray)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
+            child: Text(
               'Sign in instead',
               style: TextStyle(
                 color: AppColors.accentDim,
@@ -177,7 +174,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        foregroundColor: Colors.white,
+        foregroundColor: AppColors.fg,
         title: const Text(
           'Create Account',
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
@@ -258,23 +255,20 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         : (v) => setState(() => _tosAccepted = v ?? false),
                     activeColor: AppColors.accentDim,
                     checkColor: Colors.black,
-                    side: const BorderSide(
-                      color: AppColors.textDim,
-                      width: 1.5,
-                    ),
+                    side: BorderSide(color: AppColors.textDim, width: 1.5),
                   ),
                   Expanded(
                     child: Text.rich(
                       TextSpan(
                         text: 'I agree to the ',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.textGray,
                           fontSize: 13,
                         ),
                         children: [
                           TextSpan(
                             text: 'Terms of Service',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.accentDim,
                               decoration: TextDecoration.underline,
                             ),
@@ -319,7 +313,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text(
+        Text(
           'Already have an account? ',
           style: TextStyle(color: AppColors.textGray, fontSize: 14),
         ),
@@ -330,7 +324,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   context,
                   LoginScreen.routeName,
                 ),
-          child: const Text(
+          child: Text(
             'Sign in',
             style: TextStyle(
               color: AppColors.accentDim,

@@ -133,24 +133,24 @@ class _CoachingStyleSelectionScreenState
           children: [
             if (widget.isOnboarding) ...[
               const SizedBox(height: 32),
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(horizontal: 24),
                 child: Text(
                   'How should I coach you?',
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.fg,
                   ),
                 ),
               ),
               const SizedBox(height: 8),
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(horizontal: 24),
                 child: Text(
                   'This shapes how I communicate and how persistent I am. '
                   'You can change it anytime.',
-                  style: TextStyle(fontSize: 14, color: Colors.white54),
+                  style: TextStyle(fontSize: 14, color: AppColors.fg54),
                 ),
               ),
               const SizedBox(height: 24),
@@ -177,12 +177,12 @@ class _CoachingStyleSelectionScreenState
                   backgroundColor: AppColors.violetSoft,
                 ),
                 child: _saving
-                    ? const SizedBox(
+                    ? SizedBox(
                         height: 20,
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: AppColors.fg,
                         ),
                       )
                     : Text(
@@ -222,12 +222,12 @@ class _StyleCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.violetSoft.withAlpha(38)
-              : Colors.white.withAlpha(8),
+              : AppColors.fg.withAlpha(8),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isSelected
                 ? AppColors.violetSoft
-                : Colors.white.withAlpha(20),
+                : AppColors.fg.withAlpha(20),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -244,12 +244,12 @@ class _StyleCard extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: isSelected ? AppColors.violetSoft : Colors.transparent,
                 border: Border.all(
-                  color: isSelected ? AppColors.violetSoft : Colors.white38,
+                  color: isSelected ? AppColors.violetSoft : AppColors.fg38,
                   width: 2,
                 ),
               ),
               child: isSelected
-                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                  ? Icon(Icons.check, size: 14, color: AppColors.fg)
                   : null,
             ),
             Expanded(
@@ -258,16 +258,16 @@ class _StyleCard extends StatelessWidget {
                 children: [
                   Text(
                     style.displayName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: AppColors.fg,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     style.description,
-                    style: const TextStyle(fontSize: 13, color: Colors.white54),
+                    style: TextStyle(fontSize: 13, color: AppColors.fg54),
                   ),
                   const SizedBox(height: 10),
                   Container(
@@ -276,26 +276,26 @@ class _StyleCard extends StatelessWidget {
                       vertical: 7,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withAlpha(8),
+                      color: AppColors.fg.withAlpha(8),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'e.g. missed workout',
                           style: TextStyle(
                             fontSize: 10,
-                            color: Colors.white38,
+                            color: AppColors.fg38,
                             letterSpacing: 0.5,
                           ),
                         ),
                         const SizedBox(height: 3),
                         Text(
                           '"${style.exampleMissedWorkout}"',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Colors.white70,
+                            color: AppColors.fg70,
                             fontStyle: FontStyle.italic,
                           ),
                         ),

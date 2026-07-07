@@ -170,12 +170,12 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       backgroundColor: AppColors.ink,
       elevation: 0,
       automaticallyImplyLeading: false,
-      title: const Text(
+      title: Text(
         'Coach AI',
         style: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.w700,
-          color: Colors.white,
+          color: AppColors.fg,
         ),
       ),
       actions: [
@@ -294,7 +294,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   }
 
   Widget _buildLoadingBody() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -316,7 +316,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         child: Text(
           'Could not load Coach AI.\n$e',
           textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.textSoft, fontSize: 14),
+          style: TextStyle(color: AppColors.textSoft, fontSize: 14),
         ),
       ),
     );
@@ -338,7 +338,7 @@ class _StatusPill extends StatelessWidget {
         border: Border.all(
           color: isReady
               ? AppColors.cyan.withValues(alpha: 0.4)
-              : Colors.white.withValues(alpha: 0.1),
+              : AppColors.fg.withValues(alpha: 0.1),
         ),
         borderRadius: BorderRadius.circular(999),
       ),
@@ -396,7 +396,7 @@ class _EmptyState extends StatelessWidget {
               'Ask about your schedule or tell me what to plan.',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.white.withValues(alpha: 0.45),
+                color: AppColors.fg.withValues(alpha: 0.45),
               ),
             ),
           ),
@@ -525,9 +525,9 @@ class _PickUpBannerState extends State<_PickUpBanner> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.history_rounded, size: 14, color: AppColors.amber),
+          Icon(Icons.history_rounded, size: 14, color: AppColors.amber),
           const SizedBox(width: 8),
-          const Expanded(
+          Expanded(
             child: Text(
               'You had a pending plan — want to continue?',
               style: TextStyle(
@@ -543,7 +543,7 @@ class _PickUpBannerState extends State<_PickUpBanner> {
               widget.onResume(_pendingInput!);
               setState(() => _dismissed = true);
             },
-            child: const Text(
+            child: Text(
               'Resume',
               style: TextStyle(
                 fontSize: 12,
@@ -555,7 +555,7 @@ class _PickUpBannerState extends State<_PickUpBanner> {
           const SizedBox(width: 12),
           GestureDetector(
             onTap: () => setState(() => _dismissed = true),
-            child: const Icon(Icons.close, size: 14, color: AppColors.textSoft),
+            child: Icon(Icons.close, size: 14, color: AppColors.textSoft),
           ),
         ],
       ),
@@ -772,7 +772,7 @@ class _AiActionBar extends ConsumerWidget {
               onTap: () => _showHistorySheet(context, ref),
               child: Text(
                 'View recent AI changes ($recentCount)',
-                style: const TextStyle(color: AppColors.textGray, fontSize: 12),
+                style: TextStyle(color: AppColors.textGray, fontSize: 12),
               ),
             ),
         ],
@@ -788,7 +788,7 @@ class _AiActionBar extends ConsumerWidget {
     switch (result) {
       case UndoSuccess():
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('AI changes have been undone.'),
             backgroundColor: AppColors.inkCard,
           ),
@@ -802,15 +802,15 @@ class _AiActionBar extends ConsumerWidget {
           context: context,
           builder: (_) => AlertDialog(
             backgroundColor: AppColors.inkCard,
-            title: const Text(
+            title: Text(
               'Some tasks were completed',
-              style: TextStyle(color: Colors.white),
+              style: TextStyle(color: AppColors.fg),
             ),
             content: Text(
               'The following tasks added by the AI have since been completed. '
               'Undoing will revert those completions:\n\n'
               '${completedTitles.map((t) => '• $t').join('\n')}',
-              style: const TextStyle(color: AppColors.grayLight),
+              style: TextStyle(color: AppColors.grayLight),
             ),
             actions: [
               TextButton(
@@ -819,7 +819,7 @@ class _AiActionBar extends ConsumerWidget {
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text(
+                child: Text(
                   'Undo anyway',
                   style: TextStyle(color: AppColors.cyan),
                 ),
@@ -830,7 +830,7 @@ class _AiActionBar extends ConsumerWidget {
         if (proceed == true && context.mounted) {
           // Rollback already happened in undoLastAiBatch for warning case.
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Text('AI changes undone (including completed tasks).'),
               backgroundColor: AppColors.inkCard,
             ),
@@ -875,7 +875,7 @@ class _UndoChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: AppColors.cyanBorder20),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.undo_rounded, color: AppColors.cyan, size: 14),
@@ -919,14 +919,14 @@ class _AiHistorySheet extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
-        const Padding(
+        Padding(
           padding: EdgeInsets.symmetric(horizontal: 20),
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
               'Recent AI changes',
               style: TextStyle(
-                color: Colors.white,
+                color: AppColors.fg,
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
               ),
@@ -972,7 +972,7 @@ class _AiHistorySheet extends ConsumerWidget {
               );
             },
           ),
-          loading: () => const Center(
+          loading: () => Center(
             child: Padding(
               padding: EdgeInsets.all(24),
               child: CircularProgressIndicator(
@@ -1015,7 +1015,7 @@ class _BatchRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  style: TextStyle(color: AppColors.fg, fontSize: 14),
                 ),
                 const SizedBox(height: 2),
                 Container(
@@ -1042,7 +1042,7 @@ class _BatchRow extends StatelessWidget {
           if (canUndo)
             TextButton(
               onPressed: onUndo,
-              child: const Text(
+              child: Text(
                 'Undo',
                 style: TextStyle(color: AppColors.cyan, fontSize: 13),
               ),

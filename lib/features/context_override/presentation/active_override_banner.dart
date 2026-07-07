@@ -7,6 +7,7 @@ import '../application/context_override_providers.dart';
 import '../domain/models/context_override.dart';
 import '../domain/models/user_attention_state.dart';
 import 'context_override_quick_activate_sheet.dart';
+import '../../../core/presentation/app_colors.dart';
 
 /// Persistent home screen banner shown while any override is active.
 ///
@@ -75,7 +76,7 @@ class _ActiveOverrideBannerState extends ConsumerState<ActiveOverrideBanner> {
                   ),
                   Text(
                     _subtitleText(state, effective),
-                    style: const TextStyle(fontSize: 12, color: Colors.white54),
+                    style: TextStyle(fontSize: 12, color: AppColors.fg54),
                   ),
                 ],
               ),
@@ -137,7 +138,7 @@ class _ActiveOverrideBannerState extends ConsumerState<ActiveOverrideBanner> {
       case ContextOverride.doNotDisturb:
         return Colors.red;
       case ContextOverride.none:
-        return Colors.white;
+        return AppColors.fg;
     }
   }
 }

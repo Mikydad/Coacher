@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../domain/models/time_conflict.dart';
+import '../../../core/presentation/app_colors.dart';
 
 /// What the user chose in the conflict bottom sheet.
 enum ConflictAction { saveAnyway, adjustTime, shortenDuration }
@@ -59,7 +60,7 @@ class ConflictBottomSheet extends StatelessWidget {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: AppColors.fg24,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -90,7 +91,7 @@ class ConflictBottomSheet extends StatelessWidget {
               ),
               style: Theme.of(
                 context,
-              ).textTheme.bodySmall?.copyWith(color: Colors.white60),
+              ).textTheme.bodySmall?.copyWith(color: AppColors.fg60),
             ),
             const SizedBox(height: 16),
 
@@ -102,11 +103,11 @@ class ConflictBottomSheet extends StatelessWidget {
             if (conflicts.length > 4)
               Text(
                 '+${conflicts.length - 4} more conflicts',
-                style: const TextStyle(color: Colors.white54, fontSize: 12),
+                style: TextStyle(color: AppColors.fg54, fontSize: 12),
               ),
 
             const SizedBox(height: 20),
-            const Divider(height: 1, color: Colors.white12),
+            Divider(height: 1, color: AppColors.fg12),
             const SizedBox(height: 16),
 
             // Action buttons
@@ -114,7 +115,7 @@ class ConflictBottomSheet extends StatelessWidget {
               label: 'Save anyway',
               subtitle: 'Keep this schedule even with the overlap.',
               icon: Icons.check_circle_outline,
-              color: Colors.white,
+              color: AppColors.fg,
               onTap: () => Navigator.pop(context, ConflictAction.saveAnyway),
             ),
             const SizedBox(height: 10),
@@ -254,9 +255,9 @@ class _ActionButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(10),
+          color: AppColors.fg.withAlpha(10),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white12),
+          border: Border.all(color: AppColors.fg12),
         ),
         child: Row(
           children: [
@@ -272,7 +273,7 @@ class _ActionButton extends StatelessWidget {
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontSize: 12, color: Colors.white54),
+                    style: TextStyle(fontSize: 12, color: AppColors.fg54),
                   ),
                 ],
               ),

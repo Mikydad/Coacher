@@ -59,7 +59,7 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               colors: [AppColors.dark1A2535, AppColors.surfaceDark],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -103,7 +103,7 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                         const SizedBox(width: 6),
                         Text(
                           _expanded ? '↑ Pulse' : '↓ Pulse',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.accent,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -117,7 +117,7 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
 
               // ── Expanded content ──────────────────────────────────────────
               if (_expanded && pulse != null) ...[
-                const Divider(height: 1, color: AppColors.surfaceSlate),
+                Divider(height: 1, color: AppColors.surfaceSlate),
                 Padding(
                   padding: const EdgeInsets.all(14),
                   child: Column(
@@ -141,7 +141,7 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                                   children: [
                                     Text(
                                       line.displayName,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: AppColors.textPrimary,
                                         fontSize: 13,
                                         fontWeight: FontWeight.w600,
@@ -149,7 +149,7 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                                     ),
                                     Text(
                                       line.insight,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: AppColors.textMuted,
                                         fontSize: 12,
                                       ),
@@ -176,7 +176,7 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.lightbulb_outline,
                                 color: AppColors.accent,
                                 size: 16,
@@ -185,7 +185,7 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                               Expanded(
                                 child: Text(
                                   'Suggested: ${pulse.suggestedChallenge}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: AppColors.accent,
                                     fontSize: 12,
                                   ),
@@ -201,7 +201,7 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                                     circleId: widget.circleId,
                                   ),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'Start',
                                   style: TextStyle(
                                     color: AppColors.accent,
@@ -230,14 +230,14 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                       if (_updatedLabel != null)
                         Text(
                           _updatedLabel!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.textMuted,
                             fontSize: 11,
                           ),
                         ),
                       const Spacer(),
                       _generating
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
@@ -247,12 +247,12 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                             )
                           : TextButton.icon(
                               onPressed: _generate,
-                              icon: const Icon(
+                              icon: Icon(
                                 Icons.auto_awesome,
                                 size: 14,
                                 color: AppColors.accent,
                               ),
-                              label: const Text(
+                              label: Text(
                                 'Generate now',
                                 style: TextStyle(
                                   color: AppColors.accent,
@@ -321,11 +321,11 @@ class _PulsingDotState extends State<_PulsingDot>
 }
 
 class _MemberAvatar extends StatelessWidget {
-  const _MemberAvatar({required this.name, required this.userId});
+  _MemberAvatar({required this.name, required this.userId});
   final String name;
   final String userId;
 
-  static const _colors = [
+  static final _colors = [
     AppColors.accent,
     AppColors.cyanDeep,
     AppColors.orange,

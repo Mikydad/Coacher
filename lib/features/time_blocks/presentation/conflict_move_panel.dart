@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../application/scheduling_slot_suggestions.dart';
+import '../../../core/presentation/app_colors.dart';
 
 /// Inline panel to reschedule the conflicting entity.
 class ConflictMovePanel extends StatelessWidget {
@@ -29,9 +30,9 @@ class ConflictMovePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(12),
+        color: AppColors.fg.withAlpha(12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: AppColors.fg12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,13 +44,13 @@ class ConflictMovePanel extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'Current: $currentRangeLabel',
-            style: const TextStyle(fontSize: 12, color: Colors.white60),
+            style: TextStyle(fontSize: 12, color: AppColors.fg60),
           ),
           const SizedBox(height: 12),
           if (suggestions.isEmpty)
-            const Text(
+            Text(
               'No open slots found today. Try custom time.',
-              style: TextStyle(fontSize: 12, color: Colors.white54),
+              style: TextStyle(fontSize: 12, color: AppColors.fg54),
             )
           else
             for (final slot in suggestions) ...[
@@ -81,7 +82,7 @@ class _SuggestionChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white.withAlpha(8),
+      color: AppColors.fg.withAlpha(8),
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: onTap,
@@ -96,9 +97,9 @@ class _SuggestionChip extends StatelessWidget {
                   children: [
                     Text(
                       label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: Colors.white54,
+                        color: AppColors.fg54,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

@@ -33,13 +33,13 @@ class TaskIntegritySection extends StatelessWidget {
               Container(
                 width: 10,
                 height: 10,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: ProgressDesignTokens.secondary,
                   shape: BoxShape.circle,
                 ),
               ),
               const SizedBox(width: 10),
-              const Text(
+              Text(
                 'Task Integrity',
                 style: TextStyle(
                   color: ProgressDesignTokens.onSurface,

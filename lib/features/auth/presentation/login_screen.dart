@@ -22,7 +22,7 @@ class LoginScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        foregroundColor: Colors.white,
+        foregroundColor: AppColors.fg,
         title: const Text(
           'Sign in',
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
@@ -42,7 +42,7 @@ class LoginScreen extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
+                  Text(
                     "Don't have an account? ",
                     style: TextStyle(color: AppColors.textGray, fontSize: 14),
                   ),
@@ -51,7 +51,7 @@ class LoginScreen extends ConsumerWidget {
                       context,
                       SignUpScreen.routeName,
                     ),
-                    child: const Text(
+                    child: Text(
                       'Create one',
                       style: TextStyle(
                         color: AppColors.accentDim,

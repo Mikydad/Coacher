@@ -19,7 +19,7 @@ class UserMessageBubble extends StatelessWidget {
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.inkElevated,
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(16),
@@ -30,7 +30,7 @@ class UserMessageBubble extends StatelessWidget {
         ),
         child: Text(
           content,
-          style: const TextStyle(fontSize: 14, color: Colors.white),
+          style: TextStyle(fontSize: 14, color: AppColors.fg),
         ),
       ),
     );
@@ -56,7 +56,7 @@ class AssistantMessageBubble extends StatelessWidget {
         child: Text.rich(
           markdownLiteSpan(
             content,
-            const TextStyle(fontSize: 14, color: AppColors.textSoft),
+            TextStyle(fontSize: 14, color: AppColors.textSoft),
           ),
         ),
       ),
@@ -71,7 +71,7 @@ class AssistantMessageBubble extends StatelessWidget {
 TextSpan markdownLiteSpan(String text, TextStyle baseStyle) {
   final bold = baseStyle.copyWith(
     fontWeight: FontWeight.w700,
-    color: Colors.white,
+    color: AppColors.fg,
   );
 
   final lines = text.split('\n');

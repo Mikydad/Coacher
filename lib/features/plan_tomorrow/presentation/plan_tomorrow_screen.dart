@@ -15,6 +15,7 @@ import '../../planning/domain/models/routine_mode.dart';
 import '../../planning/domain/models/task_item.dart';
 import '../application/plan_tomorrow_providers.dart';
 import 'widgets/plan_tomorrow_widgets.dart';
+import '../../../core/presentation/app_colors.dart';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -679,11 +680,11 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
                 children: [
                   ReorderableDragStartListener(
                     index: widget.index,
-                    child: const Padding(
+                    child: Padding(
                       padding: EdgeInsets.only(right: 8),
                       child: Icon(
                         Icons.drag_handle,
-                        color: Colors.white24,
+                        color: AppColors.fg24,
                         size: 18,
                       ),
                     ),
@@ -691,16 +692,16 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
                   Expanded(
                     child: RichText(
                       text: TextSpan(
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
-                          color: Colors.white,
+                          color: AppColors.fg,
                         ),
                         children: [
                           TextSpan(text: widget.routine.title),
                           TextSpan(
                             text: '  ($modeLabel)',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w500,
                               color: PlanTomorrowColors.label,
@@ -713,7 +714,7 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
                   if (taskCount > 0) ...[
                     Text(
                       '$taskCount',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: PlanTomorrowColors.label,
                         fontSize: 13,
                       ),
@@ -723,13 +724,13 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
                   AnimatedRotation(
                     turns: widget.isExpanded ? 0.5 : 0,
                     duration: const Duration(milliseconds: 200),
-                    child: const Icon(Icons.expand_more, color: Colors.white54),
+                    child: Icon(Icons.expand_more, color: AppColors.fg54),
                   ),
                   PopupMenuButton<String>(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.more_vert,
                       size: 20,
-                      color: Colors.white54,
+                      color: AppColors.fg54,
                     ),
                     onSelected: (v) async {
                       final rows = await ref.read(
@@ -815,12 +816,12 @@ class _TomorrowTaskTile extends StatelessWidget {
             children: [
               ReorderableDragStartListener(
                 index: index,
-                child: const Padding(
+                child: Padding(
                   padding: EdgeInsets.only(right: 8),
                   child: Icon(
                     Icons.drag_handle,
                     size: 18,
-                    color: Colors.white24,
+                    color: AppColors.fg24,
                   ),
                 ),
               ),
@@ -840,16 +841,16 @@ class _TomorrowTaskTile extends StatelessWidget {
                       spacing: 6,
                       runSpacing: 4,
                       children: [
-                        _Chip('${t.durationMinutes} min', Colors.white24),
+                        _Chip('${t.durationMinutes} min', AppColors.fg24),
                         _Chip(
                           priorityLabel,
                           priorityColor.withValues(alpha: 0.15),
                           textColor: priorityColor,
                         ),
                         if (t.category != null)
-                          _Chip(t.category!, Colors.white10),
+                          _Chip(t.category!, AppColors.fg10),
                         if (t.reminderEnabled)
-                          const Icon(
+                          Icon(
                             Icons.notifications_active_outlined,
                             size: 14,
                             color: PlanTomorrowColors.cyan,
@@ -863,21 +864,14 @@ class _TomorrowTaskTile extends StatelessWidget {
                           t.notes!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white38,
-                            fontSize: 12,
-                          ),
+                          style: TextStyle(color: AppColors.fg38, fontSize: 12),
                         ),
                       ),
                   ],
                 ),
               ),
               PopupMenuButton<String>(
-                icon: const Icon(
-                  Icons.more_vert,
-                  size: 18,
-                  color: Colors.white38,
-                ),
+                icon: Icon(Icons.more_vert, size: 18, color: AppColors.fg38),
                 onSelected: (v) {
                   if (v == 'edit') onEdit();
                   if (v == 'delete') onDelete();
@@ -902,7 +896,8 @@ class _TomorrowTaskTile extends StatelessWidget {
 }
 
 class _Chip extends StatelessWidget {
-  const _Chip(this.label, this.background, {this.textColor = Colors.white70});
+  _Chip(this.label, this.background, {Color? textColor})
+    : textColor = textColor ?? AppColors.fg70;
   final String label;
   final Color background;
   final Color textColor;
@@ -966,7 +961,7 @@ class _CarryForwardSection extends StatelessWidget {
                       Expanded(
                         child: Text(
                           'Unfinished from today  (${open.length})',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                             color: PlanTomorrowColors.label,
@@ -976,10 +971,7 @@ class _CarryForwardSection extends StatelessWidget {
                       AnimatedRotation(
                         turns: expanded ? 0.5 : 0,
                         duration: const Duration(milliseconds: 200),
-                        child: const Icon(
-                          Icons.expand_more,
-                          color: Colors.white38,
-                        ),
+                        child: Icon(Icons.expand_more, color: AppColors.fg38),
                       ),
                     ],
                   ),
@@ -1033,7 +1025,7 @@ class _CarryForwardTile extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       statusLabel,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: PlanTomorrowColors.label,
                         fontSize: 12,
                       ),
@@ -1090,7 +1082,7 @@ class _SlotPickerSheet extends StatelessWidget {
                       slot.title,
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    trailing: const Icon(
+                    trailing: Icon(
                       Icons.arrow_forward_ios,
                       size: 14,
                       color: PlanTomorrowColors.label,
@@ -1144,7 +1136,7 @@ class _PlanSummarySheet extends StatelessWidget {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 20),
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: AppColors.fg24,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -1157,10 +1149,7 @@ class _PlanSummarySheet extends StatelessWidget {
             ),
             Text(
               '$totalTasks task${totalTasks == 1 ? '' : 's'} planned',
-              style: const TextStyle(
-                color: PlanTomorrowColors.label,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: PlanTomorrowColors.label, fontSize: 14),
             ),
             const SizedBox(height: 20),
             Expanded(
@@ -1180,7 +1169,7 @@ class _PlanSummarySheet extends StatelessWidget {
                         padding: const EdgeInsets.only(bottom: 6),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.notifications_active_outlined,
                               size: 16,
                               color: PlanTomorrowColors.cyan,
@@ -1194,8 +1183,8 @@ class _PlanSummarySheet extends StatelessWidget {
                             ),
                             Text(
                               _formatTime(task.reminderTimeIso!),
-                              style: const TextStyle(
-                                color: Colors.white54,
+                              style: TextStyle(
+                                color: AppColors.fg54,
                                 fontSize: 13,
                               ),
                             ),
@@ -1256,18 +1245,18 @@ class _PlanSummarySheet extends StatelessWidget {
           ),
           Text(
             '${tasks.length} task${tasks.length == 1 ? '' : 's'}',
-            style: const TextStyle(color: Colors.white54, fontSize: 13),
+            style: TextStyle(color: AppColors.fg54, fontSize: 13),
           ),
           const SizedBox(width: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: Colors.white10,
+              color: AppColors.fg10,
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
               durationStr,
-              style: const TextStyle(fontSize: 12, color: Colors.white70),
+              style: TextStyle(fontSize: 12, color: AppColors.fg70),
             ),
           ),
         ],

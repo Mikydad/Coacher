@@ -68,7 +68,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        foregroundColor: Colors.white,
+        foregroundColor: AppColors.fg,
         title: const Text(
           'Reset Password',
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
@@ -88,7 +88,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 24),
-        const Text(
+        Text(
           "Enter the email address linked to your account.\nWe'll send you a reset link.",
           style: TextStyle(
             color: AppColors.textGray,
@@ -124,16 +124,16 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(
+        Icon(
           Icons.mark_email_read_outlined,
           color: AppColors.accentDim,
           size: 56,
         ),
         const SizedBox(height: 20),
-        const Text(
+        Text(
           'Check your email',
           style: TextStyle(
-            color: Colors.white,
+            color: AppColors.fg,
             fontSize: 22,
             fontWeight: FontWeight.bold,
           ),
@@ -142,7 +142,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         Text(
           "We've sent a password reset link to ${_emailCtrl.text.trim()}.",
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.textGray,
             fontSize: 14,
             height: 1.5,
@@ -151,7 +151,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         const SizedBox(height: 32),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text(
+          child: Text(
             'Back to sign in',
             style: TextStyle(color: AppColors.accentDim, fontSize: 15),
           ),

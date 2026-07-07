@@ -185,9 +185,9 @@ class TasksHubScreen extends ConsumerWidget {
               todayAsync.when(
                 data: (rows) {
                   if (rows.isEmpty) {
-                    return const Text(
+                    return Text(
                       'No tasks today.',
-                      style: TextStyle(color: Colors.white54),
+                      style: TextStyle(color: AppColors.fg54),
                     );
                   }
                   return ReorderableListView(
@@ -285,9 +285,9 @@ class TasksHubScreen extends ConsumerWidget {
               otherAsync.when(
                 data: (rows) {
                   if (rows.isEmpty) {
-                    return const Text(
+                    return Text(
                       'No open tasks on other days.',
-                      style: TextStyle(color: Colors.white54),
+                      style: TextStyle(color: AppColors.fg54),
                     );
                   }
                   return Column(
@@ -376,7 +376,7 @@ class _HubTaskTile extends StatelessWidget {
         title: Text(t.title),
         subtitle: Text(
           subtitle.toString(),
-          style: const TextStyle(color: Colors.white54, fontSize: 12),
+          style: TextStyle(color: AppColors.fg54, fontSize: 12),
         ),
         trailing: PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert),

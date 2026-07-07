@@ -6,6 +6,7 @@ import '../application/sleep_window_util.dart';
 import '../domain/models/context_override.dart';
 import '../domain/models/user_attention_state.dart';
 import 'post_override_review_card.dart';
+import '../../../core/presentation/app_colors.dart';
 
 /// Settings section for managing context overrides and sleep window.
 ///
@@ -49,11 +50,7 @@ class OverrideSettingsSection extends ConsumerWidget {
   Widget _sectionLabel(BuildContext context, String label) {
     return Text(
       label,
-      style: const TextStyle(
-        letterSpacing: 2,
-        fontSize: 11,
-        color: Colors.white54,
-      ),
+      style: TextStyle(letterSpacing: 2, fontSize: 11, color: AppColors.fg54),
     );
   }
 }
@@ -72,9 +69,9 @@ class _CurrentOverrideRow extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(10),
+        color: AppColors.fg.withAlpha(10),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: AppColors.fg12),
       ),
       child: Row(
         children: [
@@ -96,12 +93,12 @@ class _CurrentOverrideRow extends ConsumerWidget {
                 if (hasOverride && state.overrideExpiresAt != null)
                   Text(
                     _remainingLabel(state.overrideExpiresAt!),
-                    style: const TextStyle(fontSize: 12, color: Colors.white54),
+                    style: TextStyle(fontSize: 12, color: AppColors.fg54),
                   ),
                 if (hasOverride && state.overrideExpiresAt == null)
-                  const Text(
+                  Text(
                     'Until manually ended',
-                    style: TextStyle(fontSize: 12, color: Colors.white54),
+                    style: TextStyle(fontSize: 12, color: AppColors.fg54),
                   ),
               ],
             ),
@@ -188,7 +185,7 @@ class _SleepWindowConfigState extends ConsumerState<_SleepWindowConfig> {
             _enabled
                 ? 'Reminders suppressed from ${_fmt(_start)} to ${_fmt(_end)}'
                 : 'Off — all reminders active overnight',
-            style: const TextStyle(fontSize: 12, color: Colors.white54),
+            style: TextStyle(fontSize: 12, color: AppColors.fg54),
           ),
           value: _enabled,
           onChanged: (v) async {
@@ -242,9 +239,9 @@ class _SleepWindowConfigState extends ConsumerState<_SleepWindowConfig> {
               final now = DateTime.now();
               final active = isWithinSleepWindow(now, _fmt(_start), _fmt(_end));
               if (!active) return const SizedBox.shrink();
-              return const Text(
+              return Text(
                 '🌙 Sleep window is currently active',
-                style: TextStyle(fontSize: 12, color: Colors.white54),
+                style: TextStyle(fontSize: 12, color: AppColors.fg54),
               );
             },
           ),
@@ -285,17 +282,14 @@ class _TimePicker extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(10),
+          color: AppColors.fg.withAlpha(10),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.white12),
+          border: Border.all(color: AppColors.fg12),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: const TextStyle(fontSize: 11, color: Colors.white54),
-            ),
+            Text(label, style: TextStyle(fontSize: 11, color: AppColors.fg54)),
             const SizedBox(height: 2),
             Text(
               '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}',

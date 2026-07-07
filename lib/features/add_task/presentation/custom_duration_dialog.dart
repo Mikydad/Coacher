@@ -104,7 +104,7 @@ class _CustomDurationDialogState extends State<_CustomDurationDialog> {
       backgroundColor: AddTaskColors.card,
       title: Text(
         widget.title,
-        style: const TextStyle(color: AddTaskColors.onSurface),
+        style: TextStyle(color: AddTaskColors.onSurface),
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -120,8 +120,8 @@ class _CustomDurationDialogState extends State<_CustomDurationDialog> {
                   onChanged: (_) {
                     if (_error != null) setState(() => _error = null);
                   },
-                  style: const TextStyle(color: AddTaskColors.onSurface),
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: AddTaskColors.onSurface),
+                  decoration: InputDecoration(
                     labelText: 'Hours',
                     filled: true,
                     fillColor: AddTaskColors.cardElevated,
@@ -138,8 +138,8 @@ class _CustomDurationDialogState extends State<_CustomDurationDialog> {
                   onChanged: (_) {
                     if (_error != null) setState(() => _error = null);
                   },
-                  style: const TextStyle(color: AddTaskColors.onSurface),
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: AddTaskColors.onSurface),
+                  decoration: InputDecoration(
                     labelText: 'Minutes',
                     filled: true,
                     fillColor: AddTaskColors.cardElevated,

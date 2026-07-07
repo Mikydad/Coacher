@@ -170,7 +170,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   }
 
   Widget _buildSpinner() {
-    return const Directionality(
+    return Directionality(
       textDirection: TextDirection.ltr,
       child: Material(
         color: AppColors.scaffold,
@@ -185,7 +185,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
               SizedBox(height: 20),
               Text(
                 'Loading your plan…',
-                style: TextStyle(color: Colors.white70, fontSize: 15),
+                style: TextStyle(color: AppColors.fg70, fontSize: 15),
               ),
             ],
           ),

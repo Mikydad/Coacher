@@ -4,10 +4,10 @@ import '../../../core/presentation/app_colors.dart';
 
 // ─── Design tokens (Obsidian Pulse) ─────────────────────────────────────────
 
-const kSettingsSurface = AppColors.ink;
-const kSettingsSurfaceHigh = AppColors.inkWarm;
-const kSettingsOnSurface = AppColors.white;
-const kSettingsOnSurfaceVariant = AppColors.textSoft;
+Color get kSettingsSurface => AppColors.ink;
+Color get kSettingsSurfaceHigh => AppColors.inkWarm;
+Color get kSettingsOnSurface => AppColors.white;
+Color get kSettingsOnSurfaceVariant => AppColors.textSoft;
 
 /// Shared chrome for Profile-linked settings sub-pages.
 class SettingsPageScaffold extends StatelessWidget {
@@ -29,7 +29,7 @@ class SettingsPageScaffold extends StatelessWidget {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios_new_rounded,
             color: kSettingsOnSurface,
             size: 20,
@@ -38,7 +38,7 @@ class SettingsPageScaffold extends StatelessWidget {
         ),
         title: Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
             color: kSettingsOnSurface,
@@ -49,7 +49,7 @@ class SettingsPageScaffold extends StatelessWidget {
           preferredSize: const Size.fromHeight(1),
           child: Container(
             height: 1,
-            color: Colors.white.withValues(alpha: 0.06),
+            color: AppColors.fg.withValues(alpha: 0.06),
           ),
         ),
       ),
@@ -70,7 +70,7 @@ class SettingsSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label.toUpperCase(),
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w700,
         letterSpacing: 2,
@@ -136,7 +136,7 @@ class SettingsPlaceholderRow extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: kSettingsOnSurface,
@@ -145,7 +145,7 @@ class SettingsPlaceholderRow extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         height: 1.35,
                         color: kSettingsOnSurfaceVariant,
@@ -154,7 +154,7 @@ class SettingsPlaceholderRow extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 color: kSettingsOnSurfaceVariant,
                 size: 20,
