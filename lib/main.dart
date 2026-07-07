@@ -13,6 +13,11 @@ import 'core/bootstrap/app_bootstrap.dart';
 import 'features/auth/presentation/auth_gate.dart';
 
 Future<void> main() async {
+  // debugPrint is NOT stripped in release builds — 150+ call sites log task
+  // titles/uids. Silence it outside debug/profile (AUDIT §7 S7).
+  if (kReleaseMode) {
+    debugPrint = (String? message, {int? wrapWidth}) {};
+  }
   await runZonedGuarded<Future<void>>(() async {
     WidgetsFlutterBinding.ensureInitialized();
     final container = ProviderContainer();
