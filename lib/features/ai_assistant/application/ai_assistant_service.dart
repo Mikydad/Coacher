@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/utils/stable_id.dart';
@@ -99,6 +101,30 @@ class AiAssistantService extends ChangeNotifier {
 
   Future<void> sendMessage(String userInput) async {
     if (userInput.trim().isEmpty) return;
+
+    // Guests get a sign-in nudge instead of the server's permission error —
+    // the aiChat function rejects anonymous accounts (cost-abuse guard).
+    // Firebase.apps guard: VM tests construct this service without Firebase.
+    final currentUser =
+        Firebase.apps.isEmpty ? null : FirebaseAuth.instance.currentUser;
+    if (currentUser != null && currentUser.isAnonymous) {
+      _addMessage(AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.user,
+        content: userInput.trim(),
+        timestamp: DateTime.now(),
+      ));
+      _addMessage(AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.assistant,
+        content:
+            'Coach AI needs a registered account. Create a free account in '
+            'Profile → Sign in and your data comes with you.',
+        timestamp: DateTime.now(),
+      ));
+      notifyListeners();
+      return;
+    }
 
     // 0. While a plan is awaiting confirmation, treat a plain yes/no as the
     // answer to "confirm changes?" — never send it to the parser, which would

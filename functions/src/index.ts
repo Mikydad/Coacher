@@ -202,6 +202,18 @@ export const aiChat = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Sign in required.");
     }
+    // Guest (anonymous) accounts cannot call the paid AI proxy — creating
+    // fresh anonymous uids is free, so per-uid quotas don't bound spend.
+    // TODO: enable App Check enforcement (enforceAppCheck: true) once a
+    // client version that attests has shipped.
+    const signInProvider = (request.auth.token as Record<string, any>)
+      ?.firebase?.sign_in_provider;
+    if (signInProvider === "anonymous") {
+      throw new HttpsError(
+        "permission-denied",
+        "Sign in with an account to use Coach AI.",
+      );
+    }
     const uid = request.auth.uid;
 
     const messages = validateMessages(request.data?.messages);
