@@ -210,6 +210,12 @@ class RemoteIsarMerge {
     )) {
       return;
     }
+    // idempotencyKey is also unique; a remote event whose key is already held
+    // by a different local event is a duplicate delivery, not new data.
+    final byKey = await _isar.isarAnalyticsEvents.getByIdempotencyKey(incoming.idempotencyKey);
+    if (byKey != null && byKey.eventId != incoming.id) {
+      return;
+    }
     await _isar.writeTxn(() async {
       await _isar.isarAnalyticsEvents.putByEventId(IsarAnalyticsEvent.fromDomain(incoming));
     });
