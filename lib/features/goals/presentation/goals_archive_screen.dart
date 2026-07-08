@@ -58,7 +58,7 @@ class _ArchiveTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = goal.status == GoalStatus.paused ? 'Paused' : 'Completed';
     return Card(
-      color: const Color(0xFF1A1C1F),
+      color: const Color(0xFF1F232A),
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
         title: Text(goal.title, style: const TextStyle(fontWeight: FontWeight.w700)),

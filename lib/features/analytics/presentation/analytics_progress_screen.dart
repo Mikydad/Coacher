@@ -82,7 +82,7 @@ class _AnalyticsProgressScreenState
     return Scaffold(
       backgroundColor: ProgressDesignTokens.surface,
       appBar: AppBar(
-        backgroundColor: ProgressDesignTokens.surface,
+        backgroundColor: ProgressDesignTokens.appBarSurface,
         elevation: 0,
         foregroundColor: ProgressDesignTokens.onSurfaceVariant,
         title: const Text(
@@ -220,7 +220,7 @@ class _AnalyticsProgressScreenState
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF111317),
+      backgroundColor: const Color(0xFF1F232A),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),

@@ -17,9 +17,9 @@ class CommunityScreen extends ConsumerWidget {
     final circlesAsync = ref.watch(myCirclesProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0F12),
+      backgroundColor: const Color(0xFF15171B),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF14171C),
+        backgroundColor: const Color(0xFF1E2126),
         foregroundColor: const Color(0xFFF0F4FF),
         title: const Text(
           'My Circles',
@@ -61,7 +61,7 @@ class CommunityScreen extends ConsumerWidget {
           }
           return RefreshIndicator(
             color: const Color(0xFFB7FF00),
-            backgroundColor: const Color(0xFF14171C),
+            backgroundColor: const Color(0xFF1E2126),
             onRefresh: () async => ref.invalidate(myCirclesProvider),
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
@@ -96,7 +96,7 @@ class CommunityScreen extends ConsumerWidget {
   void _showCreateOrDiscover(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF14171C),
+      backgroundColor: const Color(0xFF1E2126),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -116,7 +116,7 @@ class CommunityScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             ListTile(
               leading: const CircleAvatar(
-                backgroundColor: Color(0xFF1C2029),
+                backgroundColor: Color(0xFF1F232A),
                 child: Icon(Icons.add_rounded, color: Color(0xFFB7FF00)),
               ),
               title: const Text(
@@ -137,7 +137,7 @@ class CommunityScreen extends ConsumerWidget {
             ),
             ListTile(
               leading: const CircleAvatar(
-                backgroundColor: Color(0xFF1C2029),
+                backgroundColor: Color(0xFF1F232A),
                 child: Icon(Icons.explore_rounded, color: Color(0xFF00CFFF)),
               ),
               title: const Text(
@@ -187,7 +187,7 @@ class _EmptyState extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: const Color(0xFF1C2029),
+                color: const Color(0xFF1F232A),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Icon(
@@ -276,7 +276,7 @@ class _MyCircleCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF14171C),
+          color: const Color(0xFF1E2126),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: Colors.white.withOpacity(0.06)),
         ),
@@ -379,7 +379,7 @@ class _CategoryBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C2029),
+        color: const Color(0xFF1F232A),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(

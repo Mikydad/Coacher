@@ -18,7 +18,7 @@ class UserMessageBubble extends StatelessWidget {
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
         decoration: const BoxDecoration(
-          color: Color(0xFF262626),
+          color: Color(0xFF262B33),
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(16),
             topRight: Radius.circular(4),

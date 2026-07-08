@@ -74,7 +74,7 @@ class _ChallengeVoteBannerState
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C2029),
+        color: const Color(0xFF1F232A),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: const Color(0xFFB7FF00).withValues(alpha: 0.3),

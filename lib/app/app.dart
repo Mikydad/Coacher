@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app_navigator.dart';
 import 'application/main_tab_navigation.dart';
 import 'presentation/main_tab_shell.dart';
+import 'theme/app_palette.dart';
 import '../features/add_task/presentation/add_task_screen.dart';
 import '../features/analytics/presentation/analytics_progress_screen.dart';
 import '../features/firebase_test/presentation/firebase_test_screen.dart';
@@ -39,10 +40,26 @@ class CoachForLifeApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF050806),
+        scaffoldBackgroundColor: AppPalette.background,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFFB7FF00),
           brightness: Brightness.dark,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: AppPalette.appBarSurface,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+        ),
+        cardTheme: CardThemeData(
+          color: AppPalette.card,
+          surfaceTintColor: Colors.transparent,
+          elevation: 3,
+          shadowColor: Colors.black.withValues(alpha: 0.4),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: AppPalette.border),
+          ),
         ),
         useMaterial3: true,
       ),
@@ -136,7 +153,7 @@ class _CoachTabRedirect extends ConsumerWidget {
       Navigator.of(context).popUntil((route) => route.isFirst);
     });
     return const Scaffold(
-      backgroundColor: Color(0xFF050806),
+      backgroundColor: AppPalette.background,
       body: SizedBox.shrink(),
     );
   }

@@ -1488,7 +1488,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen> with WidgetsBindi
     return Scaffold(
       backgroundColor: AddTaskColors.surface,
       appBar: AppBar(
-        backgroundColor: AddTaskColors.surface,
+        backgroundColor: AddTaskColors.appBarSurface,
         elevation: 0,
         foregroundColor: AddTaskColors.onSurface,
         title: Text(

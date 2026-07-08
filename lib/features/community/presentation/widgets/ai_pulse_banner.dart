@@ -54,7 +54,7 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
           margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF1A2535), Color(0xFF14171C)],
+              colors: [Color(0xFF1A2535), Color(0xFF1E2126)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),

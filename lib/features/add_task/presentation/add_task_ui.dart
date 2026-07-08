@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 
 /// Visual tokens for Add / Edit Task (Obsidian + lime accent).
 abstract final class AddTaskColors {
-  static const surface = Color(0xFF0E0E0E);
-  static const card = Color(0xFF181818);
-  static const cardElevated = Color(0xFF222222);
+  static const surface = Color(0xFF15171B);
+  static const appBarSurface = Color(0xFF1E2126);
+  static const card = Color(0xFF1F232A);
+  static const cardElevated = Color(0xFF262B33);
   static const border = Color(0x14FFFFFF);
   static const borderActive = Color(0x66B7FF00);
   static const accent = Color(0xFFB7FF00);

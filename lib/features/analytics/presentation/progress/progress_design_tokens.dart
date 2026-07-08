@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 
 /// PRD Progress page — "Obsidian Pulse" palette.
 abstract final class ProgressDesignTokens {
-  static const surface = Color(0xFF0E0E0E);
-  static const surfaceContainerLow = Color(0xFF131313);
-  static const surfaceContainerHigh = Color(0xFF201F1F);
-  static const surfaceContainerHighest = Color(0xFF262626);
-  static const surfaceBright = Color(0xFF2C2C2C);
+  static const surface = Color(0xFF15171B);
+  static const appBarSurface = Color(0xFF1E2126);
+  static const surfaceContainerLow = Color(0xFF1B1E24);
+  static const surfaceContainerHigh = Color(0xFF1F232A);
+  static const surfaceContainerHighest = Color(0xFF262B33);
+  static const surfaceBright = Color(0xFF2C323B);
 
   static const primary = Color(0xFFEAFFB8);
   static const primaryDim = Color(0xFFB2ED00);

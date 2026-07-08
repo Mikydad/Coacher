@@ -131,7 +131,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
   Future<String?> _showProofCategorySheet() {
     return showModalBottomSheet<String>(
       context: context,
-      backgroundColor: const Color(0xFF14171C),
+      backgroundColor: const Color(0xFF1E2126),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -334,7 +334,7 @@ class _TextMessageBubble extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: isMe
                           ? const Color(0xFFB7FF00).withOpacity(0.15)
-                          : const Color(0xFF1C2029),
+                          : const Color(0xFF1F232A),
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(16),
                         topRight: const Radius.circular(16),
@@ -381,7 +381,7 @@ class _TextMessageBubble extends StatelessWidget {
   void _showEmojiBar(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF1C2029),
+      backgroundColor: const Color(0xFF1F232A),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -409,7 +409,7 @@ class _ImageMessageBubble extends StatelessWidget {
       child: GestureDetector(
         onLongPress: () => showModalBottomSheet<void>(
           context: context,
-          backgroundColor: const Color(0xFF1C2029),
+          backgroundColor: const Color(0xFF1F232A),
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
@@ -456,7 +456,7 @@ class _ImageMessageBubble extends StatelessWidget {
                             errorBuilder: (_, __, ___) => Container(
                               width: 220,
                               height: 140,
-                              color: const Color(0xFF1C2029),
+                              color: const Color(0xFF1F232A),
                               child: const Icon(Icons.broken_image_rounded,
                                   color: Color(0xFF8A8FA8)),
                             ),
@@ -525,7 +525,7 @@ class _SystemEventPill extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
           decoration: BoxDecoration(
-            color: const Color(0xFF1C2029),
+            color: const Color(0xFF1F232A),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
@@ -569,7 +569,7 @@ class _ReactionRow extends StatelessWidget {
               decoration: BoxDecoration(
                 color: reacted
                     ? const Color(0xFFB7FF00).withOpacity(0.2)
-                    : const Color(0xFF1C2029),
+                    : const Color(0xFF1F232A),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: reacted
@@ -637,7 +637,7 @@ class _InputBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF14171C),
+        color: const Color(0xFF1E2126),
         border: Border(
           top: BorderSide(color: Colors.white.withOpacity(0.06)),
         ),
@@ -671,7 +671,7 @@ class _InputBar extends StatelessWidget {
                   hintText: 'Message your circle…',
                   hintStyle: const TextStyle(color: Color(0xFF8A8FA8)),
                   filled: true,
-                  fillColor: const Color(0xFF1C2029),
+                  fillColor: const Color(0xFF1F232A),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 10,

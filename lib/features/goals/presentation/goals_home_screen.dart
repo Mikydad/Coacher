@@ -332,20 +332,22 @@ class _CategoryMiniTile extends StatelessWidget {
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFFB7FF00) : const Color(0xFF1A1C1F),
+            // Selected: dark lime-tinted surface + lime text so the label
+            // stays readable; unselected: raised grey clearly above the page.
+            color: selected ? const Color(0xFF324116) : const Color(0xFF262B33),
             borderRadius: BorderRadius.circular(radius),
-            border: featured && !selected
-                ? Border.all(color: const Color(0xFF2A2D32))
-                : null,
-            boxShadow: featured && !selected
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
+            border: Border.all(
+              color: selected
+                  ? const Color(0xFFB7FF00).withValues(alpha: 0.55)
+                  : Colors.white.withValues(alpha: 0.08),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.30),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: Text(
             label,
@@ -353,7 +355,7 @@ class _CategoryMiniTile extends StatelessWidget {
             maxLines: featured ? 2 : 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: selected ? Colors.black : Colors.white,
+              color: selected ? const Color(0xFFB7FF00) : Colors.white,
               fontSize: fontSize,
               fontWeight: featured ? FontWeight.w900 : FontWeight.w800,
               height: 1.05,
@@ -375,7 +377,7 @@ class _GoalRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final horizon = goal.horizon.name;
     return Card(
-      color: const Color(0xFF1A1C1F),
+      color: const Color(0xFF1F232A),
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
         title: Text(goal.title, style: const TextStyle(fontWeight: FontWeight.w700)),

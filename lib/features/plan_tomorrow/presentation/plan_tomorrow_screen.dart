@@ -218,7 +218,7 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF111317),
+      backgroundColor: const Color(0xFF1F232A),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -652,7 +652,7 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF111317),
+        color: const Color(0xFF1F232A),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
@@ -751,7 +751,7 @@ class _TomorrowTaskTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
       child: Card(
-        color: const Color(0xFF1A1C20),
+        color: const Color(0xFF1F232A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
@@ -923,7 +923,7 @@ class _CarryForwardTile extends StatelessWidget {
             : 'Not Started';
 
     return Card(
-      color: const Color(0xFF111317),
+      color: const Color(0xFF1F232A),
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -1127,7 +1127,7 @@ class _PlanSummarySheet extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1C20),
+        color: const Color(0xFF1F232A),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(

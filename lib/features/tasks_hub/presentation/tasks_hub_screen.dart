@@ -430,7 +430,7 @@ class _HubTaskTile extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      color: const Color(0xFF111317),
+      color: const Color(0xFF1F232A),
       child: ListTile(
         title: Text(t.title),
         subtitle: Text(subtitle.toString(), style: const TextStyle(color: Colors.white54, fontSize: 12)),

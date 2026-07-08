@@ -469,7 +469,7 @@ class _GoalActionTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Card(
-      color: const Color(0xFF1A1C1F),
+      color: const Color(0xFF1F232A),
       margin: const EdgeInsets.only(bottom: 6),
       child: CheckboxListTile(
         value: action.completed,
@@ -501,7 +501,7 @@ class _MilestoneTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Card(
-      color: const Color(0xFF1A1C1F),
+      color: const Color(0xFF1F232A),
       margin: const EdgeInsets.only(bottom: 6),
       child: CheckboxListTile(
         value: milestone.completed,

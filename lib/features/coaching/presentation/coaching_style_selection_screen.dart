@@ -94,7 +94,7 @@ class _CoachingStyleSelectionScreenState
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E2E),
+        backgroundColor: const Color(0xFF1F232A),
         title: const Text('Heads up'),
         content: Text(
           'Switching to ${style.displayName} will make reminders more persistent '
@@ -118,7 +118,7 @@ class _CoachingStyleSelectionScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F1A),
+      backgroundColor: const Color(0xFF15171B),
       appBar: widget.isOnboarding
           ? null
           : AppBar(

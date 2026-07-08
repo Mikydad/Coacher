@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 // ─── Design tokens (Obsidian Pulse) ─────────────────────────────────────────
 
-const kSettingsSurface = Color(0xFF0E0E0E);
-const kSettingsSurfaceHigh = Color(0xFF201F1F);
+const kSettingsSurface = Color(0xFF15171B);
+const kSettingsAppBarSurface = Color(0xFF1E2126);
+const kSettingsSurfaceHigh = Color(0xFF1F232A);
 const kSettingsOnSurface = Color(0xFFFFFFFF);
 const kSettingsOnSurfaceVariant = Color(0xFFADAAAA);
 
@@ -23,7 +24,7 @@ class SettingsPageScaffold extends StatelessWidget {
     return Scaffold(
       backgroundColor: kSettingsSurface,
       appBar: AppBar(
-        backgroundColor: kSettingsSurface,
+        backgroundColor: kSettingsAppBarSurface,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(

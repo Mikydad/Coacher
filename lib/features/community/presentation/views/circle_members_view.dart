@@ -206,7 +206,7 @@ class CircleMembersView extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF14171C),
+        backgroundColor: const Color(0xFF1E2126),
         title: const Text(
           'Remove member?',
           style: TextStyle(color: Color(0xFFF0F4FF)),
@@ -284,7 +284,7 @@ class _SectionHeader extends StatelessWidget {
             padding:
                 const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             decoration: BoxDecoration(
-              color: const Color(0xFF1C2029),
+              color: const Color(0xFF1F232A),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -320,7 +320,7 @@ class _PendingMemberTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF14171C),
+        color: const Color(0xFF1E2126),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withOpacity(0.06)),
       ),
@@ -395,7 +395,7 @@ class _ActiveMemberTile extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF14171C),
+          color: const Color(0xFF1E2126),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isMe
@@ -451,7 +451,7 @@ class _ActiveMemberTile extends StatelessWidget {
   void _showRemoveMenu(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF14171C),
+      backgroundColor: const Color(0xFF1E2126),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -546,7 +546,7 @@ class _RemovalVoteBannerState
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C2029),
+        color: const Color(0xFF1F232A),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: const Color(0xFFFF9933).withValues(alpha: 0.4),

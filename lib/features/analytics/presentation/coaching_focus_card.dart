@@ -394,7 +394,7 @@ class _FocusScoreBar extends StatelessWidget {
           child: LinearProgressIndicator(
             value: score.clamp(0.0, 1.0),
             minHeight: 5,
-            backgroundColor: const Color(0xFF2A2D33),
+            backgroundColor: const Color(0xFF2C323B),
             valueColor: AlwaysStoppedAnimation<Color>(accentColor),
           ),
         ),
@@ -471,7 +471,7 @@ class _CardShell extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF111317),
+        color: const Color(0xFF1F232A),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: accent.withAlpha(60)),
         boxShadow: [

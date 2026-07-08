@@ -123,7 +123,7 @@ class WeeklyCommitmentsView extends ConsumerWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF14171C),
+      backgroundColor: const Color(0xFF1E2126),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -378,7 +378,7 @@ class _DraftRow extends StatelessWidget {
                 hintText: 'e.g. Workout ×3',
                 hintStyle: const TextStyle(color: Color(0xFF8A8FA8)),
                 filled: true,
-                fillColor: const Color(0xFF1C2029),
+                fillColor: const Color(0xFF1F232A),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
@@ -393,7 +393,7 @@ class _DraftRow extends StatelessWidget {
           const SizedBox(width: 8),
           DropdownButton<int>(
             value: draft.target,
-            dropdownColor: const Color(0xFF1C2029),
+            dropdownColor: const Color(0xFF1F232A),
             style: const TextStyle(color: Color(0xFFF0F4FF)),
             underline: const SizedBox.shrink(),
             items: List.generate(
@@ -436,7 +436,7 @@ class _CommitmentRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF14171C),
+        color: const Color(0xFF1E2126),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.06),
@@ -500,7 +500,7 @@ class _ProgressTicks extends StatelessWidget {
             decoration: BoxDecoration(
               color: done
                   ? const Color(0xFFB7FF00)
-                  : const Color(0xFF1C2029),
+                  : const Color(0xFF1F232A),
               shape: BoxShape.circle,
               border: Border.all(
                 color: done
@@ -637,7 +637,7 @@ class _EmptyMyCommitments extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF14171C),
+          color: const Color(0xFF1E2126),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: const Color(0xFFB7FF00).withValues(alpha: 0.2),

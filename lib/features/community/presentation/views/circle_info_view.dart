@@ -44,7 +44,7 @@ class CircleInfoView extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF14171C),
+                color: const Color(0xFF1E2126),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: const Color(0xFF2A2F3D)),
               ),
@@ -210,7 +210,7 @@ class CircleInfoView extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF14171C),
+        backgroundColor: const Color(0xFF1E2126),
         title: const Text('Delete circle?',
             style: TextStyle(color: Color(0xFFF0F4FF))),
         content: Text(
@@ -256,7 +256,7 @@ class CircleInfoView extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF14171C),
+        backgroundColor: const Color(0xFF1E2126),
         title: const Text('Leave circle?',
             style: TextStyle(color: Color(0xFFF0F4FF))),
         content: const Text(
@@ -326,7 +326,7 @@ class _Chip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C2029),
+        color: const Color(0xFF1F232A),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -386,7 +386,7 @@ class _SettingsTile extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF14171C),
+          color: const Color(0xFF1E2126),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
@@ -430,7 +430,7 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF14171C),
+        color: const Color(0xFF1E2126),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF2A2F3D)),
       ),

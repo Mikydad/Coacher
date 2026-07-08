@@ -32,7 +32,7 @@ class _ProactiveSuggestionCardState
   late final Animation<Offset> _slide;
 
   static const _kAccent = Color(0xFFB2ED00);
-  static const _kSurface = Color(0xFF201f1f);
+  static const _kSurface = Color(0xFF262B33);
   static const _kVariant = Color(0xFFADAAAA);
 
   @override
@@ -111,6 +111,13 @@ class _ProactiveSuggestionCardState
             border: Border(
               left: const BorderSide(color: _kAccent, width: 3),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.30),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 14, 12, 12),

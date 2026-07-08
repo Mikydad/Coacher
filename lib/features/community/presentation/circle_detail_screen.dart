@@ -81,7 +81,7 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0F12),
+      backgroundColor: const Color(0xFF15171B),
       body: circleAsync.when(
         loading: () => const Center(
           child: CircularProgressIndicator(color: Color(0xFFB7FF00)),
@@ -110,7 +110,7 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
             child: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) => [
               SliverAppBar(
-                backgroundColor: const Color(0xFF14171C),
+                backgroundColor: const Color(0xFF1E2126),
                 foregroundColor: const Color(0xFFF0F4FF),
                 expandedHeight: 200,
                 pinned: true,
@@ -184,7 +184,7 @@ class _CircleHeader extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         // Dark background
-        Container(color: const Color(0xFF0D0F12)),
+        Container(color: const Color(0xFF15171B)),
         // Glass card
         Positioned.fill(
           child: ClipRRect(

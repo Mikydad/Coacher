@@ -75,7 +75,7 @@ class _FirstLaunchGateState extends State<FirstLaunchGate> {
       return const Directionality(
         textDirection: TextDirection.ltr,
         child: Material(
-          color: Color(0xFF050806),
+          color: Color(0xFF15171B),
           child: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,

@@ -106,7 +106,6 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     final serviceAsync = ref.watch(resolvedAiAssistantProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0E0E0E),
       appBar: _buildAppBar(serviceAsync),
       body: serviceAsync.when(
         data: (service) => _buildBody(service),
@@ -121,7 +120,6 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   ) {
     final isReady = serviceAsync.hasValue;
     return AppBar(
-      backgroundColor: const Color(0xFF0E0E0E),
       elevation: 0,
       automaticallyImplyLeading: false,
       title: const Text(
@@ -186,7 +184,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         ),
         // Fixed bottom: input + quick directives
         Container(
-          color: const Color(0xFF0E0E0E),
+          color: Theme.of(context).scaffoldBackgroundColor,
           padding: EdgeInsets.only(
             bottom: mainTabFooterPadding(context),
           ),

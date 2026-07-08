@@ -51,7 +51,7 @@ class _ChallengeCreateSheetState
           colorScheme: const ColorScheme.dark(
             primary: Color(0xFFB7FF00),
             onPrimary: Colors.black,
-            surface: Color(0xFF1C2029),
+            surface: Color(0xFF1F232A),
           ),
         ),
         child: child!,
@@ -127,7 +127,7 @@ class _ChallengeCreateSheetState
           bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         decoration: const BoxDecoration(
-          color: Color(0xFF14171C),
+          color: Color(0xFF1E2126),
           borderRadius:
               BorderRadius.vertical(top: Radius.circular(20)),
         ),
@@ -334,7 +334,7 @@ class _ChallengeCreateSheetState
         hintText: hint,
         hintStyle: const TextStyle(color: Color(0xFF8A8FA8)),
         filled: true,
-        fillColor: const Color(0xFF1C2029),
+        fillColor: const Color(0xFF1F232A),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide.none,
@@ -352,7 +352,7 @@ class _ChallengeCreateSheetState
           if (s.contains(WidgetState.selected)) {
             return const Color(0xFFB7FF00);
           }
-          return const Color(0xFF1C2029);
+          return const Color(0xFF1F232A);
         }),
         foregroundColor: WidgetStateProperty.resolveWith((s) {
           if (s.contains(WidgetState.selected)) return Colors.black;
@@ -400,7 +400,7 @@ class _DateButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(
             horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF1C2029),
+          color: const Color(0xFF1F232A),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(

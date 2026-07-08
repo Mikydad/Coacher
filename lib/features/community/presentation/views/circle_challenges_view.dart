@@ -29,7 +29,7 @@ class CircleChallengesView extends ConsumerWidget {
         ref.watch(completedChallengesProvider(circleId));
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
+      backgroundColor: const Color(0xFF15171B),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showModalBottomSheet(
           context: context,
@@ -172,7 +172,7 @@ class _CompetitionChallengeCard extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF14171C),
+        color: const Color(0xFF1E2126),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFF2A2F3D)),
       ),
@@ -294,7 +294,7 @@ class _TeamChallengeCard extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF14171C),
+        color: const Color(0xFF1E2126),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFF2A2F3D)),
       ),
@@ -373,7 +373,7 @@ class _TeamChallengeCard extends ConsumerWidget {
                 decoration: BoxDecoration(
                   color: isMe
                       ? const Color(0xFFB7FF00).withValues(alpha: 0.12)
-                      : const Color(0xFF1C2029),
+                      : const Color(0xFF1F232A),
                   borderRadius: BorderRadius.circular(20),
                   border: isMe
                       ? Border.all(
@@ -457,7 +457,7 @@ class _RankRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: isMe
             ? const Color(0xFFB7FF00).withValues(alpha: 0.06)
-            : const Color(0xFF1C2029),
+            : const Color(0xFF1F232A),
         borderRadius: BorderRadius.circular(8),
         border: isMe
             ? Border.all(
@@ -539,7 +539,7 @@ class _CompletedSectionState extends State<_CompletedSection> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1C2029),
+                  color: const Color(0xFF1F232A),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -567,7 +567,7 @@ class _CompletedSectionState extends State<_CompletedSection> {
               margin: const EdgeInsets.only(top: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF14171C),
+                color: const Color(0xFF1E2126),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -671,7 +671,7 @@ class _ManualProgressSheetState
           bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         decoration: const BoxDecoration(
-          color: Color(0xFF14171C),
+          color: Color(0xFF1E2126),
           borderRadius:
               BorderRadius.vertical(top: Radius.circular(20)),
         ),
@@ -723,7 +723,7 @@ class _ManualProgressSheetState
                   hintStyle: const TextStyle(
                       color: Color(0xFF8A8FA8)),
                   filled: true,
-                  fillColor: const Color(0xFF1C2029),
+                  fillColor: const Color(0xFF1F232A),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
@@ -739,7 +739,7 @@ class _ManualProgressSheetState
                   padding: const EdgeInsets.symmetric(
                       vertical: 10, horizontal: 14),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1C2029),
+                    color: const Color(0xFF1F232A),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(

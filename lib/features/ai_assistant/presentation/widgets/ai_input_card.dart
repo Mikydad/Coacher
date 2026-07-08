@@ -20,7 +20,7 @@ class AiInputCard extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 0),
       padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF262626),
+        color: const Color(0xFF262B33),
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
@@ -84,7 +84,7 @@ class AiInputCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: canSend
                             ? const Color(0xFFBEFC00)
-                            : const Color(0xFF3A3A3A),
+                            : const Color(0xFF3A4048),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Row(

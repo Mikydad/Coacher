@@ -29,7 +29,7 @@ class PlannedChangesCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF131313),
+        color: const Color(0xFF1B1E24),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(

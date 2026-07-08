@@ -70,7 +70,7 @@ class _CircleNotifPrefsSheetState
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF14171C),
+        color: Color(0xFF1E2126),
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(

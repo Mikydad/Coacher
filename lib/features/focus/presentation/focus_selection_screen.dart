@@ -262,7 +262,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(60),
               backgroundColor: hasRunningTask
-                  ? const Color(0xFF2B2D31)
+                  ? const Color(0xFF2C323B)
                   : const Color(0xFFB7FF00),
               foregroundColor: hasRunningTask ? Colors.white : Colors.black,
             ),
@@ -299,7 +299,7 @@ class _TaskCard extends StatelessWidget {
       child: Ink(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFF111317),
+          color: const Color(0xFF1F232A),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: selected ? const Color(0xFFB7FF00) : Colors.white12,

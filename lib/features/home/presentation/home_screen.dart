@@ -504,7 +504,7 @@ void _maybeTriggerMorningBrief(BuildContext context, WidgetRef ref) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: const Color(0xFF201f1f),
+          backgroundColor: const Color(0xFF1F232A),
           behavior: SnackBarBehavior.floating,
           content: const Text(
             'Coach AI has suggestions for today — tap to review.',
@@ -1065,7 +1065,7 @@ class _ActionCircle extends StatelessWidget {
           height: 72,
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           decoration: BoxDecoration(
-            color: const Color(0xFF1A1C1F),
+            color: const Color(0xFF1F232A),
             borderRadius: BorderRadius.circular(999),
             border: Border.all(color: Colors.white10),
           ),
@@ -1112,7 +1112,7 @@ class _FlowNowStrip extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF111317),
+        color: const Color(0xFF1F232A),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white12),
       ),
@@ -1274,7 +1274,7 @@ class _FlowNowStrip extends ConsumerWidget {
         if (displayTask != null) ...[
           const SizedBox(height: 8),
           Material(
-            color: const Color(0xFF1A1D22),
+            color: const Color(0xFF1F232A),
             borderRadius: BorderRadius.circular(10),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -1999,7 +1999,7 @@ class _NeonCard extends StatelessWidget {
     return Container(
       padding: padding ?? const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF111317),
+        color: const Color(0xFF1F232A),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.white12),
       ),
@@ -2292,7 +2292,7 @@ class _CoachAiFab extends ConsumerWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: const Color(0xFF262626).withValues(alpha: 0.85),
+              color: const Color(0xFF262B33).withValues(alpha: 0.85),
               shape: BoxShape.circle,
               border: Border.all(
                 color: const Color(0xFFEAFFB8).withValues(alpha: 0.25),

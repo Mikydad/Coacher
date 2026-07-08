@@ -135,7 +135,7 @@ class _FilterChipRow extends StatelessWidget {
               ),
               selected: isSelected,
               selectedColor: const Color(0xFFB7FF00),
-              backgroundColor: const Color(0xFF1C2029),
+              backgroundColor: const Color(0xFF1F232A),
               side: BorderSide(
                 color: isSelected
                     ? const Color(0xFFB7FF00)
@@ -174,7 +174,7 @@ class _ActivityCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF14171C),
+        color: const Color(0xFF1E2126),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
             color: Colors.white.withValues(alpha: 0.06)),
@@ -241,7 +241,7 @@ class _SystemActivityPill extends StatelessWidget {
         padding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFF1C2029),
+          color: const Color(0xFF1F232A),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(

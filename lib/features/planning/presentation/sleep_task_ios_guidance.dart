@@ -13,7 +13,7 @@ Future<void> showSleepTaskIosFocusGuidance(
   if (!Platform.isIOS) return;
   await showModalBottomSheet<void>(
     context: context,
-    backgroundColor: const Color(0xFF181818),
+    backgroundColor: const Color(0xFF1F232A),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),

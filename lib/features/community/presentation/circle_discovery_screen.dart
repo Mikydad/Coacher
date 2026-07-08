@@ -192,9 +192,9 @@ class _CircleDiscoveryScreenState
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0F12),
+      backgroundColor: const Color(0xFF15171B),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF14171C),
+        backgroundColor: const Color(0xFF1E2126),
         foregroundColor: const Color(0xFFF0F4FF),
         title: const Text(
           'Discover circles',
@@ -374,7 +374,7 @@ class _RecommendedCircleCard extends StatelessWidget {
         width: 180,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFF14171C),
+          color: const Color(0xFF1E2126),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: const Color(0xFFB7FF00).withValues(alpha: 0.3),
@@ -482,7 +482,7 @@ class _CategoryChipRow extends StatelessWidget {
             ),
             selected: isSelected,
             selectedColor: const Color(0xFFB7FF00),
-            backgroundColor: const Color(0xFF1C2029),
+            backgroundColor: const Color(0xFF1F232A),
             side: BorderSide(
               color: isSelected
                   ? const Color(0xFFB7FF00)
@@ -532,7 +532,7 @@ class _SearchTab extends StatelessWidget {
               prefixIcon: const Icon(Icons.search_rounded,
                   color: Color(0xFF8A8FA8)),
               filled: true,
-              fillColor: const Color(0xFF14171C),
+              fillColor: const Color(0xFF1E2126),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
@@ -611,7 +611,7 @@ class _CircleCardState extends State<_CircleCard> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF14171C),
+        color: const Color(0xFF1E2126),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white.withOpacity(0.06)),
       ),
@@ -697,9 +697,9 @@ class _CircleCardState extends State<_CircleCard> {
                     },
               style: FilledButton.styleFrom(
                 backgroundColor: isJoined
-                    ? const Color(0xFF1C2029)
+                    ? const Color(0xFF1F232A)
                     : isFull
-                        ? const Color(0xFF1C2029)
+                        ? const Color(0xFF1F232A)
                         : const Color(0xFFB7FF00),
                 foregroundColor: isJoined
                     ? const Color(0xFF8A8FA8)
@@ -770,7 +770,7 @@ class _PolicyBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C2029),
+        color: const Color(0xFF1F232A),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(

@@ -170,11 +170,11 @@ class _SkeletonCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       height: 88,
       decoration: BoxDecoration(
-        color: const Color(0xFF201f1f),
+        color: const Color(0xFF1F232A),
         borderRadius: BorderRadius.circular(16),
         border: const Border(
           left: BorderSide(
-            color: Color(0xFF3A3A3A),
+            color: Color(0xFF3A4048),
             width: 3,
           ),
         ),
@@ -200,7 +200,7 @@ class _SkeletonCard extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: const Color(0xFF2E2E2E),
+        color: const Color(0xFF2C323B),
         borderRadius: BorderRadius.circular(4),
       ),
     );
