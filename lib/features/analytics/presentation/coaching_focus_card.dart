@@ -493,6 +493,11 @@ class _CardShell extends StatelessWidget {
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
+          const BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
         ],
       ),
       child: child,

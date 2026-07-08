@@ -19,6 +19,8 @@ class AppPalette {
     required this.accentDim,
     required this.accentBright,
     required this.accentDeep,
+    required this.onAccent,
+    required this.homeHeroCard,
     required this.cyan,
     required this.cyanDeep,
     required this.mint,
@@ -128,6 +130,13 @@ class AppPalette {
 
   /// Text/icons ON the lime button.
   final Color accentDeep;
+
+  /// Foreground for accent-filled chips/buttons. Dark mode's accent is
+  /// bright lime → ink text; light mode's accent is dark olive → white.
+  final Color onAccent;
+
+  /// Home top analytics card — a touch dimmer than plain white cards.
+  final Color homeHeroCard;
   // Secondary accents (light values darkened for white surfaces).
   final Color cyan;
   final Color cyanDeep;
@@ -256,6 +265,8 @@ class AppPalette {
     accentDim: Color(0xFFB2ED00),
     accentBright: Color(0xFFBEFC00),
     accentDeep: Color(0xFF445D00),
+    onAccent: Color(0xFF0E0E0E),
+    homeHeroCard: Color(0xFF111317),
     // Secondary accents (light values darkened for white surfaces).
     cyan: Color(0xFF00E3FD),
     cyanDeep: Color(0xFF00CFFF),
@@ -376,13 +387,15 @@ class AppPalette {
     accentDim: Color(0xFF557300),
     accentBright: Color(0xFFC0FF00),
     accentDeep: Color(0xFF384E00),
+    onAccent: Color(0xFFFFFFFF),
+    homeHeroCard: Color(0xFFECEEF1),
     cyan: Color(0xFF0E7490),
     cyanDeep: Color(0xFF155E75),
     mint: Color(0xFF047857),
     success: Color(0xFF15803D),
     violet: Color(0xFF5B45D6),
     violetSoft: Color(0xFF4F46B8),
-    pink: Color(0xFFEFF1F4),
+    pink: Color(0xFFECEDEF),
     coral: Color(0xFFC24E2F),
     orange: Color(0xFFC2410C),
     amber: Color(0xFFB45309),
@@ -401,24 +414,24 @@ class AppPalette {
     fg54: Color(0xFF6B6B6B),
     fg38: Color(0xFF9E9E9E),
     fg24: Color(0x33000000),
-    fg12: Color(0x1F000000),
+    fg12: Color(0x14000000),
     fg10: Color(0x1A000000),
-    scaffold: Color(0xFFEFF1F4),
+    scaffold: Color(0xFFECEDEF),
     surfaceCard: Color(0xFFFFFFFF),
-    surfaceDark: Color(0xFFE8EBEF),
-    surfaceSlate: Color(0xFFDDE1E6),
-    surfaceMuted: Color(0xFFE4E7EB),
-    surfacePanel: Color(0xFFF7F8FA),
-    surfaceDeep: Color(0xFFE8EBEF),
+    surfaceDark: Color(0xFFF4F5F7),
+    surfaceSlate: Color(0xFFE3E6EA),
+    surfaceMuted: Color(0xFFEDF0F3),
+    surfacePanel: Color(0xFFFFFFFF),
+    surfaceDeep: Color(0xFFEDF0F3),
     ink: Color(0xFFF9F9F9),
     inkCard: Color(0xFFFFFFFF),
-    inkWarm: Color(0xFFF5F6F8),
-    inkElevated: Color(0xFFE4E7EB),
-    inkSoft: Color(0xFFDDE1E6),
-    inkDeep: Color(0xFFF5F6F8),
+    inkWarm: Color(0xFFFFFFFF),
+    inkElevated: Color(0xFFE9EBEE),
+    inkSoft: Color(0xFFE3E6EA),
+    inkDeep: Color(0xFFFFFFFF),
     actionTileActive: Color(0xFF1A1C1C),
     onActionTileActive: Color(0xFFFFFFFF),
-    actionTile: Color(0xFFE2E5E9),
+    actionTile: Color(0xFFE6E6E6),
     onActionTile: Color(0xFF1A1C1C),
     limeCream: Color(0xFF4C6700),
     limeSoft: Color(0xFF557300),
@@ -446,30 +459,30 @@ class AppPalette {
     graySlate: Color(0xFF6B7280),
     graySlateDeep: Color(0xFF9CA3AF),
     gray55: Color(0xFF8E8E8E),
-    gray3A: Color(0xFFCFD4DA),
-    gray33: Color(0xFFD8DCE1),
-    gray2A: Color(0xFFE1E4E8),
+    gray3A: Color(0xFFD3D7DC),
+    gray33: Color(0xFFDDE0E4),
+    gray2A: Color(0xFFE4E6EA),
     grayWarm: Color(0xFF8A8686),
-    dark0B0D10: Color(0xFFEFF1F4),
+    dark0B0D10: Color(0xFFECEDEF),
     dark0D1117: Color(0xFFFFFFFF),
-    dark0F0F1A: Color(0xFFEFF1F4),
+    dark0F0F1A: Color(0xFFECEDEF),
     dark111111: Color(0xFFFFFFFF),
     dark121212: Color(0xFFFFFFFF),
     dark151718: Color(0xFFFFFFFF),
     dark181818: Color(0xFFFFFFFF),
     dark1A1919: Color(0xFFFFFFFF),
-    dark1A1D22: Color(0xFFE8EBEF),
+    dark1A1D22: Color(0xFFECEDEF),
     dark1A2535: Color(0xFFE7F0FA),
-    dark1E1E1E: Color(0xFFD8DCE1),
-    dark1E1E2E: Color(0xFFE8EBEF),
+    dark1E1E1E: Color(0xFFDDE0E4),
+    dark1E1E2E: Color(0xFFF4F5F7),
     dark1E2A2A: Color(0xFFE6F0F0),
-    dark1F2026: Color(0xFFE4E7EB),
-    dark222528: Color(0xFFE4E7EB),
-    dark2A2D32: Color(0xFFD8DCE1),
-    dark2A2D33: Color(0xFFE2E5E9),
-    dark2B2D31: Color(0xFFE2E5E9),
-    dark2C2C2C: Color(0xFFDDE1E6),
-    whiteBorder8: Color(0x1F000000),
+    dark1F2026: Color(0xFFE9EBEE),
+    dark222528: Color(0xFFE9EBEE),
+    dark2A2D32: Color(0xFFDDE0E4),
+    dark2A2D33: Color(0xFFEDF0F3),
+    dark2B2D31: Color(0xFFE4E6EA),
+    dark2C2C2C: Color(0xFFE3E6EA),
+    whiteBorder8: Color(0x14000000),
     whiteGlow20: Color(0x33000000),
     cyanBorder20: Color(0x330E7490),
     blackScrim50: Color(0x801A1A1A),
@@ -488,6 +501,8 @@ abstract final class AppColors {
   static Color get accentDim => palette.accentDim;
   static Color get accentBright => palette.accentBright;
   static Color get accentDeep => palette.accentDeep;
+  static Color get onAccent => palette.onAccent;
+  static Color get homeHeroCard => palette.homeHeroCard;
   // Secondary accents (light values darkened for white surfaces).
   static Color get cyan => palette.cyan;
   static Color get cyanDeep => palette.cyanDeep;

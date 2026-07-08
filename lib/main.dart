@@ -9,6 +9,7 @@ import 'app/app.dart';
 import 'app/app_lifecycle_task_refresh.dart';
 import 'app/application/main_tab_navigation.dart';
 import 'app/first_launch_gate.dart';
+import 'app/presentation/animated_splash.dart';
 import 'core/bootstrap/app_bootstrap.dart';
 import 'core/presentation/theme_brightness_controller.dart';
 import 'features/auth/presentation/auth_gate.dart';
@@ -44,9 +45,11 @@ Future<void> main() async {
       runApp(
         UncontrolledProviderScope(
           container: container,
-          child: const AuthGate(
-            child: FirstLaunchGate(
-              child: AppLifecycleTaskRefresh(child: CoachForLifeApp()),
+          child: const AnimatedSplashGate(
+            child: AuthGate(
+              child: FirstLaunchGate(
+                child: AppLifecycleTaskRefresh(child: CoachForLifeApp()),
+              ),
             ),
           ),
         ),

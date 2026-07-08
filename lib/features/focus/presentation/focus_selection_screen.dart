@@ -14,7 +14,7 @@ import '../../planning/domain/add_task_duration.dart';
 import '../application/focus_quick_task.dart';
 import '../application/focus_task_resume.dart';
 import '../../timer/presentation/timer_session_screen.dart';
-import '../../home/presentation/quittr_app_bar_title.dart';
+import '../../home/presentation/pathpal_app_bar_title.dart';
 import 'focus_session_duration_picker.dart';
 
 import '../../../core/presentation/app_colors.dart';
@@ -252,7 +252,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const QuittrAppBarTitle(),
+          title: const PathPalAppBarTitle(),
           actions: [
             IconButton(
               tooltip: 'Refresh list',
@@ -351,7 +351,9 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
                 backgroundColor: hasRunningTask
                     ? AppColors.dark2B2D31
                     : AppColors.accent,
-                foregroundColor: hasRunningTask ? AppColors.fg : Colors.black,
+                foregroundColor: hasRunningTask
+                    ? AppColors.fg
+                    : AppColors.onAccent,
               ),
               onPressed: hasRunningTask
                   ? () => Navigator.pushNamed(

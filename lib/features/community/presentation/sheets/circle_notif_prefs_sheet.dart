@@ -219,7 +219,7 @@ class _CircleNotifPrefsSheetState extends ConsumerState<CircleNotifPrefsSheet> {
                         onPressed: _saving ? null : _save,
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.accent,
-                          foregroundColor: Colors.black,
+                          foregroundColor: AppColors.onAccent,
                           minimumSize: const Size.fromHeight(48),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),

@@ -17,7 +17,7 @@ import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/domain/models/analytics_event.dart';
 import '../../scoring/application/scoring_controller.dart';
 import '../../scoring/presentation/score_task_dialog.dart';
-import '../../home/presentation/quittr_app_bar_title.dart';
+import '../../home/presentation/pathpal_app_bar_title.dart';
 import '../../planning/application/planned_task_actions.dart';
 import '../../time_blocks/application/time_block_providers.dart';
 
@@ -348,7 +348,7 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const QuittrAppBarTitle()),
+      appBar: AppBar(title: const PathPalAppBarTitle()),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) => SingleChildScrollView(
@@ -479,7 +479,7 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                                 : AppColors.accent,
                             foregroundColor: running
                                 ? AppColors.fg
-                                : Colors.black,
+                                : AppColors.onAccent,
                           ),
                           onPressed: () {
                             if (running) {

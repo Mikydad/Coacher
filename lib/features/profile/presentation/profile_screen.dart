@@ -240,7 +240,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: Padding(
                   padding: const EdgeInsets.only(top: 24, bottom: 40),
                   child: Text(
-                    'QUITTR V1.0 BUILD 2026.X',
+                    'PATHPAL V1.0 BUILD 2026.X',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 10,
@@ -674,7 +674,7 @@ class _DisciplineTile extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
-                              color: _kOnPrimaryFixed,
+                              color: AppColors.onAccent,
                             ),
                           ),
                         ),

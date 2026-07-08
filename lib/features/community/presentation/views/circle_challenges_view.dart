@@ -38,7 +38,7 @@ class CircleChallengesView extends ConsumerWidget {
           builder: (_) => ChallengeCreateSheet(circleId: circleId),
         ),
         backgroundColor: AppColors.accent,
-        foregroundColor: Colors.black,
+        foregroundColor: AppColors.onAccent,
         icon: const Icon(Icons.add),
         label: const Text(
           'New challenge',
@@ -750,7 +750,7 @@ class _ManualProgressSheetState extends ConsumerState<_ManualProgressSheet> {
                     onPressed: _uploading ? null : _submit,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.accent,
-                      foregroundColor: Colors.black,
+                      foregroundColor: AppColors.onAccent,
                       minimumSize: const Size.fromHeight(48),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -816,7 +816,7 @@ class _EmptyState extends StatelessWidget {
               label: const Text('New challenge'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.accent,
-                foregroundColor: Colors.black,
+                foregroundColor: AppColors.onAccent,
               ),
             ),
           ],

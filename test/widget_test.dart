@@ -17,7 +17,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Quittr'), findsOneWidget);
+    expect(find.text('PathPal'), findsOneWidget);
     expect(find.text('Progress'), findsOneWidget);
   });
 }

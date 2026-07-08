@@ -255,7 +255,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
       onPressed: _saving ? null : _save,
       style: FilledButton.styleFrom(
         backgroundColor: AppColors.accent,
-        foregroundColor: Colors.black,
+        foregroundColor: AppColors.onAccent,
         minimumSize: const Size.fromHeight(52),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),

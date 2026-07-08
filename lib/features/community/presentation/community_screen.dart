@@ -96,7 +96,7 @@ class CommunityScreen extends ConsumerWidget {
         heroTag: 'community_tab_fab',
         onPressed: () => _showCreateOrDiscover(context),
         backgroundColor: AppColors.accent,
-        foregroundColor: Colors.black,
+        foregroundColor: AppColors.onAccent,
         icon: const Icon(Icons.add_rounded),
         label: const Text(
           'Circle',
@@ -233,7 +233,7 @@ class _EmptyState extends StatelessWidget {
                 onPressed: onCreate,
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.black,
+                  foregroundColor: AppColors.onAccent,
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),

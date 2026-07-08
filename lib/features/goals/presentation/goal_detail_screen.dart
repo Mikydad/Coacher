@@ -11,7 +11,7 @@ import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/application/daily_analytics_providers.dart';
 import '../../analytics/application/delivery_providers.dart';
 import '../../analytics/domain/models/analytics_event.dart';
-import '../../home/presentation/quittr_app_bar_title.dart';
+import '../../home/presentation/pathpal_app_bar_title.dart';
 import '../application/goal_intensity_mode.dart';
 import '../application/goal_period_helpers.dart';
 import '../application/goals_providers.dart';
@@ -70,7 +70,7 @@ class GoalDetailScreen extends ConsumerWidget {
       backgroundColor: AppColors.ink,
       appBar: AppBar(
         backgroundColor: AppColors.ink,
-        title: const QuittrAppBarTitle(),
+        title: const PathPalAppBarTitle(),
       ),
       body: Center(
         child: spinner
@@ -126,7 +126,7 @@ class GoalDetailScreen extends ConsumerWidget {
           backgroundColor: AppColors.ink,
           appBar: AppBar(
             backgroundColor: AppColors.ink,
-            title: const QuittrAppBarTitle(),
+            title: const PathPalAppBarTitle(),
             actions: [
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_horiz),

@@ -388,7 +388,7 @@ class TaskDetailScreen extends ConsumerWidget {
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.accent,
-                      foregroundColor: Colors.black,
+                      foregroundColor: AppColors.onAccent,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     onPressed: completed

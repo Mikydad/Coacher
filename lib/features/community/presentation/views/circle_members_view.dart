@@ -353,7 +353,7 @@ class _PendingMemberTile extends StatelessWidget {
             onPressed: onApprove,
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.accent,
-              foregroundColor: Colors.black,
+              foregroundColor: AppColors.onAccent,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               minimumSize: const Size(0, 36),
             ),

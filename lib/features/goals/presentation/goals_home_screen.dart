@@ -36,7 +36,7 @@ class GoalsHomeScreen extends ConsumerWidget {
         onPressed: () =>
             Navigator.pushNamed(context, GoalTemplatePickerScreen.routeName),
         backgroundColor: AppColors.accent,
-        foregroundColor: Colors.black,
+        foregroundColor: AppColors.onAccent,
         icon: const Icon(Icons.add),
         label: const Text('New goal'),
       ),

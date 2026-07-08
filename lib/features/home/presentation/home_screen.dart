@@ -55,7 +55,7 @@ import '../../context_override/presentation/active_override_banner.dart';
 import '../../context_override/presentation/context_override_quick_activate_sheet.dart';
 import '../../context_override/presentation/post_override_review_card.dart';
 import '../../timer/presentation/timer_session_screen.dart';
-import 'quittr_app_bar_title.dart';
+import 'pathpal_app_bar_title.dart';
 
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/async_value_ui.dart';
@@ -89,7 +89,7 @@ class HomeScreen extends ConsumerWidget {
       floatingActionButton: const _CoachHomeFab(),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       appBar: AppBar(
-        title: const QuittrAppBarTitle(),
+        title: const PathPalAppBarTitle(),
         actions: [
           const _SyncFromCloudAction(),
           IconButton(
@@ -608,6 +608,7 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
   Widget build(BuildContext context) {
     final bundleAsync = ref.watch(analyticsPeriodBundleProvider);
     return _NeonCard(
+      color: AppColors.homeHeroCard,
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: bundleAsync.when(
         skipLoadingOnReload: true,
@@ -1080,6 +1081,13 @@ class _ActionCircle extends StatelessWidget {
               decoration: BoxDecoration(
                 color: tileColor,
                 borderRadius: BorderRadius.circular(22),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x14000000),
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
+                  ),
+                ],
               ),
               child: Center(child: Icon(icon, color: glyphColor, size: 26)),
             ),
@@ -1130,6 +1138,13 @@ class _FlowNowStrip extends ConsumerWidget {
         color: AppColors.surfacePanel,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.fg12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: flowSnapshotAsync.when(
         data: (flow) => _buildContent(context, ref, flow, execState, todayRows),
@@ -1328,7 +1343,7 @@ class _FlowNowStrip extends ConsumerWidget {
                                         : 'Focus active')
                                   : 'Next up',
                               style: TextStyle(
-                                color: _kMuted,
+                                color: AppColors.fg,
                                 fontSize: 10,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -1356,7 +1371,10 @@ class _FlowNowStrip extends ConsumerWidget {
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: _kMuted, fontSize: 11),
+                              style: TextStyle(
+                                color: AppColors.fg,
+                                fontSize: 11,
+                              ),
                             ),
                           ],
                         ),
@@ -2013,19 +2031,29 @@ Future<({OverrideReasonCategory reason, String note})?> _promptOverrideReason(
 }
 
 class _NeonCard extends StatelessWidget {
-  const _NeonCard({required this.child, this.padding});
+  const _NeonCard({required this.child, this.padding, this.color});
 
   final Widget child;
   final EdgeInsetsGeometry? padding;
+
+  /// Card surface override (e.g. the analytics hero uses a dimmer tone).
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: padding ?? const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfacePanel,
+        color: color ?? AppColors.surfacePanel,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: AppColors.fg12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: child,
     );
