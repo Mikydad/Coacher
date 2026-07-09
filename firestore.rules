@@ -185,5 +185,33 @@ service cloud.firestore {
         allow read, write: if isCircleModerator(circleId);
       }
     }
+
+    // ─── Feedback ──────────────────────────────────────────────────────────
+    // In-app bug reports / feature requests / questions. Create-only from
+    // clients; reports are reviewed in the Firebase console (no client read).
+    // The hasOnly key list MUST mirror FeedbackReport.toMap() — a unit test
+    // (feedback_report_model_test.dart "toMap key set…") guards the pair.
+
+    match /feedback/{feedbackId} {
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasOnly(
+             ['userId', 'type', 'message', 'context', 'screenshotUrl',
+              'status', 'createdAtMs', 'schemaVersion'])
+        && request.resource.data.keys().hasAll(
+             ['userId', 'type', 'message', 'context', 'status',
+              'createdAtMs', 'schemaVersion'])
+        && request.resource.data.type in ['bug', 'feature', 'question', 'other']
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 2000
+        && request.resource.data.context is map
+        && request.resource.data.status == 'new'
+        && request.resource.data.createdAtMs is int
+        && request.resource.data.schemaVersion is int
+        && (!('screenshotUrl' in request.resource.data)
+            || request.resource.data.screenshotUrl is string);
+      allow read, update, delete: if false;
+    }
   }
 }

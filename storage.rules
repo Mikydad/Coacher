@@ -46,5 +46,18 @@ service firebase.storage {
         && isValidImageUpload()
         && fileName.matches(request.auth.uid + '_.*');
     }
+
+    // Feedback screenshots (tester bug reports) — uid-scoped, create-only,
+    // PNG only, 5MB cap. No client read: reports are reviewed in the
+    // Firebase console. Path is written by FeedbackScreenshotStorage.
+    match /feedback/{uid}/{fileName} {
+      allow read: if false;
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && fileName.matches(request.auth.uid + '_.*')
+        && request.resource.contentType == 'image/png'
+        && request.resource.size < 5 * 1024 * 1024;
+      allow update, delete: if false;
+    }
   }
 }
