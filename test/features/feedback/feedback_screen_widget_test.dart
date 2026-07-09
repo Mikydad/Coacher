@@ -16,7 +16,8 @@ class _RecordingRepository implements FeedbackRepository {
   @override
   Future<void> submit(
     FeedbackReport report, {
-    Uint8List? screenshotPngBytes,
+    Uint8List? screenshotBytes,
+    String screenshotContentType = 'image/png',
   }) async {
     submitted.add(report);
   }

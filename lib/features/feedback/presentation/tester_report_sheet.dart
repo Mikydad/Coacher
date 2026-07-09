@@ -55,7 +55,7 @@ class _TesterReportSheetState extends ConsumerState<TesterReportSheet> {
           .submit(
             type: _type,
             message: message,
-            screenshotPngBytes: _includeScreenshot ? widget.screenshot : null,
+            screenshotBytes: _includeScreenshot ? widget.screenshot : null,
             contextOverride: widget.contextSnapshot,
           );
       messenger.showSnackBar(

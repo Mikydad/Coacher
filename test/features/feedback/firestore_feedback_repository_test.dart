@@ -35,7 +35,9 @@ void main() {
     ScreenshotUploader? uploader,
     bool failingWriter = false,
   }) => FirestoreFeedbackRepository(
-    uploader: uploader ?? (_, _, _) async => 'https://unused',
+    uploader:
+        uploader ??
+        (_, _, _, {contentType = 'image/png'}) async => 'https://unused',
     docWriter: failingWriter
         ? (_, _) async => throw Exception('offline')
         : (path, payload) => fs.doc(path).set(payload),
@@ -55,16 +57,23 @@ void main() {
 
   test('uploads screenshot first and stores its URL on the create', () async {
     Uint8List? uploadedBytes;
+    String? uploadedContentType;
     final r = repo(
-      uploader: (bytes, uid, reportId) async {
+      uploader: (bytes, uid, reportId, {contentType = 'image/png'}) async {
         uploadedBytes = bytes;
+        uploadedContentType = contentType;
         return 'https://storage/feedback/${uid}_$reportId.png';
       },
     );
 
-    await r.submit(_report(), screenshotPngBytes: Uint8List.fromList([1, 2]));
+    await r.submit(
+      _report(),
+      screenshotBytes: Uint8List.fromList([1, 2]),
+      screenshotContentType: 'image/jpeg',
+    );
 
     expect(uploadedBytes, isNotNull);
+    expect(uploadedContentType, 'image/jpeg');
     final data = (await fs.doc('feedback/feedback_1').get()).data()!;
     expect(
       data['screenshotUrl'],
@@ -73,9 +82,12 @@ void main() {
   });
 
   test('degrades to text-only when the screenshot upload throws', () async {
-    final r = repo(uploader: (_, _, _) async => throw Exception('no network'));
+    final r = repo(
+      uploader: (_, _, _, {contentType = 'image/png'}) async =>
+          throw Exception('no network'),
+    );
 
-    await r.submit(_report(), screenshotPngBytes: Uint8List.fromList([1]));
+    await r.submit(_report(), screenshotBytes: Uint8List.fromList([1]));
 
     final data = (await fs.doc('feedback/feedback_1').get()).data()!;
     expect(data.containsKey('screenshotUrl'), isFalse);

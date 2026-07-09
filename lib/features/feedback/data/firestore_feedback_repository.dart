@@ -8,7 +8,12 @@ import 'feedback_repository.dart';
 import 'feedback_screenshot_storage.dart';
 
 typedef ScreenshotUploader =
-    Future<String> Function(Uint8List pngBytes, String uid, String reportId);
+    Future<String> Function(
+      Uint8List bytes,
+      String uid,
+      String reportId, {
+      String contentType,
+    });
 typedef FeedbackDocWriter =
     Future<void> Function(String path, Map<String, dynamic> payload);
 
@@ -35,16 +40,18 @@ class FirestoreFeedbackRepository implements FeedbackRepository {
   @override
   Future<void> submit(
     FeedbackReport report, {
-    Uint8List? screenshotPngBytes,
+    Uint8List? screenshotBytes,
+    String screenshotContentType = 'image/png',
   }) async {
     report.validate();
     var effective = report;
-    if (screenshotPngBytes != null) {
+    if (screenshotBytes != null) {
       try {
         final url = await _uploader(
-          screenshotPngBytes,
+          screenshotBytes,
           report.userId,
           report.id,
+          contentType: screenshotContentType,
         );
         effective = report.copyWith(screenshotUrl: url);
       } catch (_) {

@@ -19,14 +19,23 @@ class TesterBugBubbleLayer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final visible =
-        ref.watch(testerModeProvider) &&
-        !ref.watch(bubbleHiddenForCaptureProvider);
-    if (!visible) return const SizedBox.shrink();
+    if (!ref.watch(testerModeProvider)) return const SizedBox.shrink();
+    // Hide-for-capture must use Opacity, NOT tree removal: the bubble's own
+    // state runs the capture flow, and removing it would dispose that state
+    // mid-flight — stranding the hidden flag as true (bubble gone until the
+    // next app launch). Opacity(0) is skipped by painting, so the bubble
+    // still never shows up in its own screenshot.
+    final hidden = ref.watch(bubbleHiddenForCaptureProvider);
     // No Material ancestor above the Navigator — provide one for ink/shadows.
-    return const Material(
-      type: MaterialType.transparency,
-      child: _DraggableBubble(),
+    return IgnorePointer(
+      ignoring: hidden,
+      child: Opacity(
+        opacity: hidden ? 0 : 1,
+        child: const Material(
+          type: MaterialType.transparency,
+          child: _DraggableBubble(),
+        ),
+      ),
     );
   }
 }
@@ -66,11 +75,13 @@ class _DraggableBubbleState extends ConsumerState<_DraggableBubble> {
       ref.read(bubbleHiddenForCaptureProvider.notifier).state = true;
       await WidgetsBinding.instance.endOfFrame;
       final bytes = await captureAppScreenshot();
+      if (!mounted) return;
       ref.read(bubbleHiddenForCaptureProvider.notifier).state = false;
 
       final snapshot = await ref
           .read(feedbackContextCollectorProvider)
           .collect();
+      if (!mounted) return;
 
       // The bubble lives above the Navigator; the sheet needs a context
       // inside it.

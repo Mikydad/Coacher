@@ -42,7 +42,8 @@ class FeedbackSubmitService {
   Future<void> submit({
     required FeedbackType type,
     required String message,
-    Uint8List? screenshotPngBytes,
+    Uint8List? screenshotBytes,
+    String screenshotContentType = 'image/png',
     Map<String, String>? contextOverride,
   }) async {
     final prefs = await SharedPreferences.getInstance();
@@ -63,7 +64,11 @@ class FeedbackSubmitService {
       context: contextOverride ?? await collector.collect(),
       createdAtMs: nowMs,
     );
-    await repository.submit(report, screenshotPngBytes: screenshotPngBytes);
+    await repository.submit(
+      report,
+      screenshotBytes: screenshotBytes,
+      screenshotContentType: screenshotContentType,
+    );
 
     // Only a successful (or queued-for-replay) submit arms the cool-down.
     await prefs.setInt(_kLastSubmitKey, nowMs);

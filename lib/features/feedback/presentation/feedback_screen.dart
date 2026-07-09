@@ -1,7 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../community/data/circle_proof_storage.dart'
+    show imageExtensionFromPath, contentTypeForImageExtension;
 import '../../settings/presentation/settings_page_scaffold.dart';
 import '../application/feedback_submit_service.dart';
 import '../domain/models/feedback_report.dart';
@@ -27,11 +32,30 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
   final TextEditingController _messageController = TextEditingController();
   FeedbackType _type = FeedbackType.bug;
   bool _submitting = false;
+  Uint8List? _screenshotBytes;
+  String _screenshotContentType = 'image/jpeg';
 
   @override
   void dispose() {
     _messageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickScreenshot() async {
+    // Same compression as the circle chat proof picker.
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+      maxWidth: 1080,
+    );
+    if (picked == null || !mounted) return;
+    final bytes = await picked.readAsBytes();
+    final ext = imageExtensionFromPath(picked.path, mimeType: picked.mimeType);
+    if (!mounted) return;
+    setState(() {
+      _screenshotBytes = bytes;
+      _screenshotContentType = contentTypeForImageExtension(ext);
+    });
   }
 
   Future<void> _send() async {
@@ -43,7 +67,12 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
     try {
       await ref
           .read(feedbackSubmitServiceProvider)
-          .submit(type: _type, message: message);
+          .submit(
+            type: _type,
+            message: message,
+            screenshotBytes: _screenshotBytes,
+            screenshotContentType: _screenshotContentType,
+          );
       messenger.showSnackBar(
         const SnackBar(content: Text('Feedback sent — thank you!')),
       );
@@ -122,6 +151,58 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
             ),
           ),
         ),
+        const SizedBox(height: 8),
+        if (_screenshotBytes == null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _pickScreenshot,
+              icon: Icon(
+                Icons.add_photo_alternate_outlined,
+                size: 20,
+                color: AppColors.accent,
+              ),
+              label: Text(
+                'Add screenshot (optional)',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.accent,
+                ),
+              ),
+            ),
+          )
+        else
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.memory(
+                  _screenshotBytes!,
+                  height: 96,
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Screenshot attached',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: kSettingsOnSurfaceVariant,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => setState(() => _screenshotBytes = null),
+                icon: Icon(
+                  Icons.close_rounded,
+                  size: 20,
+                  color: kSettingsOnSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,

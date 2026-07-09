@@ -36,6 +36,21 @@ void main() {
     expect(find.byIcon(Icons.bug_report_rounded), findsNothing);
   });
 
+  testWidgets('bubble survives a tap (hide-for-capture must not dispose it)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host(testerMode: true));
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.bug_report_rounded));
+    await tester.pumpAndSettle();
+
+    // Regression: hide-for-capture used to REMOVE the bubble from the tree,
+    // disposing the state mid-flow — the hidden flag never reset and the
+    // bubble vanished until the next app launch.
+    expect(find.byIcon(Icons.bug_report_rounded), findsOneWidget);
+  });
+
   testWidgets('bubble can be dragged and snaps to an edge', (tester) async {
     await tester.pumpWidget(_host(testerMode: true));
     await tester.pump();
