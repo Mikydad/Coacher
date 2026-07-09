@@ -137,6 +137,27 @@ This file tracks implementation/runtime errors encountered during development of
 - **Fix applied**: Dropped `orderBy`, sort client-side; declared the app’s genuinely-needed indexes in `firestore.indexes.json` (taskScores, aiPulse — both use `limit(1)`), wired into `firebase.json`, deployed.
 - **Status**: Resolved. See `documentation/2026-07_features_fixes_and_incidents.md` §7 and §9.
 
+## 19) Release/profile iOS build stuck on white screen — Crashlytics "urgent mode"
+- **Where**: Standalone launch from the home screen (release/profile build). Debug builds via `flutter run` were fine.
+- **Error / symptom**: App never left the native launch screen (white). Device log showed `Crashlytics skipped rotating the Install ID during urgent mode` and "uploading urgently" — then nothing.
+- **Root cause**: Crashlytics had pending crash reports from earlier boot failures. With native auto-collection enabled, `FirebaseApp.configure` enters **urgent mode** and blocks the main thread uploading those reports *before Flutter ever runs*. On a slow network that upload effectively never finishes → permanent white screen.
+- **Fix applied**: `FirebaseCrashlyticsCollectionEnabled=false` in `ios/Runner/Info.plist` (disables native auto-start), then enable at runtime in `lib/main.dart` with `.timeout(Duration(seconds: 4))` wrapped in try/catch so it can never block the first frame.
+- **Status**: Resolved. See `documentation/2026-07_features_fixes_and_incidents.md` §10.
+
+## 20) Release/profile iOS build white screen #2 — Isar symbols dead-stripped
+- **Where**: `Isar.open` during pre-frame bootstrap (`lib/core/offline/offline_store.dart`), release/profile builds only.
+- **Error / symptom**: Boot "hung" at `[boot] opening isar at …`. Once the zone error handler was taught to `print` (see below), the real error surfaced: `IsarError: Could not initialize IsarCore library for processor architecture "ios_arm64"`.
+- **Root cause**: `isar_community_flutter_libs` vendors a **static** `libisar.a`. Its FFI symbols are only referenced at runtime via `dlsym`, so the release/profile linker's dead-code stripping removes them all. Debug builds don't strip → "works in debug, white screen in release". **Masking bug**: the `runZonedGuarded` handler only forwarded errors to Crashlytics (itself not yet working), so a boot *crash* looked like a boot *hang*.
+- **Fix applied**: (a) `DEAD_CODE_STRIPPING = NO` in `ios/Flutter/Release.xcconfig` (Profile inherits it in the Flutter template). (b) Migrated `isar` 3.1.0 → `isar_community` 3.3.2 (maintained fork, drop-in v3 API, same on-disk format). (c) Zone handler in `main.dart` now ALWAYS prints the error + stack locally before Crashlytics. (d) `[boot]` breadcrumbs via `print` (survives release; `debugPrint` is silenced there) bracket every boot phase so a hang localizes itself.
+- **Status**: Resolved — profile build boots end-to-end on device. See `documentation/2026-07_features_fixes_and_incidents.md` §10.
+
+## 21) VM tests: `Incorrect Isar Core version` / `slice extends beyond end of file`
+- **Where**: `flutter test` after the isar_community 3.3.2 migration.
+- **Error / symptom**: First `IsarError: Incorrect Isar Core version: Required 3.3.2 found 3.1.0+1`; after deleting the old binary, `dlopen … slice 0 extends beyond end of file`.
+- **Root cause**: The gitignored repo-root `libisar.dylib` was (1) the stale 3.1.0 binary from stock Isar, then (2) a **truncated** download — `Isar.initializeIsarCore(download: true)` has no resume/retry, and the flaky network cut it at 182 KB of ~2.1 MB.
+- **Fix applied**: Delete `libisar.dylib`, re-download resumably: `curl -L --retry 100 --retry-all-errors -C - -o libisar.dylib https://binaries.isar-community.dev/3.3.2/libisar_macos.dylib`, verify with `file` (should say "Mach-O universal binary … x86_64 … arm64", ~2.1 MB). All 1005 tests then passed.
+- **Status**: Resolved. Supersedes the environment notes in #15 for the community fork.
+
 ---
 
 ## How to use this log

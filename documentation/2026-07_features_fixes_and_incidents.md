@@ -331,3 +331,102 @@ pre-existing routines query in `errors.md` #10) the **same** bug bit:
 **Don't** swallow query errors with `error: (_, _) => genericMessage`. At least
 log the exception — a `failed-precondition` message from Firestore includes a
 one-click console link to create the exact index.
+
+## 10. The release white-screen saga (2026-07-09)
+
+**Goal**: install a standalone release build on-device so the app can be tested
+"like a normal user" all day. **Symptom**: debug via `flutter run` worked
+perfectly; release (and profile) builds launched from the home screen sat on a
+white screen forever.
+
+It turned out to be **two independent bugs stacked on top of each other**, with
+a third bug hiding the second. Fixing only one still left a white screen, which
+is what made this so confusing.
+
+### 10a. Bug 1 — Crashlytics "urgent mode" blocks native startup
+
+Device logs showed
+`Crashlytics skipped rotating the Install ID during urgent mode` and
+"uploading urgently"… then silence. When Crashlytics has **pending crash
+reports** from previous launches and native auto-collection is on,
+`FirebaseApp.configure` blocks the main thread to upload them **before a single
+line of Flutter runs**. On a slow network the upload never completes → the
+launch screen never goes away. (Ironically, the pending crashes were from Bug 2
+— the bugs fed each other.)
+
+**Fix**
+- [`ios/Runner/Info.plist`](../ios/Runner/Info.plist):
+  `FirebaseCrashlyticsCollectionEnabled = false` — Crashlytics no longer
+  auto-starts natively, so it can never block `configure`.
+- [`lib/main.dart`](../lib/main.dart): enable collection at runtime instead,
+  wrapped in try/catch with a **4-second timeout** — crash reporting must never
+  cost the first frame.
+
+### 10b. Bug 2 — release linker dead-strips the Isar database engine
+
+After Bug 1, boot advanced but "hung" at opening the local database. The real
+error (revealed by Bug 3's fix):
+
+> `IsarError: Could not initialize IsarCore library for processor architecture "ios_arm64"`
+
+`isar_community_flutter_libs` ships the database engine as a **static library**
+(`libisar.a`). Nothing in Swift/ObjC references its symbols — Dart looks them
+up at runtime via `dlsym`. Release and profile builds run the linker with
+dead-code stripping, which sees "unreferenced symbols" and deletes the entire
+engine from the binary. Debug builds don't strip → the classic
+**"works in debug, broken in release"**.
+
+**Fix**
+- [`ios/Flutter/Release.xcconfig`](../ios/Flutter/Release.xcconfig):
+  `DEAD_CODE_STRIPPING = NO` (Profile inherits Release in the Flutter
+  template). Cost: a few hundred KB of binary size. A comment in the file
+  explains why it must stay.
+- Also migrated `isar` 3.1.0 → **`isar_community` 3.3.2**
+  ([`pubspec.yaml`](../pubspec.yaml), 62 import rewrites
+  `package:isar/` → `package:isar_community/`, codegen rerun). The stock
+  package is unmaintained; the community fork is a drop-in v3 replacement with
+  the **same on-disk data format** (no user-data migration), current bug fixes,
+  and active support. `Isar.open` → `Isar.openSync` in
+  [`offline_store.dart`](../lib/core/offline/offline_store.dart) (it runs
+  pre-frame anyway; sync surfaces errors with a clean stack).
+
+### 10c. Bug 3 — the error handler that turned crashes into "hangs"
+
+The `runZonedGuarded` error handler in `main.dart` forwarded uncaught errors
+**only to Crashlytics** — which (a) wasn't initialized yet during early boot
+and (b) was itself broken by Bug 1. So Bug 2's crash produced *zero output
+anywhere*: it looked exactly like a hang, and we spent hours chasing "why does
+Isar.open never return" when it was actually **throwing instantly**.
+
+**Fix** ([`lib/main.dart`](../lib/main.dart))
+- The zone handler now **always** `print`s the error + stack trace locally
+  *before* attempting Crashlytics.
+- `[boot]` **breadcrumbs** (`binding ready` → `pre-frame init done` →
+  `brightness loaded` → `runApp`, plus `opening isar at …` in
+  `offline_store.dart`) via raw `print` — `debugPrint` is deliberately silenced
+  in release, so breadcrumbs must use `print`. A future white screen will now
+  localize itself between two breadcrumbs in the device console
+  (`idevicesyslog` or Console.app).
+
+### 10d. Aftershock — VM tests and the stale/truncated `libisar.dylib`
+
+`flutter test` failed post-migration: the gitignored repo-root `libisar.dylib`
+was still the 3.1.0 binary (`Incorrect Isar Core version`), and Isar's
+auto-download has no retry/resume, so the flaky network left a truncated 182 KB
+file (`dlopen: slice extends beyond end of file`). Manual resumable download
+fixed it (full command in [`errors.md`](errors.md) #21); the full suite then
+passed **1005/1005**.
+
+### Lessons
+
+1. **"Works in debug, white screen in release" on iOS** → suspect AOT/linker
+   differences first: dead-code stripping of FFI static libs, JIT-only code
+   paths, silenced logging.
+2. **Never route errors only to a crash reporter** — especially during boot,
+   before the reporter is guaranteed alive. Print locally first.
+3. **Crash reporting must be fenced off from startup**: disable native
+   auto-start, enable at runtime with a timeout.
+4. **Breadcrumb the boot path** with `print`. The cost is a handful of log
+   lines; the payoff is that hangs and crashes localize themselves.
+5. When a fix "doesn't work", consider that there may be **two bugs** — the
+   Crashlytics fix *was* correct; Isar just failed right behind it.
