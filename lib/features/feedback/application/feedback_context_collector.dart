@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -20,6 +20,18 @@ final feedbackContextCollectorProvider = Provider<FeedbackContextCollector>(
   (ref) => FeedbackContextCollector(ref),
 );
 
+/// Native channel returning {model, osVersion} — implemented in
+/// AppDelegate.swift / MainActivity.kt. In-house instead of device_info_plus,
+/// whose iOS code doesn't compile against this Xcode SDK.
+const _deviceInfoChannel = MethodChannel('pathpal/device_info');
+
+Future<Map<String, String>> _loadDeviceInfo() async {
+  final raw = await _deviceInfoChannel.invokeMapMethod<String, String>(
+    'getDeviceInfo',
+  );
+  return raw ?? const {};
+}
+
 /// Assembles the diagnostic snapshot attached to every feedback report.
 ///
 /// Feedback must never fail because a plugin does: every lookup is fenced
@@ -28,17 +40,16 @@ class FeedbackContextCollector {
   FeedbackContextCollector(
     this._ref, {
     Future<PackageInfo> Function()? packageInfoLoader,
-    Future<BaseDeviceInfo> Function()? deviceInfoLoader,
+    Future<Map<String, String>> Function()? deviceInfoLoader,
     Future<List<ConnectivityResult>> Function()? connectivityLoader,
   }) : _packageInfoLoader = packageInfoLoader ?? PackageInfo.fromPlatform,
-       _deviceInfoLoader =
-           deviceInfoLoader ?? (() => DeviceInfoPlugin().deviceInfo),
+       _deviceInfoLoader = deviceInfoLoader ?? _loadDeviceInfo,
        _connectivityLoader =
            connectivityLoader ?? (() => Connectivity().checkConnectivity());
 
   final Ref _ref;
   final Future<PackageInfo> Function() _packageInfoLoader;
-  final Future<BaseDeviceInfo> Function() _deviceInfoLoader;
+  final Future<Map<String, String>> Function() _deviceInfoLoader;
   final Future<List<ConnectivityResult>> Function() _connectivityLoader;
 
   // Plugin answers never change mid-session — cache after first success.
@@ -75,13 +86,8 @@ class FeedbackContextCollector {
     await _guardAsync(() async {
       if (_deviceModel == null) {
         final info = await _deviceInfoLoader();
-        if (info is IosDeviceInfo) {
-          _deviceModel = info.utsname.machine;
-          _osVersion = info.systemVersion;
-        } else if (info is AndroidDeviceInfo) {
-          _deviceModel = info.model;
-          _osVersion = info.version.release;
-        }
+        _deviceModel = info['model'];
+        _osVersion = info['osVersion'];
       }
       out['deviceModel'] = _deviceModel ?? 'unknown';
       out['osVersion'] = _osVersion ?? 'unknown';
