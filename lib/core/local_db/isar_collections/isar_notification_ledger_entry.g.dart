@@ -81,6 +81,7 @@ const IsarNotificationLedgerEntrySchema = CollectionSchema(
       type: IsarType.long,
     ),
   },
+
   estimateSize: _isarNotificationLedgerEntryEstimateSize,
   serialize: _isarNotificationLedgerEntrySerialize,
   deserialize: _isarNotificationLedgerEntryDeserialize,
@@ -155,10 +156,11 @@ const IsarNotificationLedgerEntrySchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarNotificationLedgerEntryGetId,
   getLinks: _isarNotificationLedgerEntryGetLinks,
   attach: _isarNotificationLedgerEntryAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarNotificationLedgerEntryEstimateSize(

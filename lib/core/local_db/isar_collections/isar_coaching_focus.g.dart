@@ -49,6 +49,7 @@ const IsarCoachingFocusSchema = CollectionSchema(
       type: IsarType.long,
     ),
   },
+
   estimateSize: _isarCoachingFocusEstimateSize,
   serialize: _isarCoachingFocusSerialize,
   deserialize: _isarCoachingFocusDeserialize,
@@ -110,10 +111,11 @@ const IsarCoachingFocusSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarCoachingFocusGetId,
   getLinks: _isarCoachingFocusGetLinks,
   attach: _isarCoachingFocusAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarCoachingFocusEstimateSize(

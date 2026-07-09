@@ -49,6 +49,7 @@ const IsarAiSummarySchema = CollectionSchema(
       type: IsarType.string,
     ),
   },
+
   estimateSize: _isarAiSummaryEstimateSize,
   serialize: _isarAiSummarySerialize,
   deserialize: _isarAiSummaryDeserialize,
@@ -110,10 +111,11 @@ const IsarAiSummarySchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarAiSummaryGetId,
   getLinks: _isarAiSummaryGetLinks,
   attach: _isarAiSummaryAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarAiSummaryEstimateSize(

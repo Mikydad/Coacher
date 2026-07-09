@@ -49,6 +49,7 @@ const IsarUserProfilePreferenceSchema = CollectionSchema(
       type: IsarType.long,
     ),
   },
+
   estimateSize: _isarUserProfilePreferenceEstimateSize,
   serialize: _isarUserProfilePreferenceSerialize,
   deserialize: _isarUserProfilePreferenceDeserialize,
@@ -71,10 +72,11 @@ const IsarUserProfilePreferenceSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarUserProfilePreferenceGetId,
   getLinks: _isarUserProfilePreferenceGetLinks,
   attach: _isarUserProfilePreferenceAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarUserProfilePreferenceEstimateSize(

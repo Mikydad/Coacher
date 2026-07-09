@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../../features/context_override/domain/models/user_attention_state.dart';
 

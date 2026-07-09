@@ -51,6 +51,7 @@ const IsarDeliveryHistoryEntrySchema = CollectionSchema(
     r'scopeId': PropertySchema(id: 6, name: r'scopeId', type: IsarType.string),
     r'surface': PropertySchema(id: 7, name: r'surface', type: IsarType.string),
   },
+
   estimateSize: _isarDeliveryHistoryEntryEstimateSize,
   serialize: _isarDeliveryHistoryEntrySerialize,
   deserialize: _isarDeliveryHistoryEntryDeserialize,
@@ -130,10 +131,11 @@ const IsarDeliveryHistoryEntrySchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarDeliveryHistoryEntryGetId,
   getLinks: _isarDeliveryHistoryEntryGetLinks,
   attach: _isarDeliveryHistoryEntryAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarDeliveryHistoryEntryEstimateSize(

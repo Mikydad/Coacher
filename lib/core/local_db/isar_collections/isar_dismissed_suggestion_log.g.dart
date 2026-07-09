@@ -29,6 +29,7 @@ const IsarDismissedSuggestionLogSchema = CollectionSchema(
       type: IsarType.string,
     ),
   },
+
   estimateSize: _isarDismissedSuggestionLogEstimateSize,
   serialize: _isarDismissedSuggestionLogSerialize,
   deserialize: _isarDismissedSuggestionLogDeserialize,
@@ -64,10 +65,11 @@ const IsarDismissedSuggestionLogSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarDismissedSuggestionLogGetId,
   getLinks: _isarDismissedSuggestionLogGetLinks,
   attach: _isarDismissedSuggestionLogAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarDismissedSuggestionLogEstimateSize(

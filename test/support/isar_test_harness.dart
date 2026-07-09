@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:coach_for_life/core/local_db/isar_collections/isar_schemas.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 /// Loads Isar Core native library (required for `flutter test` VM, not only devices).
 Future<void> ensureIsarCoreForVmTests() async {

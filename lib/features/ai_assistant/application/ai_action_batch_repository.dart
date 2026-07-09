@@ -1,4 +1,4 @@
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../../core/local_db/isar_collections/isar_ai_action_batch.dart';
 import 'ai_action_batch_state.dart';

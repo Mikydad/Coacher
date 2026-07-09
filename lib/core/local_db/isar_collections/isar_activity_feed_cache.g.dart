@@ -31,6 +31,7 @@ const IsarActivityFeedCacheSchema = CollectionSchema(
     r'itemId': PropertySchema(id: 2, name: r'itemId', type: IsarType.string),
     r'payload': PropertySchema(id: 3, name: r'payload', type: IsarType.string),
   },
+
   estimateSize: _isarActivityFeedCacheEstimateSize,
   serialize: _isarActivityFeedCacheSerialize,
   deserialize: _isarActivityFeedCacheDeserialize,
@@ -79,10 +80,11 @@ const IsarActivityFeedCacheSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarActivityFeedCacheGetId,
   getLinks: _isarActivityFeedCacheGetLinks,
   attach: _isarActivityFeedCacheAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarActivityFeedCacheEstimateSize(

@@ -6,7 +6,7 @@ import 'package:coach_for_life/core/offline/offline_store.dart';
 import 'package:coach_for_life/features/analytics/data/feature_cache_repository.dart';
 import 'package:coach_for_life/features/analytics/domain/models/behavior_feature_object.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../support/behavior_time_metrics_fixture.dart';
 import '../../support/isar_test_harness.dart';

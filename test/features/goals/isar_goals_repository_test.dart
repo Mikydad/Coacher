@@ -7,7 +7,7 @@ import 'package:coach_for_life/features/goals/domain/models/goal_categories.dart
 import 'package:coach_for_life/features/goals/domain/models/goal_enums.dart';
 import 'package:coach_for_life/features/goals/domain/models/user_goal.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../support/isar_test_harness.dart';
 import '../../support/no_op_goals_repository.dart';

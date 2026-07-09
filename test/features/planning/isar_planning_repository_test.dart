@@ -5,7 +5,7 @@ import 'package:coach_for_life/core/sync/sync_service.dart';
 import 'package:coach_for_life/features/planning/data/isar_planning_repository.dart';
 import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../support/isar_test_harness.dart';
 import '../../support/no_op_planning_repository.dart';

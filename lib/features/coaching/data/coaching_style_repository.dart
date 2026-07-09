@@ -1,4 +1,4 @@
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../../core/local_db/isar_collections/isar_user_coaching_profile.dart';
 import '../../../core/offline/offline_store.dart';

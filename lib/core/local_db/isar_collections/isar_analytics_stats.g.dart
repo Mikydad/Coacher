@@ -47,6 +47,7 @@ const IsarAnalyticsStatsSchema = CollectionSchema(
       type: IsarType.long,
     ),
   },
+
   estimateSize: _isarAnalyticsStatsEstimateSize,
   serialize: _isarAnalyticsStatsSerialize,
   deserialize: _isarAnalyticsStatsDeserialize,
@@ -121,10 +122,11 @@ const IsarAnalyticsStatsSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarAnalyticsStatsGetId,
   getLinks: _isarAnalyticsStatsGetLinks,
   attach: _isarAnalyticsStatsAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarAnalyticsStatsEstimateSize(

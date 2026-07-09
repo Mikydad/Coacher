@@ -10,7 +10,7 @@ import 'package:coach_for_life/features/planning/data/isar_planning_repository.d
 import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../support/isar_test_harness.dart';
 import '../../support/no_op_planning_repository.dart';

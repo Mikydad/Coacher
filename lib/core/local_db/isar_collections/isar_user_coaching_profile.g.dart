@@ -49,6 +49,7 @@ const IsarUserCoachingProfileSchema = CollectionSchema(
       type: IsarType.long,
     ),
   },
+
   estimateSize: _isarUserCoachingProfileEstimateSize,
   serialize: _isarUserCoachingProfileSerialize,
   deserialize: _isarUserCoachingProfileDeserialize,
@@ -84,10 +85,11 @@ const IsarUserCoachingProfileSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarUserCoachingProfileGetId,
   getLinks: _isarUserCoachingProfileGetLinks,
   attach: _isarUserCoachingProfileAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarUserCoachingProfileEstimateSize(

@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 // Query below always means the Firestore one (_afterCursor).
-import 'package:isar/isar.dart' hide Query;
+import 'package:isar_community/isar.dart' hide Query;
 
 import '../../features/goals/domain/models/user_goal.dart';
 import '../../features/analytics/domain/models/analytics_event.dart';

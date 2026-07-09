@@ -46,6 +46,7 @@ const IsarDeliveryDecisionSnapshotSchema = CollectionSchema(
       type: IsarType.long,
     ),
   },
+
   estimateSize: _isarDeliveryDecisionSnapshotEstimateSize,
   serialize: _isarDeliveryDecisionSnapshotSerialize,
   deserialize: _isarDeliveryDecisionSnapshotDeserialize,
@@ -107,10 +108,11 @@ const IsarDeliveryDecisionSnapshotSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarDeliveryDecisionSnapshotGetId,
   getLinks: _isarDeliveryDecisionSnapshotGetLinks,
   attach: _isarDeliveryDecisionSnapshotAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarDeliveryDecisionSnapshotEstimateSize(

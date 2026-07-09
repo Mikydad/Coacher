@@ -59,6 +59,7 @@ const IsarBehaviorFeatureCacheSchema = CollectionSchema(
       type: IsarType.string,
     ),
   },
+
   estimateSize: _isarBehaviorFeatureCacheEstimateSize,
   serialize: _isarBehaviorFeatureCacheSerialize,
   deserialize: _isarBehaviorFeatureCacheDeserialize,
@@ -107,10 +108,11 @@ const IsarBehaviorFeatureCacheSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarBehaviorFeatureCacheGetId,
   getLinks: _isarBehaviorFeatureCacheGetLinks,
   attach: _isarBehaviorFeatureCacheAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarBehaviorFeatureCacheEstimateSize(

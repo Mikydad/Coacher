@@ -1,4 +1,4 @@
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../local_db/isar_collections/isar_notification_ledger_entry.dart';
 import 'notification_ledger_state.dart';

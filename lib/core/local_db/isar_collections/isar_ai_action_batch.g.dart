@@ -55,6 +55,7 @@ const IsarAiActionBatchSchema = CollectionSchema(
       type: IsarType.long,
     ),
   },
+
   estimateSize: _isarAiActionBatchEstimateSize,
   serialize: _isarAiActionBatchSerialize,
   deserialize: _isarAiActionBatchDeserialize,
@@ -103,10 +104,11 @@ const IsarAiActionBatchSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarAiActionBatchGetId,
   getLinks: _isarAiActionBatchGetLinks,
   attach: _isarAiActionBatchAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarAiActionBatchEstimateSize(

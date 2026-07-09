@@ -6,7 +6,7 @@ import 'package:coach_for_life/features/reminders/data/isar_reminder_repository.
 import 'package:coach_for_life/features/reminders/data/reminder_repository.dart';
 import 'package:coach_for_life/features/reminders/domain/models/reminder_config.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../support/isar_test_harness.dart';
 

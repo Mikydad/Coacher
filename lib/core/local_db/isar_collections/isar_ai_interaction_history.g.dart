@@ -60,6 +60,7 @@ const IsarAiInteractionHistorySchema = CollectionSchema(
       type: IsarType.string,
     ),
   },
+
   estimateSize: _isarAiInteractionHistoryEstimateSize,
   serialize: _isarAiInteractionHistorySerialize,
   deserialize: _isarAiInteractionHistoryDeserialize,
@@ -95,10 +96,11 @@ const IsarAiInteractionHistorySchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarAiInteractionHistoryGetId,
   getLinks: _isarAiInteractionHistoryGetLinks,
   attach: _isarAiInteractionHistoryAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarAiInteractionHistoryEstimateSize(

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../../features/time_blocks/domain/models/scheduled_time_block.dart';
 

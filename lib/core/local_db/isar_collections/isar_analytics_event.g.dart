@@ -72,6 +72,7 @@ const IsarAnalyticsEventSchema = CollectionSchema(
       type: IsarType.long,
     ),
   },
+
   estimateSize: _isarAnalyticsEventEstimateSize,
   serialize: _isarAnalyticsEventSerialize,
   deserialize: _isarAnalyticsEventDeserialize,
@@ -146,10 +147,11 @@ const IsarAnalyticsEventSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarAnalyticsEventGetId,
   getLinks: _isarAnalyticsEventGetLinks,
   attach: _isarAnalyticsEventAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarAnalyticsEventEstimateSize(

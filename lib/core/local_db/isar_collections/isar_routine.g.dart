@@ -46,6 +46,7 @@ const IsarRoutineSchema = CollectionSchema(
       type: IsarType.long,
     ),
   },
+
   estimateSize: _isarRoutineEstimateSize,
   serialize: _isarRoutineSerialize,
   deserialize: _isarRoutineDeserialize,
@@ -81,10 +82,11 @@ const IsarRoutineSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarRoutineGetId,
   getLinks: _isarRoutineGetLinks,
   attach: _isarRoutineAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarRoutineEstimateSize(

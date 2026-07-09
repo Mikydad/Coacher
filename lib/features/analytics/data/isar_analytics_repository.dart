@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/local_db/isar_collections/isar_analytics_event.dart';

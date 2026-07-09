@@ -45,6 +45,7 @@ const IsarUserAttentionStateSchema = CollectionSchema(
       type: IsarType.long,
     ),
   },
+
   estimateSize: _isarUserAttentionStateEstimateSize,
   serialize: _isarUserAttentionStateSerialize,
   deserialize: _isarUserAttentionStateDeserialize,
@@ -80,10 +81,11 @@ const IsarUserAttentionStateSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarUserAttentionStateGetId,
   getLinks: _isarUserAttentionStateGetLinks,
   attach: _isarUserAttentionStateAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarUserAttentionStateEstimateSize(

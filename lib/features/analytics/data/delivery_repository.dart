@@ -1,4 +1,4 @@
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../../core/local_db/isar_collections/isar_delivery_decision_snapshot.dart';
 import '../../../core/local_db/isar_collections/isar_delivery_history_entry.dart';

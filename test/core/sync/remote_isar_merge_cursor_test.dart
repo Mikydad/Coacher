@@ -9,7 +9,7 @@ import 'package:coach_for_life/features/planning/domain/models/routine.dart';
 import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/isar_test_harness.dart';

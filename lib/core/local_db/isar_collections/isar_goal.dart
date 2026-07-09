@@ -1,4 +1,4 @@
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../../features/goals/domain/models/goal_enums.dart';
 import '../../../features/goals/domain/models/user_goal.dart';

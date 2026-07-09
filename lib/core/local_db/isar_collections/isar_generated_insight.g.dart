@@ -70,6 +70,7 @@ const IsarGeneratedInsightSchema = CollectionSchema(
       type: IsarType.long,
     ),
   },
+
   estimateSize: _isarGeneratedInsightEstimateSize,
   serialize: _isarGeneratedInsightSerialize,
   deserialize: _isarGeneratedInsightDeserialize,
@@ -149,10 +150,11 @@ const IsarGeneratedInsightSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarGeneratedInsightGetId,
   getLinks: _isarGeneratedInsightGetLinks,
   attach: _isarGeneratedInsightAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarGeneratedInsightEstimateSize(

@@ -6,7 +6,7 @@ import 'package:coach_for_life/core/notifications/notification_ledger_state.dart
 import 'package:coach_for_life/core/notifications/notification_reconciliation_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../support/isar_test_harness.dart';
 

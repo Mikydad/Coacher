@@ -80,6 +80,7 @@ const IsarScheduledTimeBlockSchema = CollectionSchema(
       type: IsarType.long,
     ),
   },
+
   estimateSize: _isarScheduledTimeBlockEstimateSize,
   serialize: _isarScheduledTimeBlockSerialize,
   deserialize: _isarScheduledTimeBlockDeserialize,
@@ -154,10 +155,11 @@ const IsarScheduledTimeBlockSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarScheduledTimeBlockGetId,
   getLinks: _isarScheduledTimeBlockGetLinks,
   attach: _isarScheduledTimeBlockAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarScheduledTimeBlockEstimateSize(

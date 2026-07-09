@@ -93,6 +93,7 @@ const IsarTaskSchema = CollectionSchema(
       type: IsarType.long,
     ),
   },
+
   estimateSize: _isarTaskEstimateSize,
   serialize: _isarTaskSerialize,
   deserialize: _isarTaskDeserialize,
@@ -167,10 +168,11 @@ const IsarTaskSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarTaskGetId,
   getLinks: _isarTaskGetLinks,
   attach: _isarTaskAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarTaskEstimateSize(

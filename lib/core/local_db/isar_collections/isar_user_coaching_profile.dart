@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../../features/coaching/domain/models/user_coaching_profile.dart';
 

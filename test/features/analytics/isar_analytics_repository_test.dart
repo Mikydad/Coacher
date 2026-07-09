@@ -7,7 +7,7 @@ import 'package:coach_for_life/features/analytics/data/isar_analytics_repository
 import 'package:coach_for_life/features/analytics/domain/models/analytics_event.dart';
 import 'package:coach_for_life/features/analytics/domain/models/analytics_stats_cache.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../support/isar_test_harness.dart';
 

@@ -1,4 +1,4 @@
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../features/planning/domain/models/task_item.dart';
 import '../local_db/isar_collections/isar_task.dart';

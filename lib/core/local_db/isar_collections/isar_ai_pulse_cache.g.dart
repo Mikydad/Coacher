@@ -30,6 +30,7 @@ const IsarAiPulseCacheSchema = CollectionSchema(
     r'payload': PropertySchema(id: 2, name: r'payload', type: IsarType.string),
     r'type': PropertySchema(id: 3, name: r'type', type: IsarType.string),
   },
+
   estimateSize: _isarAiPulseCacheEstimateSize,
   serialize: _isarAiPulseCacheSerialize,
   deserialize: _isarAiPulseCacheDeserialize,
@@ -70,10 +71,11 @@ const IsarAiPulseCacheSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarAiPulseCacheGetId,
   getLinks: _isarAiPulseCacheGetLinks,
   attach: _isarAiPulseCacheAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarAiPulseCacheEstimateSize(

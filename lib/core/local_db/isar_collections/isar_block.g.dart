@@ -60,6 +60,7 @@ const IsarBlockSchema = CollectionSchema(
       type: IsarType.long,
     ),
   },
+
   estimateSize: _isarBlockEstimateSize,
   serialize: _isarBlockSerialize,
   deserialize: _isarBlockDeserialize,
@@ -95,10 +96,11 @@ const IsarBlockSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarBlockGetId,
   getLinks: _isarBlockGetLinks,
   attach: _isarBlockAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarBlockEstimateSize(

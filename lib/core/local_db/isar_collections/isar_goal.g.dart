@@ -100,6 +100,7 @@ const IsarGoalSchema = CollectionSchema(
       type: IsarType.long,
     ),
   },
+
   estimateSize: _isarGoalEstimateSize,
   serialize: _isarGoalSerialize,
   deserialize: _isarGoalDeserialize,
@@ -135,10 +136,11 @@ const IsarGoalSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarGoalGetId,
   getLinks: _isarGoalGetLinks,
   attach: _isarGoalAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarGoalEstimateSize(
@@ -2218,6 +2220,7 @@ extension IsarGoalQueryFilter
         FilterCondition.equalTo(
           property: r'targetValue',
           value: value,
+
           epsilon: epsilon,
         ),
       );
@@ -2236,6 +2239,7 @@ extension IsarGoalQueryFilter
           include: include,
           property: r'targetValue',
           value: value,
+
           epsilon: epsilon,
         ),
       );
@@ -2253,6 +2257,7 @@ extension IsarGoalQueryFilter
           include: include,
           property: r'targetValue',
           value: value,
+
           epsilon: epsilon,
         ),
       );
@@ -2274,6 +2279,7 @@ extension IsarGoalQueryFilter
           includeLower: includeLower,
           upper: upper,
           includeUpper: includeUpper,
+
           epsilon: epsilon,
         ),
       );

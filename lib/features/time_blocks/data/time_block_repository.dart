@@ -1,4 +1,4 @@
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../../core/local_db/isar_collections/isar_goal.dart';
 import '../../../core/local_db/isar_collections/isar_scheduled_time_block.dart';

@@ -4,7 +4,7 @@ import 'package:coach_for_life/core/local_db/isar_collections/isar_ai_action_bat
 import 'package:coach_for_life/features/ai_assistant/application/ai_action_batch_repository.dart';
 import 'package:coach_for_life/features/ai_assistant/application/ai_action_batch_state.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../support/isar_test_harness.dart';
 

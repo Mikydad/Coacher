@@ -80,6 +80,7 @@ const IsarReminderSchema = CollectionSchema(
       type: IsarType.long,
     ),
   },
+
   estimateSize: _isarReminderEstimateSize,
   serialize: _isarReminderSerialize,
   deserialize: _isarReminderDeserialize,
@@ -128,10 +129,11 @@ const IsarReminderSchema = CollectionSchema(
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _isarReminderGetId,
   getLinks: _isarReminderGetLinks,
   attach: _isarReminderAttach,
-  version: '3.1.0+1',
+  version: '3.3.2',
 );
 
 int _isarReminderEstimateSize(

@@ -1,4 +1,4 @@
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import '../../../core/local_db/isar_collections/isar_dismissed_suggestion_log.dart';
 import '../../../core/offline/offline_store.dart';
