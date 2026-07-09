@@ -14,6 +14,9 @@ class FirestorePaths {
     return FirebaseAuth.instance.currentUser?.uid ?? AppConfig.localUserId;
   }
 
+  /// Uid used for all user-scoped paths (feedback reports attach it too).
+  static String get activeUid => _activeUid;
+
   static String get userRoot => 'users/$_activeUid';
   static String get routines => '$userRoot/routines';
   static String blocks(String routineId) => '$routines/$routineId/blocks';
