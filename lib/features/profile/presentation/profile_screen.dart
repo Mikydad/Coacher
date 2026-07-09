@@ -17,6 +17,9 @@ import '../../settings/presentation/account_settings_screen.dart';
 import '../../settings/presentation/notification_settings_screen.dart';
 import '../../settings/presentation/reminder_settings_screen.dart';
 import '../../analytics/application/discipline_score.dart';
+import '../../feedback/application/feedback_context_collector.dart';
+import '../../feedback/application/tester_mode_controller.dart';
+import '../../feedback/presentation/feedback_screen.dart';
 import '../application/profile_providers.dart';
 
 import '../../../core/presentation/app_colors.dart';
@@ -235,22 +238,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ),
 
-              // ── Version footer ────────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 24, bottom: 40),
-                  child: Text(
-                    'PATHPAL V1.0 BUILD 2026.X',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 2.5,
-                      color: _kOnSurfaceVariant.withValues(alpha: 0.4),
-                    ),
-                  ),
-                ),
-              ),
+              // ── Version footer (7 taps toggles tester mode) ───────────────
+              const SliverToBoxAdapter(child: _VersionFooter()),
             ],
           ),
 
@@ -866,6 +855,18 @@ class _CoreOptimizationSection extends StatelessWidget {
             ),
             onTap: () =>
                 Navigator.pushNamed(context, ReminderSettingsScreen.routeName),
+          ),
+          _SettingRow(
+            icon: Icons.feedback_outlined,
+            title: 'Send Feedback',
+            subtitle: 'Report a bug or suggest an idea',
+            trailing: Icon(
+              Icons.chevron_right_rounded,
+              color: _kOnSurfaceVariant,
+              size: 20,
+            ),
+            onTap: () =>
+                Navigator.pushNamed(context, FeedbackScreen.routeName),
             isLast: true,
           ),
         ],
@@ -1095,6 +1096,77 @@ class _ObsidianDialog extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Version footer + tester-mode toggle ─────────────────────────────────────
+
+/// Shows the real app version and hides the tester-mode switch: 7 quick taps
+/// flip the floating bug-report bubble on/off for this device.
+class _VersionFooter extends ConsumerStatefulWidget {
+  const _VersionFooter();
+
+  @override
+  ConsumerState<_VersionFooter> createState() => _VersionFooterState();
+}
+
+class _VersionFooterState extends ConsumerState<_VersionFooter> {
+  final SevenTapDetector _taps = SevenTapDetector();
+
+  Future<void> _onTap() async {
+    final remaining = _taps.registerTap(DateTime.now());
+    final messenger = ScaffoldMessenger.of(context);
+    if (remaining == 0) {
+      await ref.read(testerModeProvider.notifier).toggle();
+      if (!mounted) return;
+      final enabled = ref.read(testerModeProvider);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            enabled
+                ? 'Tester mode enabled — bug bubble is on'
+                : 'Tester mode disabled',
+          ),
+        ),
+      );
+    } else if (remaining <= 3) {
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 1),
+          content: Text(
+            '$remaining more tap${remaining == 1 ? '' : 's'} to toggle '
+            'tester mode',
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final info = ref.watch(packageInfoProvider).valueOrNull;
+    final label = info == null
+        ? 'PATHPAL'
+        : 'PATHPAL V${info.version} BUILD ${info.buildNumber}';
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _onTap,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 24, bottom: 40),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 2.5,
+            color: _kOnSurfaceVariant.withValues(alpha: 0.4),
+          ),
         ),
       ),
     );

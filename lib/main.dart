@@ -13,6 +13,7 @@ import 'app/presentation/animated_splash.dart';
 import 'core/bootstrap/app_bootstrap.dart';
 import 'core/presentation/theme_brightness_controller.dart';
 import 'features/auth/presentation/auth_gate.dart';
+import 'features/feedback/application/app_screenshot.dart';
 
 /// Boot breadcrumb that survives release builds (debugPrint is silenced
 /// there). A hang between two breadcrumbs localizes itself in device logs.
@@ -63,10 +64,17 @@ Future<void> main() async {
       runApp(
         UncontrolledProviderScope(
           container: container,
-          child: const AnimatedSplashGate(
+          child: AnimatedSplashGate(
             child: AuthGate(
               child: FirstLaunchGate(
-                child: AppLifecycleTaskRefresh(child: CoachForLifeApp()),
+                child: AppLifecycleTaskRefresh(
+                  // Stable across theme toggles (the MaterialApp inside is
+                  // keyed on brightness) — tester bug reports capture this.
+                  child: RepaintBoundary(
+                    key: appScreenshotBoundaryKey,
+                    child: const CoachForLifeApp(),
+                  ),
+                ),
               ),
             ),
           ),

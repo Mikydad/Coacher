@@ -7,12 +7,14 @@ import 'package:coach_for_life/features/context_override/domain/models/user_atte
 import 'package:coach_for_life/features/goals/application/goals_providers.dart';
 import 'package:coach_for_life/features/goals/domain/models/user_goal.dart';
 import 'package:coach_for_life/features/analytics/application/discipline_score.dart';
+import 'package:coach_for_life/features/feedback/application/tester_mode_controller.dart';
 import 'package:coach_for_life/features/profile/application/profile_providers.dart';
 import 'package:coach_for_life/features/profile/domain/models/user_profile_preference.dart';
 import 'package:coach_for_life/features/profile/presentation/profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ─── Stub data ────────────────────────────────────────────────────────────────
 
@@ -149,6 +151,50 @@ void main() {
       expect(find.text('Account Settings'), findsOneWidget);
       expect(find.text('Notifications'), findsOneWidget);
       expect(find.text('Reminder Settings'), findsOneWidget);
+    });
+
+    testWidgets('shows the Send Feedback row', (tester) async {
+      await tester.pumpWidget(_buildScreen());
+      await tester.pump();
+      await tester.scrollUntilVisible(
+        find.text('Send Feedback'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Send Feedback'), findsOneWidget);
+      expect(find.text('Report a bug or suggest an idea'), findsOneWidget);
+    });
+
+    testWidgets('7 taps on the version footer toggle tester mode',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      await tester.pumpWidget(_buildScreen());
+      await tester.pump();
+      final footer = find.textContaining('PATHPAL');
+      await tester.scrollUntilVisible(
+        footer,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.ensureVisible(footer);
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(ProfileScreen)),
+      );
+      expect(container.read(testerModeProvider), isFalse);
+
+      for (var i = 0; i < 7; i++) {
+        await tester.tap(footer, warnIfMissed: false);
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tester.pumpAndSettle();
+
+      expect(container.read(testerModeProvider), isTrue);
+      expect(
+        find.text('Tester mode enabled — bug bubble is on'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('shows Log Out button', (tester) async {

@@ -25,6 +25,9 @@ import '../features/community/presentation/circle_detail_screen.dart';
 import '../features/community/presentation/circle_discovery_screen.dart';
 import '../features/ai_assistant/presentation/ai_assistant_screen.dart';
 import '../features/community/presentation/community_screen.dart';
+import '../features/feedback/application/feedback_route_tracker.dart';
+import '../features/feedback/presentation/feedback_screen.dart';
+import '../features/feedback/presentation/tester_bug_bubble.dart';
 import '../features/profile/presentation/default_enforcement_mode_selection_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/settings/presentation/account_settings_screen.dart';
@@ -91,6 +94,12 @@ class CoachForLifeApp extends ConsumerWidget {
       title: 'Coach for Life',
       debugShowCheckedModeBanner: false,
       theme: _theme(brightness),
+      navigatorObservers: [FeedbackRouteTracker()],
+      // Overlay above every route: the tester-mode bug-report bubble.
+      builder: (context, child) => Stack(
+        textDirection: TextDirection.ltr,
+        children: [?child, const TesterBugBubbleLayer()],
+      ),
       initialRoute: MainTabShell.routeName,
       routes: {
         // ── Auth ──────────────────────────────────────────────────────────
@@ -162,6 +171,7 @@ class CoachForLifeApp extends ConsumerWidget {
         NotificationSettingsScreen.routeName: (_) =>
             const NotificationSettingsScreen(),
         ReminderSettingsScreen.routeName: (_) => const ReminderSettingsScreen(),
+        FeedbackScreen.routeName: (_) => const FeedbackScreen(),
         ProfileScreen.routeName: (_) => const ProfileScreen(),
         DefaultEnforcementModeSelectionScreen.routeName: (_) =>
             const DefaultEnforcementModeSelectionScreen(),
