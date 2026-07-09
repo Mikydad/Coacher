@@ -1,2 +1,8 @@
 #include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
 #include "Generated.xcconfig"
+
+// isar_community_flutter_libs vendors a STATIC libisar.a whose symbols are
+// only referenced at runtime via dart:ffi dlsym. Release/Profile dead-code
+// stripping removes them, making Isar.open throw "Could not initialize
+// IsarCore library for ios_arm64" (debug builds don't strip → worked).
+DEAD_CODE_STRIPPING = NO
