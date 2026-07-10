@@ -36,10 +36,12 @@ import '../../time_blocks/domain/models/time_conflict.dart';
 import '../../time_blocks/domain/models/conflict_resolution_outcome.dart';
 import '../../time_blocks/presentation/scheduling_conflict_sheet.dart';
 import '../../education/application/getting_started_controller.dart';
+import '../../education/presentation/help_dot.dart';
 import '../../education/presentation/tour_targets.dart';
 import 'add_task_ui.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/presentation/keyboard_dismiss.dart';
 
 class AddTaskEditArgs {
   const AddTaskEditArgs({
@@ -114,6 +116,10 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
   DateTime _reminderTime = DateTime.now().add(const Duration(minutes: 10));
   bool _saving = false;
   bool _loaded = false;
+
+  /// Category-first flow: the form is shown only after the user picks a
+  /// category (or skips). Edits and restored drafts go straight to the form.
+  bool _categoryChosen = false;
 
   /// Execution mode id: `flexible` | `disciplined` | `extreme`.
   String _modeRefId = 'flexible';
@@ -279,6 +285,11 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
       _advancedExpanded = draft.advancedExpanded;
       _syncSleepWindowAndQuietMode = draft.syncSleepWindowAndQuietMode;
       _inAppQuietMode = draft.inAppQuietMode;
+      // A draft with real content resumes in the form, not the category step.
+      _categoryChosen =
+          draft.category != null ||
+          draft.title.trim().isNotEmpty ||
+          draft.notes.trim().isNotEmpty;
     });
     _suppressDraftDirty = false;
     _draftAutosave?.dirty = false;
@@ -572,6 +583,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         // Phase A: _isRigid defaults to false; no field on PlannedTask yet.
         _modeUserCustomized = false;
         _advancedExpanded = _isHabitAnchor || _strictModeRequired || _isRigid;
+        _categoryChosen = true;
         _loaded = true;
       });
       _suppressDraftDirty = false;
@@ -1328,51 +1340,175 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     );
   }
 
-  Widget _buildCategorySection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+  /// Selects [category] (null = skipped) and advances to the details form.
+  void _selectCategory(String? category) {
+    setState(() {
+      final wasSleep = isSleepCategory(_category);
+      _category = category;
+      if (category != null && isSleepCategory(category)) {
+        _applySleepCategoryDefaults(category);
+      } else if (wasSleep && sleepDurationChipKeys.contains(_duration)) {
+        _duration = '25 MIN';
+      }
+      _categoryChosen = true;
+    });
+  }
+
+  Future<void> _promptCustomCategory() async {
+    final name = await showDialog<String?>(
+      context: context,
+      builder: (_) => const _CustomCategoryDialog(),
+    );
+    if (name == null || name.trim().isEmpty || !mounted) return;
+    _selectCategory(name.trim());
+  }
+
+  static String _categoryEmoji(String label) => switch (label) {
+    'Study' => '📚',
+    'Fitness' => '🏃',
+    'Work' => '💼',
+    'Personal' => '❤️',
+    'Planning' => '🗓️',
+    kSleepTaskCategory => '😴',
+    _ => '🏷️',
+  };
+
+  static String _categorySubtitle(String label) => switch (label) {
+    'Study' => 'Learn & review',
+    'Fitness' => 'Move your body',
+    'Work' => 'Get things done',
+    'Personal' => 'Life & self-care',
+    'Planning' => 'Organize your day',
+    kSleepTaskCategory => 'Rest & recover',
+    _ => 'Your own category',
+  };
+
+  /// Step 1 of the category-first flow: just the category cards, no keyboard,
+  /// nothing to scroll. Same design as the goal template picker.
+  Widget _buildCategoryStep() {
+    // Custom category coming back through "Change" gets its own card.
+    final options = [
+      ..._categoryOptions,
+      if (_category != null && !_categoryOptions.contains(_category))
+        _category!,
+    ];
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       children: [
-        const AddTaskHeroSectionLabel(
-          title: 'Category',
-          subtitle: 'Tap to organize your energy',
+        Text(
+          'What kind of task?',
+          style: TextStyle(
+            color: AddTaskColors.onSurface,
+            fontWeight: FontWeight.w800,
+            fontSize: 22,
+          ),
         ),
-        const SizedBox(height: 16),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            const spacing = 8.0;
-            const columns = 3;
-            final tileWidth =
-                (constraints.maxWidth - spacing * (columns - 1)) / columns;
-            return Wrap(
-              spacing: spacing,
-              runSpacing: spacing,
-              children: [
-                for (final label in _categoryOptions)
-                  SizedBox(
-                    width: tileWidth,
-                    child: AddTaskCategoryTile(
-                      label: label,
-                      icon: addTaskCategoryIcon(label),
-                      selected: _category == label,
-                      onTap: () => setState(() {
-                        if (_category == label) {
-                          _category = null;
-                        } else {
-                          final wasSleep = isSleepCategory(_category);
-                          _category = label;
-                          if (isSleepCategory(label)) {
-                            _applySleepCategoryDefaults(label);
-                          } else if (wasSleep &&
-                              sleepDurationChipKeys.contains(_duration)) {
-                            _duration = '25 MIN';
-                          }
-                        }
-                      }),
-                    ),
-                  ),
-              ],
+        const SizedBox(height: 6),
+        Text(
+          'Pick a category — you can change anything on the next screen.',
+          style: TextStyle(color: AddTaskColors.muted, height: 1.4),
+        ),
+        const SizedBox(height: 24),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.15,
+          ),
+          itemCount: options.length + 1,
+          itemBuilder: (context, i) {
+            // Last cell: the "start from scratch" style custom card.
+            if (i == options.length) {
+              return _CategoryCard(
+                emoji: '✨',
+                label: 'Custom',
+                isCustom: true,
+                selected: false,
+                onTap: _promptCustomCategory,
+              );
+            }
+            final label = options[i];
+            return _CategoryCard(
+              emoji: _categoryEmoji(label),
+              label: label,
+              subtitle: _categorySubtitle(label),
+              isCustom: false,
+              selected: _category == label,
+              onTap: () => _selectCategory(label),
             );
           },
+        ),
+        const SizedBox(height: 20),
+        Center(
+          child: TextButton(
+            onPressed: () => _selectCategory(null),
+            child: Text(
+              'Skip — no category',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AddTaskColors.muted,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Compact replacement for the old in-form category grid: shows the chosen
+  /// category and jumps back to the category step to change it.
+  Widget _buildCategoryChipRow() {
+    final label = _category ?? 'No category';
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AddTaskColors.card,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AddTaskColors.border),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _category == null
+                      ? Icons.label_off_outlined
+                      : addTaskCategoryIcon(_category!),
+                  size: 18,
+                  color: AddTaskColors.accentDim,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AddTaskColors.onSurface,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => setState(() => _categoryChosen = false),
+                  child: Text(
+                    'Change',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: AddTaskColors.accent,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
@@ -1715,19 +1851,27 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
             color: AddTaskColors.onSurface,
           ),
         ),
+        actions: const [HelpAppBarButton('tasks')],
       ),
       body: !_loaded
           ? Center(
               child: CircularProgressIndicator(color: AddTaskColors.accent),
             )
-          : Column(
+          : !_categoryChosen
+          ? _buildCategoryStep()
+          : KeyboardDismissOnTap(
+              child: Column(
               children: [
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     children: [
+                      _buildCategoryChipRow(),
+                      const SizedBox(height: 20),
                       const AddTaskHeroSectionLabel(
-                        title: 'What are you doing?',
+                        title: 'What do you want to do?',
                         subtitle: 'Give it a clear, actionable name',
                       ),
                       const SizedBox(height: 16),
@@ -1736,6 +1880,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                         key: TourTargets.addTaskTitleField,
                         controller: _controller,
                         hint: 'Read 10 pages',
+                        // New task: start typing immediately. Editing keeps
+                        // the keyboard down, and Sleep arrives pre-filled.
+                        autofocus: !_isEdit && !isSleepCategory(_category),
                       ),
                       const SizedBox(height: 12),
                       AddTaskField(
@@ -1755,8 +1902,6 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                       const SizedBox(height: 32),
                       _buildDurationSection(),
                       const SizedBox(height: 32),
-                      _buildCategorySection(),
-                      const SizedBox(height: 24),
                       _buildAccountabilityRow(),
                       if (!isSleepCategory(_category)) ...[
                         const SizedBox(height: 12),
@@ -1807,7 +1952,131 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                   ),
                 ),
               ],
+              ),
             ),
+    );
+  }
+}
+
+/// Category card for the category-first step — same anatomy as the goal
+/// template picker's cards: emoji top-left, bold label bottom, soft subtitle.
+class _CategoryCard extends StatelessWidget {
+  const _CategoryCard({
+    required this.emoji,
+    required this.label,
+    this.subtitle,
+    required this.isCustom,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String emoji;
+  final String label;
+  final String? subtitle;
+  final bool isCustom;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: isCustom ? Colors.transparent : AddTaskColors.card,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected
+                  ? AddTaskColors.accentDim
+                  : isCustom
+                  ? AppColors.fg24
+                  : AddTaskColors.border,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(emoji, style: const TextStyle(fontSize: 28)),
+                const Spacer(),
+                Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isCustom
+                        ? AddTaskColors.accent
+                        : AddTaskColors.onSurface,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle!,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AddTaskColors.faint,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Owns its [TextEditingController] so it is disposed only after the dialog
+/// route finishes (same pattern as the goal milestone dialog).
+class _CustomCategoryDialog extends StatefulWidget {
+  const _CustomCategoryDialog();
+
+  @override
+  State<_CustomCategoryDialog> createState() => _CustomCategoryDialogState();
+}
+
+class _CustomCategoryDialogState extends State<_CustomCategoryDialog> {
+  final TextEditingController _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final name = _ctrl.text.trim();
+    if (name.isEmpty) return;
+    Navigator.pop<String?>(context, name);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Custom category'),
+      content: TextField(
+        controller: _ctrl,
+        autofocus: true,
+        textCapitalization: TextCapitalization.words,
+        decoration: const InputDecoration(hintText: 'e.g. Music'),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop<String?>(context, null),
+          child: const Text('Cancel'),
+        ),
+        TextButton(onPressed: _submit, child: const Text('Use')),
+      ],
     );
   }
 }

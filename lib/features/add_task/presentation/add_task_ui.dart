@@ -119,12 +119,14 @@ class AddTaskField extends StatelessWidget {
     this.hint,
     this.maxLines = 1,
     this.style,
+    this.autofocus = false,
   });
 
   final TextEditingController controller;
   final String? hint;
   final int maxLines;
   final TextStyle? style;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -133,6 +135,7 @@ class AddTaskField extends StatelessWidget {
     return TextField(
       controller: controller,
       maxLines: maxLines,
+      autofocus: autofocus,
       style:
           style ??
           TextStyle(
@@ -148,13 +151,14 @@ class AddTaskField extends StatelessWidget {
         ),
         filled: true,
         fillColor: AddTaskColors.inputFill,
+        // Resting border so the field reads as editable, not as a label.
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radius),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(color: AddTaskColors.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radius),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(color: AddTaskColors.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radius),
@@ -592,76 +596,6 @@ class AddTaskPickerRow extends StatelessWidget {
   }
 }
 
-class AddTaskCategoryTile extends StatelessWidget {
-  const AddTaskCategoryTile({
-    super.key,
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 8),
-          decoration: BoxDecoration(
-            color: selected ? AddTaskColors.cardElevated : AddTaskColors.card,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selected ? AddTaskColors.accentDim : Colors.transparent,
-              width: 2,
-            ),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: AddTaskColors.accentDim.withValues(alpha: 0.25),
-                      blurRadius: 12,
-                      spreadRadius: 0,
-                    ),
-                  ]
-                : null,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 26,
-                color: selected ? AddTaskColors.accentDim : AddTaskColors.muted,
-              ),
-              const SizedBox(height: 10),
-              Text(
-                label.toUpperCase(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                  color: selected
-                      ? AddTaskColors.accentDim
-                      : AddTaskColors.muted,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class AddTaskDurationSegment extends StatelessWidget {
   const AddTaskDurationSegment({
@@ -858,6 +792,8 @@ class AddTaskEnforcementTile extends StatelessWidget {
 
 IconData addTaskCategoryIcon(String label) {
   switch (label) {
+    case 'Study':
+      return Icons.menu_book_rounded;
     case 'Fitness':
       return Icons.fitness_center_rounded;
     case 'Work':
@@ -869,6 +805,7 @@ IconData addTaskCategoryIcon(String label) {
     case 'Sleep':
       return Icons.bedtime_rounded;
     default:
-      return Icons.menu_book_rounded;
+      // User-created categories.
+      return Icons.label_outline_rounded;
   }
 }
