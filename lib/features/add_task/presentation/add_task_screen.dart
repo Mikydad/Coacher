@@ -35,6 +35,8 @@ import '../../time_blocks/application/time_block_providers.dart';
 import '../../time_blocks/domain/models/time_conflict.dart';
 import '../../time_blocks/domain/models/conflict_resolution_outcome.dart';
 import '../../time_blocks/presentation/scheduling_conflict_sheet.dart';
+import '../../education/application/getting_started_controller.dart';
+import '../../education/presentation/tour_targets.dart';
 import 'add_task_ui.dart';
 
 import '../../../core/presentation/app_colors.dart';
@@ -154,6 +156,12 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Guided-tour hook: typing a title advances "name it" → "now save it".
+    _controller.addListener(
+      () => ref
+          .read(gettingStartedControllerProvider.notifier)
+          .onTaskTitleChanged(_controller.text),
+    );
     // Pre-set reminder time to slot's plan day at 9 AM if coming from a future slot.
     final slotDateKey = widget.slotArgs?.dateKey;
     if (slotDateKey != null && slotDateKey != DateKeys.todayKey()) {
@@ -1724,6 +1732,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                       ),
                       const SizedBox(height: 16),
                       AddTaskField(
+                        // Guided-tour target: "give it a name".
+                        key: TourTargets.addTaskTitleField,
                         controller: _controller,
                         hint: 'Read 10 pages',
                       ),
@@ -1771,6 +1781,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                     ),
                   ),
                   child: FilledButton(
+                    // Guided-tour target: "now save it".
+                    key: TourTargets.addTaskSaveButton,
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(56),
                       backgroundColor: AddTaskColors.accentContainer,

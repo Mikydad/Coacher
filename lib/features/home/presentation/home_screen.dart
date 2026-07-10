@@ -54,7 +54,7 @@ import '../../../app/application/main_tab_navigation.dart';
 import '../../context_override/presentation/active_override_banner.dart';
 import '../../context_override/presentation/context_override_quick_activate_sheet.dart';
 import '../../context_override/presentation/post_override_review_card.dart';
-import '../../education/presentation/getting_started_card.dart';
+import '../../education/presentation/tour_targets.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 import 'pathpal_app_bar_title.dart';
 
@@ -111,9 +111,8 @@ class HomeScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           const _Layer4NotificationDispatchBridge(),
-          // New-user learn-by-doing checklist; SizedBox.shrink for everyone else.
-          const GettingStartedCard(),
-          const _HomeTopAnalyticsCard(),
+          // Keyed as a guided-tour target ("this is your progress").
+          _HomeTopAnalyticsCard(key: TourTargets.progressCard),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -144,6 +143,8 @@ class HomeScreen extends ConsumerWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: _ActionCircle(
+                  // Guided-tour target: "tap here to create your first task".
+                  key: TourTargets.addTaskTile,
                   icon: Icons.add,
                   label: 'Add Task',
                   tooltip: 'Add task',
@@ -230,6 +231,10 @@ class HomeScreen extends ConsumerWidget {
                       children: [
                         for (final row in visible)
                           _TaskItem(
+                            // Guided-tour target: the first task's circle.
+                            checkboxKey: row == visible.first
+                                ? TourTargets.firstTaskCheckbox
+                                : null,
                             title: row.task.title,
                             subtitle: _homeTaskSubtitle(row, scores),
                             done:
@@ -533,7 +538,7 @@ void _maybeTriggerMorningBrief(BuildContext context, WidgetRef ref) {
 }
 
 class _HomeTopAnalyticsCard extends ConsumerStatefulWidget {
-  const _HomeTopAnalyticsCard();
+  const _HomeTopAnalyticsCard({super.key});
 
   @override
   ConsumerState<_HomeTopAnalyticsCard> createState() =>
@@ -1049,6 +1054,7 @@ class _SparklinePainter extends CustomPainter {
 /// ([active]) uses the inverse fill (ink tile in light mode, lime in dark).
 class _ActionCircle extends StatelessWidget {
   const _ActionCircle({
+    super.key,
     required this.icon,
     required this.label,
     required this.onTap,
@@ -1615,8 +1621,10 @@ class _TaskItem extends StatelessWidget {
     required this.onCheckedChange,
     required this.onPlansChanged,
     this.onTap,
+    this.checkboxKey,
   });
 
+  final Key? checkboxKey;
   final String title;
   final String? subtitle;
   final bool done;
@@ -1636,6 +1644,7 @@ class _TaskItem extends StatelessWidget {
         onTap: onTap,
         contentPadding: EdgeInsets.zero,
         leading: Checkbox(
+          key: checkboxKey,
           value: done,
           onChanged: (value) {
             if (value == null) return;

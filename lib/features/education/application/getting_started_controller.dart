@@ -7,56 +7,68 @@ import '../../../core/local_db/isar_collections/isar_task.dart';
 import '../../../core/offline/offline_store.dart';
 import '../../analytics/application/analytics_period_bundle_notifier.dart';
 import '../../analytics/application/discipline_score.dart';
+import '../../feedback/application/feedback_route_tracker.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
 import '../../planning/domain/models/task_item.dart';
 import 'education_prefs.dart';
 
-enum GettingStartedPhase { loading, hidden, active, celebrating }
+/// Where the new user is in the guided first-task tour.
+enum TourStep {
+  /// Home — spotlight on the ADD TASK tile: "Tap here…".
+  tapAddTask,
+
+  /// Add Task screen — spotlight on the title field: "Give it a name".
+  nameTask,
+
+  /// Add Task screen — spotlight on the save button: "Now save it".
+  saveTask,
+
+  /// Back on Home — small non-blocking hint: "tap the circle when done"
+  /// (real life may take hours between creating and finishing the task).
+  completeTask,
+
+  /// Celebration — spotlight on the progress card, then auto-finish.
+  seeProgress,
+}
+
+enum TourStatus { loading, hidden, active }
 
 class GettingStartedState {
   const GettingStartedState({
-    required this.phase,
-    this.step1TaskCreated = false,
-    this.step2TaskCompleted = false,
-    this.step3ProgressSeen = false,
+    required this.status,
+    this.step = TourStep.tapAddTask,
   });
 
-  const GettingStartedState.loading()
-    : this(phase: GettingStartedPhase.loading);
+  const GettingStartedState.loading() : this(status: TourStatus.loading);
 
-  final GettingStartedPhase phase;
-  final bool step1TaskCreated;
-  final bool step2TaskCompleted;
-  final bool step3ProgressSeen;
+  final TourStatus status;
+  final TourStep step;
 
-  GettingStartedState copyWith({
-    GettingStartedPhase? phase,
-    bool? step1TaskCreated,
-    bool? step2TaskCompleted,
-    bool? step3ProgressSeen,
-  }) => GettingStartedState(
-    phase: phase ?? this.phase,
-    step1TaskCreated: step1TaskCreated ?? this.step1TaskCreated,
-    step2TaskCompleted: step2TaskCompleted ?? this.step2TaskCompleted,
-    step3ProgressSeen: step3ProgressSeen ?? this.step3ProgressSeen,
-  );
+  bool get isActive => status == TourStatus.active;
+
+  GettingStartedState copyWith({TourStatus? status, TourStep? step}) =>
+      GettingStartedState(
+        status: status ?? this.status,
+        step: step ?? this.step,
+      );
 }
 
-/// Learn-by-doing onboarding for NEW users: create a task → complete it →
-/// see progress react. Steps are DERIVED from real app state (fed by the
-/// provider below — never toggled by UI code) and latched, so deleting the
-/// task later can't un-check them.
+/// Guided learn-by-doing tour for NEW users. The spotlight overlay renders
+/// [GettingStartedState.step]; steps advance ONLY when the user performs the
+/// real action (route opened, title typed, task saved/completed) — signals
+/// are fed by the provider below and by small hooks in the screens.
 ///
 /// Lifecycle pref is tri-state ('active'/'done'/absent): the new-vs-existing
 /// judgement is made exactly once, so creating your first task doesn't make
-/// you look like an existing user on the next launch.
+/// you look like an existing user on the next launch. Invalidated on account
+/// switch (user_scoped_invalidation.dart).
 class GettingStartedController extends StateNotifier<GettingStartedState> {
   GettingStartedController(
     this._prefs, {
     Future<bool> Function()? hasExistingDataProbe,
     int Function()? streakReader,
-    Duration celebrateFor = const Duration(milliseconds: 2500),
+    Duration celebrateFor = const Duration(milliseconds: 3500),
   }) : _hasExistingDataProbe = hasExistingDataProbe ?? _defaultProbe,
        _streakReader = streakReader,
        _celebrateFor = celebrateFor,
@@ -70,11 +82,12 @@ class GettingStartedController extends StateNotifier<GettingStartedState> {
   final Duration _celebrateFor;
   Timer? _celebrateTimer;
 
-  // Latest signals, buffered even before init resolves so nothing emitted
-  // during the (fast) prefs read is lost.
+  // Latest signals, buffered even before init resolves.
   bool _seenTaskCreated = false;
   bool _seenTaskCompleted = false;
   bool _seenProgress = false;
+  bool _titleTyped = false;
+  String? _topRoute;
 
   /// Existing-user signal: any task ever stored locally. Safe because
   /// FirstLaunchGate blocks the UI on the remote→local seed, so an existing
@@ -90,12 +103,11 @@ class GettingStartedController extends StateNotifier<GettingStartedState> {
     if (!mounted) return;
 
     if (stored == 'done') {
-      state = state.copyWith(phase: GettingStartedPhase.hidden);
+      state = state.copyWith(status: TourStatus.hidden);
       return;
     }
 
     if (stored != 'active') {
-      // Never evaluated for this account: probe once.
       var existing = false;
       try {
         existing =
@@ -106,57 +118,103 @@ class GettingStartedController extends StateNotifier<GettingStartedState> {
       if (!mounted) return;
       if (existing) {
         await _prefs.setOnboardingState('done');
-        if (mounted) state = state.copyWith(phase: GettingStartedPhase.hidden);
+        if (mounted) state = state.copyWith(status: TourStatus.hidden);
         return;
       }
       await _prefs.setOnboardingState('active');
       if (!mounted) return;
     }
 
-    state = state.copyWith(phase: GettingStartedPhase.active);
-    _applySignals();
+    // Resume mid-journey (app killed while 'active'): derive the step from
+    // what already happened rather than restarting at "tap here".
+    var step = TourStep.tapAddTask;
+    if (_seenTaskCompleted) {
+      step = TourStep.seeProgress;
+    } else if (_seenTaskCreated) {
+      step = TourStep.completeTask;
+    }
+    state = GettingStartedState(status: TourStatus.active, step: step);
+    if (step == TourStep.seeProgress) _startCelebrationTimer();
   }
 
-  /// Fed by the provider's ref.listen on [todayAllTasksRowsProvider].
+  // ─── Signals (fed by the provider body + screen hooks) ────────────────────
+
+  void onRouteChanged(String? route) {
+    _topRoute = route;
+    if (!mounted || !state.isActive) return;
+    switch (state.step) {
+      case TourStep.tapAddTask:
+        if (route == '/add-task') {
+          state = state.copyWith(step: TourStep.nameTask);
+        }
+      case TourStep.nameTask:
+      case TourStep.saveTask:
+        // Left Add Task without saving — point at the tile again.
+        if (route != '/add-task' && !_seenTaskCreated) {
+          _titleTyped = false;
+          state = state.copyWith(step: TourStep.tapAddTask);
+        }
+      case TourStep.completeTask:
+      case TourStep.seeProgress:
+        break;
+    }
+  }
+
+  /// Hook from the Add Task screen's title field.
+  void onTaskTitleChanged(String text) {
+    _titleTyped = text.trim().isNotEmpty;
+    if (!mounted || !state.isActive) return;
+    if (state.step == TourStep.nameTask && _titleTyped) {
+      state = state.copyWith(step: TourStep.saveTask);
+    }
+  }
+
+  /// Fed by the provider's ref.listen on today's task rows.
   void onTaskRows({required bool anyTask, required bool anyCompleted}) {
     _seenTaskCreated = _seenTaskCreated || anyTask;
     _seenTaskCompleted = _seenTaskCompleted || anyCompleted;
-    _applySignals();
+    if (!mounted || !state.isActive) return;
+
+    if (_seenTaskCompleted &&
+        (state.step == TourStep.completeTask ||
+            state.step == TourStep.tapAddTask ||
+            state.step == TourStep.nameTask ||
+            state.step == TourStep.saveTask)) {
+      state = state.copyWith(step: TourStep.seeProgress);
+      _startCelebrationTimer();
+      return;
+    }
+    if (_seenTaskCreated &&
+        (state.step == TourStep.tapAddTask ||
+            state.step == TourStep.nameTask ||
+            state.step == TourStep.saveTask)) {
+      state = state.copyWith(step: TourStep.completeTask);
+    }
   }
 
-  /// Fed by the provider's ref.listen on [analyticsPeriodBundleProvider].
+  /// Fed by the provider's ref.listen on the analytics bundle.
   void onProgressSignal({required bool progressed}) {
     _seenProgress = _seenProgress || progressed;
-    _applySignals();
   }
 
-  void _applySignals() {
-    if (!mounted || state.phase != GettingStartedPhase.active) return;
-    final step1 = state.step1TaskCreated || _seenTaskCreated;
-    final step2 = state.step2TaskCompleted || _seenTaskCompleted;
-    final step3 = state.step3ProgressSeen || (step2 && _seenProgress);
-    state = state.copyWith(
-      step1TaskCreated: step1,
-      step2TaskCompleted: step2,
-      step3ProgressSeen: step3,
-    );
-    if (step3) _celebrate();
-  }
+  /// Whether the analytics number visibly moved (celebration copy hook).
+  bool get progressConfirmed => _seenProgress;
 
-  void _celebrate() {
-    if (state.phase != GettingStartedPhase.active) return;
-    state = state.copyWith(phase: GettingStartedPhase.celebrating);
+  String? get topRoute => _topRoute;
+
+  void _startCelebrationTimer() {
+    _celebrateTimer?.cancel();
     _celebrateTimer = Timer(_celebrateFor, () async {
       await _prefs.setOnboardingState('done');
-      if (mounted) state = state.copyWith(phase: GettingStartedPhase.hidden);
+      if (mounted) state = state.copyWith(status: TourStatus.hidden);
     });
   }
 
-  /// ✕ button — dismiss forever.
+  /// Skip button — dismiss forever.
   Future<void> skip() async {
     _celebrateTimer?.cancel();
     await _prefs.setOnboardingState('done');
-    if (mounted) state = state.copyWith(phase: GettingStartedPhase.hidden);
+    if (mounted) state = state.copyWith(status: TourStatus.hidden);
   }
 
   @override
@@ -202,6 +260,15 @@ final gettingStartedControllerProvider =
               homeDisplayStreakDays(bundle) > 0,
         );
       }, fireImmediately: true);
+
+      // Route changes advance/rewind the tour (reuses the feedback tracker).
+      controller.onRouteChanged(FeedbackRouteTracker.topRouteName.value);
+      void routeListener() =>
+          controller.onRouteChanged(FeedbackRouteTracker.topRouteName.value);
+      FeedbackRouteTracker.topRouteName.addListener(routeListener);
+      ref.onDispose(
+        () => FeedbackRouteTracker.topRouteName.removeListener(routeListener),
+      );
 
       return controller;
     });

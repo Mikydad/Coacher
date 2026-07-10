@@ -27,6 +27,7 @@ import '../features/ai_assistant/presentation/ai_assistant_screen.dart';
 import '../features/community/presentation/community_screen.dart';
 import '../features/feedback/application/feedback_route_tracker.dart';
 import '../features/feedback/presentation/feedback_screen.dart';
+import '../features/education/presentation/getting_started_tour.dart';
 import '../features/feedback/presentation/tester_bug_bubble.dart';
 import '../features/profile/presentation/default_enforcement_mode_selection_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
@@ -95,10 +96,15 @@ class CoachForLifeApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: _theme(brightness),
       navigatorObservers: [FeedbackRouteTracker()],
-      // Overlay above every route: the tester-mode bug-report bubble.
+      // Overlays above every route: the new-user guided tour and the
+      // tester-mode bug-report bubble (bubble stays on top).
       builder: (context, child) => Stack(
         textDirection: TextDirection.ltr,
-        children: [?child, const TesterBugBubbleLayer()],
+        children: [
+          ?child,
+          const GettingStartedTourLayer(),
+          const TesterBugBubbleLayer(),
+        ],
       ),
       initialRoute: MainTabShell.routeName,
       routes: {

@@ -20,18 +20,37 @@ topic matching, `suggestedPrompts` chips, and an optional Try-it destination.
 - `isEducationQuestion` = education phrase ("what is", "teach me", …) AND a
   topic match — this gate is what lets questions bypass fast-paths safely.
 
-## Surface 1 — Getting Started onboarding (new users only)
+## Surface 1 — Getting Started guided tour (new users only)
 
-A checklist card at the top of Home (NOT a spotlight overlay — it reacts to
-real actions and survives refactors): ① create your first task (row opens the
-Add Task screen) → ② complete it → ③ watch the progress score react → short
-celebration → gone forever. Skippable via ✕.
+A spotlight walkthrough (`getting_started_tour.dart`, mounted in
+`MaterialApp.builder` like the tester bug bubble so it follows across
+routes): the screen dims except the target, which pulses with a glow, and an
+animated instruction card points at it. Steps advance ONLY when the user
+performs the real action — never a "Next" button:
+
+1. `tapAddTask` — spotlight on Home's ADD TASK tile ("Tap here…").
+2. `nameTask` — follows into the Add Task screen, spotlights the title field.
+3. `saveTask` — spotlights the save button once a title is typed.
+4. `completeTask` — back home, collapses to a small NON-BLOCKING hint chip
+   ("tap the circle when you're done") because real life may take hours
+   between creating and finishing the task; the first task's checkbox glows.
+5. `seeProgress` — on completion, spotlights the progress card with a
+   celebration, then auto-finishes forever.
+
+"Skip tour" is always visible. Backing out of Add Task without saving rewinds
+to step 1. Targets are `TourTargets` GlobalKeys attached in home_screen and
+add_task_screen (plus a title-typed hook); a target that isn't on screen
+renders no spotlight, which makes off-script navigation safe. The dim is four
+plain boxes around the target hole, so taps on the target pass through to the
+real button.
 
 - State machine: [`getting_started_controller.dart`](../lib/features/education/application/getting_started_controller.dart).
-  Steps are DERIVED from `todayAllTasksRowsProvider` (any row / any
-  completed-or-partial) and `analyticsPeriodBundleProvider`
-  (`taskDay.weightedCompletionRate > 0` or streak > 0 — plain task completion
-  doesn't reliably move the goals/habits streak), latched monotonic.
+  Signals: route changes (reuses `FeedbackRouteTracker`), title text hook,
+  `todayAllTasksRowsProvider` (created / completed-or-partial) and
+  `analyticsPeriodBundleProvider` (`taskDay.weightedCompletionRate > 0` or
+  streak > 0 — plain task completion doesn't reliably move the goals/habits
+  streak), latched monotonic; resume derives the step from what already
+  happened.
 - New-vs-existing detection: tri-state pref `education_onboarding_state_v1`
   (absent → probe once: any Isar task or streak > 0 ⇒ existing user, silently
   'done'; else 'active'). The tri-state prevents the classic bug where
