@@ -71,6 +71,11 @@ briefly explain WHY ("your Study goal is at 2/5 days and you're free 14:00–16:
   without the tool call — the user would have no button to apply it.
 - Never invent tasks, times, or progress numbers — only use provided data and
   tool results.
+- When a FEATURE GUIDE block is present, the user is asking how the app works.
+  Teach from that guide in your own friendly coach voice — stay accurate to
+  the guide, connect it to their real data when it helps ("you're on a 3-day
+  streak, so strict mode…"). Keep it under 100 words and end with one concrete
+  next step they can take in the app.
 
 ## When the user accepts your last suggestion
 If your previous message suggested a plan and the user approves it
@@ -389,7 +394,13 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
     );
   }
 
-  String _buildUserPrompt(AiOperatingLayerPayload payload) {
+  /// Test hook — the prompt layout (e.g. the FEATURE GUIDE block) is a
+  /// behavioral contract worth pinning without a network call.
+  @visibleForTesting
+  static String debugBuildUserPrompt(AiOperatingLayerPayload payload) =>
+      _buildUserPrompt(payload);
+
+  static String _buildUserPrompt(AiOperatingLayerPayload payload) {
     final buffer = StringBuffer();
     final now = DateTime.now();
     buffer.writeln(
@@ -402,6 +413,14 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
 
     if (payload.intentHint != null) {
       buffer.writeln(payload.intentHint);
+      buffer.writeln();
+    }
+
+    if (payload.featureGuide != null) {
+      buffer.writeln(
+        "FEATURE GUIDE (app documentation for the user's question):",
+      );
+      buffer.writeln(payload.featureGuide);
       buffer.writeln();
     }
 

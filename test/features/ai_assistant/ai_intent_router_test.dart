@@ -27,6 +27,13 @@ void main() {
       (input: 'Fill my free time tomorrow', kind: AiIntentKind.suggest, focus: AiFocusDate.tomorrow),
       (input: 'Help me with planning this week', kind: AiIntentKind.suggest, focus: AiFocusDate.week),
       (input: 'Plan tomorrow', kind: AiIntentKind.suggest, focus: AiFocusDate.tomorrow),
+      // Education questions must route query even without '?', and even when
+      // they embed a mutate verb ("…to set a reminder").
+      (input: 'What is discipline mode', kind: AiIntentKind.query, focus: null),
+      (input: 'teach me how reminders work', kind: AiIntentKind.query, focus: null),
+      (input: 'explain how to set a reminder', kind: AiIntentKind.query, focus: null),
+      (input: 'Which mode should I use', kind: AiIntentKind.query, focus: null),
+      (input: 'tell me about circles', kind: AiIntentKind.query, focus: null),
     ];
 
     for (final c in cases) {

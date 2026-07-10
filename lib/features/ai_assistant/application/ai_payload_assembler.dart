@@ -56,6 +56,7 @@ class AiPayloadAssembler {
     String? previousPlanSummary,
     AiIntentRoute? intentRoute,
     Map<String, dynamic>? proactiveContext,
+    String? featureGuideText,
   }) async {
     final schedule = await _scheduleSliceForSession(sessionId);
 
@@ -86,6 +87,7 @@ class AiPayloadAssembler {
       intentKind: intentRoute?.kind.name,
       proactiveContext: proactiveContext,
       previousPlan: previousPlanSummary,
+      featureGuide: featureGuideText,
       todayFreeWindows: computeFreeWindows(
         schedule.todaySchedule,
         fromMinuteOfDay: _nowMinuteOfDay(),

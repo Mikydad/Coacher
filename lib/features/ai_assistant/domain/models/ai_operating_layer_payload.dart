@@ -28,6 +28,7 @@ class AiOperatingLayerPayload {
     this.previousPlan,
     this.todayFreeWindows = const [],
     this.tomorrowFreeWindows = const [],
+    this.featureGuide,
   });
 
   /// The raw user input for this turn.
@@ -99,6 +100,10 @@ class AiOperatingLayerPayload {
   /// [todayFreeWindows].
   final List<String> tomorrowFreeWindows;
 
+  /// Compact app documentation for the ONE feature the user asked about
+  /// (see FeatureGuides.matchTopic) — grounds "what is X?" teaching answers.
+  final String? featureGuide;
+
   Map<String, dynamic> toJson() => {
     'userInput': userInput,
     'activeTasks': activeTasks,
@@ -124,5 +129,6 @@ class AiOperatingLayerPayload {
     if (todayFreeWindows.isNotEmpty) 'todayFreeWindows': todayFreeWindows,
     if (tomorrowFreeWindows.isNotEmpty)
       'tomorrowFreeWindows': tomorrowFreeWindows,
+    if (featureGuide != null) 'featureGuide': featureGuide,
   };
 }

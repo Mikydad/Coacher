@@ -1,3 +1,4 @@
+import '../../education/presentation/first_time_feature_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -212,6 +213,10 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
             onTap: () => dismissKeyboard(context),
             child: Column(
               children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: FirstTimeFeatureCard(guideId: 'coachAi'),
+                ),
                 // Expanded while the chat is empty (suggestions are the
                 // content); collapses to the slim header once a conversation
                 // is underway so the transcript gets the space.

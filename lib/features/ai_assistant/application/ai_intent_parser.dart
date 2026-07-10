@@ -8,6 +8,7 @@ import 'ai_capability_registry.dart';
 import 'ai_chat_suggestion_enricher.dart';
 import 'ai_conflict_detector.dart';
 import 'ai_intent_router.dart';
+import '../../education/domain/feature_guides.dart';
 import 'ai_missing_field_detector.dart';
 import 'ai_operating_layer_client.dart';
 import 'ai_payload_assembler.dart';
@@ -55,15 +56,25 @@ class AiIntentParser {
       );
     }
 
-    // Fast path — unsupported domains never reach the LLM.
-    final unsupported = AiCapabilityRegistry.detectUnsupported(userInput);
-    if (unsupported != null) {
-      return AiPlannedChanges(
-        sessionId: sessionId,
-        responseType: AiResponseType.unsupported,
-        informationalMessage: unsupported.message,
-        suggestedPrompts: unsupported.suggestedPrompts,
-      );
+    // Education topic match — must precede detectUnsupported, otherwise
+    // "What are Circles?" hits the canned "Circles are not available in
+    // Coach AI" answer instead of a guide-grounded explanation. Commands
+    // ("add me to a circle") are not education-shaped and fall through.
+    final educationGuide = FeatureGuides.isEducationQuestion(userInput)
+        ? FeatureGuides.matchTopic(userInput)
+        : null;
+
+    if (educationGuide == null) {
+      // Fast path — unsupported domains never reach the LLM.
+      final unsupported = AiCapabilityRegistry.detectUnsupported(userInput);
+      if (unsupported != null) {
+        return AiPlannedChanges(
+          sessionId: sessionId,
+          responseType: AiResponseType.unsupported,
+          informationalMessage: unsupported.message,
+          suggestedPrompts: unsupported.suggestedPrompts,
+        );
+      }
     }
 
     final route = AiIntentRouter.classify(userInput);
@@ -106,6 +117,7 @@ class AiIntentParser {
         previousPlanSummary: previousPlanSummary,
         intentRoute: route,
         proactiveContext: proactiveContext,
+        featureGuideText: educationGuide?.toPromptBlock(),
       );
     } catch (e) {
       return AiPlannedChanges(
@@ -139,6 +151,15 @@ class AiIntentParser {
 
     // Read-only or unsupported answers skip the mutation pipeline.
     if (result.isInformational || result.isUnsupported) {
+      // Teaching answers offer the guide's own follow-up prompts first.
+      if (result.isInformational && educationGuide != null) {
+        result = result.copyWith(
+          suggestedPrompts: <String>{
+            ...educationGuide.suggestedPrompts,
+            ...result.suggestedPrompts,
+          }.take(3).toList(),
+        );
+      }
       if (result.isInformational && chatSuggestionEnricher != null) {
         final extra = await chatSuggestionEnricher!.promptsForInformationalGaps(
           payload,

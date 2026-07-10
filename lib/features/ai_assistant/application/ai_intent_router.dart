@@ -26,9 +26,29 @@ abstract final class AiIntentRouter {
     'plan out',
   ];
 
+  /// Questions ABOUT the app or a feature. Checked before mutate verbs:
+  /// "explain how to set a reminder" contains ' set ' but must route query.
+  static const _educationKeywords = [
+    'what is',
+    'what are',
+    'how do i',
+    'how do you',
+    'how does',
+    'how to use',
+    'explain',
+    'teach me',
+    'tell me about',
+    'which mode',
+    'what does',
+  ];
+
   static AiIntentRoute classify(String userInput) {
     final lower = userInput.toLowerCase().trim();
     final focusDate = _detectFocusDate(lower);
+
+    if (_educationKeywords.any(lower.contains)) {
+      return AiIntentRoute(kind: AiIntentKind.query, focusDate: focusDate);
+    }
 
     if (_hasMutateKeyword(lower)) {
       return AiIntentRoute(kind: AiIntentKind.mutate, focusDate: focusDate);
