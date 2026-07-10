@@ -1,3 +1,4 @@
+import '../../education/presentation/first_time_feature_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -300,7 +301,13 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
                   onReorder: (o, n) => _onReorderSlots(slots, o, n),
                   header: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                    child: PlanTomorrowHero(dateLabel: _formatDate(tomorrow)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const FirstTimeFeatureCard(guideId: 'planTomorrow'),
+                        PlanTomorrowHero(dateLabel: _formatDate(tomorrow)),
+                      ],
+                    ),
                   ),
                   footer: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),

@@ -1,3 +1,4 @@
+import '../../education/presentation/first_time_feature_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -264,6 +265,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            const FirstTimeFeatureCard(guideId: 'focus'),
             Text(
               'SELECTION MODE',
               style: TextStyle(letterSpacing: 3, color: AppColors.cyan),

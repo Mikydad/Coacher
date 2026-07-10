@@ -1,3 +1,4 @@
+import '../../education/presentation/first_time_feature_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -78,16 +79,19 @@ class CommunityScreen extends ConsumerWidget {
                   onRefresh: () async => invalidateCircleScopedProviders(ref),
                   child: ListView.separated(
                     padding: const EdgeInsets.all(16),
-                    itemCount: circles.length,
+                    // Index 0 is the once-only intro card.
+                    itemCount: circles.length + 1,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) => _MyCircleCard(
-                      circle: circles[i],
-                      onTap: () => Navigator.pushNamed(
-                        context,
-                        CircleDetailScreen.routeName,
-                        arguments: circles[i].id,
-                      ),
-                    ),
+                    itemBuilder: (_, i) => i == 0
+                        ? const FirstTimeFeatureCard(guideId: 'circles')
+                        : _MyCircleCard(
+                            circle: circles[i - 1],
+                            onTap: () => Navigator.pushNamed(
+                              context,
+                              CircleDetailScreen.routeName,
+                              arguments: circles[i - 1].id,
+                            ),
+                          ),
                   ),
                 );
               },

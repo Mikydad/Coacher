@@ -54,6 +54,7 @@ import '../../../app/application/main_tab_navigation.dart';
 import '../../context_override/presentation/active_override_banner.dart';
 import '../../context_override/presentation/context_override_quick_activate_sheet.dart';
 import '../../context_override/presentation/post_override_review_card.dart';
+import '../../education/presentation/getting_started_card.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 import 'pathpal_app_bar_title.dart';
 
@@ -110,6 +111,8 @@ class HomeScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           const _Layer4NotificationDispatchBridge(),
+          // New-user learn-by-doing checklist; SizedBox.shrink for everyone else.
+          const GettingStartedCard(),
           const _HomeTopAnalyticsCard(),
           const SizedBox(height: 16),
           Row(

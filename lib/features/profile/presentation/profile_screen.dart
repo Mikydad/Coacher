@@ -1,3 +1,4 @@
+import '../../education/presentation/first_time_feature_card.dart';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -182,7 +183,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: _DisciplineModesSection(activeMode: defaultMode),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const FirstTimeFeatureCard(guideId: 'disciplineModes'),
+                      _DisciplineModesSection(activeMode: defaultMode),
+                    ],
+                  ),
                 ),
               ),
 

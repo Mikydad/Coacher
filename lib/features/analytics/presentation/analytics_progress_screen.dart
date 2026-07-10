@@ -1,3 +1,4 @@
+import '../../education/presentation/first_time_feature_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -128,6 +129,7 @@ class _AnalyticsProgressScreenState
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
+          const FirstTimeFeatureCard(guideId: 'analytics'),
           bundleAsync.when(
             skipLoadingOnReload: true,
             data: (bundle) => Column(

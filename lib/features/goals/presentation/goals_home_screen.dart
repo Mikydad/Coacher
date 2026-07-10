@@ -1,3 +1,4 @@
+import '../../education/presentation/first_time_feature_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -43,6 +44,10 @@ class GoalsHomeScreen extends ConsumerWidget {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: FirstTimeFeatureCard(guideId: 'goals'),
+          ),
           // ── Category filter ─────────────────────────────────────────
           const SizedBox(height: 12),
           const CategoryChipRow(),
