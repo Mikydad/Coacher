@@ -86,6 +86,9 @@ abstract final class AuthSessionPolicy {
     await Future.wait([
       prefs.remove('isar_seeded_v1'),
       prefs.remove('notification_task_id_index_v1'),
+      // Onboarding is per-account (a different sign-in re-evaluates new vs
+      // existing); seen feature cards stay device-level on purpose.
+      prefs.remove('education_onboarding_state_v1'),
     ]);
   }
 }
