@@ -4,6 +4,7 @@ import '../../../core/di/providers.dart';
 import '../../ai_assistant/application/ai_assistant_providers.dart';
 import '../../community/application/circle_providers.dart';
 import '../../context_override/application/context_override_providers.dart';
+import '../../education/application/getting_started_controller.dart';
 import '../../goals/application/goals_providers.dart';
 import '../../reminders/application/attention_orchestrator_providers.dart';
 import '../../scoring/application/scoring_controller.dart';
@@ -50,6 +51,12 @@ void invalidateUserScopedProviders(WidgetRef ref) {
 
   // ── Context override ─────────────────────────────────────────────────────────
   ref.invalidate(pendingRecoveryReviewProvider);
+
+  // ── Education / onboarding ───────────────────────────────────────────────
+  // The Getting Started controller decides new-vs-existing ONCE per
+  // instance; without this, User A's 'hidden' controller survives in memory
+  // and User B (a brand-new account) never gets onboarding.
+  ref.invalidate(gettingStartedControllerProvider);
 
   // ── Ephemeral UI / navigation state ──────────────────────────────────────────
   ref.invalidate(selectedTaskProvider);
