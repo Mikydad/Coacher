@@ -6,6 +6,7 @@ import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../add_task/presentation/add_task_screen.dart';
+import '../../education/presentation/help_dot.dart';
 import '../../planning/application/planned_task_actions.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
@@ -124,6 +125,7 @@ class TasksHubScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Tasks'),
         actions: [
+          const HelpAppBarButton('tasks'),
           IconButton(
             tooltip: 'What next',
             icon: const Icon(Icons.play_circle_outline),

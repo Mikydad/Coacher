@@ -1,4 +1,5 @@
 import '../../education/presentation/first_time_feature_card.dart';
+import '../../education/presentation/help_dot.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -98,6 +99,7 @@ class _AnalyticsProgressScreenState
           ),
         ),
         actions: [
+          const HelpAppBarButton('analytics'),
           IconButton(
             tooltip: 'Test AI coaching summary',
             onPressed: () => _testAiSummary(context, ref),

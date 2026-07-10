@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/presentation/keyboard_dismiss.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../analytics/application/analytics_event_logger.dart';
@@ -959,10 +960,12 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
         onBack: () => Navigator.pop(context),
         onSave: _saving ? null : _save,
       ),
-      body: Form(
+      body: KeyboardDismissOnTap(
+        child: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           children: [
             // ── 1. Title ────────────────────────────────────────────────
             const GoalEditorSectionLabel('Title'),
@@ -1063,6 +1066,7 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
               onPressed: _saving ? null : _save,
             ),
           ],
+        ),
         ),
       ),
     );

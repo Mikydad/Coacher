@@ -69,9 +69,11 @@ class GettingStartedController extends StateNotifier<GettingStartedState> {
     Future<bool> Function()? hasExistingDataProbe,
     int Function()? streakReader,
     Duration celebrateFor = const Duration(milliseconds: 3500),
+    Duration titleSettleFor = const Duration(milliseconds: 1800),
   }) : _hasExistingDataProbe = hasExistingDataProbe ?? _defaultProbe,
        _streakReader = streakReader,
        _celebrateFor = celebrateFor,
+       _titleSettleFor = titleSettleFor,
        super(const GettingStartedState.loading()) {
     _init();
   }
@@ -80,7 +82,9 @@ class GettingStartedController extends StateNotifier<GettingStartedState> {
   final Future<bool> Function() _hasExistingDataProbe;
   final int Function()? _streakReader;
   final Duration _celebrateFor;
+  final Duration _titleSettleFor;
   Timer? _celebrateTimer;
+  Timer? _titleSettleTimer;
 
   // Latest signals, buffered even before init resolves.
   bool _seenTaskCreated = false;
@@ -152,6 +156,7 @@ class GettingStartedController extends StateNotifier<GettingStartedState> {
         // Left Add Task without saving — point at the tile again.
         if (route != '/add-task' && !_seenTaskCreated) {
           _titleTyped = false;
+          _titleSettleTimer?.cancel();
           state = state.copyWith(step: TourStep.tapAddTask);
         }
       case TourStep.completeTask:
@@ -160,12 +165,20 @@ class GettingStartedController extends StateNotifier<GettingStartedState> {
     }
   }
 
-  /// Hook from the Add Task screen's title field.
+  /// Hook from the Add Task screen's title field. Advancing to "now save it"
+  /// is debounced: jumping the spotlight to the save button on the very first
+  /// keystroke feels rushed, so wait until the user pauses typing.
   void onTaskTitleChanged(String text) {
     _titleTyped = text.trim().isNotEmpty;
+    _titleSettleTimer?.cancel();
     if (!mounted || !state.isActive) return;
     if (state.step == TourStep.nameTask && _titleTyped) {
-      state = state.copyWith(step: TourStep.saveTask);
+      _titleSettleTimer = Timer(_titleSettleFor, () {
+        if (!mounted || !state.isActive) return;
+        if (state.step == TourStep.nameTask && _titleTyped) {
+          state = state.copyWith(step: TourStep.saveTask);
+        }
+      });
     }
   }
 
@@ -213,6 +226,7 @@ class GettingStartedController extends StateNotifier<GettingStartedState> {
   /// Skip button — dismiss forever.
   Future<void> skip() async {
     _celebrateTimer?.cancel();
+    _titleSettleTimer?.cancel();
     await _prefs.setOnboardingState('done');
     if (mounted) state = state.copyWith(status: TourStatus.hidden);
   }
@@ -220,6 +234,7 @@ class GettingStartedController extends StateNotifier<GettingStartedState> {
   @override
   void dispose() {
     _celebrateTimer?.cancel();
+    _titleSettleTimer?.cancel();
     super.dispose();
   }
 }

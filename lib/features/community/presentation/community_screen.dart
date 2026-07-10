@@ -1,4 +1,5 @@
 import '../../education/presentation/first_time_feature_card.dart';
+import '../../education/presentation/help_dot.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -36,6 +37,7 @@ class CommunityScreen extends ConsumerWidget {
         ),
         elevation: 0,
         actions: [
+          const HelpAppBarButton('circles'),
           IconButton(
             icon: Icon(Icons.explore_rounded, color: AppColors.textMuted),
             tooltip: 'Discover circles',

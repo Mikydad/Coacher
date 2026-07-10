@@ -7,11 +7,13 @@ GettingStartedController _controller({
   bool existingData = false,
   int streak = 0,
   Duration celebrateFor = const Duration(minutes: 1),
+  Duration titleSettleFor = const Duration(milliseconds: 5),
 }) => GettingStartedController(
   EducationPrefs(),
   hasExistingDataProbe: () async => existingData,
   streakReader: () => streak,
   celebrateFor: celebrateFor,
+  titleSettleFor: titleSettleFor,
 );
 
 Future<void> _settle() =>
@@ -95,7 +97,10 @@ void main() {
       c.onRouteChanged('/add-task');
       expect(c.state.step, TourStep.nameTask);
 
+      // Advancing to "save it" waits for the user to pause typing.
       c.onTaskTitleChanged('Read 10 pages');
+      expect(c.state.step, TourStep.nameTask);
+      await _settle();
       expect(c.state.step, TourStep.saveTask);
 
       // Saved: rows now contain the task; route pops home.
@@ -117,10 +122,34 @@ void main() {
       await _settle();
       c.onRouteChanged('/add-task');
       c.onTaskTitleChanged('half typed');
+      await _settle();
       expect(c.state.step, TourStep.saveTask);
 
       c.onRouteChanged('/'); // backed out, nothing saved
       expect(c.state.step, TourStep.tapAddTask);
+    });
+
+    test('typing pause is debounced: keystrokes keep it at nameTask',
+        () async {
+      final c = _controller(titleSettleFor: const Duration(milliseconds: 15));
+      await _settle();
+      c.onRouteChanged('/add-task');
+
+      // A burst of keystrokes — each one restarts the settle timer.
+      c.onTaskTitleChanged('R');
+      c.onTaskTitleChanged('Re');
+      c.onTaskTitleChanged('Rea');
+      expect(c.state.step, TourStep.nameTask);
+
+      // Cleared before the pause elapsed → no advance at all.
+      c.onTaskTitleChanged('');
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(c.state.step, TourStep.nameTask);
+
+      // Typed again and left alone → advances after the pause.
+      c.onTaskTitleChanged('Read');
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(c.state.step, TourStep.saveTask);
     });
 
     test('leaving Add Task AFTER saving does not rewind', () async {

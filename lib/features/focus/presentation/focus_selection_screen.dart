@@ -1,8 +1,10 @@
 import '../../education/presentation/first_time_feature_card.dart';
+import '../../education/presentation/help_dot.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/presentation/keyboard_dismiss.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
@@ -255,6 +257,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
         appBar: AppBar(
           title: const PathPalAppBarTitle(),
           actions: [
+            const HelpAppBarButton('focus'),
             IconButton(
               tooltip: 'Refresh list',
               onPressed: () => ref.invalidate(executionDayTasksProvider),
@@ -262,8 +265,10 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
             ),
           ],
         ),
-        body: ListView(
+        body: KeyboardDismissOnTap(
+          child: ListView(
           padding: const EdgeInsets.all(16),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           children: [
             const FirstTimeFeatureCard(guideId: 'focus'),
             Text(
@@ -373,6 +378,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
               ),
             ),
           ],
+          ),
         ),
       ),
     );

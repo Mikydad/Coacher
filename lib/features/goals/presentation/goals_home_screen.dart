@@ -1,4 +1,5 @@
 import '../../education/presentation/first_time_feature_card.dart';
+import '../../education/presentation/help_dot.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -24,6 +25,7 @@ class GoalsHomeScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Goals'),
         actions: [
+          const HelpAppBarButton('goals'),
           IconButton(
             tooltip: 'Paused & completed',
             icon: const Icon(Icons.inventory_2_outlined),

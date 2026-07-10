@@ -29,3 +29,20 @@ class HelpDot extends StatelessWidget {
     );
   }
 }
+
+/// Page-level `?` for AppBar actions: opens the page's [HelpSheet]
+/// (what the page is for, how to use it, why it exists).
+class HelpAppBarButton extends StatelessWidget {
+  const HelpAppBarButton(this.guideId, {super.key});
+
+  final String guideId;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: () => showHelpSheet(context, guideId),
+      tooltip: 'About this page',
+      icon: const Icon(Icons.help_outline_rounded, size: 20),
+    );
+  }
+}

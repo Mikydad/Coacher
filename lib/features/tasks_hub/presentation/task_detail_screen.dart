@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../education/presentation/help_dot.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
@@ -253,6 +255,7 @@ class TaskDetailScreen extends ConsumerWidget {
           appBar: AppBar(
             title: const Text('Task'),
             actions: [
+              const HelpAppBarButton('tasks'),
               IconButton(
                 tooltip: 'Edit',
                 icon: const Icon(Icons.edit_outlined),

@@ -1,4 +1,5 @@
 import '../../education/presentation/first_time_feature_card.dart';
+import '../../education/presentation/help_dot.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -180,6 +181,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         ),
       ),
       actions: [
+        const HelpAppBarButton('coachAi'),
         _StatusPill(isReady: isReady),
         const SizedBox(width: 16),
       ],

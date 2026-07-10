@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/presentation/app_colors.dart';
+import '../../../education/presentation/help_dot.dart';
 
 /// Obsidian Pulse tokens for Plan Tomorrow — visual only.
 abstract final class PlanTomorrowColors {
@@ -38,6 +39,7 @@ class PlanTomorrowHeader extends StatelessWidget
           fontSize: 16,
         ),
       ),
+      actions: const [HelpAppBarButton('planTomorrow')],
     );
   }
 }
