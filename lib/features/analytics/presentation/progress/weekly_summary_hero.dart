@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../education/presentation/help_dot.dart';
 
 import '../../application/analytics_period_bundle.dart';
 import '../../application/discipline_score.dart';
@@ -68,6 +69,7 @@ class WeeklySummaryHero extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+            const HelpDot('weeklySummary'),
             const Spacer(),
             Text(
               progressWeekDateRangeLabel().toUpperCase(),

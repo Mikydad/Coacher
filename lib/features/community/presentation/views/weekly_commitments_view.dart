@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/presentation/keyboard_dismiss.dart';
+import '../../../education/presentation/help_dot.dart';
 import '../../../../core/utils/date_keys.dart';
 import '../../../../core/utils/stable_id.dart';
 import '../../application/weekly_commitment_providers.dart';
@@ -53,6 +54,7 @@ class WeeklyCommitmentsView extends ConsumerWidget {
             // ── My commitments ─────────────────────────────────────────────
             _SectionHeader(
               'My commitments this week',
+              helpId: 'weeklyCommitments',
               trailing: TextButton.icon(
                 onPressed: () =>
                     _showEditSheet(context, ref, uid, weekKey, mine),
@@ -612,9 +614,12 @@ class _EndOfWeekBanner extends StatelessWidget {
 // ── Section header ────────────────────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.title, {this.trailing});
+  const _SectionHeader(this.title, {this.trailing, this.helpId});
   final String title;
   final Widget? trailing;
+
+  /// Feature-guide id — renders a `?` that opens the help sheet.
+  final String? helpId;
 
   @override
   Widget build(BuildContext context) {
@@ -629,6 +634,7 @@ class _SectionHeader extends StatelessWidget {
             letterSpacing: 0.8,
           ),
         ),
+        if (helpId != null) HelpDot(helpId!),
         const Spacer(),
         if (trailing != null) trailing!,
       ],

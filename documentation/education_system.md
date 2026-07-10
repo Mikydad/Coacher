@@ -93,6 +93,35 @@ Pipeline (all client-side; the cloud function is untouched):
 Cost: ~200 extra words only on matched turns (gpt-4o-mini; 120k-char input
 cap, no server change).
 
+## Surface 4 — `?` help dots (Round 2)
+
+`HelpDot(guideId)` (`help_dot.dart`) is a small always-available `?` attached
+to any element that needs explaining — not just pages. Tap → `HelpSheet`
+(`help_sheet.dart`): a draggable bottom sheet with the topic's what/why/how/
+tips and an **"Ask Coach about this"** button that deep-links to the Coach tab
+with "Tell me about <title>" prefilled (prefill only — the auto-send path
+would prepend the wrong wording).
+
+Content lives in `FeatureGuides.elements` (17 element topics — Flow Now,
+Today's Progress, Weekly Summary, Task Integrity, Coaching Focus, Streak at
+Risk, Weekly Commitments, Challenge Voting, Cycle Progress, Milestones, Goal
+Actions, Carry Forward, Coach Tone, Core Optimization, …). Elements are NOT
+in `all` (no first-time cards/tour for them; howSteps may be empty) but ARE
+in `searchable`, so the Coach AI answers "what is flow now?" through the same
+FEATURE GUIDE pipeline.
+
+**Keyword invariants** (tested): exact-string unique across pages+elements
+(matchTopic ties go to the page guide — a duplicate element keyword is dead),
+and each element's lowercase title must be one of its keywords so the
+Ask-Coach prefill round-trips.
+
+Attachment points: optional `helpId` param on the private section-header
+widgets (profile `_SectionLabel`, goal-detail/commitments/challenges
+`_SectionHeader`s, `ProgressGlassCard`) plus manual dots in home (Flow Now,
+Today's Tasks/Goals headers, analytics hero), progress (Weekly Summary,
+Goals & Habits, Task Integrity), and plan-tomorrow carry-forward. To add one:
+create the topic in `elements`, drop `HelpDot('<id>')` next to the title.
+
 ## Adding or editing a guide
 
 Edit `feature_guides.dart` only. Every surface updates. Run

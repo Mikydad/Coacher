@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../../education/presentation/help_dot.dart';
 import 'progress_design_tokens.dart';
 
 class ProgressTonalCard extends StatelessWidget {
@@ -115,6 +116,7 @@ class ProgressGlassCard extends StatelessWidget {
     required this.title,
     required this.headline,
     required this.body,
+    this.helpId,
   });
 
   final Color? accentColor;
@@ -122,6 +124,9 @@ class ProgressGlassCard extends StatelessWidget {
   final String title;
   final String headline;
   final String body;
+
+  /// Feature-guide id — renders a `?` that opens the help sheet.
+  final String? helpId;
 
   @override
   Widget build(BuildContext context) {
@@ -173,6 +178,7 @@ class ProgressGlassCard extends StatelessWidget {
                             letterSpacing: 0.9,
                           ),
                         ),
+                        if (helpId != null) HelpDot(helpId!),
                       ],
                     ),
                     const SizedBox(height: 10),

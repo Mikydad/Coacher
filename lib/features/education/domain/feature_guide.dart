@@ -55,10 +55,12 @@ class FeatureGuide {
     final b = StringBuffer()
       ..writeln('$title — $oneLiner')
       ..writeln('What: $what')
-      ..writeln('Why: $why')
-      ..writeln('How:');
-    for (var i = 0; i < howSteps.length; i++) {
-      b.writeln('  ${i + 1}. ${howSteps[i]}');
+      ..writeln('Why: $why');
+    if (howSteps.isNotEmpty) {
+      b.writeln('How:');
+      for (var i = 0; i < howSteps.length; i++) {
+        b.writeln('  ${i + 1}. ${howSteps[i]}');
+      }
     }
     if (tips.isNotEmpty) b.writeln('Tips: ${tips.join(' ')}');
     return b.toString();

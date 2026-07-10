@@ -55,6 +55,7 @@ import '../../context_override/presentation/active_override_banner.dart';
 import '../../context_override/presentation/context_override_quick_activate_sheet.dart';
 import '../../context_override/presentation/post_override_review_card.dart';
 import '../../education/presentation/tour_targets.dart';
+import '../../education/presentation/help_dot.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 import 'pathpal_app_bar_title.dart';
 
@@ -206,6 +207,7 @@ class HomeScreen extends ConsumerWidget {
                           ),
                         ),
                       ),
+                      const HelpDot('todaysTasks'),
                       IconButton(
                         icon: Icon(Icons.chevron_right, color: AppColors.fg54),
                         onPressed: () => Navigator.pushNamed(
@@ -307,6 +309,7 @@ class HomeScreen extends ConsumerWidget {
                           ),
                         ),
                       ),
+                      const HelpDot('todaysGoals'),
                       IconButton(
                         icon: Icon(Icons.chevron_right, color: AppColors.fg54),
                         onPressed: () => navigateToMainTab(
@@ -687,12 +690,18 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
                       Center(
                         child: Column(
                           children: [
-                            Text(
-                              "Today's Progress",
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.fg70,
-                              ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  "Today's Progress",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.fg70,
+                                  ),
+                                ),
+                                const HelpDot('todaysProgress'),
+                              ],
                             ),
                             const SizedBox(height: 5),
                             AnimatedContainer(
@@ -1317,6 +1326,7 @@ class _FlowNowStrip extends ConsumerWidget {
                 ),
               ),
             ),
+            const HelpDot('flowNow'),
           ],
         ),
         if (displayTask != null) ...[

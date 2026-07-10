@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../education/presentation/help_dot.dart';
 
 import '../../application/daily_analytics_engine.dart';
 import 'progress_design_tokens.dart';
@@ -47,6 +48,7 @@ class TaskIntegritySection extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              const HelpDot('taskIntegrity'),
             ],
           ),
           const SizedBox(height: 14),

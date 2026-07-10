@@ -112,4 +112,85 @@ void main() {
     }
     expect(FeatureGuides.byId('nope'), isNull);
   });
+
+  group('element help topics', () {
+    test('ids unique across pages + elements; byId resolves all', () {
+      final ids = FeatureGuides.searchable.map((g) => g.id).toList();
+      expect(ids.toSet().length, ids.length);
+      for (final g in FeatureGuides.searchable) {
+        expect(FeatureGuides.byId(g.id), same(g));
+      }
+    });
+
+    // matchTopic breaks ties toward the first list ([all]), so an element
+    // keyword that duplicates a page-guide keyword can never match — it is
+    // dead content. Enforce exact-string uniqueness across the whole set.
+    test('keywords are exact-string unique across the combined set', () {
+      final seen = <String, String>{};
+      for (final g in FeatureGuides.searchable) {
+        for (final k in g.keywords) {
+          expect(
+            seen.containsKey(k),
+            isFalse,
+            reason: '"$k" used by both ${seen[k]} and ${g.id}',
+          );
+          seen[k] = g.id;
+        }
+      }
+    });
+
+    test('element keywords lowercase/non-empty; steps non-blank if present',
+        () {
+      for (final g in FeatureGuides.elements) {
+        expect(g.keywords, isNotEmpty, reason: g.id);
+        for (final k in g.keywords) {
+          expect(k, k.toLowerCase(), reason: '${g.id}: "$k"');
+          expect(k.trim(), isNotEmpty, reason: g.id);
+        }
+        for (final s in g.howSteps) {
+          expect(s.trim(), isNotEmpty, reason: g.id);
+        }
+      }
+    });
+
+    // The HelpSheet "Ask Coach about this" button prefills
+    // "Tell me about <title>" — every element must resolve back to itself.
+    test('ask-coach round-trip resolves every element topic', () {
+      for (final g in FeatureGuides.elements) {
+        final query = 'tell me about ${g.title.toLowerCase()}';
+        expect(
+          FeatureGuides.matchTopic(query)?.id,
+          g.id,
+          reason: query,
+        );
+        expect(FeatureGuides.isEducationQuestion(query), isTrue, reason: query);
+      }
+    });
+
+    test('element questions match: flow now / task integrity', () {
+      expect(FeatureGuides.matchTopic('what is flow now')?.id, 'flowNow');
+      expect(
+        FeatureGuides.matchTopic('explain task integrity')?.id,
+        'taskIntegrity',
+      );
+    });
+
+    test('no element text trips the informational output guard', () {
+      for (final g in FeatureGuides.elements) {
+        final texts = [
+          g.toPromptBlock(),
+          g.oneLiner,
+          ...g.tips,
+          ...g.suggestedPrompts,
+        ];
+        for (final t in texts) {
+          expect(
+            AiInformationalOutputGuard.looksLikeInternalLeak(t),
+            isFalse,
+            reason: '${g.id}: "$t"',
+          );
+        }
+      }
+    });
+  });
 }

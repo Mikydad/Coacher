@@ -20,6 +20,7 @@ import '../../settings/presentation/reminder_settings_screen.dart';
 import '../../analytics/application/discipline_score.dart';
 import '../../feedback/application/feedback_context_collector.dart';
 import '../../feedback/application/tester_mode_controller.dart';
+import '../../education/presentation/help_dot.dart';
 import '../../feedback/presentation/feedback_screen.dart';
 import '../application/profile_providers.dart';
 
@@ -163,7 +164,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _SectionLabel(label: 'Discipline Modes'),
+                    _SectionLabel(label: 'Discipline Modes', helpId: 'disciplineModes'),
                     const SizedBox(height: 4),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -200,7 +201,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _SectionLabel(label: 'Coach Tone'),
+                    _SectionLabel(label: 'Coach Tone', helpId: 'coachTone'),
                     const SizedBox(height: 4),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -226,7 +227,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
               // ── Core Optimization (settings) ──────────────────────────────
               SliverToBoxAdapter(
-                child: _SectionLabel(label: 'Core Optimization'),
+                child: _SectionLabel(label: 'Core Optimization', helpId: 'coreOptimization'),
               ),
               SliverToBoxAdapter(
                 child: Padding(
@@ -986,22 +987,28 @@ class _LogOutButton extends StatelessWidget {
 // ─── Shared section label ─────────────────────────────────────────────────────
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.label});
+  const _SectionLabel({required this.label, this.helpId});
   final String label;
+
+  /// Feature-guide id — renders a `?` that opens the help sheet.
+  final String? helpId;
 
   @override
   Widget build(BuildContext context) {
+    final text = Text(
+      label.toUpperCase(),
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 2,
+        color: _kOnSurfaceVariant,
+      ),
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Text(
-        label.toUpperCase(),
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 2,
-          color: _kOnSurfaceVariant,
-        ),
-      ),
+      child: helpId == null
+          ? text
+          : Row(children: [Flexible(child: text), HelpDot(helpId!)]),
     );
   }
 }

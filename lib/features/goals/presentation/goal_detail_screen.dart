@@ -20,6 +20,7 @@ import '../domain/models/goal_check_in.dart';
 import '../domain/models/goal_enums.dart';
 import '../domain/models/goal_milestone.dart';
 import '../domain/models/user_goal.dart';
+import '../../education/presentation/help_dot.dart';
 import 'goal_editor_screen.dart';
 
 /// Obsidian Pulse goal detail — layered dark surfaces, no dividers, lime as
@@ -248,6 +249,7 @@ class GoalDetailScreen extends ConsumerWidget {
               ],
               _SectionHeader(
                 title: 'Cycle Progress',
+                helpId: 'cycleProgress',
                 trailing: _EmphasisCount(
                   strong: '$elapsed/$totalDays',
                   soft: ' DAYS',
@@ -267,6 +269,7 @@ class GoalDetailScreen extends ConsumerWidget {
               const SizedBox(height: 32),
               _SectionHeader(
                 title: 'Actions',
+                helpId: 'goalActions',
                 subtitle: 'OPERATIONAL CHECKLIST',
                 trailing: totalActions > 0
                     ? _EmphasisCount(
@@ -299,6 +302,7 @@ class GoalDetailScreen extends ConsumerWidget {
               const SizedBox(height: 32),
               _SectionHeader(
                 title: 'Milestones',
+                helpId: 'milestones',
                 trailing: TextButton.icon(
                   onPressed: () => _addMilestoneDialog(context, ref, g.id),
                   style: TextButton.styleFrom(
@@ -601,11 +605,19 @@ class _MetaPill extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.subtitle, this.trailing});
+  const _SectionHeader({
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.helpId,
+  });
 
   final String title;
   final String? subtitle;
   final Widget? trailing;
+
+  /// Feature-guide id — renders a `?` that opens the help sheet.
+  final String? helpId;
 
   @override
   Widget build(BuildContext context) {
@@ -625,6 +637,7 @@ class _SectionHeader extends StatelessWidget {
                 ),
               ),
             ),
+            if (helpId != null) HelpDot(helpId!),
             ?trailing,
           ],
         ),

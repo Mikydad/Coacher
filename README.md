@@ -4,6 +4,7 @@ A new Flutter project.
 
 ## Documentation
 
+- [Codebase guide for new developers](documentation/CODEBASE_GUIDE.md) — how the app works: architecture principles, data flow, the domain loop, debugging playbooks, and recipes for adding features. Start here.
 - [Isar local-first and notification routing](documentation/isar-local-first-and-notification-routing.md) — what changed, how it works, debugging checklist, known errors.
 - [Error log](documentation/errors.md) — incremental issues and fixes during development.
 - [Firebase rules notes](documentation/firebase-rules.md)

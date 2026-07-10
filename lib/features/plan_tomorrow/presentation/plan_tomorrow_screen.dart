@@ -1,5 +1,6 @@
 import '../../education/presentation/first_time_feature_card.dart';
 import 'package:flutter/material.dart';
+import '../../education/presentation/help_dot.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
@@ -975,6 +976,7 @@ class _CarryForwardSection extends StatelessWidget {
                           ),
                         ),
                       ),
+                      const HelpDot('carryForward'),
                       AnimatedRotation(
                         turns: expanded ? 0.5 : 0,
                         duration: const Duration(milliseconds: 200),

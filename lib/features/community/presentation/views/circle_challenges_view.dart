@@ -15,6 +15,7 @@ import '../sheets/challenge_create_sheet.dart';
 import '../widgets/challenge_vote_banner.dart';
 
 import '../../../../core/presentation/app_colors.dart';
+import '../../../education/presentation/help_dot.dart';
 import '../../../../core/presentation/async_value_ui.dart';
 
 class CircleChallengesView extends ConsumerWidget {
@@ -55,7 +56,7 @@ class CircleChallengesView extends ConsumerWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _SectionHeader('Waiting for votes'),
+                  const _SectionHeader('Waiting for votes', helpId: 'challengeVoting'),
                   ...list.map(
                     (c) =>
                         ChallengeVoteBanner(challenge: c, circleId: circleId),
@@ -78,7 +79,7 @@ class CircleChallengesView extends ConsumerWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _SectionHeader('Active challenges'),
+                  const _SectionHeader('Active challenges', helpId: 'challengeVoting'),
                   ...list.map(
                     (c) => c.mode == ChallengeMode.competition
                         ? _CompetitionChallengeCard(
@@ -135,22 +136,28 @@ class CircleChallengesView extends ConsumerWidget {
 // ─── Section header ───────────────────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.text);
+  const _SectionHeader(this.text, {this.helpId});
   final String text;
+
+  /// Feature-guide id — renders a `?` that opens the help sheet.
+  final String? helpId;
 
   @override
   Widget build(BuildContext context) {
+    final label = Text(
+      text.toUpperCase(),
+      style: TextStyle(
+        color: AppColors.textMuted,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.8,
+      ),
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: 10, top: 4),
-      child: Text(
-        text.toUpperCase(),
-        style: TextStyle(
-          color: AppColors.textMuted,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.8,
-        ),
-      ),
+      child: helpId == null
+          ? label
+          : Row(children: [label, HelpDot(helpId!)]),
     );
   }
 }
