@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../education/presentation/first_time_feature_card.dart';
 import '../../education/presentation/help_dot.dart';
 import 'package:flutter/material.dart';
@@ -52,11 +54,13 @@ class FocusSelectionScreen extends ConsumerStatefulWidget {
 class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
   final _quickController = TextEditingController();
   bool _quickBusy = false;
+  bool _hasQuickText = false;
   bool _didHandleLaunchArgs = false;
 
   @override
   void initState() {
     super.initState();
+    _quickController.addListener(_onQuickTextChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted || _didHandleLaunchArgs) return;
       final args = widget.launchArgs;
@@ -100,38 +104,103 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
 
   @override
   void dispose() {
+    _quickController.removeListener(_onQuickTextChanged);
     _quickController.dispose();
     super.dispose();
   }
 
-  Future<void> _onQuickAdd() async {
+  void _onQuickTextChanged() {
+    final hasText = _quickController.text.trim().isNotEmpty;
+    if (hasText != _hasQuickText && mounted) {
+      setState(() => _hasQuickText = hasText);
+    }
+  }
+
+  /// Primary-button entry point. When the quick-start field holds text we start
+  /// that typed task; otherwise we fall back to the existing list-selection flow.
+  Future<void> _onStartFocusPressed(List<ExecutionTaskItem> tasks) async {
+    if (_quickController.text.trim().isNotEmpty) {
+      await _onQuickStart();
+      return;
+    }
+    await _openTimerForSelectedTask(tasks);
+  }
+
+  /// Quick-start flow: type a task → pick a duration → create it on today's plan
+  /// → open the timer. Mirrors the enforcement-mode inheritance of the old
+  /// quick-add and the launch behaviour of starting a selected task.
+  Future<void> _onQuickStart() async {
     if (_quickBusy) return;
-    final text = _quickController.text;
-    if (text.trim().isEmpty) return;
+    final text = _quickController.text.trim();
+    if (text.isEmpty) return;
+
+    final execState = ref.read(executionControllerProvider);
+    if (execState.hasActiveFocusTask) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Task "${execState.taskLabel}" is already running. '
+            'Finish or stop it before switching focus.',
+          ),
+        ),
+      );
+      return;
+    }
+
     setState(() => _quickBusy = true);
     try {
-      await persistQuickPlannedTaskForToday(
+      final minutes = await showFocusSessionDurationPicker(
+        context,
+        taskTitle: text,
+      );
+      if (!mounted || minutes == null) return;
+
+      final task = await persistQuickPlannedTaskForToday(
         ref.read(planningRepositoryProvider),
         text,
+        durationMinutes: minutes,
       );
-      if (!mounted) return;
+      if (task == null || !mounted) return;
+
       _quickController.clear();
-      // migrated to coordinator
-      await ScheduleMutationCoordinator.instance.run(
-        TaskCreatedMutation(
-          entityId: 'focus_quick_add',
-          sourceContext: 'focus_selection_screen',
-          dateStr: DateKeys.todayKey(),
-        ),
-        commitOverride: () async {},
-      );
-      if (!mounted) return;
       FocusScope.of(context).unfocus();
+
+      ref.read(activeExecutionTaskIdProvider.notifier).state = task.id;
+      ref.read(activeExecutionTaskLabelProvider.notifier).state = task.title;
+      ref
+          .read(executionControllerProvider.notifier)
+          .setTask(id: task.id, label: task.title, durationMinutes: minutes);
+
+      fireAndForgetAnalyticsEvent(
+        ref,
+        type: AnalyticsEventType.taskStarted,
+        entityId: task.id,
+        entityKind: 'task',
+        sourceSurface: 'focus_quick_start',
+        idempotencyKey:
+            'task_started_focus_${task.id}_${DateTime.now().millisecondsSinceEpoch}',
+      );
+
+      // Keep the schedule/analytics pipeline in sync (same coordinator the old
+      // '+' quick-add used) without blocking the jump to the timer.
+      unawaited(
+        ScheduleMutationCoordinator.instance.run(
+          TaskCreatedMutation(
+            entityId: task.id,
+            sourceContext: 'focus_quick_start',
+            dateStr: DateKeys.todayKey(),
+          ),
+          commitOverride: () async {},
+        ),
+      );
+
+      if (!mounted) return;
+      await Navigator.pushNamed(context, TimerSessionScreen.routeName);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Could not create task: $e')));
+        ).showSnackBar(SnackBar(content: Text('Could not start task: $e')));
       }
     } finally {
       if (mounted) setState(() => _quickBusy = false);
@@ -285,6 +354,52 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
               ),
             ),
             const SizedBox(height: 20),
+            // Quick-start field: type a task and press Start Focus (or the
+            // keyboard's done action) to launch a focus session immediately —
+            // no round-trip through the task list below.
+            TextField(
+              controller: _quickController,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _onQuickStart(),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              decoration: InputDecoration(
+                hintText: 'Start something new to focus on…',
+                hintStyle: TextStyle(
+                  color: AppColors.fg38,
+                  fontWeight: FontWeight.w500,
+                ),
+                filled: true,
+                fillColor: AppColors.surfacePanel,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide(color: AppColors.fg12),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide(color: AppColors.fg12),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide(color: AppColors.accent, width: 1.5),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 18,
+                ),
+                suffixIcon: IconButton(
+                  tooltip: 'Start focus on this task',
+                  onPressed: _quickBusy ? null : _onQuickStart,
+                  icon: _quickBusy
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(Icons.play_circle_fill, color: AppColors.accent),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
             ...taskList.when(
               data: (tasks) {
                 if (tasks.isEmpty) {
@@ -332,25 +447,6 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 22),
-            TextField(
-              controller: _quickController,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _onQuickAdd(),
-              decoration: InputDecoration(
-                hintText: 'Create Quick Task…',
-                suffixIcon: IconButton(
-                  onPressed: _quickBusy ? null : _onQuickAdd,
-                  icon: _quickBusy
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.add_circle),
-                ),
-              ),
-            ),
             const SizedBox(height: 24),
             FilledButton(
               style: FilledButton.styleFrom(
@@ -367,9 +463,14 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
                       context,
                       TimerSessionScreen.routeName,
                     )
+                  : _quickBusy
+                  ? null
+                  : _hasQuickText
+                  // Field has text → start the typed task (duration → timer).
+                  ? () => _onStartFocusPressed(const [])
+                  // Field empty → keep today's list-selection behaviour.
                   : taskList.maybeWhen(
-                      data: (tasks) =>
-                          () => _openTimerForSelectedTask(tasks),
+                      data: (tasks) => () => _onStartFocusPressed(tasks),
                       orElse: () => null,
                     ),
               child: Text(

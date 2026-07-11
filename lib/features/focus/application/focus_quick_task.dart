@@ -4,12 +4,18 @@ import '../../planning/data/planning_repository.dart';
 import '../../planning/domain/models/task_item.dart';
 
 /// Creates an open task on **today’s** plan (local calendar) and persists locally + sync queue.
-Future<void> persistQuickPlannedTaskForToday(
+///
+/// Returns the created [PlannedTask] so callers can immediately act on it
+/// (e.g. start a focus session), or `null` when [title] is blank.
+/// [durationMinutes] defaults to 25 to preserve the original quick-add target;
+/// the quick-start flow passes the user's chosen focus length instead.
+Future<PlannedTask?> persistQuickPlannedTaskForToday(
   PlanningRepository planning,
-  String title,
-) async {
+  String title, {
+  int durationMinutes = 25,
+}) async {
   final trimmed = title.trim();
-  if (trimmed.isEmpty) return;
+  if (trimmed.isEmpty) return null;
 
   final today = DateKeys.todayKey();
   final day = await planning.ensureDefaultDayPlan(today);
@@ -36,7 +42,7 @@ Future<void> persistQuickPlannedTaskForToday(
     routineId: day.routineId,
     blockId: day.blockId,
     title: trimmed,
-    durationMinutes: 25,
+    durationMinutes: durationMinutes,
     priority: 3,
     orderIndex: orderIndex,
     reminderEnabled: false,
@@ -48,4 +54,5 @@ Future<void> persistQuickPlannedTaskForToday(
     modeRefId: modeRefId,
   );
   await planning.upsertTask(task);
+  return task;
 }
