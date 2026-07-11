@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import '../../../core/presentation/bento_category_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -1419,8 +1420,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
   /// category cards that fills the viewport (no scrolling), with the Custom
   /// action as a dark pill button and Skip as a floating square beside it.
   Widget _buildCategoryStep() {
-    _BentoCategoryCard card(String label, Color color, {bool hero = false}) =>
-        _BentoCategoryCard(
+    BentoCategoryCard card(String label, Color color, {bool hero = false}) =>
+        BentoCategoryCard(
           color: color,
           icon: _categoryIcon(label),
           label: label,
@@ -1461,16 +1462,16 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
               children: [
                 Expanded(
                   flex: 7,
-                  child: card('Study', _CategoryBento.yellow, hero: true),
+                  child: card('Study', BentoPalette.yellow, hero: true),
                 ),
                 const SizedBox(height: 12),
                 Expanded(
                   flex: 5,
                   child: Row(
                     children: [
-                      Expanded(child: card('Work', _CategoryBento.orange)),
+                      Expanded(child: card('Work', BentoPalette.orange)),
                       const SizedBox(width: 12),
-                      Expanded(child: card('Planning', _CategoryBento.green)),
+                      Expanded(child: card('Planning', BentoPalette.green)),
                     ],
                   ),
                 ),
@@ -1479,19 +1480,19 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                   flex: 8,
                   child: Row(
                     children: [
-                      Expanded(child: card('Fitness', _CategoryBento.purple)),
+                      Expanded(child: card('Fitness', BentoPalette.purple)),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           children: [
                             Expanded(
-                              child: card('Personal', _CategoryBento.blue),
+                              child: card('Personal', BentoPalette.blue),
                             ),
                             const SizedBox(height: 12),
                             Expanded(
                               child: card(
                                 kSleepTaskCategory,
-                                _CategoryBento.teal,
+                                BentoPalette.teal,
                               ),
                             ),
                           ],
@@ -1507,47 +1508,13 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
           Row(
             children: [
               Expanded(
-                child: Material(
+                child: BentoPillButton(
+                  label: customActive ? _category! : 'Custom',
+                  onTap: _promptCustomCategory,
                   color: AddTaskColors.card,
-                  borderRadius: BorderRadius.circular(18),
-                  child: InkWell(
-                    onTap: _promptCustomCategory,
-                    borderRadius: BorderRadius.circular(18),
-                    child: Container(
-                      height: 56,
-                      decoration: customActive
-                          ? BoxDecoration(
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: AddTaskColors.accentDim,
-                                width: 2,
-                              ),
-                            )
-                          : null,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.add,
-                            size: 18,
-                            color: AddTaskColors.onSurface,
-                          ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              customActive ? _category! : 'Custom',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: AddTaskColors.onSurface,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  textColor: AddTaskColors.onSurface,
+                  ringColor: AddTaskColors.accentDim,
+                  active: customActive,
                 ),
               ),
               const SizedBox(width: 12),
@@ -2153,136 +2120,6 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
   }
 }
 
-/// Bento card palette for the category-first step. Deliberately fixed raw
-/// colors (NOT AppColors tokens): per the design reference these bright
-/// cards look identical in dark and light themes — only the page background
-/// behind them adapts. Ink is the dark text drawn on top of every card.
-abstract final class _CategoryBento {
-  static const yellow = Color(0xFFF6D14E);
-  static const orange = Color(0xFFEF8D43);
-  static const green = Color(0xFF92E3A9);
-  static const purple = Color(0xFFC79BF2);
-  static const blue = Color(0xFF8FC9F5);
-  static const teal = Color(0xFF56C2AB);
-  static const ink = Color(0xFF17191C);
-}
-
-/// One colored mosaic card: uppercase label top-left, a check chip top-right
-/// when selected, big emoji as the hero, one soft supporting line below.
-class _BentoCategoryCard extends StatelessWidget {
-  const _BentoCategoryCard({
-    required this.color,
-    required this.icon,
-    required this.label,
-    this.subtitle,
-    required this.selected,
-    required this.onTap,
-    this.hero = false,
-  });
-
-  final Color color;
-  final IconData icon;
-  final String label;
-  final String? subtitle;
-  final bool selected;
-  final VoidCallback onTap;
-
-  /// The full-width top card: bigger emoji, roomier text.
-  final bool hero;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: color,
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: selected
-                ? Border.all(color: _CategoryBento.ink, width: 2.5)
-                : null,
-          ),
-          // Cards get whatever height the mosaic flexes give them — short
-          // slots (Personal/Sleep share one column) drop the subtitle and
-          // shrink the emoji instead of overflowing.
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxHeight < 96;
-              return Padding(
-                padding: EdgeInsets.all(compact ? 10 : 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            label.toUpperCase(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: _CategoryBento.ink,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        if (selected)
-                          Container(
-                            padding: const EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              color: _CategoryBento.ink.withValues(
-                                alpha: 0.14,
-                              ),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.check_rounded,
-                              size: 14,
-                              color: _CategoryBento.ink,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const Spacer(),
-                    Icon(
-                      icon,
-                      color: _CategoryBento.ink,
-                      size: hero
-                          ? 38
-                          : compact
-                          ? 18
-                          : 26,
-                    ),
-                    if (subtitle != null && !compact) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle!,
-                        maxLines: hero ? 1 : 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: _CategoryBento.ink.withValues(alpha: 0.72),
-                          fontSize: 11,
-                          height: 1.3,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 /// Owns its [TextEditingController] so it is disposed only after the dialog
 /// route finishes (same pattern as the goal milestone dialog).
