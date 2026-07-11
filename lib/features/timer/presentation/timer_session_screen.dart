@@ -191,6 +191,15 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
       } else {
         await returnToFocusList(context, ref);
       }
+      // The rating is saved at this point, so the user should never be left
+      // stranded on the finished timer. Most paths above already navigate
+      // away (returnToFocusList, or "Start now" pushing the next task's
+      // timer on top) — but some leave this screen as the current route,
+      // e.g. no next task was available, or a next-task sub-dialog (extra
+      // time / move with reason) was cancelled. Only pop when we're still
+      // the active route so we never pop a screen that was pushed on top of
+      // us in the meantime, and never double-pop an already-removed route.
+      _autoReturnToFocusIfStillCurrent();
     } finally {
       if (mounted) {
         setState(() => _isHandlingStopFlow = false);
@@ -198,6 +207,17 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
         _isHandlingStopFlow = false;
       }
     }
+  }
+
+  /// Pops this screen once the post-session rating flow has fully settled,
+  /// but only if nothing else already navigated away. `route.isCurrent` is
+  /// false when another screen (e.g. Focus, or a freshly-pushed timer for
+  /// the auto-next task) is now on top, so this is a no-op in that case.
+  void _autoReturnToFocusIfStillCurrent() {
+    if (!mounted) return;
+    final route = ModalRoute.of(context);
+    if (route == null || !route.isCurrent) return;
+    Navigator.of(context).maybePop();
   }
 
   Future<void> _checkReclaimedTime(String taskId) async {
