@@ -1,6 +1,6 @@
 import '../../education/presentation/first_time_feature_card.dart';
 import '../../education/presentation/help_dot.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../../../core/firebase/firestore_paths.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -195,13 +195,14 @@ class _DiscoverCirclesState extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final discoverAsync = ref.watch(discoverCirclesProvider(_category));
     final joinedIds = ref.watch(myCircleIdsProvider).valueOrNull?.toSet() ?? {};
-    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    // FirestorePaths guards the no-Firebase case (VM/widget tests) — a raw
+    // FirebaseAuth.instance here throws before any provider can swallow it.
+    final currentUid = FirestorePaths.activeUid;
 
     return RefreshIndicator(
       color: AppColors.accent,
       backgroundColor: AppColors.surfaceDark,
-      onRefresh: () async =>
-          ref.invalidate(discoverCirclesProvider(_category)),
+      onRefresh: () async => ref.invalidate(discoverCirclesProvider(_category)),
       child: discoverAsync.when(
         loading: () => ListView(
           physics: const AlwaysScrollableScrollPhysics(),
