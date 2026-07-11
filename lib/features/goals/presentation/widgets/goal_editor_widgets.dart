@@ -101,6 +101,7 @@ class GoalEditorTextField extends StatelessWidget {
     this.validator,
     this.keyboardType,
     this.helperText,
+    this.autofocus = false,
   });
 
   final TextEditingController controller;
@@ -108,6 +109,7 @@ class GoalEditorTextField extends StatelessWidget {
   final String? Function(String?)? validator;
   final TextInputType? keyboardType;
   final String? helperText;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -118,6 +120,7 @@ class GoalEditorTextField extends StatelessWidget {
           controller: controller,
           validator: validator,
           keyboardType: keyboardType,
+          autofocus: autofocus,
           style: TextStyle(
             color: AppColors.fg,
             fontWeight: FontWeight.w600,

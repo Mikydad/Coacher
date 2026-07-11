@@ -954,6 +954,9 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
         .where((d) => d.controller.text.trim().isNotEmpty)
         .length;
 
+    final bottomSafe = MediaQuery.paddingOf(context).bottom;
+    final surface = Theme.of(context).scaffoldBackgroundColor;
+
     return Scaffold(
       appBar: GoalEditorHeader(
         isEditing: widget.goalId != null,
@@ -962,111 +965,136 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
       ),
       body: KeyboardDismissOnTap(
         child: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          children: [
-            // ── 1. Title ────────────────────────────────────────────────
-            const GoalEditorSectionLabel('Title'),
-            GoalEditorTextField(
-              controller: _title,
-              hintText: (_suggestedTitle != null && _suggestedTitle!.isNotEmpty)
-                  ? _suggestedTitle!
-                  : 'What is your mission?',
-              validator: (v) {
-                // A blank field is fine when a template suggestion will be used.
-                if (v != null && v.trim().isNotEmpty) return null;
-                if (_suggestedTitle != null &&
-                    _suggestedTitle!.trim().isNotEmpty) {
-                  return null;
-                }
-                return 'Required';
-              },
-            ),
-            const SizedBox(height: 24),
+          key: _formKey,
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  children: [
+                    // ── 1. Title ────────────────────────────────────────────────
+                    const GoalEditorSectionLabel('Title'),
+                    GoalEditorTextField(
+                      controller: _title,
+                      // Creating a new goal (from the template/custom picker) opens the
+                      // keyboard on the title so the user can type at once. Editing an
+                      // existing goal (goalId != null) must not shove the keyboard open.
+                      autofocus: widget.goalId == null,
+                      hintText:
+                          (_suggestedTitle != null &&
+                              _suggestedTitle!.isNotEmpty)
+                          ? _suggestedTitle!
+                          : 'What is your mission?',
+                      validator: (v) {
+                        // A blank field is fine when a template suggestion will be used.
+                        if (v != null && v.trim().isNotEmpty) return null;
+                        if (_suggestedTitle != null &&
+                            _suggestedTitle!.trim().isNotEmpty) {
+                          return null;
+                        }
+                        return 'Required';
+                      },
+                    ),
+                    const SizedBox(height: 24),
 
-            // ── 2. Progress type ────────────────────────────────────────
-            const GoalEditorSectionLabel('Measure progress with'),
-            GoalEditorMeasurementDropdown(
-              value: _measurement,
-              onChanged: (v) => setState(() => _measurement = v),
-            ),
-            if (_measurement == MeasurementKind.custom) ...[
-              const SizedBox(height: 12),
-              GoalEditorTextField(
-                controller: _customLabel,
-                hintText: 'Custom unit label',
+                    // ── 2. Progress type ────────────────────────────────────────
+                    const GoalEditorSectionLabel('Measure progress with'),
+                    GoalEditorMeasurementDropdown(
+                      value: _measurement,
+                      onChanged: (v) => setState(() => _measurement = v),
+                    ),
+                    if (_measurement == MeasurementKind.custom) ...[
+                      const SizedBox(height: 12),
+                      GoalEditorTextField(
+                        controller: _customLabel,
+                        hintText: 'Custom unit label',
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+
+                    // ── 3. Target ───────────────────────────────────────────────
+                    const GoalEditorSectionLabel('Target'),
+                    GoalEditorTextField(
+                      controller: _target,
+                      keyboardType: TextInputType.number,
+                      hintText: _suggestedTarget ?? 'e.g. 30',
+                      helperText: _targetLabelText(),
+                      validator: (v) {
+                        // Blank is fine when the template suggestion will be used.
+                        if (v != null && v.trim().isNotEmpty) return null;
+                        if (_suggestedTarget != null) return null;
+                        return 'Required';
+                      },
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ── 4. Schedule ───────────────────────────────────────────────
+                    _buildScheduleSection(),
+                    const SizedBox(height: 24),
+
+                    // ── 5. Setup steps (optional) ───────────────────────────────
+                    GoalEditorSetupStepsSection(
+                      stepCount: filledSteps,
+                      onAdd: () => setState(() {
+                        // Writing their own steps — the example has done its job.
+                        _exampleStepsDismissed = true;
+                        _actionDrafts.add(_ActionDraft());
+                      }),
+                      children: [
+                        if (_exampleSteps.isNotEmpty)
+                          GoalEditorExampleStepsCard(
+                            visible: !_exampleStepsDismissed,
+                            steps: _exampleSteps,
+                            onUseThese: _useExampleSteps,
+                          ),
+                        for (var i = 0; i < _actionDrafts.length; i++)
+                          GoalEditorSetupStepRow(
+                            index: i,
+                            controller: _actionDrafts[i].controller,
+                            canRemove: _actionDrafts.length > 1,
+                            onChanged: (text) {
+                              if (!_exampleStepsDismissed &&
+                                  text.trim().isNotEmpty) {
+                                setState(() => _exampleStepsDismissed = true);
+                              }
+                            },
+                            onRemove: () {
+                              setState(() {
+                                _actionDrafts[i].controller.dispose();
+                                _actionDrafts.removeAt(i);
+                              });
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ── 6. Advanced settings ────────────────────────────────────
+                    _buildAdvancedSection(context),
+                  ],
+                ),
+              ),
+              // Save button pinned below the scroll so it's always reachable
+              // without scrolling. Scaffold's default resizeToAvoidBottomInset
+              // lifts this above the keyboard when it opens.
+              Container(
+                padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + bottomSafe),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [surface.withValues(alpha: 0), surface],
+                  ),
+                ),
+                child: GoalEditorSaveButton(
+                  saving: _saving,
+                  onPressed: _saving ? null : _save,
+                ),
               ),
             ],
-            const SizedBox(height: 24),
-
-            // ── 3. Target ───────────────────────────────────────────────
-            const GoalEditorSectionLabel('Target'),
-            GoalEditorTextField(
-              controller: _target,
-              keyboardType: TextInputType.number,
-              hintText: _suggestedTarget ?? 'e.g. 30',
-              helperText: _targetLabelText(),
-              validator: (v) {
-                // Blank is fine when the template suggestion will be used.
-                if (v != null && v.trim().isNotEmpty) return null;
-                if (_suggestedTarget != null) return null;
-                return 'Required';
-              },
-            ),
-            const SizedBox(height: 24),
-
-            // ── 4. Schedule ───────────────────────────────────────────────
-            _buildScheduleSection(),
-            const SizedBox(height: 24),
-
-            // ── 5. Setup steps (optional) ───────────────────────────────
-            GoalEditorSetupStepsSection(
-              stepCount: filledSteps,
-              onAdd: () => setState(() {
-                // Writing their own steps — the example has done its job.
-                _exampleStepsDismissed = true;
-                _actionDrafts.add(_ActionDraft());
-              }),
-              children: [
-                if (_exampleSteps.isNotEmpty)
-                  GoalEditorExampleStepsCard(
-                    visible: !_exampleStepsDismissed,
-                    steps: _exampleSteps,
-                    onUseThese: _useExampleSteps,
-                  ),
-                for (var i = 0; i < _actionDrafts.length; i++)
-                  GoalEditorSetupStepRow(
-                    index: i,
-                    controller: _actionDrafts[i].controller,
-                    canRemove: _actionDrafts.length > 1,
-                    onChanged: (text) {
-                      if (!_exampleStepsDismissed && text.trim().isNotEmpty) {
-                        setState(() => _exampleStepsDismissed = true);
-                      }
-                    },
-                    onRemove: () {
-                      setState(() {
-                        _actionDrafts[i].controller.dispose();
-                        _actionDrafts.removeAt(i);
-                      });
-                    },
-                  ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // ── 6. Advanced settings ────────────────────────────────────
-            _buildAdvancedSection(context),
-            const SizedBox(height: 28),
-
-            GoalEditorSaveButton(
-              saving: _saving,
-              onPressed: _saving ? null : _save,
-            ),
-          ],
-        ),
+          ),
         ),
       ),
     );
