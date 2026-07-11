@@ -47,6 +47,14 @@ class SyncService {
   bool _isSyncing = false;
   final ValueNotifier<int> pendingCount = ValueNotifier<int>(0);
 
+  /// `true` when the last queue flush left pending writes that failed to reach
+  /// Firestore (i.e. the queue is stuck and needs the user's attention).
+  ///
+  /// Routine background sync never sets this — only a genuine push failure does.
+  /// It clears as soon as a later flush drains the queue. Kept as a
+  /// [ValueNotifier] to match [pendingCount] so UI can listen without Riverpod.
+  final ValueNotifier<bool> hasSyncIssue = ValueNotifier<bool>(false);
+
   DateTime? _lastRemoteSyncStartedAt;
   Future<void>? _activeRemotePullFuture;
   String? _activeRemotePullUid;
@@ -301,6 +309,10 @@ class SyncService {
         ..._queue.where((op) => !handledIds.contains(op.id)),
       ];
       pendingCount.value = _queue.length;
+      // A flush that left failures behind means writes are stuck and the user
+      // should know; a clean flush clears the warning. Ops enqueued mid-flush
+      // (not yet attempted) are routine and do not count as an issue.
+      hasSyncIssue.value = failed.isNotEmpty;
       if (!debugSkipQueuePersistenceForTests) {
         await _queueStore.save(_queue);
       }

@@ -471,15 +471,22 @@ class HomeScreen extends ConsumerWidget {
             error: (Object? error, StackTrace? stackTrace) =>
                 const SizedBox.shrink(),
           ),
-          const SizedBox(height: 4),
-          ValueListenableBuilder<int>(
-            valueListenable: SyncService.instance.pendingCount,
-            builder: (context, pending, _) => Text(
-              pending > 0
-                  ? 'Pending sync operations: $pending'
-                  : 'All changes synced',
-              style: TextStyle(color: AppColors.fg54),
-            ),
+          // Routine sync is silent — no "syncing"/"all synced" status line during
+          // normal operation. Only surface when the write queue is stuck and the
+          // user should know their changes haven't reached the cloud.
+          ValueListenableBuilder<bool>(
+            valueListenable: SyncService.instance.hasSyncIssue,
+            builder: (context, hasIssue, _) {
+              if (!hasIssue) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Some changes haven’t synced yet. They’ll retry '
+                  'automatically when you’re back online.',
+                  style: TextStyle(color: AppColors.amber),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -2090,50 +2097,36 @@ class _SyncFromCloudAction extends StatefulWidget {
 }
 
 class _SyncFromCloudActionState extends State<_SyncFromCloudAction> {
-  late bool _wasSyncing;
+  // Tracks only the sync THIS button started. Routine background syncs are
+  // deliberately ignored here so they produce no spinner and no snackbar —
+  // feedback is reserved for the pull the user explicitly asked for.
+  bool _userSyncing = false;
 
-  @override
-  void initState() {
-    super.initState();
-    final n = SyncService.instance.isSyncingFromRemote;
-    _wasSyncing = n.value;
-    n.addListener(_onSyncingChanged);
-  }
-
-  @override
-  void dispose() {
-    SyncService.instance.isSyncingFromRemote.removeListener(_onSyncingChanged);
-    super.dispose();
-  }
-
-  void _onSyncingChanged() {
-    final syncing = SyncService.instance.isSyncingFromRemote.value;
-    if (_wasSyncing && !syncing && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Updated from cloud'),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 2),
-        ),
-      );
+  Future<void> _syncFromCloud() async {
+    if (_userSyncing) return;
+    setState(() => _userSyncing = true);
+    var ok = false;
+    try {
+      ok = await SyncService.instance.syncFromRemote(force: true);
+    } finally {
+      if (mounted) setState(() => _userSyncing = false);
     }
-    _wasSyncing = syncing;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Updated from cloud' : 'Could not sync. Try again.'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: SyncService.instance.isSyncingFromRemote,
-      builder: (context, syncing, _) {
-        return IconButton(
-          tooltip: syncing ? 'Syncing from cloud' : 'Sync from cloud',
-          onPressed: syncing
-              ? null
-              : () =>
-                    unawaited(SyncService.instance.syncFromRemote(force: true)),
-          icon: Icon(Icons.sync, color: syncing ? AppColors.fg38 : null),
-        );
-      },
+    return IconButton(
+      tooltip: _userSyncing ? 'Syncing from cloud' : 'Sync from cloud',
+      onPressed: _userSyncing ? null : () => unawaited(_syncFromCloud()),
+      icon: Icon(Icons.sync, color: _userSyncing ? AppColors.fg38 : null),
     );
   }
 }

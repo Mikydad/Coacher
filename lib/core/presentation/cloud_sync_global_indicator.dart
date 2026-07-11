@@ -5,19 +5,21 @@ import '../sync/cloud_sync_providers.dart';
 
 import 'app_colors.dart';
 
-/// App-wide cloud sync affordance: thin progress under the status bar.
+/// App-wide cloud sync affordance.
 ///
-/// Visible on every main tab while [SyncService.syncFromRemote] runs so you can
-/// verify sync during testing without section-level spinners.
+/// Routine background synchronisation is silent: this shows NOTHING while a
+/// remote pull or queue flush is in flight during normal operation. It appears
+/// only when the write queue is stuck with changes that failed to reach the
+/// cloud ([SyncService.hasSyncIssue]) — a state the user should know about —
+/// rendered as a thin, static (non-animated) warning line under the status bar
+/// so it reads as "attention needed", not "currently syncing".
 class CloudSyncGlobalIndicator extends ConsumerWidget {
   const CloudSyncGlobalIndicator({super.key});
 
-  static Color get _accent => AppColors.accent;
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final syncing = ref.watch(cloudSyncInProgressProvider);
-    if (!syncing) return const SizedBox.shrink();
+    final hasIssue = ref.watch(cloudSyncHasIssueProvider);
+    if (!hasIssue) return const SizedBox.shrink();
 
     final top = MediaQuery.paddingOf(context).top;
 
@@ -31,11 +33,7 @@ class CloudSyncGlobalIndicator extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(height: top),
-            LinearProgressIndicator(
-              minHeight: 2,
-              backgroundColor: Colors.transparent,
-              color: _accent,
-            ),
+            Container(height: 2, color: AppColors.amber),
           ],
         ),
       ),

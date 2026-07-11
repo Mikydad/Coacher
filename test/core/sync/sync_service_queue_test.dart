@@ -16,6 +16,7 @@ void main() {
     SyncService.debugUidForTests = 'user-a';
     SyncService.debugOpWriterForTests = (_) async {};
     SyncService.instance.debugResetQueueInMemoryOnly();
+    SyncService.instance.hasSyncIssue.value = false;
   });
 
   tearDown(() {
@@ -23,6 +24,7 @@ void main() {
     SyncService.debugUidForTests = null;
     SyncService.debugOpWriterForTests = null;
     SyncService.instance.debugResetQueueInMemoryOnly();
+    SyncService.instance.hasSyncIssue.value = false;
   });
 
   test('enqueued operations are stamped with the current uid', () async {
@@ -120,11 +122,32 @@ void main() {
     SyncService.debugOpWriterForTests = (_) async => throw Exception('offline');
     await SyncService.instance.processQueue();
     expect(SyncService.instance.pendingCount.value, 1);
+    // A flush that left writes behind must flag a sync issue so the UI can
+    // surface it — this is the one time routine sync becomes visible.
+    expect(SyncService.instance.hasSyncIssue.value, isTrue);
 
     final written = <OfflineOperation>[];
     SyncService.debugOpWriterForTests = (op) async => written.add(op);
     await SyncService.instance.processQueue();
     expect(written, hasLength(1));
     expect(SyncService.instance.pendingCount.value, 0);
+    // Draining the queue clears the warning — back to silent operation.
+    expect(SyncService.instance.hasSyncIssue.value, isFalse);
+  });
+
+  test('a routine flush that drains cleanly never flags a sync issue', () async {
+    await SyncService.instance.enqueueUpsert(
+      entityType: 'task',
+      documentPath: 'users/user-a/tasks/t1',
+      payload: {'n': 1},
+    );
+
+    final written = <OfflineOperation>[];
+    SyncService.debugOpWriterForTests = (op) async => written.add(op);
+    await SyncService.instance.processQueue();
+
+    expect(written, hasLength(1));
+    expect(SyncService.instance.pendingCount.value, 0);
+    expect(SyncService.instance.hasSyncIssue.value, isFalse);
   });
 }
