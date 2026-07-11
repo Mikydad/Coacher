@@ -180,7 +180,6 @@ abstract final class FeatureGuides {
       'focus',
       'focus session',
       'focus mode',
-      'deep work',
       'timer',
       'pomodoro',
       'start focus',
@@ -445,6 +444,7 @@ abstract final class FeatureGuides {
     carryForward,
     coachTone,
     coreOptimization,
+    deepWork,
   ];
 
   static const flowNow = FeatureGuide(
@@ -772,5 +772,35 @@ abstract final class FeatureGuides {
     ],
     keywords: ['core optimization', 'optimization settings', 'app settings section'],
     suggestedPrompts: ['How do reminders work?', 'Tell me about Coach Tone'],
+  );
+
+  static const deepWork = FeatureGuide(
+    id: 'deepWork',
+    title: 'Deep Work',
+    emoji: '⚡',
+    oneLiner: 'Silence notifications while you work on this task.',
+    what:
+        'Deep Work marks a task as a no-interruption block: while you work '
+        'on it, the app holds its own notifications so nothing pulls you '
+        'away mid-task.',
+    why:
+        'One ping can cost twenty minutes of focus. Blocking alerts on your '
+        'hardest tasks protects the time you already decided to protect.',
+    howSteps: [
+      'Turn on Deep Work when creating or editing a task.',
+      'Work on the task — alerts stay quiet until you finish.',
+    ],
+    keywords: [
+      // Moved off the Focus guide: asking about "deep work" now teaches the
+      // task toggle, which cross-links to Focus Sessions.
+      'deep work',
+      'deep work toggle',
+      'notification blackout',
+      'blocks alerts',
+    ],
+    suggestedPrompts: [
+      'What is Focus?',
+      'Tell me about Discipline Modes',
+    ],
   );
 }
