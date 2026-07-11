@@ -1,5 +1,6 @@
 import '../../education/presentation/first_time_feature_card.dart';
 import '../../education/presentation/help_dot.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -64,16 +65,10 @@ class CommunityScreen extends ConsumerWidget {
               ),
               data: (circles) {
                 if (circles.isEmpty) {
-                  return _EmptyState(
-                    onCreate: () => Navigator.pushNamed(
-                      context,
-                      CircleCreateScreen.routeName,
-                    ),
-                    onDiscover: () => Navigator.pushNamed(
-                      context,
-                      CircleDiscoveryScreen.routeName,
-                    ),
-                  );
+                  // Discovery-first: instead of a bare empty state, surface
+                  // existing public circles to browse and join immediately.
+                  // Creating a circle stays available via the '+ Circle' FAB.
+                  return const _DiscoverCirclesState();
                 }
                 return RefreshIndicator(
                   color: AppColors.accent,
@@ -183,93 +178,129 @@ class CommunityScreen extends ConsumerWidget {
   }
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
+// ── Zero-circles state: discover-first ──────────────────────────────────────
+//
+// Shown when the user hasn't joined or created any circles yet. Rather than a
+// bare empty state, it surfaces the same public-circle list & join action as
+// CircleDiscoveryScreen (via `discoverCirclesProvider` / `joinOrRequestCircle`
+// / `CircleCard`, all defined in circle_discovery_screen.dart) so discovery is
+// the default. Creating a circle stays reachable through the '+ Circle' FAB.
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onCreate, required this.onDiscover});
+class _DiscoverCirclesState extends ConsumerWidget {
+  const _DiscoverCirclesState();
 
-  final VoidCallback onCreate;
-  final VoidCallback onDiscover;
+  static const String? _category = null; // all categories
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(36),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final discoverAsync = ref.watch(discoverCirclesProvider(_category));
+    final joinedIds = ref.watch(myCircleIdsProvider).valueOrNull?.toSet() ?? {};
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    return RefreshIndicator(
+      color: AppColors.accent,
+      backgroundColor: AppColors.surfaceDark,
+      onRefresh: () async =>
+          ref.invalidate(discoverCirclesProvider(_category)),
+      child: discoverAsync.when(
+        loading: () => ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceCard,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(
-                Icons.group_rounded,
-                color: AppColors.textMuted,
-                size: 36,
-              ),
-            ),
+            const FirstTimeFeatureCard(guideId: 'circles'),
             const SizedBox(height: 24),
-            Text(
-              "You're not in any circles yet",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Join a circle to stay accountable with others who share your goals.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 14,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: onCreate,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.onAccent,
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  'Create a circle',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: onDiscover,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textPrimary,
-                  side: BorderSide(color: AppColors.fg.withOpacity(0.12)),
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Discover circles'),
+            const _DiscoverHeader(),
+            const SizedBox(height: 40),
+            Center(
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(color: AppColors.accent),
               ),
             ),
           ],
         ),
+        error: (e, _) => swallowedAsyncError(
+          'community_screen_discover',
+          e,
+          ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            children: [
+              const FirstTimeFeatureCard(guideId: 'circles'),
+              const SizedBox(height: 24),
+              const _DiscoverHeader(),
+              const SizedBox(height: 40),
+              Text(
+                'Could not load circles to discover.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textMuted),
+              ),
+            ],
+          ),
+        ),
+        data: (circles) {
+          final itemCount = circles.isEmpty ? 3 : circles.length + 2;
+          return ListView.separated(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            itemCount: itemCount,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (_, i) {
+              if (i == 0) {
+                return const FirstTimeFeatureCard(guideId: 'circles');
+              }
+              if (i == 1) return const _DiscoverHeader();
+              if (circles.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    'No public circles yet. Be the first to create one!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+                  ),
+                );
+              }
+              final circle = circles[i - 2];
+              final isJoined =
+                  joinedIds.contains(circle.id) ||
+                  (currentUid.isNotEmpty && circle.creatorId == currentUid);
+              return CircleCard(
+                circle: circle,
+                joined: isJoined,
+                onJoin: (c) =>
+                    joinOrRequestCircle(context: context, ref: ref, circle: c),
+              );
+            },
+          );
+        },
       ),
+    );
+  }
+}
+
+class _DiscoverHeader extends StatelessWidget {
+  const _DiscoverHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Discover circles',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Join an existing circle or create your own.',
+          style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+        ),
+      ],
     );
   }
 }

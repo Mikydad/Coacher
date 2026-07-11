@@ -68,6 +68,23 @@ final myCirclesProvider = StreamProvider.autoDispose<List<AccountabilityCircle>>
   },
 );
 
+// ── Discovery (public circles) ──────────────────────────────────────────────
+
+/// Public circles for the discovery/browse experience — powers the
+/// "Discover circles" screen's Browse tab and the zero-circles state on the
+/// Community tab. Pass `null` (or `'all'`) for [category] to fetch every
+/// category.
+final discoverCirclesProvider = FutureProvider.autoDispose
+    .family<List<AccountabilityCircle>, String?>((ref, category) {
+      return ref
+          .watch(circleRepositoryProvider)
+          .searchCircles(
+            category: (category == null || category == 'all')
+                ? null
+                : category,
+          );
+    });
+
 // ── Per-circle providers ──────────────────────────────────────────────────────
 // Circle-scoped streams key off `authUidProvider` (auth_providers.dart) so
 // they rebuild when the signed-in uid changes.
