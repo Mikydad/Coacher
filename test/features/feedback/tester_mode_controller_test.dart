@@ -1,6 +1,11 @@
+import 'package:coach_for_life/features/auth/application/auth_providers.dart';
 import 'package:coach_for_life/features/feedback/application/tester_mode_controller.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// Lets a fresh async settle (listeners + SharedPreferences awaits).
+Future<void> _settle() => Future<void>.delayed(const Duration(milliseconds: 20));
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -8,32 +13,134 @@ void main() {
   group('TesterModeController', () {
     setUp(() => SharedPreferences.setMockInitialValues({}));
 
-    test('defaults to false', () async {
-      final controller = TesterModeController();
-      await Future<void>.delayed(Duration.zero); // let _load complete
-      expect(controller.state, isFalse);
+    /// Container with a fixed account identity.
+    ProviderContainer fixed({String? uid, required bool registered}) {
+      final container = ProviderContainer(
+        overrides: [
+          authUidProvider.overrideWithValue(uid),
+          isRegisteredProvider.overrideWithValue(registered),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    test('registered account with no stored flag defaults to false', () async {
+      final c = fixed(uid: 'userA', registered: true);
+      c.read(testerModeProvider.notifier);
+      await _settle();
+      expect(c.read(testerModeProvider), isFalse);
     });
 
-    test('loads persisted true', () async {
-      SharedPreferences.setMockInitialValues({'tester_mode_enabled_v1': true});
-      final controller = TesterModeController();
-      await Future<void>.delayed(Duration.zero);
-      expect(controller.state, isTrue);
-    });
+    test('toggle enables and persists under a per-uid key', () async {
+      final c = fixed(uid: 'userA', registered: true);
+      final controller = c.read(testerModeProvider.notifier);
+      await _settle();
 
-    test('toggle flips and persists', () async {
-      final controller = TesterModeController();
-      await Future<void>.delayed(Duration.zero);
-
-      await controller.toggle();
-      expect(controller.state, isTrue);
+      expect(await controller.toggle(), TesterToggleOutcome.enabled);
+      expect(c.read(testerModeProvider), isTrue);
 
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getBool('tester_mode_enabled_v1'), isTrue);
+      expect(prefs.getBool('tester_mode_enabled_v2_userA'), isTrue);
 
-      await controller.toggle();
-      expect(controller.state, isFalse);
-      expect(prefs.getBool('tester_mode_enabled_v1'), isFalse);
+      expect(await controller.toggle(), TesterToggleOutcome.disabled);
+      expect(c.read(testerModeProvider), isFalse);
+      expect(prefs.getBool('tester_mode_enabled_v2_userA'), isFalse);
+    });
+
+    test('a registered account loads its own persisted flag', () async {
+      SharedPreferences.setMockInitialValues({
+        'tester_mode_enabled_v2_userA': true,
+      });
+      final c = fixed(uid: 'userA', registered: true);
+      c.read(testerModeProvider.notifier);
+      await _settle();
+      expect(c.read(testerModeProvider), isTrue);
+    });
+
+    test('tester state is isolated per account', () async {
+      SharedPreferences.setMockInitialValues({
+        'tester_mode_enabled_v2_userA': true,
+      });
+      // A different signed-in account never inherits A's flag.
+      final b = fixed(uid: 'userB', registered: true);
+      b.read(testerModeProvider.notifier);
+      await _settle();
+      expect(b.read(testerModeProvider), isFalse);
+    });
+
+    test('anonymous session cannot enable tester mode', () async {
+      final c = fixed(uid: 'guest-uid', registered: false);
+      final controller = c.read(testerModeProvider.notifier);
+      await _settle();
+
+      expect(await controller.toggle(), TesterToggleOutcome.accountRequired);
+      expect(c.read(testerModeProvider), isFalse);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('tester_mode_enabled_v2_guest-uid'), isNull);
+    });
+
+    test('guest state does not carry into a signed-in account', () async {
+      // Anonymous session that upgrades to registered, preserving the uid
+      // (the real anonymous→email link path). Nothing was (or could be)
+      // enabled while anonymous, so the account starts clean.
+      final uidCtrl = StateProvider<String?>((_) => 'shared-uid');
+      final regCtrl = StateProvider<bool>((_) => false);
+      final container = ProviderContainer(
+        overrides: [
+          authUidProvider.overrideWith((ref) => ref.watch(uidCtrl)),
+          isRegisteredProvider.overrideWith((ref) => ref.watch(regCtrl)),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(testerModeProvider.notifier);
+      await _settle();
+      // Guest cannot enable it.
+      expect(await controller.toggle(), TesterToggleOutcome.accountRequired);
+
+      // Upgrade to a registered account on the same uid.
+      container.read(regCtrl.notifier).state = true;
+      await _settle();
+
+      expect(container.read(testerModeProvider), isFalse);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('tester_mode_enabled_v2_shared-uid'), isNull);
+    });
+
+    test('signing out clears the effective tester state', () async {
+      SharedPreferences.setMockInitialValues({
+        'tester_mode_enabled_v2_userA': true,
+      });
+      final uidCtrl = StateProvider<String?>((_) => 'userA');
+      final regCtrl = StateProvider<bool>((_) => true);
+      final container = ProviderContainer(
+        overrides: [
+          authUidProvider.overrideWith((ref) => ref.watch(uidCtrl)),
+          isRegisteredProvider.overrideWith((ref) => ref.watch(regCtrl)),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(testerModeProvider.notifier);
+      await _settle();
+      expect(container.read(testerModeProvider), isTrue);
+
+      // Sign out.
+      container.read(uidCtrl.notifier).state = null;
+      container.read(regCtrl.notifier).state = false;
+      await _settle();
+      expect(container.read(testerModeProvider), isFalse);
+    });
+
+    test('legacy device-wide key is purged on init', () async {
+      SharedPreferences.setMockInitialValues({'tester_mode_enabled_v1': true});
+      final c = fixed(uid: 'userA', registered: true);
+      c.read(testerModeProvider.notifier);
+      await _settle();
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('tester_mode_enabled_v1'), isNull);
     });
   });
 

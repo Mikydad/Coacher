@@ -48,13 +48,12 @@ class AddTaskFormDraft {
   final String? slotBlockId;
   final String? slotDateKey;
 
+  /// True only when the user authored real content worth restoring. Incidental
+  /// configuration (category pick, mode, duration/reminder toggles, expanding
+  /// advanced) is deliberately excluded: without a title or notes there is no
+  /// task to resume, and prompting to restore config-only state annoys users.
   bool get hasMeaningfulContent {
-    if (title.trim().isNotEmpty || notes.trim().isNotEmpty) return true;
-    if (durationEnabled || focusSession) return true;
-    if (reminder || isHabitAnchor || strictModeRequired || isRigid) return true;
-    if (category != null && category!.isNotEmpty) return true;
-    if (modeUserCustomized || modeRefId != 'flexible') return true;
-    return false;
+    return title.trim().isNotEmpty || notes.trim().isNotEmpty;
   }
 
   Map<String, dynamic> toJson() => {

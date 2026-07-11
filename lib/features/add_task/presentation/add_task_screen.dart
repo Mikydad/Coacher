@@ -207,6 +207,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         repository: ref.read(formDraftRepositoryProvider),
         key: _draftKey,
         capture: _captureDraftJson,
+        isMeaningful: () => _captureDraft().hasMeaningfulContent,
       );
     }
   }

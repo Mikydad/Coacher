@@ -134,6 +134,7 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
         repository: ref.read(formDraftRepositoryProvider),
         key: _draftKey,
         capture: _captureDraftJson,
+        isMeaningful: () => _captureDraft().hasMeaningfulContent,
       );
     }
   }

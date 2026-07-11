@@ -1134,17 +1134,18 @@ class _VersionFooterState extends ConsumerState<_VersionFooter> {
     final remaining = _taps.registerTap(DateTime.now());
     final messenger = ScaffoldMessenger.of(context);
     if (remaining == 0) {
-      await ref.read(testerModeProvider.notifier).toggle();
+      final outcome = await ref.read(testerModeProvider.notifier).toggle();
       if (!mounted) return;
-      final enabled = ref.read(testerModeProvider);
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(
         SnackBar(
-          content: Text(
-            enabled
-                ? 'Tester mode enabled — bug bubble is on'
-                : 'Tester mode disabled',
-          ),
+          content: Text(switch (outcome) {
+            TesterToggleOutcome.enabled =>
+              'Tester mode enabled — bug bubble is on',
+            TesterToggleOutcome.disabled => 'Tester mode disabled',
+            TesterToggleOutcome.accountRequired =>
+              'Sign in with an account to use tester mode',
+          }),
         ),
       );
     } else if (remaining <= 3) {

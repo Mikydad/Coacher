@@ -2,6 +2,7 @@ import 'package:coach_for_life/features/coaching/application/coaching_style_prov
 import 'package:coach_for_life/features/coaching/domain/models/coaching_style.dart';
 import 'package:coach_for_life/features/coaching/domain/models/enforcement_mode.dart';
 import 'package:coach_for_life/features/coaching/domain/models/user_coaching_profile.dart';
+import 'package:coach_for_life/features/auth/application/auth_providers.dart';
 import 'package:coach_for_life/features/context_override/application/context_override_providers.dart';
 import 'package:coach_for_life/features/context_override/domain/models/user_attention_state.dart';
 import 'package:coach_for_life/features/goals/application/goals_providers.dart';
@@ -67,6 +68,10 @@ Widget _buildScreen({
       // Active goals
       goalsStreamProvider.overrideWith((ref) => Stream.value(activeGoals)),
       homeDisplayStreakDaysProvider.overrideWithValue(12),
+      // Signed-in registered account — tester mode requires one, and this
+      // keeps the auth providers off real Firebase in tests.
+      authUidProvider.overrideWithValue('test-uid'),
+      isRegisteredProvider.overrideWithValue(true),
     ],
     child: const MaterialApp(home: ProfileScreen()),
   );

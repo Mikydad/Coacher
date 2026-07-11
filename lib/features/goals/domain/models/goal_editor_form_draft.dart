@@ -90,6 +90,11 @@ class GoalEditorFormDraft {
   final int reminderMinutesFromMidnight;
   final List<GoalEditorActionDraftRow> actions;
 
+  /// True only when the user authored real content worth restoring. Incidental
+  /// configuration (category, repeat schedule, reminder, weekday/day-of-month
+  /// picks) is deliberately excluded: without a title, target, or a named
+  /// action there is no goal to resume, and prompting to restore config-only
+  /// state annoys users.
   bool get hasMeaningfulContent {
     if (title.trim().isNotEmpty) return true;
     if (target.trim().isNotEmpty) return true;
@@ -97,11 +102,6 @@ class GoalEditorFormDraft {
     for (final a in actions) {
       if (a.title.trim().isNotEmpty) return true;
     }
-    if (reminderEnabled) return true;
-    if (repeatCadence != 'off') return true;
-    if (scheduledWeekdays.isNotEmpty) return true;
-    if (repeatDaysOfMonth.isNotEmpty) return true;
-    if (categoryId != GoalCategories.study) return true;
     return false;
   }
 

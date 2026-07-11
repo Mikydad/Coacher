@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/circle_providers.dart';
 import '../domain/models/accountability_circle.dart';
+import 'circle_auth_guard.dart';
 import 'circle_create_screen.dart';
 import 'circle_detail_screen.dart';
 import 'circle_discovery_screen.dart';
@@ -95,7 +96,7 @@ class CommunityScreen extends ConsumerWidget {
             ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'community_tab_fab',
-        onPressed: () => _showCreateOrDiscover(context),
+        onPressed: () => _showCreateOrDiscover(context, ref),
         backgroundColor: AppColors.accent,
         foregroundColor: AppColors.onAccent,
         icon: const Icon(Icons.add_rounded),
@@ -107,7 +108,7 @@ class CommunityScreen extends ConsumerWidget {
     );
   }
 
-  void _showCreateOrDiscover(BuildContext context) {
+  void _showCreateOrDiscover(BuildContext context, WidgetRef ref) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceDark,
@@ -144,9 +145,19 @@ class CommunityScreen extends ConsumerWidget {
                 'Start a new accountability circle',
                 style: TextStyle(color: AppColors.textMuted, fontSize: 13),
               ),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(ctx);
-                Navigator.pushNamed(context, CircleCreateScreen.routeName);
+                // Creating a circle requires a real identity.
+                if (!await ensureRegisteredForCircleAction(
+                  context,
+                  ref,
+                  actionLabel: 'create a circle',
+                )) {
+                  return;
+                }
+                if (context.mounted) {
+                  Navigator.pushNamed(context, CircleCreateScreen.routeName);
+                }
               },
             ),
             ListTile(

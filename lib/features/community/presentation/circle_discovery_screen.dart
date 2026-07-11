@@ -12,6 +12,7 @@ import '../application/circle_recommendation_service.dart';
 import '../application/user_circle_membership_service.dart';
 import '../domain/models/accountability_circle.dart';
 import '../domain/models/circle_enums.dart';
+import 'circle_auth_guard.dart';
 import 'circle_detail_screen.dart';
 
 import '../../../core/presentation/app_colors.dart';
@@ -46,14 +47,20 @@ Future<void> joinOrRequestCircle({
   required AccountabilityCircle circle,
 }) async {
   _logDiscoveryJoin('Join tapped for ${circle.id} (${circle.name})');
+  // Joining binds the circle to a real identity — anonymous/guest sessions
+  // must register first. (An anonymous user is never already a member, so
+  // this never blocks re-opening a joined circle.)
+  if (!await ensureRegisteredForCircleAction(
+    context,
+    ref,
+    actionLabel: 'join a circle',
+  )) {
+    _logDiscoveryJoin('Aborted: account required');
+    return;
+  }
   final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
   if (uid.isEmpty) {
     _logDiscoveryJoin('Aborted: not signed in');
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sign in to join a circle.')),
-      );
-    }
     return;
   }
 

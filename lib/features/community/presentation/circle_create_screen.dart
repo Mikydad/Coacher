@@ -8,6 +8,7 @@ import '../../../core/di/providers.dart';
 import '../application/circle_providers.dart';
 import '../domain/models/accountability_circle.dart';
 import '../domain/models/circle_enums.dart';
+import 'circle_auth_guard.dart';
 import 'circle_detail_screen.dart';
 
 import '../../../core/presentation/app_colors.dart';
@@ -53,6 +54,15 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please choose a category.')),
       );
+      return;
+    }
+    // Defense-in-depth: this screen is normally reached only after the guard
+    // in community_screen, but never let an anonymous session create a circle.
+    if (!await ensureRegisteredForCircleAction(
+      context,
+      ref,
+      actionLabel: 'create a circle',
+    )) {
       return;
     }
 
