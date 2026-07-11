@@ -118,6 +118,7 @@ class AddTaskField extends StatelessWidget {
     required this.controller,
     this.hint,
     this.maxLines = 1,
+    this.minLines,
     this.style,
     this.autofocus = false,
   });
@@ -125,16 +126,21 @@ class AddTaskField extends StatelessWidget {
   final TextEditingController controller;
   final String? hint;
   final int maxLines;
+
+  /// When set below [maxLines], the field starts small and grows as the
+  /// user types.
+  final int? minLines;
   final TextStyle? style;
   final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
-    final radius = maxLines == 1 ? 28.0 : 22.0;
+    final radius = maxLines == 1 ? 18.0 : 14.0;
 
     return TextField(
       controller: controller,
       maxLines: maxLines,
+      minLines: minLines,
       autofocus: autofocus,
       style:
           style ??
@@ -203,23 +209,23 @@ class AddTaskSettingsActionRow extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   color: AddTaskColors.cardHighest,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   icon,
-                  size: 22,
+                  size: 18,
                   color: iconColor ?? AddTaskColors.cyan,
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -227,7 +233,7 @@ class AddTaskSettingsActionRow extends StatelessWidget {
                     Text(
                       title,
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: AddTaskColors.onSurface,
                       ),
@@ -262,82 +268,95 @@ class AddTaskSettingsActionRow extends StatelessWidget {
   }
 }
 
-class AddTaskSettingsToggleRow extends StatelessWidget {
-  const AddTaskSettingsToggleRow({
+/// Half-width settings card for side-by-side pairs (e.g. Accountability +
+/// Deep Work): icon chip and control on the top row, title and one-line
+/// subtitle beneath, so it stays legible at half screen width.
+class AddTaskSplitSettingCard extends StatelessWidget {
+  const AddTaskSplitSettingCard({
     super.key,
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.value,
-    required this.onChanged,
+    required this.trailing,
+    this.onTap,
     this.iconColor,
+    this.help,
   });
 
   final IconData icon;
   final Color? iconColor;
   final String title;
   final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
+
+  /// Control in the top-right corner: a switch, an action label, etc.
+  final Widget trailing;
+  final VoidCallback? onTap;
+
+  /// Optional `?` HelpDot rendered next to the title.
+  final Widget? help;
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: AddTaskColors.card,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
-        onTap: () => onChanged(!value),
-        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          child: Row(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AddTaskColors.cardHighest,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icon,
-                  size: 22,
-                  color: iconColor ?? AddTaskColors.cyan,
-                ),
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AddTaskColors.cardHighest,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      icon,
+                      size: 18,
+                      color: iconColor ?? AddTaskColors.cyan,
+                    ),
+                  ),
+                  const Spacer(),
+                  trailing,
+                ],
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
                       title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: AddTaskColors.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.8,
-                        color: AddTaskColors.muted,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  if (help != null) ...[const SizedBox(width: 2), help!],
+                ],
               ),
-              Switch.adaptive(
-                value: value,
-                onChanged: onChanged,
-                activeTrackColor: AddTaskColors.accentDim.withValues(
-                  alpha: 0.55,
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.8,
+                  color: AddTaskColors.muted,
                 ),
-                activeThumbColor: AddTaskColors.accentContainer,
               ),
             ],
           ),
@@ -463,12 +482,12 @@ class AddTaskToggleRow extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       onTap: () => onChanged(!value),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: (iconColor ?? AddTaskColors.accent).withValues(
                   alpha: 0.12,
@@ -477,7 +496,7 @@ class AddTaskToggleRow extends StatelessWidget {
               ),
               child: Icon(
                 icon,
-                size: 20,
+                size: 18,
                 color: iconColor ?? AddTaskColors.accent,
               ),
             ),
@@ -505,6 +524,7 @@ class AddTaskToggleRow extends StatelessWidget {
             Switch.adaptive(
               value: value,
               onChanged: onChanged,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               activeTrackColor: AddTaskColors.accent.withValues(alpha: 0.45),
               activeThumbColor: AddTaskColors.accent,
             ),

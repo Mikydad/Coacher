@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -106,6 +107,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
   final _controller = TextEditingController();
   final _notesController = TextEditingController();
   final _scheduleSectionKey = GlobalKey();
+  final _advancedSectionKey = GlobalKey();
   String _duration = '25 MIN';
   int _customDurationMinutes = kAddTaskDefaultCustomMinutes;
   bool _durationEnabled = false;
@@ -1253,9 +1255,6 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
 
   String get _advancedSubtitle {
     final parts = <String>[];
-    if (isSleepCategory(_category) && _syncSleepWindowAndQuietMode) {
-      parts.add('Sleep window');
-    }
     if (_isHabitAnchor) parts.add('Habit anchor');
     if (_strictModeRequired) parts.add('Strict');
     if (_isRigid) parts.add('Fixed time');
@@ -1273,70 +1272,101 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     return label;
   }
 
+  /// Card matching the reminder section: a single toggle row when off, the
+  /// duration chips revealed beneath it when on. Sleep always has a length,
+  /// so it gets a static header instead of a switch.
   Widget _buildDurationSection() {
     final sleep = isSleepCategory(_category);
+    final showChips = sleep || _durationEnabled;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Material(
+      color: AddTaskColors.card,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: AddTaskHeroSectionLabel(
+            if (sleep)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AddTaskColors.accentDim.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.hourglass_bottom_rounded,
+                        size: 18,
+                        color: AddTaskColors.accentDim,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Sleep length',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AddTaskColors.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Pick a preset or tap Custom',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AddTaskColors.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              AddTaskToggleRow(
+                icon: Icons.timer_outlined,
+                iconColor: AddTaskColors.accentDim,
                 title: 'Duration',
-                subtitle: sleep
-                    ? 'Choose a preset or tap Custom for your sleep length'
-                    : _durationEnabled
+                subtitle: _durationEnabled
                     ? 'Define your focus sprint'
-                    : 'Reminder only — no calendar time block',
+                    : 'Reminder only — no time block',
+                value: _durationEnabled,
+                onChanged: (value) => setState(() => _durationEnabled = value),
               ),
-            ),
-            if (!sleep) ...[
-              const SizedBox(width: 12),
-              Column(
-                children: [
-                  Switch.adaptive(
-                    value: _durationEnabled,
-                    onChanged: (value) =>
-                        setState(() => _durationEnabled = value),
-                    activeTrackColor: AddTaskColors.accentDim.withValues(
-                      alpha: 0.55,
-                    ),
-                    activeThumbColor: AddTaskColors.accentContainer,
-                  ),
-                  Text(
-                    'Use duration',
-                    style: TextStyle(
-                      color: AddTaskColors.muted,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+            if (showChips) ...[
+              const SizedBox(height: 2),
+              AddTaskDurationSegment(
+                options: _activeDurationLabels,
+                selected: _durationSegmentSelection,
+                onSelected: (label) async {
+                  final i = _activeDurationLabels.indexOf(label);
+                  if (i < 0) return;
+                  final key = _activeDurationOptions[i];
+                  if (isCustomDurationKey(key)) {
+                    await _editCustomDuration();
+                    return;
+                  }
+                  setState(() {
+                    _durationEnabled = true;
+                    _duration = key;
+                  });
+                },
               ),
+              const SizedBox(height: 12),
             ],
           ],
         ),
-        const SizedBox(height: 16),
-        AddTaskDurationSegment(
-          options: _activeDurationLabels,
-          selected: _durationSegmentSelection,
-          onSelected: (label) async {
-            final i = _activeDurationLabels.indexOf(label);
-            if (i < 0) return;
-            final key = _activeDurationOptions[i];
-            if (isCustomDurationKey(key)) {
-              await _editCustomDuration();
-              return;
-            }
-            setState(() {
-              _durationEnabled = true;
-              _duration = key;
-            });
-          },
-        ),
-      ],
+      ),
     );
   }
 
@@ -1363,14 +1393,16 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     _selectCategory(name.trim());
   }
 
-  static String _categoryEmoji(String label) => switch (label) {
-    'Study' => '📚',
-    'Fitness' => '🏃',
-    'Work' => '💼',
-    'Personal' => '❤️',
-    'Planning' => '🗓️',
-    kSleepTaskCategory => '😴',
-    _ => '🏷️',
+  /// Ink-drawn glyphs for the bento cards — the reference design uses clean
+  /// line icons, not emoji.
+  static IconData _categoryIcon(String label) => switch (label) {
+    'Study' => CupertinoIcons.book_fill,
+    'Fitness' => CupertinoIcons.flame_fill,
+    'Work' => CupertinoIcons.briefcase_fill,
+    'Personal' => CupertinoIcons.heart_fill,
+    'Planning' => CupertinoIcons.calendar,
+    kSleepTaskCategory => CupertinoIcons.moon_fill,
+    _ => CupertinoIcons.tag_fill,
   };
 
   static String _categorySubtitle(String label) => switch (label) {
@@ -1383,79 +1415,166 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     _ => 'Your own category',
   };
 
-  /// Step 1 of the category-first flow: just the category cards, no keyboard,
-  /// nothing to scroll. Same design as the goal template picker.
+  /// Step 1 of the category-first flow: a fixed bento mosaic of six colored
+  /// category cards that fills the viewport (no scrolling), with the Custom
+  /// action as a dark pill button and Skip as a floating square beside it.
   Widget _buildCategoryStep() {
-    // Custom category coming back through "Change" gets its own card.
-    final options = [
-      ..._categoryOptions,
-      if (_category != null && !_categoryOptions.contains(_category))
-        _category!,
-    ];
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-      children: [
-        Text(
-          'What kind of task?',
-          style: TextStyle(
-            color: AddTaskColors.onSurface,
-            fontWeight: FontWeight.w800,
-            fontSize: 22,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Pick a category — you can change anything on the next screen.',
-          style: TextStyle(color: AddTaskColors.muted, height: 1.4),
-        ),
-        const SizedBox(height: 24),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.15,
-          ),
-          itemCount: options.length + 1,
-          itemBuilder: (context, i) {
-            // Last cell: the "start from scratch" style custom card.
-            if (i == options.length) {
-              return _CategoryCard(
-                emoji: '✨',
-                label: 'Custom',
-                isCustom: true,
-                selected: false,
-                onTap: _promptCustomCategory,
-              );
-            }
-            final label = options[i];
-            return _CategoryCard(
-              emoji: _categoryEmoji(label),
-              label: label,
-              subtitle: _categorySubtitle(label),
-              isCustom: false,
-              selected: _category == label,
-              onTap: () => _selectCategory(label),
-            );
-          },
-        ),
-        const SizedBox(height: 20),
-        Center(
-          child: TextButton(
-            onPressed: () => _selectCategory(null),
-            child: Text(
-              'Skip — no category',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AddTaskColors.muted,
-              ),
+    _BentoCategoryCard card(String label, Color color, {bool hero = false}) =>
+        _BentoCategoryCard(
+          color: color,
+          icon: _categoryIcon(label),
+          label: label,
+          subtitle: _categorySubtitle(label),
+          selected: _category == label,
+          hero: hero,
+          onTap: () => _selectCategory(label),
+        );
+
+    // A custom category (from editing or "Change") lights up the pill.
+    final customActive =
+        _category != null && !_categoryOptions.contains(_category);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'What kind of task?',
+            style: TextStyle(
+              color: AddTaskColors.onSurface,
+              fontWeight: FontWeight.w800,
+              fontSize: 22,
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 4),
+          Text(
+            'Pick a category — you can change anything on the next screen.',
+            style: TextStyle(color: AddTaskColors.muted, height: 1.3),
+          ),
+          const SizedBox(height: 16),
+          // The mosaic (matches the bento reference): Study hero on top,
+          // Work | Planning pair, then tall Fitness with Personal over
+          // Sleep splitting the right column.
+          Expanded(
+            child: Column(
+              children: [
+                Expanded(
+                  flex: 7,
+                  child: card('Study', _CategoryBento.yellow, hero: true),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  flex: 5,
+                  child: Row(
+                    children: [
+                      Expanded(child: card('Work', _CategoryBento.orange)),
+                      const SizedBox(width: 12),
+                      Expanded(child: card('Planning', _CategoryBento.green)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  flex: 8,
+                  child: Row(
+                    children: [
+                      Expanded(child: card('Fitness', _CategoryBento.purple)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: card('Personal', _CategoryBento.blue),
+                            ),
+                            const SizedBox(height: 12),
+                            Expanded(
+                              child: card(
+                                kSleepTaskCategory,
+                                _CategoryBento.teal,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Material(
+                  color: AddTaskColors.card,
+                  borderRadius: BorderRadius.circular(18),
+                  child: InkWell(
+                    onTap: _promptCustomCategory,
+                    borderRadius: BorderRadius.circular(18),
+                    child: Container(
+                      height: 56,
+                      decoration: customActive
+                          ? BoxDecoration(
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: AddTaskColors.accentDim,
+                                width: 2,
+                              ),
+                            )
+                          : null,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.add,
+                            size: 18,
+                            color: AddTaskColors.onSurface,
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              customActive ? _category! : 'Custom',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: AddTaskColors.onSurface,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Material(
+                color: AddTaskColors.card,
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
+                  onTap: () => _selectCategory(null),
+                  borderRadius: BorderRadius.circular(18),
+                  child: Tooltip(
+                    message: 'Skip — no category',
+                    child: SizedBox(
+                      width: 56,
+                      height: 56,
+                      child: Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 22,
+                        color: AddTaskColors.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1543,7 +1662,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
               Text(
                 'Accountability',
                 style: TextStyle(
-                  fontSize: 17,
+                  fontSize: 5,
                   fontWeight: FontWeight.w700,
                   color: AddTaskColors.onSurface,
                 ),
@@ -1589,13 +1708,56 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     );
   }
 
-  Widget _buildDeepWorkRow() {
-    return AddTaskSettingsToggleRow(
-      icon: Icons.bolt_rounded,
-      title: 'Deep Work',
-      subtitle: 'NOTIFICATION BLACKOUT',
-      value: _focusSession,
-      onChanged: (v) => setState(() => _focusSession = v),
+  /// Accountability and Deep Work share one row of half-width cards.
+  /// IntrinsicHeight bounds the stretch: inside the ListView height is
+  /// unbounded, and stretching into it crashes layout.
+  Widget _buildAccountabilityAndDeepWorkRow() {
+    final selectedIndex = _selectedModeIndex;
+
+    return IntrinsicHeight(
+      child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: AddTaskSplitSettingCard(
+            icon: Icons.verified_user_outlined,
+            title: 'Accountability',
+            // Short label only — the picker sheet explains the rest.
+            // No HelpDot here: 'Accountability' barely fits the half-width
+            // card, and a dot on one card but not its twin looks lopsided.
+            subtitle: _modeLabels[selectedIndex].toUpperCase(),
+            onTap: _showAccountabilityPicker,
+            trailing: Text(
+              'CHANGE',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+                color: AddTaskColors.accentDim,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: AddTaskSplitSettingCard(
+            icon: Icons.bolt_rounded,
+            title: 'Deep Work',
+            subtitle: 'BLOCKS ALERTS',
+            onTap: () => setState(() => _focusSession = !_focusSession),
+            trailing: Switch.adaptive(
+              value: _focusSession,
+              onChanged: (v) => setState(() => _focusSession = v),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              activeTrackColor: AddTaskColors.accentDim.withValues(
+                alpha: 0.55,
+              ),
+              activeThumbColor: AddTaskColors.accentContainer,
+            ),
+          ),
+        ),
+      ],
+      ),
     );
   }
 
@@ -1641,9 +1803,10 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
               ),
               if (_reminder) ...[
                 AddTaskInsetPanel(
-                  child: Column(
-                    children: [
-                      AddTaskPickerRow(
+                  child: Builder(
+                    builder: (context) {
+                      final sleep = isSleepCategory(_category);
+                      final datePicker = AddTaskPickerRow(
                         icon: Icons.calendar_today_outlined,
                         label: 'Date',
                         value: dateLabel,
@@ -1669,13 +1832,10 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                             );
                           });
                         },
-                      ),
-                      const SizedBox(height: 8),
-                      AddTaskPickerRow(
+                      );
+                      final timePicker = AddTaskPickerRow(
                         icon: Icons.schedule_rounded,
-                        label: isSleepCategory(_category)
-                            ? 'Sleep start'
-                            : 'Time',
+                        label: sleep ? 'Sleep start' : 'Time',
                         value: timeLabel,
                         onTap: () async {
                           final picked = await showTimePicker(
@@ -1693,59 +1853,66 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                             );
                           });
                         },
-                      ),
-                      if (isSleepCategory(_category) && _reminder) ...[
-                        const SizedBox(height: 8),
-                        AddTaskPickerRow(
-                          icon: Icons.bedtime_rounded,
-                          label: 'Sleep end',
-                          value: formatTaskTimeOfDay(
-                            _reminderTime.add(
-                              Duration(minutes: _effectiveDurationMinutes),
+                      );
+
+                      return Column(
+                        children: [
+                          // Sleep pairs its start/end times; everything else
+                          // pairs date + time — one row either way.
+                          if (sleep) ...[
+                            datePicker,
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(child: timePicker),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: AddTaskPickerRow(
+                                    icon: Icons.bedtime_rounded,
+                                    label: 'Sleep end',
+                                    value: formatTaskTimeOfDay(
+                                      _reminderTime.add(
+                                        Duration(
+                                          minutes: _effectiveDurationMinutes,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ] else
+                            Row(
+                              children: [
+                                Expanded(child: datePicker),
+                                const SizedBox(width: 8),
+                                Expanded(child: timePicker),
+                              ],
+                            ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(4, 8, 4, 2),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.event_available_outlined,
+                                  size: 13,
+                                  color: AddTaskColors.faint,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Plan day · $planLabel',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AddTaskColors.faint,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
-                      ],
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 8,
-                          horizontal: 4,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.event_available_outlined,
-                              size: 18,
-                              color: AddTaskColors.muted,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Plan day',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: AddTaskColors.faint,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  Text(
-                                    planLabel,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: AddTaskColors.onSurface,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                        ],
+                      );
+                    },
                   ),
                 ),
               ],
@@ -1756,51 +1923,31 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     );
   }
 
-  Widget _buildSleepAdvancedExtras() {
-    if (!isSleepCategory(_category)) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        AddTaskToggleRow(
-          icon: Icons.bedtime_rounded,
-          iconColor: AddTaskColors.accentDim,
-          title: 'Sleep window & quiet mode',
-          subtitle: Platform.isIOS
-              ? 'Updates daily sleep window; offers in-app Sleep or DND'
-              : 'Updates daily sleep window and in-app quiet mode',
-          value: _syncSleepWindowAndQuietMode,
-          onChanged: (v) => setState(() => _syncSleepWindowAndQuietMode = v),
-        ),
-        if (_syncSleepWindowAndQuietMode && !Platform.isIOS) ...[
-          const SizedBox(height: 8),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'sleep', label: Text('Sleep')),
-              ButtonSegment(value: 'dnd', label: Text('DND')),
-            ],
-            selected: {_inAppQuietMode},
-            onSelectionChanged: (s) {
-              if (s.isEmpty) return;
-              setState(() => _inAppQuietMode = s.first);
-            },
-          ),
-        ],
-      ],
-    );
-  }
-
+  /// Collapsed power-user toggles. Sleep hides this — its schedule is
+  /// already rigid by default and its extras live in their own card.
   Widget _buildAdvancedSection() {
     return AddTaskCollapsibleSection(
+      key: _advancedSectionKey,
       title: 'Advanced settings',
       subtitle: _advancedSubtitle,
       expanded: _advancedExpanded,
-      onToggle: () => setState(() => _advancedExpanded = !_advancedExpanded),
+      onToggle: () {
+        setState(() => _advancedExpanded = !_advancedExpanded);
+        if (!_advancedExpanded) return;
+        // The section sits at the bottom of the list, so the toggles it
+        // reveals land below the fold — scroll them into view.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final ctx = _advancedSectionKey.currentContext;
+          if (ctx == null || !mounted) return;
+          Scrollable.ensureVisible(
+            ctx,
+            alignment: 0.05,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+          );
+        });
+      },
       children: [
-        if (isSleepCategory(_category)) ...[
-          _buildSleepAdvancedExtras(),
-          const SizedBox(height: 12),
-        ],
         AddTaskToggleRow(
           icon: Icons.anchor_rounded,
           iconColor: AddTaskColors.accentDim,
@@ -1827,6 +1974,50 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
           onChanged: (v) => setState(() => _isRigid = v),
         ),
       ],
+    );
+  }
+
+  /// Sleep-only card: sync the daily sleep window / quiet mode.
+  Widget _buildSleepExtrasSection() {
+    if (!isSleepCategory(_category)) return const SizedBox.shrink();
+
+    return Material(
+      color: AddTaskColors.card,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AddTaskToggleRow(
+              icon: Icons.bedtime_rounded,
+              iconColor: AddTaskColors.accentDim,
+              title: 'Sleep window & quiet mode',
+              subtitle: Platform.isIOS
+                  ? 'Updates daily sleep window; offers in-app Sleep or DND'
+                  : 'Updates daily sleep window and in-app quiet mode',
+              value: _syncSleepWindowAndQuietMode,
+              onChanged: (v) =>
+                  setState(() => _syncSleepWindowAndQuietMode = v),
+            ),
+            if (_syncSleepWindowAndQuietMode && !Platform.isIOS) ...[
+              const SizedBox(height: 8),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'sleep', label: Text('Sleep')),
+                  ButtonSegment(value: 'dnd', label: Text('DND')),
+                ],
+                selected: {_inAppQuietMode},
+                onSelectionChanged: (s) {
+                  if (s.isEmpty) return;
+                  setState(() => _inAppQuietMode = s.first);
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -1869,7 +2060,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     children: [
                       _buildCategoryChipRow(),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       const AddTaskHeroSectionLabel(
                         title: 'What do you want to do?',
                         subtitle: 'Give it a clear, actionable name',
@@ -1888,27 +2079,31 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                       AddTaskField(
                         controller: _notesController,
                         hint: 'Notes (optional)',
-                        maxLines: 2,
+                        // One line that grows while typing.
+                        minLines: 1,
+                        maxLines: 3,
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                           color: AddTaskColors.muted,
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 20),
                       // Reminder sits directly under the name so it can be set
                       // without scrolling — the most common add-task intent.
                       _buildReminderSection(),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 12),
                       _buildDurationSection(),
-                      const SizedBox(height: 32),
-                      _buildAccountabilityRow(),
-                      if (!isSleepCategory(_category)) ...[
+                      const SizedBox(height: 20),
+                      if (isSleepCategory(_category)) ...[
+                        _buildAccountabilityRow(),
                         const SizedBox(height: 12),
-                        _buildDeepWorkRow(),
+                        _buildSleepExtrasSection(),
+                      ] else ...[
+                        _buildAccountabilityAndDeepWorkRow(),
+                        const SizedBox(height: 20),
+                        _buildAdvancedSection(),
                       ],
-                      const SizedBox(height: 24),
-                      _buildAdvancedSection(),
                     ],
                   ),
                 ),
@@ -1958,76 +2153,130 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
   }
 }
 
-/// Category card for the category-first step — same anatomy as the goal
-/// template picker's cards: emoji top-left, bold label bottom, soft subtitle.
-class _CategoryCard extends StatelessWidget {
-  const _CategoryCard({
-    required this.emoji,
+/// Bento card palette for the category-first step. Deliberately fixed raw
+/// colors (NOT AppColors tokens): per the design reference these bright
+/// cards look identical in dark and light themes — only the page background
+/// behind them adapts. Ink is the dark text drawn on top of every card.
+abstract final class _CategoryBento {
+  static const yellow = Color(0xFFF6D14E);
+  static const orange = Color(0xFFEF8D43);
+  static const green = Color(0xFF92E3A9);
+  static const purple = Color(0xFFC79BF2);
+  static const blue = Color(0xFF8FC9F5);
+  static const teal = Color(0xFF56C2AB);
+  static const ink = Color(0xFF17191C);
+}
+
+/// One colored mosaic card: uppercase label top-left, a check chip top-right
+/// when selected, big emoji as the hero, one soft supporting line below.
+class _BentoCategoryCard extends StatelessWidget {
+  const _BentoCategoryCard({
+    required this.color,
+    required this.icon,
     required this.label,
     this.subtitle,
-    required this.isCustom,
     required this.selected,
     required this.onTap,
+    this.hero = false,
   });
 
-  final String emoji;
+  final Color color;
+  final IconData icon;
   final String label;
   final String? subtitle;
-  final bool isCustom;
   final bool selected;
   final VoidCallback onTap;
+
+  /// The full-width top card: bigger emoji, roomier text.
+  final bool hero;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
+      color: color,
+      borderRadius: BorderRadius.circular(24),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         child: Ink(
           decoration: BoxDecoration(
-            color: isCustom ? Colors.transparent : AddTaskColors.card,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: selected
-                  ? AddTaskColors.accentDim
-                  : isCustom
-                  ? AppColors.fg24
-                  : AddTaskColors.border,
-              width: selected ? 2 : 1,
-            ),
+            borderRadius: BorderRadius.circular(24),
+            border: selected
+                ? Border.all(color: _CategoryBento.ink, width: 2.5)
+                : null,
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(emoji, style: const TextStyle(fontSize: 28)),
-                const Spacer(),
-                Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: isCustom
-                        ? AddTaskColors.accent
-                        : AddTaskColors.onSurface,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle!,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: AddTaskColors.faint,
-                      fontSize: 11,
+          // Cards get whatever height the mosaic flexes give them — short
+          // slots (Personal/Sleep share one column) drop the subtitle and
+          // shrink the emoji instead of overflowing.
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxHeight < 96;
+              return Padding(
+                padding: EdgeInsets.all(compact ? 10 : 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            label.toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: _CategoryBento.ink,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        if (selected)
+                          Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: _CategoryBento.ink.withValues(
+                                alpha: 0.14,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.check_rounded,
+                              size: 14,
+                              color: _CategoryBento.ink,
+                            ),
+                          ),
+                      ],
                     ),
-                  ),
-                ],
-              ],
-            ),
+                    const Spacer(),
+                    Icon(
+                      icon,
+                      color: _CategoryBento.ink,
+                      size: hero
+                          ? 38
+                          : compact
+                          ? 18
+                          : 26,
+                    ),
+                    if (subtitle != null && !compact) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle!,
+                        maxLines: hero ? 1 : 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _CategoryBento.ink.withValues(alpha: 0.72),
+                          fontSize: 11,
+                          height: 1.3,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
           ),
         ),
       ),
