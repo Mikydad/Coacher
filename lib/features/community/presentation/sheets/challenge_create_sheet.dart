@@ -11,9 +11,19 @@ import '../../domain/models/challenge.dart';
 import '../../../../core/presentation/app_colors.dart';
 
 class ChallengeCreateSheet extends ConsumerStatefulWidget {
-  const ChallengeCreateSheet({super.key, required this.circleId});
+  const ChallengeCreateSheet({
+    super.key,
+    required this.circleId,
+    this.initialUnit,
+  });
 
   final String circleId;
+
+  /// Pre-existing unit value, if any (e.g. when reopening the sheet on an
+  /// existing challenge). When set and it isn't one of the predefined
+  /// [_ChallengeCreateSheetState._kUnitOptions], the Custom chip is
+  /// pre-selected with this text.
+  final String? initialUnit;
 
   @override
   ConsumerState<ChallengeCreateSheet> createState() =>
@@ -21,6 +31,9 @@ class ChallengeCreateSheet extends ConsumerStatefulWidget {
 }
 
 class _ChallengeCreateSheetState extends ConsumerState<ChallengeCreateSheet> {
+  static const _kUnitOptions = ['sessions', 'minutes', 'km', 'pages', 'reps'];
+  static const _kCustomUnitOption = 'custom';
+
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _targetController = TextEditingController();
@@ -30,6 +43,34 @@ class _ChallengeCreateSheetState extends ConsumerState<ChallengeCreateSheet> {
   DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now().add(const Duration(days: 7));
   bool _saving = false;
+
+  /// One of [_kUnitOptions], [_kCustomUnitOption], or null when nothing has
+  /// been chosen yet.
+  String? _unitSelection;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialUnit?.trim();
+    if (initial != null && initial.isNotEmpty) {
+      if (_kUnitOptions.contains(initial)) {
+        _unitSelection = initial;
+      } else {
+        _unitSelection = _kCustomUnitOption;
+        _unitController.text = initial;
+      }
+    }
+  }
+
+  /// The unit string that will actually be stored on the Challenge — a
+  /// predefined option verbatim, or the trimmed custom text.
+  String get _resolvedUnit {
+    if (_unitSelection == null) return '';
+    if (_unitSelection == _kCustomUnitOption) {
+      return _unitController.text.trim();
+    }
+    return _unitSelection!;
+  }
 
   @override
   void dispose() {
@@ -90,7 +131,7 @@ class _ChallengeCreateSheetState extends ConsumerState<ChallengeCreateSheet> {
         mode: _mode,
         status: ChallengeStatus.pending,
         targetValue: int.tryParse(_targetController.text.trim()) ?? 1,
-        unit: _unitController.text.trim(),
+        unit: _resolvedUnit,
         memberProgress: const {},
         teamTotal: 0,
         startsAtMs: _startDate.millisecondsSinceEpoch,
@@ -232,30 +273,76 @@ class _ChallengeCreateSheetState extends ConsumerState<ChallengeCreateSheet> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 3,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _Label('Unit'),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Unit — full-width so the six chips breathe instead of
+                    // wrapping into a tower beside the Target field.
+                    _Label('Unit'),
+                    const SizedBox(height: 8),
+                    FormField<String>(
+                      validator: (_) {
+                        if (_unitSelection == null) return 'Required';
+                        if (_unitSelection == _kCustomUnitOption &&
+                            _unitController.text.trim().isEmpty) {
+                          return 'Required';
+                        }
+                        return null;
+                      },
+                      builder: (field) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final option in _kUnitOptions)
+                                  _unitChip(
+                                    label: option,
+                                    selected: _unitSelection == option,
+                                    onTap: () {
+                                      setState(() => _unitSelection = option);
+                                      field.didChange(option);
+                                    },
+                                  ),
+                                _unitChip(
+                                  label: 'Custom',
+                                  selected:
+                                      _unitSelection == _kCustomUnitOption,
+                                  onTap: () {
+                                    setState(
+                                      () => _unitSelection = _kCustomUnitOption,
+                                    );
+                                    field.didChange(_unitController.text);
+                                  },
+                                ),
+                              ],
+                            ),
+                            if (_unitSelection == _kCustomUnitOption) ...[
                               const SizedBox(height: 8),
                               TextFormField(
                                 controller: _unitController,
                                 style: TextStyle(color: AppColors.textPrimary),
                                 onTapOutside: (_) => dismissKeyboard(context),
-                                decoration: _inputDeco('miles / sessions'),
-                                validator: (v) {
-                                  if (v == null || v.trim().isEmpty) {
-                                    return 'Required';
-                                  }
-                                  return null;
-                                },
+                                decoration: _inputDeco('e.g. laps'),
+                                onChanged: (v) => field.didChange(v),
                               ),
                             ],
-                          ),
-                        ),
-                      ],
+                            if (field.hasError) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                field.errorText!,
+                                style: TextStyle(
+                                  color: AppColors.danger,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
 
@@ -323,6 +410,27 @@ class _ChallengeCreateSheetState extends ConsumerState<ChallengeCreateSheet> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _unitChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      selectedColor: AppColors.accent,
+      backgroundColor: AppColors.surfaceCard,
+      labelStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: selected ? AppColors.onAccent : AppColors.textMuted,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      showCheckmark: false,
     );
   }
 
