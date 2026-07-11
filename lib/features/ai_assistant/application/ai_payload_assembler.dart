@@ -403,8 +403,12 @@ class AiPayloadAssembler {
               '${g.targetValue.toStringAsFixed(0)} ${g.customLabel ?? g.measurementKind.name}',
           'periodSummary': GoalPeriodHelpers.formatPeriodSummary(g),
           'daysMet': GoalPeriodHelpers.countMetCheckIns(checkIns),
-          'daysElapsed': GoalPeriodHelpers.daysElapsedInPeriodThrough(g, now),
-          'totalDays': GoalPeriodHelpers.totalCalendarDaysInPeriod(g),
+          // Action-day counts: repeating goals are paced by their own
+          // planned days, not the full calendar.
+          'daysElapsed': GoalPeriodHelpers.scheduledDaysElapsedThrough(g, now),
+          'totalDays': GoalPeriodHelpers.totalScheduledDaysInPeriod(g),
+          if (g.hasRepeatSchedule)
+            'repeatSchedule': GoalPeriodHelpers.formatRepeatSummary(g),
         });
       }
 

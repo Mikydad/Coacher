@@ -73,11 +73,22 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
   bool _exampleStepsDismissed = false;
 
   String _categoryId = GoalCategories.study;
-  GoalHorizon _horizon = GoalHorizon.monthly;
   GoalPeriodMode _periodMode = GoalPeriodMode.calendar;
+
+  /// The single scheduling control. Off = one-time goal (target accumulates
+  /// start→end); Daily/Weekly/Monthly repeat also defines the target window.
+  GoalRepeatCadence _repeatCadence = GoalRepeatCadence.off;
+
+  /// "Every X" for the repeat cadence, set by the wheel picker.
+  int _repeatInterval = 1;
+
+  /// Weekdays (1=Mon…7=Sun) acted on when repeat is weekly.
+  final Set<int> _scheduledWeekdays = <int>{};
+
+  /// Days of month (1–31) acted on when repeat is monthly.
+  final Set<int> _repeatDaysOfMonth = <int>{};
   MeasurementKind _measurement = MeasurementKind.minutes;
   double _intensity = 3;
-  DateTime _monthAnchor = DateTime.now();
   DateTime _rangeStart = DateTime.now();
   DateTime _rangeEnd = DateTime.now().add(const Duration(days: 6));
   DateTime _durationStart = DateTime.now();
@@ -168,14 +179,16 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
       customLabel: _customLabel.text,
       durationDays: _durationDays.text,
       categoryId: _categoryId,
-      horizon: _horizon.name,
       periodMode: _periodMode.name,
       measurement: _measurement.name,
       intensity: _intensity,
-      monthAnchorMs: _monthAnchor.millisecondsSinceEpoch,
       rangeStartMs: _rangeStart.millisecondsSinceEpoch,
       rangeEndMs: _rangeEnd.millisecondsSinceEpoch,
       durationStartMs: _durationStart.millisecondsSinceEpoch,
+      repeatCadence: _repeatCadence.name,
+      repeatInterval: '$_repeatInterval',
+      scheduledWeekdays: _scheduledWeekdays.toList()..sort(),
+      repeatDaysOfMonth: _repeatDaysOfMonth.toList()..sort(),
       reminderEnabled: _reminderEnabled,
       reminderMinutesFromMidnight: _reminderMinutesFromMidnight,
       actions: _actionDrafts
@@ -184,6 +197,7 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
               id: d.id,
               title: d.controller.text,
               completed: d.completed,
+              repeatWeekdays: d.repeatWeekdays.toList()..sort(),
             ),
           )
           .toList(),
@@ -207,6 +221,7 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
             id: row.id,
             controller: TextEditingController(text: row.title),
             completed: row.completed,
+            repeatWeekdays: row.repeatWeekdays.toSet(),
           ),
         );
       }
@@ -222,19 +237,27 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
       _customLabel.text = draft.customLabel;
       _durationDays.text = draft.durationDays;
       _categoryId = draft.categoryId;
-      _horizon = GoalHorizonStorage.fromStorage(draft.horizon);
       _periodMode = GoalPeriodModeStorage.fromStorage(draft.periodMode);
       _measurement = MeasurementKind.values.firstWhere(
         (e) => e.name == draft.measurement,
         orElse: () => MeasurementKind.minutes,
       );
       _intensity = draft.intensity;
-      _monthAnchor = DateTime.fromMillisecondsSinceEpoch(draft.monthAnchorMs);
       _rangeStart = DateTime.fromMillisecondsSinceEpoch(draft.rangeStartMs);
       _rangeEnd = DateTime.fromMillisecondsSinceEpoch(draft.rangeEndMs);
       _durationStart = DateTime.fromMillisecondsSinceEpoch(
         draft.durationStartMs,
       );
+      _repeatCadence = GoalRepeatCadenceStorage.fromStorage(
+        draft.repeatCadence,
+      );
+      _repeatInterval = int.tryParse(draft.repeatInterval) ?? 1;
+      _scheduledWeekdays
+        ..clear()
+        ..addAll(draft.scheduledWeekdays);
+      _repeatDaysOfMonth
+        ..clear()
+        ..addAll(draft.repeatDaysOfMonth);
       _reminderEnabled = draft.reminderEnabled;
       _reminderMinutesFromMidnight = draft.reminderMinutesFromMidnight;
     });
@@ -263,7 +286,9 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
         _suggestedTitle = template.suggestedTitle;
       }
       if (template.categoryId != null) _categoryId = template.categoryId!;
-      if (template.horizon != null) _horizon = template.horizon!;
+      if (template.repeatCadence != null) {
+        _repeatCadence = template.repeatCadence!;
+      }
       if (template.periodMode != null) _periodMode = template.periodMode!;
       if (template.measurement != null) _measurement = template.measurement!;
       if (template.targetValue != null) {
@@ -276,6 +301,12 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
       }
       if (template.reminderEnabled != null) {
         _reminderEnabled = template.reminderEnabled!;
+        // Reminders need a repeat schedule; templates predate the split and
+        // meant "remind me every day".
+        if (template.reminderEnabled! &&
+            _repeatCadence == GoalRepeatCadence.off) {
+          _repeatCadence = GoalRepeatCadence.daily;
+        }
       }
       if (template.reminderMinutesFromMidnight != null) {
         _reminderMinutesFromMidnight = template.reminderMinutesFromMidnight!;
@@ -398,38 +429,46 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
     );
   }
 
-  Future<void> _pickMonth() async {
-    final picked = await showDatePicker(
+  /// Start and end picked together on one calendar, like booking a flight.
+  Future<void> _pickRange() async {
+    final start = DateTime(_rangeStart.year, _rangeStart.month, _rangeStart.day);
+    final end = DateTime(_rangeEnd.year, _rangeEnd.month, _rangeEnd.day);
+    final picked = await showDateRangePicker(
       context: context,
-      initialDate: _monthAnchor,
+      initialDateRange: DateTimeRange(
+        start: start,
+        end: end.isBefore(start) ? start : end,
+      ),
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
-      initialDatePickerMode: DatePickerMode.year,
+      helpText: 'Goal duration',
+      saveText: 'Set duration',
     );
     if (picked != null) {
-      setState(() => _monthAnchor = DateTime(picked.year, picked.month, 1));
+      setState(() {
+        _rangeStart = picked.start;
+        _rangeEnd = picked.end;
+      });
     }
   }
 
-  Future<void> _pickStart() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _rangeStart,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) setState(() => _rangeStart = picked);
-  }
+  static const _shortMonths = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
 
-  Future<void> _pickEnd() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _rangeEnd,
-      firstDate: _rangeStart,
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) setState(() => _rangeEnd = picked);
-  }
+  String _formatRangeDay(DateTime d) =>
+      '${_shortMonths[d.month - 1]} ${d.day}, ${d.year}';
 
   String _formatReminderTime(BuildContext context) {
     final t = TimeOfDay(
@@ -468,16 +507,7 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
           durationDayCount ?? int.tryParse(_durationDays.text.trim()) ?? 1;
       return GoalPeriodHelpers.localDurationDayCount(_durationStart, n);
     }
-    switch (_horizon) {
-      case GoalHorizon.monthly:
-        return GoalPeriodHelpers.localCalendarMonthBounds(
-          _monthAnchor.year,
-          _monthAnchor.month,
-        );
-      case GoalHorizon.daily:
-      case GoalHorizon.weekly:
-        return GoalPeriodHelpers.localDayRangeBounds(_rangeStart, _rangeEnd);
-    }
+    return GoalPeriodHelpers.localDayRangeBounds(_rangeStart, _rangeEnd);
   }
 
   // ─── Time block helpers ──────────────────────────────────────────────────
@@ -619,7 +649,7 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
         );
         return;
       }
-    } else if (_horizon != GoalHorizon.monthly) {
+    } else {
       final rs = DateTime(_rangeStart.year, _rangeStart.month, _rangeStart.day);
       final re = DateTime(_rangeEnd.year, _rangeEnd.month, _rangeEnd.day);
       if (re.isBefore(rs)) {
@@ -641,6 +671,25 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
       );
       return;
     }
+    if (_repeatCadence == GoalRepeatCadence.weekly &&
+        _scheduledWeekdays.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pick at least one weekday to repeat on')),
+      );
+      return;
+    }
+    if (_repeatCadence == GoalRepeatCadence.monthly &&
+        _repeatDaysOfMonth.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pick at least one day of the month to repeat on'),
+        ),
+      );
+      return;
+    }
+    final repeatInterval = _repeatCadence == GoalRepeatCadence.off
+        ? 1
+        : _repeatInterval.clamp(1, 999);
     setState(() => _saving = true);
     final repo = ref.read(goalsRepositoryProvider);
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -658,7 +707,6 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
             ? typedTitle
             : (_suggestedTitle?.trim() ?? ''),
         categoryId: _categoryId,
-        horizon: _horizon,
         status: existing?.status ?? GoalStatus.active,
         measurementKind: _measurement,
         targetValue: target,
@@ -674,13 +722,25 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
         durationDays: _periodMode == GoalPeriodMode.durationDays
             ? durationDayCount
             : null,
-        reminderEnabled: _reminderEnabled,
-        reminderMinutesFromMidnight: _reminderEnabled
+        repeatCadence: _repeatCadence,
+        repeatInterval: repeatInterval,
+        scheduledWeekdays: _repeatCadence == GoalRepeatCadence.weekly
+            ? (_scheduledWeekdays.toList()..sort())
+            : null,
+        repeatDaysOfMonth: _repeatCadence == GoalRepeatCadence.monthly
+            ? (_repeatDaysOfMonth.toList()..sort())
+            : null,
+        // Reminders are gated on the repeat schedule.
+        reminderEnabled:
+            _reminderEnabled && _repeatCadence != GoalRepeatCadence.off,
+        reminderMinutesFromMidnight:
+            _reminderEnabled && _repeatCadence != GoalRepeatCadence.off
             ? _reminderMinutesFromMidnight
             : null,
         reminderStyle: existing?.reminderStyle ?? GoalReminderStyle.dailyOnce,
         createdAtMs: existing?.createdAtMs ?? now,
         updatedAtMs: now,
+        colorHex: existing?.colorHex,
       );
 
       // Time block conflict check — must happen before persisting so the user
@@ -692,6 +752,12 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
       }
 
       await repo.upsertGoal(goal);
+
+      // Existing rows keep their per-day completion history on re-save.
+      final oldActions = widget.goalId != null
+          ? await repo.getActions(goalId)
+          : const <GoalAction>[];
+      final oldActionsById = {for (final a in oldActions) a.id: a};
 
       final keptActionIds = <String>{};
       var actionIndex = 0;
@@ -707,15 +773,17 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
             title: title,
             orderIndex: actionIndex++,
             completed: draft.completed,
+            repeatWeekdays: draft.repeatWeekdays.isEmpty
+                ? null
+                : (draft.repeatWeekdays.toList()..sort()),
+            completedDateKeys:
+                oldActionsById[actionId]?.completedDateKeys ?? const [],
           ),
         );
       }
-      if (widget.goalId != null) {
-        final oldActions = await repo.getActions(goalId);
-        for (final a in oldActions) {
-          if (!keptActionIds.contains(a.id)) {
-            await repo.deleteAction(goalId: goalId, actionId: a.id);
-          }
+      for (final a in oldActions) {
+        if (!keptActionIds.contains(a.id)) {
+          await repo.deleteAction(goalId: goalId, actionId: a.id);
         }
       }
 
@@ -754,7 +822,6 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
     final g = bundle.goal;
     _title.text = g.title;
     _categoryId = g.categoryId;
-    _horizon = g.horizon;
     _measurement = g.measurementKind;
     _target.text = g.targetValue == g.targetValue.roundToDouble()
         ? '${g.targetValue.toInt()}'
@@ -762,12 +829,19 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
     if (g.customLabel != null) _customLabel.text = g.customLabel!;
     _intensity = g.intensity.toDouble();
     _periodMode = g.periodMode;
-    _monthAnchor = DateTime.fromMillisecondsSinceEpoch(g.periodStartMs);
     _rangeStart = DateTime.fromMillisecondsSinceEpoch(g.periodStartMs);
     _rangeEnd = DateTime.fromMillisecondsSinceEpoch(g.periodEndMs);
     _durationStart = DateTime.fromMillisecondsSinceEpoch(g.periodStartMs);
     _durationDays.text =
         '${g.durationDays ?? GoalPeriodHelpers.totalCalendarDaysInPeriod(g)}';
+    _repeatCadence = g.repeatCadence;
+    _repeatInterval = g.repeatInterval;
+    _scheduledWeekdays
+      ..clear()
+      ..addAll(g.scheduledWeekdays ?? const []);
+    _repeatDaysOfMonth
+      ..clear()
+      ..addAll(g.repeatDaysOfMonth ?? const []);
     _reminderEnabled = g.reminderEnabled;
     _reminderMinutesFromMidnight = g.reminderMinutesFromMidnight ?? 9 * 60;
     for (final d in _actionDrafts) {
@@ -783,6 +857,7 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
             id: a.id,
             controller: TextEditingController(text: a.title),
             completed: a.completed,
+            repeatWeekdays: a.repeatWeekdays?.toSet(),
           ),
         );
       }
@@ -800,66 +875,35 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
     }
   }
 
+  /// Target framing follows the repeat cycle: Off accumulates over the whole
+  /// goal, a repeating goal measures per cycle.
   String _targetLabelText() {
-    return switch ((_periodMode, _horizon)) {
-      (GoalPeriodMode.durationDays, _) => 'Target (per day in this run)',
-      (_, GoalHorizon.weekly) => 'Target (this week)',
-      (_, GoalHorizon.monthly) => 'Target (per day in that month)',
-      (_, GoalHorizon.daily) => 'Target (per day)',
+    final n = _repeatInterval;
+    return switch (_repeatCadence) {
+      GoalRepeatCadence.off => 'Target (entire goal)',
+      GoalRepeatCadence.daily =>
+        n <= 1 ? 'Target (per day)' : 'Target (per $n days)',
+      GoalRepeatCadence.weekly =>
+        n <= 1 ? 'Target (per week)' : 'Target (per $n weeks)',
+      GoalRepeatCadence.monthly =>
+        n <= 1 ? 'Target (per month)' : 'Target (per $n months)',
     };
   }
 
-  String _monthTitle() {
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    return '${months[_monthAnchor.month - 1]} ${_monthAnchor.year}';
-  }
-
-  Widget _buildScheduleSection() {
+  /// Start/end dates — how long the goal lives.
+  Widget _buildDurationSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const GoalEditorSectionLabel('Schedule'),
-        GoalEditorHorizonToggle(
-          selected: _horizon,
-          onChanged: (h) => setState(() => _horizon = h),
-        ),
-        if (_periodMode == GoalPeriodMode.calendar) ...[
-          const SizedBox(height: 12),
-          if (_horizon == GoalHorizon.monthly)
-            GoalEditorDateCard(
-              title: _monthTitle(),
-              subtitle: 'Whole calendar month (local time)',
-              onTap: _pickMonth,
-            )
-          else ...[
-            GoalEditorDateCard(
-              title:
-                  'Start: ${_rangeStart.year}-${_rangeStart.month.toString().padLeft(2, '0')}-${_rangeStart.day.toString().padLeft(2, '0')}',
-              subtitle: 'First day',
-              onTap: _pickStart,
-            ),
-            const SizedBox(height: 8),
-            GoalEditorDateCard(
-              title:
-                  'End: ${_rangeEnd.year}-${_rangeEnd.month.toString().padLeft(2, '0')}-${_rangeEnd.day.toString().padLeft(2, '0')}',
-              subtitle: 'Last day',
-              onTap: _pickEnd,
-            ),
-          ],
-        ] else
+        const GoalEditorSectionLabel('Duration'),
+        if (_periodMode == GoalPeriodMode.calendar)
+          GoalEditorDateCard(
+            title:
+                '${_formatRangeDay(_rangeStart)}  →  ${_formatRangeDay(_rangeEnd)}',
+            subtitle: 'First day → last day · tap to change',
+            onTap: _pickRange,
+          )
+        else
           Padding(
             padding: EdgeInsets.only(top: 10),
             child: Text(
@@ -871,10 +915,140 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
     );
   }
 
+  /// The single scheduling section: Off / Daily / Weekly / Monthly. Defines
+  /// both when the user acts (reminders, time blocks, Today's goals) and the
+  /// window the target is measured over.
+  Widget _buildRepeatSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GoalEditorSectionLabel(
+          'Schedule',
+          trailing: Text(
+            _repeatCadence == GoalRepeatCadence.off ? 'ONE-TIME' : 'REPEATS',
+            style: TextStyle(
+              color: _repeatCadence == GoalRepeatCadence.off
+                  ? AppColors.fg38
+                  : GoalEditorColors.lime,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.1,
+            ),
+          ),
+        ),
+        GoalEditorRepeatToggle(
+          selected: _repeatCadence,
+          onChanged: (c) => setState(() => _repeatCadence = c),
+        ),
+        const SizedBox(height: 8),
+        if (_repeatCadence == GoalRepeatCadence.off)
+          Text(
+            'One-time goal — progress accumulates from start to end date. '
+            'Log whenever you like; no reminders or routine days.',
+            style: TextStyle(color: AppColors.fg38, fontSize: 12),
+          )
+        else ...[
+          if (_repeatCadence == GoalRepeatCadence.weekly) ...[
+            const SizedBox(height: 8),
+            GoalEditorWeekdayPicker(
+              selected: _scheduledWeekdays,
+              onDayToggled: (day) => setState(() {
+                if (!_scheduledWeekdays.remove(day)) {
+                  _scheduledWeekdays.add(day);
+                }
+              }),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (_repeatCadence == GoalRepeatCadence.monthly) ...[
+            const SizedBox(height: 8),
+            GoalEditorMonthDayPicker(
+              selected: _repeatDaysOfMonth,
+              onChanged: (days) => setState(() {
+                _repeatDaysOfMonth
+                  ..clear()
+                  ..addAll(days);
+              }),
+            ),
+            const SizedBox(height: 12),
+          ],
+          // "Every X days" wheel and the reminder control share one row.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              GoalEditorIntervalWheel(
+                value: _repeatInterval,
+                maxValue: _repeatCadence == GoalRepeatCadence.daily ? 30 : 12,
+                onChanged: (v) => setState(() => _repeatInterval = v),
+                unitSingular: switch (_repeatCadence) {
+                  GoalRepeatCadence.daily => 'day',
+                  GoalRepeatCadence.weekly => 'week',
+                  GoalRepeatCadence.monthly => 'month',
+                  GoalRepeatCadence.off => '',
+                },
+                unitPlural: switch (_repeatCadence) {
+                  GoalRepeatCadence.daily => 'days',
+                  GoalRepeatCadence.weekly => 'weeks',
+                  GoalRepeatCadence.monthly => 'months',
+                  GoalRepeatCadence.off => '',
+                },
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: KeyedSubtree(
+                  key: _reminderSectionKey,
+                  child: GoalEditorReminderCard(
+                    compact: true,
+                    enabled: _reminderEnabled,
+                    timeLabel: _formatReminderTime(context),
+                    onToggle: (v) async {
+                      if (v) {
+                        final ok = await ref
+                            .read(localNotificationsServiceProvider)
+                            .requestPermissionsIfNeeded();
+                        if (!context.mounted) return;
+                        if (!ok) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Allow notifications to get goal reminders.',
+                              ),
+                            ),
+                          );
+                        }
+                      }
+                      if (!context.mounted) return;
+                      setState(() => _reminderEnabled = v);
+                    },
+                    onPickTime: _pickReminderTime,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Target is measured per '
+            '${_repeatInterval <= 1 ? '' : '$_repeatInterval '}'
+            '${switch (_repeatCadence) {
+              GoalRepeatCadence.daily => _repeatInterval <= 1 ? 'day' : 'days',
+              GoalRepeatCadence.weekly =>
+                _repeatInterval <= 1 ? 'week' : 'weeks',
+              GoalRepeatCadence.monthly =>
+                _repeatInterval <= 1 ? 'month' : 'months',
+              GoalRepeatCadence.off => '',
+            }}.',
+            style: TextStyle(color: AppColors.fg38, fontSize: 12),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildAdvancedSection(BuildContext context) {
     return GoalEditorCollapsibleSection(
       title: 'Advanced settings',
-      subtitle: 'Period mode, discipline, reminder',
+      subtitle: 'Period mode, discipline',
       expanded: _advancedExpanded,
       onToggle: () => setState(() => _advancedExpanded = !_advancedExpanded),
       children: [
@@ -904,34 +1078,6 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
         GoalEditorDisciplineSection(
           intensity: _intensity,
           onChanged: (v) => setState(() => _intensity = v),
-        ),
-        const SizedBox(height: 20),
-        KeyedSubtree(
-          key: _reminderSectionKey,
-          child: GoalEditorReminderCard(
-            enabled: _reminderEnabled,
-            timeLabel: _formatReminderTime(context),
-            onToggle: (v) async {
-              if (v) {
-                final ok = await ref
-                    .read(localNotificationsServiceProvider)
-                    .requestPermissionsIfNeeded();
-                if (!context.mounted) return;
-                if (!ok) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Allow notifications to get goal reminders.',
-                      ),
-                    ),
-                  );
-                }
-              }
-              if (!context.mounted) return;
-              setState(() => _reminderEnabled = v);
-            },
-            onPickTime: _pickReminderTime,
-          ),
         ),
       ],
     );
@@ -999,11 +1145,47 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
                     ),
                     const SizedBox(height: 24),
 
-                    // ── 2. Progress type ────────────────────────────────────────
-                    const GoalEditorSectionLabel('Measure progress with'),
-                    GoalEditorMeasurementDropdown(
-                      value: _measurement,
-                      onChanged: (v) => setState(() => _measurement = v),
+                    // ── 2. Target + unit (one row) ──────────────────────────────
+                    const GoalEditorSectionLabel('Target'),
+                    // IntrinsicHeight + stretch keeps the unit pill exactly
+                    // as tall as the target field.
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: GoalEditorTextField(
+                              controller: _target,
+                              keyboardType: TextInputType.number,
+                              hintText: _suggestedTarget ?? 'e.g. 30',
+                              validator: (v) {
+                                // Blank is fine when the template suggestion
+                                // will be used.
+                                if (v != null && v.trim().isNotEmpty) {
+                                  return null;
+                                }
+                                if (_suggestedTarget != null) return null;
+                                return 'Required';
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: GoalEditorMeasurementDropdown(
+                              value: _measurement,
+                              onChanged: (v) =>
+                                  setState(() => _measurement = v),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _targetLabelText(),
+                      style: TextStyle(color: AppColors.fg38, fontSize: 12),
                     ),
                     if (_measurement == MeasurementKind.custom) ...[
                       const SizedBox(height: 12),
@@ -1014,27 +1196,15 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
                     ],
                     const SizedBox(height: 24),
 
-                    // ── 3. Target ───────────────────────────────────────────────
-                    const GoalEditorSectionLabel('Target'),
-                    GoalEditorTextField(
-                      controller: _target,
-                      keyboardType: TextInputType.number,
-                      hintText: _suggestedTarget ?? 'e.g. 30',
-                      helperText: _targetLabelText(),
-                      validator: (v) {
-                        // Blank is fine when the template suggestion will be used.
-                        if (v != null && v.trim().isNotEmpty) return null;
-                        if (_suggestedTarget != null) return null;
-                        return 'Required';
-                      },
-                    ),
+                    // ── 4. Duration (start/end dates) ───────────────────────────
+                    _buildDurationSection(),
                     const SizedBox(height: 24),
 
-                    // ── 4. Schedule ───────────────────────────────────────────────
-                    _buildScheduleSection(),
+                    // ── 5. Schedule (Off / Daily / Weekly / Monthly) ────────────
+                    _buildRepeatSection(context),
                     const SizedBox(height: 24),
 
-                    // ── 5. Setup steps (optional) ───────────────────────────────
+                    // ── 6. Setup steps (optional) ───────────────────────────────
                     GoalEditorSetupStepsSection(
                       stepCount: filledSteps,
                       onAdd: () => setState(() {
@@ -1054,6 +1224,16 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
                             index: i,
                             controller: _actionDrafts[i].controller,
                             canRemove: _actionDrafts.length > 1,
+                            repeatWeekdays: _actionDrafts[i].repeatWeekdays,
+                            repeatExpanded: _actionDrafts[i].repeatExpanded,
+                            onToggleRepeatExpanded: () => setState(() {
+                              _actionDrafts[i].repeatExpanded =
+                                  !_actionDrafts[i].repeatExpanded;
+                            }),
+                            onRepeatDayToggled: (day) => setState(() {
+                              final days = _actionDrafts[i].repeatWeekdays;
+                              if (!days.remove(day)) days.add(day);
+                            }),
                             onChanged: (text) {
                               if (!_exampleStepsDismissed &&
                                   text.trim().isNotEmpty) {
@@ -1071,7 +1251,7 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
                     ),
                     const SizedBox(height: 24),
 
-                    // ── 6. Advanced settings ────────────────────────────────────
+                    // ── 7. Advanced settings ────────────────────────────────────
                     _buildAdvancedSection(context),
                   ],
                 ),
@@ -1106,9 +1286,17 @@ class _ActionDraft {
     this.id,
     TextEditingController? controller,
     this.completed = false,
-  }) : controller = controller ?? TextEditingController();
+    Set<int>? repeatWeekdays,
+  }) : controller = controller ?? TextEditingController(),
+       repeatWeekdays = repeatWeekdays ?? <int>{};
 
   final String? id;
   final TextEditingController controller;
   final bool completed;
+
+  /// Weekdays (1=Mon…7=Sun) this step repeats on; empty = one-time step.
+  final Set<int> repeatWeekdays;
+
+  /// Whether the inline weekday chips are open in the editor.
+  bool repeatExpanded = false;
 }

@@ -137,7 +137,7 @@ UserGoal _goal({required String id}) {
     id: id,
     title: 'Goal',
     categoryId: 'study',
-    horizon: GoalHorizon.daily,
+    repeatCadence: GoalRepeatCadence.daily,
     status: GoalStatus.active,
     measurementKind: MeasurementKind.sessions,
     targetValue: 1,

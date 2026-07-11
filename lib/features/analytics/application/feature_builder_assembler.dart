@@ -306,6 +306,9 @@ int _goalOpportunitiesForDays(GoalHorizon horizon, int days) {
       return (days / 7).ceil().clamp(1, days);
     case GoalHorizon.monthly:
       return (days / 30).ceil().clamp(1, days);
+    case GoalHorizon.entireGoal:
+      // The whole period is one evaluation window — a single opportunity.
+      return 1;
   }
 }
 

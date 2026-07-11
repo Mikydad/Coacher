@@ -44,19 +44,26 @@ UserGoal _makeGoal({
   int? reminderMinutesFromMidnight = 600, // 10:00
   int intensity = 3,
   GoalStatus status = GoalStatus.active,
+  GoalRepeatCadence? repeatCadence,
+  List<int>? scheduledWeekdays,
 }) {
   final now = DateTime.now().millisecondsSinceEpoch;
   return UserGoal(
     id: 'goal-1',
     title: 'Test goal',
     categoryId: 'health',
-    horizon: GoalHorizon.monthly,
     status: status,
     measurementKind: MeasurementKind.count,
     targetValue: 10,
     intensity: intensity,
     periodStartMs: now,
     periodEndMs: now + const Duration(days: 30).inMilliseconds,
+    repeatCadence:
+        repeatCadence ??
+        (scheduledWeekdays != null
+            ? GoalRepeatCadence.weekly
+            : GoalRepeatCadence.daily),
+    scheduledWeekdays: scheduledWeekdays,
     reminderEnabled: reminderEnabled,
     reminderMinutesFromMidnight: reminderMinutesFromMidnight,
     createdAtMs: now,
@@ -201,6 +208,46 @@ void main() {
       }
     });
 
+    test('removes block when today is not a scheduled weekday', () async {
+      final repo = _FakeRepo();
+      final svc = _buildService(repo);
+      // today (2026-05-19) is a Tuesday; goal runs Mon/Wed/Fri.
+      final goal = _makeGoal(
+        scheduledWeekdays: const [
+          DateTime.monday,
+          DateTime.wednesday,
+          DateTime.friday,
+        ],
+      );
+
+      await svc.syncBlockForGoal(goal, today);
+
+      expect(repo.upserted, isEmpty);
+      expect(repo.deleted, contains(goal.id));
+    });
+
+    test('removes block when repeat schedule is off (passive goal)', () async {
+      final repo = _FakeRepo();
+      final svc = _buildService(repo);
+      final goal = _makeGoal(repeatCadence: GoalRepeatCadence.off);
+
+      await svc.syncBlockForGoal(goal, today);
+
+      expect(repo.upserted, isEmpty);
+      expect(repo.deleted, contains(goal.id));
+    });
+
+    test('upserts block when today is a scheduled weekday', () async {
+      final repo = _FakeRepo();
+      final svc = _buildService(repo);
+      // 2026-05-19 is a Tuesday.
+      final goal = _makeGoal(scheduledWeekdays: const [DateTime.tuesday]);
+
+      await svc.syncBlockForGoal(goal, today);
+
+      expect(repo.upserted, hasLength(1));
+    });
+
     test('block is flexible (not rigid)', () async {
       final repo = _FakeRepo();
       final svc = _buildService(repo);
@@ -222,6 +269,16 @@ void main() {
       final svc = _buildService(_FakeRepo());
       final block = svc.deriveBlockForGoal(
         _makeGoal(reminderMinutesFromMidnight: null),
+        today,
+      );
+      expect(block, isNull);
+    });
+
+    test('returns null when today is not a scheduled weekday', () {
+      final svc = _buildService(_FakeRepo());
+      // 2026-05-19 is a Tuesday; goal runs Monday only.
+      final block = svc.deriveBlockForGoal(
+        _makeGoal(scheduledWeekdays: const [DateTime.monday]),
         today,
       );
       expect(block, isNull);

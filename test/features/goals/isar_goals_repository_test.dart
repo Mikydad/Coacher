@@ -17,7 +17,7 @@ UserGoal _sampleGoal({required String id, required int updatedAtMs}) {
     id: id,
     title: 'Goal $id',
     categoryId: GoalCategories.study,
-    horizon: GoalHorizon.weekly,
+    repeatCadence: GoalRepeatCadence.weekly,
     status: GoalStatus.active,
     measurementKind: MeasurementKind.minutes,
     targetValue: 60,

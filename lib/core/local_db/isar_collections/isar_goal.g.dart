@@ -22,80 +22,105 @@ const IsarGoalSchema = CollectionSchema(
       name: r'categoryId',
       type: IsarType.string,
     ),
-    r'createdAtMs': PropertySchema(
+    r'colorHex': PropertySchema(
       id: 1,
+      name: r'colorHex',
+      type: IsarType.string,
+    ),
+    r'createdAtMs': PropertySchema(
+      id: 2,
       name: r'createdAtMs',
       type: IsarType.long,
     ),
     r'customLabel': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'customLabel',
       type: IsarType.string,
     ),
     r'durationDays': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'durationDays',
       type: IsarType.long,
     ),
-    r'goalId': PropertySchema(id: 4, name: r'goalId', type: IsarType.string),
+    r'goalId': PropertySchema(id: 5, name: r'goalId', type: IsarType.string),
     r'horizonStorage': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'horizonStorage',
       type: IsarType.string,
     ),
     r'intensity': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'intensity',
       type: IsarType.long,
     ),
     r'measurementKindStorage': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'measurementKindStorage',
       type: IsarType.string,
     ),
     r'periodEndMs': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'periodEndMs',
       type: IsarType.long,
     ),
     r'periodModeStorage': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'periodModeStorage',
       type: IsarType.string,
     ),
     r'periodStartMs': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'periodStartMs',
       type: IsarType.long,
     ),
     r'reminderEnabled': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'reminderEnabled',
       type: IsarType.bool,
     ),
     r'reminderMinutesFromMidnight': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'reminderMinutesFromMidnight',
       type: IsarType.long,
     ),
     r'reminderStyleStorage': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'reminderStyleStorage',
       type: IsarType.string,
     ),
+    r'repeatCadenceStorage': PropertySchema(
+      id: 15,
+      name: r'repeatCadenceStorage',
+      type: IsarType.string,
+    ),
+    r'repeatDaysOfMonth': PropertySchema(
+      id: 16,
+      name: r'repeatDaysOfMonth',
+      type: IsarType.longList,
+    ),
+    r'repeatInterval': PropertySchema(
+      id: 17,
+      name: r'repeatInterval',
+      type: IsarType.long,
+    ),
+    r'scheduledWeekdays': PropertySchema(
+      id: 18,
+      name: r'scheduledWeekdays',
+      type: IsarType.longList,
+    ),
     r'statusStorage': PropertySchema(
-      id: 14,
+      id: 19,
       name: r'statusStorage',
       type: IsarType.string,
     ),
     r'targetValue': PropertySchema(
-      id: 15,
+      id: 20,
       name: r'targetValue',
       type: IsarType.double,
     ),
-    r'title': PropertySchema(id: 16, name: r'title', type: IsarType.string),
+    r'title': PropertySchema(id: 21, name: r'title', type: IsarType.string),
     r'updatedAtMs': PropertySchema(
-      id: 17,
+      id: 22,
       name: r'updatedAtMs',
       type: IsarType.long,
     ),
@@ -151,6 +176,12 @@ int _isarGoalEstimateSize(
   var bytesCount = offsets.last;
   bytesCount += 3 + object.categoryId.length * 3;
   {
+    final value = object.colorHex;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.customLabel;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -161,6 +192,24 @@ int _isarGoalEstimateSize(
   bytesCount += 3 + object.measurementKindStorage.length * 3;
   bytesCount += 3 + object.periodModeStorage.length * 3;
   bytesCount += 3 + object.reminderStyleStorage.length * 3;
+  {
+    final value = object.repeatCadenceStorage;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.repeatDaysOfMonth;
+    if (value != null) {
+      bytesCount += 3 + value.length * 8;
+    }
+  }
+  {
+    final value = object.scheduledWeekdays;
+    if (value != null) {
+      bytesCount += 3 + value.length * 8;
+    }
+  }
   bytesCount += 3 + object.statusStorage.length * 3;
   bytesCount += 3 + object.title.length * 3;
   return bytesCount;
@@ -173,23 +222,28 @@ void _isarGoalSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeString(offsets[0], object.categoryId);
-  writer.writeLong(offsets[1], object.createdAtMs);
-  writer.writeString(offsets[2], object.customLabel);
-  writer.writeLong(offsets[3], object.durationDays);
-  writer.writeString(offsets[4], object.goalId);
-  writer.writeString(offsets[5], object.horizonStorage);
-  writer.writeLong(offsets[6], object.intensity);
-  writer.writeString(offsets[7], object.measurementKindStorage);
-  writer.writeLong(offsets[8], object.periodEndMs);
-  writer.writeString(offsets[9], object.periodModeStorage);
-  writer.writeLong(offsets[10], object.periodStartMs);
-  writer.writeBool(offsets[11], object.reminderEnabled);
-  writer.writeLong(offsets[12], object.reminderMinutesFromMidnight);
-  writer.writeString(offsets[13], object.reminderStyleStorage);
-  writer.writeString(offsets[14], object.statusStorage);
-  writer.writeDouble(offsets[15], object.targetValue);
-  writer.writeString(offsets[16], object.title);
-  writer.writeLong(offsets[17], object.updatedAtMs);
+  writer.writeString(offsets[1], object.colorHex);
+  writer.writeLong(offsets[2], object.createdAtMs);
+  writer.writeString(offsets[3], object.customLabel);
+  writer.writeLong(offsets[4], object.durationDays);
+  writer.writeString(offsets[5], object.goalId);
+  writer.writeString(offsets[6], object.horizonStorage);
+  writer.writeLong(offsets[7], object.intensity);
+  writer.writeString(offsets[8], object.measurementKindStorage);
+  writer.writeLong(offsets[9], object.periodEndMs);
+  writer.writeString(offsets[10], object.periodModeStorage);
+  writer.writeLong(offsets[11], object.periodStartMs);
+  writer.writeBool(offsets[12], object.reminderEnabled);
+  writer.writeLong(offsets[13], object.reminderMinutesFromMidnight);
+  writer.writeString(offsets[14], object.reminderStyleStorage);
+  writer.writeString(offsets[15], object.repeatCadenceStorage);
+  writer.writeLongList(offsets[16], object.repeatDaysOfMonth);
+  writer.writeLong(offsets[17], object.repeatInterval);
+  writer.writeLongList(offsets[18], object.scheduledWeekdays);
+  writer.writeString(offsets[19], object.statusStorage);
+  writer.writeDouble(offsets[20], object.targetValue);
+  writer.writeString(offsets[21], object.title);
+  writer.writeLong(offsets[22], object.updatedAtMs);
 }
 
 IsarGoal _isarGoalDeserialize(
@@ -200,24 +254,29 @@ IsarGoal _isarGoalDeserialize(
 ) {
   final object = IsarGoal();
   object.categoryId = reader.readString(offsets[0]);
-  object.createdAtMs = reader.readLong(offsets[1]);
-  object.customLabel = reader.readStringOrNull(offsets[2]);
-  object.durationDays = reader.readLongOrNull(offsets[3]);
-  object.goalId = reader.readString(offsets[4]);
-  object.horizonStorage = reader.readString(offsets[5]);
+  object.colorHex = reader.readStringOrNull(offsets[1]);
+  object.createdAtMs = reader.readLong(offsets[2]);
+  object.customLabel = reader.readStringOrNull(offsets[3]);
+  object.durationDays = reader.readLongOrNull(offsets[4]);
+  object.goalId = reader.readString(offsets[5]);
+  object.horizonStorage = reader.readString(offsets[6]);
   object.id = id;
-  object.intensity = reader.readLong(offsets[6]);
-  object.measurementKindStorage = reader.readString(offsets[7]);
-  object.periodEndMs = reader.readLong(offsets[8]);
-  object.periodModeStorage = reader.readString(offsets[9]);
-  object.periodStartMs = reader.readLong(offsets[10]);
-  object.reminderEnabled = reader.readBool(offsets[11]);
-  object.reminderMinutesFromMidnight = reader.readLongOrNull(offsets[12]);
-  object.reminderStyleStorage = reader.readString(offsets[13]);
-  object.statusStorage = reader.readString(offsets[14]);
-  object.targetValue = reader.readDouble(offsets[15]);
-  object.title = reader.readString(offsets[16]);
-  object.updatedAtMs = reader.readLong(offsets[17]);
+  object.intensity = reader.readLong(offsets[7]);
+  object.measurementKindStorage = reader.readString(offsets[8]);
+  object.periodEndMs = reader.readLong(offsets[9]);
+  object.periodModeStorage = reader.readString(offsets[10]);
+  object.periodStartMs = reader.readLong(offsets[11]);
+  object.reminderEnabled = reader.readBool(offsets[12]);
+  object.reminderMinutesFromMidnight = reader.readLongOrNull(offsets[13]);
+  object.reminderStyleStorage = reader.readString(offsets[14]);
+  object.repeatCadenceStorage = reader.readStringOrNull(offsets[15]);
+  object.repeatDaysOfMonth = reader.readLongList(offsets[16]);
+  object.repeatInterval = reader.readLongOrNull(offsets[17]);
+  object.scheduledWeekdays = reader.readLongList(offsets[18]);
+  object.statusStorage = reader.readString(offsets[19]);
+  object.targetValue = reader.readDouble(offsets[20]);
+  object.title = reader.readString(offsets[21]);
+  object.updatedAtMs = reader.readLong(offsets[22]);
   return object;
 }
 
@@ -231,38 +290,48 @@ P _isarGoalDeserializeProp<P>(
     case 0:
       return (reader.readString(offset)) as P;
     case 1:
-      return (reader.readLong(offset)) as P;
-    case 2:
       return (reader.readStringOrNull(offset)) as P;
+    case 2:
+      return (reader.readLong(offset)) as P;
     case 3:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 4:
-      return (reader.readString(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 5:
       return (reader.readString(offset)) as P;
     case 6:
-      return (reader.readLong(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 7:
-      return (reader.readString(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 8:
-      return (reader.readLong(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 9:
-      return (reader.readString(offset)) as P;
-    case 10:
       return (reader.readLong(offset)) as P;
-    case 11:
-      return (reader.readBool(offset)) as P;
-    case 12:
-      return (reader.readLongOrNull(offset)) as P;
-    case 13:
+    case 10:
       return (reader.readString(offset)) as P;
+    case 11:
+      return (reader.readLong(offset)) as P;
+    case 12:
+      return (reader.readBool(offset)) as P;
+    case 13:
+      return (reader.readLongOrNull(offset)) as P;
     case 14:
       return (reader.readString(offset)) as P;
     case 15:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 16:
-      return (reader.readString(offset)) as P;
+      return (reader.readLongList(offset)) as P;
     case 17:
+      return (reader.readLongOrNull(offset)) as P;
+    case 18:
+      return (reader.readLongList(offset)) as P;
+    case 19:
+      return (reader.readString(offset)) as P;
+    case 20:
+      return (reader.readDouble(offset)) as P;
+    case 21:
+      return (reader.readString(offset)) as P;
+    case 22:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -728,6 +797,168 @@ extension IsarGoalQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.greaterThan(property: r'categoryId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition> colorHexIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'colorHex'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition> colorHexIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'colorHex'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition> colorHexEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'colorHex',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition> colorHexGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'colorHex',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition> colorHexLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'colorHex',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition> colorHexBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'colorHex',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition> colorHexStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'colorHex',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition> colorHexEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'colorHex',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition> colorHexContains(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'colorHex',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition> colorHexMatches(
+    String pattern, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'colorHex',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition> colorHexIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'colorHex', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition> colorHexIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'colorHex', value: ''),
       );
     });
   }
@@ -2064,6 +2295,505 @@ extension IsarGoalQueryFilter
     });
   }
 
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatCadenceStorageIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'repeatCadenceStorage'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatCadenceStorageIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'repeatCadenceStorage'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatCadenceStorageEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'repeatCadenceStorage',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatCadenceStorageGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'repeatCadenceStorage',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatCadenceStorageLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'repeatCadenceStorage',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatCadenceStorageBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'repeatCadenceStorage',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatCadenceStorageStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'repeatCadenceStorage',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatCadenceStorageEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'repeatCadenceStorage',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatCadenceStorageContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'repeatCadenceStorage',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatCadenceStorageMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'repeatCadenceStorage',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatCadenceStorageIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'repeatCadenceStorage', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatCadenceStorageIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          property: r'repeatCadenceStorage',
+          value: '',
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatDaysOfMonthIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'repeatDaysOfMonth'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatDaysOfMonthIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'repeatDaysOfMonth'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatDaysOfMonthElementEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'repeatDaysOfMonth', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatDaysOfMonthElementGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'repeatDaysOfMonth',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatDaysOfMonthElementLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'repeatDaysOfMonth',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatDaysOfMonthElementBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'repeatDaysOfMonth',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatDaysOfMonthLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'repeatDaysOfMonth', length, true, length, true);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatDaysOfMonthIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'repeatDaysOfMonth', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatDaysOfMonthIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'repeatDaysOfMonth', 0, false, 999999, true);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatDaysOfMonthLengthLessThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'repeatDaysOfMonth', 0, true, length, include);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatDaysOfMonthLengthGreaterThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'repeatDaysOfMonth',
+        length,
+        include,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatDaysOfMonthLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'repeatDaysOfMonth',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatIntervalIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'repeatInterval'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatIntervalIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'repeatInterval'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition> repeatIntervalEqualTo(
+    int? value,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'repeatInterval', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatIntervalGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'repeatInterval',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  repeatIntervalLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'repeatInterval',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition> repeatIntervalBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'repeatInterval',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  scheduledWeekdaysIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'scheduledWeekdays'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  scheduledWeekdaysIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'scheduledWeekdays'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  scheduledWeekdaysElementEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'scheduledWeekdays', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  scheduledWeekdaysElementGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'scheduledWeekdays',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  scheduledWeekdaysElementLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'scheduledWeekdays',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  scheduledWeekdaysElementBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'scheduledWeekdays',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  scheduledWeekdaysLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'scheduledWeekdays', length, true, length, true);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  scheduledWeekdaysIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'scheduledWeekdays', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  scheduledWeekdaysIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'scheduledWeekdays', 0, false, 999999, true);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  scheduledWeekdaysLengthLessThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'scheduledWeekdays', 0, true, length, include);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  scheduledWeekdaysLengthGreaterThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'scheduledWeekdays',
+        length,
+        include,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition>
+  scheduledWeekdaysLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'scheduledWeekdays',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
   QueryBuilder<IsarGoal, IsarGoal, QAfterFilterCondition> statusStorageEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -2509,6 +3239,18 @@ extension IsarGoalQuerySortBy on QueryBuilder<IsarGoal, IsarGoal, QSortBy> {
     });
   }
 
+  QueryBuilder<IsarGoal, IsarGoal, QAfterSortBy> sortByColorHex() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'colorHex', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterSortBy> sortByColorHexDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'colorHex', Sort.desc);
+    });
+  }
+
   QueryBuilder<IsarGoal, IsarGoal, QAfterSortBy> sortByCreatedAtMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAtMs', Sort.asc);
@@ -2670,6 +3412,31 @@ extension IsarGoalQuerySortBy on QueryBuilder<IsarGoal, IsarGoal, QSortBy> {
     });
   }
 
+  QueryBuilder<IsarGoal, IsarGoal, QAfterSortBy> sortByRepeatCadenceStorage() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'repeatCadenceStorage', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterSortBy>
+  sortByRepeatCadenceStorageDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'repeatCadenceStorage', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterSortBy> sortByRepeatInterval() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'repeatInterval', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterSortBy> sortByRepeatIntervalDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'repeatInterval', Sort.desc);
+    });
+  }
+
   QueryBuilder<IsarGoal, IsarGoal, QAfterSortBy> sortByStatusStorage() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'statusStorage', Sort.asc);
@@ -2730,6 +3497,18 @@ extension IsarGoalQuerySortThenBy
   QueryBuilder<IsarGoal, IsarGoal, QAfterSortBy> thenByCategoryIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'categoryId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterSortBy> thenByColorHex() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'colorHex', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterSortBy> thenByColorHexDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'colorHex', Sort.desc);
     });
   }
 
@@ -2906,6 +3685,31 @@ extension IsarGoalQuerySortThenBy
     });
   }
 
+  QueryBuilder<IsarGoal, IsarGoal, QAfterSortBy> thenByRepeatCadenceStorage() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'repeatCadenceStorage', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterSortBy>
+  thenByRepeatCadenceStorageDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'repeatCadenceStorage', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterSortBy> thenByRepeatInterval() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'repeatInterval', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QAfterSortBy> thenByRepeatIntervalDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'repeatInterval', Sort.desc);
+    });
+  }
+
   QueryBuilder<IsarGoal, IsarGoal, QAfterSortBy> thenByStatusStorage() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'statusStorage', Sort.asc);
@@ -2962,6 +3766,14 @@ extension IsarGoalQueryWhereDistinct
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'categoryId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QDistinct> distinctByColorHex({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'colorHex', caseSensitive: caseSensitive);
     });
   }
 
@@ -3068,6 +3880,35 @@ extension IsarGoalQueryWhereDistinct
     });
   }
 
+  QueryBuilder<IsarGoal, IsarGoal, QDistinct> distinctByRepeatCadenceStorage({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'repeatCadenceStorage',
+        caseSensitive: caseSensitive,
+      );
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QDistinct> distinctByRepeatDaysOfMonth() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'repeatDaysOfMonth');
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QDistinct> distinctByRepeatInterval() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'repeatInterval');
+    });
+  }
+
+  QueryBuilder<IsarGoal, IsarGoal, QDistinct> distinctByScheduledWeekdays() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'scheduledWeekdays');
+    });
+  }
+
   QueryBuilder<IsarGoal, IsarGoal, QDistinct> distinctByStatusStorage({
     bool caseSensitive = true,
   }) {
@@ -3111,6 +3952,12 @@ extension IsarGoalQueryProperty
   QueryBuilder<IsarGoal, String, QQueryOperations> categoryIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'categoryId');
+    });
+  }
+
+  QueryBuilder<IsarGoal, String?, QQueryOperations> colorHexProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'colorHex');
     });
   }
 
@@ -3192,6 +4039,33 @@ extension IsarGoalQueryProperty
   reminderStyleStorageProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'reminderStyleStorage');
+    });
+  }
+
+  QueryBuilder<IsarGoal, String?, QQueryOperations>
+  repeatCadenceStorageProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'repeatCadenceStorage');
+    });
+  }
+
+  QueryBuilder<IsarGoal, List<int>?, QQueryOperations>
+  repeatDaysOfMonthProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'repeatDaysOfMonth');
+    });
+  }
+
+  QueryBuilder<IsarGoal, int?, QQueryOperations> repeatIntervalProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'repeatInterval');
+    });
+  }
+
+  QueryBuilder<IsarGoal, List<int>?, QQueryOperations>
+  scheduledWeekdaysProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'scheduledWeekdays');
     });
   }
 

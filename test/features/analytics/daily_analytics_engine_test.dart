@@ -108,7 +108,7 @@ UserGoal _goal({required String id, required int intensity}) {
     id: id,
     title: id,
     categoryId: 'habits',
-    horizon: GoalHorizon.daily,
+    repeatCadence: GoalRepeatCadence.daily,
     status: GoalStatus.active,
     measurementKind: MeasurementKind.sessions,
     targetValue: 1,

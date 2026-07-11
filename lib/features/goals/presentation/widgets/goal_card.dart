@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/date_keys.dart';
-import '../../../../core/utils/stable_id.dart';
+import '../../application/goal_period_helpers.dart';
 import '../../application/goals_providers.dart';
 import '../../domain/models/goal_categories.dart';
 import '../../domain/models/goal_check_in.dart';
@@ -46,11 +46,20 @@ class GoalCard extends ConsumerWidget {
     return goalCategoryColor(goal.categoryId);
   }
 
-  String get _horizonLabel => switch (goal.horizon) {
-    GoalHorizon.daily => 'Every day',
-    GoalHorizon.weekly => 'Every week',
-    GoalHorizon.monthly => 'Every month',
-  };
+  /// Repeat summary when the goal has one ("Every week on Mon · Wed"),
+  /// otherwise the evaluation period ("This month", "Entire goal").
+  String get _horizonLabel {
+    final repeat = GoalPeriodHelpers.formatRepeatSummary(goal);
+    if (repeat.isNotEmpty) return repeat;
+    return switch (goal.horizon) {
+      GoalHorizon.daily => 'Daily',
+      GoalHorizon.weekly => 'This week',
+      GoalHorizon.monthly => 'This month',
+      GoalHorizon.entireGoal => 'Entire goal',
+    };
+  }
+
+  bool get _loggableToday => goal.allowsLoggingOn(DateTime.now());
 
   String get _unitLabel {
     if (goal.measurementKind == MeasurementKind.custom &&
@@ -83,15 +92,17 @@ class GoalCard extends ConsumerWidget {
   ) async {
     final repo = ref.read(goalsRepositoryProvider);
     final dateKey = DateKeys.todayKey();
-    final newValue = progress.currentValue + 1;
-    final met = newValue >= goal.targetValue;
+    // The check-in stores today's amount; "met" is judged against the
+    // evaluation window's accumulated total.
+    final newTodayValue = progress.todayValue + 1;
+    final met = progress.currentValue + 1 >= goal.targetValue;
 
     final checkIn = GoalCheckIn(
       goalId: goal.id,
       dateKey: dateKey,
       metCommitment: met,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch,
-      value: newValue,
+      value: newTodayValue,
       note: progress.checkIn?.note,
     );
     await repo.upsertCheckIn(checkIn);
@@ -133,14 +144,16 @@ class GoalCard extends ConsumerWidget {
         goal: goal,
         horizonLabel: _horizonLabel,
         measurementLabel: _targetLabel(p.currentValue),
-        metCommitment: p.metCommitment,
+        // Done styling: today explicitly met, or the window target reached.
+        metCommitment: p.metCommitment || p.periodTargetMet,
         onTap: () => showModalBottomSheet<void>(
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
           builder: (_) => GoalCounterSheet(goal: goal, initialProgress: p),
         ).then((_) => ref.invalidate(goalTodayProgressProvider(goal.id))),
-        onQuickAdd: p.metCommitment
+        // Repeating goals are dormant on off-days — nothing to log.
+        onQuickAdd: p.metCommitment || p.periodTargetMet || !_loggableToday
             ? null
             : () => _quickIncrement(context, ref, p),
       ),

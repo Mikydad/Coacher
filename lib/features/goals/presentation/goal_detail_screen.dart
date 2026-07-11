@@ -42,25 +42,49 @@ class GoalDetailScreen extends ConsumerWidget {
         : g.measurementKind.displayLabel().toLowerCase();
     final suffix = switch (g.horizon) {
       GoalHorizon.weekly => 'this week',
-      GoalHorizon.monthly => 'per day (in this month)',
+      GoalHorizon.monthly => 'this month',
       GoalHorizon.daily => 'per day',
+      GoalHorizon.entireGoal => 'over the entire goal',
     };
     return '${g.targetValue == g.targetValue.roundToDouble() ? g.targetValue.toInt() : g.targetValue} $unit ($suffix)';
   }
 
-  /// Consecutive days (ending today or yesterday) with a met check-in.
-  int _currentStreak(List<GoalCheckIn> checkIns) {
+  /// Consecutive **action** days (ending today or the latest action day)
+  /// with a met check-in. Off-days never break the streak — missing a
+  /// Tuesday doesn't hurt a Mon/Wed/Fri goal. Passive (repeat-off) goals
+  /// count every calendar day, like before repeat schedules existed.
+  int _currentStreak(UserGoal goal, List<GoalCheckIn> checkIns) {
     final met = <String>{
       for (final c in checkIns)
         if (c.metCommitment) c.dateKey,
     };
+    if (met.isEmpty) return 0;
+    bool counts(DateTime d) =>
+        !goal.hasRepeatSchedule || goal.isActionDay(d);
+    final periodStart = DateTime.fromMillisecondsSinceEpoch(
+      goal.periodStartMs,
+    );
+    final floor = DateTime(
+      periodStart.year,
+      periodStart.month,
+      periodStart.day,
+    ).subtract(const Duration(days: 1));
+
     var day = DateTime.now();
+    // Walk back to the latest action day; if it's still unmet (e.g. today
+    // isn't over yet) it doesn't break the streak — start counting before it.
+    while (day.isAfter(floor) && !counts(day)) {
+      day = day.subtract(const Duration(days: 1));
+    }
     if (!met.contains(DateKeys.yyyymmdd(day))) {
       day = day.subtract(const Duration(days: 1));
     }
     var streak = 0;
-    while (met.contains(DateKeys.yyyymmdd(day))) {
-      streak++;
+    while (day.isAfter(floor)) {
+      if (counts(day)) {
+        if (!met.contains(DateKeys.yyyymmdd(day))) break;
+        streak++;
+      }
       day = day.subtract(const Duration(days: 1));
     }
     return streak;
@@ -99,11 +123,13 @@ class GoalDetailScreen extends ConsumerWidget {
         final g = bundle.goal;
         final todayKey = DateKeys.todayKey();
         final inPeriod = GoalPeriodHelpers.isDateKeyInPeriod(g, todayKey);
-        final elapsed = GoalPeriodHelpers.daysElapsedInPeriodThrough(
+        final loggableToday = g.allowsLoggingOn(DateTime.now());
+        // Scheduled-day math: for a Mon/Wed/Fri goal only those days count.
+        final elapsed = GoalPeriodHelpers.scheduledDaysElapsedThrough(
           g,
           DateTime.now(),
         );
-        final totalDays = GoalPeriodHelpers.totalCalendarDaysInPeriod(g);
+        final totalDays = GoalPeriodHelpers.totalScheduledDaysInPeriod(g);
         final metInPeriod = bundle.checkIns
             .where(
               (c) =>
@@ -111,9 +137,11 @@ class GoalDetailScreen extends ConsumerWidget {
                   GoalPeriodHelpers.isDateKeyInPeriod(g, c.dateKey),
             )
             .length;
-        final doneActions = bundle.actions.where((a) => a.completed).length;
+        final doneActions = bundle.actions
+            .where((a) => a.isCompletedOn(todayKey))
+            .length;
         final totalActions = bundle.actions.length;
-        final streak = _currentStreak(bundle.checkIns);
+        final streak = _currentStreak(g, bundle.checkIns);
         GoalCheckIn? todayCheckIn;
         for (final c in bundle.checkIns) {
           if (c.dateKey == todayKey) {
@@ -161,8 +189,22 @@ class GoalDetailScreen extends ConsumerWidget {
                   children: [
                     _MetaPill(label: GoalCategories.label(g.categoryId)),
                     const SizedBox(width: 6),
-                    _MetaPill(label: g.horizon.name),
+                    _MetaPill(
+                      label: switch (g.horizon) {
+                        GoalHorizon.daily => 'daily',
+                        GoalHorizon.weekly => 'weekly',
+                        GoalHorizon.monthly => 'monthly',
+                        GoalHorizon.entireGoal => 'entire goal',
+                      },
+                    ),
                     const SizedBox(width: 6),
+                    if (g.hasRepeatSchedule) ...[
+                      _MetaPill(
+                        label: GoalPeriodHelpers.formatRepeatSummary(g),
+                        color: AppColors.accentBright,
+                      ),
+                      const SizedBox(width: 6),
+                    ],
                     _MetaPill(label: 'Intensity ${g.intensity}/5'),
                     const SizedBox(width: 6),
                     _MetaPill(
@@ -241,10 +283,17 @@ class GoalDetailScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 28),
               if (g.status == GoalStatus.active && inPeriod) ...[
-                _TodayCommitmentCard(
-                  done: todayDone,
-                  onToggle: () => _toggleToday(context, ref, g, todayDone),
-                ),
+                if (loggableToday)
+                  _TodayCommitmentCard(
+                    done: todayDone,
+                    onToggle: () => _toggleToday(context, ref, g, todayDone),
+                  )
+                else
+                  _RestDayCard(
+                    repeatLabel: GoalPeriodHelpers.formatRepeatSummary(
+                      g,
+                    ).toLowerCase(),
+                  ),
                 const SizedBox(height: 32),
               ],
               _SectionHeader(
@@ -289,12 +338,25 @@ class GoalDetailScreen extends ConsumerWidget {
                 for (final a in bundle.actions)
                   _ChecklistTile(
                     title: a.title,
-                    completed: a.completed,
-                    metaLabel: a.completed ? 'COMPLETED' : 'TAP TO CHECK OFF',
+                    completed: a.isCompletedOn(todayKey),
+                    metaLabel: switch ((
+                      a.isRepeating,
+                      a.isCompletedOn(todayKey),
+                    )) {
+                      (true, true) =>
+                        'DONE TODAY · ${GoalPeriodHelpers.formatWeekdays(a.repeatWeekdays!).toUpperCase()}',
+                      (true, false) =>
+                        'EVERY ${GoalPeriodHelpers.formatWeekdays(a.repeatWeekdays!).toUpperCase()}',
+                      (false, true) => 'COMPLETED',
+                      (false, false) => 'TAP TO CHECK OFF',
+                    },
                     onToggle: () async {
                       final repo = ref.read(goalsRepositoryProvider);
                       await repo.upsertAction(
-                        a.copyWith(completed: !a.completed),
+                        a.withCompletionOn(
+                          todayKey,
+                          done: !a.isCompletedOn(todayKey),
+                        ),
                       );
                       invalidateGoals(ref, goalId: g.id);
                     },
@@ -780,6 +842,54 @@ class _TodayCommitmentCard extends StatelessWidget {
                       ),
                     ),
                   ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown in place of [_TodayCommitmentCard] on days the goal isn't scheduled.
+class _RestDayCard extends StatelessWidget {
+  const _RestDayCard({required this.repeatLabel});
+
+  final String repeatLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.inkDeep,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.self_improvement, color: AppColors.textSoft, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Rest day',
+                  style: TextStyle(
+                    color: AppColors.fg,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'This goal repeats $repeatLabel. Recover today — the streak is safe.',
+                  style: TextStyle(
+                    color: AppColors.textSoft,
+                    fontSize: 14,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

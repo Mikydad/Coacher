@@ -27,10 +27,22 @@ class IsarGoal {
   late int periodEndMs;
   late String periodModeStorage;
   int? durationDays;
+
+  /// Repeat schedule storage; null = saved before repeat schedules existed
+  /// (derived via [UserGoal.legacyRepeatCadence] on read).
+  String? repeatCadenceStorage;
+  int? repeatInterval;
+
+  /// Weekdays acted on when repeat is weekly (1=Mon … 7=Sun).
+  List<int>? scheduledWeekdays;
+
+  /// Days of month (1–31) acted on when repeat is monthly.
+  List<int>? repeatDaysOfMonth;
   late bool reminderEnabled;
   int? reminderMinutesFromMidnight;
   late String reminderStyleStorage;
   late int createdAtMs;
+  String? colorHex;
 
   static IsarGoal fromDomain(UserGoal g) {
     return IsarGoal()
@@ -48,10 +60,15 @@ class IsarGoal {
       ..periodEndMs = g.periodEndMs
       ..periodModeStorage = g.periodMode.storageValue
       ..durationDays = g.durationDays
+      ..repeatCadenceStorage = g.repeatCadence.storageValue
+      ..repeatInterval = g.repeatInterval
+      ..scheduledWeekdays = g.scheduledWeekdays
+      ..repeatDaysOfMonth = g.repeatDaysOfMonth
       ..reminderEnabled = g.reminderEnabled
       ..reminderMinutesFromMidnight = g.reminderMinutesFromMidnight
       ..reminderStyleStorage = g.reminderStyle.storageValue
-      ..createdAtMs = g.createdAtMs;
+      ..createdAtMs = g.createdAtMs
+      ..colorHex = g.colorHex;
   }
 
   UserGoal toDomain() {
@@ -59,7 +76,7 @@ class IsarGoal {
       id: goalId,
       title: title,
       categoryId: categoryId,
-      horizon: GoalHorizonStorage.fromStorage(horizonStorage),
+      // horizonStorage is ignored on read — the window derives from repeat.
       status: GoalStatusStorage.fromStorage(statusStorage),
       measurementKind: MeasurementKindStorage.fromStorage(
         measurementKindStorage,
@@ -71,11 +88,18 @@ class IsarGoal {
       periodEndMs: periodEndMs,
       periodMode: GoalPeriodModeStorage.fromStorage(periodModeStorage),
       durationDays: durationDays,
+      repeatCadence: repeatCadenceStorage != null
+          ? GoalRepeatCadenceStorage.fromStorage(repeatCadenceStorage)
+          : UserGoal.legacyRepeatCadence(scheduledWeekdays),
+      repeatInterval: repeatInterval ?? 1,
+      scheduledWeekdays: scheduledWeekdays,
+      repeatDaysOfMonth: repeatDaysOfMonth,
       reminderEnabled: reminderEnabled,
       reminderMinutesFromMidnight: reminderMinutesFromMidnight,
       reminderStyle: GoalReminderStyleStorage.fromStorage(reminderStyleStorage),
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs,
+      colorHex: colorHex,
     );
   }
 }

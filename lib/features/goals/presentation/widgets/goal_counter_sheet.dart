@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/date_keys.dart';
+import '../../application/goal_period_helpers.dart';
 import '../../application/goals_providers.dart';
 import '../../domain/models/goal_action.dart';
 import '../../domain/models/goal_check_in.dart';
@@ -33,8 +34,12 @@ class GoalCounterSheet extends ConsumerStatefulWidget {
 }
 
 class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
-  /// Numeric measurement value logged today (e.g. 30 minutes, 3 sessions).
+  /// Numeric measurement value logged **today** — the counter edits this.
   late double _value;
+
+  /// Amount accumulated on other days of the current evaluation window
+  /// (zero for daily goals). Ring shows `_otherDaysValue + _value`.
+  late double _otherDaysValue;
 
   /// Local copies of action counts to avoid re-fetching on every toggle.
   late int _doneActions;
@@ -45,7 +50,9 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
   @override
   void initState() {
     super.initState();
-    _value = widget.initialProgress.currentValue;
+    _value = widget.initialProgress.todayValue;
+    _otherDaysValue =
+        widget.initialProgress.currentValue - widget.initialProgress.todayValue;
     _doneActions = widget.initialProgress.doneActions;
     _totalActions = widget.initialProgress.totalActions;
   }
@@ -53,9 +60,12 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
   UserGoal get _goal => widget.goal;
   double get _target => _goal.targetValue;
 
-  /// Measurement-based progress (value / target) — drives the ring and card fill.
+  /// Window total accumulated so far (other days + today's edits).
+  double get _windowValue => _otherDaysValue + _value;
+
+  /// Window progress (accumulated / target) — drives the ring and card fill.
   double get _measureProgress =>
-      _target > 0 ? (_value / _target).clamp(0.0, 1.0) : 0.0;
+      _target > 0 ? (_windowValue / _target).clamp(0.0, 1.0) : 0.0;
 
   bool get _allDone => _doneActions >= _totalActions && _totalActions > 0;
 
@@ -82,11 +92,18 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
   String _formatValue(double v) =>
       v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
 
-  String get _horizonLabel => switch (_goal.horizon) {
-    GoalHorizon.daily => 'Every day',
-    GoalHorizon.weekly => 'Every week',
-    GoalHorizon.monthly => 'Every month',
-  };
+  String get _horizonLabel {
+    final repeat = GoalPeriodHelpers.formatRepeatSummary(_goal);
+    final period = switch (_goal.horizon) {
+      GoalHorizon.daily => 'Daily',
+      GoalHorizon.weekly => 'This week',
+      GoalHorizon.monthly => 'This month',
+      GoalHorizon.entireGoal => 'Entire goal',
+    };
+    return repeat.isEmpty ? period : '$period · $repeat';
+  }
+
+  bool get _loggableToday => _goal.allowsLoggingOn(DateTime.now());
 
   Color get _accentColor => goalCategoryColor(_goal.categoryId);
 
@@ -97,7 +114,7 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
     setState(() => _saving = true);
     try {
       final repo = ref.read(goalsRepositoryProvider);
-      final met = forceComplete || _allDone || _value >= _target;
+      final met = forceComplete || _allDone || _windowValue >= _target;
       final checkIn = GoalCheckIn(
         goalId: _goal.id,
         dateKey: DateKeys.todayKey(),
@@ -133,12 +150,17 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
     List<GoalAction> allActions,
   ) async {
     final repo = ref.read(goalsRepositoryProvider);
-    final nowDone = !action.completed;
-    await repo.upsertAction(action.copyWith(completed: nowDone));
+    final todayKey = DateKeys.todayKey();
+    final nowDone = !action.isCompletedOn(todayKey);
+    await repo.upsertAction(
+      action.withCompletionOn(todayKey, done: nowDone),
+    );
 
     // Recount locally.
     final newDone = allActions
-        .map((a) => a.id == action.id ? nowDone : a.completed)
+        .map(
+          (a) => a.id == action.id ? nowDone : a.isCompletedOn(todayKey),
+        )
         .where((done) => done)
         .length;
 
@@ -164,19 +186,23 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
     setState(() => _saving = true);
     try {
       final repo = ref.read(goalsRepositoryProvider);
-      // Tick every action.
+      // Tick every action due today.
+      final todayKey = DateKeys.todayKey();
       for (final a in actions) {
-        if (!a.completed) {
-          await repo.upsertAction(a.copyWith(completed: true));
+        if (!a.isCompletedOn(todayKey)) {
+          await repo.upsertAction(a.withCompletionOn(todayKey, done: true));
         }
       }
-      // Set value to target.
+      // Bring the window total up to the target (today's log absorbs the
+      // remainder); never reduce what was already logged today.
+      final remainder = (_target - _otherDaysValue).clamp(0.0, double.infinity);
+      final completedTodayValue = _value > remainder ? _value : remainder;
       final checkIn = GoalCheckIn(
         goalId: _goal.id,
         dateKey: DateKeys.todayKey(),
         metCommitment: true,
         updatedAtMs: DateTime.now().millisecondsSinceEpoch,
-        value: _target,
+        value: completedTodayValue,
         note: widget.initialProgress.checkIn?.note,
       );
       await repo.upsertCheckIn(checkIn);
@@ -216,26 +242,34 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
               e,
               const Center(child: Text('Error loading actions')),
             ),
-            data: (actions) => ListView(
-              controller: scrollController,
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom + 32,
-              ),
-              children: [
-                _buildHandle(),
-                _buildToolbar(),
-                _buildTitle(),
-                const SizedBox(height: 20),
-                _buildRing(),
-                const SizedBox(height: 6),
-                _buildRingSubtitle(),
-                const SizedBox(height: 24),
-                _buildMeasurementCounter(),
-                const SizedBox(height: 20),
-                _buildCompleteButton(actions),
-                _buildActionsSection(actions),
-              ],
-            ),
+            data: (actions) {
+              final dueToday = actions
+                  .where((a) => a.isScheduledOn(DateTime.now()))
+                  .toList();
+              return ListView(
+                controller: scrollController,
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 32,
+                ),
+                children: [
+                  _buildHandle(),
+                  _buildToolbar(),
+                  _buildTitle(),
+                  const SizedBox(height: 20),
+                  _buildRing(),
+                  const SizedBox(height: 6),
+                  _buildRingSubtitle(),
+                  const SizedBox(height: 24),
+                  if (_loggableToday) ...[
+                    _buildMeasurementCounter(),
+                    const SizedBox(height: 20),
+                    _buildCompleteButton(dueToday),
+                    _buildActionsSection(dueToday),
+                  ] else
+                    _buildRestDayCard(),
+                ],
+              );
+            },
           ),
         );
       },
@@ -333,11 +367,14 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
   );
 
   Widget _buildRingSubtitle() {
-    final valueStr = _formatValue(_value);
+    final valueStr = _formatValue(_windowValue);
     final targetStr = _formatValue(_target);
+    final todayNote = _otherDaysValue > 0
+        ? '  ·  today: ${_formatValue(_value)}'
+        : '';
     return Center(
       child: Text(
-        '$valueStr / $targetStr $_unitLabel',
+        '$valueStr / $targetStr $_unitLabel$todayNote',
         style: TextStyle(color: _accentColor, fontSize: 13),
       ),
     );
@@ -426,6 +463,42 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
     ),
   );
 
+  /// Shown instead of counter + checklist on days the goal isn't scheduled.
+  Widget _buildRestDayCard() {
+    final days = GoalPeriodHelpers.formatRepeatSummary(_goal).toLowerCase();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+        decoration: BoxDecoration(
+          color: AppColors.dark2A2D32,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.self_improvement, color: AppColors.fg54, size: 30),
+            const SizedBox(height: 10),
+            Text(
+              'Rest day',
+              style: TextStyle(
+                color: AppColors.fg,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'This goal repeats $days — nothing to log today.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.fg54, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildActionsSection(List<GoalAction> actions) {
     if (actions.isEmpty) return const SizedBox.shrink();
     final done = _doneActions;
@@ -495,6 +568,7 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
         for (final action in actions)
           _ActionTile(
             action: action,
+            completed: action.isCompletedOn(DateKeys.todayKey()),
             accentColor: _accentColor,
             onToggle: () => _toggleAction(action, actions),
           ),
@@ -537,11 +611,15 @@ class _PresetButton extends StatelessWidget {
 class _ActionTile extends StatelessWidget {
   const _ActionTile({
     required this.action,
+    required this.completed,
     required this.accentColor,
     required this.onToggle,
   });
 
   final GoalAction action;
+
+  /// Today's completion state — per-day for repeating actions.
+  final bool completed;
   final Color accentColor;
   final VoidCallback onToggle;
 
@@ -559,28 +637,43 @@ class _ActionTile extends StatelessWidget {
               height: 22,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: action.completed ? accentColor : Colors.transparent,
+                color: completed ? accentColor : Colors.transparent,
                 border: Border.all(
-                  color: action.completed ? accentColor : Colors.white30,
+                  color: completed ? accentColor : Colors.white30,
                   width: 1.5,
                 ),
               ),
-              child: action.completed
+              child: completed
                   ? const Icon(Icons.check, size: 14, color: Colors.black)
                   : null,
             ),
             const SizedBox(width: 14),
             Expanded(
-              child: Text(
-                action.title,
-                style: TextStyle(
-                  color: action.completed ? AppColors.fg38 : AppColors.fg,
-                  fontSize: 14,
-                  decoration: action.completed
-                      ? TextDecoration.lineThrough
-                      : TextDecoration.none,
-                  decorationColor: AppColors.fg38,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    action.title,
+                    style: TextStyle(
+                      color: completed ? AppColors.fg38 : AppColors.fg,
+                      fontSize: 14,
+                      decoration: completed
+                          ? TextDecoration.lineThrough
+                          : TextDecoration.none,
+                      decorationColor: AppColors.fg38,
+                    ),
+                  ),
+                  if (action.isRepeating)
+                    Text(
+                      GoalPeriodHelpers.formatWeekdays(action.repeatWeekdays!),
+                      style: TextStyle(
+                        color: accentColor.withValues(alpha: 0.8),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                ],
               ),
             ),
           ],

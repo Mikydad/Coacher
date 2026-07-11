@@ -212,45 +212,6 @@ class _SectorChip extends StatelessWidget {
   }
 }
 
-class GoalEditorHorizonToggle extends StatelessWidget {
-  const GoalEditorHorizonToggle({
-    super.key,
-    required this.selected,
-    required this.onChanged,
-  });
-
-  final GoalHorizon selected;
-  final ValueChanged<GoalHorizon> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: GoalEditorColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: GoalEditorColors.border),
-      ),
-      child: Row(
-        children: [
-          for (final h in GoalHorizon.values)
-            Expanded(
-              child: _HorizonTab(
-                label: switch (h) {
-                  GoalHorizon.daily => 'Daily',
-                  GoalHorizon.weekly => 'Weekly',
-                  GoalHorizon.monthly => 'Monthly',
-                },
-                selected: selected == h,
-                onTap: () => onChanged(h),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 class _HorizonTab extends StatelessWidget {
   const _HorizonTab({
     required this.label,
@@ -284,12 +245,352 @@ class _HorizonTab extends StatelessWidget {
               ? Border.all(color: GoalEditorColors.lime.withValues(alpha: 0.4))
               : null,
         ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: selected ? GoalEditorColors.lime : AppColors.fg54,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Segmented Off / Daily / Weekly / Monthly toggle for the repeat schedule.
+class GoalEditorRepeatToggle extends StatelessWidget {
+  const GoalEditorRepeatToggle({
+    super.key,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final GoalRepeatCadence selected;
+  final ValueChanged<GoalRepeatCadence> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: GoalEditorColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: GoalEditorColors.border),
+      ),
+      child: Row(
+        children: [
+          for (final c in GoalRepeatCadence.values)
+            Expanded(
+              child: _HorizonTab(
+                label: switch (c) {
+                  GoalRepeatCadence.off => 'Off',
+                  GoalRepeatCadence.daily => 'Daily',
+                  GoalRepeatCadence.weekly => 'Weekly',
+                  GoalRepeatCadence.monthly => 'Monthly',
+                },
+                selected: selected == c,
+                onTap: () => onChanged(c),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Every [n] days/weeks/months" — scroll wheel, defaults to 1.
+class GoalEditorIntervalWheel extends StatefulWidget {
+  const GoalEditorIntervalWheel({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    required this.unitSingular,
+    required this.unitPlural,
+    this.maxValue = 30,
+  });
+
+  final int value;
+  final ValueChanged<int> onChanged;
+  final String unitSingular;
+  final String unitPlural;
+  final int maxValue;
+
+  @override
+  State<GoalEditorIntervalWheel> createState() =>
+      _GoalEditorIntervalWheelState();
+}
+
+class _GoalEditorIntervalWheelState extends State<GoalEditorIntervalWheel> {
+  late final FixedExtentScrollController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = FixedExtentScrollController(initialItem: widget.value - 1);
+  }
+
+  @override
+  void didUpdateWidget(GoalEditorIntervalWheel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // External resets (seeding, draft restore) reposition the wheel.
+    if (widget.value - 1 != _controller.selectedItem) {
+      _controller.jumpToItem(widget.value - 1);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Every', style: TextStyle(color: AppColors.fg54, fontSize: 14)),
+        const SizedBox(width: 12),
+        Container(
+          width: 64,
+          height: 96,
+          decoration: BoxDecoration(
+            color: GoalEditorColors.inputFill,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: GoalEditorColors.border),
+          ),
+          child: ListWheelScrollView.useDelegate(
+            controller: _controller,
+            itemExtent: 32,
+            physics: const FixedExtentScrollPhysics(),
+            overAndUnderCenterOpacity: 0.35,
+            magnification: 1.15,
+            useMagnifier: true,
+            onSelectedItemChanged: (i) => widget.onChanged(i + 1),
+            childDelegate: ListWheelChildBuilderDelegate(
+              childCount: widget.maxValue,
+              builder: (context, i) => Center(
+                child: Text(
+                  '${i + 1}',
+                  style: TextStyle(
+                    color: AppColors.fg,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          widget.value == 1 ? widget.unitSingular : widget.unitPlural,
+          style: TextStyle(color: AppColors.fg54, fontSize: 14),
+        ),
+      ],
+    );
+  }
+}
+
+/// Day-of-month multi-select (1–31), seven chips per row.
+///
+/// Supports tap to toggle a single day and **press-and-drag** to sweep a run
+/// of days in one gesture — dragging applies the opposite of the first
+/// touched chip's state to every chip crossed.
+class GoalEditorMonthDayPicker extends StatefulWidget {
+  const GoalEditorMonthDayPicker({
+    super.key,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final Set<int> selected;
+  final ValueChanged<Set<int>> onChanged;
+
+  @override
+  State<GoalEditorMonthDayPicker> createState() =>
+      _GoalEditorMonthDayPickerState();
+}
+
+class _GoalEditorMonthDayPickerState extends State<GoalEditorMonthDayPicker> {
+  static const _perRow = 7;
+  static const _spacing = 6.0;
+  static const _cellHeight = 36.0;
+
+  /// True while a drag selects, false while it deselects, null when idle.
+  bool? _dragSelects;
+
+  /// Day under the finger at touch-down. A pan only "starts" after the drag
+  /// slop is exceeded, by which point the finger has already left the first
+  /// chip — so the origin must be captured here, at contact.
+  int? _downDay;
+
+  /// Last day a drag applied to; gaps to the current day are range-filled so
+  /// a fast sweep can't skip chips.
+  int? _lastDragDay;
+
+  int? _dayAt(Offset local, double maxWidth) {
+    final cellWidth = (maxWidth - _spacing * (_perRow - 1)) / _perRow;
+    final col = (local.dx / (cellWidth + _spacing)).floor().clamp(
+      0,
+      _perRow - 1,
+    );
+    final row = (local.dy / (_cellHeight + _spacing)).floor();
+    if (row < 0) return null;
+    final day = row * _perRow + col + 1;
+    return (day >= 1 && day <= 31) ? day : null;
+  }
+
+  void _applyDragThrough(int day) {
+    final selects = _dragSelects;
+    if (selects == null) return;
+    final from = _lastDragDay ?? day;
+    final lo = from < day ? from : day;
+    final hi = from > day ? from : day;
+    final next = Set<int>.from(widget.selected);
+    var changed = false;
+    for (var d = lo; d <= hi; d++) {
+      changed = (selects ? next.add(d) : next.remove(d)) || changed;
+    }
+    _lastDragDay = day;
+    if (changed) widget.onChanged(next);
+  }
+
+  void _endDrag() {
+    _dragSelects = null;
+    _downDay = null;
+    _lastDragDay = null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final cellWidth = (maxWidth - _spacing * (_perRow - 1)) / _perRow;
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanDown: (details) {
+            // Record only — a plain tap is handled by the chip's own onTap.
+            _downDay = _dayAt(details.localPosition, maxWidth);
+          },
+          onPanStart: (details) {
+            final origin = _downDay ?? _dayAt(details.localPosition, maxWidth);
+            if (origin == null) return;
+            _dragSelects = !widget.selected.contains(origin);
+            _lastDragDay = origin;
+            _applyDragThrough(origin);
+            final current = _dayAt(details.localPosition, maxWidth);
+            if (current != null) _applyDragThrough(current);
+          },
+          onPanUpdate: (details) {
+            final day = _dayAt(details.localPosition, maxWidth);
+            if (day != null) _applyDragThrough(day);
+          },
+          onPanEnd: (_) => _endDrag(),
+          onPanCancel: _endDrag,
+          child: Wrap(
+            spacing: _spacing,
+            runSpacing: _spacing,
+            children: [
+              for (var day = 1; day <= 31; day++)
+                SizedBox(
+                  width: cellWidth,
+                  height: _cellHeight,
+                  child: _WeekdayDot(
+                    label: '$day',
+                    selected: widget.selected.contains(day),
+                    onTap: () {
+                      final next = Set<int>.from(widget.selected);
+                      if (!next.remove(day)) next.add(day);
+                      widget.onChanged(next);
+                    },
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Mon–Sun multi-toggle. Empty selection means "every day".
+class GoalEditorWeekdayPicker extends StatelessWidget {
+  const GoalEditorWeekdayPicker({
+    super.key,
+    required this.selected,
+    required this.onDayToggled,
+  });
+
+  /// Selected weekdays ([DateTime.monday]=1 … [DateTime.sunday]=7).
+  final Set<int> selected;
+  final ValueChanged<int> onDayToggled;
+
+  static const _labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var day = DateTime.monday; day <= DateTime.sunday; day++) ...[
+          if (day != DateTime.monday) const SizedBox(width: 6),
+          Expanded(
+            child: _WeekdayDot(
+              label: _labels[day - 1],
+              selected: selected.contains(day),
+              onTap: () => onDayToggled(day),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _WeekdayDot extends StatelessWidget {
+  const _WeekdayDot({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: 40,
+        decoration: BoxDecoration(
+          color: selected
+              ? GoalEditorColors.lime.withValues(alpha: 0.18)
+              : GoalEditorColors.inputFill,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected
+                ? GoalEditorColors.lime.withValues(alpha: 0.7)
+                : GoalEditorColors.border,
+          ),
+        ),
+        alignment: Alignment.center,
         child: Text(
           label,
-          textAlign: TextAlign.center,
           style: TextStyle(
             color: selected ? GoalEditorColors.lime : AppColors.fg54,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
             fontSize: 13,
           ),
         ),
@@ -478,7 +779,10 @@ class GoalEditorMeasurementDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      // Centers the fixed-height dropdown when the pill is stretched to
+      // match a sibling (e.g. the target field beside it).
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: GoalEditorColors.inputFill,
         borderRadius: BorderRadius.circular(28),
@@ -604,6 +908,7 @@ class GoalEditorReminderCard extends StatelessWidget {
     required this.timeLabel,
     required this.onToggle,
     required this.onPickTime,
+    this.compact = false,
   });
 
   final bool enabled;
@@ -611,30 +916,35 @@ class GoalEditorReminderCard extends StatelessWidget {
   final ValueChanged<bool> onToggle;
   final VoidCallback onPickTime;
 
+  /// Tighter layout for sharing a row (no leading icon, shorter copy).
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 16, vertical: 10),
       decoration: BoxDecoration(
         color: GoalEditorColors.inputFill,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(compact ? 20 : 28),
       ),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.fg24),
+          if (!compact) ...[
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.fg24),
+              ),
+              child: Icon(
+                Icons.notifications_outlined,
+                color: AppColors.fg54,
+                size: 20,
+              ),
             ),
-            child: Icon(
-              Icons.notifications_outlined,
-              color: AppColors.fg54,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
+            const SizedBox(width: 12),
+          ],
           Expanded(
             child: GestureDetector(
               onTap: enabled ? onPickTime : null,
@@ -642,15 +952,22 @@ class GoalEditorReminderCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Daily reminder',
+                    'Reminder',
                     style: TextStyle(
                       color: AppColors.fg,
                       fontWeight: FontWeight.w600,
+                      fontSize: compact ? 14 : null,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    enabled ? 'Alert scheduled for $timeLabel' : 'Off',
+                    enabled
+                        ? (compact ? timeLabel : 'Alert scheduled for $timeLabel')
+                        : 'Off',
                     style: TextStyle(color: AppColors.fg38, fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -966,6 +1283,10 @@ class GoalEditorSetupStepRow extends StatelessWidget {
     required this.canRemove,
     required this.onRemove,
     this.onChanged,
+    this.repeatWeekdays = const <int>{},
+    this.repeatExpanded = false,
+    this.onToggleRepeatExpanded,
+    this.onRepeatDayToggled,
   });
 
   final int index;
@@ -973,6 +1294,16 @@ class GoalEditorSetupStepRow extends StatelessWidget {
   final bool canRemove;
   final VoidCallback onRemove;
   final ValueChanged<String>? onChanged;
+
+  /// Weekdays this step repeats on every week; empty = one-time step.
+  final Set<int> repeatWeekdays;
+
+  /// Whether the inline weekday chips are shown (controlled by the parent).
+  final bool repeatExpanded;
+  final VoidCallback? onToggleRepeatExpanded;
+  final ValueChanged<int>? onRepeatDayToggled;
+
+  bool get _isRepeating => repeatWeekdays.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -985,53 +1316,104 @@ class GoalEditorSetupStepRow extends StatelessWidget {
           color: GoalEditorColors.inputFill,
           borderRadius: BorderRadius.circular(22),
         ),
-        child: Row(
+        child: Column(
           children: [
-            Text(
-              number,
-              style: TextStyle(
-                color: GoalEditorColors.lime,
-                fontWeight: FontWeight.w800,
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                onChanged: onChanged,
-                style: TextStyle(
-                  color: AppColors.fg,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-                decoration: InputDecoration(
-                  hintText: index == 0
-                      ? 'Install Flutter SDK'
-                      : 'Add next setup step…',
-                  hintStyle: TextStyle(
-                    color: GoalEditorColors.label.withValues(alpha: 0.5),
-                    fontWeight: FontWeight.w400,
-                    fontStyle: FontStyle.italic,
-                    fontSize: 14,
-                  ),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 10,
+            Row(
+              children: [
+                Text(
+                  number,
+                  style: TextStyle(
+                    color: GoalEditorColors.lime,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
                   ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    onChanged: onChanged,
+                    style: TextStyle(
+                      color: AppColors.fg,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: index == 0
+                          ? 'Install Flutter SDK'
+                          : 'Add next setup step…',
+                      hintStyle: TextStyle(
+                        color: GoalEditorColors.label.withValues(alpha: 0.5),
+                        fontWeight: FontWeight.w400,
+                        fontStyle: FontStyle.italic,
+                        fontSize: 14,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 10,
+                      ),
+                    ),
+                  ),
+                ),
+                if (onToggleRepeatExpanded != null)
+                  IconButton(
+                    tooltip: _isRepeating
+                        ? 'Repeats weekly — edit days'
+                        : 'Repeat on certain days',
+                    icon: Icon(
+                      Icons.repeat,
+                      color: _isRepeating
+                          ? GoalEditorColors.lime
+                          : AppColors.fg38,
+                      size: 18,
+                    ),
+                    onPressed: onToggleRepeatExpanded,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                  ),
+                if (canRemove)
+                  IconButton(
+                    icon: Icon(Icons.close, color: AppColors.fg38, size: 18),
+                    onPressed: onRemove,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                  ),
+              ],
             ),
-            if (canRemove)
-              IconButton(
-                icon: Icon(Icons.close, color: AppColors.fg38, size: 18),
-                onPressed: onRemove,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            if (repeatExpanded && onRepeatDayToggled != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 4, 8, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _isRepeating
+                          ? 'REPEATS EVERY WEEK ON'
+                          : 'PICK DAYS TO REPEAT EVERY WEEK',
+                      style: TextStyle(
+                        color: AppColors.fg38,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    GoalEditorWeekdayPicker(
+                      selected: repeatWeekdays,
+                      onDayToggled: onRepeatDayToggled!,
+                    ),
+                  ],
+                ),
               ),
           ],
         ),

@@ -118,7 +118,7 @@ UserGoal _goal() {
     id: 'g1',
     title: 'Study 10 Minutes',
     categoryId: 'study',
-    horizon: GoalHorizon.weekly,
+    repeatCadence: GoalRepeatCadence.weekly,
     status: GoalStatus.active,
     measurementKind: MeasurementKind.minutes,
     targetValue: 30,

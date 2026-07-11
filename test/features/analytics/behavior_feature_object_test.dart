@@ -129,7 +129,7 @@ void main() {
         id: 'g1',
         title: 'Goal',
         categoryId: 'study',
-        horizon: GoalHorizon.weekly,
+        repeatCadence: GoalRepeatCadence.weekly,
         status: GoalStatus.active,
         measurementKind: MeasurementKind.sessions,
         targetValue: 1,

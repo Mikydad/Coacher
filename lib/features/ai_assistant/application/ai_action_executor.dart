@@ -655,11 +655,12 @@ class AiActionExecutor {
           }())
         : now + const Duration(days: 30).inMilliseconds;
 
+    // Repeat off: an AI-created goal with a deadline is a one-time outcome
+    // goal — progress accumulates until the deadline.
     final goal = UserGoal(
       id: StableId.generate('goal'),
       title: title,
       categoryId: GoalCategories.productivity,
-      horizon: GoalHorizon.monthly,
       status: GoalStatus.active,
       measurementKind: MeasurementKind.count,
       targetValue: 1,

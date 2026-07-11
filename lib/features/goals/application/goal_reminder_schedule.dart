@@ -21,8 +21,58 @@ DateTime? nextGoalDailyReminderLocal({
   return null;
 }
 
+/// Next fire on any of the goal's **action days** inside the period, or null.
+/// Used for interval repeats (every 2 days/weeks/…) where the OS can't
+/// auto-repeat — the app schedules one shot at a time and rolls it forward.
+DateTime? nextGoalActionDayReminderLocal({
+  required UserGoal goal,
+  required int minutesFromMidnight,
+  required DateTime now,
+}) {
+  final h = minutesFromMidnight ~/ 60;
+  final m = minutesFromMidnight % 60;
+  final ds = _dateOnly(DateTime.fromMillisecondsSinceEpoch(goal.periodStartMs));
+  final de = _dateOnly(DateTime.fromMillisecondsSinceEpoch(goal.periodEndMs));
+  var day = _dateOnly(now);
+  if (day.isBefore(ds)) day = ds;
+  while (!day.isAfter(de)) {
+    if (goal.isActionDay(day)) {
+      final fire = DateTime(day.year, day.month, day.day, h, m);
+      if (fire.isAfter(now)) return fire;
+    }
+    day = day.add(const Duration(days: 1));
+  }
+  return null;
+}
+
+/// Next fire on [weekday] (1=Mon…7=Sun) inside the goal's period, or null if
+/// that weekday never occurs again before the period ends.
+DateTime? nextGoalWeekdayReminderLocal({
+  required UserGoal goal,
+  required int weekday,
+  required int minutesFromMidnight,
+  required DateTime now,
+}) {
+  final h = minutesFromMidnight ~/ 60;
+  final m = minutesFromMidnight % 60;
+  final ds = _dateOnly(DateTime.fromMillisecondsSinceEpoch(goal.periodStartMs));
+  final de = _dateOnly(DateTime.fromMillisecondsSinceEpoch(goal.periodEndMs));
+  var day = _dateOnly(now);
+  if (day.isBefore(ds)) day = ds;
+  while (!day.isAfter(de)) {
+    if (day.weekday == weekday) {
+      final fire = DateTime(day.year, day.month, day.day, h, m);
+      if (fire.isAfter(now)) return fire;
+    }
+    day = day.add(const Duration(days: 1));
+  }
+  return null;
+}
+
 bool goalShouldScheduleDailyReminder(UserGoal goal, DateTime now) {
   if (goal.status != GoalStatus.active) return false;
+  // Reminders are gated on the repeat schedule: passive goals stay silent.
+  if (!goal.hasRepeatSchedule) return false;
   if (!goal.reminderEnabled || goal.reminderMinutesFromMidnight == null) {
     return false;
   }

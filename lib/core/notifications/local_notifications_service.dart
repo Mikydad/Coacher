@@ -165,6 +165,15 @@ class LocalNotificationsService implements ActiveNotificationsSource {
   int idFromGoalId(String goalId) =>
       (goalId.hashCode ^ 0x474f414c).abs() % 2147483647;
 
+  /// Per-weekday slot (1=Mon…7=Sun) for goals restricted to specific days —
+  /// each weekday gets its own weekly-repeating notification.
+  int idFromGoalIdWeekday(String goalId, int weekday) =>
+      ('goalw:$goalId:$weekday').hashCode.abs() % 2147483647;
+
+  /// Per day-of-month slot (1–31) for monthly-repeating goal reminders.
+  int idFromGoalIdMonthDay(String goalId, int dayOfMonth) =>
+      ('goalm:$goalId:$dayOfMonth').hashCode.abs() % 2147483647;
+
   /// Repeats every day at the same local hour/minute (see [matchDateTimeComponents]).
   Future<void> scheduleDailyAtLocalTime({
     required int id,
@@ -194,6 +203,90 @@ class LocalNotificationsService implements ActiveNotificationsSource {
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
+      payload: payload,
+    );
+    await _indexNotificationTaskMapping(id: id, payload: payload);
+  }
+
+  /// Repeats every week on [firstFireLocal]'s weekday at its local hour/minute.
+  Future<void> scheduleWeeklyAtLocalTime({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime firstFireLocal,
+    String? payload,
+  }) async {
+    var scheduled = firstFireLocal;
+    final now = DateTime.now();
+    while (!scheduled.isAfter(now)) {
+      scheduled = scheduled.add(const Duration(days: 7));
+    }
+    final when = tz.TZDateTime.from(scheduled, tz.local);
+    debugPrint(
+      'Scheduling weekly goal reminder: id=$id atLocal=$scheduled tz=$when',
+    );
+    await _plugin.zonedSchedule(
+      id,
+      title,
+      body,
+      when,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'coach4life_goal_reminders',
+          'Goal reminders',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      payload: payload,
+    );
+    await _indexNotificationTaskMapping(id: id, payload: payload);
+  }
+
+  /// Repeats every month on [firstFireLocal]'s day-of-month at its local
+  /// hour/minute. Months without that day (e.g. the 31st) are skipped by
+  /// the OS matcher.
+  Future<void> scheduleMonthlyAtLocalTime({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime firstFireLocal,
+    String? payload,
+  }) async {
+    var scheduled = firstFireLocal;
+    final now = DateTime.now();
+    while (!scheduled.isAfter(now)) {
+      scheduled = DateTime(
+        scheduled.year,
+        scheduled.month + 1,
+        scheduled.day,
+        scheduled.hour,
+        scheduled.minute,
+      );
+    }
+    final when = tz.TZDateTime.from(scheduled, tz.local);
+    debugPrint(
+      'Scheduling monthly goal reminder: id=$id atLocal=$scheduled tz=$when',
+    );
+    await _plugin.zonedSchedule(
+      id,
+      title,
+      body,
+      when,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'coach4life_goal_reminders',
+          'Goal reminders',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
       payload: payload,
     );
     await _indexNotificationTaskMapping(id: id, payload: payload);

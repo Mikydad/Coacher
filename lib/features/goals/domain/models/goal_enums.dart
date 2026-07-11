@@ -12,8 +12,26 @@ extension GoalPeriodModeStorage on GoalPeriodMode {
   }
 }
 
-/// PRD: Goals — habit horizons (`prd-goals.md` §9).
-enum GoalHorizon { daily, weekly, monthly }
+/// Evaluation period for the goal's target — answers "over what period is
+/// this goal measured?". Progress accumulates within the current window and
+/// resets at its boundary; [entireGoal] accumulates over the whole period.
+enum GoalHorizon { daily, weekly, monthly, entireGoal }
+
+/// Optional execution recurrence — answers "when does the user act?".
+/// Controls reminders, time blocks, and Today's-goals membership only;
+/// never affects progress math. [off] = passive outcome goal.
+enum GoalRepeatCadence { off, daily, weekly, monthly }
+
+extension GoalRepeatCadenceStorage on GoalRepeatCadence {
+  String get storageValue => name;
+
+  static GoalRepeatCadence fromStorage(String? raw) {
+    return GoalRepeatCadence.values.firstWhere(
+      (e) => e.name == raw,
+      orElse: () => GoalRepeatCadence.off,
+    );
+  }
+}
 
 /// Stored on [UserGoal]; drives list vs archive (`prd-goals.md` §4.6).
 enum GoalStatus { active, paused, completed }

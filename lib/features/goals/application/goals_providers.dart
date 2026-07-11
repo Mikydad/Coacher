@@ -51,7 +51,9 @@ final activeGoalsProvider = Provider<AsyncValue<List<UserGoal>>>((ref) {
   );
 });
 
-/// Active goals whose period includes **today** (local calendar).
+/// Active goals for which **today** is a planned action day. Passive goals
+/// (repeat off) and repeating goals on an off-day stay out — this list is
+/// "what's planned today", not "every active goal" (that's the Goals hub).
 final todaysActiveGoalsProvider = Provider<AsyncValue<List<UserGoal>>>((ref) {
   final async = ref.watch(goalsStreamProvider);
   return async.when(
@@ -62,7 +64,7 @@ final todaysActiveGoalsProvider = Provider<AsyncValue<List<UserGoal>>>((ref) {
               .where(
                 (g) =>
                     g.status == GoalStatus.active &&
-                    GoalPeriodHelpers.isDateKeyInPeriod(g, todayKey),
+                    GoalPeriodHelpers.isGoalActiveOnDateKey(g, todayKey),
               )
               .toList()
             ..sort((a, b) {
@@ -169,10 +171,11 @@ void invalidateGoals(WidgetRef ref, {String? goalId}) {
 }
 
 /// Progress snapshot for a single goal combining action completion and
-/// the numeric measurement value logged today.
+/// the measurement value accumulated over the current evaluation window.
 class GoalTodayProgress {
   const GoalTodayProgress({
     required this.currentValue,
+    required this.todayValue,
     required this.targetValue,
     required this.progress,
     required this.metCommitment,
@@ -181,18 +184,25 @@ class GoalTodayProgress {
     this.checkIn,
   });
 
-  /// Numeric amount logged today via the measurement counter (e.g. 30 minutes).
+  /// Amount accumulated in the goal's **current evaluation window** (today /
+  /// this week / this month / whole period, per [UserGoal.horizon]).
   final double currentValue;
 
-  /// The goal's measurement target (e.g. 60 minutes, 5 sessions).
+  /// Amount logged **today** only — the value counter buttons edit this.
+  final double todayValue;
+
+  /// The goal's measurement target for the evaluation window.
   final double targetValue;
 
-  /// Measurement-based fill fraction: [currentValue] / [targetValue], clamped 0.0–1.0.
+  /// Fill fraction: [currentValue] / [targetValue], clamped 0.0–1.0.
   /// Drives the card fill bar and the ring in the counter sheet.
   final double progress;
 
   /// True when the user has explicitly marked today as met.
   final bool metCommitment;
+
+  /// True when the evaluation window's target has been reached.
+  bool get periodTargetMet => targetValue > 0 && currentValue >= targetValue;
 
   /// How many of the goal's actions are completed.
   final int doneActions;
@@ -204,10 +214,11 @@ class GoalTodayProgress {
   final GoalCheckIn? checkIn;
 }
 
-/// Fetches today's progress for a single goal.
+/// Fetches progress for a single goal.
 ///
-/// [progress] is measurement-based: [currentValue] / [targetValue].
-/// [doneActions] / [totalActions] are carried separately for the actions bar.
+/// [GoalTodayProgress.currentValue] accumulates check-in values over the
+/// goal's current evaluation window (per horizon: day / week / month /
+/// entire goal); [GoalTodayProgress.todayValue] is today's log alone.
 final goalTodayProgressProvider = FutureProvider.family<GoalTodayProgress, String>((
   ref,
   goalId,
@@ -236,15 +247,39 @@ final goalTodayProgressProvider = FutureProvider.family<GoalTodayProgress, Strin
   final actions = results[0] as List<GoalAction>;
   final checkIn = results[1] as GoalCheckIn?;
 
-  final totalActions = actions.length;
-  final doneActions = actions.where((a) => a.completed).length;
-  final currentValue = checkIn?.value ?? 0.0;
+  // Only actions due today count: one-time steps always, repeating steps on
+  // their scheduled weekdays (completion is per-day for those).
+  final today = DateKeys.parseLocalDateKey(dateKey);
+  final dueToday = actions.where((a) => a.isScheduledOn(today)).toList();
+  final totalActions = dueToday.length;
+  final doneActions = dueToday.where((a) => a.isCompletedOn(dateKey)).length;
+  final todayValue = checkIn?.value ?? 0.0;
 
-  // Progress is measurement-based (value / target), shown in the ring and card fill.
+  // Accumulate over the evaluation window (one repeat cycle, or the whole
+  // period for one-time goals). Single-day windows are today-only, so the
+  // extra fetch is skipped.
+  var currentValue = todayValue;
+  final g = goal;
+  if (g != null) {
+    final window = GoalPeriodHelpers.evaluationWindow(g, DateTime.now());
+    if (window.start != window.end) {
+      final windowCheckIns = await repo.getCheckInsForGoal(
+        goalId,
+        startDateKey: DateKeys.yyyymmdd(window.start),
+        endDateKey: DateKeys.yyyymmdd(window.end),
+      );
+      currentValue = windowCheckIns.fold(
+        0.0,
+        (sum, c) => sum + (c.value ?? 0),
+      );
+    }
+  }
+
   final progress = target > 0 ? (currentValue / target).clamp(0.0, 1.0) : 0.0;
 
   return GoalTodayProgress(
     currentValue: currentValue,
+    todayValue: todayValue,
     targetValue: target,
     progress: progress,
     metCommitment: checkIn?.metCommitment ?? false,

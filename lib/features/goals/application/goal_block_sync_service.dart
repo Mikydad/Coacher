@@ -23,12 +23,15 @@ class GoalBlockSyncService {
   ///
   /// No-ops silently when:
   ///   - [goal.reminderEnabled] is false, OR
-  ///   - [goal.reminderMinutesFromMidnight] is null.
+  ///   - [goal.reminderMinutesFromMidnight] is null, OR
+  ///   - [today] is not a planned action day (repeat off or off-day).
   ///
   /// In those cases the existing block (if any) is removed so stale rows do
   /// not participate in future conflict checks.
   Future<void> syncBlockForGoal(UserGoal goal, DateTime today) async {
-    if (!goal.reminderEnabled || goal.reminderMinutesFromMidnight == null) {
+    if (!goal.reminderEnabled ||
+        goal.reminderMinutesFromMidnight == null ||
+        !goal.isActionDay(today)) {
       await _tb.removeBlockForEntity(goal.id);
       return;
     }
@@ -59,9 +62,12 @@ class GoalBlockSyncService {
   /// Derives a proposed [ScheduledTimeBlock] for [goal] **without persisting**
   /// it. Used by [GoalEditorScreen] to run a conflict check before committing.
   ///
-  /// Returns null if the goal has no reminder or no time set.
+  /// Returns null if the goal has no reminder, no time set, or [today] is
+  /// not a planned action day.
   ScheduledTimeBlock? deriveBlockForGoal(UserGoal goal, DateTime today) {
-    if (!goal.reminderEnabled || goal.reminderMinutesFromMidnight == null) {
+    if (!goal.reminderEnabled ||
+        goal.reminderMinutesFromMidnight == null ||
+        !goal.isActionDay(today)) {
       return null;
     }
     final startAt = _startAtFromMinutes(

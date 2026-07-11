@@ -143,7 +143,9 @@ void main() {
       id: 'g1',
       title: 'Read',
       categoryId: GoalCategories.study,
-      horizon: GoalHorizon.monthly,
+      repeatCadence: GoalRepeatCadence.monthly,
+      repeatInterval: 2,
+      repeatDaysOfMonth: const [1, 15],
       status: GoalStatus.active,
       measurementKind: MeasurementKind.sessions,
       targetValue: 12.5,
@@ -164,6 +166,9 @@ void main() {
     expect(back.title, original.title);
     expect(back.categoryId, original.categoryId);
     expect(back.horizon, original.horizon);
+    expect(back.repeatCadence, original.repeatCadence);
+    expect(back.repeatInterval, original.repeatInterval);
+    expect(back.repeatDaysOfMonth, original.repeatDaysOfMonth);
     expect(back.status, original.status);
     expect(back.measurementKind, original.measurementKind);
     expect(back.targetValue, original.targetValue);

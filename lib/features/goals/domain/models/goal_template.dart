@@ -8,7 +8,7 @@ class GoalTemplate {
     required this.emoji,
     this.suggestedTitle = '',
     this.categoryId,
-    this.horizon,
+    this.repeatCadence,
     this.periodMode,
     this.measurement,
     this.targetValue,
@@ -24,7 +24,9 @@ class GoalTemplate {
   final String emoji;
   final String suggestedTitle;
   final String? categoryId;
-  final GoalHorizon? horizon;
+
+  /// Suggested repeat setting; also defines the target's measuring window.
+  final GoalRepeatCadence? repeatCadence;
   final GoalPeriodMode? periodMode;
   final MeasurementKind? measurement;
   final double? targetValue;

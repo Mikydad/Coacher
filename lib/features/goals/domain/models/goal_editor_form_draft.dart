@@ -6,16 +6,21 @@ class GoalEditorActionDraftRow {
     this.id,
     required this.title,
     required this.completed,
+    this.repeatWeekdays = const [],
   });
 
   final String? id;
   final String title;
   final bool completed;
 
+  /// Weekdays (1=Mon…7=Sun) the step repeats on; empty = one-time step.
+  final List<int> repeatWeekdays;
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'title': title,
     'completed': completed,
+    'repeatWeekdays': repeatWeekdays,
   };
 
   factory GoalEditorActionDraftRow.fromJson(Map<String, dynamic> json) {
@@ -23,6 +28,12 @@ class GoalEditorActionDraftRow {
       id: json['id'] as String?,
       title: json['title'] as String? ?? '',
       completed: json['completed'] as bool? ?? false,
+      repeatWeekdays:
+          (json['repeatWeekdays'] as List?)
+              ?.whereType<num>()
+              .map((d) => d.toInt())
+              .toList() ??
+          const [],
     );
   }
 }
@@ -36,14 +47,16 @@ class GoalEditorFormDraft {
     required this.customLabel,
     required this.durationDays,
     required this.categoryId,
-    required this.horizon,
     required this.periodMode,
     required this.measurement,
     required this.intensity,
-    required this.monthAnchorMs,
     required this.rangeStartMs,
     required this.rangeEndMs,
     required this.durationStartMs,
+    this.repeatCadence = 'off',
+    this.repeatInterval = '1',
+    this.scheduledWeekdays = const [],
+    this.repeatDaysOfMonth = const [],
     required this.reminderEnabled,
     required this.reminderMinutesFromMidnight,
     required this.actions,
@@ -55,14 +68,24 @@ class GoalEditorFormDraft {
   final String customLabel;
   final String durationDays;
   final String categoryId;
-  final String horizon;
   final String periodMode;
   final String measurement;
   final double intensity;
-  final int monthAnchorMs;
   final int rangeStartMs;
   final int rangeEndMs;
   final int durationStartMs;
+
+  /// [GoalRepeatCadence] name; 'off' = no repeat schedule.
+  final String repeatCadence;
+
+  /// Raw "every X" field text.
+  final String repeatInterval;
+
+  /// Weekdays (1=Mon…7=Sun) acted on when repeat is weekly.
+  final List<int> scheduledWeekdays;
+
+  /// Days of month (1–31) acted on when repeat is monthly.
+  final List<int> repeatDaysOfMonth;
   final bool reminderEnabled;
   final int reminderMinutesFromMidnight;
   final List<GoalEditorActionDraftRow> actions;
@@ -75,6 +98,9 @@ class GoalEditorFormDraft {
       if (a.title.trim().isNotEmpty) return true;
     }
     if (reminderEnabled) return true;
+    if (repeatCadence != 'off') return true;
+    if (scheduledWeekdays.isNotEmpty) return true;
+    if (repeatDaysOfMonth.isNotEmpty) return true;
     if (categoryId != GoalCategories.study) return true;
     return false;
   }
@@ -86,14 +112,16 @@ class GoalEditorFormDraft {
     'customLabel': customLabel,
     'durationDays': durationDays,
     'categoryId': categoryId,
-    'horizon': horizon,
     'periodMode': periodMode,
     'measurement': measurement,
     'intensity': intensity,
-    'monthAnchorMs': monthAnchorMs,
     'rangeStartMs': rangeStartMs,
     'rangeEndMs': rangeEndMs,
     'durationStartMs': durationStartMs,
+    'repeatCadence': repeatCadence,
+    'repeatInterval': repeatInterval,
+    'scheduledWeekdays': scheduledWeekdays,
+    'repeatDaysOfMonth': repeatDaysOfMonth,
     'reminderEnabled': reminderEnabled,
     'reminderMinutesFromMidnight': reminderMinutesFromMidnight,
     'actions': actions.map((a) => a.toJson()).toList(),
@@ -120,14 +148,10 @@ class GoalEditorFormDraft {
       customLabel: json['customLabel'] as String? ?? '',
       durationDays: json['durationDays'] as String? ?? '30',
       categoryId: json['categoryId'] as String? ?? GoalCategories.study,
-      horizon: json['horizon'] as String? ?? GoalHorizon.monthly.name,
       periodMode: json['periodMode'] as String? ?? GoalPeriodMode.calendar.name,
       measurement:
           json['measurement'] as String? ?? MeasurementKind.minutes.name,
       intensity: (json['intensity'] as num?)?.toDouble() ?? 3,
-      monthAnchorMs:
-          json['monthAnchorMs'] as int? ??
-          DateTime.now().millisecondsSinceEpoch,
       rangeStartMs:
           json['rangeStartMs'] as int? ?? DateTime.now().millisecondsSinceEpoch,
       rangeEndMs:
@@ -136,6 +160,20 @@ class GoalEditorFormDraft {
       durationStartMs:
           json['durationStartMs'] as int? ??
           DateTime.now().millisecondsSinceEpoch,
+      repeatCadence: json['repeatCadence'] as String? ?? 'off',
+      repeatInterval: json['repeatInterval'] as String? ?? '1',
+      scheduledWeekdays:
+          (json['scheduledWeekdays'] as List?)
+              ?.whereType<num>()
+              .map((d) => d.toInt())
+              .toList() ??
+          const [],
+      repeatDaysOfMonth:
+          (json['repeatDaysOfMonth'] as List?)
+              ?.whereType<num>()
+              .map((d) => d.toInt())
+              .toList() ??
+          const [],
       reminderEnabled: json['reminderEnabled'] as bool? ?? false,
       reminderMinutesFromMidnight:
           json['reminderMinutesFromMidnight'] as int? ?? 9 * 60,
@@ -149,11 +187,9 @@ class GoalEditorFormDraft {
         customLabel != other.customLabel ||
         durationDays != other.durationDays ||
         categoryId != other.categoryId ||
-        horizon != other.horizon ||
         periodMode != other.periodMode ||
         measurement != other.measurement ||
         intensity != other.intensity ||
-        monthAnchorMs != other.monthAnchorMs ||
         rangeStartMs != other.rangeStartMs ||
         rangeEndMs != other.rangeEndMs ||
         durationStartMs != other.durationStartMs ||
@@ -161,13 +197,32 @@ class GoalEditorFormDraft {
         reminderMinutesFromMidnight != other.reminderMinutesFromMidnight) {
       return false;
     }
+    if (repeatCadence != other.repeatCadence ||
+        repeatInterval != other.repeatInterval) {
+      return false;
+    }
+    if (!_intListEquals(scheduledWeekdays, other.scheduledWeekdays) ||
+        !_intListEquals(repeatDaysOfMonth, other.repeatDaysOfMonth)) {
+      return false;
+    }
     if (actions.length != other.actions.length) return false;
     for (var i = 0; i < actions.length; i++) {
       final a = actions[i];
       final b = other.actions[i];
-      if (a.id != b.id || a.title != b.title || a.completed != b.completed) {
+      if (a.id != b.id ||
+          a.title != b.title ||
+          a.completed != b.completed ||
+          !_intListEquals(a.repeatWeekdays, b.repeatWeekdays)) {
         return false;
       }
+    }
+    return true;
+  }
+
+  static bool _intListEquals(List<int> a, List<int> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
     }
     return true;
   }

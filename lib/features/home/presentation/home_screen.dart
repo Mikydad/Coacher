@@ -1617,11 +1617,11 @@ String _homeGoalSubtitle(UserGoal g) {
           (g.customLabel?.isNotEmpty ?? false)
       ? g.customLabel!
       : g.measurementKind.displayLabel().toLowerCase();
-  final suffix = switch ((g.periodMode, g.horizon)) {
-    (GoalPeriodMode.durationDays, _) => 'per day in this run',
-    (_, GoalHorizon.weekly) => 'this week',
-    (_, GoalHorizon.monthly) => 'per day (in this month)',
-    (_, GoalHorizon.daily) => 'per day',
+  final suffix = switch (g.horizon) {
+    GoalHorizon.weekly => 'this week',
+    GoalHorizon.monthly => 'this month',
+    GoalHorizon.daily => 'per day',
+    GoalHorizon.entireGoal => 'entire goal',
   };
   final value = g.targetValue == g.targetValue.roundToDouble()
       ? g.targetValue.toInt().toString()
