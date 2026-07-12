@@ -83,3 +83,37 @@ not silent reversal.
 - **2026-07-12 · The awaited-Firestore-write anti-pattern is banned by CI**
   (`test/architecture/local_first_guard_test.dart`). Allowlist contains only
   the outbox flusher (`sync_service.dart`).
+
+- **2026-07-12 · First-launch onboarding sits ABOVE AuthGate; Skip = the
+  anonymous account.** `OnboardingGate` (device-level
+  `onboarding_completed_v1` prefs flag) shows the 15-step flow
+  (`ONBOARDING_PRD.md` + registration step after Welcome) only on fresh
+  installs; existing installs (`last_signed_in_uid` or `isar_seeded_v1`
+  present) are auto-marked complete. The flow-level Skip just sets the flag
+  and falls through — AuthGate's existing silent anonymous sign-in IS the
+  skip path (zero new auth code). Registration is a hard gate to continue
+  the tour ("for now"; when `REQUIRE_REGISTERED_AUTH` ships, the Skip
+  button is what disappears). The flag survives logout on purpose —
+  a marketing flow never replays; signed-out users get `AuthLandingScreen`.
+  *Considered:* registration at the end of the flow (rejected: registering
+  first means every answer lands under the real uid — no anon→registered
+  migration); a per-account flag (rejected: replaying marketing at login).
+
+- **2026-07-12 · Onboarding answers are interest TAGS, not auto-created
+  goals.** Screen 10's categories + Screen 2's struggles persist in the
+  synced `OnboardingProfile` singleton (Isar + outbox +
+  `users/{uid}/onboarding/profile` + merge phase, LWW on `updatedAtMs`) for
+  later AI/goal-flow consumption. Screen 12's "personalized dashboard" is a
+  template render from those tags. The Day One photo stays device-local
+  (path + takenAt sync, the file does not — v1). The AI demo (Screen 6) and
+  Personalizing (Screen 11) are scripted animations — the whole tour passes
+  airplane mode; only Firebase account creation itself needs network.
+  *Considered:* seeding real Goal entities from Screen 10 (rejected:
+  categories aren't goals — no target/period; vague rows pollute the hub).
+
+- **2026-07-12 · Onboarding visuals: dark-only feature palette
+  (`OnboardingColors` aliases `AppPalette.dark` directly).** The flow
+  renders before any theme choice exists and DESIGN.md is premium-dark
+  only. Premium screen (13) is UI-only — both CTAs advance; IAP is a
+  future feature. Illustrations are gradient placeholders pending exported
+  artwork.

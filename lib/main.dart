@@ -14,6 +14,7 @@ import 'core/bootstrap/app_bootstrap.dart';
 import 'core/presentation/theme_brightness_controller.dart';
 import 'features/auth/presentation/auth_gate.dart';
 import 'features/feedback/application/app_screenshot.dart';
+import 'features/onboarding/presentation/onboarding_gate.dart';
 
 /// Boot breadcrumb that survives release builds (debugPrint is silenced
 /// there). A hang between two breadcrumbs localizes itself in device logs.
@@ -65,14 +66,19 @@ Future<void> main() async {
         UncontrolledProviderScope(
           container: container,
           child: AnimatedSplashGate(
-            child: AuthGate(
-              child: FirstLaunchGate(
-                child: AppLifecycleTaskRefresh(
-                  // Stable across theme toggles (the MaterialApp inside is
-                  // keyed on brightness) — tester bug reports capture this.
-                  child: RepaintBoundary(
-                    key: appScreenshotBoundaryKey,
-                    child: const CoachForLifeApp(),
+            // First-launch onboarding sits ABOVE AuthGate: finishing (or
+            // skipping) it simply reveals AuthGate, whose existing anonymous
+            // sign-in IS the skip path.
+            child: OnboardingGate(
+              child: AuthGate(
+                child: FirstLaunchGate(
+                  child: AppLifecycleTaskRefresh(
+                    // Stable across theme toggles (the MaterialApp inside is
+                    // keyed on brightness) — tester bug reports capture this.
+                    child: RepaintBoundary(
+                      key: appScreenshotBoundaryKey,
+                      child: const CoachForLifeApp(),
+                    ),
                   ),
                 ),
               ),

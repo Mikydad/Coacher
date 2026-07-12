@@ -17,6 +17,7 @@ import 'isar_goal_action.dart';
 import 'isar_goal_check_in.dart';
 import 'isar_goal_milestone.dart';
 import 'isar_notification_ledger_entry.dart';
+import 'isar_onboarding_profile.dart';
 import 'isar_reminder.dart';
 import 'isar_routine.dart';
 import 'isar_scheduled_time_block.dart';
@@ -47,6 +48,7 @@ const isarSchemaList = [
   IsarUserAttentionStateSchema,
   IsarUserCoachingProfileSchema,
   IsarUserProfilePreferenceSchema,
+  IsarOnboardingProfileSchema,
   IsarActivityFeedCacheSchema,
   IsarAiPulseCacheSchema,
   IsarAiInteractionHistorySchema,

@@ -13,6 +13,7 @@ import '../../features/analytics/domain/models/analytics_event.dart';
 import '../../features/analytics/domain/models/analytics_stats_cache.dart';
 import '../../features/planning/domain/models/block.dart';
 import '../../features/planning/domain/models/routine.dart';
+import '../../features/onboarding/domain/models/onboarding_profile.dart';
 import '../../features/planning/domain/models/task_item.dart';
 import '../../features/reminders/data/reminder_repository.dart';
 import '../../features/reminders/domain/models/reminder_config.dart';
@@ -24,6 +25,7 @@ import '../local_db/isar_collections/isar_goal.dart';
 import '../local_db/isar_collections/isar_goal_action.dart';
 import '../local_db/isar_collections/isar_goal_check_in.dart';
 import '../local_db/isar_collections/isar_goal_milestone.dart';
+import '../local_db/isar_collections/isar_onboarding_profile.dart';
 import '../local_db/isar_collections/isar_reminder.dart';
 import '../local_db/isar_collections/isar_routine.dart';
 import 'isar_lww_merge.dart';
@@ -128,6 +130,8 @@ class RemoteIsarMerge {
     await _pullGoalSubcollections();
     _abortIfUidChanged();
     await _pullAnalytics();
+    _abortIfUidChanged();
+    await _pullOnboardingProfile();
     // Only reached when every phase succeeded — safe to advance cursors.
     for (final entry in _maxSeen.entries) {
       await _cursors.advance(entry.key, entry.value);
@@ -375,6 +379,41 @@ class RemoteIsarMerge {
         debugPrint('RemoteIsarMerge: skip analytics stats ${doc.id}: $e\n$st');
       }
     }
+  }
+
+  /// Singleton doc — one read per pull, no cursor (cheaper than tracking one).
+  Future<void> _pullOnboardingProfile() async {
+    final snap = await _client.userCollection('onboarding').get();
+    for (final doc in snap.docs) {
+      try {
+        final m = Map<String, dynamic>.from(doc.data());
+        final profile = OnboardingProfile.fromMap(m);
+        await _mergeOnboardingProfile(profile);
+      } catch (e, st) {
+        debugPrint(
+          'RemoteIsarMerge: skip onboarding profile ${doc.id}: $e\n$st',
+        );
+      }
+    }
+  }
+
+  Future<void> _mergeOnboardingProfile(OnboardingProfile incoming) async {
+    final existing = await _isar.isarOnboardingProfiles
+        .filter()
+        .profileIdEqualTo(incoming.id)
+        .findFirst();
+    if (!shouldApplyRemoteUpdatedAt(
+      localUpdatedAtMs: existing?.updatedAtMs,
+      remoteUpdatedAtMs: incoming.updatedAtMs,
+    )) {
+      return;
+    }
+    await _isar.writeTxn(() async {
+      await _isar.isarOnboardingProfiles.putByProfileId(
+        IsarOnboardingProfile.fromDomain(incoming),
+      );
+    });
+    _appliedCount++;
   }
 
   Future<void> _mergeRoutine(Routine incoming) async {

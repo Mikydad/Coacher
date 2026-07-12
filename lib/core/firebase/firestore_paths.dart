@@ -31,6 +31,11 @@ class FirestorePaths {
   static String get accountabilityLogs => '$userRoot/accountabilityLogs';
 
   static String get goals => '$userRoot/goals';
+
+  /// Singleton doc (collection `onboarding`, doc `profile`) — what the user
+  /// told us during first-launch onboarding (struggles / interests).
+  static String get onboardingProfileDoc => '$userRoot/onboarding/profile';
+
   static String get analyticsEvents => '$userRoot/analytics_events';
   static String get analyticsStats => '$userRoot/analytics_stats';
 
