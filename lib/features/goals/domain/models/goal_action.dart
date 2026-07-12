@@ -7,12 +7,18 @@ class GoalAction {
     this.completed = false,
     this.repeatWeekdays,
     this.completedDateKeys = const [],
+    this.updatedAtMs = 0,
   });
 
   final String id;
   final String goalId;
   final String title;
   final int orderIndex;
+
+  /// Last local edit time — drives last-write-wins sync merging. `0` for
+  /// legacy records written before offline sync; the repository stamps it
+  /// on every upsert.
+  final int updatedAtMs;
 
   /// One-time completion flag. Only meaningful when [isRepeating] is false;
   /// repeating actions track completion per day in [completedDateKeys].
@@ -61,6 +67,7 @@ class GoalAction {
     bool? completed,
     List<int>? repeatWeekdays,
     List<String>? completedDateKeys,
+    int? updatedAtMs,
   }) {
     return GoalAction(
       id: id ?? this.id,
@@ -70,6 +77,7 @@ class GoalAction {
       completed: completed ?? this.completed,
       repeatWeekdays: repeatWeekdays ?? this.repeatWeekdays,
       completedDateKeys: completedDateKeys ?? this.completedDateKeys,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     );
   }
 
@@ -81,6 +89,7 @@ class GoalAction {
     'completed': completed,
     if (repeatWeekdays != null) 'repeatWeekdays': repeatWeekdays,
     if (completedDateKeys.isNotEmpty) 'completedDateKeys': completedDateKeys,
+    'updatedAtMs': updatedAtMs,
   };
 
   static GoalAction fromMap(Map<String, dynamic> map) => GoalAction(
@@ -96,5 +105,6 @@ class GoalAction {
     completedDateKeys:
         (map['completedDateKeys'] as List?)?.whereType<String>().toList() ??
         const [],
+    updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
   );
 }

@@ -7,7 +7,7 @@ import '../../../core/local_db/isar_collections/isar_routine.dart';
 import '../../../core/local_db/isar_collections/isar_scheduled_time_block.dart';
 import '../../../core/local_db/isar_collections/isar_task.dart';
 import '../../../core/offline/offline_store.dart';
-import '../../../core/sync/sync_service.dart';
+import '../../../core/sync/outbox_writer.dart';
 import '../../../core/utils/stable_id.dart';
 import '../domain/models/accountability_log.dart';
 import '../domain/models/block.dart';
@@ -31,31 +31,21 @@ class IsarPlanningRepository implements PlanningRepository {
     required String path,
     required Map<String, dynamic> payload,
   }) async {
-    try {
-      await FirebaseFirestore.instance
-          .doc(path)
-          .set(payload, SetOptions(merge: true));
-    } catch (_) {
-      await SyncService.instance.enqueueUpsert(
-        entityType: entityType,
-        documentPath: path,
-        payload: payload,
-      );
-    }
+    await outboxUpsert(
+      entityType: entityType,
+      documentPath: path,
+      payload: payload,
+    );
   }
 
   Future<void> _enqueueDelete({
     required String entityType,
     required String path,
   }) async {
-    try {
-      await FirebaseFirestore.instance.doc(path).delete();
-    } catch (_) {
-      await SyncService.instance.enqueueDelete(
-        entityType: entityType,
-        documentPath: path,
-      );
-    }
+    await outboxDelete(
+      entityType: entityType,
+      documentPath: path,
+    );
   }
 
   @override

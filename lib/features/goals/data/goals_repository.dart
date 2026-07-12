@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/firebase/firestore_client.dart';
 import '../../../core/firebase/firestore_paths.dart';
-import '../../../core/sync/sync_service.dart';
+import '../../../core/sync/outbox_writer.dart';
 import '../domain/models/goal_action.dart';
 import '../domain/models/goal_check_in.dart';
 import '../domain/models/goal_milestone.dart';
@@ -12,6 +12,16 @@ import '../domain/models/user_goal.dart';
 /// `actions`, `milestones`, `checkIns` (check-in doc id = `yyyy-MM-dd`).
 abstract class GoalsRepository {
   Stream<List<UserGoal>> watchGoals();
+
+  /// Live stream of one goal (null when it doesn't exist / was deleted).
+  Stream<UserGoal?> watchGoal(String goalId);
+
+  /// Live streams of a goal's subcollections — the UI's primary read path:
+  /// local mutations and background sync pulls both surface here, so screens
+  /// update in one frame with no refetch.
+  Stream<List<GoalAction>> watchActions(String goalId);
+  Stream<List<GoalMilestone>> watchMilestones(String goalId);
+  Stream<List<GoalCheckIn>> watchCheckIns(String goalId);
 
   /// One-shot fetch (e.g. bootstrap); same ordering as [watchGoals] snapshots.
   Future<List<UserGoal>> fetchGoalsOnce();
@@ -61,31 +71,18 @@ class FirestoreGoalsRepository implements GoalsRepository {
     required String path,
     required Map<String, dynamic> payload,
   }) async {
-    try {
-      await FirebaseFirestore.instance
-          .doc(path)
-          .set(payload, SetOptions(merge: true));
-    } catch (_) {
-      await SyncService.instance.enqueueUpsert(
-        entityType: entityType,
-        documentPath: path,
-        payload: payload,
-      );
-    }
+    await outboxUpsert(
+      entityType: entityType,
+      documentPath: path,
+      payload: payload,
+    );
   }
 
   Future<void> _deleteWithQueue({
     required String entityType,
     required String path,
   }) async {
-    try {
-      await FirebaseFirestore.instance.doc(path).delete();
-    } catch (_) {
-      await SyncService.instance.enqueueDelete(
-        entityType: entityType,
-        documentPath: path,
-      );
-    }
+    await outboxDelete(entityType: entityType, documentPath: path);
   }
 
   static Future<void> _purgeCollection(
@@ -111,6 +108,65 @@ class FirestoreGoalsRepository implements GoalsRepository {
         return UserGoal.fromMap(data);
       }).toList();
     });
+  }
+
+  @override
+  Stream<UserGoal?> watchGoal(String goalId) {
+    return _goals.doc(goalId).snapshots().map((doc) {
+      final data = doc.data();
+      if (!doc.exists || data == null) return null;
+      final m = Map<String, dynamic>.from(data);
+      m['id'] = doc.id;
+      return UserGoal.fromMap(m);
+    });
+  }
+
+  @override
+  Stream<List<GoalAction>> watchActions(String goalId) {
+    return _goals
+        .doc(goalId)
+        .collection('actions')
+        .orderBy('orderIndex')
+        .snapshots()
+        .map(
+          (s) => s.docs.map((d) {
+            final data = Map<String, dynamic>.from(d.data());
+            data['id'] = d.id;
+            return GoalAction.fromMap(data);
+          }).toList(),
+        );
+  }
+
+  @override
+  Stream<List<GoalMilestone>> watchMilestones(String goalId) {
+    return _goals
+        .doc(goalId)
+        .collection('milestones')
+        .orderBy('orderIndex')
+        .snapshots()
+        .map(
+          (s) => s.docs.map((d) {
+            final data = Map<String, dynamic>.from(d.data());
+            data['id'] = d.id;
+            return GoalMilestone.fromMap(data);
+          }).toList(),
+        );
+  }
+
+  @override
+  Stream<List<GoalCheckIn>> watchCheckIns(String goalId) {
+    return _goals
+        .doc(goalId)
+        .collection('checkIns')
+        .orderBy('dateKey')
+        .snapshots()
+        .map(
+          (s) => s.docs
+              .map(
+                (d) => GoalCheckIn.fromMap(Map<String, dynamic>.from(d.data())),
+              )
+              .toList(),
+        );
   }
 
   @override

@@ -13,6 +13,9 @@ import 'isar_delivery_decision_snapshot.dart';
 import 'isar_delivery_history_entry.dart';
 import 'isar_generated_insight.dart';
 import 'isar_goal.dart';
+import 'isar_goal_action.dart';
+import 'isar_goal_check_in.dart';
+import 'isar_goal_milestone.dart';
 import 'isar_notification_ledger_entry.dart';
 import 'isar_reminder.dart';
 import 'isar_routine.dart';
@@ -37,6 +40,9 @@ const isarSchemaList = [
   IsarGeneratedInsightSchema,
   IsarReminderSchema,
   IsarGoalSchema,
+  IsarGoalActionSchema,
+  IsarGoalMilestoneSchema,
+  IsarGoalCheckInSchema,
   IsarScheduledTimeBlockSchema,
   IsarUserAttentionStateSchema,
   IsarUserCoachingProfileSchema,

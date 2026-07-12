@@ -7,13 +7,19 @@ import 'package:coach_for_life/features/goals/domain/models/user_goal.dart';
 /// Stub remote used with [IsarGoalsRepository] in tests (no Firestore).
 class NoOpGoalsRepository implements GoalsRepository {
   @override
-  Future<void> deleteAction({required String goalId, required String actionId}) async {}
+  Future<void> deleteAction({
+    required String goalId,
+    required String actionId,
+  }) async {}
 
   @override
   Future<void> deleteGoal(String goalId) async {}
 
   @override
-  Future<void> deleteMilestone({required String goalId, required String milestoneId}) async {}
+  Future<void> deleteMilestone({
+    required String goalId,
+    required String milestoneId,
+  }) async {}
 
   @override
   Future<List<GoalAction>> getActions(String goalId) async => const [];
@@ -23,14 +29,14 @@ class NoOpGoalsRepository implements GoalsRepository {
     String goalId, {
     String? startDateKey,
     String? endDateKey,
-  }) async =>
-      const [];
+  }) async => const [];
 
   @override
   Future<UserGoal?> getGoal(String goalId) async => null;
 
   @override
-  Future<GoalCheckIn?> getTodayCheckIn(String goalId, String dateKey) async => null;
+  Future<GoalCheckIn?> getTodayCheckIn(String goalId, String dateKey) async =>
+      null;
 
   @override
   Future<List<GoalMilestone>> getMilestones(String goalId) async => const [];
@@ -40,6 +46,21 @@ class NoOpGoalsRepository implements GoalsRepository {
 
   @override
   Stream<List<UserGoal>> watchGoals() => Stream.value(const []);
+
+  @override
+  Stream<UserGoal?> watchGoal(String goalId) => Stream.value(null);
+
+  @override
+  Stream<List<GoalAction>> watchActions(String goalId) =>
+      Stream.value(const []);
+
+  @override
+  Stream<List<GoalMilestone>> watchMilestones(String goalId) =>
+      Stream.value(const []);
+
+  @override
+  Stream<List<GoalCheckIn>> watchCheckIns(String goalId) =>
+      Stream.value(const []);
 
   @override
   Future<void> upsertAction(GoalAction action) async {}

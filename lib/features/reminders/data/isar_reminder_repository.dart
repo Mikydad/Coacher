@@ -1,10 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:isar_community/isar.dart';
 
 import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/local_db/isar_collections/isar_reminder.dart';
 import '../../../core/offline/offline_store.dart';
-import '../../../core/sync/sync_service.dart';
+import '../../../core/sync/outbox_writer.dart';
 import '../domain/models/reminder_config.dart';
 import 'reminder_repository.dart';
 
@@ -71,16 +70,10 @@ class IsarReminderRepository implements ReminderRepository {
     });
     final path = '${FirestorePaths.reminders}/${reminder.id}';
     final payload = reminder.toMap();
-    try {
-      await FirebaseFirestore.instance
-          .doc(path)
-          .set(payload, SetOptions(merge: true));
-    } catch (_) {
-      await SyncService.instance.enqueueUpsert(
-        entityType: 'reminder',
-        documentPath: path,
-        payload: payload,
-      );
-    }
+    await outboxUpsert(
+      entityType: 'reminder',
+      documentPath: path,
+      payload: payload,
+    );
   }
 }

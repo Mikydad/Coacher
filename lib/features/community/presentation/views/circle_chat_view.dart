@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -48,38 +49,42 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
     super.dispose();
   }
 
-  Future<void> _sendText() async {
+  void _sendText() {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    setState(() => _sending = true);
     _textController.clear();
-    if (mounted) dismissKeyboard(context);
+    dismissKeyboard(context);
 
-    try {
-      final msg = CircleMessage(
-        id: StableId.generate('msg'),
-        circleId: widget.circleId,
-        senderId: user.uid,
-        senderDisplayName: user.displayName ?? 'User',
-        type: MessageType.text,
-        content: text,
-        createdAtMs: DateTime.now().millisecondsSinceEpoch,
-      );
-      await ref.read(circleMessageRepositoryProvider).sendMessage(msg);
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to send message.')),
-        );
-        _textController.text = text; // restore on failure
-      }
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
+    final msg = CircleMessage(
+      id: StableId.generate('msg'),
+      circleId: widget.circleId,
+      senderId: user.uid,
+      senderDisplayName: user.displayName ?? 'User',
+      type: MessageType.text,
+      content: text,
+      createdAtMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    // Optimistic send: the message list's snapshot listener echoes the local
+    // write instantly, and Firestore's own offline queue delivers it when a
+    // connection exists — the composer never waits on a server ack. A genuine
+    // rejection (e.g. rules) surfaces as a snackbar with the text restored.
+    unawaited(
+      ref.read(circleMessageRepositoryProvider).sendMessage(msg).catchError((
+        Object _,
+      ) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Message not delivered.')));
+        if (_textController.text.trim().isEmpty) {
+          _textController.text = text; // restore for retry
+        }
+      }),
+    );
   }
 
   Future<void> _pickAndSendImage() async {

@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/firebase/firestore_paths.dart';
-import '../../../core/sync/sync_service.dart';
+import '../../../core/sync/outbox_writer.dart';
 import '../domain/models/task_score.dart';
 
 abstract class ScoringRepository {
@@ -27,16 +27,10 @@ class FirestoreScoringRepository implements ScoringRepository {
     score.validate();
     final path = '${FirestorePaths.taskScores}/${score.id}';
     final payload = score.toMap();
-    try {
-      await FirebaseFirestore.instance
-          .doc(path)
-          .set(payload, SetOptions(merge: true));
-    } catch (_) {
-      await SyncService.instance.enqueueUpsert(
-        entityType: 'taskScore',
-        documentPath: path,
-        payload: payload,
-      );
-    }
+    await outboxUpsert(
+      entityType: 'taskScore',
+      documentPath: path,
+      payload: payload,
+    );
   }
 }

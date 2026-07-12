@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/di/providers.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../features/time_blocks/application/time_block_providers.dart';
 import 'goal_block_sync_service.dart';
@@ -14,11 +13,10 @@ import '../domain/models/goal_milestone.dart';
 import '../domain/models/user_goal.dart';
 
 final goalsRepositoryProvider = Provider<GoalsRepository>(
-  // watch (not read): rebuilds on uid change so the repository never holds a
-  // FirestoreClient pinned to a previous account after a switch.
-  (ref) => IsarGoalsRepository(
-    FirestoreGoalsRepository(ref.watch(firestoreClientProvider)),
-  ),
+  // Fully local-first: reads/writes hit Isar; Firestore replication happens
+  // in the background (outbox push + RemoteIsarMerge pull), so no client
+  // needs to be pinned here.
+  (ref) => IsarGoalsRepository(),
 );
 
 /// Raw stream of all goals for the signed-in user (ordered by `updatedAtMs` desc).
@@ -113,34 +111,75 @@ class GoalDetailBundle {
   final List<GoalCheckIn> checkIns;
 }
 
-final goalDetailProvider = FutureProvider.family<GoalDetailBundle?, String>((
-  ref,
-  goalId,
-) async {
-  // watch: re-runs when the repository re-scopes on account switch.
-  final repo = ref.watch(goalsRepositoryProvider);
-  final goal = await repo.getGoal(goalId);
-  if (goal == null) return null;
-  final actions = await repo.getActions(goalId);
-  final milestones = await repo.getMilestones(goalId);
-  final checkIns = await repo.getCheckInsForGoal(goalId);
-  return GoalDetailBundle(
-    goal: goal,
-    actions: actions,
-    milestones: milestones,
-    checkIns: checkIns,
-  );
-});
+/// Live Isar watches — one stream per goal aspect. These are the single door
+/// through which ALL updates reach the UI: a local tick and a background sync
+/// pull both write Isar, Isar emits, screens rebuild in one frame. No
+/// invalidation, no refetch.
+final goalStreamProvider = StreamProvider.family<UserGoal?, String>(
+  (ref, goalId) => ref.watch(goalsRepositoryProvider).watchGoal(goalId),
+);
 
-/// Lightweight fetch of actions for a single goal — used by the counter sheet
-/// to show the action checklist without loading milestones or check-in history.
-final goalActionsProvider = FutureProvider.family<List<GoalAction>, String>((
-  ref,
-  goalId,
-) async {
-  final repo = ref.watch(goalsRepositoryProvider);
-  return repo.getActions(goalId);
-});
+final goalActionsStreamProvider =
+    StreamProvider.family<List<GoalAction>, String>(
+      (ref, goalId) => ref.watch(goalsRepositoryProvider).watchActions(goalId),
+    );
+
+final goalMilestonesStreamProvider =
+    StreamProvider.family<List<GoalMilestone>, String>(
+      (ref, goalId) =>
+          ref.watch(goalsRepositoryProvider).watchMilestones(goalId),
+    );
+
+final goalCheckInsStreamProvider =
+    StreamProvider.family<List<GoalCheckIn>, String>(
+      (ref, goalId) => ref.watch(goalsRepositoryProvider).watchCheckIns(goalId),
+    );
+
+/// Detail bundle assembled synchronously from the four watch streams above.
+/// Same [AsyncValue] surface as the old FutureProvider, so call sites keep
+/// their `.when(...)` handling — but data now arrives from local Isar in one
+/// frame and stays live.
+final goalDetailProvider =
+    Provider.family<AsyncValue<GoalDetailBundle?>, String>((ref, goalId) {
+      final goalAsync = ref.watch(goalStreamProvider(goalId));
+      final actionsAsync = ref.watch(goalActionsStreamProvider(goalId));
+      final milestonesAsync = ref.watch(goalMilestonesStreamProvider(goalId));
+      final checkInsAsync = ref.watch(goalCheckInsStreamProvider(goalId));
+
+      for (final async in [
+        goalAsync,
+        actionsAsync,
+        milestonesAsync,
+        checkInsAsync,
+      ]) {
+        final err = async.whenOrNull(error: (e, st) => (e, st));
+        if (err != null) return AsyncValue.error(err.$1, err.$2);
+      }
+      if (goalAsync.isLoading ||
+          actionsAsync.isLoading ||
+          milestonesAsync.isLoading ||
+          checkInsAsync.isLoading) {
+        return const AsyncValue.loading();
+      }
+
+      final goal = goalAsync.valueOrNull;
+      if (goal == null) return const AsyncValue.data(null);
+      return AsyncValue.data(
+        GoalDetailBundle(
+          goal: goal,
+          actions: actionsAsync.valueOrNull ?? const [],
+          milestones: milestonesAsync.valueOrNull ?? const [],
+          checkIns: checkInsAsync.valueOrNull ?? const [],
+        ),
+      );
+    });
+
+/// Live actions for a single goal — used by the counter sheet to show the
+/// checklist without loading milestones or check-in history.
+final goalActionsProvider =
+    Provider.family<AsyncValue<List<GoalAction>>, String>(
+      (ref, goalId) => ref.watch(goalActionsStreamProvider(goalId)),
+    );
 
 /// Provides [GoalBlockSyncService] for writing/removing goal time blocks.
 final goalBlockSyncServiceProvider = Provider<GoalBlockSyncService>((ref) {
@@ -161,14 +200,12 @@ final goalTitleMapProvider = Provider<Map<String, String>>((ref) {
       const {};
 });
 
-void invalidateGoals(WidgetRef ref, {String? goalId}) {
-  ref.invalidate(goalsStreamProvider);
-  if (goalId != null) {
-    ref.invalidate(goalDetailProvider(goalId));
-    ref.invalidate(goalTodayProgressProvider(goalId));
-    ref.invalidate(goalActionsProvider(goalId));
-  }
-}
+/// Historically forced a refetch after every goal mutation. All goal
+/// providers are now live Isar watches, so the mutation's own local write is
+/// what updates the UI — invalidating the streams here would only re-subscribe
+/// them and flash a loading state. Kept as a no-op so call sites stay valid;
+/// prefer removing calls as code is touched.
+void invalidateGoals(WidgetRef ref, {String? goalId}) {}
 
 /// Progress snapshot for a single goal combining action completion and
 /// the measurement value accumulated over the current evaluation window.
@@ -219,72 +256,83 @@ class GoalTodayProgress {
 /// [GoalTodayProgress.currentValue] accumulates check-in values over the
 /// goal's current evaluation window (per horizon: day / week / month /
 /// entire goal); [GoalTodayProgress.todayValue] is today's log alone.
-final goalTodayProgressProvider = FutureProvider.family<GoalTodayProgress, String>((
-  ref,
-  goalId,
-) async {
-  final repo = ref.watch(goalsRepositoryProvider);
-  final goalAsync = ref.watch(goalsStreamProvider);
+final goalTodayProgressProvider =
+    Provider.family<AsyncValue<GoalTodayProgress>, String>((ref, goalId) {
+      final goalsAsync = ref.watch(goalsStreamProvider);
+      final actionsAsync = ref.watch(goalActionsStreamProvider(goalId));
+      final checkInsAsync = ref.watch(goalCheckInsStreamProvider(goalId));
 
-  UserGoal? goal;
-  goalAsync.whenData((list) {
-    try {
-      goal = list.firstWhere((g) => g.id == goalId);
-    } catch (_) {
-      goal = null;
-    }
-  });
+      for (final async in [actionsAsync, checkInsAsync]) {
+        final err = async.whenOrNull(error: (e, st) => (e, st));
+        if (err != null) return AsyncValue.error(err.$1, err.$2);
+      }
+      if (actionsAsync.isLoading || checkInsAsync.isLoading) {
+        return const AsyncValue.loading();
+      }
 
-  final target = goal?.targetValue ?? 1.0;
-  final dateKey = DateKeys.todayKey();
+      UserGoal? goal;
+      for (final g in goalsAsync.valueOrNull ?? const <UserGoal>[]) {
+        if (g.id == goalId) {
+          goal = g;
+          break;
+        }
+      }
 
-  // Fetch actions and today's check-in concurrently.
-  final results = await Future.wait([
-    repo.getActions(goalId),
-    repo.getTodayCheckIn(goalId, dateKey),
-  ]);
+      final target = goal?.targetValue ?? 1.0;
+      final dateKey = DateKeys.todayKey();
+      final actions = actionsAsync.valueOrNull ?? const <GoalAction>[];
+      final checkIns = checkInsAsync.valueOrNull ?? const <GoalCheckIn>[];
 
-  final actions = results[0] as List<GoalAction>;
-  final checkIn = results[1] as GoalCheckIn?;
+      GoalCheckIn? checkIn;
+      for (final c in checkIns) {
+        if (c.dateKey == dateKey) {
+          checkIn = c;
+          break;
+        }
+      }
 
-  // Only actions due today count: one-time steps always, repeating steps on
-  // their scheduled weekdays (completion is per-day for those).
-  final today = DateKeys.parseLocalDateKey(dateKey);
-  final dueToday = actions.where((a) => a.isScheduledOn(today)).toList();
-  final totalActions = dueToday.length;
-  final doneActions = dueToday.where((a) => a.isCompletedOn(dateKey)).length;
-  final todayValue = checkIn?.value ?? 0.0;
+      // Only actions due today count: one-time steps always, repeating steps
+      // on their scheduled weekdays (completion is per-day for those).
+      final today = DateKeys.parseLocalDateKey(dateKey);
+      final dueToday = actions.where((a) => a.isScheduledOn(today)).toList();
+      final totalActions = dueToday.length;
+      final doneActions = dueToday
+          .where((a) => a.isCompletedOn(dateKey))
+          .length;
+      final todayValue = checkIn?.value ?? 0.0;
 
-  // Accumulate over the evaluation window (one repeat cycle, or the whole
-  // period for one-time goals). Single-day windows are today-only, so the
-  // extra fetch is skipped.
-  var currentValue = todayValue;
-  final g = goal;
-  if (g != null) {
-    final window = GoalPeriodHelpers.evaluationWindow(g, DateTime.now());
-    if (window.start != window.end) {
-      final windowCheckIns = await repo.getCheckInsForGoal(
-        goalId,
-        startDateKey: DateKeys.yyyymmdd(window.start),
-        endDateKey: DateKeys.yyyymmdd(window.end),
+      // Accumulate over the evaluation window (one repeat cycle, or the whole
+      // period for one-time goals). All data is local — this is pure math.
+      var currentValue = todayValue;
+      if (goal != null) {
+        final window = GoalPeriodHelpers.evaluationWindow(goal, DateTime.now());
+        if (window.start != window.end) {
+          final startKey = DateKeys.yyyymmdd(window.start);
+          final endKey = DateKeys.yyyymmdd(window.end);
+          currentValue = checkIns
+              .where(
+                (c) =>
+                    c.dateKey.compareTo(startKey) >= 0 &&
+                    c.dateKey.compareTo(endKey) <= 0,
+              )
+              .fold(0.0, (sum, c) => sum + (c.value ?? 0));
+        }
+      }
+
+      final progress = target > 0
+          ? (currentValue / target).clamp(0.0, 1.0)
+          : 0.0;
+
+      return AsyncValue.data(
+        GoalTodayProgress(
+          currentValue: currentValue,
+          todayValue: todayValue,
+          targetValue: target,
+          progress: progress,
+          metCommitment: checkIn?.metCommitment ?? false,
+          doneActions: doneActions,
+          totalActions: totalActions,
+          checkIn: checkIn,
+        ),
       );
-      currentValue = windowCheckIns.fold(
-        0.0,
-        (sum, c) => sum + (c.value ?? 0),
-      );
-    }
-  }
-
-  final progress = target > 0 ? (currentValue / target).clamp(0.0, 1.0) : 0.0;
-
-  return GoalTodayProgress(
-    currentValue: currentValue,
-    todayValue: todayValue,
-    targetValue: target,
-    progress: progress,
-    metCommitment: checkIn?.metCommitment ?? false,
-    doneActions: doneActions,
-    totalActions: totalActions,
-    checkIn: checkIn,
-  );
-});
+    });

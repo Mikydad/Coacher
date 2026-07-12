@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 // Query below always means the Firestore one (_afterCursor).
 import 'package:isar_community/isar.dart' hide Query;
 
+import '../../features/goals/domain/models/goal_action.dart';
+import '../../features/goals/domain/models/goal_check_in.dart';
+import '../../features/goals/domain/models/goal_milestone.dart';
 import '../../features/goals/domain/models/user_goal.dart';
 import '../../features/analytics/domain/models/analytics_event.dart';
 import '../../features/analytics/domain/models/analytics_stats_cache.dart';
@@ -18,6 +21,9 @@ import '../local_db/isar_collections/isar_block.dart';
 import '../local_db/isar_collections/isar_analytics_event.dart';
 import '../local_db/isar_collections/isar_analytics_stats.dart';
 import '../local_db/isar_collections/isar_goal.dart';
+import '../local_db/isar_collections/isar_goal_action.dart';
+import '../local_db/isar_collections/isar_goal_check_in.dart';
+import '../local_db/isar_collections/isar_goal_milestone.dart';
 import '../local_db/isar_collections/isar_reminder.dart';
 import '../local_db/isar_collections/isar_routine.dart';
 import 'isar_lww_merge.dart';
@@ -80,6 +86,11 @@ class RemoteIsarMerge {
   /// common case for the periodic 30s pull.
   int _appliedCount = 0;
 
+  /// Goal ids first seen by this pull (no local row before merge). Their
+  /// subcollections are hydrated without cursors — see
+  /// [_pullGoalSubcollections].
+  final Set<String> _newLocalGoalIds = {};
+
   Future<int> _cursorFor(String key) async =>
       ignoreCursors ? 0 : _cursors.read(key);
 
@@ -113,6 +124,8 @@ class RemoteIsarMerge {
     await _pullReminders();
     _abortIfUidChanged();
     await _pullGoals();
+    _abortIfUidChanged();
+    await _pullGoalSubcollections();
     _abortIfUidChanged();
     await _pullAnalytics();
     // Only reached when every phase succeeded — safe to advance cursors.
@@ -226,6 +239,108 @@ class RemoteIsarMerge {
     }
   }
 
+  /// Hydrates goal subcollections (actions / milestones / check-ins) into
+  /// their Isar mirrors so goal detail renders and mutates fully offline.
+  ///
+  /// Walks goals present in LOCAL Isar (a goal deleted locally is never
+  /// resurrected through its subdocuments). Goals that just appeared this
+  /// pull ([_newLocalGoalIds]) are read without cursors — their historical
+  /// subdocuments predate any cursor watermark; everything else uses the
+  /// shared per-collection cursor.
+  Future<void> _pullGoalSubcollections() async {
+    // Active goals only, plus anything that just appeared this pull — paused
+    // and completed goals were hydrated while they were live, and walking
+    // them every periodic pull would grow with archive size. A force pull
+    // (ignoreCursors) walks everything as the reconcile escape hatch.
+    final activeIds = await _isar.isarGoals
+        .filter()
+        .statusStorageEqualTo('active')
+        .goalIdProperty()
+        .findAll();
+    final goalIds = ignoreCursors
+        ? await _isar.isarGoals.where().goalIdProperty().findAll()
+        : {...activeIds, ..._newLocalGoalIds}.toList();
+    if (goalIds.isEmpty) return;
+
+    final actionsCursor = await _cursorFor('goal_actions');
+    final milestonesCursor = await _cursorFor('goal_milestones');
+    final checkInsCursor = await _cursorFor('goal_check_ins');
+    final goalsCol = _client.userCollection('goals');
+
+    for (final goalId in goalIds) {
+      _abortIfUidChanged();
+      final isNewLocally = _newLocalGoalIds.contains(goalId);
+      final goalDoc = goalsCol.doc(goalId);
+
+      try {
+        final snap = await _afterCursor(
+          goalDoc.collection('actions'),
+          isNewLocally ? 0 : actionsCursor,
+        ).get();
+        for (final doc in snap.docs) {
+          try {
+            final m = Map<String, dynamic>.from(doc.data());
+            m['id'] = _docFieldId(doc, m);
+            m['goalId'] = goalId;
+            final a = GoalAction.fromMap(m);
+            _noteSeen('goal_actions', a.updatedAtMs);
+            await _mergeGoalAction(a);
+          } catch (e, st) {
+            debugPrint('RemoteIsarMerge: skip goal action ${doc.id}: $e\n$st');
+          }
+        }
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip actions of $goalId: $e\n$st');
+      }
+
+      try {
+        final snap = await _afterCursor(
+          goalDoc.collection('milestones'),
+          isNewLocally ? 0 : milestonesCursor,
+        ).get();
+        for (final doc in snap.docs) {
+          try {
+            final m = Map<String, dynamic>.from(doc.data());
+            m['id'] = _docFieldId(doc, m);
+            m['goalId'] = goalId;
+            final ms = GoalMilestone.fromMap(m);
+            _noteSeen('goal_milestones', ms.updatedAtMs);
+            await _mergeGoalMilestone(ms);
+          } catch (e, st) {
+            debugPrint(
+              'RemoteIsarMerge: skip goal milestone ${doc.id}: $e\n$st',
+            );
+          }
+        }
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip milestones of $goalId: $e\n$st');
+      }
+
+      try {
+        final snap = await _afterCursor(
+          goalDoc.collection('checkIns'),
+          isNewLocally ? 0 : checkInsCursor,
+        ).get();
+        for (final doc in snap.docs) {
+          try {
+            final m = Map<String, dynamic>.from(doc.data());
+            m['goalId'] = goalId;
+            m['dateKey'] = (m['dateKey'] as String?) ?? doc.id;
+            final c = GoalCheckIn.fromMap(m);
+            _noteSeen('goal_check_ins', c.updatedAtMs);
+            await _mergeGoalCheckIn(c);
+          } catch (e, st) {
+            debugPrint(
+              'RemoteIsarMerge: skip goal check-in ${doc.id}: $e\n$st',
+            );
+          }
+        }
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip check-ins of $goalId: $e\n$st');
+      }
+    }
+  }
+
   Future<void> _pullAnalytics() async {
     final eventsCursor = await _cursorFor('analytics_events');
     final eventsSnap = await _afterCursor(
@@ -326,6 +441,7 @@ class RemoteIsarMerge {
         .filter()
         .goalIdEqualTo(incoming.id)
         .findFirst();
+    if (existing == null) _newLocalGoalIds.add(incoming.id);
     if (!shouldApplyRemoteUpdatedAt(
       localUpdatedAtMs: existing?.updatedAtMs,
       remoteUpdatedAtMs: incoming.updatedAtMs,
@@ -334,6 +450,62 @@ class RemoteIsarMerge {
     }
     await _isar.writeTxn(() async {
       await _isar.isarGoals.putByGoalId(IsarGoal.fromDomain(incoming));
+    });
+    _appliedCount++;
+  }
+
+  Future<void> _mergeGoalAction(GoalAction incoming) async {
+    final existing = await _isar.isarGoalActions
+        .filter()
+        .actionIdEqualTo(incoming.id)
+        .findFirst();
+    if (!shouldApplyRemoteUpdatedAt(
+      localUpdatedAtMs: existing?.updatedAtMs,
+      remoteUpdatedAtMs: incoming.updatedAtMs,
+    )) {
+      return;
+    }
+    await _isar.writeTxn(() async {
+      await _isar.isarGoalActions.putByActionId(
+        IsarGoalAction.fromDomain(incoming),
+      );
+    });
+    _appliedCount++;
+  }
+
+  Future<void> _mergeGoalMilestone(GoalMilestone incoming) async {
+    final existing = await _isar.isarGoalMilestones
+        .filter()
+        .milestoneIdEqualTo(incoming.id)
+        .findFirst();
+    if (!shouldApplyRemoteUpdatedAt(
+      localUpdatedAtMs: existing?.updatedAtMs,
+      remoteUpdatedAtMs: incoming.updatedAtMs,
+    )) {
+      return;
+    }
+    await _isar.writeTxn(() async {
+      await _isar.isarGoalMilestones.putByMilestoneId(
+        IsarGoalMilestone.fromDomain(incoming),
+      );
+    });
+    _appliedCount++;
+  }
+
+  Future<void> _mergeGoalCheckIn(GoalCheckIn incoming) async {
+    final existing = await _isar.isarGoalCheckIns.getByCheckInKey(
+      IsarGoalCheckIn.keyFor(incoming.goalId, incoming.dateKey),
+    );
+    if (!shouldApplyRemoteUpdatedAt(
+      localUpdatedAtMs: existing?.updatedAtMs,
+      remoteUpdatedAtMs: incoming.updatedAtMs,
+    )) {
+      return;
+    }
+    await _isar.writeTxn(() async {
+      await _isar.isarGoalCheckIns.putByCheckInKey(
+        IsarGoalCheckIn.fromDomain(incoming),
+      );
     });
     _appliedCount++;
   }

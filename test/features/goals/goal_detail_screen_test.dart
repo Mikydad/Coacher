@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:coach_for_life/core/di/providers.dart';
 import 'package:coach_for_life/core/utils/date_keys.dart';
 import 'package:coach_for_life/features/analytics/application/feature_builder_recompute_service.dart';
@@ -17,15 +19,42 @@ import 'package:flutter_test/flutter_test.dart';
 
 class _MemoryGoalsRepository implements GoalsRepository {
   _MemoryGoalsRepository(this.goal, {List<GoalCheckIn> checkIns = const []})
-      : checkIns = {for (final c in checkIns) c.dateKey: c};
+    : checkIns = {for (final c in checkIns) c.dateKey: c};
 
   UserGoal goal;
   final Map<String, GoalCheckIn> checkIns;
   final List<GoalAction> actions = [];
   final List<GoalMilestone> milestones = [];
 
+  /// Pinged on every mutation so the watch streams re-emit — mirrors the
+  /// live Isar watches the real repository exposes.
+  final StreamController<void> _changes = StreamController<void>.broadcast();
+
+  Stream<T> _live<T>(T Function() snapshot) async* {
+    yield snapshot();
+    yield* _changes.stream.map((_) => snapshot());
+  }
+
+  void _notify() => _changes.add(null);
+
   @override
-  Stream<List<UserGoal>> watchGoals() => Stream.value([goal]);
+  Stream<List<UserGoal>> watchGoals() => _live(() => [goal]);
+
+  @override
+  Stream<UserGoal?> watchGoal(String goalId) =>
+      _live(() => goalId == goal.id ? goal : null);
+
+  @override
+  Stream<List<GoalAction>> watchActions(String goalId) =>
+      _live(() => List.of(actions));
+
+  @override
+  Stream<List<GoalMilestone>> watchMilestones(String goalId) =>
+      _live(() => List.of(milestones));
+
+  @override
+  Stream<List<GoalCheckIn>> watchCheckIns(String goalId) =>
+      _live(() => checkIns.values.toList());
 
   @override
   Future<List<UserGoal>> fetchGoalsOnce() async => [goal];
@@ -35,7 +64,10 @@ class _MemoryGoalsRepository implements GoalsRepository {
       goalId == goal.id ? goal : null;
 
   @override
-  Future<void> upsertGoal(UserGoal g) async => goal = g;
+  Future<void> upsertGoal(UserGoal g) async {
+    goal = g;
+    _notify();
+  }
 
   @override
   Future<void> deleteGoal(String goalId) async {}
@@ -47,13 +79,17 @@ class _MemoryGoalsRepository implements GoalsRepository {
   Future<void> upsertAction(GoalAction action) async {
     actions.removeWhere((a) => a.id == action.id);
     actions.add(action);
+    _notify();
   }
 
   @override
   Future<void> deleteAction({
     required String goalId,
     required String actionId,
-  }) async {}
+  }) async {
+    actions.removeWhere((a) => a.id == actionId);
+    _notify();
+  }
 
   @override
   Future<List<GoalMilestone>> getMilestones(String goalId) async => milestones;
@@ -62,6 +98,7 @@ class _MemoryGoalsRepository implements GoalsRepository {
   Future<void> upsertMilestone(GoalMilestone milestone) async {
     milestones.removeWhere((m) => m.id == milestone.id);
     milestones.add(milestone);
+    _notify();
   }
 
   @override
@@ -70,11 +107,13 @@ class _MemoryGoalsRepository implements GoalsRepository {
     required String milestoneId,
   }) async {
     milestones.removeWhere((m) => m.id == milestoneId);
+    _notify();
   }
 
   @override
   Future<void> upsertCheckIn(GoalCheckIn checkIn) async {
     checkIns[checkIn.dateKey] = checkIn;
+    _notify();
   }
 
   @override
@@ -86,8 +125,7 @@ class _MemoryGoalsRepository implements GoalsRepository {
     String goalId, {
     String? startDateKey,
     String? endDateKey,
-  }) async =>
-      checkIns.values.toList();
+  }) async => checkIns.values.toList();
 }
 
 class _NoOpAnalyticsRepository implements AnalyticsRepository {
@@ -135,32 +173,36 @@ Widget _app(_MemoryGoalsRepository repo) {
     overrides: [
       goalsRepositoryProvider.overrideWithValue(repo),
       analyticsRepositoryProvider.overrideWithValue(_NoOpAnalyticsRepository()),
-      featureBuilderRecomputeServiceProvider
-          .overrideWithValue(_NoOpRecomputeService()),
+      featureBuilderRecomputeServiceProvider.overrideWithValue(
+        _NoOpRecomputeService(),
+      ),
     ],
     child: const MaterialApp(home: GoalDetailScreen(goalId: 'g1')),
   );
 }
 
 void main() {
-  testWidgets('shows commit CTA when today is not done; tapping marks it done',
-      (tester) async {
-    final repo = _MemoryGoalsRepository(_goal());
-    await tester.pumpWidget(_app(repo));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'shows commit CTA when today is not done; tapping marks it done',
+    (tester) async {
+      final repo = _MemoryGoalsRepository(_goal());
+      await tester.pumpWidget(_app(repo));
+      await tester.pumpAndSettle();
 
-    expect(find.text('I DID IT TODAY'), findsOneWidget);
-    await tester.tap(find.text('I DID IT TODAY'));
-    await tester.pumpAndSettle();
+      expect(find.text('I DID IT TODAY'), findsOneWidget);
+      await tester.tap(find.text('I DID IT TODAY'));
+      await tester.pumpAndSettle();
 
-    final todayKey = DateKeys.todayKey();
-    expect(repo.checkIns[todayKey]?.metCommitment, isTrue);
-    expect(find.text('Mission Accomplished.'), findsOneWidget);
-    expect(find.text('UNDO TODAY'), findsOneWidget);
-  });
+      final todayKey = DateKeys.todayKey();
+      expect(repo.checkIns[todayKey]?.metCommitment, isTrue);
+      expect(find.text('Mission Accomplished.'), findsOneWidget);
+      expect(find.text('UNDO TODAY'), findsOneWidget);
+    },
+  );
 
-  testWidgets('UNDO TODAY unmarks today and returns to the commit CTA',
-      (tester) async {
+  testWidgets('UNDO TODAY unmarks today and returns to the commit CTA', (
+    tester,
+  ) async {
     final todayKey = DateKeys.todayKey();
     final repo = _MemoryGoalsRepository(
       _goal(),

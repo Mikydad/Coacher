@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/firebase/firestore_paths.dart';
-import '../../../core/sync/sync_service.dart';
+import '../../../core/sync/outbox_writer.dart';
 import '../domain/models/timer_session.dart';
 
 abstract class ExecutionRepository {
@@ -53,16 +53,10 @@ class FirestoreExecutionRepository implements ExecutionRepository {
     session.validate();
     final path = '${FirestorePaths.timerSessions}/${session.id}';
     final payload = session.toMap();
-    try {
-      await FirebaseFirestore.instance
-          .doc(path)
-          .set(payload, SetOptions(merge: true));
-    } catch (_) {
-      await SyncService.instance.enqueueUpsert(
-        entityType: 'timerSession',
-        documentPath: path,
-        payload: payload,
-      );
-    }
+    await outboxUpsert(
+      entityType: 'timerSession',
+      documentPath: path,
+      payload: payload,
+    );
   }
 }

@@ -1,11 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:isar_community/isar.dart';
 
 import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/local_db/isar_collections/isar_analytics_event.dart';
 import '../../../core/local_db/isar_collections/isar_analytics_stats.dart';
 import '../../../core/offline/offline_store.dart';
-import '../../../core/sync/sync_service.dart';
+import '../../../core/sync/outbox_writer.dart';
 import '../domain/models/analytics_event.dart';
 import '../domain/models/analytics_stats_cache.dart';
 import 'analytics_repository.dart';
@@ -38,17 +37,11 @@ class IsarAnalyticsRepository implements AnalyticsRepository {
     });
     final path = '${FirestorePaths.analyticsEvents}/${event.id}';
     final payload = event.toMap();
-    try {
-      await FirebaseFirestore.instance
-          .doc(path)
-          .set(payload, SetOptions(merge: true));
-    } catch (_) {
-      await SyncService.instance.enqueueUpsert(
-        entityType: 'analyticsEvent',
-        documentPath: path,
-        payload: payload,
-      );
-    }
+    await outboxUpsert(
+      entityType: 'analyticsEvent',
+      documentPath: path,
+      payload: payload,
+    );
   }
 
   @override
@@ -124,17 +117,11 @@ class IsarAnalyticsRepository implements AnalyticsRepository {
     });
     final path = '${FirestorePaths.analyticsStats}/${stats.id}';
     final payload = stats.toMap();
-    try {
-      await FirebaseFirestore.instance
-          .doc(path)
-          .set(payload, SetOptions(merge: true));
-    } catch (_) {
-      await SyncService.instance.enqueueUpsert(
-        entityType: 'analyticsStats',
-        documentPath: path,
-        payload: payload,
-      );
-    }
+    await outboxUpsert(
+      entityType: 'analyticsStats',
+      documentPath: path,
+      payload: payload,
+    );
   }
 
   @override

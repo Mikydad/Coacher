@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/firebase/firestore_client.dart';
 import '../../../core/firebase/firestore_paths.dart';
-import '../../../core/sync/sync_service.dart';
+import '../../../core/sync/outbox_writer.dart';
 import '../../../core/utils/stable_id.dart';
 import '../application/accountability_log_codec.dart';
 import '../../planning/domain/models/accountability_log.dart';
@@ -70,31 +70,21 @@ class FirestorePlanningRepository implements PlanningRepository {
     required String path,
     required Map<String, dynamic> payload,
   }) async {
-    try {
-      await FirebaseFirestore.instance
-          .doc(path)
-          .set(payload, SetOptions(merge: true));
-    } catch (_) {
-      await SyncService.instance.enqueueUpsert(
-        entityType: entityType,
-        documentPath: path,
-        payload: payload,
-      );
-    }
+    await outboxUpsert(
+      entityType: entityType,
+      documentPath: path,
+      payload: payload,
+    );
   }
 
   Future<void> _deleteWithQueue({
     required String entityType,
     required String path,
   }) async {
-    try {
-      await FirebaseFirestore.instance.doc(path).delete();
-    } catch (_) {
-      await SyncService.instance.enqueueDelete(
-        entityType: entityType,
-        documentPath: path,
-      );
-    }
+    await outboxDelete(
+      entityType: entityType,
+      documentPath: path,
+    );
   }
 
   @override
