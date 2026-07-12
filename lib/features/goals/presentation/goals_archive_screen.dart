@@ -9,6 +9,7 @@ import '../application/goal_period_helpers.dart';
 import 'goal_detail_screen.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/presentation/page_headers.dart';
 
 class GoalsArchiveScreen extends ConsumerWidget {
   const GoalsArchiveScreen({super.key});
@@ -20,7 +21,10 @@ class GoalsArchiveScreen extends ConsumerWidget {
     final async = ref.watch(archivedGoalsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Paused & completed')),
+      appBar: AppBar(
+        title: const PageTitle('Paused & completed'),
+        centerTitle: true,
+      ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Could not load: $e')),

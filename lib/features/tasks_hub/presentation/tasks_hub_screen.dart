@@ -16,6 +16,7 @@ import '../../timer/presentation/timer_session_screen.dart';
 import 'task_detail_screen.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/presentation/page_headers.dart';
 
 PlannedTask _hubTaskWithOrderIndex(PlannedTaskRow row, int orderIndex) {
   final t = row.task;
@@ -123,7 +124,8 @@ class TasksHubScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tasks'),
+        title: const PageTitle('Tasks'),
+        centerTitle: true,
         actions: [
           const HelpAppBarButton('tasks'),
           IconButton(

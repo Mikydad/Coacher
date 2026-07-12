@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/presentation/page_headers.dart';
 
 // ─── Design tokens (Obsidian Pulse) ─────────────────────────────────────────
 
@@ -36,15 +37,8 @@ class SettingsPageScaffold extends StatelessWidget {
           ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: kSettingsOnSurface,
-            letterSpacing: -0.3,
-          ),
-        ),
+        title: PageTitle(title),
+        centerTitle: true,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(

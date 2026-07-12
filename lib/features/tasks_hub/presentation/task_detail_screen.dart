@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/presentation/page_headers.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
@@ -228,17 +229,17 @@ class TaskDetailScreen extends ConsumerWidget {
 
     return async.when(
       loading: () => Scaffold(
-        appBar: AppBar(title: const Text('Task')),
+        appBar: AppBar(title: const PageTitle('Task'), centerTitle: true),
         body: const Center(child: CircularProgressIndicator()),
       ),
       error: (e, _) => Scaffold(
-        appBar: AppBar(title: const Text('Task')),
+        appBar: AppBar(title: const PageTitle('Task'), centerTitle: true),
         body: Center(child: Text('Could not load task: $e')),
       ),
       data: (bundle) {
         if (bundle == null) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Task')),
+            appBar: AppBar(title: const PageTitle('Task'), centerTitle: true),
             body: Center(
               child: Text(
                 'Task not found. It may have been deleted.',
@@ -253,7 +254,8 @@ class TaskDetailScreen extends ConsumerWidget {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Task'),
+            title: const PageTitle('Task'),
+            centerTitle: true,
             actions: [
               const HelpAppBarButton('tasks'),
               IconButton(

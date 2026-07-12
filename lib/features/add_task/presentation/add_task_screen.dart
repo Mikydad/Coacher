@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import '../../../core/presentation/bento_category_card.dart';
+import '../../../core/presentation/page_headers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -1684,47 +1685,47 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
 
     return IntrinsicHeight(
       child: Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: AddTaskSplitSettingCard(
-            icon: Icons.verified_user_outlined,
-            title: 'Accountability',
-            // Short label only — the picker sheet explains the rest.
-            // No HelpDot here: 'Accountability' barely fits the half-width
-            // card, and a dot on one card but not its twin looks lopsided.
-            subtitle: _modeLabels[selectedIndex].toUpperCase(),
-            onTap: _showAccountabilityPicker,
-            trailing: Text(
-              'CHANGE',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.6,
-                color: AddTaskColors.accentDim,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: AddTaskSplitSettingCard(
+              icon: Icons.verified_user_outlined,
+              title: 'Accountability',
+              // Short label only — the picker sheet explains the rest.
+              // No HelpDot here: 'Accountability' barely fits the half-width
+              // card, and a dot on one card but not its twin looks lopsided.
+              subtitle: _modeLabels[selectedIndex].toUpperCase(),
+              onTap: _showAccountabilityPicker,
+              trailing: Text(
+                'CHANGE',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                  color: AddTaskColors.accentDim,
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: AddTaskSplitSettingCard(
-            icon: Icons.bolt_rounded,
-            title: 'Deep Work',
-            subtitle: 'BLOCKS ALERTS',
-            onTap: () => setState(() => _focusSession = !_focusSession),
-            trailing: Switch.adaptive(
-              value: _focusSession,
-              onChanged: (v) => setState(() => _focusSession = v),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              activeTrackColor: AddTaskColors.accentDim.withValues(
-                alpha: 0.55,
+          const SizedBox(width: 12),
+          Expanded(
+            child: AddTaskSplitSettingCard(
+              icon: Icons.bolt_rounded,
+              title: 'Deep Work',
+              subtitle: 'BLOCKS ALERTS',
+              onTap: () => setState(() => _focusSession = !_focusSession),
+              trailing: Switch.adaptive(
+                value: _focusSession,
+                onChanged: (v) => setState(() => _focusSession = v),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                activeTrackColor: AddTaskColors.accentDim.withValues(
+                  alpha: 0.55,
+                ),
+                activeThumbColor: AddTaskColors.accentContainer,
               ),
-              activeThumbColor: AddTaskColors.accentContainer,
             ),
           ),
-        ),
-      ],
+        ],
       ),
     );
   }
@@ -1993,134 +1994,166 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
   Widget build(BuildContext context) {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
 
-    return Scaffold(
-      backgroundColor: AddTaskColors.surface,
-      appBar: AppBar(
+    // A new task starts on the category grid; from the details form, back
+    // (app-bar arrow and system gesture both go through maybePop) returns to
+    // that grid instead of leaving the screen. Editing has no category step.
+    // Saving closes via imperative Navigator.pop, which skips this scope.
+    final backReturnsToCategoryStep = !_isEdit && _loaded && _categoryChosen;
+
+    return PopScope(
+      canPop: !backReturnsToCategoryStep,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) setState(() => _categoryChosen = false);
+      },
+      child: Scaffold(
         backgroundColor: AddTaskColors.surface,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        foregroundColor: AddTaskColors.accent,
-        centerTitle: true,
-        title: Text(
-          (_isEdit ? 'Edit task' : 'Add task').toUpperCase(),
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 14,
-            letterSpacing: 2,
-            color: AddTaskColors.onSurface,
-          ),
+        appBar: AppBar(
+          backgroundColor: AddTaskColors.surface,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          foregroundColor: AddTaskColors.accent,
+          centerTitle: true,
+          title: PageTitle(_isEdit ? 'Edit task' : 'Add task'),
+          actions: const [HelpAppBarButton('tasks')],
         ),
-        actions: const [HelpAppBarButton('tasks')],
-      ),
-      body: !_loaded
-          ? Center(
-              child: CircularProgressIndicator(color: AddTaskColors.accent),
-            )
-          : !_categoryChosen
-          ? _buildCategoryStep()
-          : KeyboardDismissOnTap(
-              child: Column(
-              children: [
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
+        // The category grid and the details form are steps inside one route,
+        // so route transitions never fire between them — a soft fade+slide
+        // keeps the step change from snapping (forward and back).
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 260),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.02),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
+            ),
+          ),
+          child: !_loaded
+              ? Center(
+                  key: const ValueKey('add_task_loading'),
+                  child: CircularProgressIndicator(color: AddTaskColors.accent),
+                )
+              : !_categoryChosen
+              ? KeyedSubtree(
+                  key: const ValueKey('add_task_category_step'),
+                  child: _buildCategoryStep(),
+                )
+              : KeyboardDismissOnTap(
+                  key: const ValueKey('add_task_form_step'),
+                  child: Column(
                     children: [
-                      _buildCategoryChipRow(),
-                      const SizedBox(height: 16),
-                      const AddTaskHeroSectionLabel(
-                        title: 'What do you want to do?',
-                        subtitle: 'Give it a clear, actionable name',
-                      ),
-                      const SizedBox(height: 16),
-                      AddTaskField(
-                        // Guided-tour target: "give it a name".
-                        key: TourTargets.addTaskTitleField,
-                        controller: _controller,
-                        hint: 'Read 10 pages',
-                        // New task: start typing immediately. Editing keeps
-                        // the keyboard down, and Sleep arrives pre-filled.
-                        autofocus: !_isEdit && !isSleepCategory(_category),
-                      ),
-                      const SizedBox(height: 12),
-                      AddTaskField(
-                        controller: _notesController,
-                        hint: 'Notes (optional)',
-                        // One line that grows while typing.
-                        minLines: 1,
-                        maxLines: 3,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: AddTaskColors.muted,
+                      Expanded(
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          children: [
+                            _buildCategoryChipRow(),
+                            const SizedBox(height: 16),
+                            const AddTaskHeroSectionLabel(
+                              title: 'What do you want to do?',
+                              subtitle: 'Give it a clear, actionable name',
+                            ),
+                            const SizedBox(height: 16),
+                            AddTaskField(
+                              // Guided-tour target: "give it a name".
+                              key: TourTargets.addTaskTitleField,
+                              controller: _controller,
+                              hint: 'Read 10 pages',
+                              // New task: start typing immediately. Editing keeps
+                              // the keyboard down, and Sleep arrives pre-filled.
+                              autofocus:
+                                  !_isEdit && !isSleepCategory(_category),
+                            ),
+                            const SizedBox(height: 12),
+                            AddTaskField(
+                              controller: _notesController,
+                              hint: 'Notes (optional)',
+                              // One line that grows while typing.
+                              minLines: 1,
+                              maxLines: 3,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: AddTaskColors.muted,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            // Reminder sits directly under the name so it can be set
+                            // without scrolling — the most common add-task intent.
+                            _buildReminderSection(),
+                            const SizedBox(height: 12),
+                            _buildDurationSection(),
+                            const SizedBox(height: 20),
+                            if (isSleepCategory(_category)) ...[
+                              _buildAccountabilityRow(),
+                              const SizedBox(height: 12),
+                              _buildSleepExtrasSection(),
+                            ] else ...[
+                              _buildAccountabilityAndDeepWorkRow(),
+                              const SizedBox(height: 20),
+                              _buildAdvancedSection(),
+                            ],
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      // Reminder sits directly under the name so it can be set
-                      // without scrolling — the most common add-task intent.
-                      _buildReminderSection(),
-                      const SizedBox(height: 12),
-                      _buildDurationSection(),
-                      const SizedBox(height: 20),
-                      if (isSleepCategory(_category)) ...[
-                        _buildAccountabilityRow(),
-                        const SizedBox(height: 12),
-                        _buildSleepExtrasSection(),
-                      ] else ...[
-                        _buildAccountabilityAndDeepWorkRow(),
-                        const SizedBox(height: 20),
-                        _buildAdvancedSection(),
-                      ],
+                      Container(
+                        padding: EdgeInsets.fromLTRB(
+                          24,
+                          16,
+                          24,
+                          16 + bottomSafe,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AddTaskColors.surface,
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              AddTaskColors.surface.withValues(alpha: 0),
+                              AddTaskColors.surface,
+                            ],
+                          ),
+                        ),
+                        child: FilledButton(
+                          // Guided-tour target: "now save it".
+                          key: TourTargets.addTaskSaveButton,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(56),
+                            backgroundColor: AddTaskColors.accentContainer,
+                            foregroundColor: AppColors.accentDeep,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(28),
+                            ),
+                          ),
+                          onPressed: _saving ? null : _onSave,
+                          child: Text(
+                            _saving
+                                ? 'Saving…'
+                                : (_isEdit ? 'Save changes' : 'Add task')
+                                      .toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                Container(
-                  padding: EdgeInsets.fromLTRB(24, 16, 24, 16 + bottomSafe),
-                  decoration: BoxDecoration(
-                    color: AddTaskColors.surface,
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        AddTaskColors.surface.withValues(alpha: 0),
-                        AddTaskColors.surface,
-                      ],
-                    ),
-                  ),
-                  child: FilledButton(
-                    // Guided-tour target: "now save it".
-                    key: TourTargets.addTaskSaveButton,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(56),
-                      backgroundColor: AddTaskColors.accentContainer,
-                      foregroundColor: AppColors.accentDeep,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                    ),
-                    onPressed: _saving ? null : _onSave,
-                    child: Text(
-                      _saving
-                          ? 'Saving…'
-                          : (_isEdit ? 'Save changes' : 'Add task')
-                                .toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-              ),
-            ),
+        ),
+      ),
     );
   }
 }
-
 
 /// Owns its [TextEditingController] so it is disposed only after the dialog
 /// route finishes (same pattern as the goal milestone dialog).

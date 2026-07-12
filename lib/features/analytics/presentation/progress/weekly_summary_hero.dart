@@ -7,6 +7,7 @@ import 'progress_design_tokens.dart';
 import 'progress_shared_widgets.dart';
 
 import '../../../../core/presentation/app_colors.dart';
+import '../../../../core/presentation/page_headers.dart';
 
 String progressWeekDateRangeLabel() {
   final now = DateTime.now();
@@ -61,14 +62,7 @@ class WeeklySummaryHero extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
-              'Weekly Summary',
-              style: TextStyle(
-                color: ProgressDesignTokens.onSurface,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            Text('Weekly summary', style: SectionHeader.style),
             const HelpDot('weeklySummary'),
             const Spacer(),
             Text(

@@ -432,7 +432,11 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
 
   /// Start and end picked together on one calendar, like booking a flight.
   Future<void> _pickRange() async {
-    final start = DateTime(_rangeStart.year, _rangeStart.month, _rangeStart.day);
+    final start = DateTime(
+      _rangeStart.year,
+      _rangeStart.month,
+      _rangeStart.day,
+    );
     final end = DateTime(_rangeEnd.year, _rangeEnd.month, _rangeEnd.day);
     final picked = await showDateRangePicker(
       context: context,
@@ -802,7 +806,9 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
       await ref.read(formDraftRepositoryProvider).delete(_draftKey);
 
       if (!mounted) return;
-      Navigator.pop(context);
+      // `true` = saved: the template picker beneath pops itself as well, so
+      // back after saving doesn't land on a stale picker.
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -1033,10 +1039,8 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
             '${_repeatInterval <= 1 ? '' : '$_repeatInterval '}'
             '${switch (_repeatCadence) {
               GoalRepeatCadence.daily => _repeatInterval <= 1 ? 'day' : 'days',
-              GoalRepeatCadence.weekly =>
-                _repeatInterval <= 1 ? 'week' : 'weeks',
-              GoalRepeatCadence.monthly =>
-                _repeatInterval <= 1 ? 'month' : 'months',
+              GoalRepeatCadence.weekly => _repeatInterval <= 1 ? 'week' : 'weeks',
+              GoalRepeatCadence.monthly => _repeatInterval <= 1 ? 'month' : 'months',
               GoalRepeatCadence.off => '',
             }}.',
             style: TextStyle(color: AppColors.fg38, fontSize: 12),

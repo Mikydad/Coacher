@@ -116,7 +116,8 @@ void main() {
     );
 
     await tester.pumpAndSettle();
-    expect(find.text('Accountability History'), findsOneWidget);
+    // PageTitle renders app-bar titles as small caps.
+    expect(find.text('ACCOUNTABILITY HISTORY'), findsOneWidget);
     expect(find.textContaining('defer'), findsOneWidget);
     expect(find.textContaining('scheduleConflict'), findsOneWidget);
   });

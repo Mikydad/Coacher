@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/local_db/isar_collections/isar_ai_action_batch.dart';
 import '../../../core/presentation/keyboard_dismiss.dart';
+import '../../../core/presentation/page_headers.dart';
 import '../../../core/utils/date_keys.dart';
 import '../application/ai_action_batch_state.dart';
 import '../application/ai_assistant_providers.dart';
@@ -172,14 +173,8 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       backgroundColor: AppColors.ink,
       elevation: 0,
       automaticallyImplyLeading: false,
-      title: Text(
-        'Coach AI',
-        style: TextStyle(
-          fontSize: 22,
-          fontWeight: FontWeight.w700,
-          color: AppColors.fg,
-        ),
-      ),
+      title: const PageTitle('Coach AI'),
+      centerTitle: true,
       actions: [
         const HelpAppBarButton('coachAi'),
         _StatusPill(isReady: isReady),

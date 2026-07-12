@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/presentation/page_headers.dart';
 import '../domain/models/accountability_log.dart';
 import '../domain/models/flow_transition_event.dart';
 
@@ -95,7 +96,8 @@ class _AccountabilityHistoryScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Accountability History'),
+        title: const PageTitle('Accountability History'),
+        centerTitle: true,
         actions: [
           PopupMenuButton<String>(
             onSelected: _export,

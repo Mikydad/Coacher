@@ -5,6 +5,7 @@ import '../../domain/models/goal_categories.dart';
 import '../../domain/models/goal_enums.dart';
 
 import '../../../../core/presentation/app_colors.dart';
+import '../../../../core/presentation/page_headers.dart';
 
 /// Shared palette for the goal editor — matches goals list accent styling.
 abstract final class GoalEditorColors {
@@ -922,7 +923,10 @@ class GoalEditorReminderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 16, vertical: 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 16,
+        vertical: 10,
+      ),
       decoration: BoxDecoration(
         color: GoalEditorColors.inputFill,
         borderRadius: BorderRadius.circular(compact ? 20 : 28),
@@ -963,7 +967,9 @@ class GoalEditorReminderCard extends StatelessWidget {
                   ),
                   Text(
                     enabled
-                        ? (compact ? timeLabel : 'Alert scheduled for $timeLabel')
+                        ? (compact
+                              ? timeLabel
+                              : 'Alert scheduled for $timeLabel')
                         : 'Off',
                     style: TextStyle(color: AppColors.fg38, fontSize: 12),
                     maxLines: 1,
@@ -1450,15 +1456,7 @@ class GoalEditorHeader extends StatelessWidget implements PreferredSizeWidget {
         onPressed: onBack,
       ),
       centerTitle: true,
-      title: Text(
-        isEditing ? 'EDIT GOAL' : 'NEW GOAL',
-        style: TextStyle(
-          color: AppColors.fg,
-          fontWeight: FontWeight.w800,
-          fontSize: 14,
-          letterSpacing: 1.5,
-        ),
-      ),
+      title: PageTitle(isEditing ? 'Edit goal' : 'New goal'),
       actions: [
         IconButton(
           tooltip: 'Save',

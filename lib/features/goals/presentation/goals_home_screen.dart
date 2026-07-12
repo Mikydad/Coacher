@@ -11,6 +11,7 @@ import 'widgets/category_chip_row.dart';
 import 'widgets/goal_card.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/presentation/page_headers.dart';
 
 /// Goals tab — list with fill-bar cards, horizontal category chips,
 /// and a counter bottom sheet on tap.
@@ -23,7 +24,8 @@ class GoalsHomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Goals'),
+        title: const PageTitle('Goals'),
+        centerTitle: true,
         actions: [
           const HelpAppBarButton('goals'),
           IconButton(

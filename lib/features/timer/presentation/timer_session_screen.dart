@@ -18,11 +18,11 @@ import '../../analytics/domain/models/analytics_event.dart';
 import '../../scoring/application/scoring_controller.dart';
 import '../../scoring/presentation/score_task_dialog.dart';
 import '../../education/presentation/help_dot.dart';
-import '../../home/presentation/pathpal_app_bar_title.dart';
 import '../../planning/application/planned_task_actions.dart';
 import '../../time_blocks/application/time_block_providers.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/presentation/page_headers.dart';
 
 class TimerLaunchArgs {
   const TimerLaunchArgs({this.autoStartDelaySeconds});
@@ -370,7 +370,8 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const PathPalAppBarTitle(),
+        title: const PageTitle('Focus session'),
+        centerTitle: true,
         actions: const [HelpAppBarButton('focus')],
       ),
       body: SafeArea(

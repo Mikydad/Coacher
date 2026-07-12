@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/presentation/keyboard_dismiss.dart';
+import '../../../core/presentation/page_headers.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../../core/di/providers.dart';
 import '../application/circle_providers.dart';
@@ -123,13 +124,8 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.surfaceDark,
         foregroundColor: AppColors.textPrimary,
-        title: Text(
-          'Create circle',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        title: const PageTitle('Create circle'),
+        centerTitle: true,
         elevation: 0,
       ),
       body: KeyboardDismissOnTap(

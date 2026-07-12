@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/presentation/page_headers.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
@@ -11,7 +12,6 @@ import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/application/daily_analytics_providers.dart';
 import '../../analytics/application/delivery_providers.dart';
 import '../../analytics/domain/models/analytics_event.dart';
-import '../../home/presentation/pathpal_app_bar_title.dart';
 import '../application/goal_intensity_mode.dart';
 import '../application/goal_period_helpers.dart';
 import '../application/goals_providers.dart';
@@ -59,11 +59,8 @@ class GoalDetailScreen extends ConsumerWidget {
         if (c.metCommitment) c.dateKey,
     };
     if (met.isEmpty) return 0;
-    bool counts(DateTime d) =>
-        !goal.hasRepeatSchedule || goal.isActionDay(d);
-    final periodStart = DateTime.fromMillisecondsSinceEpoch(
-      goal.periodStartMs,
-    );
+    bool counts(DateTime d) => !goal.hasRepeatSchedule || goal.isActionDay(d);
+    final periodStart = DateTime.fromMillisecondsSinceEpoch(goal.periodStartMs);
     final floor = DateTime(
       periodStart.year,
       periodStart.month,
@@ -95,7 +92,8 @@ class GoalDetailScreen extends ConsumerWidget {
       backgroundColor: AppColors.ink,
       appBar: AppBar(
         backgroundColor: AppColors.ink,
-        title: const PathPalAppBarTitle(),
+        title: const PageTitle('Goal'),
+        centerTitle: true,
       ),
       body: Center(
         child: spinner
@@ -155,7 +153,8 @@ class GoalDetailScreen extends ConsumerWidget {
           backgroundColor: AppColors.ink,
           appBar: AppBar(
             backgroundColor: AppColors.ink,
-            title: const PathPalAppBarTitle(),
+            title: const PageTitle('Goal'),
+            centerTitle: true,
             actions: [
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_horiz),
@@ -689,16 +688,7 @@ class _SectionHeader extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  color: AppColors.fg,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
+            Expanded(child: Text(title, style: SectionHeader.style)),
             if (helpId != null) HelpDot(helpId!),
             ?trailing,
           ],

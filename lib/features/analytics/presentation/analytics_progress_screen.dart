@@ -17,6 +17,7 @@ import 'progress/weekly_summary_hero.dart';
 import '../domain/models/ai_summary_response.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/presentation/page_headers.dart';
 import '../../../core/presentation/async_value_ui.dart';
 
 class AnalyticsProgressScreen extends ConsumerStatefulWidget {
@@ -90,14 +91,8 @@ class _AnalyticsProgressScreenState
         backgroundColor: ProgressDesignTokens.surface,
         elevation: 0,
         foregroundColor: ProgressDesignTokens.onSurfaceVariant,
-        title: Text(
-          'Progress',
-          style: TextStyle(
-            color: ProgressDesignTokens.primaryDim,
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+        title: const PageTitle('Progress'),
+        centerTitle: true,
         actions: [
           const HelpAppBarButton('analytics'),
           IconButton(

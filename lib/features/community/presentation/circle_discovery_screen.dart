@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/presentation/keyboard_dismiss.dart';
+import '../../../core/presentation/page_headers.dart';
 import '../application/circle_providers.dart';
 import '../application/circle_recommendation_service.dart';
 import '../application/user_circle_membership_service.dart';
@@ -281,13 +282,8 @@ class _CircleDiscoveryScreenState extends ConsumerState<CircleDiscoveryScreen>
       appBar: AppBar(
         backgroundColor: AppColors.surfaceDark,
         foregroundColor: AppColors.textPrimary,
-        title: Text(
-          'Discover circles',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        title: const PageTitle('Discover circles'),
+        centerTitle: true,
         elevation: 0,
         bottom: TabBar(
           controller: _tabController,

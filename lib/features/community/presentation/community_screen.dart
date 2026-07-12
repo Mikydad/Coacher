@@ -12,6 +12,7 @@ import 'circle_detail_screen.dart';
 import 'circle_discovery_screen.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/presentation/page_headers.dart';
 import '../../../core/presentation/async_value_ui.dart';
 
 class CommunityScreen extends ConsumerWidget {
@@ -29,14 +30,8 @@ class CommunityScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: AppColors.surfaceDark,
         foregroundColor: AppColors.textPrimary,
-        title: Text(
-          'My Circles',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w700,
-            fontSize: 20,
-          ),
-        ),
+        title: const PageTitle('My Circles'),
+        centerTitle: true,
         elevation: 0,
         actions: [
           const HelpAppBarButton('circles'),
@@ -299,18 +294,9 @@ class _DiscoverHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const SectionHeader(
           'Discover circles',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Join an existing circle or create your own.',
-          style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+          subtitle: 'Join an existing circle or create your own.',
         ),
       ],
     );

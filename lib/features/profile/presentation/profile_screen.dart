@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/presentation/theme_brightness_controller.dart';
+import '../../../core/presentation/page_headers.dart';
 
 import '../../../app/application/main_tab_navigation.dart';
 import '../../auth/application/auth_providers.dart';
@@ -164,7 +165,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _SectionLabel(label: 'Discipline Modes', helpId: 'disciplineModes'),
+                    _SectionLabel(
+                      label: 'Discipline Modes',
+                      helpId: 'disciplineModes',
+                    ),
                     const SizedBox(height: 4),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -227,7 +231,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
               // ── Core Optimization (settings) ──────────────────────────────
               SliverToBoxAdapter(
-                child: _SectionLabel(label: 'Core Optimization', helpId: 'coreOptimization'),
+                child: _SectionLabel(
+                  label: 'Core Optimization',
+                  helpId: 'coreOptimization',
+                ),
               ),
               SliverToBoxAdapter(
                 child: Padding(
@@ -276,15 +283,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                         ),
                         const SizedBox(width: 16),
-                        Text(
-                          'Profile',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: _kOnSurface,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
+                        const PageTitle('Profile'),
                       ],
                     ),
                   ),
@@ -873,8 +872,7 @@ class _CoreOptimizationSection extends StatelessWidget {
               color: _kOnSurfaceVariant,
               size: 20,
             ),
-            onTap: () =>
-                Navigator.pushNamed(context, FeedbackScreen.routeName),
+            onTap: () => Navigator.pushNamed(context, FeedbackScreen.routeName),
             isLast: true,
           ),
         ],
@@ -1008,7 +1006,12 @@ class _SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: helpId == null
           ? text
-          : Row(children: [Flexible(child: text), HelpDot(helpId!)]),
+          : Row(
+              children: [
+                Flexible(child: text),
+                HelpDot(helpId!),
+              ],
+            ),
     );
   }
 }

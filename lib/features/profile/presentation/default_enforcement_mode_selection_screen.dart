@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../features/coaching/domain/models/enforcement_mode.dart';
+import '../../../core/presentation/page_headers.dart';
 import '../application/profile_providers.dart';
 
 /// Full-screen picker for the user's default [EnforcementMode].
@@ -45,7 +46,10 @@ class _DefaultEnforcementModeSelectionScreenState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Enforcement Mode')),
+      appBar: AppBar(
+        title: const PageTitle('Enforcement Mode'),
+        centerTitle: true,
+      ),
       body: SafeArea(
         child: Column(
           children: [

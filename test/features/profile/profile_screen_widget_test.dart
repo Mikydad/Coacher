@@ -84,7 +84,8 @@ void main() {
     testWidgets('renders the Profile app bar', (tester) async {
       await tester.pumpWidget(_buildScreen());
       await tester.pump();
-      expect(find.text('Profile'), findsOneWidget);
+      // PageTitle renders app-bar titles as small caps.
+      expect(find.text('PROFILE'), findsOneWidget);
     });
 
     testWidgets('displays the display name', (tester) async {

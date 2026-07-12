@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/presentation/keyboard_dismiss.dart';
+import '../../../core/presentation/page_headers.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
@@ -19,7 +20,6 @@ import '../../planning/domain/add_task_duration.dart';
 import '../application/focus_quick_task.dart';
 import '../application/focus_task_resume.dart';
 import '../../timer/presentation/timer_session_screen.dart';
-import '../../home/presentation/pathpal_app_bar_title.dart';
 import 'focus_session_duration_picker.dart';
 
 import '../../../core/presentation/app_colors.dart';
@@ -324,7 +324,8 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const PathPalAppBarTitle(),
+          title: const PageTitle('Focus'),
+          centerTitle: true,
           actions: [
             const HelpAppBarButton('focus'),
             IconButton(
@@ -336,149 +337,153 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
         ),
         body: KeyboardDismissOnTap(
           child: ListView(
-          padding: const EdgeInsets.all(16),
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          children: [
-            const FirstTimeFeatureCard(guideId: 'focus'),
-            Text(
-              'SELECTION MODE',
-              style: TextStyle(letterSpacing: 3, color: AppColors.cyan),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'What task do you want\nto focus on?',
-              style: TextStyle(
-                fontSize: 48,
-                height: 1.1,
-                fontWeight: FontWeight.w700,
+            padding: const EdgeInsets.all(16),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            children: [
+              const FirstTimeFeatureCard(guideId: 'focus'),
+              Text(
+                'SELECTION MODE',
+                style: TextStyle(letterSpacing: 3, color: AppColors.cyan),
               ),
-            ),
-            const SizedBox(height: 20),
-            // Quick-start field: type a task and press Start Focus (or the
-            // keyboard's done action) to launch a focus session immediately —
-            // no round-trip through the task list below.
-            TextField(
-              controller: _quickController,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _onQuickStart(),
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              decoration: InputDecoration(
-                hintText: 'Start something new to focus on…',
-                hintStyle: TextStyle(
-                  color: AppColors.fg38,
-                  fontWeight: FontWeight.w500,
-                ),
-                filled: true,
-                fillColor: AppColors.surfacePanel,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide(color: AppColors.fg12),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide(color: AppColors.fg12),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide(color: AppColors.accent, width: 1.5),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 18,
-                ),
-                suffixIcon: IconButton(
-                  tooltip: 'Start focus on this task',
-                  onPressed: _quickBusy ? null : _onQuickStart,
-                  icon: _quickBusy
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(Icons.play_circle_fill, color: AppColors.accent),
+              const SizedBox(height: 12),
+              const Text(
+                'What task do you want\nto focus on?',
+                style: TextStyle(
+                  fontSize: 48,
+                  height: 1.1,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            ...taskList.when(
-              data: (tasks) {
-                if (tasks.isEmpty) {
-                  return [
-                    Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Text(
-                        'No tasks today.',
-                        style: TextStyle(color: AppColors.fg38, fontSize: 15),
-                      ),
-                    ),
-                  ];
-                }
-                return tasks
-                    .map(
-                      (task) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _TaskCard(
-                          title: task.title,
-                          subtitle: focusTaskListSubtitle(
-                            task: task,
-                            scores: scores,
-                          ),
-                          isPartial: task.status == TaskStatus.partial,
-                          selected: selectedTask == task.title,
-                          onTap: () => _selectTask(task),
-                        ),
-                      ),
-                    )
-                    .toList();
-              },
-              loading: () => const [
-                Padding(
-                  padding: EdgeInsets.all(18),
-                  child: Center(child: CircularProgressIndicator()),
+              const SizedBox(height: 20),
+              // Quick-start field: type a task and press Start Focus (or the
+              // keyboard's done action) to launch a focus session immediately —
+              // no round-trip through the task list below.
+              TextField(
+                controller: _quickController,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _onQuickStart(),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                 ),
-              ],
-              error: (e, _) => [
-                Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Text(
-                    'Could not load tasks. Check your connection and try leaving this screen and opening Focus again.\n\n$e',
-                    style: TextStyle(color: Colors.red.shade200),
+                decoration: InputDecoration(
+                  hintText: 'Start something new to focus on…',
+                  hintStyle: TextStyle(
+                    color: AppColors.fg38,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  filled: true,
+                  fillColor: AppColors.surfacePanel,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: BorderSide(color: AppColors.fg12),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: BorderSide(color: AppColors.fg12),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: BorderSide(color: AppColors.accent, width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 18,
+                  ),
+                  suffixIcon: IconButton(
+                    tooltip: 'Start focus on this task',
+                    onPressed: _quickBusy ? null : _onQuickStart,
+                    icon: _quickBusy
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(Icons.play_circle_fill, color: AppColors.accent),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(60),
-                backgroundColor: hasRunningTask
-                    ? AppColors.dark2B2D31
-                    : AppColors.accent,
-                foregroundColor: hasRunningTask
-                    ? AppColors.fg
-                    : AppColors.onAccent,
               ),
-              onPressed: hasRunningTask
-                  ? () => Navigator.pushNamed(
-                      context,
-                      TimerSessionScreen.routeName,
-                    )
-                  : _quickBusy
-                  ? null
-                  : _hasQuickText
-                  // Field has text → start the typed task (duration → timer).
-                  ? () => _onStartFocusPressed(const [])
-                  // Field empty → keep today's list-selection behaviour.
-                  : taskList.maybeWhen(
-                      data: (tasks) => () => _onStartFocusPressed(tasks),
-                      orElse: () => null,
+              const SizedBox(height: 20),
+              ...taskList.when(
+                data: (tasks) {
+                  if (tasks.isEmpty) {
+                    return [
+                      Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Text(
+                          'No tasks today.',
+                          style: TextStyle(color: AppColors.fg38, fontSize: 15),
+                        ),
+                      ),
+                    ];
+                  }
+                  return tasks
+                      .map(
+                        (task) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _TaskCard(
+                            title: task.title,
+                            subtitle: focusTaskListSubtitle(
+                              task: task,
+                              scores: scores,
+                            ),
+                            isPartial: task.status == TaskStatus.partial,
+                            selected: selectedTask == task.title,
+                            onTap: () => _selectTask(task),
+                          ),
+                        ),
+                      )
+                      .toList();
+                },
+                loading: () => const [
+                  Padding(
+                    padding: EdgeInsets.all(18),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                ],
+                error: (e, _) => [
+                  Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Text(
+                      'Could not load tasks. Check your connection and try leaving this screen and opening Focus again.\n\n$e',
+                      style: TextStyle(color: Colors.red.shade200),
                     ),
-              child: Text(
-                hasRunningTask ? 'Running Focus' : 'Start Focus',
-                style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 24),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(60),
+                  backgroundColor: hasRunningTask
+                      ? AppColors.dark2B2D31
+                      : AppColors.accent,
+                  foregroundColor: hasRunningTask
+                      ? AppColors.fg
+                      : AppColors.onAccent,
+                ),
+                onPressed: hasRunningTask
+                    ? () => Navigator.pushNamed(
+                        context,
+                        TimerSessionScreen.routeName,
+                      )
+                    : _quickBusy
+                    ? null
+                    : _hasQuickText
+                    // Field has text → start the typed task (duration → timer).
+                    ? () => _onStartFocusPressed(const [])
+                    // Field empty → keep today's list-selection behaviour.
+                    : taskList.maybeWhen(
+                        data: (tasks) =>
+                            () => _onStartFocusPressed(tasks),
+                        orElse: () => null,
+                      ),
+                child: Text(
+                  hasRunningTask ? 'Running Focus' : 'Start Focus',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
           ),
         ),
       ),
