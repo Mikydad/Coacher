@@ -114,13 +114,16 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
   int _customDurationMinutes = kAddTaskDefaultCustomMinutes;
   bool _durationEnabled = false;
   String? _category;
-
   bool _reminder = false;
   bool _focusSession = false;
   bool _isHabitAnchor = false;
   DateTime _reminderTime = DateTime.now().add(const Duration(minutes: 10));
   bool _saving = false;
   bool _loaded = false;
+
+  /// Category-first flow: the form is shown only after the user picks a
+  /// category (or skips). Edits and restored drafts go straight to the form.
+  bool _categoryChosen = false;
 
   /// Execution mode id: `flexible` | `disciplined` | `extreme`.
   String _modeRefId = 'flexible';
@@ -287,6 +290,11 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
       _advancedExpanded = draft.advancedExpanded;
       _syncSleepWindowAndQuietMode = draft.syncSleepWindowAndQuietMode;
       _inAppQuietMode = draft.inAppQuietMode;
+      // A draft with real content resumes in the form, not the category step.
+      _categoryChosen =
+          draft.category != null ||
+          draft.title.trim().isNotEmpty ||
+          draft.notes.trim().isNotEmpty;
     });
     _suppressDraftDirty = false;
     _draftAutosave?.dirty = false;
@@ -580,6 +588,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         // Phase A: _isRigid defaults to false; no field on PlannedTask yet.
         _modeUserCustomized = false;
         _advancedExpanded = _isHabitAnchor || _strictModeRequired || _isRigid;
+        _categoryChosen = true;
         _loaded = true;
       });
       _suppressDraftDirty = false;
@@ -1364,9 +1373,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     );
   }
 
-  /// Sets the category inline ([category] null clears it — no category is a
-  /// valid choice). Selecting Sleep applies its defaults; leaving Sleep reverts
-  /// the sleep-only duration back to the standard default.
+  /// Selects [category] (null = skipped) and advances to the details form.
   void _selectCategory(String? category) {
     setState(() {
       final wasSleep = isSleepCategory(_category);
@@ -1376,6 +1383,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
       } else if (wasSleep && sleepDurationChipKeys.contains(_duration)) {
         _duration = '25 MIN';
       }
+      _categoryChosen = true;
     });
   }
 
@@ -1400,74 +1408,197 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     _ => CupertinoIcons.tag_fill,
   };
 
-  /// Fixed bento color per category — bright in both themes, matching the
-  /// mosaic these mini cards replace. Custom / unknown labels fall back to a
-  /// soft neutral so the dark ink text stays readable.
-  static Color _categoryColor(String label) => switch (label) {
-    'Study' => BentoPalette.yellow,
-    'Work' => BentoPalette.orange,
-    'Planning' => BentoPalette.green,
-    'Fitness' => BentoPalette.purple,
-    'Personal' => BentoPalette.blue,
-    kSleepTaskCategory => BentoPalette.teal,
-    _ => const Color(0xFFDADDE2),
+  static String _categorySubtitle(String label) => switch (label) {
+    'Study' => 'Learn & review',
+    'Fitness' => 'Move your body',
+    'Work' => 'Get things done',
+    'Personal' => 'Life & self-care',
+    'Planning' => 'Organize your day',
+    kSleepTaskCategory => 'Rest & recover',
+    _ => 'Your own category',
   };
 
-  /// One fixed-width mini bento card for the inline category row.
-  Widget _categoryMiniCard(
-    String label, {
-    required Color color,
-    required IconData icon,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return SizedBox(
-      width: 104,
-      child: BentoCategoryCard(
-        color: color,
-        icon: icon,
-        label: label,
-        selected: selected,
-        onTap: onTap,
+  /// Step 1 of the category-first flow: a fixed bento mosaic of six colored
+  /// category cards that fills the viewport (no scrolling), with the Custom
+  /// action as a dark pill button and Skip as a floating square beside it.
+  Widget _buildCategoryStep() {
+    BentoCategoryCard card(String label, Color color, {bool hero = false}) =>
+        BentoCategoryCard(
+          color: color,
+          icon: _categoryIcon(label),
+          label: label,
+          subtitle: _categorySubtitle(label),
+          selected: _category == label,
+          hero: hero,
+          onTap: () => _selectCategory(label),
+        );
+
+    // A custom category (from editing or "Change") lights up the pill.
+    final customActive =
+        _category != null && !_categoryOptions.contains(_category);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'What kind of task?',
+            style: TextStyle(
+              color: AddTaskColors.onSurface,
+              fontWeight: FontWeight.w800,
+              fontSize: 22,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Pick a category — you can change anything on the next screen.',
+            style: TextStyle(color: AddTaskColors.muted, height: 1.3),
+          ),
+          const SizedBox(height: 16),
+          // The mosaic (matches the bento reference): Study hero on top,
+          // Work | Planning pair, then tall Fitness with Personal over
+          // Sleep splitting the right column.
+          Expanded(
+            child: Column(
+              children: [
+                Expanded(
+                  flex: 7,
+                  child: card('Study', BentoPalette.yellow, hero: true),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  flex: 5,
+                  child: Row(
+                    children: [
+                      Expanded(child: card('Work', BentoPalette.orange)),
+                      const SizedBox(width: 12),
+                      Expanded(child: card('Planning', BentoPalette.green)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  flex: 8,
+                  child: Row(
+                    children: [
+                      Expanded(child: card('Fitness', BentoPalette.purple)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: card('Personal', BentoPalette.blue),
+                            ),
+                            const SizedBox(height: 12),
+                            Expanded(
+                              child: card(
+                                kSleepTaskCategory,
+                                BentoPalette.teal,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: BentoPillButton(
+                  label: customActive ? _category! : 'Custom',
+                  onTap: _promptCustomCategory,
+                  color: AddTaskColors.card,
+                  textColor: AddTaskColors.onSurface,
+                  ringColor: AddTaskColors.accentDim,
+                  active: customActive,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Material(
+                color: AddTaskColors.card,
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
+                  onTap: () => _selectCategory(null),
+                  borderRadius: BorderRadius.circular(18),
+                  child: Tooltip(
+                    message: 'Skip — no category',
+                    child: SizedBox(
+                      width: 56,
+                      height: 56,
+                      child: Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 22,
+                        color: AddTaskColors.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  /// Inline category picker (replaces the old full-screen category step):
-  /// a single horizontally scrolling line of mini bento cards, shown under
-  /// Notes. Tapping the selected card clears it — no category is a valid
-  /// choice — and a trailing Custom card opens the name dialog (showing the
-  /// chosen custom name once set).
-  Widget _buildCategoryPickerRow() {
-    final customActive =
-        _category != null && !_categoryOptions.contains(_category);
-
-    return SizedBox(
-      height: 78,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.zero,
-        physics: const BouncingScrollPhysics(),
-        children: [
-          for (final label in _categoryOptions) ...[
-            _categoryMiniCard(
-              label,
-              color: _categoryColor(label),
-              icon: _categoryIcon(label),
-              selected: _category == label,
-              onTap: () => _selectCategory(_category == label ? null : label),
+  /// Compact replacement for the old in-form category grid: shows the chosen
+  /// category and jumps back to the category step to change it.
+  Widget _buildCategoryChipRow() {
+    final label = _category ?? 'No category';
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AddTaskColors.card,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AddTaskColors.border),
             ),
-            const SizedBox(width: 10),
-          ],
-          _categoryMiniCard(
-            customActive ? _category! : 'Custom',
-            color: _categoryColor(customActive ? _category! : 'Custom'),
-            icon: CupertinoIcons.tag_fill,
-            selected: customActive,
-            onTap: _promptCustomCategory,
+            child: Row(
+              children: [
+                Icon(
+                  _category == null
+                      ? Icons.label_off_outlined
+                      : addTaskCategoryIcon(_category!),
+                  size: 18,
+                  color: AddTaskColors.accentDim,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AddTaskColors.onSurface,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => setState(() => _categoryChosen = false),
+                  child: Text(
+                    'Change',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: AddTaskColors.accent,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1863,145 +1994,162 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
   Widget build(BuildContext context) {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
 
-    return Scaffold(
-      backgroundColor: AddTaskColors.surface,
-      appBar: AppBar(
+    // A new task starts on the category grid; from the details form, back
+    // (app-bar arrow and system gesture both go through maybePop) returns to
+    // that grid instead of leaving the screen. Editing has no category step.
+    // Saving closes via imperative Navigator.pop, which skips this scope.
+    final backReturnsToCategoryStep = !_isEdit && _loaded && _categoryChosen;
+
+    return PopScope(
+      canPop: !backReturnsToCategoryStep,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) setState(() => _categoryChosen = false);
+      },
+      child: Scaffold(
         backgroundColor: AddTaskColors.surface,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        foregroundColor: AddTaskColors.accent,
-        centerTitle: true,
-        title: PageTitle(_isEdit ? 'Edit task' : 'Add task'),
-        actions: const [HelpAppBarButton('tasks')],
-      ),
-      // A soft fade+slide swaps the loading spinner for the form so the
-      // first paint doesn't snap in.
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 260),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) => FadeTransition(
-          opacity: animation,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.02),
-              end: Offset.zero,
-            ).animate(animation),
-            child: child,
-          ),
+        appBar: AppBar(
+          backgroundColor: AddTaskColors.surface,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          foregroundColor: AddTaskColors.accent,
+          centerTitle: true,
+          title: PageTitle(_isEdit ? 'Edit task' : 'Add task'),
+          actions: const [HelpAppBarButton('tasks')],
         ),
-        child: !_loaded
-            ? Center(
-                key: const ValueKey('add_task_loading'),
-                child: CircularProgressIndicator(color: AddTaskColors.accent),
-              )
-            : KeyboardDismissOnTap(
-                key: const ValueKey('add_task_form_step'),
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                        keyboardDismissBehavior:
-                            ScrollViewKeyboardDismissBehavior.onDrag,
-                        children: [
-                          const AddTaskHeroSectionLabel(
-                            title: 'What do you want to do?',
-                            subtitle: 'Give it a clear, actionable name',
+        // The category grid and the details form are steps inside one route,
+        // so route transitions never fire between them — a soft fade+slide
+        // keeps the step change from snapping (forward and back).
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 260),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.02),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
+            ),
+          ),
+          child: !_loaded
+              ? Center(
+                  key: const ValueKey('add_task_loading'),
+                  child: CircularProgressIndicator(color: AddTaskColors.accent),
+                )
+              : !_categoryChosen
+              ? KeyedSubtree(
+                  key: const ValueKey('add_task_category_step'),
+                  child: _buildCategoryStep(),
+                )
+              : KeyboardDismissOnTap(
+                  key: const ValueKey('add_task_form_step'),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          children: [
+                            _buildCategoryChipRow(),
+                            const SizedBox(height: 16),
+                            const AddTaskHeroSectionLabel(
+                              title: 'What do you want to do?',
+                              subtitle: 'Give it a clear, actionable name',
+                            ),
+                            const SizedBox(height: 16),
+                            AddTaskField(
+                              // Guided-tour target: "give it a name".
+                              key: TourTargets.addTaskTitleField,
+                              controller: _controller,
+                              hint: 'Read 10 pages',
+                              // New task: start typing immediately. Editing keeps
+                              // the keyboard down, and Sleep arrives pre-filled.
+                              autofocus:
+                                  !_isEdit && !isSleepCategory(_category),
+                            ),
+                            const SizedBox(height: 12),
+                            AddTaskField(
+                              controller: _notesController,
+                              hint: 'Notes (optional)',
+                              // One line that grows while typing.
+                              minLines: 1,
+                              maxLines: 3,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: AddTaskColors.muted,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            // Reminder sits directly under the name so it can be set
+                            // without scrolling — the most common add-task intent.
+                            _buildReminderSection(),
+                            const SizedBox(height: 12),
+                            _buildDurationSection(),
+                            const SizedBox(height: 20),
+                            if (isSleepCategory(_category)) ...[
+                              _buildAccountabilityRow(),
+                              const SizedBox(height: 12),
+                              _buildSleepExtrasSection(),
+                            ] else ...[
+                              _buildAccountabilityAndDeepWorkRow(),
+                              const SizedBox(height: 20),
+                              _buildAdvancedSection(),
+                            ],
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: EdgeInsets.fromLTRB(
+                          24,
+                          16,
+                          24,
+                          16 + bottomSafe,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AddTaskColors.surface,
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              AddTaskColors.surface.withValues(alpha: 0),
+                              AddTaskColors.surface,
+                            ],
                           ),
-                          const SizedBox(height: 16),
-                          AddTaskField(
-                            // Guided-tour target: "give it a name".
-                            key: TourTargets.addTaskTitleField,
-                            controller: _controller,
-                            hint: 'Read 10 pages',
-                            // New task: start typing immediately. Editing keeps
-                            // the keyboard down, and Sleep arrives pre-filled.
-                            autofocus: !_isEdit && !isSleepCategory(_category),
-                          ),
-                          const SizedBox(height: 12),
-                          AddTaskField(
-                            controller: _notesController,
-                            hint: 'Notes (optional)',
-                            // One line that grows while typing.
-                            minLines: 1,
-                            maxLines: 3,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: AddTaskColors.muted,
+                        ),
+                        child: FilledButton(
+                          // Guided-tour target: "now save it".
+                          key: TourTargets.addTaskSaveButton,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(56),
+                            backgroundColor: AddTaskColors.accentContainer,
+                            foregroundColor: AppColors.accentDeep,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(28),
                             ),
                           ),
-                          const SizedBox(height: 20),
-                          // Category picker sits right under Notes: pick after
-                          // jotting the task down. Optional — none is fine.
-                          const AddTaskSectionLabel(
-                            title: 'Category',
-                            subtitle: 'Optional — tap to color-code this task',
-                          ),
-                          const SizedBox(height: 12),
-                          _buildCategoryPickerRow(),
-                          const SizedBox(height: 20),
-                          // Reminder sits directly under the name so it can be set
-                          // without scrolling — the most common add-task intent.
-                          _buildReminderSection(),
-                          const SizedBox(height: 12),
-                          _buildDurationSection(),
-                          const SizedBox(height: 20),
-                          if (isSleepCategory(_category)) ...[
-                            _buildAccountabilityRow(),
-                            const SizedBox(height: 12),
-                            _buildSleepExtrasSection(),
-                          ] else ...[
-                            _buildAccountabilityAndDeepWorkRow(),
-                            const SizedBox(height: 20),
-                            _buildAdvancedSection(),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: EdgeInsets.fromLTRB(24, 16, 24, 16 + bottomSafe),
-                      decoration: BoxDecoration(
-                        color: AddTaskColors.surface,
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            AddTaskColors.surface.withValues(alpha: 0),
-                            AddTaskColors.surface,
-                          ],
-                        ),
-                      ),
-                      child: FilledButton(
-                        // Guided-tour target: "now save it".
-                        key: TourTargets.addTaskSaveButton,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(56),
-                          backgroundColor: AddTaskColors.accentContainer,
-                          foregroundColor: AppColors.accentDeep,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(28),
-                          ),
-                        ),
-                        onPressed: _saving ? null : _onSave,
-                        child: Text(
-                          _saving
-                              ? 'Saving…'
-                              : (_isEdit ? 'Save changes' : 'Add task')
-                                    .toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.2,
+                          onPressed: _saving ? null : _onSave,
+                          child: Text(
+                            _saving
+                                ? 'Saving…'
+                                : (_isEdit ? 'Save changes' : 'Add task')
+                                      .toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+        ),
       ),
     );
   }
