@@ -11,6 +11,7 @@ import '../../../app/application/main_tab_navigation.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../auth/application/auth_session_policy.dart';
 import '../../auth/application/user_scoped_invalidation.dart';
+import '../../auth/presentation/widgets/connect_account_section.dart';
 import '../../../features/coaching/application/coaching_style_providers.dart';
 import '../../../features/coaching/domain/models/coaching_style.dart';
 import '../../../features/coaching/domain/models/enforcement_mode.dart';
@@ -84,16 +85,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _signOut() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => _ObsidianDialog(
-        title: 'Log Out?',
-        body: 'Your local data will be cleared. You can sign back in any time.',
-        confirmLabel: 'Log Out',
-        confirmColor: _kError,
-      ),
-    );
-    if (confirmed != true || !mounted) return;
+    // Guests have no way back into an anonymous account — logging out is
+    // permanent data loss. Warn honestly and offer Connect as the way out.
+    if (!ref.read(isRegisteredProvider)) {
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (_) => const _GuestLogOutDialog(),
+      );
+      if (!mounted) return;
+      if (choice == 'connect') {
+        await showConnectAccountFlow(context, ref);
+        return;
+      }
+      if (choice != 'logout') return;
+    } else {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => _ObsidianDialog(
+          title: 'Log Out?',
+          body:
+              'Your local data will be cleared. You can sign back in any '
+              'time.',
+          confirmLabel: 'Log Out',
+          confirmColor: _kError,
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
 
     // Signal AuthGate to show the landing screen (not silent anon re-sign-in).
     ref.read(pendingAuthLandingProvider.notifier).state = true;
@@ -242,6 +260,34 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   child: _CoreOptimizationSection(quietLabel: quietLabel),
                 ),
               ),
+
+              // ── Account (guest only: connect prompt; registered users see
+              // their identity in Account settings) ─────────────────────────
+              if (!ref.watch(isRegisteredProvider)) ...[
+                const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                const SliverToBoxAdapter(
+                  child: _SectionLabel(label: 'Account'),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      'Connect an account so your data survives phone changes '
+                      'and reinstalls.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: _kOnSurfaceVariant.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ),
+                ),
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
+                    child: ConnectAccountSection(),
+                  ),
+                ),
+              ],
 
               const SliverToBoxAdapter(child: SizedBox(height: 32)),
 
@@ -1017,6 +1063,127 @@ class _SectionLabel extends StatelessWidget {
 }
 
 // ─── Confirmation dialog ──────────────────────────────────────────────────────
+
+/// Guest log-out warning: anonymous accounts cannot be signed back into, so
+/// logging out permanently loses all data. Primary action is the way out —
+/// connecting an account; destroying data is the quiet, deliberate option.
+class _GuestLogOutDialog extends StatelessWidget {
+  const _GuestLogOutDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: _kSurfaceHigh,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Your data will be lost',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: _kOnSurface,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              "You're not connected to an account. Logging out permanently "
+              'deletes everything on this device — tasks, goals, and '
+              "progress can't be recovered.\n\nConnect an account first and "
+              'your data stays safe.',
+              style: TextStyle(
+                fontSize: 13,
+                color: _kOnSurfaceVariant,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context, 'connect'),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Connect account',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.onAccent,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: _kSurfaceHighest,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: _kOnSurface,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context, 'logout'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: _kError.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _kError.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Delete & log out',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: _kError,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _ObsidianDialog extends StatelessWidget {
   const _ObsidianDialog({

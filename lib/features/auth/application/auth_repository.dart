@@ -21,6 +21,11 @@ class AuthRepository implements AuthRepositoryInterface {
   final GoogleSignIn _googleSignIn;
   bool _googleSignInInitialized = false;
 
+  /// Credential from a link attempt that failed with credential-already-in-use
+  /// (the identity already owns another PathPal account). Held so the user can
+  /// choose to switch to that account ([signInWithPendingLinkConflict]).
+  AuthCredential? _pendingLinkConflictCredential;
+
   // ── Getters ──────────────────────────────────────────────────────────────────
 
   @override
@@ -74,9 +79,17 @@ class AuthRepository implements AuthRepositoryInterface {
   }
 
   @override
-  Future<(AuthFailure?, User?)> signInWithGoogle() async {
+  Future<(AuthFailure?, User?)> signInWithGoogle({
+    bool forceAccountPicker = false,
+  }) async {
     try {
       await _ensureGoogleSignInInitialized();
+
+      // "Try another account": drop the remembered Google session so the
+      // account chooser is shown instead of silently reusing the last pick.
+      if (forceAccountPicker) {
+        await _googleSignIn.signOut();
+      }
 
       final googleUser = await _googleSignIn.authenticate(
         scopeHint: const ['email', 'profile'],
@@ -97,7 +110,18 @@ class AuthRepository implements AuthRepositoryInterface {
       final current = _auth.currentUser;
       final UserCredential result;
       if (current != null && current.isAnonymous) {
-        result = await current.linkWithCredential(credential);
+        try {
+          result = await current.linkWithCredential(credential);
+        } on FirebaseAuthException catch (e) {
+          final conflict = _captureLinkConflict(
+            e,
+            fallbackCredential: credential,
+            email: e.email ?? googleUser.email,
+            providerLabel: 'Google',
+          );
+          if (conflict != null) return (conflict, null);
+          rethrow;
+        }
         debugPrint(
           '[Auth] linkAnonymousWithGoogle uid=${_shortUid(result.user?.uid)}',
         );
@@ -174,7 +198,18 @@ class AuthRepository implements AuthRepositoryInterface {
       final current = _auth.currentUser;
       final UserCredential result;
       if (current != null && current.isAnonymous) {
-        result = await current.linkWithCredential(credential);
+        try {
+          result = await current.linkWithCredential(credential);
+        } on FirebaseAuthException catch (e) {
+          final conflict = _captureLinkConflict(
+            e,
+            fallbackCredential: credential,
+            email: e.email ?? appleCredential.email,
+            providerLabel: 'Apple',
+          );
+          if (conflict != null) return (conflict, null);
+          rethrow;
+        }
         debugPrint(
           '[Auth] linkAnonymousWithApple uid=${_shortUid(result.user?.uid)}',
         );
@@ -363,6 +398,58 @@ class AuthRepository implements AuthRepositoryInterface {
         '[Auth] deleteAccount failed: code=${e.code} uid_prefix=${_shortUid(uid)}',
       );
       return _mapException(e);
+    }
+  }
+
+  // ── Link-conflict recovery ───────────────────────────────────────────────────
+
+  /// When a link attempt hits credential-already-in-use (the identity already
+  /// owns another PathPal account — reinstall / phone change), cache the
+  /// credential and return the typed conflict; null for unrelated errors.
+  CredentialAlreadyLinked? _captureLinkConflict(
+    FirebaseAuthException e, {
+    required AuthCredential fallbackCredential,
+    required String? email,
+    required String providerLabel,
+  }) {
+    if (e.code != 'credential-already-in-use' &&
+        e.code != 'email-already-in-use') {
+      return null;
+    }
+    _pendingLinkConflictCredential = e.credential ?? fallbackCredential;
+    debugPrint(
+      '[Auth] link conflict ($providerLabel): identity already owns an '
+      'account — pending credential cached',
+    );
+    return CredentialAlreadyLinked(email: email, providerLabel: providerLabel);
+  }
+
+  @override
+  Future<(AuthFailure?, User?)> signInWithPendingLinkConflict() async {
+    final credential = _pendingLinkConflictCredential;
+    if (credential == null) {
+      return (
+        const UnknownAuthFailure(
+          'The sign-in session expired. Tap Connect and pick the account '
+          'again.',
+        ),
+        null,
+      );
+    }
+    try {
+      // Replaces the anonymous session with the existing account; its data
+      // pulls down via the normal uid-change path (AuthGate + merge).
+      final result = await _auth.signInWithCredential(credential);
+      _pendingLinkConflictCredential = null;
+      debugPrint(
+        '[Auth] switched to existing linked account '
+        'uid=${_shortUid(result.user?.uid)}',
+      );
+      return (null, result.user);
+    } on FirebaseAuthException catch (e) {
+      _pendingLinkConflictCredential = null;
+      debugPrint('[Auth] pending-conflict sign-in failed: code=${e.code}');
+      return (_mapException(e), null);
     }
   }
 

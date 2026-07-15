@@ -30,30 +30,31 @@ class _FakeAuthRepo implements AuthRepositoryInterface {
   Future<(AuthFailure?, User?)> signInAnonymously() async =>
       (const NetworkFailure(), null);
   @override
-  Future<(AuthFailure?, User?)> signInWithGoogle() async =>
-      (const AuthSignInCanceled(), null);
+  Future<(AuthFailure?, User?)> signInWithGoogle({
+    bool forceAccountPicker = false,
+  }) async => (const AuthSignInCanceled(), null);
   @override
   Future<(AuthFailure?, User?)> signInWithApple() async =>
+      (const AuthSignInCanceled(), null);
+  @override
+  Future<(AuthFailure?, User?)> signInWithPendingLinkConflict() async =>
       (const AuthSignInCanceled(), null);
   @override
   Future<(AuthFailure?, User?)> signInWithEmail({
     required String email,
     required String password,
-  }) async =>
-      (null, null);
+  }) async => (null, null);
   @override
   Future<(AuthFailure?, User?)> createUserWithEmail({
     required String email,
     required String password,
     String? displayName,
-  }) async =>
-      createResult ?? (null, null);
+  }) async => createResult ?? (null, null);
   @override
   Future<(AuthFailure?, User?)> linkAnonymousWithEmail({
     required String email,
     required String password,
-  }) async =>
-      linkResult ?? (null, null);
+  }) async => linkResult ?? (null, null);
   @override
   Future<void> sendPasswordResetEmail(String email) async {}
   @override
@@ -62,8 +63,7 @@ class _FakeAuthRepo implements AuthRepositoryInterface {
   Future<AuthFailure?> reauthenticate({
     required String email,
     required String password,
-  }) async =>
-      null;
+  }) async => null;
   @override
   Future<AuthFailure?> deleteAccount() async => null;
 }
@@ -76,9 +76,7 @@ Widget _buildScreen(AuthRepositoryInterface fake) {
       authRepositoryProvider.overrideWithValue(fake),
       authStateProvider.overrideWith((_) => const Stream.empty()),
     ],
-    child: const MaterialApp(
-      home: SignUpScreen(),
-    ),
+    child: const MaterialApp(home: SignUpScreen()),
   );
 }
 
@@ -86,8 +84,9 @@ Widget _buildScreen(AuthRepositoryInterface fake) {
 
 void main() {
   group('SignUpScreen', () {
-    testWidgets('password shorter than 8 chars → inline error before submit',
-        (tester) async {
+    testWidgets('password shorter than 8 chars → inline error before submit', (
+      tester,
+    ) async {
       final fake = _FakeAuthRepo();
       await tester.pumpWidget(_buildScreen(fake));
 
@@ -96,22 +95,30 @@ void main() {
       await tester.pump();
 
       await tester.enterText(
-          find.widgetWithText(TextField, 'Email address'), 'a@b.com');
+        find.widgetWithText(TextField, 'Email address'),
+        'a@b.com',
+      );
       await tester.enterText(
-          find.widgetWithText(TextField, 'Password (min 8 characters)'),
-          'short');
+        find.widgetWithText(TextField, 'Password (min 8 characters)'),
+        'short',
+      );
       await tester.enterText(
-          find.widgetWithText(TextField, 'Confirm password'), 'short');
+        find.widgetWithText(TextField, 'Confirm password'),
+        'short',
+      );
 
       await tester.tap(find.text('Create account'));
       await tester.pump();
 
       expect(
-          find.text('Password must be at least 8 characters.'), findsOneWidget);
+        find.text('Password must be at least 8 characters.'),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('confirm password mismatch → inline error before submit',
-        (tester) async {
+    testWidgets('confirm password mismatch → inline error before submit', (
+      tester,
+    ) async {
       final fake = _FakeAuthRepo();
       await tester.pumpWidget(_buildScreen(fake));
 
@@ -119,12 +126,17 @@ void main() {
       await tester.pump();
 
       await tester.enterText(
-          find.widgetWithText(TextField, 'Email address'), 'a@b.com');
+        find.widgetWithText(TextField, 'Email address'),
+        'a@b.com',
+      );
       await tester.enterText(
-          find.widgetWithText(TextField, 'Password (min 8 characters)'),
-          'password1');
+        find.widgetWithText(TextField, 'Password (min 8 characters)'),
+        'password1',
+      );
       await tester.enterText(
-          find.widgetWithText(TextField, 'Confirm password'), 'password2');
+        find.widgetWithText(TextField, 'Confirm password'),
+        'password2',
+      );
 
       await tester.tap(find.text('Create account'));
       await tester.pump();
@@ -132,22 +144,29 @@ void main() {
       expect(find.text('Passwords do not match.'), findsOneWidget);
     });
 
-    testWidgets('mock returns EmailAlreadyInUse → dialog shown',
-        (tester) async {
-      final fake =
-          _FakeAuthRepo(createResult: (const EmailAlreadyInUse(), null));
+    testWidgets('mock returns EmailAlreadyInUse → dialog shown', (
+      tester,
+    ) async {
+      final fake = _FakeAuthRepo(
+        createResult: (const EmailAlreadyInUse(), null),
+      );
       await tester.pumpWidget(_buildScreen(fake));
 
       await tester.tap(find.byType(Checkbox));
       await tester.pump();
 
       await tester.enterText(
-          find.widgetWithText(TextField, 'Email address'), 'exists@b.com');
+        find.widgetWithText(TextField, 'Email address'),
+        'exists@b.com',
+      );
       await tester.enterText(
-          find.widgetWithText(TextField, 'Password (min 8 characters)'),
-          'password1');
+        find.widgetWithText(TextField, 'Password (min 8 characters)'),
+        'password1',
+      );
       await tester.enterText(
-          find.widgetWithText(TextField, 'Confirm password'), 'password1');
+        find.widgetWithText(TextField, 'Confirm password'),
+        'password1',
+      );
 
       await tester.tap(find.text('Create account'));
       await tester.pump();
@@ -162,8 +181,11 @@ void main() {
 
       // Do NOT tap the checkbox.
       final btn = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
-      expect(btn.onPressed, isNull,
-          reason: 'Button must be disabled until ToS is checked');
+      expect(
+        btn.onPressed,
+        isNull,
+        reason: 'Button must be disabled until ToS is checked',
+      );
     });
   });
 }

@@ -34,10 +34,14 @@ class _FakeAuthRepo implements AuthRepositoryInterface {
   Future<(AuthFailure?, User?)> signInAnonymously() async =>
       (const NetworkFailure(), null);
   @override
-  Future<(AuthFailure?, User?)> signInWithGoogle() async =>
-      (const AuthSignInCanceled(), null);
+  Future<(AuthFailure?, User?)> signInWithGoogle({
+    bool forceAccountPicker = false,
+  }) async => (const AuthSignInCanceled(), null);
   @override
   Future<(AuthFailure?, User?)> signInWithApple() async =>
+      (const AuthSignInCanceled(), null);
+  @override
+  Future<(AuthFailure?, User?)> signInWithPendingLinkConflict() async =>
       (const AuthSignInCanceled(), null);
   @override
   Future<(AuthFailure?, User?)> signInWithEmail({
@@ -53,14 +57,12 @@ class _FakeAuthRepo implements AuthRepositoryInterface {
     required String email,
     required String password,
     String? displayName,
-  }) async =>
-      (null, null);
+  }) async => (null, null);
   @override
   Future<(AuthFailure?, User?)> linkAnonymousWithEmail({
     required String email,
     required String password,
-  }) async =>
-      (null, null);
+  }) async => (null, null);
   @override
   Future<void> sendPasswordResetEmail(String email) async {}
   @override
@@ -69,8 +71,7 @@ class _FakeAuthRepo implements AuthRepositoryInterface {
   Future<AuthFailure?> reauthenticate({
     required String email,
     required String password,
-  }) async =>
-      null;
+  }) async => null;
   @override
   Future<AuthFailure?> deleteAccount() async => null;
 }
@@ -83,8 +84,7 @@ class _SlowSignInRepo extends _FakeAuthRepo {
   Future<(AuthFailure?, User?)> signInWithEmail({
     required String email,
     required String password,
-  }) =>
-      _future;
+  }) => _future;
 }
 
 // ── Helper ────────────────────────────────────────────────────────────────────
@@ -95,9 +95,7 @@ Widget _buildScreen(AuthRepositoryInterface fake) {
       authRepositoryProvider.overrideWithValue(fake),
       authStateProvider.overrideWith((_) => const Stream.empty()),
     ],
-    child: const MaterialApp(
-      home: LoginScreen(),
-    ),
+    child: const MaterialApp(home: LoginScreen()),
   );
 }
 
@@ -105,31 +103,40 @@ Widget _buildScreen(AuthRepositoryInterface fake) {
 
 void main() {
   group('LoginScreen', () {
-    testWidgets('submit with empty fields → validation error, no network call',
-        (tester) async {
-      final fake = _FakeAuthRepo();
-      await tester.pumpWidget(_buildScreen(fake));
-
-      await tester.tap(find.text('Sign in with email'));
-      await tester.pump();
-
-      expect(find.byType(AuthErrorText), findsOneWidget);
-      expect(
-          find.text('Please enter your email and password.'), findsOneWidget);
-      expect(fake.signInCallCount, 0);
-    });
-
     testWidgets(
-        'mock returns InvalidCredentials → AuthErrorText shown',
-        (tester) async {
-      final fake =
-          _FakeAuthRepo(signInResult: (const InvalidCredentials(), null));
+      'submit with empty fields → validation error, no network call',
+      (tester) async {
+        final fake = _FakeAuthRepo();
+        await tester.pumpWidget(_buildScreen(fake));
+
+        await tester.tap(find.text('Sign in with email'));
+        await tester.pump();
+
+        expect(find.byType(AuthErrorText), findsOneWidget);
+        expect(
+          find.text('Please enter your email and password.'),
+          findsOneWidget,
+        );
+        expect(fake.signInCallCount, 0);
+      },
+    );
+
+    testWidgets('mock returns InvalidCredentials → AuthErrorText shown', (
+      tester,
+    ) async {
+      final fake = _FakeAuthRepo(
+        signInResult: (const InvalidCredentials(), null),
+      );
       await tester.pumpWidget(_buildScreen(fake));
 
       await tester.enterText(
-          find.widgetWithText(TextField, 'Email address'), 'a@b.com');
+        find.widgetWithText(TextField, 'Email address'),
+        'a@b.com',
+      );
       await tester.enterText(
-          find.widgetWithText(TextField, 'Password'), 'password123');
+        find.widgetWithText(TextField, 'Password'),
+        'password123',
+      );
 
       await tester.tap(find.text('Sign in with email'));
       await tester.pump();
@@ -146,9 +153,13 @@ void main() {
       await tester.pumpWidget(_buildScreen(fake));
 
       await tester.enterText(
-          find.widgetWithText(TextField, 'Email address'), 'a@b.com');
+        find.widgetWithText(TextField, 'Email address'),
+        'a@b.com',
+      );
       await tester.enterText(
-          find.widgetWithText(TextField, 'Password'), 'pass1234');
+        find.widgetWithText(TextField, 'Password'),
+        'pass1234',
+      );
 
       await tester.tap(find.text('Sign in with email'));
       await tester.pump();

@@ -16,6 +16,7 @@ import '../../../features/auth/presentation/change_password_screen.dart';
 import '../../../features/auth/presentation/forgot_password_screen.dart';
 import '../../../features/auth/presentation/widgets/auth_error_text.dart';
 import '../../../features/auth/presentation/widgets/auth_text_field.dart';
+import '../../../features/auth/presentation/widgets/connect_account_section.dart';
 import 'settings_page_scaffold.dart';
 
 import '../../../core/presentation/app_colors.dart';
@@ -350,6 +351,14 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
     return SettingsPageScaffold(
       title: 'Account Settings',
       children: [
+        // ── Connected identity (registered users; guests connect from the
+        // Profile page's Account section) ────────────────────────────────
+        if (user != null && !user.isAnonymous) ...[
+          const SettingsSectionHeader(label: 'Connected Account'),
+          const SizedBox(height: 10),
+          ConnectedIdentityCard(user: user),
+          const SizedBox(height: 32),
+        ],
         const SettingsSectionHeader(label: 'Security'),
         const SizedBox(height: 10),
         SettingsObsidianCard(

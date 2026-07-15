@@ -154,6 +154,31 @@ not silent reversal.
   *Known trade-off:* snackbars raised from coach actions show on the root
   scaffold behind the sheet.
 
+- **2026-07-15 · Connect account = uid-preserving link; reinstall recovery =
+  switch, not merge.** Profile bottom gets an "Account" section for GUESTS
+  ONLY: one "Connect account" button whose tap opens a bottom sheet to pick
+  Google/Apple (Apple only where supported) — the provider decision doesn't
+  deserve permanent page space. Registered users see nothing on Profile;
+  their "Account connected · provider · email" card lives in Account
+  settings. Connecting calls the
+  existing `linkWithCredential` path — same uid, so all data is instantly
+  recoverable on any device (that's the whole feature: no data copying).
+  The reinstall/phone-change case (identity already owns another account →
+  `credential-already-in-use`) now returns a typed
+  `CredentialAlreadyLinked` failure with the credential cached in the
+  repository; the profile dialog offers "Use that account"
+  (`signInWithPendingLinkConflict` — signs into the old uid; AuthGate's
+  existing uid-change path invalidates + clears local session + re-pulls),
+  "Try another account" (Google re-shows the chooser via sign-out-first),
+  or Cancel. *Considered:* merging this device's guest data into the
+  existing account (rejected for v1: re-keying every Isar collection +
+  outbox; guest work on a fresh reinstall is typically minutes old — the
+  dialog warns it will be replaced). Guest LOG OUT is permanent data loss
+  (anonymous accounts cannot be signed back into), so guests get an honest
+  warning dialog whose primary action is "Connect account" (launches the
+  connect flow); "Delete & log out" is the destructive-styled secondary.
+  Registered users keep the old mild dialog — for them it's accurate.
+
 - **2026-07-15 · Goal template picker reads as a choice, not an info wall.**
   Header is "Pick a goal" (subtitle removed); Study is preselected on open
   (a visibly selected card is what signals "these are selectable"); the
