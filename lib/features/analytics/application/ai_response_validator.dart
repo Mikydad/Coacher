@@ -51,8 +51,12 @@ class AiResponseValidator {
       return response.withValidationOutcome(AiSummaryValidationOutcome.tooLong);
     }
 
-    // 3. Tone must match expected framing tone
-    final expectedTone = expectedToneForFraming(payload.framing);
+    // 3. Tone must match the framing × style expectation — the user's chosen
+    // coaching mode must never be contradicted by phrasing.
+    final expectedTone = expectedToneFor(
+      framing: payload.framing,
+      style: payload.coachingStyle,
+    );
     if (response.tone != expectedTone) {
       return response.withValidationOutcome(
         AiSummaryValidationOutcome.toneMismatch,

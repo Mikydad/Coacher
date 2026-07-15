@@ -90,8 +90,12 @@ class ProxyCoachingAiClient implements CoachingAiClient {
   // ─── Prompt builders ───────────────────────────────────────────────────────
 
   String _buildSystemPrompt(CoachingAiPayload payload) {
+    final expectedTone = expectedToneFor(
+      framing: payload.framing,
+      style: payload.coachingStyle,
+    );
     final framingGuidance = _framingGuidance(payload.framing);
-    final toneGuidance = _toneGuidance(expectedToneForFraming(payload.framing));
+    final toneGuidance = _toneGuidance(expectedTone);
     final maxSummary = payload.deliveryContext.maxSummaryWords;
     final maxRec = payload.deliveryContext.maxRecommendationWords;
     final notifMode = payload.deliveryContext.isNotificationDelivery
@@ -99,7 +103,7 @@ class ProxyCoachingAiClient implements CoachingAiClient {
         : '';
 
     final framingName = payload.framing.name;
-    final toneName = expectedToneForFraming(payload.framing).name;
+    final toneName = expectedTone.name;
     final styleInstruction = _styleInstruction(payload.coachingStyle);
 
     return '''
@@ -230,7 +234,10 @@ class MockCoachingAiClient implements CoachingAiClient {
     return AiSummaryResponse(
       focusId: payload.focusId,
       summaryType: payload.summaryType,
-      tone: expectedToneForFraming(payload.framing),
+      tone: expectedToneFor(
+        framing: payload.framing,
+        style: payload.coachingStyle,
+      ),
       dailySummary:
           '[mock] Coaching summary for focus: ${payload.focusReason}.',
       mainRecommendation: '[mock] Take the next planned action.',

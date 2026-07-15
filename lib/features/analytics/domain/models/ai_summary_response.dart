@@ -1,3 +1,4 @@
+import '../../../coaching/domain/models/coaching_style.dart';
 import 'coaching_ai_payload.dart';
 import 'current_coaching_focus.dart';
 
@@ -29,20 +30,53 @@ CoachingTone coachingToneFromStorage(String? raw) {
   return CoachingTone.informative;
 }
 
-/// Expected tone for a given [CoachingFraming].
-/// Used during semantic validation to catch framing drift.
-CoachingTone expectedToneForFraming(CoachingFraming framing) {
+/// Expected tone for a given [CoachingFraming] under the user's chosen
+/// [CoachingStyle] — the deterministic framing × style matrix (FR-D-13).
+///
+/// The engine stays in charge: the AI is *instructed* with this tone and the
+/// validator rejects responses that drift from it, so the user's chosen mode
+/// can never be contradicted by phrasing.
+///
+/// | framing       | supportive  | balanced    | disciplined | intense   |
+/// |---------------|-------------|-------------|-------------|-----------|
+/// | momentum      | encouraging | encouraging | encouraging | assertive |
+/// | recovery      | supportive  | supportive  | informative | assertive |
+/// | protection    | supportive  | assertive   | assertive   | assertive |
+/// | stabilization | supportive  | informative | informative | assertive |
+/// | consistency   | encouraging | informative | informative | assertive |
+///
+/// The balanced column is exactly the pre-style behavior (compatibility).
+CoachingTone expectedToneFor({
+  required CoachingFraming framing,
+  required CoachingStyle style,
+}) {
+  if (style == CoachingStyle.intense) return CoachingTone.assertive;
   switch (framing) {
     case CoachingFraming.momentum:
       return CoachingTone.encouraging;
     case CoachingFraming.recovery:
-      return CoachingTone.supportive;
+      return style == CoachingStyle.disciplined
+          ? CoachingTone.informative
+          : CoachingTone.supportive;
     case CoachingFraming.protection:
-      return CoachingTone.assertive;
+      return style == CoachingStyle.supportive
+          ? CoachingTone.supportive
+          : CoachingTone.assertive;
     case CoachingFraming.stabilization:
+      return style == CoachingStyle.supportive
+          ? CoachingTone.supportive
+          : CoachingTone.informative;
     case CoachingFraming.consistency:
-      return CoachingTone.informative;
+      return style == CoachingStyle.supportive
+          ? CoachingTone.encouraging
+          : CoachingTone.informative;
   }
+}
+
+/// Expected tone for a given [CoachingFraming] with the balanced style.
+/// Prefer [expectedToneFor] — this remains for callers without a style.
+CoachingTone expectedToneForFraming(CoachingFraming framing) {
+  return expectedToneFor(framing: framing, style: CoachingStyle.balanced);
 }
 
 // ─── Validation result ────────────────────────────────────────────────────────

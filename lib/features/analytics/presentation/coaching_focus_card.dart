@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../coaching/application/coaching_style_providers.dart';
 import '../application/ai_summary_providers.dart';
 import '../application/focus_providers.dart';
 import '../application/insight_generation_providers.dart';
@@ -134,6 +135,7 @@ class _FocusCard extends StatelessWidget {
           focusReason: focus.focusReason,
           focusScore: focus.focusScore,
           urgencyScore: focus.scoreBreakdown.urgencyScore,
+          coachingStyle: ref.read(activeCoachingStyleProvider),
         );
     final framingColor = _framingColor(framing);
     final reasonLabel = _focusReasonLabel(focus.focusReason);
@@ -559,6 +561,8 @@ String _focusReasonLabel(FocusReason reason) {
       return 'Strong streak';
     case FocusReason.timingOpportunity:
       return 'Good timing';
+    case FocusReason.learningYourRhythm:
+      return 'Learning your rhythm';
   }
 }
 

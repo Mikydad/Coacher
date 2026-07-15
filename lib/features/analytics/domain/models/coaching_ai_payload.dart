@@ -99,6 +99,11 @@ CoachingFraming deriveCoachingFraming({
       return focusScore >= 0.65
           ? CoachingFraming.momentum
           : CoachingFraming.consistency;
+
+    case FocusReason.learningYourRhythm:
+      // Cold-start warm-up: calm, expectation-setting copy regardless of
+      // style — there is no behavioral signal to frame yet.
+      return CoachingFraming.consistency;
   }
 }
 

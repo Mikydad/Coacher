@@ -105,6 +105,12 @@ final recomputeAiSummaryProvider = FutureProvider<AiSummaryResponse>((
     return _buildGenericFallback();
   }
 
+  // Cold-start warm-up focus: deterministic copy with the day counter — no
+  // AI call, no cache (the counter must move as soon as new data lands).
+  if (focus.focusReason == FocusReason.learningYourRhythm) {
+    return _buildWarmupSummary(focus);
+  }
+
   final summaryRepo = ref.read(aiSummaryRepositoryProvider);
   final nowMs = DateTime.now().millisecondsSinceEpoch;
 
@@ -123,10 +129,17 @@ final recomputeAiSummaryProvider = FutureProvider<AiSummaryResponse>((
     justCompletedTask: false,
   );
 
+  // Resolve the user's coaching style BEFORE deriving framing: the framing ×
+  // style matrix must produce the same framing here (TTL + summary type) as
+  // in the payload below, or the cache freshness check and the AI prompt
+  // would disagree about what is being generated.
+  final coachingStyle = ref.read(activeCoachingStyleProvider);
+
   final framing = deriveCoachingFraming(
     focusReason: focus.focusReason,
     focusScore: focus.focusScore,
     urgencyScore: focus.scoreBreakdown.urgencyScore,
+    coachingStyle: coachingStyle,
   );
   final summaryType = deriveSummaryType(
     framing: framing,
@@ -149,9 +162,6 @@ final recomputeAiSummaryProvider = FutureProvider<AiSummaryResponse>((
     final cached = await summaryRepo.getSummaryForFocus(focus.focusId);
     if (cached != null) return cached;
   }
-
-  // Resolve the user's current coaching style (defaults to balanced).
-  final coachingStyle = ref.read(activeCoachingStyleProvider);
 
   // Assemble payload.
   final deliveryContext = AiDeliveryContext(
@@ -229,6 +239,42 @@ InsightType? _findSecondaryInsightType(
   } catch (_) {
     return null;
   }
+}
+
+/// Deterministic warm-up copy: honest about the observation window, tells the
+/// user exactly how insights get unlocked. Day counter comes from the focus's
+/// context snapshot (distinct active days observed, not calendar days).
+AiSummaryResponse _buildWarmupSummary(CurrentCoachingFocus focus) {
+  final evidence = focus.contextSnapshot.topEvidence;
+  final observed = (evidence['activeDaysObserved'] as num?)?.toInt() ?? 0;
+  final target = (evidence['targetActiveDays'] as num?)?.toInt() ?? 5;
+  final day = observed.clamp(0, target);
+
+  final String summary;
+  if (day <= 0) {
+    summary =
+        "I'm getting to know your rhythm. Complete your first task and "
+        'the learning starts.';
+  } else {
+    summary =
+        "Day $day of $target — I'm learning your rhythm. Real insights "
+        'unlock as your patterns take shape.';
+  }
+
+  return AiSummaryResponse(
+    focusId: focus.focusId,
+    summaryType: SummaryType.daily,
+    tone: CoachingTone.informative,
+    dailySummary: summary,
+    mainRecommendation:
+        'Keep completing your planned tasks — every day of real data makes '
+        'the coaching sharper.',
+    framing: CoachingFraming.consistency,
+    generatedAtMs: DateTime.now().millisecondsSinceEpoch,
+    promptVersion: kCoachingAiPromptVersion,
+    isFallback: true,
+    metadata: const {'fallbackReason': 'warmup_data_maturity'},
+  );
 }
 
 AiSummaryResponse _buildGenericFallback() {

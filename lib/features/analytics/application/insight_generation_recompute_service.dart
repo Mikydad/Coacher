@@ -8,8 +8,18 @@ import '../data/insight_cache_repository.dart';
 import '../domain/models/behavior_feature_object.dart';
 import '../domain/models/detected_pattern.dart';
 import '../domain/models/generated_insight.dart';
+import 'data_maturity.dart';
 import 'insight_display_title.dart';
 import 'insight_generation_orchestrator.dart';
+
+/// Insight types allowed through while an entity is still `calibrating`:
+/// concrete, high-evidence risk signals only. Praise and leverage insights
+/// need a full observation window or they read as guessing.
+const Set<InsightType> kCalibratingAllowedInsightTypes = {
+  InsightType.streakRiskWarning,
+  InsightType.fragileStreakAlert,
+  InsightType.goalAtRisk,
+};
 
 class InsightGenerationRecomputeService {
   InsightGenerationRecomputeService({
@@ -17,15 +27,20 @@ class InsightGenerationRecomputeService {
     required InsightCacheRepository cacheRepository,
     required FeatureCacheRepository featureCacheRepository,
     GoalsRepository? goalsRepository,
+    DataMaturityEvaluator? dataMaturityEvaluator,
   }) : _orchestrator = orchestrator,
        _cacheRepository = cacheRepository,
        _featureCacheRepository = featureCacheRepository,
-       _goalsRepository = goalsRepository;
+       _goalsRepository = goalsRepository,
+       _dataMaturityEvaluator = dataMaturityEvaluator;
 
   final InsightGenerationOrchestrator _orchestrator;
   final InsightCacheRepository _cacheRepository;
   final FeatureCacheRepository _featureCacheRepository;
   final GoalsRepository? _goalsRepository;
+
+  /// Cold-start gate; null (tests) means ungated.
+  final DataMaturityEvaluator? _dataMaturityEvaluator;
 
   Future<void> recomputeEntity({
     required String entityId,
@@ -34,6 +49,7 @@ class InsightGenerationRecomputeService {
   }) async {
     final key = entityId.trim();
     if (key.isEmpty) return;
+    final maturity = await _dataMaturityEvaluator?.evaluate();
     final feature = await _featureCacheRepository.getByEntityId(key);
     final out = _orchestrator.runForEntity(
       entityId: key,
@@ -42,7 +58,11 @@ class InsightGenerationRecomputeService {
       now: now,
     );
     if (out.hasFatalError) return;
-    final insights = await _maybeWithDisplayTitles(out.insights);
+    final gated = gateInsightsByMaturity(
+      insights: out.insights,
+      maturity: maturity?.forEntity(key),
+    );
+    final insights = await _maybeWithDisplayTitles(gated);
     await _cacheRepository.replaceScopeInsights(
       scopeType: InsightScopeType.entity,
       scopeId: key,
@@ -55,6 +75,7 @@ class InsightGenerationRecomputeService {
     required Map<String, List<DetectedPattern>> patternsByEntityId,
     required DateTime now,
   }) async {
+    final maturity = await _dataMaturityEvaluator?.evaluate();
     final contexts = <String, Layer3FeatureContext>{};
     for (final entityId in patternsByEntityId.keys) {
       final feature = await _featureCacheRepository.getByEntityId(entityId);
@@ -73,7 +94,11 @@ class InsightGenerationRecomputeService {
     );
     for (final entity in out.entityResults) {
       if (entity.hasFatalError) continue;
-      final insights = await _maybeWithDisplayTitles(entity.insights);
+      final gated = gateInsightsByMaturity(
+        insights: entity.insights,
+        maturity: maturity?.forEntity(entity.entityId),
+      );
+      final insights = await _maybeWithDisplayTitles(gated);
       await _cacheRepository.replaceScopeInsights(
         scopeType: InsightScopeType.entity,
         scopeId: entity.entityId,
@@ -81,10 +106,16 @@ class InsightGenerationRecomputeService {
       );
     }
     if (!out.globalResult.hasFatalError) {
+      // Global (cross-entity trend) insights need an established account-wide
+      // observation window; before that they are aggregate guesses.
+      final globalEstablished =
+          maturity == null || maturity.global.isEstablished;
       await _cacheRepository.replaceScopeInsights(
         scopeType: InsightScopeType.global,
         scopeId: out.globalResult.dateKey,
-        insights: out.globalResult.insights,
+        insights: globalEstablished
+            ? out.globalResult.insights
+            : const <GeneratedInsight>[],
       );
     }
   }
@@ -112,6 +143,53 @@ class InsightGenerationRecomputeService {
   }
 }
 
+/// Applies the cold-start gate to one entity's freshly generated insights.
+///
+/// - `observing` (< 3 active days or < 5 events): nothing user-facing.
+/// - `calibrating`: only [kCalibratingAllowedInsightTypes] with confidence
+///   ≥ [kCalibratingConfidenceFloor].
+/// - `established` (or [maturity] null = ungated): everything.
+///
+/// Every surviving insight is stamped with `supportingMetrics.dataMaturity`
+/// so downstream consumers (AI phrasing, debugging) know how much data backs
+/// it.
+List<GeneratedInsight> gateInsightsByMaturity({
+  required List<GeneratedInsight> insights,
+  required EntityDataMaturity? maturity,
+}) {
+  if (maturity == null) return insights;
+  switch (maturity.stage) {
+    case DataMaturityStage.observing:
+      return const <GeneratedInsight>[];
+    case DataMaturityStage.calibrating:
+      return insights
+          .where(
+            (insight) =>
+                kCalibratingAllowedInsightTypes.contains(insight.insightType) &&
+                insight.confidence >= kCalibratingConfidenceFloor,
+          )
+          .map((insight) => _withMaturityStamp(insight, maturity.stage))
+          .toList(growable: false);
+    case DataMaturityStage.established:
+      return insights
+          .map((insight) => _withMaturityStamp(insight, maturity.stage))
+          .toList(growable: false);
+  }
+}
+
+GeneratedInsight _withMaturityStamp(
+  GeneratedInsight insight,
+  DataMaturityStage stage,
+) {
+  return GeneratedInsight.fromMap({
+    ...insight.toMap(),
+    'supportingMetrics': <String, dynamic>{
+      ...insight.supportingMetrics,
+      'dataMaturity': stage.name,
+    },
+  });
+}
+
 final insightGenerationOrchestratorProvider =
     Provider<InsightGenerationOrchestrator>((ref) {
       return const InsightGenerationOrchestrator();
@@ -124,5 +202,6 @@ final insightGenerationRecomputeServiceProvider =
         cacheRepository: ref.read(insightCacheRepositoryProvider),
         featureCacheRepository: ref.read(featureCacheRepositoryProvider),
         goalsRepository: ref.read(goalsRepositoryProvider),
+        dataMaturityEvaluator: ref.read(dataMaturityEvaluatorProvider),
       );
     });

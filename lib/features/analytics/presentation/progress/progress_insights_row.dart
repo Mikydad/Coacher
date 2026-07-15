@@ -62,7 +62,7 @@ class _CoachingFocusGlass extends StatelessWidget {
             accentColor: ProgressDesignTokens.secondary,
             icon: Icons.psychology_outlined,
             title: 'Coaching Focus',
-          helpId: 'coachingFocus',
+            helpId: 'coachingFocus',
             headline: 'Your coach is learning your rhythm.',
             body:
                 'Complete a few tasks or check in on a goal — we\'ll surface your peak focus window here.',
@@ -133,7 +133,7 @@ class _StreakAtRiskGlass extends StatelessWidget {
             accentColor: ProgressDesignTokens.primaryDim,
             icon: Icons.warning_amber_rounded,
             title: 'Streak at risk',
-          helpId: 'streakAtRisk',
+            helpId: 'streakAtRisk',
             headline: _firstSentence(primary.message),
             body: caption ?? _streakFallbackBody(bundle),
           );
@@ -145,7 +145,7 @@ class _StreakAtRiskGlass extends StatelessWidget {
             accentColor: ProgressDesignTokens.primaryDim,
             icon: Icons.warning_amber_rounded,
             title: 'Streak at risk',
-          helpId: 'streakAtRisk',
+            helpId: 'streakAtRisk',
             headline: _firstSentence(riskInsight.message),
             body:
                 coachingDetailCaption(riskInsight) ??

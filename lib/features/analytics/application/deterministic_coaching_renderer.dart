@@ -286,6 +286,18 @@ const Map<FocusReason, _FallbackTemplate> _kReasonFallbacks = {
         'Act during this window — it aligns with your best performance times.',
     tone: CoachingTone.informative,
   ),
+  // Cold-start warm-up. The primary path builds this copy (with the live day
+  // counter) in ai_summary_providers; this static variant covers any other
+  // render route so the warm-up never falls through to the generic message.
+  FocusReason.learningYourRhythm: _FallbackTemplate(
+    summary:
+        "I'm learning your rhythm. Real insights unlock as your patterns "
+        'take shape over the first few days.',
+    recommendation:
+        'Keep completing your planned tasks — every day of real data makes '
+        'the coaching sharper.',
+    tone: CoachingTone.informative,
+  ),
 };
 
 /// Generic fallback when no specific template matches.
@@ -317,6 +329,9 @@ class DeterministicCoachingRenderer {
     String? failureReason,
   }) {
     final focusReason = focusReasonFromStorage(payload.focusReason);
+    // The user's style already shifted template selection upstream (the
+    // framing × style matrix in deriveCoachingFraming picks the framing this
+    // lookup keys on); the tone is styled here for the same reason.
     final template =
         _kTemplates[(focusReason, payload.framing)] ??
         _kReasonFallbacks[focusReason] ??
@@ -325,7 +340,10 @@ class DeterministicCoachingRenderer {
     return AiSummaryResponse(
       focusId: payload.focusId,
       summaryType: payload.summaryType,
-      tone: template.tone,
+      tone: expectedToneFor(
+        framing: payload.framing,
+        style: payload.coachingStyle,
+      ),
       dailySummary: template.summary,
       mainRecommendation: template.recommendation,
       framing: payload.framing,

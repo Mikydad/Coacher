@@ -9,6 +9,7 @@ import '../../auth/application/auth_providers.dart';
 import '../../coaching/domain/models/enforcement_mode.dart';
 import '../domain/models/current_coaching_focus.dart';
 import '../domain/models/detected_behavior_pattern.dart';
+import 'data_maturity.dart';
 import 'focus_candidate.dart';
 import 'focus_selector.dart';
 import 'insight_generation_providers.dart';
@@ -75,7 +76,19 @@ final recomputeCoachingFocusProvider = FutureProvider<CurrentCoachingFocus?>((
   final insights = await ref.read(
     layer3DeliveryDayInsightsProvider(today).future,
   );
-  if (insights.isEmpty) return null;
+  if (insights.isEmpty) {
+    // Cold start: Layer 3's maturity gate produces no insights until real
+    // data exists. Instead of a data-starved guess (or a blank card), emit
+    // an honest warm-up focus that sets expectations.
+    final maturity = await ref.read(dataMaturityEvaluatorProvider).evaluate();
+    if (maturity.global.isEstablished) return null;
+    return _upsertWarmupFocus(
+      ref,
+      today: today,
+      now: now,
+      maturity: maturity.global,
+    );
+  }
 
   // Pull today's canonical Layer 2 patterns.
   final patternRepo = ref.read(patternDetectionRepositoryProvider);
@@ -142,3 +155,69 @@ final recomputeCoachingFocusProvider = FutureProvider<CurrentCoachingFocus?>((
 
   return result.focus;
 });
+
+/// Builds and persists the cold-start warm-up focus ("learning your rhythm —
+/// day X of 5"). One stable focusId per day so recomputes don't churn the
+/// focus history; the day counter is the number of distinct active days
+/// observed so far (honest: it counts data, not calendar time).
+Future<CurrentCoachingFocus> _upsertWarmupFocus(
+  Ref ref, {
+  required String today,
+  required DateTime now,
+  required GlobalDataMaturity maturity,
+}) async {
+  final focusId = 'warmup-$today';
+  final existing = await ref.read(focusRepositoryProvider).getActiveFocus();
+  if (existing != null && existing.focusId == focusId) return existing;
+
+  final daysObserved = maturity.activeDaysObserved.clamp(
+    0,
+    kGlobalEstablishedActiveDays,
+  );
+  final timingProfile = resolveTimingProfile(
+    now: now,
+    justCompletedTask: false,
+  );
+  final focus = CurrentCoachingFocus(
+    focusId: focusId,
+    primaryInsightId: focusId,
+    lifecycleState: FocusLifecycleState.active,
+    focusReason: FocusReason.learningYourRhythm,
+    focusScore: 0.25,
+    focusConfidence: 1.0,
+    scoreBreakdown: const FocusScoreBreakdown(
+      urgencyScore: 0,
+      momentumScore: 0,
+      feasibilityScore: 0,
+      riskScore: 0,
+      recoveryScore: 0,
+      focusScore: 0.25,
+    ),
+    contextSnapshot: FocusContextSnapshot(
+      insightTypes: const [],
+      keyPatternCodes: const [],
+      topEvidence: {
+        'activeDaysObserved': daysObserved,
+        'targetActiveDays': kGlobalEstablishedActiveDays,
+        'dataMaturity': maturity.stage.name,
+      },
+      selectedRationale:
+          'Cold-start warm-up: $daysObserved/$kGlobalEstablishedActiveDays '
+          'active days observed — insight generation gated until enough '
+          'real data exists.',
+      timingProfile: timingProfile.name,
+    ),
+    evaluationTrace: [
+      'Global data maturity: ${maturity.stage.name} '
+          '($daysObserved/$kGlobalEstablishedActiveDays active days)',
+      'Insufficient observed data for behavioral insights — '
+          'warm-up focus emitted instead',
+    ],
+    suppressedCandidates: const [],
+    sourceInsightTypes: const [],
+    detectedAtMs: now.millisecondsSinceEpoch,
+    activeUntilMs: now.add(const Duration(hours: 2)).millisecondsSinceEpoch,
+  );
+  await ref.read(focusRepositoryProvider).upsertFocus(focus);
+  return focus;
+}

@@ -83,3 +83,41 @@ not silent reversal.
 - **2026-07-12 · The awaited-Firestore-write anti-pattern is banned by CI**
   (`test/architecture/local_first_guard_test.dart`). Allowlist contains only
   the outbox flusher (`sync_service.dart`).
+
+- **2026-07-15 · Insights are gated by data maturity; cold start shows an
+  honest warm-up card.** Problem: on a fresh device the pipeline phrased
+  day-one data with full authority ("100% consistent!") — it read as
+  guessing and burned trust. `DataMaturityEvaluator`
+  (`analytics/application/data_maturity.dart`) counts distinct active days
+  + events from the analytics log. Thresholds (user decision): entity
+  leaves `observing` at ≥3 active days AND ≥5 events, `established` at ≥7
+  active days; global `established` at ≥5 active days. Gate lives in
+  `InsightGenerationRecomputeService`: observing → no user-facing
+  insights; calibrating → only {streakRiskWarning, fragileStreakAlert,
+  goalAtRisk} with confidence ≥0.55; global trend insights require global
+  established. Survivors are stamped `supportingMetrics.dataMaturity`.
+  When Layer 3 yields nothing and global maturity isn't established,
+  Layer 4 emits a `FocusReason.learningYourRhythm` warm-up focus (stable
+  id `warmup-<dateKey>`, no AI call, no summary cache) whose card says
+  "Day X of 5 — I'm learning your rhythm"; X counts *active days with
+  data*, not calendar days — honest by design. Warm-up never triggers
+  notifications (dispatch keys off insight ids, which are empty).
+  *Considered:* silence during warm-up (rejected: blank card reads as
+  broken); calendar-days counter (rejected: 5 idle days would "unlock"
+  insights with no data).
+
+- **2026-07-15 · Coaching tone is a deterministic framing × style matrix
+  (FR-D-13), enforced end-to-end.** `expectedToneFor(framing, style)` in
+  `ai_summary_response.dart` replaces the framing-only tone rule: intense →
+  assertive everywhere; supportive softens protection/stabilization to
+  supportive and consistency to encouraging; disciplined keeps recovery
+  informative; the balanced column is exactly the old behavior. The same
+  matrix drives the AI prompt's TONE RULE, the response validator (AI
+  output contradicting the user's mode is rejected → deterministic
+  fallback), and the fallback renderer's tone — the fallback *copy* was
+  already style-shifted because the framing × style matrix
+  (`deriveCoachingFraming`, FR-D-12) picks which template is looked up.
+  Also fixed: `recomputeAiSummaryProvider` derived framing for TTL/summary
+  type WITHOUT the user's style while the payload derived it WITH — cache
+  freshness and prompt could disagree; both now use the style. The focus
+  card's fallback framing (no summary yet) is style-fed too.

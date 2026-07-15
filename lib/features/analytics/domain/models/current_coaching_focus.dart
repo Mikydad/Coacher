@@ -48,6 +48,11 @@ enum FocusReason {
   goalDriftDetected,
   reinforcingActiveStreak,
   timingOpportunity,
+
+  /// Cold-start warm-up: not enough observed data for real insights yet.
+  /// The focus card shows an honest "learning your rhythm — day X of 5"
+  /// message instead of a data-starved guess.
+  learningYourRhythm,
 }
 
 FocusReason focusReasonFromStorage(String? raw) {
