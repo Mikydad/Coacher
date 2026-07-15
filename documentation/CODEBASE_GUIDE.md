@@ -37,15 +37,21 @@ The UI **never** renders from Firestore directly (for user-owned data). Writes g
 to Isar first; reads come from Isar watchers. Firestore is where data goes to be
 backed up and to reach other devices. If the network is gone, the app fully works.
 
-### P2 — Writes try the network inline, and queue only on failure
-Every synced repository does:
+### P2 — Writes replicate through the outbox, always
+*(Superseded the original "try Firestore inline, queue on failure" pattern on
+2026-07-12 — see the decision log in `GUIDELINES.md`.)* Every synced
+repository commits to Isar, then:
 ```dart
-try { FirebaseFirestore...set(payload, SetOptions(merge: true)); }
-catch (_) { SyncService.instance.enqueueUpsert(...); }   // outbox on disk
+await outboxUpsert(entityType: ..., documentPath: ..., payload: ...);
+// enqueue to disk + unawaited background flush — never awaits the network
 ```
-The queue (`offline_sync_queue.json` in app documents) is a *failure-recovery
-outbox*, not a write-ahead log. It flushes on connectivity restore, app resume,
-and boot. See `lib/features/planning/data/isar_planning_repository.dart:29`.
+(`lib/core/sync/outbox_writer.dart`). Awaiting a Firestore `set`/`delete` on
+an interaction path is banned by CI
+(`test/architecture/local_first_guard_test.dart`) — `set()` resolves only on
+server ack, and a dead connection never throws, it just hangs. The queue
+(`offline_sync_queue.json` in app documents) flushes on enqueue, connectivity
+restore, app resume, and boot; a flush that leaves ops behind sets
+`SyncService.hasSyncIssue` (the thin amber stuck-writes line).
 
 ### P3 — Conflicts resolve by Last-Write-Wins on `updatedAtMs`
 Whole-document, strictly-greater timestamp comparison
@@ -133,8 +139,8 @@ AddTaskScreen._onSave                    add_task_screen.dart:948
   → task.validate()                      throws ArgumentError; the ONLY validation gate
   → stamp updatedAtMs = now
   → Isar writeTxn: putByTaskId(...)      ← UI updates from here (watchers fire)
-  → try Firestore set(merge:true) at users/{uid}/routines/{r}/blocks/{b}/tasks/{id}
-      catch → SyncService.enqueueUpsert  ← offline outbox
+  → outboxUpsert(...) targeting users/{uid}/routines/{r}/blocks/{b}/tasks/{id}
+      (durable enqueue + unawaited background flush — P2)
   → ScheduleMutationCoordinator.run(TaskCreatedMutation…)   ← side-effect fan-out
 ```
 
@@ -406,9 +412,9 @@ breakpoint spots.
 3. Add the path to `FirestorePaths` (under `users/{uid}/...` — the blanket rule
    covers it; add narrower rules only for shared data).
 4. Repository: Isar impl wrapping a Firestore impl, copying the
-   try-Firestore-else-enqueue pattern **exactly** (uid-tagged ops, paths via
-   `FirestorePaths`) — it is *not* centralized; forgetting the enqueue fallback
-   silently drops offline writes.
+   writeTxn-then-`outboxUpsert` pattern **exactly** (uid-tagged ops, paths via
+   `FirestorePaths`) — it is *not* centralized; forgetting the outbox call
+   silently leaves the entity local-only.
 5. Add pull support in `RemoteIsarMerge` (cursor-filtered query + LWW merge)
    and a cursor key in `SyncCursorStore`.
 6. Expose via a provider in `features/<x>/application/`, watching Isar.
