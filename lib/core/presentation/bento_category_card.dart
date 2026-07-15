@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 /// Bento card palette for the category-first pickers (Add Task, New Goal).
@@ -19,7 +21,12 @@ abstract final class BentoPalette {
 /// when selected, a hero glyph, one soft supporting line below. Sizes itself
 /// to whatever height its mosaic slot gives it — short slots drop the
 /// subtitle and shrink the glyph instead of overflowing.
-class BentoCategoryCard extends StatelessWidget {
+///
+/// Selection keeps the card's color untouched and draws an inner accent ring
+/// (inset from the edge) with a soft glow that gently pulses — lights and
+/// dims — plus a check chip centered on the right edge; [dimmed] softly
+/// recedes the non-chosen siblings.
+class BentoCategoryCard extends StatefulWidget {
   const BentoCategoryCard({
     super.key,
     required this.color,
@@ -28,6 +35,7 @@ class BentoCategoryCard extends StatelessWidget {
     this.subtitle,
     required this.onTap,
     this.selected = false,
+    this.dimmed = false,
     this.hero = false,
   });
 
@@ -38,96 +46,206 @@ class BentoCategoryCard extends StatelessWidget {
   final VoidCallback onTap;
   final bool selected;
 
+  /// Softly fades the card when a sibling is selected (kept subtle — the
+  /// options must still read as available).
+  final bool dimmed;
+
   /// The full-width top card: bigger glyph, roomier text.
   final bool hero;
 
   @override
+  State<BentoCategoryCard> createState() => _BentoCategoryCardState();
+}
+
+class _BentoCategoryCardState extends State<BentoCategoryCard>
+    with SingleTickerProviderStateMixin {
+  /// Drives the comet sweep — one lap of the ring per cycle; runs only while
+  /// selected. Linear on purpose: a curve would make the comet speed pulse.
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 4200),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.selected) _pulse.repeat();
+  }
+
+  @override
+  void didUpdateWidget(BentoCategoryCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selected == oldWidget.selected) return;
+    if (widget.selected) {
+      _pulse.repeat();
+    } else {
+      _pulse.stop();
+      _pulse.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Material(
-      color: color,
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
-        onTap: onTap,
+    const fg = BentoPalette.ink;
+    return AnimatedOpacity(
+      opacity: widget.dimmed ? 0.82 : 1,
+      duration: const Duration(milliseconds: 200),
+      child: Material(
+        color: widget.color,
         borderRadius: BorderRadius.circular(24),
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: selected
-                ? Border.all(color: BentoPalette.ink, width: 2.5)
-                : null,
-          ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxHeight < 96;
-              return Padding(
-                padding: EdgeInsets.all(compact ? 10 : 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+        child: InkWell(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
+            // Non-positioned children fill the slot — keeps the hero card
+            // full-width even under the mosaic Column's loose constraints.
+            fit: StackFit.expand,
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxHeight < 96;
+                  return Padding(
+                    padding: EdgeInsets.all(compact ? 10 : 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Flexible(
-                          child: Text(
-                            label.toUpperCase(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: BentoPalette.ink,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2,
-                            ),
+                        Text(
+                          widget.label.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: fg,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
                           ),
                         ),
                         const Spacer(),
-                        if (selected)
-                          Container(
-                            padding: const EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              color: BentoPalette.ink.withValues(alpha: 0.14),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.check_rounded,
-                              size: 14,
-                              color: BentoPalette.ink,
+                        Icon(
+                          widget.icon,
+                          color: fg,
+                          size: widget.hero
+                              ? 38
+                              : compact
+                              ? 18
+                              : 26,
+                        ),
+                        if (widget.subtitle != null && !compact) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            widget.subtitle!,
+                            maxLines: widget.hero ? 1 : 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: fg.withValues(alpha: 0.72),
+                              fontSize: 11,
+                              height: 1.3,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
+                        ],
                       ],
                     ),
-                    const Spacer(),
-                    Icon(
-                      icon,
-                      color: BentoPalette.ink,
-                      size: hero
-                          ? 38
-                          : compact
-                          ? 18
-                          : 26,
-                    ),
-                    if (subtitle != null && !compact) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle!,
-                        maxLines: hero ? 1 : 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: BentoPalette.ink.withValues(alpha: 0.72),
-                          fontSize: 11,
-                          height: 1.3,
-                          fontWeight: FontWeight.w600,
+                  );
+                },
+              ),
+              if (widget.selected) ...[
+                // Inner white ring with a comet sweep: a bright highlight
+                // (with fading tail) travels the border; the rest of the
+                // ring stays a dim steady white. Painter, not BoxShadow —
+                // the glow must hug the stroke, never haze the card face.
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Padding(
+                      padding: const EdgeInsets.all(5),
+                      child: AnimatedBuilder(
+                        animation: _pulse,
+                        builder: (context, _) => CustomPaint(
+                          painter: _CometRingPainter(t: _pulse.value),
                         ),
                       ),
-                    ],
-                  ],
+                    ),
+                  ),
                 ),
-              );
-            },
+                // Check chip: top-right corner.
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: fg.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.check_rounded, size: 14, color: fg),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
     );
   }
+}
+
+/// White selection ring with a traveling comet: a dim steady base ring, and
+/// a bright highlight with a fading tail that laps the border once per [t]
+/// cycle (sweep-gradient stroke rotated by t). The comet also carries a
+/// blurred halo so the moving light glows along the stroke only.
+class _CometRingPainter extends CustomPainter {
+  const _CometRingPainter({required this.t});
+
+  /// Lap progress, 0..1 → one full trip around the border.
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(19));
+
+    // Dim steady track.
+    final base = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..color = Colors.white.withValues(alpha: 0.38);
+    canvas.drawRRect(rrect, base);
+
+    // Comet: tail brightens toward the head, then cuts off.
+    final comet = SweepGradient(
+      colors: [
+        Colors.white.withValues(alpha: 0),
+        Colors.white.withValues(alpha: 0),
+        Colors.white.withValues(alpha: 0.55),
+        Colors.white,
+        Colors.white.withValues(alpha: 0),
+      ],
+      stops: const [0.0, 0.62, 0.86, 0.97, 0.98],
+      transform: GradientRotation(2 * math.pi * t),
+    ).createShader(rect);
+
+    final halo = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..shader = comet
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+    canvas.drawRRect(rrect, halo);
+
+    final head = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..shader = comet;
+    canvas.drawRRect(rrect, head);
+  }
+
+  @override
+  bool shouldRepaint(_CometRingPainter oldDelegate) => oldDelegate.t != t;
 }
 
 /// The dark "pill" action button that sits under a bento mosaic (Custom

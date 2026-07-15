@@ -12,16 +12,29 @@ import '../../../core/presentation/bento_category_card.dart';
 
 /// Entry point for creating a goal — pick a popular template (bento mosaic)
 /// or start from a blank Custom Goal.
-class GoalTemplatePickerScreen extends StatelessWidget {
+class GoalTemplatePickerScreen extends StatefulWidget {
   const GoalTemplatePickerScreen({super.key});
 
   static const routeName = '/goals/templates';
+
+  @override
+  State<GoalTemplatePickerScreen> createState() =>
+      _GoalTemplatePickerScreenState();
+}
+
+class _GoalTemplatePickerScreenState extends State<GoalTemplatePickerScreen> {
+  /// The highlighted template: tinted + check chip (and the others softly
+  /// dimmed) so the mosaic reads as a choice, and still marks the pick when
+  /// the user backs out of the editor to re-choose. Starts on Study — a
+  /// preselected card is what signals "these are selectable" at first glance.
+  String? _selectedId = 'study';
 
   /// Pushes (not replaces) the editor so back returns here to re-pick a
   /// template. After a successful save the editor pops with `true` and this
   /// picker pops itself too — the user lands where they started, not on a
   /// stale picker.
   Future<void> _openEditor(BuildContext context, GoalTemplate template) async {
+    setState(() => _selectedId = template.id);
     final saved = await Navigator.pushNamed(
       context,
       GoalEditorScreen.routeName,
@@ -67,6 +80,8 @@ class GoalTemplatePickerScreen extends StatelessWidget {
         label: t.label,
         subtitle: _subtitle(t),
         hero: hero,
+        selected: _selectedId == id,
+        dimmed: _selectedId != null && _selectedId != id,
         onTap: () => _openEditor(context, t),
       );
     }
@@ -89,12 +104,7 @@ class GoalTemplatePickerScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SectionHeader(
-              'Popular goals',
-              subtitle:
-                  'Pick a starting point — you can change anything on the '
-                  'next screen.',
-            ),
+            const SectionHeader('Pick a goal'),
             const SizedBox(height: 16),
             // Bento mosaic: Study hero on top, then two side-by-side pairs.
             Expanded(
@@ -139,6 +149,8 @@ class GoalTemplatePickerScreen extends StatelessWidget {
               onTap: () => _openEditor(context, custom),
               color: AppColors.surfaceCard,
               textColor: AppColors.fg,
+              ringColor: AppColors.accentDim,
+              active: _selectedId == custom.id,
             ),
           ],
         ),

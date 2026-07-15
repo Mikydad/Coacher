@@ -153,3 +153,17 @@ not silent reversal.
   keyboard up); full AppBar in the sheet (rejected: chrome eats the 60%).
   *Known trade-off:* snackbars raised from coach actions show on the root
   scaffold behind the sheet.
+
+- **2026-07-15 · Goal template picker reads as a choice, not an info wall.**
+  Header is "Pick a goal" (subtitle removed); Study is preselected on open
+  (a visibly selected card is what signals "these are selectable"); the
+  tapped card stays marked when backing out of the editor. Selection style
+  after several iterations: card color untouched, inner white ring inset
+  5px with a slow comet sweep (bright highlight + fading tail lapping the
+  border every ~4.2s over a dim steady track, custom painter so the glow
+  hugs the stroke), check chip top-right, siblings dimmed to 0.82.
+  *Considered & rejected:* ink-inversion selected state (too dark), 15%
+  ink tint (not visible enough), BoxShadow glow (hazes the whole card
+  face), breathing pulse (read as blinking). The comet is angular-speed
+  (sweep gradient), so it runs slightly faster on short edges — accepted.
+  Animation runs only on the selected card.
