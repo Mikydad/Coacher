@@ -2421,8 +2421,9 @@ class _CoachHomeFab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return FloatingActionButton(
-      onPressed: () =>
-          navigateToMainTab(context, ref, index: MainTabIndex.coach),
+      // Quick access: Coach AI slides up as a 60% sheet over Home instead of
+      // switching tabs (the Coach tab remains the full-page presentation).
+      onPressed: () => showCoachAiSheet(context),
       elevation: 0,
       highlightElevation: 0,
       splashColor: _accent.withValues(alpha: 0.12),

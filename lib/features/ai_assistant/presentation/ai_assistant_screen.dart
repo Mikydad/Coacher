@@ -50,10 +50,113 @@ class CoachRouteArgs {
   final bool autoSendMessage;
 }
 
+/// Opens Coach AI as a drag-expandable modal bottom sheet (~60% height,
+/// expandable toward full) over the current screen — quick AI access without
+/// leaving the page. The Coach tab remains the full-page presentation;
+/// conversation state lives in providers, so both show the same thread.
+/// The route keeps the '/coach' name for the feedback route tracker.
+Future<void> showCoachAiSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    // The DraggableScrollableSheet inside owns all drag/resize/dismiss
+    // gestures; the modal's own drag would fight it.
+    enableDrag: false,
+    backgroundColor: Colors.transparent,
+    routeSettings: const RouteSettings(name: AiAssistantScreen.routeName),
+    builder: (_) => const _CoachAiSheet(),
+  );
+}
+
+/// Owns the sheet's [DraggableScrollableController]: 60% initial, snaps to
+/// 60% / 93%, and pops the route when dragged to the minimum extent.
+class _CoachAiSheet extends StatefulWidget {
+  const _CoachAiSheet();
+
+  static const initialSize = 0.6;
+  static const minSize = 0.32;
+  static const maxSize = 0.93;
+
+  @override
+  State<_CoachAiSheet> createState() => _CoachAiSheetState();
+}
+
+class _CoachAiSheetState extends State<_CoachAiSheet> {
+  final _sheetController = DraggableScrollableController();
+  bool _popped = false;
+
+  @override
+  void dispose() {
+    _sheetController.dispose();
+    super.dispose();
+  }
+
+  void _popOnce() {
+    if (_popped) return;
+    _popped = true;
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Keyboard: lift the whole sheet above it — the fractions then apply to
+    // the remaining space, so no fixed extent can overflow.
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: NotificationListener<DraggableScrollableNotification>(
+        onNotification: (n) {
+          if (n.extent <= n.minExtent + 0.005) _popOnce();
+          return false;
+        },
+        child: DraggableScrollableSheet(
+          controller: _sheetController,
+          expand: false,
+          initialChildSize: _CoachAiSheet.initialSize,
+          minChildSize: _CoachAiSheet.minSize,
+          maxChildSize: _CoachAiSheet.maxSize,
+          snap: true,
+          snapSizes: const [_CoachAiSheet.initialSize],
+          builder: (context, scrollController) => ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            child: AiAssistantScreen(
+              sheetMode: true,
+              sheetScrollController: scrollController,
+              sheetController: _sheetController,
+              onSheetDismiss: _popOnce,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class AiAssistantScreen extends ConsumerStatefulWidget {
-  const AiAssistantScreen({super.key});
+  const AiAssistantScreen({
+    super.key,
+    this.sheetMode = false,
+    this.sheetScrollController,
+    this.sheetController,
+    this.onSheetDismiss,
+  });
 
   static const routeName = '/coach';
+
+  /// True when presented via [showCoachAiSheet]: slim grabber header instead
+  /// of the AppBar, and the message list drives the sheet's drag-resize.
+  final bool sheetMode;
+
+  /// The [DraggableScrollableSheet]-provided controller (sheet mode only).
+  final ScrollController? sheetScrollController;
+
+  /// Lets the slim header translate its drags into sheet resizes.
+  final DraggableScrollableController? sheetController;
+
+  /// Closes the sheet (header drag past the dismiss threshold).
+  final VoidCallback? onSheetDismiss;
 
   @override
   ConsumerState<AiAssistantScreen> createState() => _AiAssistantScreenState();
@@ -132,11 +235,17 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     super.dispose();
   }
 
+  /// In sheet mode the DraggableScrollableSheet's controller drives the
+  /// message list so scrolling and sheet-resizing stay coordinated.
+  ScrollController get _activeScrollController =>
+      widget.sheetScrollController ?? _scrollController;
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+      final controller = _activeScrollController;
+      if (controller.hasClients) {
+        controller.animateTo(
+          controller.position.maxScrollExtent,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
@@ -154,13 +263,88 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
 
     final serviceAsync = ref.watch(resolvedAiAssistantProvider);
 
+    final body = serviceAsync.when(
+      data: (service) => _buildBody(service),
+      loading: () => _buildLoadingBody(),
+      error: (e, _) => _buildErrorBody(e),
+    );
+
+    if (widget.sheetMode) {
+      return Material(
+        color: AppColors.ink,
+        child: Column(
+          children: [
+            _buildSheetHeader(serviceAsync),
+            Expanded(child: body),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.ink,
       appBar: _buildAppBar(serviceAsync),
-      body: serviceAsync.when(
-        data: (service) => _buildBody(service),
-        loading: () => _buildLoadingBody(),
-        error: (e, _) => _buildErrorBody(e),
+      body: body,
+    );
+  }
+
+  /// Slim sheet chrome: grabber + compact title row. Dragging it resizes the
+  /// sheet (DraggableScrollableSheet only reacts to drags on its attached
+  /// scrollable, so the header forwards its own).
+  Widget _buildSheetHeader(AsyncValue<AiAssistantService> serviceAsync) {
+    final sheet = widget.sheetController;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onVerticalDragUpdate: sheet == null
+          ? null
+          : (details) {
+              final height = MediaQuery.sizeOf(context).height;
+              sheet.jumpTo(
+                (sheet.size - details.delta.dy / height).clamp(
+                  _CoachAiSheet.minSize,
+                  _CoachAiSheet.maxSize,
+                ),
+              );
+            },
+      onVerticalDragEnd: sheet == null
+          ? null
+          : (details) {
+              final flingDown = details.velocity.pixelsPerSecond.dy > 700;
+              if (flingDown || sheet.size < 0.45) {
+                widget.onSheetDismiss?.call();
+                return;
+              }
+              final target = sheet.size < 0.75
+                  ? _CoachAiSheet.initialSize
+                  : _CoachAiSheet.maxSize;
+              sheet.animateTo(
+                target,
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+              );
+            },
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.textSoft.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const PageTitle('Coach AI'),
+              const SizedBox(width: 8),
+              _StatusPill(isReady: serviceAsync.hasValue),
+            ],
+          ),
+          const SizedBox(height: 4),
+        ],
       ),
     );
   }
@@ -202,62 +386,91 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
 
     final showSuggestionsPanel = _shouldShowSuggestionsPanel();
 
+    // Discoverability chrome above the thread. The sheet skips it entirely
+    // (quick chat, no cards); the tab keeps it.
+    final topExtras = <Widget>[
+      if (!widget.sheetMode) ...[
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: FirstTimeFeatureCard(guideId: 'coachAi'),
+        ),
+        // Expanded while the chat is empty (suggestions are the
+        // content); collapses to the slim header once a conversation
+        // is underway so the transcript gets the space.
+        if (showSuggestionsPanel)
+          ProactiveSuggestionsCoachPanel(
+            initiallyExpanded: _openSuggestionsPanel || !hasMessages,
+          ),
+      ],
+      // "Pick up where you left off" banner — shown when no active messages
+      // and there is a recent unconfirmed plan
+      if (!hasMessages)
+        _PickUpBanner(
+          historyRepository: service.historyRepository,
+          onResume: (input) {
+            service.sendMessage(input);
+          },
+        ),
+    ];
+
     return Column(
       children: [
         Expanded(
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTap: () => dismissKeyboard(context),
-            child: Column(
-              children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  child: FirstTimeFeatureCard(guideId: 'coachAi'),
-                ),
-                // Expanded while the chat is empty (suggestions are the
-                // content); collapses to the slim header once a conversation
-                // is underway so the transcript gets the space.
-                if (showSuggestionsPanel)
-                  ProactiveSuggestionsCoachPanel(
-                    initiallyExpanded: _openSuggestionsPanel || !hasMessages,
-                  ),
-                // "Pick up where you left off" banner — shown when no active messages
-                // and there is a recent unconfirmed plan
-                if (!hasMessages)
-                  _PickUpBanner(
-                    historyRepository: service.historyRepository,
-                    onResume: (input) {
-                      service.sendMessage(input);
-                    },
-                  ),
-                // Conversation thread
-                Expanded(
-                  child: hasMessages
-                      ? _MessageList(
-                          messages: messages,
-                          service: service,
-                          scrollController: _scrollController,
-                          isLoading: service.isLoading,
-                          onSuggestedPrompt: (prompt) {
-                            _inputController.text = prompt;
-                            _inputFocusNode.requestFocus();
-                          },
-                        )
-                      : _EmptyState(
-                          onPromptSelected: (p) {
-                            _inputController.text = p;
-                            _inputFocusNode.requestFocus();
-                          },
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // The extras block is capped so the thread always keeps
+                // ~160px: with the keyboard up (or a short sheet) the extras
+                // scroll inside their cap instead of overflowing the Column.
+                final extrasMaxHeight = (constraints.maxHeight - 160).clamp(
+                  0.0,
+                  double.infinity,
+                );
+                return Column(
+                  children: [
+                    if (topExtras.isNotEmpty)
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxHeight: extrasMaxHeight),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: topExtras,
+                          ),
                         ),
-                ),
-              ],
+                      ),
+                    // Conversation thread
+                    Expanded(
+                      child: hasMessages
+                          ? _MessageList(
+                              messages: messages,
+                              service: service,
+                              scrollController: _activeScrollController,
+                              isLoading: service.isLoading,
+                              onSuggestedPrompt: (prompt) {
+                                _inputController.text = prompt;
+                                _inputFocusNode.requestFocus();
+                              },
+                            )
+                          : _buildEmptyState(),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),
-        // Fixed bottom: input + quick directives
+        // Fixed bottom: input + quick directives. The tab clears the floating
+        // nav bar; the sheet only needs the home indicator (keyboard insets
+        // are handled by the sheet wrapper lifting the whole sheet).
         Container(
           color: AppColors.ink,
-          padding: EdgeInsets.only(bottom: mainTabFooterPadding(context)),
+          padding: EdgeInsets.only(
+            bottom: widget.sheetMode
+                ? MediaQuery.paddingOf(context).bottom + 8
+                : mainTabFooterPadding(context),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -285,6 +498,20 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  /// Empty state. In sheet mode its scrollable attaches to the sheet's
+  /// controller (drag-to-resize/dismiss works on it) and the example prompt
+  /// chips are hidden — the sheet goes straight to the composer.
+  Widget _buildEmptyState() {
+    return _EmptyState(
+      controller: widget.sheetMode ? _activeScrollController : null,
+      showExamples: !widget.sheetMode,
+      onPromptSelected: (p) {
+        _inputController.text = p;
+        _inputFocusNode.requestFocus();
+      },
     );
   }
 
@@ -374,9 +601,20 @@ class _StatusPill extends StatelessWidget {
 // ─── Empty state (shown before first message) ─────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onPromptSelected});
+  const _EmptyState({
+    required this.onPromptSelected,
+    this.controller,
+    this.showExamples = true,
+  });
 
   final void Function(String) onPromptSelected;
+
+  /// Sheet mode passes the DraggableScrollableSheet controller so dragging
+  /// the empty area resizes/dismisses the sheet.
+  final ScrollController? controller;
+
+  /// Sheet mode hides the example prompt chips — composer-first.
+  final bool showExamples;
 
   static const _examples = [
     "What's my plan for tomorrow?",
@@ -387,6 +625,10 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
+      controller: controller,
+      physics: controller != null
+          ? const AlwaysScrollableScrollPhysics()
+          : null,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(0, 8, 0, 16),
       child: Column(
@@ -402,25 +644,30 @@ class _EmptyState extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final example in _examples)
-                  ActionChip(
-                    label: Text(example, style: const TextStyle(fontSize: 12)),
-                    backgroundColor: AppColors.inkCard,
-                    side: BorderSide(
-                      color: AppColors.cyan.withValues(alpha: 0.25),
+          if (showExamples) ...[
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final example in _examples)
+                    ActionChip(
+                      label: Text(
+                        example,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      backgroundColor: AppColors.inkCard,
+                      side: BorderSide(
+                        color: AppColors.cyan.withValues(alpha: 0.25),
+                      ),
+                      onPressed: () => onPromptSelected(example),
                     ),
-                    onPressed: () => onPromptSelected(example),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

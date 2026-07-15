@@ -140,3 +140,16 @@ not silent reversal.
   away. *Considered:* sheet for create only (rejected: two presentations
   of one form); half-height opening ~60% (rejected: most saves would need
   an extra drag).
+
+- **2026-07-15 · The Home Coach FAB opens Coach AI as a 60% drag-expandable
+  sheet** (`showCoachAiSheet`: opens 60%, snaps 60%/93%, drag below ~45% or
+  fling down dismisses; slim grabber header replaces the AppBar in sheet
+  mode). ONLY the FAB changed — the Coach bottom-nav tab, morning-brief
+  snackbar, and "See all in Coach" still switch tabs (they pass
+  `CoachRouteArgs`; the sheet takes none). Conversation state lives in
+  providers, so sheet and tab show the same thread. The sheet route is
+  named `'/coach'` for the feedback tracker. *Why:* quick AI access without
+  leaving the current page. *Considered:* fixed 60% (rejected: cramped with
+  keyboard up); full AppBar in the sheet (rejected: chrome eats the 60%).
+  *Known trade-off:* snackbars raised from coach actions show on the root
+  scaffold behind the sheet.
