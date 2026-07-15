@@ -1303,6 +1303,15 @@ class _FlowNowStrip extends ConsumerWidget {
     final displayTask = focusActive
         ? (_findTask(todayRows, execState.taskId) ?? next)
         : next;
+    final isThisFocus =
+        focusActive &&
+        displayTask != null &&
+        execState.taskId == displayTask.id;
+    final statusLabel = !isThisFocus
+        ? 'Next up'
+        : (execState.phase == ExecutionPhase.paused
+              ? 'Focus paused'
+              : 'Focus active');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1341,7 +1350,7 @@ class _FlowNowStrip extends ConsumerWidget {
             color: AppColors.dark1A1D22,
             borderRadius: BorderRadius.circular(10),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               child: Row(
                 children: [
                   _FlowNowTimerControl(
@@ -1356,53 +1365,32 @@ class _FlowNowStrip extends ConsumerWidget {
                     child: InkWell(
                       onTap: () => _openTimerScreen(context, ref, displayTask),
                       borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              focusActive && execState.taskId == displayTask.id
-                                  ? (execState.phase == ExecutionPhase.paused
-                                        ? 'Focus paused'
-                                        : 'Focus active')
-                                  : 'Next up',
-                              style: TextStyle(
-                                color: AppColors.fg,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                              ),
+                      // Two lines matching the 36px button height: title on
+                      // top, status + timer merged below — keeps the row slim.
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            isThisFocus
+                                ? execState.taskLabel
+                                : displayTask.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: AppColors.fg,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
                             ),
-                            Text(
-                              focusActive && execState.taskId == displayTask.id
-                                  ? execState.taskLabel
-                                  : displayTask.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: AppColors.fg,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _FlowNowStrip._subtitleFor(
-                                task: displayTask,
-                                execState: execState,
-                                focusActive:
-                                    focusActive &&
-                                    execState.taskId == displayTask.id,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: AppColors.fg,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            '$statusLabel · ${_FlowNowStrip._subtitleFor(task: displayTask, execState: execState, focusActive: isThisFocus)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: AppColors.fg, fontSize: 11),
+                          ),
+                        ],
                       ),
                     ),
                   ),
