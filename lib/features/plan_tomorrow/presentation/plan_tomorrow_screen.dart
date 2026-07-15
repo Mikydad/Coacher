@@ -502,10 +502,9 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
     final repo = ref.read(planningRepositoryProvider);
     final blocks = await repo.getBlocks(widget.routine.id);
     if (blocks.isEmpty || !mounted) return;
-    await Navigator.pushNamed(
+    await showAddTaskSheet(
       context,
-      AddTaskScreen.routeName,
-      arguments: AddTaskSlotArgs(
+      slotArgs: AddTaskSlotArgs(
         routineId: widget.routine.id,
         blockId: blocks.first.id,
         dateKey: DateKeys.tomorrowKey(),
@@ -517,10 +516,9 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
   }
 
   Future<void> _editTask(PlannedTaskRow row) async {
-    await Navigator.pushNamed(
+    await showAddTaskSheet(
       context,
-      AddTaskScreen.routeName,
-      arguments: AddTaskEditArgs(
+      editArgs: AddTaskEditArgs(
         taskId: row.task.id,
         routineId: row.routineId,
         blockId: row.blockId,

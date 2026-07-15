@@ -616,7 +616,6 @@ class AddTaskPickerRow extends StatelessWidget {
   }
 }
 
-
 class AddTaskDurationSegment extends StatelessWidget {
   const AddTaskDurationSegment({
     super.key,
@@ -820,7 +819,8 @@ IconData addTaskCategoryIcon(String label) {
       return Icons.work_outline_rounded;
     case 'Personal':
       return Icons.favorite_border_rounded;
-    case 'Planning':
+    case 'Plan':
+    case 'Planning': // legacy value, superseded by 'Plan'
       return Icons.calendar_month_outlined;
     case 'Sleep':
       return Icons.bedtime_rounded;

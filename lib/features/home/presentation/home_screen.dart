@@ -149,8 +149,7 @@ class HomeScreen extends ConsumerWidget {
                   icon: Icons.add,
                   label: 'Add Task',
                   tooltip: 'Add task',
-                  onTap: () =>
-                      Navigator.pushNamed(context, AddTaskScreen.routeName),
+                  onTap: () => showAddTaskSheet(context),
                 ),
               ),
               const SizedBox(width: 8),

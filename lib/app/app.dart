@@ -10,7 +10,6 @@ import '../features/auth/presentation/change_password_screen.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/sign_up_screen.dart';
-import '../features/add_task/presentation/add_task_screen.dart';
 import '../features/analytics/presentation/analytics_progress_screen.dart';
 import '../features/focus/presentation/focus_selection_screen.dart';
 import '../features/goals/presentation/goal_detail_screen.dart';
@@ -157,13 +156,9 @@ class CoachForLifeApp extends ConsumerWidget {
         PlanTomorrowScreen.routeName: (_) => const PlanTomorrowScreen(),
         AccountabilityHistoryScreen.routeName: (_) =>
             const AccountabilityHistoryScreen(),
-        AddTaskScreen.routeName: (context) {
-          final args = ModalRoute.of(context)?.settings.arguments;
-          return AddTaskScreen(
-            editArgs: args is AddTaskEditArgs ? args : null,
-            slotArgs: args is AddTaskSlotArgs ? args : null,
-          );
-        },
+        // Add Task has no route-table entry: it always opens as a modal
+        // bottom sheet via [showAddTaskSheet] (still named '/add-task' for
+        // the tour + feedback route tracker).
         TasksHubScreen.routeName: (_) => const TasksHubScreen(),
         TaskDetailScreen.routeName: (context) {
           final args = ModalRoute.of(context)?.settings.arguments;

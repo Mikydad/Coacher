@@ -117,3 +117,26 @@ not silent reversal.
   only. Premium screen (13) is UI-only — both CTAs advance; IAP is a
   future feature. Illustrations are gradient placeholders pending exported
   artwork.
+
+- **2026-07-15 · Add Task is one page; category is an inline row under
+  Notes.** The full-screen category-first bento step was folded into the
+  details form: a single horizontally scrolling line of mini bento cards
+  (same palette/icons) directly under Notes, tap-to-toggle (tapping the
+  selected card clears it — no category is valid), trailing Custom card.
+  *Why:* two steps for one optional field slowed the core "jot a task"
+  path. *Considered:* keeping the two-step flow (previous implementation
+  preserved verbatim in `backups/add_task_screen_category_flow.dart` for
+  reversal); wrap-to-grid layout (rejected: one line keeps the form
+  compact). The Skip action died with the step.
+
+- **2026-07-15 · Add Task opens as a modal bottom sheet everywhere** —
+  create, edit, and Plan Tomorrow slots all go through `showAddTaskSheet`
+  (~93% height, drag handle, swipe-down / scrim-tap / X to dismiss). The
+  `/add-task` route-table entry is gone; the sheet route keeps the name
+  `'/add-task'` via `RouteSettings` so the guided tour and feedback route
+  tracker are unaffected. Dismissing mid-entry is safe: the existing form
+  draft autosave offers restore on next open. *Why:* task capture should
+  feel like a light overlay, not a page navigation — enter, type, slide
+  away. *Considered:* sheet for create only (rejected: two presentations
+  of one form); half-height opening ~60% (rejected: most saves would need
+  an extra drag).

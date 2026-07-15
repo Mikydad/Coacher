@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/application/main_tab_navigation.dart';
 import '../../../core/presentation/app_colors.dart';
+import '../../add_task/presentation/add_task_screen.dart';
 import '../application/education_providers.dart';
 import '../domain/feature_guide.dart';
 import '../domain/feature_guides.dart';
@@ -28,7 +29,10 @@ class _FirstTimeFeatureCardState extends ConsumerState<FirstTimeFeatureCard> {
 
   void _tryIt(FeatureGuide guide) {
     _dismiss();
-    if (guide.tryItRoute != null) {
+    if (guide.tryItRoute == AddTaskScreen.routeName) {
+      // Add Task is a bottom sheet, not a pushed route.
+      showAddTaskSheet(context);
+    } else if (guide.tryItRoute != null) {
       Navigator.pushNamed(context, guide.tryItRoute!);
     } else if (guide.tryItTabIndex != null) {
       navigateToMainTab(context, ref, index: guide.tryItTabIndex!);

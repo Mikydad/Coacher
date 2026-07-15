@@ -121,10 +121,9 @@ class TaskDetailScreen extends ConsumerWidget {
   );
 
   Future<void> _openEdit(BuildContext context, WidgetRef ref) async {
-    await Navigator.pushNamed(
+    await showAddTaskSheet(
       context,
-      AddTaskScreen.routeName,
-      arguments: AddTaskEditArgs(
+      editArgs: AddTaskEditArgs(
         taskId: args.taskId,
         routineId: args.routineId,
         blockId: args.blockId,

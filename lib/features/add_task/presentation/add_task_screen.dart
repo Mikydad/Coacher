@@ -76,6 +76,39 @@ class AddTaskSlotArgs {
   final String dateKey;
 }
 
+/// Opens Add Task as a modal bottom sheet — the one way to reach the form
+/// (create, edit, and Plan Tomorrow slots all come through here).
+///
+/// The sheet slides up over the caller, dismisses by swipe-down / tapping the
+/// scrim / save, and keeps the caller's context underneath. Dismissing
+/// mid-entry is safe: the form's draft autosave offers a restore next open.
+/// The route is still named [AddTaskScreen.routeName] so the guided tour and
+/// the feedback route tracker see the same signal as the old pushed page.
+Future<void> showAddTaskSheet(
+  BuildContext context, {
+  AddTaskEditArgs? editArgs,
+  AddTaskSlotArgs? slotArgs,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    backgroundColor: AddTaskColors.surface,
+    clipBehavior: Clip.antiAlias,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    ),
+    routeSettings: const RouteSettings(name: AddTaskScreen.routeName),
+    builder: (_) => FractionallySizedBox(
+      // Tall overlay: a sliver of the caller stays visible so the sheet
+      // reads as "on top of" the screen, not a new page.
+      heightFactor: 0.93,
+      child: AddTaskScreen(editArgs: editArgs, slotArgs: slotArgs),
+    ),
+  );
+}
+
 class AddTaskScreen extends ConsumerStatefulWidget {
   const AddTaskScreen({super.key, this.editArgs, this.slotArgs});
 
@@ -90,12 +123,14 @@ class AddTaskScreen extends ConsumerStatefulWidget {
 
 class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     with WidgetsBindingObserver {
+  // 'Plan' superseded 'Planning' (2026-07-15); older tasks may still carry
+  // the long value, so the icon/color maps keep a legacy alias.
   static const _categoryOptions = [
     'Study',
     'Fitness',
     'Work',
     'Personal',
-    'Planning',
+    'Plan',
     kSleepTaskCategory,
   ];
   static const _modeChoiceIds = ['flexible', 'disciplined', 'extreme'];
@@ -1395,7 +1430,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     'Fitness' => CupertinoIcons.flame_fill,
     'Work' => CupertinoIcons.briefcase_fill,
     'Personal' => CupertinoIcons.heart_fill,
-    'Planning' => CupertinoIcons.calendar,
+    'Plan' || 'Planning' => CupertinoIcons.calendar,
     kSleepTaskCategory => CupertinoIcons.moon_fill,
     _ => CupertinoIcons.tag_fill,
   };
@@ -1406,14 +1441,17 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
   static Color _categoryColor(String label) => switch (label) {
     'Study' => BentoPalette.yellow,
     'Work' => BentoPalette.orange,
-    'Planning' => BentoPalette.green,
+    'Plan' || 'Planning' => BentoPalette.green,
     'Fitness' => BentoPalette.purple,
     'Personal' => BentoPalette.blue,
     kSleepTaskCategory => BentoPalette.teal,
     _ => const Color(0xFFDADDE2),
   };
 
-  /// One fixed-width mini bento card for the inline category row.
+  /// One fixed-size mini bento chip for the inline category row: icon +
+  /// uppercase label on a single centered line (the row is too short for the
+  /// stacked bento layout). Selection inverts the chip — dark-ink background
+  /// with the category color as ink — so the pick is unmissable at a glance.
   Widget _categoryMiniCard(
     String label, {
     required Color color,
@@ -1421,14 +1459,37 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     required bool selected,
     required VoidCallback onTap,
   }) {
+    final bg = selected ? BentoPalette.ink : color;
+    final fg = selected ? color : BentoPalette.ink;
     return SizedBox(
-      width: 104,
-      child: BentoCategoryCard(
-        color: color,
-        icon: icon,
-        label: label,
-        selected: selected,
-        onTap: onTap,
+      width: 73,
+      child: Material(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 13, color: fg),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  label.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: fg,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1443,7 +1504,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         _category != null && !_categoryOptions.contains(_category);
 
     return SizedBox(
-      height: 78,
+      height: 40,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: EdgeInsets.zero,
@@ -1614,7 +1675,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         color: AddTaskColors.card,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          // Slimmer than the sibling cards on purpose (user call, 2026-07-15):
+          // the collapsed reminder row reads ~15% shorter.
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1871,6 +1934,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         scrolledUnderElevation: 0,
         foregroundColor: AddTaskColors.accent,
         centerTitle: true,
+        // Presented as a bottom sheet: close is an X (slide-down), not a
+        // page-back arrow.
+        leading: const CloseButton(),
         title: PageTitle(_isEdit ? 'Edit task' : 'Add task'),
         actions: const [HelpAppBarButton('tasks')],
       ),
@@ -1935,10 +2001,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                           const SizedBox(height: 20),
                           // Category picker sits right under Notes: pick after
                           // jotting the task down. Optional — none is fine.
-                          const AddTaskSectionLabel(
-                            title: 'Category',
-                            subtitle: 'Optional — tap to color-code this task',
-                          ),
+                          const AddTaskSectionLabel(title: 'Category'),
                           const SizedBox(height: 12),
                           _buildCategoryPickerRow(),
                           const SizedBox(height: 20),

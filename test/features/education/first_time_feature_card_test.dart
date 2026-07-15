@@ -7,7 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 Widget _host({String guideId = 'focus'}) => ProviderScope(
   child: MaterialApp(
     home: Scaffold(body: FirstTimeFeatureCard(guideId: guideId)),
-    routes: {'/add-task': (_) => const Scaffold(body: Text('ADD TASK PAGE'))},
+    // The tasks guide's '/add-task' is special-cased to a bottom sheet in
+    // _tryIt, so the routed branch is exercised with the focus guide.
+    routes: {'/focus': (_) => const Scaffold(body: Text('FOCUS PAGE'))},
   ),
 );
 
@@ -63,15 +65,15 @@ void main() {
   testWidgets('Try it marks seen and navigates to the guide route', (
     tester,
   ) async {
-    await tester.pumpWidget(_host(guideId: 'tasks'));
+    await tester.pumpWidget(_host());
     await tester.pumpAndSettle();
-    expect(find.text('Tasks'), findsOneWidget);
+    expect(find.text('Focus Sessions'), findsOneWidget);
 
     await tester.tap(find.text('Try it'));
     await tester.pumpAndSettle();
 
-    expect(find.text('ADD TASK PAGE'), findsOneWidget);
+    expect(find.text('FOCUS PAGE'), findsOneWidget);
     final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getStringList('education_seen_cards_v1'), contains('tasks'));
+    expect(prefs.getStringList('education_seen_cards_v1'), contains('focus'));
   });
 }

@@ -76,7 +76,7 @@ class TasksHubScreen extends ConsumerWidget {
   static const routeName = '/tasks';
 
   Future<void> _openAddTask(BuildContext context, WidgetRef ref) async {
-    await Navigator.pushNamed(context, AddTaskScreen.routeName);
+    await showAddTaskSheet(context);
     // AddTaskScreen calls the coordinator on save; this is a safety net
     // recompute for the case the user navigates back without saving.
     // migrated to coordinator
@@ -95,10 +95,9 @@ class TasksHubScreen extends ConsumerWidget {
     WidgetRef ref,
     PlannedTaskRow row,
   ) async {
-    await Navigator.pushNamed(
+    await showAddTaskSheet(
       context,
-      AddTaskScreen.routeName,
-      arguments: AddTaskEditArgs(
+      editArgs: AddTaskEditArgs(
         taskId: row.task.id,
         routineId: row.routineId,
         blockId: row.blockId,
