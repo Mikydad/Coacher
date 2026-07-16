@@ -272,6 +272,27 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // PT-1/PT-2 — the points ledger. Balance is truth-derived from the
+    // append-only txns; EVERY write comes from Cloud Functions. A client
+    // that could write here could print money — keep this write-denied
+    // forever.
+    match /points_ledger/{uid} {
+      allow read: if isUser(uid);
+      allow write: if false;
+
+      match /txns/{txnId} {
+        allow read: if isUser(uid);
+        allow write: if false;
+      }
+    }
+
+    // D7 — curated charity list, admin-managed (Admin SDK only). Clients
+    // read only ACTIVE entries; nobody free-enters a recipient, ever.
+    match /charities/{charityId} {
+      allow read: if isSignedIn() && resource.data.active == true;
+      allow write: if false;
+    }
+
     // ─── Feedback ──────────────────────────────────────────────────────────
     // In-app bug reports / feature requests / questions. Create-only from
     // clients; reports are reviewed in the Firebase console (no client read).

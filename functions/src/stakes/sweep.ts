@@ -23,6 +23,8 @@ import {
   eventDoc,
   evidenceFromSnap,
 } from './firestore_layout';
+import { balanceRef, writeLedgerTxn } from './ledger';
+import { BalanceDoc, EARN_AMOUNTS } from './points';
 import { assertTransition } from './state_machine';
 import { Confirmation, StakeChallenge, VetoRequest, Vote } from './types';
 
@@ -126,6 +128,23 @@ async function decideDue(now: number): Promise<number> {
       if (fresh.data()?.status !== 'pending_verification') return; // already handled
 
       assertTransition('pending_verification', decision.statusAfter);
+
+      // All reads before writes: balances of points participants, so the
+      // ledger effects commit ATOMICALLY with the status flip — a crashed
+      // sweep can never decide a challenge but strand the locked points.
+      const pointsUids =
+        ch.type === 'practice'
+          ? []
+          : ch.participants
+              .filter((p) => p.stakeKind === 'points' && (p.stakeAmount ?? 0) > 0)
+              .map((p) => p.uid);
+      const balances = new Map<string, BalanceDoc | undefined>();
+      for (const uid of pointsUids) {
+        balances.set(
+          uid,
+          (await tx.get(balanceRef(uid))).data() as BalanceDoc | undefined,
+        );
+      }
       const update: Record<string, unknown> = {
         status: decision.statusAfter,
         updatedAtMs: now,
@@ -183,9 +202,48 @@ async function decideDue(now: number): Promise<number> {
       for (const e of decision.events) {
         tx.create(doc.ref.collection('events').doc(), eventDoc(e));
       }
-      // Points/money refund+forfeit resolutions are recorded in `outcome`
-      // now; the ledger (Phase 2) and Stripe (Phase 4) rails consume them
-      // from there — outcome and money movement stay decoupled.
+
+      // PT-4 — points resolutions: winners get their lock back
+      // (stake_release), losers' locks burn (stake_forfeit, zero-amount
+      // audit row carrying the burned amount + charity for the quarterly
+      // conversion). Win bonus ONLY when some side actually lost —
+      // both-win pays refunds alone, so colluding friends can't farm the
+      // bonus risk-free. Money resolutions stay recorded in `outcome` for
+      // the Stripe rail (Phase 4).
+      const anySideLost = decision.perParticipant.some((r) => !r.sideWon);
+      for (const r of decision.perParticipant) {
+        if (!pointsUids.includes(r.uid)) continue;
+        const stake =
+          ch.participants.find((p) => p.uid === r.uid)?.stakeAmount ?? 0;
+        let bal = balances.get(r.uid);
+        if (r.sideWon) {
+          bal = writeLedgerTxn(tx, r.uid, bal, {
+            source: 'stake_release',
+            amount: stake,
+            refId: ch.id,
+            atMs: now,
+          });
+          if (anySideLost) {
+            bal = writeLedgerTxn(tx, r.uid, bal, {
+              source: 'earn_challenge_win',
+              amount: EARN_AMOUNTS.earn_challenge_win!,
+              refId: ch.id,
+              atMs: now,
+            });
+          }
+        } else {
+          const toCharityId =
+            r.resolution.kind === 'forfeit' ? r.resolution.toCharityId : '';
+          bal = writeLedgerTxn(tx, r.uid, bal, {
+            source: 'stake_forfeit',
+            amount: 0,
+            refId: ch.id,
+            atMs: now,
+            data: { burnedAmount: stake, toCharityId },
+          });
+        }
+        balances.set(r.uid, bal);
+      }
     });
 
     // Storage deletes AFTER the transaction commits (best-effort, retried

@@ -223,6 +223,8 @@ class StakeChallenge {
     required this.participants,
     required this.frozenGoal,
     this.mode,
+    this.sideCharities = const {},
+    this.bothLoseCharityId,
     required this.deadlineMs,
     this.photoState,
     this.revealedAtMs,
@@ -245,6 +247,13 @@ class StakeChallenge {
 
   /// `'flexible' | 'disciplined' | 'extreme'` — solo/h2h only (D3/D4).
   final String? mode;
+
+  /// D5 — teamId (== uid for 1v1) → the charity that side loves; the
+  /// LOSING side's stake funds the winner's pick.
+  final Map<String, String> sideCharities;
+
+  /// D6 — where everything goes when every side loses.
+  final String? bothLoseCharityId;
   final int deadlineMs;
 
   final StakePhotoState? photoState;
@@ -296,6 +305,9 @@ class StakeChallenge {
       frozenGoal: StakeFrozenGoal.fromMap(
           (m['frozenGoal'] as Map<String, dynamic>?) ?? const {}),
       mode: m['mode'] as String?,
+      sideCharities: ((m['sideCharities'] as Map?) ?? const {})
+          .map((k, v) => MapEntry('$k', '$v')),
+      bothLoseCharityId: m['bothLoseCharityId'] as String?,
       deadlineMs: (m['deadlineMs'] as num?)?.toInt() ?? 0,
       photoState: StakePhotoState.fromStorage(m['photoState'] as String?),
       revealedAtMs: (m['revealedAtMs'] as num?)?.toInt(),

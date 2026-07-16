@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
+import '../application/points_providers.dart';
 import '../application/stakes_providers.dart';
+import '../domain/models/points.dart';
 import '../domain/models/stake_challenge.dart';
 import 'accountability_create_flow.dart';
 import 'stake_challenge_detail_screen.dart';
@@ -17,11 +20,14 @@ class AccountabilityHubScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final challengesAsync = ref.watch(stakeChallengesStreamProvider);
+    // PT-3 earn wiring: idempotent re-derivation sweep, once per session.
+    ref.read(pointsEarnServiceProvider).sweepToday();
 
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
         title: const PageTitle('Accountability'),
+        actions: [_PointsChip(onTap: () => _showLedger(context, ref))],
       ),
       body: challengesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -37,9 +43,32 @@ class AccountabilityHubScreen extends ConsumerWidget {
 
           if (all.isEmpty) return const _EmptyState();
 
+          // PSY-4-adjacent scoreboard: W/L across decided multi-party
+          // challenges (side outcome, not personal — matches the stakes).
+          final myUid = FirestorePaths.activeUid;
+          var wins = 0;
+          var losses = 0;
+          for (final c in done.where((c) => c.type.isMultiParty)) {
+            final r = c.results.where((r) => r.uid == myUid).firstOrNull;
+            if (r == null) continue;
+            r.sideWon ? wins++ : losses++;
+          }
+
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
             children: [
+              if (wins + losses > 0)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    'Head-to-head record: $wins W – $losses L',
+                    style: TextStyle(
+                      color: AppColors.textSoft,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               if (open.isNotEmpty) ...[
                 const SectionHeader('On the line'),
                 const SizedBox(height: 8),
@@ -64,6 +93,124 @@ class AccountabilityHubScreen extends ConsumerWidget {
     );
   }
 }
+
+/// Balance chip in the hub app bar; tap for the ledger history sheet.
+class _PointsChip extends ConsumerWidget {
+  const _PointsChip({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final balance = ref.watch(pointsBalanceProvider).valueOrNull ?? 0;
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.amber.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.stars_rounded, size: 15, color: AppColors.amber),
+              const SizedBox(width: 5),
+              Text(
+                '$balance',
+                style: TextStyle(
+                  color: AppColors.amber,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void _showLedger(BuildContext context, WidgetRef ref) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: AppColors.inkCard,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (_) => Consumer(
+      builder: (context, ref, _) {
+        final txns = ref.watch(pointsTxnsProvider).valueOrNull ?? const <PointsTxn>[];
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: SectionHeader('Points'),
+              ),
+              Flexible(
+                child: txns.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          'Earn points by checking in, finishing tasks, and '
+                          'winning challenges.',
+                          style: TextStyle(color: AppColors.textMuted),
+                        ),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: txns.length.clamp(0, 50),
+                        itemBuilder: (_, i) {
+                          final t = txns[i];
+                          return ListTile(
+                            dense: true,
+                            title: Text(
+                              _txnLabel(t.source),
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 13.5,
+                              ),
+                            ),
+                            trailing: Text(
+                              t.amount >= 0 ? '+${t.amount}' : '${t.amount}',
+                              style: TextStyle(
+                                color: t.amount >= 0
+                                    ? AppColors.statusGreen
+                                    : AppColors.danger,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
+String _txnLabel(String source) => switch (source) {
+      'signup_bonus' => 'Welcome bonus',
+      'earn_checkin' => 'Daily check-in',
+      'earn_task' => 'Task completed',
+      'earn_goal' => 'Goal progress',
+      'earn_streak' => 'Streak bonus',
+      'earn_challenge_win' => 'Challenge won',
+      'stake_lock' => 'Stake locked',
+      'stake_release' => 'Stake returned',
+      'stake_forfeit' => 'Stake forfeited',
+      'spend_photo_removal' => 'Photo removed early',
+      _ => source,
+    };
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
@@ -170,6 +317,11 @@ class _ChallengeCard extends StatelessWidget {
     switch (c.status) {
       case StakeChallengeStatus.draft:
         return 'Waiting for photo check · $target';
+      case StakeChallengeStatus.pendingAccept:
+        final me = c.participant(FirestorePaths.activeUid);
+        return me != null && !me.accepted
+            ? 'You\'ve been challenged — tap to respond'
+            : 'Waiting for your opponent to accept';
       case StakeChallengeStatus.active:
         final left = Duration(
           milliseconds:
@@ -198,21 +350,25 @@ class _StakeIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isPractice = challenge.type == StakeChallengeType.practice;
+    final (icon, color) = switch (challenge.type) {
+      StakeChallengeType.practice => (Icons.school_rounded, AppColors.textSoft),
+      StakeChallengeType.h2hPoints ||
+      StakeChallengeType.h2hMoney ||
+      StakeChallengeType.teamPoints ||
+      StakeChallengeType.teamMoney =>
+        (Icons.sports_kabaddi_rounded, AppColors.amber),
+      _ => (Icons.photo_camera_rounded, AppColors.coral),
+    };
     return Container(
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: isPractice
+        color: challenge.type == StakeChallengeType.practice
             ? AppColors.fg12
-            : AppColors.coral.withValues(alpha: 0.16),
+            : color.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(
-        isPractice ? Icons.school_rounded : Icons.photo_camera_rounded,
-        size: 20,
-        color: isPractice ? AppColors.textSoft : AppColors.coral,
-      ),
+      child: Icon(icon, size: 20, color: color),
     );
   }
 }

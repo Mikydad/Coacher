@@ -10,8 +10,10 @@ import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../community/application/circle_providers.dart';
+import '../application/points_providers.dart';
 import '../application/stake_functions.dart';
 import '../application/stakes_providers.dart';
+import '../domain/models/points.dart';
 import '../domain/models/stake_challenge.dart';
 import 'stake_challenge_detail_screen.dart';
 
@@ -57,6 +59,9 @@ class AccountabilityCreateFlow extends ConsumerStatefulWidget {
 
 enum _Step { commitment, stake, consent, pledge, review }
 
+/// What's on the line: the three Phase-1/2 stake types.
+enum _StakeChoice { photo, h2h, practice }
+
 class _AccountabilityCreateFlowState
     extends ConsumerState<AccountabilityCreateFlow> {
   _Step _step = _Step.commitment;
@@ -70,10 +75,18 @@ class _AccountabilityCreateFlowState
   String _mode = 'disciplined';
 
   // Stake
-  bool _isPractice = false;
+  _StakeChoice _stake = _StakeChoice.photo;
   String? _circleId;
   XFile? _photo;
   int _revealWindowMins = 60;
+  // h2h (D5/D6, M-4)
+  String? _opponentUid;
+  int _h2hStake = 100;
+  String? _charityId;
+  String? _bothLoseCharityId;
+
+  bool get _isPractice => _stake == _StakeChoice.practice;
+  bool get _isH2h => _stake == _StakeChoice.h2h;
 
   // Consent + pledge
   bool _consentIsMe = false;
@@ -101,7 +114,7 @@ class _AccountabilityCreateFlowState
   List<_Step> get _steps => [
         _Step.commitment,
         _Step.stake,
-        if (!_isPractice) _Step.consent,
+        if (_stake == _StakeChoice.photo) _Step.consent,
         _Step.pledge,
         _Step.review,
       ];
@@ -132,7 +145,14 @@ class _AccountabilityCreateFlowState
   bool get _stepValid => switch (_step) {
         _Step.commitment =>
           _title.text.trim().isNotEmpty && _unitTarget > 0 && _totalUnits > 0,
-        _Step.stake => _isPractice || (_circleId != null && _photo != null),
+        _Step.stake => switch (_stake) {
+            _StakeChoice.practice => true,
+            _StakeChoice.photo => _circleId != null && _photo != null,
+            _StakeChoice.h2h => _circleId != null &&
+                _opponentUid != null &&
+                _charityId != null &&
+                _bothLoseCharityId != null,
+          },
         _Step.consent => _consentIsMe && _consentPosting && _consentAdult,
         _Step.pledge => _why.text.trim().isNotEmpty,
         _Step.review => !_creating,
@@ -311,13 +331,22 @@ class _AccountabilityCreateFlowState
         const SectionHeader('What\'s on the line?'),
         const SizedBox(height: 12),
         _stakeChoiceCard(
-          selected: !_isPractice,
+          selected: _stake == _StakeChoice.photo,
           icon: Icons.photo_camera_rounded,
           iconColor: AppColors.coral,
           title: 'Photo stake',
           subtitle:
               'An embarrassing photo of you. Fail and it posts to your circle.',
-          onTap: () => setState(() => _isPractice = false),
+          onTap: () => setState(() => _stake = _StakeChoice.photo),
+        ),
+        _stakeChoiceCard(
+          selected: _isH2h,
+          icon: Icons.sports_kabaddi_rounded,
+          iconColor: AppColors.amber,
+          title: 'Challenge a friend',
+          subtitle:
+              'Both stake points. The loser\'s points fund the winner\'s cause.',
+          onTap: () => setState(() => _stake = _StakeChoice.h2h),
         ),
         _stakeChoiceCard(
           selected: _isPractice,
@@ -325,9 +354,10 @@ class _AccountabilityCreateFlowState
           iconColor: AppColors.textSoft,
           title: 'Practice run',
           subtitle: 'No stake — learn the loop first.',
-          onTap: () => setState(() => _isPractice = true),
+          onTap: () => setState(() => _stake = _StakeChoice.practice),
         ),
-        if (!_isPractice) ...[
+        if (_isH2h) ..._h2hFields(),
+        if (_stake == _StakeChoice.photo) ...[
           const SizedBox(height: 20),
           _microLabel('POSTS TO'),
           const SizedBox(height: 8),
@@ -428,6 +458,134 @@ class _AccountabilityCreateFlowState
           ),
         ],
       ],
+    );
+  }
+
+  /// h2h fields (D5/D6): opponent, stake size, and the two charity picks.
+  List<Widget> _h2hFields() {
+    final circlesAsync = ref.watch(myCirclesProvider);
+    final charitiesAsync = ref.watch(charitiesProvider);
+    final balance = ref.watch(pointsBalanceProvider).valueOrNull ?? 0;
+    final myUid = FirestorePaths.activeUid;
+
+    return [
+      const SizedBox(height: 20),
+      _microLabel('CIRCLE'),
+      const SizedBox(height: 8),
+      circlesAsync.when(
+        loading: () => const LinearProgressIndicator(),
+        error: (e, _) =>
+            Text('Could not load circles', style: TextStyle(color: AppColors.danger)),
+        data: (circles) => circles.isEmpty
+            ? Text('Join a circle first — challenges live inside one.',
+                style: TextStyle(color: AppColors.textSoft, fontSize: 12.5))
+            : Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final circle in circles)
+                    _choiceChip(circle.name, _circleId == circle.id, () {
+                      setState(() {
+                        _circleId = circle.id;
+                        _opponentUid = null; // circle changed, re-pick
+                      });
+                    }),
+                ],
+              ),
+      ),
+      if (_circleId != null) ...[
+        const SizedBox(height: 16),
+        _microLabel('OPPONENT'),
+        const SizedBox(height: 8),
+        ref.watch(circleMembersProvider(_circleId!)).when(
+              loading: () => const LinearProgressIndicator(),
+              error: (e, _) => Text('Could not load members',
+                  style: TextStyle(color: AppColors.danger)),
+              data: (members) {
+                final others =
+                    members.where((m) => m.userId != myUid).toList();
+                if (others.isEmpty) {
+                  return Text('Nobody else in this circle yet.',
+                      style:
+                          TextStyle(color: AppColors.textSoft, fontSize: 12.5));
+                }
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final m in others)
+                      _choiceChip(
+                        m.displayName.isEmpty ? 'Member' : m.displayName,
+                        _opponentUid == m.userId,
+                        () => setState(() => _opponentUid = m.userId),
+                      ),
+                  ],
+                );
+              },
+            ),
+      ],
+      const SizedBox(height: 16),
+      _microLabel('POINTS AT STAKE (EACH)'),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final amount in const [100, 200, 300, 500])
+            _choiceChip('$amount', _h2hStake == amount,
+                () => setState(() => _h2hStake = amount)),
+        ],
+      ),
+      if (balance < _h2hStake)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            'You have $balance points — earn more before staking $_h2hStake.',
+            style: TextStyle(color: AppColors.amber, fontSize: 12),
+          ),
+        ),
+      const SizedBox(height: 16),
+      _microLabel('IF YOU WIN, THEIR POINTS FUND'),
+      const SizedBox(height: 8),
+      _charityChips(
+        charitiesAsync,
+        selectedId: _charityId,
+        onPick: (id) => setState(() => _charityId = id),
+      ),
+      const SizedBox(height: 16),
+      _microLabel('IF YOU BOTH LOSE, EVERYTHING GOES TO'),
+      const SizedBox(height: 8),
+      _charityChips(
+        charitiesAsync,
+        selectedId: _bothLoseCharityId,
+        onPick: (id) => setState(() => _bothLoseCharityId = id),
+      ),
+    ];
+  }
+
+  Widget _charityChips(
+    AsyncValue<List<Charity>> charitiesAsync, {
+    required String? selectedId,
+    required ValueChanged<String> onPick,
+  }) {
+    return charitiesAsync.when(
+      loading: () => const LinearProgressIndicator(),
+      error: (e, _) =>
+          Text('Could not load charities', style: TextStyle(color: AppColors.danger)),
+      data: (charities) => charities.isEmpty
+          ? Text(
+              'The charity list hasn\'t synced yet — check your connection.',
+              style: TextStyle(color: AppColors.textSoft, fontSize: 12.5),
+            )
+          : Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final charity in charities)
+                  _choiceChip(charity.name, selectedId == charity.id,
+                      () => onPick(charity.id)),
+              ],
+            ),
     );
   }
 
@@ -554,11 +712,19 @@ class _AccountabilityCreateFlowState
         '$_unitTarget${_unitKind == 'minutes' ? ' min' : '×'} a day, '
             '$_totalUnits days ($_mode — pass $_requiredUnits)'
       ),
-      if (!_isPractice) ...[
-        ('Stake', 'Embarrassing photo'),
-        ('Reveal window', _revealWindowLabel(_revealWindowMins)),
-      ] else
-        ('Stake', 'Practice — nothing on the line'),
+      ...switch (_stake) {
+        _StakeChoice.photo => [
+            ('Stake', 'Embarrassing photo'),
+            ('Reveal window', _revealWindowLabel(_revealWindowMins)),
+          ],
+        _StakeChoice.h2h => [
+            ('Stake', '$_h2hStake points each — locked when they accept'),
+            ('Mode', 'They see "$_mode" before accepting'),
+          ],
+        _StakeChoice.practice => [
+            ('Stake', 'Practice — nothing on the line'),
+          ],
+      },
       ('Your word', _why.text.trim()),
     ];
     return Column(
@@ -624,11 +790,15 @@ class _AccountabilityCreateFlowState
     if (deadline < minDeadline) deadline = minDeadline;
 
     final id = StableId.generate('stk');
-    final type = _isPractice ? 'practice' : 'solo_photo';
+    final type = switch (_stake) {
+      _StakeChoice.photo => 'solo_photo',
+      _StakeChoice.h2h => 'h2h_points',
+      _StakeChoice.practice => 'practice',
+    };
 
     try {
       Map<String, dynamic>? photoPayload;
-      if (!_isPractice) {
+      if (_stake == _StakeChoice.photo) {
         final storagePath = 'stake_photos/$id/$uid.jpg';
         // Owner-only path (storage.rules); the server verifies this exact
         // layout in stakeCreateChallenge.
@@ -655,6 +825,10 @@ class _AccountabilityCreateFlowState
         mode: _mode,
         deadlineMs: deadline,
         photo: photoPayload,
+        opponentUid: _isH2h ? _opponentUid : null,
+        stakeAmount: _isH2h ? _h2hStake : null,
+        charityId: _isH2h ? _charityId : null,
+        bothLoseCharityId: _isH2h ? _bothLoseCharityId : null,
         pledgeWhy: _why.text.trim(),
       );
 
@@ -664,24 +838,39 @@ class _AccountabilityCreateFlowState
       await repository.upsertLocalMirror(
         StakeChallenge(
           id: id,
-          type: _isPractice
-              ? StakeChallengeType.practice
-              : StakeChallengeType.soloPhoto,
-          status: _isPractice
-              ? StakeChallengeStatus.active
-              : StakeChallengeStatus.draft,
+          type: switch (_stake) {
+            _StakeChoice.photo => StakeChallengeType.soloPhoto,
+            _StakeChoice.h2h => StakeChallengeType.h2hPoints,
+            _StakeChoice.practice => StakeChallengeType.practice,
+          },
+          status: switch (_stake) {
+            _StakeChoice.photo => StakeChallengeStatus.draft,
+            _StakeChoice.h2h => StakeChallengeStatus.pendingAccept,
+            _StakeChoice.practice => StakeChallengeStatus.active,
+          },
           creatorUid: uid,
           circleId: _isPractice ? '' : (_circleId ?? ''),
           participants: [
             StakeParticipant(
               uid: uid,
               teamId: uid,
-              stakeKind: _isPractice ? 'points' : 'photo',
-              photoStoragePath:
-                  _isPractice ? null : 'stake_photos/$id/$uid.jpg',
-              revealWindowMins: _isPractice ? null : _revealWindowMins,
+              stakeKind: _stake == _StakeChoice.photo ? 'photo' : 'points',
+              stakeAmount: _isH2h ? _h2hStake : null,
+              photoStoragePath: _stake == _StakeChoice.photo
+                  ? 'stake_photos/$id/$uid.jpg'
+                  : null,
+              revealWindowMins:
+                  _stake == _StakeChoice.photo ? _revealWindowMins : null,
               accepted: true,
             ),
+            if (_isH2h && _opponentUid != null)
+              StakeParticipant(
+                uid: _opponentUid!,
+                teamId: _opponentUid!,
+                stakeKind: 'points',
+                stakeAmount: _h2hStake,
+                accepted: false,
+              ),
           ],
           frozenGoal: StakeFrozenGoal(
             title: _title.text.trim(),
@@ -690,8 +879,14 @@ class _AccountabilityCreateFlowState
             totalUnits: _totalUnits,
           ),
           mode: _mode,
+          sideCharities: _isH2h && _charityId != null
+              ? {uid: _charityId!}
+              : const {},
+          bothLoseCharityId: _isH2h ? _bothLoseCharityId : null,
           deadlineMs: deadline,
-          photoState: _isPractice ? null : StakePhotoState.pendingScreen,
+          photoState: _stake == _StakeChoice.photo
+              ? StakePhotoState.pendingScreen
+              : null,
           createdAtMs: nowMs,
           updatedAtMs: nowMs,
         ),

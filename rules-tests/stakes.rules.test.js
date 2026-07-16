@@ -218,3 +218,73 @@ describe('enforcement — strikes/bans/veto timestamps', () => {
     );
   });
 });
+
+describe('points_ledger — the money printer stays welded shut (PT-2)', () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(docPath('points_ledger', OWNER)).set({ balance: 100 });
+      await ctx
+        .firestore()
+        .doc(docPath('points_ledger', OWNER, 'txns', 'signup_bonus'))
+        .set({ source: 'signup_bonus', amount: 50, atMs: 1 });
+    });
+  });
+
+  it('user reads own balance and txns', async () => {
+    await assertSucceeds(asUser(OWNER).doc(docPath('points_ledger', OWNER)).get());
+    await assertSucceeds(
+      asUser(OWNER).doc(docPath('points_ledger', OWNER, 'txns', 'signup_bonus')).get(),
+    );
+  });
+
+  it('nobody else reads it', async () => {
+    await assertFails(asUser(MEMBER).doc(docPath('points_ledger', OWNER)).get());
+    await assertFails(
+      asUser(STRANGER).doc(docPath('points_ledger', OWNER, 'txns', 'signup_bonus')).get(),
+    );
+  });
+
+  it('NO client write, not even the owner', async () => {
+    await assertFails(
+      asUser(OWNER).doc(docPath('points_ledger', OWNER)).set({ balance: 999999 }),
+    );
+    await assertFails(
+      asUser(OWNER)
+        .doc(docPath('points_ledger', OWNER, 'txns', 'earn_task_forged_2026-07-16'))
+        .set({ source: 'earn_task', amount: 999999, atMs: 1 }),
+    );
+    await assertFails(
+      asUser(OWNER).doc(docPath('points_ledger', OWNER, 'txns', 'signup_bonus')).delete(),
+    );
+  });
+});
+
+describe('charities — curated list (D7)', () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(docPath('charities', 'rivals_fc')).set({
+        name: 'Rivals FC Foundation',
+        active: true,
+      });
+      await ctx.firestore().doc(docPath('charities', 'retired_org')).set({
+        name: 'Retired Org',
+        active: false,
+      });
+    });
+  });
+
+  it('signed-in users read active charities; inactive are invisible', async () => {
+    await assertSucceeds(asUser(OWNER).doc(docPath('charities', 'rivals_fc')).get());
+    await assertFails(asUser(OWNER).doc(docPath('charities', 'retired_org')).get());
+    await assertFails(asGuest().doc(docPath('charities', 'rivals_fc')).get());
+  });
+
+  it('no client writes — curation is admin-only, permanently', async () => {
+    await assertFails(
+      asUser(OWNER).doc(docPath('charities', 'my_own_llc')).set({ name: 'x', active: true }),
+    );
+    await assertFails(
+      asUser(OWNER).doc(docPath('charities', 'rivals_fc')).update({ active: false }),
+    );
+  });
+});

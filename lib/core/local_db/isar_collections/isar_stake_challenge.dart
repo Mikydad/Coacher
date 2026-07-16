@@ -33,6 +33,10 @@ class IsarStakeChallenge {
   late String participantsJson;
   late String frozenGoalJson;
   String? mode;
+
+  /// JSON map teamId → charityId (D5); empty string when absent.
+  late String sideCharitiesJson;
+  String? bothLoseCharityId;
   late int deadlineMs;
 
   String? photoStateStorage;
@@ -57,6 +61,9 @@ class IsarStakeChallenge {
       ..participantsJson = StakeChallenge.participantsToJson(c.participants)
       ..frozenGoalJson = jsonEncode(c.frozenGoal.toMap())
       ..mode = c.mode
+      ..sideCharitiesJson =
+          c.sideCharities.isEmpty ? '' : jsonEncode(c.sideCharities)
+      ..bothLoseCharityId = c.bothLoseCharityId
       ..deadlineMs = c.deadlineMs
       ..photoStateStorage = c.photoState?.storageValue
       ..revealedAtMs = c.revealedAtMs
@@ -85,6 +92,11 @@ class IsarStakeChallenge {
       frozenGoal: StakeFrozenGoal.fromMap(
           (jsonDecode(frozenGoalJson) as Map).cast<String, dynamic>()),
       mode: mode,
+      sideCharities: sideCharitiesJson.isEmpty
+          ? const {}
+          : (jsonDecode(sideCharitiesJson) as Map)
+              .map((k, v) => MapEntry('$k', '$v')),
+      bothLoseCharityId: bothLoseCharityId,
       deadlineMs: deadlineMs,
       photoState: StakePhotoState.fromStorage(photoStateStorage),
       revealedAtMs: revealedAtMs,

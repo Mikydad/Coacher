@@ -14,6 +14,7 @@ import '../../features/analytics/domain/models/analytics_stats_cache.dart';
 import '../../features/planning/domain/models/block.dart';
 import '../../features/planning/domain/models/routine.dart';
 import '../../features/onboarding/domain/models/onboarding_profile.dart';
+import '../../features/accountability/domain/models/points.dart';
 import '../../features/accountability/domain/models/stake_challenge.dart';
 import '../../features/accountability/domain/models/stake_evidence.dart';
 import '../../features/planning/domain/models/task_item.dart';
@@ -30,6 +31,7 @@ import '../local_db/isar_collections/isar_goal_milestone.dart';
 import '../local_db/isar_collections/isar_onboarding_profile.dart';
 import '../local_db/isar_collections/isar_reminder.dart';
 import '../local_db/isar_collections/isar_blocked_user.dart';
+import '../local_db/isar_collections/isar_points.dart';
 import '../local_db/isar_collections/isar_routine.dart';
 import '../local_db/isar_collections/isar_stake_challenge.dart';
 import '../local_db/isar_collections/isar_stake_evidence.dart';
@@ -141,6 +143,10 @@ class RemoteIsarMerge {
     await _pullStakeChallenges();
     _abortIfUidChanged();
     await _pullBlockedUsers();
+    _abortIfUidChanged();
+    await _pullPointsLedger();
+    _abortIfUidChanged();
+    await _pullCharities();
     // Only reached when every phase succeeded — safe to advance cursors.
     for (final entry in _maxSeen.entries) {
       await _cursors.advance(entry.key, entry.value);
@@ -479,6 +485,92 @@ class RemoteIsarMerge {
         _appliedCount++;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip blocked user ${doc.id}: $e\n$st');
+      }
+    }
+  }
+
+  /// Points ledger mirror: the balance doc plus txns after the cursor
+  /// (txns are immutable, `updatedAtMs == atMs`, so a single-field range
+  /// needs no composite index — errors.md #16/#18).
+  Future<void> _pullPointsLedger() async {
+    final uid = _client.uid;
+    final balanceSnap =
+        await _client.topCollection('points_ledger').doc(uid).get();
+    final balanceData = balanceSnap.data();
+    if (balanceData != null) {
+      final updatedAtMs = (balanceData['updatedAtMs'] as num?)?.toInt() ?? 0;
+      final existing = await _isar.isarPointsBalances
+          .filter()
+          .uidEqualTo(uid)
+          .findFirst();
+      if (shouldApplyRemoteUpdatedAt(
+        localUpdatedAtMs: existing?.updatedAtMs,
+        remoteUpdatedAtMs: updatedAtMs,
+      )) {
+        final row = IsarPointsBalance()
+          ..uid = uid
+          ..balance = (balanceData['balance'] as num?)?.toInt() ?? 0
+          ..updatedAtMs = updatedAtMs;
+        await _isar.writeTxn(() async {
+          await _isar.isarPointsBalances.putByUid(row);
+        });
+        _appliedCount++;
+      }
+    }
+
+    final cursor = await _cursorFor('points_txns');
+    final txnsSnap = await _afterCursor(
+      _client.topCollection('points_ledger').doc(uid).collection('txns'),
+      cursor,
+    ).get();
+    for (final doc in txnsSnap.docs) {
+      try {
+        final m = Map<String, dynamic>.from(doc.data());
+        m['id'] = doc.id;
+        final txn = PointsTxn.fromMap(m);
+        _noteSeen('points_txns', txn.atMs);
+        final existing = await _isar.isarPointsTxns
+            .filter()
+            .txnIdEqualTo(txn.id)
+            .findFirst();
+        if (existing != null) continue; // immutable — once is enough
+        await _isar.writeTxn(() async {
+          await _isar.isarPointsTxns.putByTxnId(IsarPointsTxn.fromDomain(txn));
+        });
+        _appliedCount++;
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip points txn ${doc.id}: $e\n$st');
+      }
+    }
+  }
+
+  /// Curated charities (D7). Rules only permit reading active entries, so
+  /// the query MUST carry the filter or the whole read is denied.
+  Future<void> _pullCharities() async {
+    final snap = await _client
+        .topCollection('charities')
+        .where('active', isEqualTo: true)
+        .get();
+    for (final doc in snap.docs) {
+      try {
+        final m = Map<String, dynamic>.from(doc.data());
+        m['id'] = doc.id;
+        final charity = Charity.fromMap(m);
+        final updatedAtMs = (m['updatedAtMs'] as num?)?.toInt() ??
+            DateTime.now().millisecondsSinceEpoch;
+        final existing = await _isar.isarCharitys
+            .filter()
+            .charityIdEqualTo(charity.id)
+            .findFirst();
+        if (existing != null && existing.name == charity.name) continue;
+        await _isar.writeTxn(() async {
+          await _isar.isarCharitys.putByCharityId(
+            IsarCharity.fromDomain(charity, updatedAtMs),
+          );
+        });
+        _appliedCount++;
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip charity ${doc.id}: $e\n$st');
       }
     }
   }

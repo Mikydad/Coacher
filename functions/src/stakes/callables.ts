@@ -17,7 +17,15 @@ import { logger } from 'firebase-functions/v2';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 
-import { vetoEligible } from './decisions';
+import { canRemoveRevealedPhoto, vetoEligible } from './decisions';
+import { balanceRef, txnRef, writeLedgerTxn } from './ledger';
+import {
+  BalanceDoc,
+  H2H_STAKE_MAX,
+  H2H_STAKE_MIN,
+  PHOTO_REMOVAL_PRICE,
+  txnId,
+} from './points';
 import {
   applyStrike,
   banDurationMsForStrike,
@@ -51,10 +59,11 @@ const CALL_OPTS = { region: REGION, timeoutSeconds: 30, memory: '256MiB' as cons
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 
-/** Phase 1 — only these can be created; the rest 'failed-precondition'. */
+/** Phase 1+2 — creatable types; money variants say 'failed-precondition'. */
 const CREATABLE_TYPES: ReadonlySet<ChallengeType> = new Set([
   'solo_photo',
   'practice',
+  'h2h_points',
 ]);
 
 // ─── Shared guards ───────────────────────────────────────────────────────────
@@ -133,6 +142,19 @@ interface CreateData {
   deadlineMs?: unknown;
   photo?: unknown;
   pledge?: unknown;
+  // h2h (D5/D6):
+  opponentUid?: unknown;
+  stakeAmount?: unknown;
+  charityId?: unknown; // creator's "loved" pick
+  bothLoseCharityId?: unknown;
+}
+
+/** D7 — every charity reference must be on the curated active list. */
+async function assertCharityActive(charityId: string): Promise<void> {
+  const snap = await getFirestore().doc(`charities/${charityId}`).get();
+  if (!snap.exists || snap.data()?.active !== true) {
+    throw new HttpsError('invalid-argument', 'Unknown or inactive charity.');
+  }
 }
 
 export const stakeCreateChallenge = onCall(
@@ -199,15 +221,12 @@ export const stakeCreateChallenge = onCall(
     const rawPledge = (request.data?.pledge ?? {}) as Record<string, unknown>;
     const pledgeWhy = str(rawPledge.why, 'pledge.why', 1, 280);
 
-    const participant: Participant = {
-      uid,
-      teamId: uid,
-      stakeKind: 'photo',
-      accepted: true,
-    };
+    const participants: Participant[] = [];
     let circleId = '';
     let initialStatus: StakeChallenge['status'];
     let photoState: string | undefined;
+    let sideCharities: Record<string, string> | undefined;
+    let bothLoseCharityId: string | undefined;
 
     if (type === 'solo_photo') {
       circleId = str(request.data?.circleId, 'circleId', 1, 64);
@@ -219,24 +238,85 @@ export const stakeCreateChallenge = onCall(
       if (storagePath !== `stake_photos/${id}/${uid}.jpg`) {
         throw new HttpsError('invalid-argument', 'photo.storagePath does not match the required layout.');
       }
-      participant.photo = {
-        storagePath,
-        revealWindowMins: int(
-          rawPhoto.revealWindowMins,
-          'photo.revealWindowMins',
-          REVEAL_WINDOW_MIN_MINS,
-          REVEAL_WINDOW_MAX_MINS,
-        ),
-        // P-1 — consent is the tap that invoked this call; server-stamped.
-        consentAtMs: now,
-      };
+      participants.push({
+        uid,
+        teamId: uid,
+        stakeKind: 'photo',
+        accepted: true,
+        photo: {
+          storagePath,
+          revealWindowMins: int(
+            rawPhoto.revealWindowMins,
+            'photo.revealWindowMins',
+            REVEAL_WINDOW_MIN_MINS,
+            REVEAL_WINDOW_MAX_MINS,
+          ),
+          // P-1 — consent is the tap that invoked this call; server-stamped.
+          consentAtMs: now,
+        },
+      });
       // P-2 — cannot activate until the NSFW screen passes (Step 1.6 trigger).
       initialStatus = 'draft';
       photoState = 'pending_screen';
+    } else if (type === 'h2h_points') {
+      // 1v1 on points (D5/D6, M-4): challenger proposes goal + mode +
+      // stake; both stakes lock at accept, not here.
+      circleId = str(request.data?.circleId, 'circleId', 1, 64);
+      const opponentUid = str(request.data?.opponentUid, 'opponentUid', 1, 128);
+      if (opponentUid === uid) {
+        throw new HttpsError('invalid-argument', 'You cannot challenge yourself.');
+      }
+      if (!(await isCircleMember(circleId, uid)) ||
+          !(await isCircleMember(circleId, opponentUid))) {
+        throw new HttpsError('permission-denied', 'Both players must be members of that circle.');
+      }
+      const stakeAmount = int(
+        request.data?.stakeAmount,
+        'stakeAmount',
+        H2H_STAKE_MIN,
+        H2H_STAKE_MAX,
+      );
+      const charityId = str(request.data?.charityId, 'charityId', 1, 64);
+      bothLoseCharityId = str(
+        request.data?.bothLoseCharityId,
+        'bothLoseCharityId',
+        1,
+        64,
+      );
+      await assertCharityActive(charityId);
+      await assertCharityActive(bothLoseCharityId);
+
+      // Soft balance check for honest UX; the binding check is at accept.
+      const bal = (await balanceRef(uid).get()).data() as BalanceDoc | undefined;
+      if ((bal?.balance ?? 0) < stakeAmount) {
+        throw new HttpsError(
+          'failed-precondition',
+          `You need ${stakeAmount} points to stake this challenge.`,
+        );
+      }
+
+      participants.push(
+        { uid, teamId: uid, stakeKind: 'points', stakeAmount, accepted: true },
+        {
+          uid: opponentUid,
+          teamId: opponentUid,
+          stakeKind: 'points',
+          stakeAmount,
+          accepted: false,
+        },
+      );
+      sideCharities = { [uid]: charityId };
+      initialStatus = 'pending_accept';
+      assertTransition('draft', 'pending_accept');
     } else {
       // Practice: no stake, self-report, activates immediately (CC-7).
-      participant.stakeKind = 'points';
-      participant.stakeAmount = 0;
+      participants.push({
+        uid,
+        teamId: uid,
+        stakeKind: 'points',
+        stakeAmount: 0,
+        accepted: true,
+      });
       initialStatus = 'active';
       assertTransition('draft', 'active');
     }
@@ -249,15 +329,17 @@ export const stakeCreateChallenge = onCall(
       status: initialStatus,
       creatorUid: uid,
       circleId,
-      participants: [participant],
+      participants,
       // Denormalized for the client mirror's arrayContains pull.
-      participantUids: [uid],
+      participantUids: participants.map((p) => p.uid),
       frozenGoal: goal,
       mode: mode as SoloMode,
       deadlineMs,
       createdAtMs: now,
       updatedAtMs: now,
       ...(photoState !== undefined ? { photoState } : {}),
+      ...(sideCharities !== undefined ? { sideCharities } : {}),
+      ...(bothLoseCharityId !== undefined ? { bothLoseCharityId } : {}),
     };
 
     const ref = db.collection(CHALLENGES).doc(id);
@@ -283,6 +365,8 @@ export const stakeCreateChallenge = onCall(
       appendEvent(tx, id, { type: 'pledge_signed', uid, atMs: now, data: { why: pledgeWhy } });
       if (doc.status === 'active') {
         appendEvent(tx, id, { type: 'activated', uid, atMs: now });
+      } else if (doc.status === 'pending_accept') {
+        appendEvent(tx, id, { type: 'invited', uid, atMs: now });
       } else {
         appendEvent(tx, id, { type: 'photo_screen_pending', uid, atMs: now });
       }
@@ -324,6 +408,205 @@ export const stakeCancelDraft = onCall(
     if (photoPath) {
       await getStorage().bucket().file(photoPath).delete({ ignoreNotFound: true });
     }
+    return { ok: true };
+  },
+);
+
+// ─── stakeAcceptChallenge / stakeDeclineChallenge (h2h, PT-4) ────────────────
+// "B accepts → both stakes are locked." The lock is one transaction: both
+// balances are checked and debited together, and only then does the
+// challenge go active — no state where one side is committed alone.
+
+export const stakeAcceptChallenge = onCall(
+  CALL_OPTS,
+  async (
+    request: CallableRequest<{ challengeId?: unknown; charityId?: unknown }>,
+  ) => {
+    const uid = requireAuth(request);
+    requireRegistered(request);
+    const id = str(request.data?.challengeId, 'challengeId', 1, 64);
+    const charityId = str(request.data?.charityId, 'charityId', 1, 64);
+    const now = Date.now();
+    const db = getFirestore();
+
+    await assertCharityActive(charityId);
+
+    // D11 — banned users cannot join challenges.
+    const enforcement = (
+      await db.collection(ENFORCEMENT).doc(uid).get()
+    ).data() as EnforcementDoc | undefined;
+    if (isChallengeBanned(enforcement?.challengeBanUntilMs, now)) {
+      throw new HttpsError(
+        'permission-denied',
+        'You are temporarily banned from joining challenges.',
+      );
+    }
+
+    await db.runTransaction(async (tx) => {
+      const ref = db.collection(CHALLENGES).doc(id);
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new HttpsError('not-found', 'Challenge not found.');
+      const ch = challengeFromSnap(snap);
+      if (ch.status !== 'pending_accept') {
+        throw new HttpsError('failed-precondition', 'This invite is no longer open.');
+      }
+      if (now >= ch.deadlineMs) {
+        throw new HttpsError('failed-precondition', 'This invite has expired.');
+      }
+      const me = ch.participants.find((p) => p.uid === uid && !p.accepted);
+      if (!me) throw new HttpsError('permission-denied', 'This invite is not for you.');
+      const stake = me.stakeAmount ?? 0;
+
+      // All reads before writes: both balances.
+      const balances = new Map<string, BalanceDoc | undefined>();
+      for (const p of ch.participants) {
+        balances.set(
+          p.uid,
+          (await tx.get(balanceRef(p.uid))).data() as BalanceDoc | undefined,
+        );
+      }
+
+      if ((balances.get(uid)?.balance ?? 0) < stake) {
+        throw new HttpsError(
+          'failed-precondition',
+          `You need ${stake} points to accept this challenge.`,
+        );
+      }
+      const creator = ch.participants.find((p) => p.uid !== uid);
+      if (creator && (balances.get(creator.uid)?.balance ?? 0) < stake) {
+        // Challenger spent their points since inviting — the invite dies.
+        assertTransition('pending_accept', 'cancelled');
+        tx.update(ref, { status: 'cancelled', updatedAtMs: now });
+        appendEvent(tx, id, {
+          type: 'cancelled',
+          atMs: now,
+          data: { reason: 'challenger_insufficient_points' },
+        });
+        throw new HttpsError(
+          'failed-precondition',
+          'The challenger no longer has enough points — the invite was cancelled.',
+        );
+      }
+
+      // Lock both stakes + activate, atomically (PT-4 stake_lock).
+      assertTransition('pending_accept', 'active');
+      for (const p of ch.participants) {
+        writeLedgerTxn(tx, p.uid, balances.get(p.uid), {
+          source: 'stake_lock',
+          amount: -stake,
+          refId: id,
+          atMs: now,
+        });
+      }
+      tx.update(ref, {
+        status: 'active',
+        participants: ch.participants.map((p) => ({
+          ...p,
+          accepted: true,
+        })),
+        [`sideCharities.${uid}`]: charityId,
+        updatedAtMs: now,
+      });
+      appendEvent(tx, id, { type: 'accepted', uid, atMs: now });
+      appendEvent(tx, id, { type: 'activated', atMs: now });
+    });
+
+    logger.info('stakeAcceptChallenge ok', { uid, id });
+    return { ok: true };
+  },
+);
+
+export const stakeDeclineChallenge = onCall(
+  CALL_OPTS,
+  async (request: CallableRequest<{ challengeId?: unknown }>) => {
+    const uid = requireAuth(request);
+    const id = str(request.data?.challengeId, 'challengeId', 1, 64);
+    const now = Date.now();
+    const db = getFirestore();
+
+    await db.runTransaction(async (tx) => {
+      const ref = db.collection(CHALLENGES).doc(id);
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new HttpsError('not-found', 'Challenge not found.');
+      const ch = challengeFromSnap(snap);
+      if (ch.status !== 'pending_accept') {
+        throw new HttpsError('failed-precondition', 'This invite is no longer open.');
+      }
+      if (!ch.participants.some((p) => p.uid === uid && !p.accepted)) {
+        throw new HttpsError('permission-denied', 'This invite is not for you.');
+      }
+      assertTransition('pending_accept', 'cancelled');
+      tx.update(ref, { status: 'cancelled', updatedAtMs: now });
+      appendEvent(tx, id, { type: 'declined', uid, atMs: now });
+    });
+    return { ok: true };
+  },
+);
+
+// ─── stakeRemovePhoto (P-5/D9) ───────────────────────────────────────────────
+// Early takedown of a live reveal: only after the 30% exposure floor, only
+// for the price. The loss stays on the record either way.
+
+export const stakeRemovePhoto = onCall(
+  CALL_OPTS,
+  async (request: CallableRequest<{ challengeId?: unknown }>) => {
+    const uid = requireAuth(request);
+    const id = str(request.data?.challengeId, 'challengeId', 1, 64);
+    const now = Date.now();
+    const db = getFirestore();
+
+    let photoPath: string | undefined;
+    await db.runTransaction(async (tx) => {
+      const ref = db.collection(CHALLENGES).doc(id);
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new HttpsError('not-found', 'Challenge not found.');
+      const ch = challengeFromSnap(snap);
+      const me = ch.participants.find((p) => p.uid === uid);
+      if (!me?.photo) {
+        throw new HttpsError('permission-denied', 'Not your stake photo.');
+      }
+      const data = snap.data()!;
+      if (data.photoState !== 'revealed') {
+        throw new HttpsError('failed-precondition', 'No live reveal to remove.');
+      }
+      const revealedAtMs = data.revealedAtMs as number | undefined;
+      if (
+        revealedAtMs === undefined ||
+        !canRemoveRevealedPhoto(revealedAtMs, me.photo.revealWindowMins, now)
+      ) {
+        throw new HttpsError(
+          'failed-precondition',
+          'The photo must stay up for at least 30% of its window first.',
+        );
+      }
+
+      // Dedupe + balance (reads before writes).
+      const spendId = txnId('spend_photo_removal', id, now);
+      const existing = await tx.get(txnRef(uid, spendId));
+      if (existing.exists) return; // already paid — idempotent
+      const bal = (await tx.get(balanceRef(uid))).data() as BalanceDoc | undefined;
+      if ((bal?.balance ?? 0) < PHOTO_REMOVAL_PRICE) {
+        throw new HttpsError(
+          'failed-precondition',
+          `Removing the photo costs ${PHOTO_REMOVAL_PRICE} points.`,
+        );
+      }
+
+      writeLedgerTxn(tx, uid, bal, {
+        source: 'spend_photo_removal',
+        amount: -PHOTO_REMOVAL_PRICE,
+        refId: id,
+        atMs: now,
+      });
+      tx.update(ref, { photoState: 'removed', updatedAtMs: now });
+      appendEvent(tx, id, { type: 'photo_removed', uid, atMs: now });
+      photoPath = me.photo.storagePath;
+    });
+
+    if (photoPath) {
+      await getStorage().bucket().file(photoPath).delete({ ignoreNotFound: true });
+    }
+    logger.info('stakeRemovePhoto ok', { uid, id });
     return { ok: true };
   },
 );

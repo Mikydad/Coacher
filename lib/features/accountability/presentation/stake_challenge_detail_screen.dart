@@ -8,10 +8,13 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
+import '../../community/application/circle_providers.dart';
+import '../application/points_providers.dart';
 import '../application/stake_functions.dart';
 import '../application/stakes_providers.dart';
 import '../domain/models/stake_challenge.dart';
 import '../domain/models/stake_evidence.dart';
+import 'accountability_create_flow.dart';
 import 'stake_reveal_viewer_screen.dart';
 import 'stake_timer_screen.dart';
 
@@ -109,14 +112,26 @@ class _BodyState extends ConsumerState<_Body> {
         ),
         const SizedBox(height: 16),
         _statusBanner(),
+        if (c.type.isMultiParty) ...[
+          const SizedBox(height: 12),
+          _h2hStakeCard(),
+        ],
+        if (_isInvitedMe) ...[
+          const SizedBox(height: 12),
+          _inviteActions(),
+        ],
         if (c.photoState == StakePhotoState.revealed) ...[
           const SizedBox(height: 12),
           _revealCard(),
         ],
         const SizedBox(height: 20),
-        const SectionHeader('Days'),
-        const SizedBox(height: 10),
-        _unitGrid(logged, mercy, today),
+        if (c.type.isMultiParty)
+          ..._multiPartyGrids(mercy, today)
+        else ...[
+          const SectionHeader('Days'),
+          const SizedBox(height: 10),
+          _unitGrid(logged, mercy, today),
+        ],
         const SizedBox(height: 8),
         Text(
           'A day passes at ≥$mercy$unitLabel — the 25% mercy.',
@@ -130,11 +145,55 @@ class _BodyState extends ConsumerState<_Body> {
         if (c.status == StakeChallengeStatus.pendingVerification &&
             c.type == StakeChallengeType.soloPhoto)
           _vetoAction(),
+        if (c.status == StakeChallengeStatus.pendingVerification &&
+            c.type.isMultiParty)
+          _confirmDisputeActions(),
+        if (c.status.isTerminal && c.type.isMultiParty) _rematchAction(),
         if (c.status == StakeChallengeStatus.draft ||
-            c.status == StakeChallengeStatus.pendingAccept)
+            (c.status == StakeChallengeStatus.pendingAccept &&
+                c.creatorUid == FirestorePaths.activeUid))
           _cancelAction(),
       ],
     );
+  }
+
+  bool get _isInvitedMe {
+    final me = c.participant(FirestorePaths.activeUid);
+    return c.status == StakeChallengeStatus.pendingAccept &&
+        me != null &&
+        !me.accepted;
+  }
+
+  /// One unit grid per player (1v1): mine first, labeled with names when
+  /// the circle roster has them.
+  List<Widget> _multiPartyGrids(int mercy, int today) {
+    final myUid = FirestorePaths.activeUid;
+    final members = ref.watch(circleMembersProvider(c.circleId)).valueOrNull;
+    String nameOf(String uid) {
+      if (uid == myUid) return 'You';
+      final m = members?.where((m) => m.userId == uid).firstOrNull;
+      return (m == null || m.displayName.isEmpty) ? 'Opponent' : m.displayName;
+    }
+
+    final ordered = [...c.participants]
+      ..sort((a, b) => a.uid == myUid ? -1 : (b.uid == myUid ? 1 : 0));
+    return [
+      for (final p in ordered) ...[
+        SectionHeader(nameOf(p.uid)),
+        const SizedBox(height: 10),
+        _unitGrid(_loggedByUnitFor(p.uid), mercy, today),
+        const SizedBox(height: 16),
+      ],
+    ];
+  }
+
+  Map<int, int> _loggedByUnitFor(String uid) {
+    final sums = <int, int>{};
+    for (final e in widget.evidence) {
+      if (e.uid != uid) continue;
+      sums[e.unitIndex] = (sums[e.unitIndex] ?? 0) + e.amount;
+    }
+    return sums;
   }
 
   Widget _statusBanner() {
@@ -410,9 +469,233 @@ class _BodyState extends ConsumerState<_Body> {
     );
   }
 
+  /// D5/D6 — what's riding on this 1v1, in plain words.
+  Widget _h2hStakeCard() {
+    final stake = c.participants.firstOrNull?.stakeAmount ?? 0;
+    final charities = ref.watch(charitiesProvider).valueOrNull ?? const [];
+    String charityName(String? id) =>
+        charities.where((x) => x.id == id).firstOrNull?.name ?? 'their cause';
+    final myUid = FirestorePaths.activeUid;
+    final opponent = c.participants.where((p) => p.uid != myUid).firstOrNull;
+    final myPick = charityName(c.sideCharities[myUid]);
+    final theirPick = charityName(c.sideCharities[opponent?.uid]);
+    final bothLose = charityName(c.bothLoseCharityId);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.amber.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.amber.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        '$stake points each. If you win, their points fund $myPick. '
+        'If they win, yours fund $theirPick. If you BOTH fail, everything '
+        'goes to $bothLose.',
+        style: TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 13,
+          height: 1.5,
+        ),
+      ),
+    );
+  }
+
+  /// The invited side's accept/decline (PT-4 — accepting locks BOTH stakes).
+  Widget _inviteActions() {
+    final stake = c.participant(FirestorePaths.activeUid)?.stakeAmount ?? 0;
+    final balance = ref.watch(pointsBalanceProvider).valueOrNull ?? 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          balance >= stake
+              ? 'Accepting locks $stake of your points until the outcome.'
+              : 'You need $stake points to accept — you have $balance.',
+          style: TextStyle(color: AppColors.textSoft, fontSize: 12.5),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton(
+                onPressed:
+                    _busy || balance < stake ? null : _acceptInvite,
+                child: const Text('Accept'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _busy ? null : _declineInvite,
+                child: const Text('Decline'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _acceptInvite() async {
+    // D5 — your loved pick: whoever loses to you funds this.
+    final charities = ref.read(charitiesProvider).valueOrNull ?? const [];
+    if (charities.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Charity list not synced yet — try again online.')),
+      );
+      return;
+    }
+    String? picked = charities.first.id;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('If you win, their points fund…'),
+          content: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final charity in charities)
+                ChoiceChip(
+                  label: Text(charity.name),
+                  selected: picked == charity.id,
+                  onSelected: (_) =>
+                      setDialogState(() => picked = charity.id),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Lock stakes & start'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(stakeFunctionsProvider).acceptChallenge(
+            challengeId: c.id,
+            charityId: picked!,
+          );
+    } on StakeActionException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _declineInvite() async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(stakeFunctionsProvider).declineChallenge(c.id);
+      if (mounted) Navigator.of(context).pop();
+    } on StakeActionException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// V-2 — vouch for or dispute the other side's completion.
+  Widget _confirmDisputeActions() {
+    final myUid = FirestorePaths.activeUid;
+    final opponent = c.participants.where((p) => p.uid != myUid).firstOrNull;
+    if (opponent == null || c.participant(myUid) == null) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader('Their word'),
+        const SizedBox(height: 8),
+        Text(
+          'Did they really do it? Silence counts as a confirm after 24h; a '
+          'dispute sends it to a circle vote.',
+          style: TextStyle(color: AppColors.textSoft, fontSize: 12.5),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _busy ? null : () => _confirmOutcome(opponent.uid, dispute: false),
+                child: const Text('Looks right'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _busy ? null : () => _confirmOutcome(opponent.uid, dispute: true),
+                child: const Text('Dispute'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirmOutcome(String aboutUid, {required bool dispute}) async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(stakeFunctionsProvider).confirmOutcome(
+            challengeId: c.id,
+            aboutUid: aboutUid,
+            dispute: dispute,
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(dispute
+                ? 'Disputed — the circle votes for the next 48h.'
+                : 'Confirmed.'),
+          ),
+        );
+      }
+    } on StakeActionException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.code == 'already-exists'
+              ? 'You already gave your word on this.'
+              : e.message),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Widget _rematchAction() {
+    return Center(
+      child: TextButton.icon(
+        icon: const Icon(Icons.replay_rounded, size: 18),
+        onPressed: () => openAccountabilityCreateFlow(
+          context,
+          prefilledTitle: c.frozenGoal.title,
+          prefilledCircleId: c.circleId,
+        ),
+        label: const Text('Rematch'),
+      ),
+    );
+  }
+
   /// Owner-side view of their own live reveal (P-4/P-5): countdown, a way
-  /// to face it, and the point-removal stub (price lands with the points
-  /// economy in Phase 2 — the 30% floor is already enforced server-side).
+  /// to face it, and point-based early removal (D9: 30% floor, 300 pts).
   Widget _revealCard() {
     final expires = c.revealExpiresAtMs;
     final left = expires == null
@@ -458,18 +741,77 @@ class _BodyState extends ConsumerState<_Body> {
                 child: const Text('Face it'),
               ),
               const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Early removal costs points — coming with the points '
-                  'update.',
-                  style: TextStyle(color: AppColors.textFaint, fontSize: 11.5),
-                ),
-              ),
+              Expanded(child: _removalAction()),
             ],
           ),
         ],
       ),
     );
+  }
+
+  /// D9 — early takedown: 30% floor, 300 points, loss stays recorded.
+  Widget _removalAction() {
+    const price = 300;
+    final balance = ref.watch(pointsBalanceProvider).valueOrNull ?? 0;
+    final me = c.participant(FirestorePaths.activeUid);
+    final revealedAt = c.revealedAtMs;
+    final windowMins = me?.revealWindowMins;
+    final floorPassed = revealedAt != null &&
+        windowMins != null &&
+        DateTime.now().millisecondsSinceEpoch >=
+            revealedAt + (windowMins * 60000 * 30) ~/ 100;
+
+    if (!floorPassed) {
+      return Text(
+        'Removal unlocks after 30% of the window.',
+        style: TextStyle(color: AppColors.textFaint, fontSize: 11.5),
+      );
+    }
+    if (balance < price) {
+      return Text(
+        'Remove early: $price pts (you have $balance).',
+        style: TextStyle(color: AppColors.textFaint, fontSize: 11.5),
+      );
+    }
+    return OutlinedButton(
+      onPressed: _busy ? null : _removePhoto,
+      child: Text('Remove — $price pts'),
+    );
+  }
+
+  Future<void> _removePhoto() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Take the photo down?'),
+        content: const Text(
+          'This burns 300 points. The loss stays on your record — only the '
+          'photo goes.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Leave it up'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Burn the points'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(stakeFunctionsProvider).removePhoto(c.id);
+    } on StakeActionException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   // ─── Veto (M-6) ────────────────────────────────────────────────────────────

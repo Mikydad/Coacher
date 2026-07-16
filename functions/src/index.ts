@@ -12,12 +12,16 @@ initializeApp();
 export {
   stakeCreateChallenge,
   stakeCancelDraft,
+  stakeAcceptChallenge,
+  stakeDeclineChallenge,
   stakeApplyVeto,
   stakeConfirmOutcome,
   stakeCastVote,
   stakeReportScreenshot,
   stakeReportPhoto,
+  stakeRemovePhoto,
 } from "./stakes/callables";
+export { grantPoints, pointsSignupBonus } from "./stakes/ledger";
 export { stakeSweep } from "./stakes/sweep";
 export { stakeEvidenceArrived } from "./stakes/triggers";
 export { stakePhotoUploaded } from "./stakes/nsfw_screen";

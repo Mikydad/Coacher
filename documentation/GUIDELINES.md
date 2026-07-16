@@ -220,3 +220,27 @@ not silent reversal.
   "Contact support" row in Account Settings. *Considered:* full chat/
   message block filtering (deferred — feed + reveals are the stake
   surfaces); deleting blocked rows (rejected: LWW needs the tombstone).
+
+- **2026-07-16 · Points economy semantics (Phase 2).** Ledger:
+  `points_ledger/{uid}/txns` append-only, ALL writes via Cloud Functions,
+  deterministic txn ids are the idempotency backbone (`earn_task_{id}_{day}`,
+  `stake_release_{challengeId}`, …) so replays are structurally no-ops;
+  denormalized balance maintained in the same transaction; daily caps live
+  on the balance doc's per-day counters (UTC dayKey). Amounts are fixed
+  server-side (checkin 5×1/day, task 2×20/day, goal 5×10/day, win 50,
+  signup 50; removal 300; h2h stakes 50–1000). **Win bonus pays only when
+  some side actually lost** — both-win is refunds-only, so colluding
+  friends can't farm the bonus risk-free. Forfeited locks burn silently;
+  a zero-amount `stake_forfeit` txn carries {burnedAmount, toCharityId}
+  as the audit row for the quarterly charity conversion. H2H escrow locks
+  BOTH stakes in the accept transaction (no one-sided commitment); ledger
+  effects of a decision commit atomically WITH the status flip (a crashed
+  sweep can't strand locked points). Earn wiring is a re-derivation sweep
+  (scan today's completed artifacts, fire idempotent grants) instead of
+  scattering grant calls through completion paths — offline completions
+  self-heal on the next online sweep. *Considered:* client-passed amounts
+  (rejected: cheating surface); per-completion grant hooks (rejected:
+  N call sites, offline losses); Firestore count() for caps (rejected:
+  needs indexes, counters are simpler). *Known softness:* earn sources
+  ride on client-owned artifacts, so self-inflation is possible — bounded
+  by caps, and points never cash out (§1.1).

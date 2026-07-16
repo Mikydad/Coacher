@@ -43,6 +43,8 @@ class StakeFunctions {
   /// Creates a challenge; returns its id. For photo stakes the photo must
   /// already be uploaded to `stake_photos/{id}/{uid}.jpg` (owner-only path)
   /// before calling — pass the same client-generated [challengeId].
+  /// For h2h: [opponentUid], [stakeAmount], [charityId] (your side's loved
+  /// pick, D5) and [bothLoseCharityId] (D6) are required.
   Future<String> createChallenge({
     String? challengeId,
     required String type,
@@ -51,6 +53,10 @@ class StakeFunctions {
     required String mode,
     required int deadlineMs,
     Map<String, dynamic>? photo,
+    String? opponentUid,
+    int? stakeAmount,
+    String? charityId,
+    String? bothLoseCharityId,
     required String pledgeWhy,
   }) async {
     final id = challengeId ?? StableId.generate('stk');
@@ -62,10 +68,36 @@ class StakeFunctions {
       'mode': mode,
       'deadlineMs': deadlineMs,
       'photo': ?photo,
+      'opponentUid': ?opponentUid,
+      'stakeAmount': ?stakeAmount,
+      'charityId': ?charityId,
+      'bothLoseCharityId': ?bothLoseCharityId,
       'pledge': {'why': pledgeWhy},
     });
     return id;
   }
+
+  /// PT-4 — accept an h2h invite; locks BOTH stakes atomically.
+  /// [charityId] is your side's loved pick (D5).
+  Future<void> acceptChallenge({
+    required String challengeId,
+    required String charityId,
+  }) =>
+      _call<Map<String, dynamic>>('stakeAcceptChallenge', {
+        'challengeId': challengeId,
+        'charityId': charityId,
+      });
+
+  Future<void> declineChallenge(String challengeId) =>
+      _call<Map<String, dynamic>>('stakeDeclineChallenge', {
+        'challengeId': challengeId,
+      });
+
+  /// P-5/D9 — early takedown of a live reveal (30% floor, 300 points).
+  Future<void> removePhoto(String challengeId) =>
+      _call<Map<String, dynamic>>('stakeRemovePhoto', {
+        'challengeId': challengeId,
+      });
 
   Future<void> cancelDraft(String challengeId) =>
       _call<Map<String, dynamic>>('stakeCancelDraft', {'challengeId': challengeId});
