@@ -116,6 +116,10 @@ class _BodyState extends ConsumerState<_Body> {
           const SizedBox(height: 12),
           _h2hStakeCard(),
         ],
+        if (c.type == StakeChallengeType.soloMoney) ...[
+          const SizedBox(height: 12),
+          _moneyStakeCard(),
+        ],
         if (_isInvitedMe) ...[
           const SizedBox(height: 12),
           _inviteActions(),
@@ -493,6 +497,56 @@ class _BodyState extends ConsumerState<_Body> {
         '$stake points each. If you win, their points fund $myPick. '
         'If they win, yours fund $theirPick. If you BOTH fail, everything '
         'goes to $bothLose.',
+        style: TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 13,
+          height: 1.5,
+        ),
+      ),
+    );
+  }
+
+  /// $-1/$-3 — what the money is doing right now, receipt included.
+  Widget _moneyStakeCard() {
+    final myUid = FirestorePaths.activeUid;
+    final amountCents = c.participant(myUid)?.stakeAmount ?? 0;
+    final amount = '\$${(amountCents / 100).toStringAsFixed(amountCents % 100 == 0 ? 0 : 2)}';
+    final charities = ref.watch(charitiesProvider).valueOrNull ?? const [];
+    final antiName = charities
+            .where((x) => x.id == c.antiCharityId)
+            .firstOrNull
+            ?.name ??
+        'your chosen recipient';
+    final receipt = c.receipts[myUid];
+
+    final String text;
+    if (c.status == StakeChallengeStatus.active ||
+        c.status == StakeChallengeStatus.pendingVerification) {
+      text = '$amount held in escrow (simulated). Keep your word and it all '
+          'comes back; fail and it funds $antiName. No veto on money.';
+    } else if (c.status == StakeChallengeStatus.completedSuccess) {
+      text = '$amount refunded. Your word held.';
+    } else if (receipt != null) {
+      text = '$amount donated to $antiName. '
+          '${receipt.note.isNotEmpty ? receipt.note : 'Receipt on file.'}';
+    } else if (c.status == StakeChallengeStatus.completedForfeit) {
+      text = '$amount forfeited — being donated to $antiName. The receipt '
+          'will appear here.';
+    } else {
+      text = '$amount — ${c.status.storageValue}.';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.statusGreen.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border:
+            Border.all(color: AppColors.statusGreen.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        text,
         style: TextStyle(
           color: AppColors.textPrimary,
           fontSize: 13,

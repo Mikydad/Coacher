@@ -23,7 +23,8 @@ export {
 } from "./stakes/callables";
 export { grantPoints, pointsSignupBonus } from "./stakes/ledger";
 export { stakeSweep } from "./stakes/sweep";
-export { stakeEvidenceArrived } from "./stakes/triggers";
+export { devRunSweep } from "./stakes/dev";
+export { stakeEvidenceArrived, stakeDisbursementReceipt } from "./stakes/triggers";
 export { stakePhotoUploaded } from "./stakes/nsfw_screen";
 export { stakeAccountPurge } from "./stakes/account_purge";
 

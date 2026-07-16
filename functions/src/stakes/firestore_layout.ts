@@ -109,6 +109,8 @@ export interface AuditEvent {
     | 'invite_expired'
     | 'cancelled'
     | 'photo_removed'
+    | 'stake_charged'
+    | 'donation_receipt'
     | 'deadline_reached'
     | 'evidence_window_closed'
     | 'veto_requested'

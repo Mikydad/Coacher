@@ -23,12 +23,31 @@ import {
   eventDoc,
   evidenceFromSnap,
 } from './firestore_layout';
+import { escrowRef, markEscrow, processRefundQueue } from './escrows';
 import { balanceRef, writeLedgerTxn } from './ledger';
+import { EscrowDoc } from './payments';
 import { BalanceDoc, EARN_AMOUNTS } from './points';
 import { assertTransition } from './state_machine';
 import { Confirmation, StakeChallenge, VetoRequest, Vote } from './types';
 
 const BATCH_LIMIT = 100;
+
+/** One full sweep pass — extracted so tests can run it on demand. */
+export async function runSweepOnce(
+  now: number,
+): Promise<Record<string, number>> {
+  const counts = {
+    expired: await expireInvites(now),
+    toVerification: await moveToVerification(now),
+    decided: await decideDue(now),
+    reveals: await expireReveals(now),
+    // Phase 2 of the two-phase money move: drive refund_pending →
+    // refunded through the provider (crash-safe, idempotent).
+    refunds: await processRefundQueue(now),
+  };
+  logger.info('stakeSweep done', counts);
+  return counts;
+}
 
 export const stakeSweep = onSchedule(
   {
@@ -39,14 +58,7 @@ export const stakeSweep = onSchedule(
     maxInstances: 1, // overlap safety belt on top of transactional re-checks
   },
   async () => {
-    const now = Date.now();
-    const counts = {
-      expired: await expireInvites(now),
-      toVerification: await moveToVerification(now),
-      decided: await decideDue(now),
-      reveals: await expireReveals(now),
-    };
-    logger.info('stakeSweep done', counts);
+    await runSweepOnce(Date.now());
   },
 );
 
@@ -143,6 +155,17 @@ async function decideDue(now: number): Promise<number> {
         balances.set(
           uid,
           (await tx.get(balanceRef(uid))).data() as BalanceDoc | undefined,
+        );
+      }
+      // Money escrows (still reads-before-writes).
+      const moneyUids = ch.participants
+        .filter((p) => p.stakeKind === 'money' && (p.stakeAmount ?? 0) > 0)
+        .map((p) => p.uid);
+      const escrows = new Map<string, EscrowDoc | undefined>();
+      for (const uid of moneyUids) {
+        escrows.set(
+          uid,
+          (await tx.get(escrowRef(ch.id, uid))).data() as EscrowDoc | undefined,
         );
       }
       const update: Record<string, unknown> = {
@@ -243,6 +266,25 @@ async function decideDue(now: number): Promise<number> {
           });
         }
         balances.set(r.uid, bal);
+      }
+
+      // $-2 — money escrows: record the INTENT atomically with the
+      // decision (refund_pending / disbursement_pending); the provider
+      // call happens in processRefundQueue, never inside this transaction.
+      for (const r of decision.perParticipant) {
+        if (!moneyUids.includes(r.uid)) continue;
+        const escrow = escrows.get(r.uid);
+        if (!escrow || escrow.status !== 'held') continue; // nothing to move
+        const ref = escrowRef(ch.id, r.uid);
+        if (r.sideWon) {
+          markEscrow(tx, ref, escrow, 'refund_pending', now);
+        } else {
+          const toCharityId =
+            r.resolution.kind === 'forfeit' ? r.resolution.toCharityId : '';
+          markEscrow(tx, ref, escrow, 'disbursement_pending', now, {
+            toCharityId,
+          });
+        }
       }
     });
 

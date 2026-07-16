@@ -37,6 +37,10 @@ class IsarStakeChallenge {
   /// JSON map teamId → charityId (D5); empty string when absent.
   late String sideCharitiesJson;
   String? bothLoseCharityId;
+  String? antiCharityId;
+
+  /// JSON map uid → donation receipt ($-3); empty string when absent.
+  late String receiptsJson;
   late int deadlineMs;
 
   String? photoStateStorage;
@@ -64,6 +68,12 @@ class IsarStakeChallenge {
       ..sideCharitiesJson =
           c.sideCharities.isEmpty ? '' : jsonEncode(c.sideCharities)
       ..bothLoseCharityId = c.bothLoseCharityId
+      ..antiCharityId = c.antiCharityId
+      ..receiptsJson = c.receipts.isEmpty
+          ? ''
+          : jsonEncode(
+              c.receipts.map((k, v) => MapEntry(k, v.toMap())),
+            )
       ..deadlineMs = c.deadlineMs
       ..photoStateStorage = c.photoState?.storageValue
       ..revealedAtMs = c.revealedAtMs
@@ -97,6 +107,17 @@ class IsarStakeChallenge {
           : (jsonDecode(sideCharitiesJson) as Map)
               .map((k, v) => MapEntry('$k', '$v')),
       bothLoseCharityId: bothLoseCharityId,
+      antiCharityId: antiCharityId,
+      receipts: receiptsJson.isEmpty
+          ? const {}
+          : {
+              for (final e in ((jsonDecode(receiptsJson) as Map)
+                      .cast<String, dynamic>())
+                  .entries)
+                if (e.value is Map)
+                  e.key: StakeDonationReceipt.fromMap(
+                      (e.value as Map).cast<String, dynamic>()),
+            },
       deadlineMs: deadlineMs,
       photoState: StakePhotoState.fromStorage(photoStateStorage),
       revealedAtMs: revealedAtMs,

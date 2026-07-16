@@ -17,8 +17,10 @@ import { logger } from 'firebase-functions/v2';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 
+import { ESCROWS, markEscrow, processRefundQueue } from './escrows';
 import { CHALLENGES, eventDoc } from './firestore_layout';
 import { PHOTO_SCREENS } from './nsfw_screen';
+import { EscrowDoc } from './payments';
 
 /** Statuses that may still move to cancelled (CC-2's non-terminal set). */
 const CANCELLABLE = new Set([
@@ -81,9 +83,29 @@ export const stakeAccountPurge = functionsV1
 
     await db.collection('enforcement').doc(uid).delete().catch(() => undefined);
 
+    // $-4 — held money goes back to its owner on account deletion:
+    // mark refund_pending transactionally, then drive the queue once.
+    const heldEscrows = await db
+      .collection(ESCROWS)
+      .where('uid', '==', uid)
+      .where('status', '==', 'held')
+      .get();
+    for (const doc of heldEscrows.docs) {
+      await db.runTransaction(async (tx) => {
+        const fresh = await tx.get(doc.ref);
+        const escrow = fresh.data() as EscrowDoc | undefined;
+        if (!escrow || escrow.status !== 'held') return;
+        markEscrow(tx, doc.ref, escrow, 'refund_pending', now, {
+          accountDeleted: true,
+        });
+      });
+    }
+    const refunds = await processRefundQueue(now);
+
     logger.info('stakeAccountPurge done', {
       uid,
       challenges: challenges.size,
       cancelled,
+      refunds,
     });
   });

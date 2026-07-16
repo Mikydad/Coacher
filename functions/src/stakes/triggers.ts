@@ -9,7 +9,14 @@
  * and make evidence docs immutable once created.
  */
 
-import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import {
+  onDocumentCreated,
+  onDocumentUpdated,
+} from 'firebase-functions/v2/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
+
+import { CHALLENGES, eventDoc } from './firestore_layout';
+import { EscrowDoc } from './payments';
 
 export const stakeEvidenceArrived = onDocumentCreated(
   {
@@ -23,5 +30,54 @@ export const stakeEvidenceArrived = onDocumentCreated(
     if (!snap) return;
     if (typeof snap.data().arrivedAtMs === 'number') return; // already stamped
     await snap.ref.update({ arrivedAtMs: Date.now() });
+  },
+);
+
+/**
+ * $-3 — receipt posting. Disbursement is manual at launch (admin performs
+ * the donation, then edits the escrow doc in the console: status
+ * 'disbursed' + receiptUrl). This trigger closes the loop for the user:
+ * the receipt lands on the challenge doc (mirror-synced, so the detail
+ * screen shows "your $20 funded X — receipt") plus an audit event.
+ */
+export const stakeDisbursementReceipt = onDocumentUpdated(
+  {
+    document: 'stake_escrows/{escrowId}',
+    region: 'us-central1',
+    memory: '256MiB',
+    maxInstances: 5,
+  },
+  async (event) => {
+    const before = event.data?.before.data() as EscrowDoc | undefined;
+    const after = event.data?.after.data() as (EscrowDoc & {
+      receiptUrl?: string;
+      receiptNote?: string;
+    }) | undefined;
+    if (!before || !after) return;
+    if (before.status === 'disbursed' || after.status !== 'disbursed') return;
+
+    const now = Date.now();
+    const ref = getFirestore().collection(CHALLENGES).doc(after.challengeId);
+    await ref.update({
+      [`outcome.receipts.${after.uid}`]: {
+        amountCents: after.amountCents,
+        toCharityId: after.toCharityId ?? '',
+        receiptUrl: after.receiptUrl ?? '',
+        note: after.receiptNote ?? '',
+        atMs: now,
+      },
+      updatedAtMs: now,
+    });
+    await ref.collection('events').doc().create(
+      eventDoc({
+        type: 'donation_receipt',
+        uid: after.uid,
+        atMs: now,
+        data: {
+          amountCents: after.amountCents,
+          toCharityId: after.toCharityId ?? '',
+        },
+      }),
+    );
   },
 );

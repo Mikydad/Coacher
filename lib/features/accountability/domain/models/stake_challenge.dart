@@ -211,6 +211,40 @@ class StakeParticipantResult {
       };
 }
 
+/// $-3 — proof the forfeited money actually reached the charity.
+class StakeDonationReceipt {
+  const StakeDonationReceipt({
+    required this.amountCents,
+    required this.toCharityId,
+    required this.receiptUrl,
+    required this.note,
+    required this.atMs,
+  });
+
+  final int amountCents;
+  final String toCharityId;
+  final String receiptUrl;
+  final String note;
+  final int atMs;
+
+  factory StakeDonationReceipt.fromMap(Map<String, dynamic> m) =>
+      StakeDonationReceipt(
+        amountCents: (m['amountCents'] as num?)?.toInt() ?? 0,
+        toCharityId: (m['toCharityId'] as String?) ?? '',
+        receiptUrl: (m['receiptUrl'] as String?) ?? '',
+        note: (m['note'] as String?) ?? '',
+        atMs: (m['atMs'] as num?)?.toInt() ?? 0,
+      );
+
+  Map<String, dynamic> toMap() => {
+        'amountCents': amountCents,
+        'toCharityId': toCharityId,
+        'receiptUrl': receiptUrl,
+        'note': note,
+        'atMs': atMs,
+      };
+}
+
 // ─── The challenge ───────────────────────────────────────────────────────────
 
 class StakeChallenge {
@@ -225,6 +259,8 @@ class StakeChallenge {
     this.mode,
     this.sideCharities = const {},
     this.bothLoseCharityId,
+    this.antiCharityId,
+    this.receipts = const {},
     required this.deadlineMs,
     this.photoState,
     this.revealedAtMs,
@@ -254,6 +290,9 @@ class StakeChallenge {
 
   /// D6 — where everything goes when every side loses.
   final String? bothLoseCharityId;
+
+  /// $-1 — solo money: the anti-charity that gets the stake on forfeit.
+  final String? antiCharityId;
   final int deadlineMs;
 
   final StakePhotoState? photoState;
@@ -262,6 +301,10 @@ class StakeChallenge {
 
   final int? decidedAtMs;
   final List<StakeParticipantResult> results;
+
+  /// $-3 — uid → donation receipt posted by the admin after disbursing a
+  /// forfeited money stake (mirror of outcome.receipts).
+  final Map<String, StakeDonationReceipt> receipts;
 
   final int createdAtMs;
   final int updatedAtMs;
@@ -308,6 +351,14 @@ class StakeChallenge {
       sideCharities: ((m['sideCharities'] as Map?) ?? const {})
           .map((k, v) => MapEntry('$k', '$v')),
       bothLoseCharityId: m['bothLoseCharityId'] as String?,
+      antiCharityId: m['antiCharityId'] as String?,
+      receipts: {
+        for (final e
+            in ((outcome?['receipts'] as Map?) ?? const {}).entries)
+          if (e.value is Map)
+            '${e.key}': StakeDonationReceipt.fromMap(
+                (e.value as Map).cast<String, dynamic>()),
+      },
       deadlineMs: (m['deadlineMs'] as num?)?.toInt() ?? 0,
       photoState: StakePhotoState.fromStorage(m['photoState'] as String?),
       revealedAtMs: (m['revealedAtMs'] as num?)?.toInt(),

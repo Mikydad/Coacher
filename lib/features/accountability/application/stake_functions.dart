@@ -57,6 +57,8 @@ class StakeFunctions {
     int? stakeAmount,
     String? charityId,
     String? bothLoseCharityId,
+    int? amountCents,
+    String? antiCharityId,
     required String pledgeWhy,
   }) async {
     final id = challengeId ?? StableId.generate('stk');
@@ -72,6 +74,8 @@ class StakeFunctions {
       'stakeAmount': ?stakeAmount,
       'charityId': ?charityId,
       'bothLoseCharityId': ?bothLoseCharityId,
+      'amountCents': ?amountCents,
+      'antiCharityId': ?antiCharityId,
       'pledge': {'why': pledgeWhy},
     });
     return id;

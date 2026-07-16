@@ -1,0 +1,13 @@
+{
+  "name": "coach-for-life-integration-tests",
+  "description": "End-to-end stake lifecycles against the full emulator suite (auth + firestore + functions)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "npm --prefix ../functions run build && firebase emulators:exec --only auth,firestore,functions --project demo-stakes-e2e 'node --test --test-force-exit *.test.js'"
+  },
+  "devDependencies": {
+    "firebase": "^11.10.0",
+    "firebase-admin": "^13.0.0"
+  }
+}

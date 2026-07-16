@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -59,8 +60,9 @@ class AccountabilityCreateFlow extends ConsumerStatefulWidget {
 
 enum _Step { commitment, stake, consent, pledge, review }
 
-/// What's on the line: the three Phase-1/2 stake types.
-enum _StakeChoice { photo, h2h, practice }
+/// What's on the line: photo (P1), h2h points (P2), money ($ — SIMULATED
+/// until Stripe activates; debug builds only), practice.
+enum _StakeChoice { photo, h2h, money, practice }
 
 class _AccountabilityCreateFlowState
     extends ConsumerState<AccountabilityCreateFlow> {
@@ -84,9 +86,13 @@ class _AccountabilityCreateFlowState
   int _h2hStake = 100;
   String? _charityId;
   String? _bothLoseCharityId;
+  // solo money ($-1) — SIMULATED provider until Stripe is live
+  int _moneyCents = 2000;
+  String? _antiCharityId;
 
   bool get _isPractice => _stake == _StakeChoice.practice;
   bool get _isH2h => _stake == _StakeChoice.h2h;
+  bool get _isMoney => _stake == _StakeChoice.money;
 
   // Consent + pledge
   bool _consentIsMe = false;
@@ -114,7 +120,7 @@ class _AccountabilityCreateFlowState
   List<_Step> get _steps => [
         _Step.commitment,
         _Step.stake,
-        if (_stake == _StakeChoice.photo) _Step.consent,
+        if (_stake == _StakeChoice.photo || _isMoney) _Step.consent,
         _Step.pledge,
         _Step.review,
       ];
@@ -152,8 +158,11 @@ class _AccountabilityCreateFlowState
                 _opponentUid != null &&
                 _charityId != null &&
                 _bothLoseCharityId != null,
+            _StakeChoice.money => _antiCharityId != null,
           },
-        _Step.consent => _consentIsMe && _consentPosting && _consentAdult,
+        _Step.consent => _isMoney
+            ? _consentPosting && _consentAdult
+            : _consentIsMe && _consentPosting && _consentAdult,
         _Step.pledge => _why.text.trim().isNotEmpty,
         _Step.review => !_creating,
       };
@@ -348,6 +357,19 @@ class _AccountabilityCreateFlowState
               'Both stake points. The loser\'s points fund the winner\'s cause.',
           onTap: () => setState(() => _stake = _StakeChoice.h2h),
         ),
+        // $ — debug builds only until Stripe activates (Phase 3 runbook);
+        // the server rail is the SIMULATED provider either way.
+        if (kDebugMode)
+          _stakeChoiceCard(
+            selected: _isMoney,
+            icon: Icons.attach_money_rounded,
+            iconColor: AppColors.statusGreen,
+            title: 'Money stake (simulated)',
+            subtitle:
+                'Fail and it\'s donated to a cause you can\'t stand. No real '
+                'money until Stripe is live.',
+            onTap: () => setState(() => _stake = _StakeChoice.money),
+          ),
         _stakeChoiceCard(
           selected: _isPractice,
           icon: Icons.school_rounded,
@@ -357,6 +379,7 @@ class _AccountabilityCreateFlowState
           onTap: () => setState(() => _stake = _StakeChoice.practice),
         ),
         if (_isH2h) ..._h2hFields(),
+        if (_isMoney) ..._moneyFields(),
         if (_stake == _StakeChoice.photo) ...[
           const SizedBox(height: 20),
           _microLabel('POSTS TO'),
@@ -563,6 +586,63 @@ class _AccountabilityCreateFlowState
     ];
   }
 
+  /// Solo money ($-1): amount + the anti-charity, with the simulation
+  /// banner impossible to miss.
+  List<Widget> _moneyFields() {
+    final charitiesAsync = ref.watch(charitiesProvider);
+    return [
+      const SizedBox(height: 16),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.amber.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.amber.withValues(alpha: 0.4)),
+        ),
+        child: Text(
+          'SIMULATED — no card is charged and no real money moves. The full '
+          'flow runs so it\'s real the day Stripe goes live.',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      const SizedBox(height: 16),
+      _microLabel('ON THE LINE'),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final (label, cents) in const [
+            ('\$5', 500),
+            ('\$10', 1000),
+            ('\$20', 2000),
+            ('\$50', 5000),
+          ])
+            _choiceChip(label, _moneyCents == cents,
+                () => setState(() => _moneyCents = cents)),
+        ],
+      ),
+      const SizedBox(height: 16),
+      _microLabel('IF YOU FAIL, IT FUNDS'),
+      const SizedBox(height: 8),
+      Text(
+        'Pick the one that hurts — that\'s the point.',
+        style: TextStyle(color: AppColors.textSoft, fontSize: 12),
+      ),
+      const SizedBox(height: 8),
+      _charityChips(
+        charitiesAsync,
+        selectedId: _antiCharityId,
+        onPick: (id) => setState(() => _antiCharityId = id),
+      ),
+    ];
+  }
+
   Widget _charityChips(
     AsyncValue<List<Charity>> charitiesAsync, {
     required String? selectedId,
@@ -601,6 +681,7 @@ class _AccountabilityCreateFlowState
   // ─── Step: consent (P-1 — explicit, in-flow, not ToS) ─────────────────────
 
   Widget _consentStep() {
+    if (_isMoney) return _moneyConsentStep();
     final circles = ref.watch(myCirclesProvider).value ?? const [];
     final circle = circles.where((c) => c.id == _circleId).firstOrNull;
     final circleName = circle?.name ?? 'your circle';
@@ -670,6 +751,62 @@ class _AccountabilityCreateFlowState
     );
   }
 
+  /// Money consent ($-1, D10): explicit, in-flow, with the no-mercy line.
+  Widget _moneyConsentStep() {
+    final charities = ref.watch(charitiesProvider).valueOrNull ?? const [];
+    final charity = charities.where((c) => c.id == _antiCharityId).firstOrNull;
+    final amount = '\$${(_moneyCents / 100).toStringAsFixed(0)}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader('Read this carefully'),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.danger.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+            border:
+                Border.all(color: AppColors.danger.withValues(alpha: 0.35)),
+          ),
+          child: Text(
+            'If you fail "${_title.text.trim()}" by the deadline, $amount '
+            'will be donated to ${charity?.name ?? 'your chosen recipient'}. '
+            'There is NO mercy veto on money — if you lose, you lose.\n\n'
+            'Keep your word and every cent comes back to you.\n\n'
+            '(Simulated build: no card is charged yet.)',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        CheckboxListTile(
+          value: _consentPosting,
+          onChanged: (v) => setState(() => _consentPosting = v ?? false),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            'I understand the money is donated if I fail — no undo',
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+          ),
+        ),
+        CheckboxListTile(
+          value: _consentAdult,
+          onChanged: (v) => setState(() => _consentAdult = v ?? false),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            'I am 18 or older',
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+          ),
+        ),
+      ],
+    );
+  }
+
   // ─── Step: pledge (PSY-1) ──────────────────────────────────────────────────
 
   Widget _pledgeStep() {
@@ -720,6 +857,13 @@ class _AccountabilityCreateFlowState
         _StakeChoice.h2h => [
             ('Stake', '$_h2hStake points each — locked when they accept'),
             ('Mode', 'They see "$_mode" before accepting'),
+          ],
+        _StakeChoice.money => [
+            (
+              'Stake',
+              '\$${(_moneyCents / 100).toStringAsFixed(0)} — simulated, '
+                  'charged at start, refunded if you pass'
+            ),
           ],
         _StakeChoice.practice => [
             ('Stake', 'Practice — nothing on the line'),
@@ -793,6 +937,7 @@ class _AccountabilityCreateFlowState
     final type = switch (_stake) {
       _StakeChoice.photo => 'solo_photo',
       _StakeChoice.h2h => 'h2h_points',
+      _StakeChoice.money => 'solo_money',
       _StakeChoice.practice => 'practice',
     };
 
@@ -829,6 +974,8 @@ class _AccountabilityCreateFlowState
         stakeAmount: _isH2h ? _h2hStake : null,
         charityId: _isH2h ? _charityId : null,
         bothLoseCharityId: _isH2h ? _bothLoseCharityId : null,
+        amountCents: _isMoney ? _moneyCents : null,
+        antiCharityId: _isMoney ? _antiCharityId : null,
         pledgeWhy: _why.text.trim(),
       );
 
@@ -841,21 +988,32 @@ class _AccountabilityCreateFlowState
           type: switch (_stake) {
             _StakeChoice.photo => StakeChallengeType.soloPhoto,
             _StakeChoice.h2h => StakeChallengeType.h2hPoints,
+            _StakeChoice.money => StakeChallengeType.soloMoney,
             _StakeChoice.practice => StakeChallengeType.practice,
           },
           status: switch (_stake) {
             _StakeChoice.photo => StakeChallengeStatus.draft,
             _StakeChoice.h2h => StakeChallengeStatus.pendingAccept,
-            _StakeChoice.practice => StakeChallengeStatus.active,
+            _StakeChoice.money ||
+            _StakeChoice.practice =>
+              StakeChallengeStatus.active,
           },
           creatorUid: uid,
-          circleId: _isPractice ? '' : (_circleId ?? ''),
+          circleId: (_isPractice || _isMoney) ? '' : (_circleId ?? ''),
           participants: [
             StakeParticipant(
               uid: uid,
               teamId: uid,
-              stakeKind: _stake == _StakeChoice.photo ? 'photo' : 'points',
-              stakeAmount: _isH2h ? _h2hStake : null,
+              stakeKind: switch (_stake) {
+                _StakeChoice.photo => 'photo',
+                _StakeChoice.money => 'money',
+                _ => 'points',
+              },
+              stakeAmount: _isH2h
+                  ? _h2hStake
+                  : _isMoney
+                      ? _moneyCents
+                      : null,
               photoStoragePath: _stake == _StakeChoice.photo
                   ? 'stake_photos/$id/$uid.jpg'
                   : null,
@@ -883,6 +1041,7 @@ class _AccountabilityCreateFlowState
               ? {uid: _charityId!}
               : const {},
           bothLoseCharityId: _isH2h ? _bothLoseCharityId : null,
+          antiCharityId: _isMoney ? _antiCharityId : null,
           deadlineMs: deadline,
           photoState: _stake == _StakeChoice.photo
               ? StakePhotoState.pendingScreen

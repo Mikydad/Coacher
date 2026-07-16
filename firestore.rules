@@ -293,6 +293,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // $-1/$-2 — money escrow records. Owner reads their own; every write
+    // is server-side (charge, refund queue, admin disbursement). A client
+    // that could touch these could move money — write-denied forever.
+    match /stake_escrows/{escrowId} {
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
     // ─── Feedback ──────────────────────────────────────────────────────────
     // In-app bug reports / feature requests / questions. Create-only from
     // clients; reports are reviewed in the Firebase console (no client read).

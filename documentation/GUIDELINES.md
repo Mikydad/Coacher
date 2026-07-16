@@ -13,6 +13,7 @@ already exists:
 | PRD template / task generation | `PRD/create-prd.md`, `PRD/generate-tasks.md` |
 | Known pitfalls (Firestore indexes, plugins…) | `documentation/errors.md` |
 | Incidents & fixes journal | `documentation/2026-07_features_fixes_and_incidents.md` |
+| Business setup (LLC/EIN/bank/Stripe/Apple) | `documentation/PHASE3_BUSINESS_SETUP.md` |
 
 ## Feature review checklist
 
@@ -244,3 +245,26 @@ not silent reversal.
   needs indexes, counters are simpler). *Known softness:* earn sources
   ride on client-owned artifacts, so self-inflation is possible — bounded
   by caps, and points never cash out (§1.1).
+
+- **2026-07-16 · Money layer ships SIMULATED behind a provider abstraction
+  (Phase 4 pre-Stripe).** No Stripe account exists yet (see
+  `PHASE3_BUSINESS_SETUP.md`), so `PaymentProvider` (charge/refund only —
+  §1.1 is enforced by SHAPE: no user-to-user transfer is expressible) runs
+  as `SimulatedPaymentProvider`: instant deterministic charges (amounts
+  ending in ¢99 decline — the failure-drill hook), real escrow records
+  (`stake_escrows/{challengeId}_{uid}`, client-write-denied), real status
+  machine (held → refund_pending → refunded | held → disbursement_pending
+  → disbursed). Money movement is two-phase everywhere: transactions
+  record INTENT atomically with the decision; `processRefundQueue` drives
+  provider calls afterwards, idempotently — a transaction retry can never
+  double-refund, a crash never strands money. Disbursement is manual
+  (admin sets status+receiptUrl on the escrow doc; a trigger posts the
+  receipt onto the challenge). solo_money is live end-to-end on this rail;
+  client UI is kDebugMode-gated with a SIMULATED banner until Stripe
+  activates, at which point a StripePaymentProvider implements the same
+  interface and PAYMENTS_PROVIDER=stripe flips it (unknown provider names
+  THROW rather than silently simulating). *Considered:* waiting for
+  Stripe before building (rejected: the escrow/receipt/refund machinery
+  is provider-independent and testable now); provider calls inside the
+  decision transaction (rejected: retried transactions + network calls =
+  double refunds).

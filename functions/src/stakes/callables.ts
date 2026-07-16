@@ -18,7 +18,9 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 
 import { canRemoveRevealedPhoto, vetoEligible } from './decisions';
+import { escrowRef, newEscrowDoc } from './escrows';
 import { balanceRef, txnRef, writeLedgerTxn } from './ledger';
+import { EscrowDoc, getPaymentProvider, validMoneyAmount } from './payments';
 import {
   BalanceDoc,
   H2H_STAKE_MAX,
@@ -59,11 +61,12 @@ const CALL_OPTS = { region: REGION, timeoutSeconds: 30, memory: '256MiB' as cons
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 
-/** Phase 1+2 — creatable types; money variants say 'failed-precondition'. */
+/** Phase 1+2+4 — creatable types (team + h2h money still gated off). */
 const CREATABLE_TYPES: ReadonlySet<ChallengeType> = new Set([
   'solo_photo',
   'practice',
   'h2h_points',
+  'solo_money',
 ]);
 
 // ─── Shared guards ───────────────────────────────────────────────────────────
@@ -147,6 +150,9 @@ interface CreateData {
   stakeAmount?: unknown;
   charityId?: unknown; // creator's "loved" pick
   bothLoseCharityId?: unknown;
+  // solo money ($-1): the anti-charity + stake in cents
+  antiCharityId?: unknown;
+  amountCents?: unknown;
 }
 
 /** D7 — every charity reference must be on the curated active list. */
@@ -227,6 +233,8 @@ export const stakeCreateChallenge = onCall(
     let photoState: string | undefined;
     let sideCharities: Record<string, string> | undefined;
     let bothLoseCharityId: string | undefined;
+    let antiCharityId: string | undefined;
+    let chargedEscrow: EscrowDoc | undefined;
 
     if (type === 'solo_photo') {
       circleId = str(request.data?.circleId, 'circleId', 1, 64);
@@ -308,6 +316,55 @@ export const stakeCreateChallenge = onCall(
       sideCharities = { [uid]: charityId };
       initialStatus = 'pending_accept';
       assertTransition('draft', 'pending_accept');
+    } else if (type === 'solo_money') {
+      // $-1 — charge at creation; the challenge only exists if the charge
+      // succeeded. NO mercy on money (D10) beyond the measurement rules.
+      // Runs on the SIMULATED provider until Stripe activates
+      // (documentation/PHASE3_BUSINESS_SETUP.md).
+      const amountCents = int(request.data?.amountCents, 'amountCents', 1, 1_000_000);
+      if (!validMoneyAmount(amountCents)) {
+        throw new HttpsError('invalid-argument', 'Stake must be between $1 and $100.');
+      }
+      antiCharityId = str(request.data?.antiCharityId, 'antiCharityId', 1, 64);
+      await assertCharityActive(antiCharityId);
+      // Circle is optional for solo money (announcement context only).
+      const rawCircle = request.data?.circleId;
+      if (typeof rawCircle === 'string' && rawCircle.length > 0) {
+        circleId = str(rawCircle, 'circleId', 1, 64);
+        if (!(await isCircleMember(circleId, uid))) {
+          throw new HttpsError('permission-denied', 'Not a member of that circle.');
+        }
+      }
+
+      const charge = await getPaymentProvider().charge({
+        challengeId: id,
+        uid,
+        amountCents,
+      });
+      if (!charge.ok) {
+        throw new HttpsError(
+          'failed-precondition',
+          charge.failureReason ?? 'The charge did not go through.',
+        );
+      }
+      chargedEscrow = newEscrowDoc({
+        challengeId: id,
+        uid,
+        amountCents,
+        provider: getPaymentProvider().name,
+        providerRef: charge.providerRef,
+        nowMs: now,
+      });
+
+      participants.push({
+        uid,
+        teamId: uid,
+        stakeKind: 'money',
+        stakeAmount: amountCents,
+        accepted: true,
+      });
+      initialStatus = 'active';
+      assertTransition('draft', 'active');
     } else {
       // Practice: no stake, self-report, activates immediately (CC-7).
       participants.push({
@@ -340,6 +397,7 @@ export const stakeCreateChallenge = onCall(
       ...(photoState !== undefined ? { photoState } : {}),
       ...(sideCharities !== undefined ? { sideCharities } : {}),
       ...(bothLoseCharityId !== undefined ? { bothLoseCharityId } : {}),
+      ...(antiCharityId !== undefined ? { antiCharityId } : {}),
     };
 
     const ref = db.collection(CHALLENGES).doc(id);
@@ -361,6 +419,16 @@ export const stakeCreateChallenge = onCall(
         }
       }
       tx.create(ref, doc); // throws already-exists on id reuse
+      if (chargedEscrow !== undefined) {
+        // $-1 — escrow record commits atomically with the challenge.
+        tx.create(escrowRef(id, uid), chargedEscrow);
+        appendEvent(tx, id, {
+          type: 'stake_charged',
+          uid,
+          atMs: now,
+          data: { amountCents: chargedEscrow.amountCents, provider: chargedEscrow.provider },
+        });
+      }
       appendEvent(tx, id, { type: 'created', uid, atMs: now, data: { challengeType: type } });
       appendEvent(tx, id, { type: 'pledge_signed', uid, atMs: now, data: { why: pledgeWhy } });
       if (doc.status === 'active') {

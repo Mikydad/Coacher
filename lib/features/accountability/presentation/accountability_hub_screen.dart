@@ -357,6 +357,8 @@ class _StakeIcon extends StatelessWidget {
       StakeChallengeType.teamPoints ||
       StakeChallengeType.teamMoney =>
         (Icons.sports_kabaddi_rounded, AppColors.amber),
+      StakeChallengeType.soloMoney =>
+        (Icons.attach_money_rounded, AppColors.statusGreen),
       _ => (Icons.photo_camera_rounded, AppColors.coral),
     };
     return Container(

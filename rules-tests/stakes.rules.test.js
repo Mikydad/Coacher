@@ -288,3 +288,44 @@ describe('charities — curated list (D7)', () => {
     );
   });
 });
+
+describe('stake_escrows — money records ($-1/$-2)', () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(docPath('stake_escrows', `${CH}_${OWNER}`)).set({
+        challengeId: CH,
+        uid: OWNER,
+        amountCents: 2000,
+        currency: 'usd',
+        status: 'held',
+        provider: 'simulated',
+        providerRef: 'sim_x',
+        createdAtMs: 1,
+        updatedAtMs: 1,
+      });
+    });
+  });
+
+  it('owner reads own escrow; others cannot', async () => {
+    await assertSucceeds(asUser(OWNER).doc(docPath('stake_escrows', `${CH}_${OWNER}`)).get());
+    await assertFails(asUser(MEMBER).doc(docPath('stake_escrows', `${CH}_${OWNER}`)).get());
+    await assertFails(asGuest().doc(docPath('stake_escrows', `${CH}_${OWNER}`)).get());
+  });
+
+  it('no client write — a writable escrow is a money mover', async () => {
+    await assertFails(
+      asUser(OWNER)
+        .doc(docPath('stake_escrows', `${CH}_${OWNER}`))
+        .update({ status: 'refund_pending' }),
+    );
+    await assertFails(
+      asUser(OWNER)
+        .doc(docPath('stake_escrows', `${CH}_${OWNER}`))
+        .update({ amountCents: 1 }),
+    );
+    await assertFails(asUser(OWNER).doc(docPath('stake_escrows', `${CH}_${OWNER}`)).delete());
+    await assertFails(
+      asUser(STRANGER).doc(docPath('stake_escrows', 'forged_x')).set({ uid: STRANGER, status: 'refund_pending' }),
+    );
+  });
+});
