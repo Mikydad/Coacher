@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/presentation/keyboard_dismiss.dart';
+import '../../../accountability/presentation/accountability_create_flow.dart';
 import '../../application/challenge_providers.dart';
 import '../../application/circle_providers.dart';
 import '../../data/circle_proof_storage.dart';
@@ -49,6 +50,10 @@ class CircleChallengesView extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
         children: [
+          // Entry point #3 into the unified accountability flow — a real
+          // stake, distinct from the casual circle challenges below.
+          _StakeEntryCard(circleId: circleId),
+          const SizedBox(height: 16),
           // Pending — vote banners
           pendingAsync.when(
             data: (list) {
@@ -827,6 +832,66 @@ class _EmptyState extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Entry card into the unified accountability flow (real stakes), shown
+/// above the casual circle challenges so the two never get confused.
+class _StakeEntryCard extends StatelessWidget {
+  const _StakeEntryCard({required this.circleId});
+
+  final String circleId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.coral.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () =>
+            openAccountabilityCreateFlow(context, prefilledCircleId: circleId),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border:
+                Border.all(color: AppColors.coral.withValues(alpha: 0.35)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.local_fire_department_rounded,
+                  color: AppColors.coral),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Stake something real',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Put an embarrassing photo on the line — this circle '
+                      'sees it if you fail.',
+                      style: TextStyle(
+                        color: AppColors.textSoft,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: AppColors.textSoft),
+            ],
+          ),
         ),
       ),
     );

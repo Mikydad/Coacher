@@ -23,6 +23,7 @@ class ObsidianBottomNav extends ConsumerWidget {
     (icon: Icons.auto_awesome_rounded, label: 'Coach'),
     (icon: Icons.track_changes_rounded, label: 'Goals'),
     (icon: Icons.leaderboard_rounded, label: 'Progress'),
+    (icon: Icons.handshake_rounded, label: 'Accountability'),
     (icon: Icons.group_rounded, label: 'Community'),
     (icon: Icons.person_rounded, label: 'Profile'),
   ];

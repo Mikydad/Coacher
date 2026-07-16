@@ -1,0 +1,1008 @@
+import 'dart:io';
+
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../../core/firebase/firestore_paths.dart';
+import '../../../core/presentation/app_colors.dart';
+import '../../../core/presentation/page_headers.dart';
+import '../../../core/utils/stable_id.dart';
+import '../../community/application/circle_providers.dart';
+import '../application/stake_functions.dart';
+import '../application/stakes_providers.dart';
+import '../domain/models/stake_challenge.dart';
+import 'stake_challenge_detail_screen.dart';
+
+/// The unified accountability creation flow (PRD 1.4). All three entry
+/// points land here:
+///  - goal/task editor → [prefilledTitle]
+///  - Accountability hub → nothing prefilled
+///  - circle → [prefilledCircleId]
+///
+/// Steps: commitment → stake → consent (photo only) → pledge → review.
+/// Multi-step back is intercepted (PopScope steps back, never exits
+/// mid-flow); step changes animate (~260 ms).
+Future<void> openAccountabilityCreateFlow(
+  BuildContext context, {
+  String? prefilledTitle,
+  String? prefilledCircleId,
+}) {
+  return Navigator.of(context).push(
+    MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => AccountabilityCreateFlow(
+        prefilledTitle: prefilledTitle,
+        prefilledCircleId: prefilledCircleId,
+      ),
+    ),
+  );
+}
+
+class AccountabilityCreateFlow extends ConsumerStatefulWidget {
+  const AccountabilityCreateFlow({
+    super.key,
+    this.prefilledTitle,
+    this.prefilledCircleId,
+  });
+
+  final String? prefilledTitle;
+  final String? prefilledCircleId;
+
+  @override
+  ConsumerState<AccountabilityCreateFlow> createState() =>
+      _AccountabilityCreateFlowState();
+}
+
+enum _Step { commitment, stake, consent, pledge, review }
+
+class _AccountabilityCreateFlowState
+    extends ConsumerState<AccountabilityCreateFlow> {
+  _Step _step = _Step.commitment;
+
+  // Commitment
+  late final TextEditingController _title =
+      TextEditingController(text: widget.prefilledTitle ?? '');
+  String _unitKind = 'minutes';
+  int _unitTarget = 60;
+  int _totalUnits = 7;
+  String _mode = 'disciplined';
+
+  // Stake
+  bool _isPractice = false;
+  String? _circleId;
+  XFile? _photo;
+  int _revealWindowMins = 60;
+
+  // Consent + pledge
+  bool _consentIsMe = false;
+  bool _consentPosting = false;
+  bool _consentAdult = false;
+  late final TextEditingController _why = TextEditingController();
+
+  // Create
+  bool _creating = false;
+  String? _createError;
+
+  @override
+  void initState() {
+    super.initState();
+    _circleId = widget.prefilledCircleId;
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _why.dispose();
+    super.dispose();
+  }
+
+  List<_Step> get _steps => [
+        _Step.commitment,
+        _Step.stake,
+        if (!_isPractice) _Step.consent,
+        _Step.pledge,
+        _Step.review,
+      ];
+
+  void _goBack() {
+    final order = _steps;
+    final i = order.indexOf(_step);
+    if (i > 0) setState(() => _step = order[i - 1]);
+  }
+
+  void _goNext() {
+    final order = _steps;
+    final i = order.indexOf(_step);
+    if (i < order.length - 1) setState(() => _step = order[i + 1]);
+  }
+
+  int get _requiredUnits {
+    final pct = switch (_mode) {
+      'flexible' => 70,
+      'extreme' => 100,
+      _ => 85,
+    };
+    return ((_totalUnits * pct) + 99) ~/ 100;
+  }
+
+  int get _mercyTarget => (_unitTarget * 3 + 3) ~/ 4;
+
+  bool get _stepValid => switch (_step) {
+        _Step.commitment =>
+          _title.text.trim().isNotEmpty && _unitTarget > 0 && _totalUnits > 0,
+        _Step.stake => _isPractice || (_circleId != null && _photo != null),
+        _Step.consent => _consentIsMe && _consentPosting && _consentAdult,
+        _Step.pledge => _why.text.trim().isNotEmpty,
+        _Step.review => !_creating,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final atFirstStep = _steps.indexOf(_step) == 0;
+    return PopScope(
+      canPop: atFirstStep,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _goBack();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          centerTitle: true,
+          title: const PageTitle('New Challenge'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () {
+              if (atFirstStep) {
+                Navigator.of(context).pop();
+              } else {
+                _goBack();
+              }
+            },
+          ),
+        ),
+        body: Column(
+          children: [
+            _StepDots(current: _steps.indexOf(_step), total: _steps.length),
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 260),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                child: SingleChildScrollView(
+                  key: ValueKey(_step),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                  child: _buildStep(),
+                ),
+              ),
+            ),
+            SafeArea(
+              minimum: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+              child: SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: _step == _Step.pledge
+                    ? _HoldToCommitButton(
+                        enabled: _stepValid,
+                        onCommitted: () {
+                          setState(_goNext);
+                        },
+                      )
+                    : FilledButton(
+                        onPressed: _stepValid
+                            ? (_step == _Step.review ? _create : _goNext)
+                            : null,
+                        child: _creating
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.4,
+                                ),
+                              )
+                            : Text(
+                                _step == _Step.review
+                                    ? 'Start the challenge'
+                                    : 'Continue',
+                              ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep() => switch (_step) {
+        _Step.commitment => _commitmentStep(),
+        _Step.stake => _stakeStep(),
+        _Step.consent => _consentStep(),
+        _Step.pledge => _pledgeStep(),
+        _Step.review => _reviewStep(),
+      };
+
+  // ─── Step: commitment ──────────────────────────────────────────────────────
+
+  Widget _commitmentStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader('The commitment'),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _title,
+          maxLength: 80,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(
+            labelText: 'What will you do?',
+            hintText: 'Read for my exams',
+            counterText: '',
+          ),
+        ),
+        const SizedBox(height: 16),
+        _microLabel('MEASURED IN'),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            _choiceChip('Minutes', _unitKind == 'minutes',
+                () => setState(() => _unitKind = 'minutes')),
+            const SizedBox(width: 8),
+            _choiceChip('Count', _unitKind == 'count',
+                () => setState(() => _unitKind = 'count')),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _microLabel('EVERY DAY'),
+        const SizedBox(height: 8),
+        _stepperRow(
+          value: _unitTarget,
+          label: _unitKind == 'minutes' ? 'minutes a day' : 'times a day',
+          options: _unitKind == 'minutes'
+              ? const [15, 30, 45, 60, 90, 120]
+              : const [1, 2, 3, 5, 10, 20],
+          onChanged: (v) => setState(() => _unitTarget = v),
+        ),
+        const SizedBox(height: 16),
+        _microLabel('FOR'),
+        const SizedBox(height: 8),
+        _stepperRow(
+          value: _totalUnits,
+          label: 'days',
+          options: const [3, 7, 14, 21, 30],
+          onChanged: (v) => setState(() => _totalUnits = v),
+        ),
+        const SizedBox(height: 20),
+        _microLabel('STRICTNESS'),
+        const SizedBox(height: 8),
+        _modeCard('flexible', 'Flexible', 'Pass 70% of days'),
+        _modeCard('disciplined', 'Disciplined', 'Pass 85% of days'),
+        _modeCard('extreme', 'Extreme', 'Every single day. No excuses'),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.fg12,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            'You pass by hitting $_requiredUnits of $_totalUnits days. '
+            'A day counts from $_mercyTarget '
+            '${_unitKind == 'minutes' ? 'min' : ''} — '
+            'a 25% mercy for timer slips.',
+            style: TextStyle(
+              color: AppColors.textSoft,
+              fontSize: 12.5,
+              height: 1.45,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Step: stake ───────────────────────────────────────────────────────────
+
+  Widget _stakeStep() {
+    final circlesAsync = ref.watch(myCirclesProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader('What\'s on the line?'),
+        const SizedBox(height: 12),
+        _stakeChoiceCard(
+          selected: !_isPractice,
+          icon: Icons.photo_camera_rounded,
+          iconColor: AppColors.coral,
+          title: 'Photo stake',
+          subtitle:
+              'An embarrassing photo of you. Fail and it posts to your circle.',
+          onTap: () => setState(() => _isPractice = false),
+        ),
+        _stakeChoiceCard(
+          selected: _isPractice,
+          icon: Icons.school_rounded,
+          iconColor: AppColors.textSoft,
+          title: 'Practice run',
+          subtitle: 'No stake — learn the loop first.',
+          onTap: () => setState(() => _isPractice = true),
+        ),
+        if (!_isPractice) ...[
+          const SizedBox(height: 20),
+          _microLabel('POSTS TO'),
+          const SizedBox(height: 8),
+          circlesAsync.when(
+            loading: () => const LinearProgressIndicator(),
+            error: (e, _) => Text('Could not load circles',
+                style: TextStyle(color: AppColors.danger)),
+            data: (circles) {
+              if (circles.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.amber.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'A photo stake needs a circle to post to. Join one in '
+                    'Community first — or start with a practice run.',
+                    style: TextStyle(
+                      color: AppColors.textSoft,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                );
+              }
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final circle in circles)
+                    _choiceChip(
+                      circle.name,
+                      _circleId == circle.id,
+                      () => setState(() => _circleId = circle.id),
+                    ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+          _microLabel('THE PHOTO'),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: _pickPhoto,
+            child: Container(
+              height: 140,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppColors.inkCard,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _photo == null ? AppColors.fg24 : AppColors.coral,
+                ),
+              ),
+              child: _photo == null
+                  ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_photo_alternate_rounded,
+                            color: AppColors.textSoft, size: 32),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Choose the photo you\'d hate them to see',
+                          style: TextStyle(
+                            color: AppColors.textSoft,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ],
+                    )
+                  : ClipRRect(
+                      borderRadius: BorderRadius.circular(13),
+                      child: Image.file(
+                        File(_photo!.path),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _microLabel('IF IT POSTS, IT STAYS UP FOR'),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final (label, mins) in const [
+                ('5 min', 5),
+                ('30 min', 30),
+                ('1 hour', 60),
+                ('3 hours', 180),
+                ('12 hours', 720),
+                ('24 hours', 1440),
+              ])
+                _choiceChip(label, _revealWindowMins == mins,
+                    () => setState(() => _revealWindowMins = mins)),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _pickPhoto() async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    if (picked != null) setState(() => _photo = picked);
+  }
+
+  // ─── Step: consent (P-1 — explicit, in-flow, not ToS) ─────────────────────
+
+  Widget _consentStep() {
+    final circles = ref.watch(myCirclesProvider).value ?? const [];
+    final circle = circles.where((c) => c.id == _circleId).firstOrNull;
+    final circleName = circle?.name ?? 'your circle';
+    final members = circle?.memberCount ?? 0;
+    final window = _revealWindowLabel(_revealWindowMins);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader('Read this carefully'),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.danger.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+            border:
+                Border.all(color: AppColors.danger.withValues(alpha: 0.35)),
+          ),
+          child: Text(
+            'If you fail "${_title.text.trim()}" by the deadline, this photo '
+            'will be posted to $circleName and visible to its '
+            '$members members for $window.\n\n'
+            'The decision is made by the server. Going offline, deleting the '
+            'app, or missing the moment does not stop it.',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        CheckboxListTile(
+          value: _consentIsMe,
+          onChanged: (v) => setState(() => _consentIsMe = v ?? false),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            'This is a photo of me',
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+          ),
+        ),
+        CheckboxListTile(
+          value: _consentPosting,
+          onChanged: (v) => setState(() => _consentPosting = v ?? false),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            'I understand it will be posted if I fail',
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+          ),
+        ),
+        // P-9 — photo stakes are 18+ (17+ App Store rating is the other
+        // layer; this is the in-flow attestation).
+        CheckboxListTile(
+          value: _consentAdult,
+          onChanged: (v) => setState(() => _consentAdult = v ?? false),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            'I am 18 or older',
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Step: pledge (PSY-1) ──────────────────────────────────────────────────
+
+  Widget _pledgeStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader('Why does this matter?'),
+        const SizedBox(height: 8),
+        Text(
+          'You\'ll see these words every time you log a day. '
+          'Make them yours.',
+          style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _why,
+          maxLength: 280,
+          maxLines: 3,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(
+            hintText: 'So I stop failing exams I could pass…',
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Hold the button to give your word.',
+          style: TextStyle(color: AppColors.textSoft, fontSize: 12.5),
+        ),
+      ],
+    );
+  }
+
+  // ─── Step: review + create ─────────────────────────────────────────────────
+
+  Widget _reviewStep() {
+    final rows = <(String, String)>[
+      ('Commitment', _title.text.trim()),
+      (
+        'Target',
+        '$_unitTarget${_unitKind == 'minutes' ? ' min' : '×'} a day, '
+            '$_totalUnits days ($_mode — pass $_requiredUnits)'
+      ),
+      if (!_isPractice) ...[
+        ('Stake', 'Embarrassing photo'),
+        ('Reveal window', _revealWindowLabel(_revealWindowMins)),
+      ] else
+        ('Stake', 'Practice — nothing on the line'),
+      ('Your word', _why.text.trim()),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader('Look it in the eye'),
+        const SizedBox(height: 12),
+        for (final (label, value) in rows)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _microLabel(label.toUpperCase()),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14.5,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (_createError != null) ...[
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.danger.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              _createError!,
+              style: TextStyle(color: AppColors.danger, fontSize: 12.5),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _create() async {
+    setState(() {
+      _creating = true;
+      _createError = null;
+    });
+
+    final functions = ref.read(stakeFunctionsProvider);
+    final repository = ref.read(stakesRepositoryProvider);
+    final uid = FirestorePaths.activeUid;
+    final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
+    var deadline = startOfToday
+        .add(Duration(days: _totalUnits))
+        .millisecondsSinceEpoch;
+    // Server requires deadline ≥ now + 1h; a 1-day challenge started late
+    // at night still gets a real runway.
+    final minDeadline =
+        now.add(const Duration(hours: 2)).millisecondsSinceEpoch;
+    if (deadline < minDeadline) deadline = minDeadline;
+
+    final id = StableId.generate('stk');
+    final type = _isPractice ? 'practice' : 'solo_photo';
+
+    try {
+      Map<String, dynamic>? photoPayload;
+      if (!_isPractice) {
+        final storagePath = 'stake_photos/$id/$uid.jpg';
+        // Owner-only path (storage.rules); the server verifies this exact
+        // layout in stakeCreateChallenge.
+        await FirebaseStorage.instance.ref(storagePath).putFile(
+              File(_photo!.path),
+              SettableMetadata(contentType: 'image/jpeg'),
+            );
+        photoPayload = {
+          'storagePath': storagePath,
+          'revealWindowMins': _revealWindowMins,
+        };
+      }
+
+      await functions.createChallenge(
+        challengeId: id,
+        type: type,
+        circleId: _isPractice ? '' : (_circleId ?? ''),
+        goal: {
+          'title': _title.text.trim(),
+          'unitKind': _unitKind,
+          'unitTarget': _unitTarget,
+          'totalUnits': _totalUnits,
+        },
+        mode: _mode,
+        deadlineMs: deadline,
+        photo: photoPayload,
+        pledgeWhy: _why.text.trim(),
+      );
+
+      // Optimistic local mirror so the challenge renders before the next
+      // background pull (which LWW-overwrites with server truth).
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      await repository.upsertLocalMirror(
+        StakeChallenge(
+          id: id,
+          type: _isPractice
+              ? StakeChallengeType.practice
+              : StakeChallengeType.soloPhoto,
+          status: _isPractice
+              ? StakeChallengeStatus.active
+              : StakeChallengeStatus.draft,
+          creatorUid: uid,
+          circleId: _isPractice ? '' : (_circleId ?? ''),
+          participants: [
+            StakeParticipant(
+              uid: uid,
+              teamId: uid,
+              stakeKind: _isPractice ? 'points' : 'photo',
+              photoStoragePath:
+                  _isPractice ? null : 'stake_photos/$id/$uid.jpg',
+              revealWindowMins: _isPractice ? null : _revealWindowMins,
+              accepted: true,
+            ),
+          ],
+          frozenGoal: StakeFrozenGoal(
+            title: _title.text.trim(),
+            unitKind: _unitKind,
+            unitTarget: _unitTarget,
+            totalUnits: _totalUnits,
+          ),
+          mode: _mode,
+          deadlineMs: deadline,
+          photoState: _isPractice ? null : StakePhotoState.pendingScreen,
+          createdAtMs: nowMs,
+          updatedAtMs: nowMs,
+        ),
+      );
+
+      if (!mounted) return;
+      final nav = Navigator.of(context);
+      nav.pop();
+      nav.push(
+        MaterialPageRoute(
+          builder: (_) => StakeChallengeDetailScreen(challengeId: id),
+        ),
+      );
+    } on StakeActionException catch (e) {
+      setState(() {
+        _creating = false;
+        _createError = e.isRetryable
+            ? 'Couldn\'t reach the server. Check your connection and try again.'
+            : e.message;
+      });
+    } catch (e) {
+      setState(() {
+        _creating = false;
+        _createError = 'Something went wrong: $e';
+      });
+    }
+  }
+
+  // ─── Small shared widgets ──────────────────────────────────────────────────
+
+  Widget _microLabel(String text) => Text(
+        text,
+        style: TextStyle(
+          color: AppColors.textFaint,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.1,
+        ),
+      );
+
+  Widget _choiceChip(String label, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.accent.withValues(alpha: 0.18) : AppColors.inkCard,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? AppColors.accent : AppColors.fg12,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? AppColors.accent : AppColors.textSoft,
+            fontSize: 13,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _stepperRow({
+    required int value,
+    required String label,
+    required List<int> options,
+    required ValueChanged<int> onChanged,
+  }) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        for (final option in options)
+          _choiceChip('$option', value == option, () => onChanged(option)),
+        Text(label,
+            style: TextStyle(color: AppColors.textSoft, fontSize: 12.5)),
+      ],
+    );
+  }
+
+  Widget _stakeChoiceCard({
+    required bool selected,
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: selected
+            ? AppColors.accent.withValues(alpha: 0.12)
+            : AppColors.inkCard,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected ? AppColors.accent : AppColors.fg12,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: iconColor, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: AppColors.textSoft,
+                          fontSize: 12.5,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (selected)
+                  Icon(Icons.check_circle_rounded,
+                      color: AppColors.accent, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _modeCard(String mode, String title, String subtitle) {
+    final selected = _mode == mode;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: selected
+            ? AppColors.accent.withValues(alpha: 0.12)
+            : AppColors.inkCard,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => setState(() => _mode = mode),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected ? AppColors.accent : AppColors.fg12,
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: AppColors.textSoft,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (selected)
+                  Icon(Icons.check_circle_rounded,
+                      color: AppColors.accent, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _revealWindowLabel(int mins) {
+    if (mins < 60) return '$mins minutes';
+    if (mins == 60) return '1 hour';
+    if (mins < 1440) return '${mins ~/ 60} hours';
+    return '24 hours';
+  }
+}
+
+class _StepDots extends StatelessWidget {
+  const _StepDots({required this.current, required this.total});
+
+  final int current;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (var i = 0; i < total; i++)
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: i == current ? 18 : 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: i <= current ? AppColors.accent : AppColors.fg24,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// PSY-1 — the pledge is an active gesture: hold 1.5s to commit.
+class _HoldToCommitButton extends StatefulWidget {
+  const _HoldToCommitButton({required this.enabled, required this.onCommitted});
+
+  final bool enabled;
+  final VoidCallback onCommitted;
+
+  @override
+  State<_HoldToCommitButton> createState() => _HoldToCommitButtonState();
+}
+
+class _HoldToCommitButtonState extends State<_HoldToCommitButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _progress = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _progress.addStatusListener((status) {
+      if (status == AnimationStatus.completed) widget.onCommitted();
+    });
+  }
+
+  @override
+  void dispose() {
+    _progress.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: widget.enabled ? (_) => _progress.forward() : null,
+      onTapUp: (_) => _progress.reverse(),
+      onTapCancel: () => _progress.reverse(),
+      child: AnimatedBuilder(
+        animation: _progress,
+        builder: (context, _) {
+          return Container(
+            decoration: BoxDecoration(
+              color: widget.enabled ? AppColors.accent : AppColors.fg12,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: _progress.value,
+                  child: Container(color: AppColors.accentDeep),
+                ),
+                Center(
+                  child: Text(
+                    _progress.value > 0 ? 'Keep holding…' : 'Hold to give your word',
+                    style: TextStyle(
+                      color: widget.enabled
+                          ? AppColors.onAccent
+                          : AppColors.textFaint,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}

@@ -3,6 +3,7 @@ package com.example.coach_for_life
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -20,6 +21,26 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         // Device model + OS version for feedback reports (see AppDelegate.swift
         // for why this is in-house instead of device_info_plus).
+        // Stake reveal viewer (accountability PRD P-6): FLAG_SECURE while the
+        // reveal route is on screen - screenshots and recents previews come
+        // out black. Cleared when the route pops.
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "pathpal/secure_screen"
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "enableSecure" -> {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    result.success(true)
+                }
+                "disableSecure" -> {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "pathpal/device_info"

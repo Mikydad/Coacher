@@ -1,0 +1,13 @@
+{
+  "name": "coach-for-life-rules-tests",
+  "description": "Firestore/Storage security-rules tests (run against the emulator)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-stakes-rules 'node --test *.test.js'"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.10.0"
+  }
+}

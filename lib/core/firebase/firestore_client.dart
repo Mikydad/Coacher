@@ -26,4 +26,12 @@ class FirestoreClient {
   CollectionReference<Map<String, dynamic>> userCollection(String collection) {
     return _firestore.collection('users').doc(_uid).collection(collection);
   }
+
+  /// Top-level (non-user-scoped) collection on the same pinned Firestore
+  /// instance — used for server-owned collections like `stake_challenges`
+  /// that are queried by membership rather than path. Keeps VM tests able
+  /// to inject a fake instance.
+  CollectionReference<Map<String, dynamic>> topCollection(String collection) {
+    return _firestore.collection(collection);
+  }
 }

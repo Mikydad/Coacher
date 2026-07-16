@@ -8,6 +8,7 @@ import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
+import '../../accountability/presentation/accountability_create_flow.dart';
 import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/application/daily_analytics_providers.dart';
 import '../../analytics/application/delivery_providers.dart';
@@ -293,6 +294,9 @@ class GoalDetailScreen extends ConsumerWidget {
                       g,
                     ).toLowerCase(),
                   ),
+                const SizedBox(height: 12),
+                // Entry point #1 into the unified accountability flow.
+                _AddAccountabilityCard(goalTitle: g.title),
                 const SizedBox(height: 32),
               ],
               _SectionHeader(
@@ -1100,6 +1104,52 @@ class _NewMilestoneDialogState extends State<_NewMilestoneDialog> {
         ),
         TextButton(onPressed: _submit, child: const Text('Add')),
       ],
+    );
+  }
+}
+
+/// Entry point #1 into the unified accountability flow: wrap this goal in
+/// a real stake ("Add Accountability" per the confirmed three-entry design).
+class _AddAccountabilityCard extends StatelessWidget {
+  const _AddAccountabilityCard({required this.goalTitle});
+
+  final String goalTitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.coral.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () =>
+            openAccountabilityCreateFlow(context, prefilledTitle: goalTitle),
+        child: Container(
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.coral.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.handshake_rounded, color: AppColors.coral, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Add accountability — stake something on this goal',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded,
+                  color: AppColors.textSoft, size: 20),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

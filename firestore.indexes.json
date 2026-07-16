@@ -1,6 +1,22 @@
 {
   "indexes": [
     {
+      "collectionGroup": "stake_challenges",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "deadlineMs", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "stake_challenges",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "photoState", "order": "ASCENDING" },
+        { "fieldPath": "revealExpiresAtMs", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "taskScores",
       "queryScope": "COLLECTION",
       "fields": [

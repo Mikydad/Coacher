@@ -16,6 +16,8 @@ analyzer:
     # Build artifacts (copied Dart sources) — not project code.
     - build/**
     - ios/build/**
+    # Manual screen backups (stale copies with dead imports) — not built.
+    - backups/**
 
 linter:
   # The lint rules applied to this project can be customized in the

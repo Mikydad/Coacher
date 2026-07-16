@@ -186,6 +186,92 @@ service cloud.firestore {
       }
     }
 
+    // ─── Accountability stakes ─────────────────────────────────────────────
+    // Server-owned (PRD/Accountability_feature/prd-accountability-stakes.md
+    // §7.4): outcomes, statuses, and stake movements are written ONLY by
+    // Cloud Functions (Admin SDK bypasses rules). Clients read their
+    // challenges and append evidence — nothing else. Treat as
+    // security-critical; covered by rules-tests/.
+
+    match /stake_challenges/{challengeId} {
+      // Parent doc read: participant or member of the challenge's circle.
+      allow read: if isSignedIn() && (
+        request.auth.uid in resource.data.participantUids
+        || (resource.data.circleId != ''
+            && canAccessCircleContent(resource.data.circleId))
+      );
+      // All mutations go through callables/sweep.
+      allow create, update, delete: if false;
+
+      // Subcollection helpers re-read the parent (resource there is the
+      // subdocument, not the challenge).
+      function stakeChallenge() {
+        return get(/databases/$(database)/documents/stake_challenges/$(challengeId)).data;
+      }
+      function isStakeParticipant() {
+        return isSignedIn()
+          && request.auth.uid in stakeChallenge().participantUids;
+      }
+      function canReadStake() {
+        return isStakeParticipant()
+          || (stakeChallenge().circleId != ''
+              && canAccessCircleContent(stakeChallenge().circleId));
+      }
+
+      // CC-3 — append-only audit log; server-written only.
+      match /events/{eventId} {
+        allow read: if canReadStake();
+        allow write: if false;
+      }
+
+      // M-5/CC-5 — the ONE client-writable path: a participant appends own
+      // evidence. Immutable once created; arrivedAtMs is server-stamped by
+      // the stakeEvidenceArrived trigger and may never come from a client.
+      match /evidence/{evidenceId} {
+        allow read: if canReadStake();
+        allow create: if isStakeParticipant()
+          && evidenceId.matches(request.auth.uid + '_.*')
+          && stakeChallenge().status in ['active', 'pending_verification']
+          && request.resource.data.keys().hasOnly(
+               ['id', 'challengeId', 'uid', 'unitIndex', 'amount',
+                'source', 'recordedAtMs', 'updatedAtMs'])
+          && request.resource.data.keys().hasAll(
+               ['uid', 'unitIndex', 'amount', 'source', 'recordedAtMs',
+                'updatedAtMs'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.unitIndex is int
+          && request.resource.data.unitIndex >= 0
+          && request.resource.data.unitIndex < 90
+          && request.resource.data.amount is int
+          && request.resource.data.amount > 0
+          && request.resource.data.amount <= 100000
+          && request.resource.data.source in ['timer', 'camera', 'checkin']
+          && request.resource.data.recordedAtMs is int
+          && request.resource.data.updatedAtMs is int;
+        allow update, delete: if false;
+      }
+
+      // V-2/V-3/M-6 — written only via callables (validation lives there).
+      match /confirmations/{confirmationId} {
+        allow read: if canReadStake();
+        allow write: if false;
+      }
+      match /votes/{voteId} {
+        allow read: if canReadStake();
+        allow write: if false;
+      }
+      match /vetoRequests/{requestUid} {
+        allow read: if isStakeParticipant();
+        allow write: if false;
+      }
+    }
+
+    // P-7/M-6 — strikes, bans, veto timestamps. Server-written only.
+    match /enforcement/{uid} {
+      allow read: if isUser(uid);
+      allow write: if false;
+    }
+
     // ─── Feedback ──────────────────────────────────────────────────────────
     // In-app bug reports / feature requests / questions. Create-only from
     // clients; reports are reviewed in the Firebase console (no client read).

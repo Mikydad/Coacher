@@ -167,3 +167,56 @@ not silent reversal.
   face), breathing pulse (read as blinking). The comet is angular-speed
   (sweep gradient), so it runs slightly faster on short edges — accepted.
   Animation runs only on the selected card.
+
+- **2026-07-16 · Accountability Stakes: confirmed model locked** (full PRD:
+  `PRD/Accountability_feature/prd-accountability-stakes.md`, supersedes
+  ambiguities in the original spec). Key semantics, confirmed with the
+  product owner over three rounds: two mercy layers (25% within-unit time
+  mercy always; 1/month mercy veto, photo-only — **no mercy of any kind on
+  money**); solo strictness reuses `RoutineMode` (Flexible ≥70% of units,
+  Disciplined ≥85%, Extreme 100%); teams are unanimous-completion with no
+  modes (one member's failure loses it — peer pressure is the product;
+  both-teams-lose accepted as a common outcome); winners always refunded,
+  losers' stakes fund the WINNING side's chosen charity, both-lose goes to
+  a mutually-disliked charity picked at creation (app default fallback);
+  all charities from the curated admin list, both directions, never free
+  entry; photo reveals 5 min–24 h with a 30% hard exposure floor before
+  point-based removal (~1–2 weeks of honest earning); screenshot
+  enforcement is deter+punish (Android FLAG_SECURE blocks; iOS
+  detect-only) — 12 h/3 d/1 wk join-ban ladder + public circle naming;
+  evidence is in-app timer + in-app-camera only (no gallery — kills the
+  AI/edit-fake vector instead of fighting a detection arms race).
+  *Considered & rejected:* team score with 80% threshold (owner initially
+  chose it, then deliberately reversed to unanimity); all-stakes-donated
+  team pool (violates winner-gets-own-stake-back); free-entry charities;
+  AI-image-fake detection at launch.
+
+- **2026-07-16 · Stakes are the app's first sanctioned exception to
+  local-first: server-authoritative outcomes.** Deadlines, forfeits, and
+  every stake movement (photo reveal, points burn, refund, donation) are
+  decided only by Cloud Functions on the server clock — a jailbroken or
+  offline client must not dodge a forfeit. Challenge state transitions go
+  through callables (optimistic-then-honest UI), NOT the outbox; reads
+  stay watch-based via read-only Isar mirrors pulled by `RemoteIsarMerge`;
+  evidence (timer sessions, capture metadata) remains normal user-own
+  outbox data with a 12 h post-deadline sync-grace before decisions.
+  Points ledger + challenge events are append-only and client-write-denied
+  in rules. *Why:* stakes move other people's photos/points/money —
+  network-inherent class per the feature checklist. *Considered:* outbox
+  replication for challenge writes (rejected: fire-and-forget can't carry
+  server validation or an authoritative answer).
+
+- **2026-07-16 · Stakes safety set semantics (Phase 1.7).** Blocking is
+  hide-from-me only (`users/{uid}/blocked/{buid}`, Isar + outbox + merge,
+  LWW row with `active` flag so an unblock beats a stale block from another
+  device — never a delete); it filters the circle feed and stake reveals,
+  and never affects what others see. Account deletion (existing in-app
+  flow) now fires `stakeAccountPurge` (v1 auth onDelete): photos and
+  evidence images are deleted unconditionally, non-terminal challenges
+  cancel, but terminal challenges KEEP their event history (audit trail,
+  CC-3). Photo stakes are 18+ via in-flow attestation checkbox (P-9) —
+  the app collects no birthdate; the 17+ store rating is the second layer.
+  Support contact = the existing in-app feedback form surfaced as a
+  "Contact support" row in Account Settings. *Considered:* full chat/
+  message block filtering (deferred — feed + reveals are the stake
+  surfaces); deleting blocked rows (rejected: LWW needs the tombstone).

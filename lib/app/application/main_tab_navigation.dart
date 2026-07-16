@@ -18,8 +18,9 @@ abstract final class MainTabIndex {
   static const int coach = 1;
   static const int goals = 2;
   static const int progress = 3;
-  static const int community = 4;
-  static const int profile = 5;
+  static const int accountability = 4;
+  static const int community = 5;
+  static const int profile = 6;
 }
 
 /// Switches the main shell tab and returns to the root route stack.

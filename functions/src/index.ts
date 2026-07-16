@@ -6,6 +6,23 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 
 initializeApp();
 
+// Accountability Stakes (PRD/Accountability_feature/prd-accountability-stakes.md).
+// Outcome engine is pure + unit-tested (src/stakes/*.test.ts); these are the
+// thin IO shells around it.
+export {
+  stakeCreateChallenge,
+  stakeCancelDraft,
+  stakeApplyVeto,
+  stakeConfirmOutcome,
+  stakeCastVote,
+  stakeReportScreenshot,
+  stakeReportPhoto,
+} from "./stakes/callables";
+export { stakeSweep } from "./stakes/sweep";
+export { stakeEvidenceArrived } from "./stakes/triggers";
+export { stakePhotoUploaded } from "./stakes/nsfw_screen";
+export { stakeAccountPurge } from "./stakes/account_purge";
+
 const openAiApiKey = defineSecret("OPENAI_API_KEY");
 
 // Model is pinned server-side; clients cannot request a different one.

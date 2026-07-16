@@ -14,6 +14,8 @@ import '../../features/analytics/domain/models/analytics_stats_cache.dart';
 import '../../features/planning/domain/models/block.dart';
 import '../../features/planning/domain/models/routine.dart';
 import '../../features/onboarding/domain/models/onboarding_profile.dart';
+import '../../features/accountability/domain/models/stake_challenge.dart';
+import '../../features/accountability/domain/models/stake_evidence.dart';
 import '../../features/planning/domain/models/task_item.dart';
 import '../../features/reminders/data/reminder_repository.dart';
 import '../../features/reminders/domain/models/reminder_config.dart';
@@ -27,7 +29,10 @@ import '../local_db/isar_collections/isar_goal_check_in.dart';
 import '../local_db/isar_collections/isar_goal_milestone.dart';
 import '../local_db/isar_collections/isar_onboarding_profile.dart';
 import '../local_db/isar_collections/isar_reminder.dart';
+import '../local_db/isar_collections/isar_blocked_user.dart';
 import '../local_db/isar_collections/isar_routine.dart';
+import '../local_db/isar_collections/isar_stake_challenge.dart';
+import '../local_db/isar_collections/isar_stake_evidence.dart';
 import 'isar_lww_merge.dart';
 import 'lww_updated_at.dart';
 import 'sync_cursor_store.dart';
@@ -132,6 +137,10 @@ class RemoteIsarMerge {
     await _pullAnalytics();
     _abortIfUidChanged();
     await _pullOnboardingProfile();
+    _abortIfUidChanged();
+    await _pullStakeChallenges();
+    _abortIfUidChanged();
+    await _pullBlockedUsers();
     // Only reached when every phase succeeded — safe to advance cursors.
     for (final entry in _maxSeen.entries) {
       await _cursors.advance(entry.key, entry.value);
@@ -395,6 +404,121 @@ class RemoteIsarMerge {
         );
       }
     }
+  }
+
+  /// Stake challenges are a TOP-LEVEL server-owned collection (outcomes are
+  /// decided by Cloud Functions — PRD accountability-stakes §7.1). Pulled by
+  /// `participantUids arrayContains uid`, full pull every time: a user has a
+  /// handful of challenges, and arrayContains + updatedAtMs range would need
+  /// a composite index (errors.md #16/#18) for no real saving. LWW makes
+  /// re-merges no-ops. Evidence of NON-terminal challenges is pulled too so
+  /// a second device sees this account's own logged units.
+  Future<void> _pullStakeChallenges() async {
+    final snap = await _client
+        .topCollection('stake_challenges')
+        .where('participantUids', arrayContains: _client.uid)
+        .get();
+    final openChallengeIds = <String>[];
+    for (final doc in snap.docs) {
+      try {
+        final m = Map<String, dynamic>.from(doc.data());
+        m['id'] = doc.id;
+        final challenge = StakeChallenge.fromMap(m);
+        await _mergeStakeChallenge(challenge);
+        if (!challenge.status.isTerminal) openChallengeIds.add(challenge.id);
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip stake challenge ${doc.id}: $e\n$st');
+      }
+    }
+    for (final challengeId in openChallengeIds) {
+      _abortIfUidChanged();
+      final evidenceSnap = await _client
+          .topCollection('stake_challenges')
+          .doc(challengeId)
+          .collection('evidence')
+          .get();
+      for (final doc in evidenceSnap.docs) {
+        try {
+          final m = Map<String, dynamic>.from(doc.data());
+          m['id'] = doc.id;
+          m['challengeId'] = challengeId;
+          await _mergeStakeEvidence(StakeEvidence.fromMap(m));
+        } catch (e, st) {
+          debugPrint('RemoteIsarMerge: skip stake evidence ${doc.id}: $e\n$st');
+        }
+      }
+    }
+  }
+
+  /// Block list (`users/{uid}/blocked`) — tiny, full pull, LWW.
+  Future<void> _pullBlockedUsers() async {
+    final snap = await _client.userCollection('blocked').get();
+    for (final doc in snap.docs) {
+      try {
+        final m = doc.data();
+        final blockedUid = (m['blockedUid'] as String?) ?? doc.id;
+        final updatedAtMs = (m['updatedAtMs'] as num?)?.toInt() ?? 0;
+        final existing = await _isar.isarBlockedUsers
+            .filter()
+            .blockedUidEqualTo(blockedUid)
+            .findFirst();
+        if (!shouldApplyRemoteUpdatedAt(
+          localUpdatedAtMs: existing?.updatedAtMs,
+          remoteUpdatedAtMs: updatedAtMs,
+        )) {
+          continue;
+        }
+        final row = IsarBlockedUser()
+          ..blockedUid = blockedUid
+          ..active = (m['active'] as bool?) ?? true
+          ..createdAtMs = (m['createdAtMs'] as num?)?.toInt() ?? updatedAtMs
+          ..updatedAtMs = updatedAtMs;
+        await _isar.writeTxn(() async {
+          await _isar.isarBlockedUsers.putByBlockedUid(row);
+        });
+        _appliedCount++;
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip blocked user ${doc.id}: $e\n$st');
+      }
+    }
+  }
+
+  Future<void> _mergeStakeChallenge(StakeChallenge incoming) async {
+    final existing = await _isar.isarStakeChallenges
+        .filter()
+        .challengeIdEqualTo(incoming.id)
+        .findFirst();
+    if (!shouldApplyRemoteUpdatedAt(
+      localUpdatedAtMs: existing?.updatedAtMs,
+      remoteUpdatedAtMs: incoming.updatedAtMs,
+    )) {
+      return;
+    }
+    await _isar.writeTxn(() async {
+      await _isar.isarStakeChallenges.putByChallengeId(
+        IsarStakeChallenge.fromDomain(incoming),
+      );
+    });
+    _appliedCount++;
+  }
+
+  Future<void> _mergeStakeEvidence(StakeEvidence incoming) async {
+    final existing = await _isar.isarStakeEvidences
+        .filter()
+        .evidenceIdEqualTo(incoming.id)
+        .findFirst();
+    if (!shouldApplyRemoteUpdatedAt(
+      localUpdatedAtMs: existing?.updatedAtMs,
+      remoteUpdatedAtMs: incoming.updatedAtMs,
+    )) {
+      return;
+    }
+    await _isar.writeTxn(() async {
+      await _isar.isarStakeEvidences.putByEvidenceId(
+        IsarStakeEvidence.fromDomain(incoming),
+      );
+    });
+    _appliedCount++;
   }
 
   Future<void> _mergeOnboardingProfile(OnboardingProfile incoming) async {

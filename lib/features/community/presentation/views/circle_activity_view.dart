@@ -2,7 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../accountability/application/blocked_users.dart';
 import '../../application/circle_providers.dart';
+import '../../../accountability/presentation/stake_reveal_viewer_screen.dart';
 import '../../domain/models/activity_feed_item.dart';
 import '../../domain/models/circle_enums.dart';
 import '../widgets/ai_pulse_banner.dart';
@@ -55,7 +57,12 @@ class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
               ),
             ),
             data: (items) {
-              final filtered = _applyFilter(items);
+              final blocked =
+                  ref.watch(blockedUidsProvider).valueOrNull ?? const <String>{};
+              final visible = blocked.isEmpty
+                  ? items
+                  : items.where((i) => !blocked.contains(i.userId)).toList();
+              final filtered = _applyFilter(visible);
 
               return ListView.separated(
                 padding: const EdgeInsets.all(16),
@@ -173,6 +180,24 @@ class _ActivityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Reveal posts open the secure viewer while the window lasts.
+    final revealId = item.eventType == ActivityEventType.stakePhotoRevealed
+        ? item.entityId
+        : null;
+    return GestureDetector(
+      onTap: revealId == null
+          ? null
+          : () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      StakeRevealViewerScreen(challengeId: revealId),
+                ),
+              ),
+      child: _cardBody(context),
+    );
+  }
+
+  Widget _cardBody(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -284,6 +309,10 @@ class _EventIcon extends StatelessWidget {
       case ActivityEventType.memberJoined:
       case ActivityEventType.memberLeft:
         return (Icons.group_rounded, AppColors.textMuted);
+      case ActivityEventType.stakePhotoRevealed:
+        return (Icons.local_fire_department_rounded, AppColors.danger);
+      case ActivityEventType.screenshotStrike:
+        return (Icons.no_photography_rounded, AppColors.danger);
     }
   }
 }
@@ -370,7 +399,20 @@ String _activityCopy(ActivityFeedItem item) {
       return 'joined the circle 👋';
     case ActivityEventType.memberLeft:
       return 'left the circle';
+    case ActivityEventType.stakePhotoRevealed:
+      return 'broke their promise "${item.entityTitle ?? 'a staked goal'}" — '
+          'their stake photo is live. Tap to see it before it\'s gone. 💥';
+    case ActivityEventType.screenshotStrike:
+      return 'screenshotted a stake photo and is banned from challenges '
+          'for ${_banLabel(item.value)} 🚫';
   }
+}
+
+String _banLabel(String? banMsRaw) {
+  final ms = int.tryParse(banMsRaw ?? '') ?? 0;
+  final hours = ms ~/ 3600000;
+  if (hours >= 24) return '${hours ~/ 24} day${hours >= 48 ? 's' : ''}';
+  return '$hours hours';
 }
 
 String _relativeTime(int ms) {

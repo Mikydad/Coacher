@@ -19,6 +19,7 @@ import '../../../features/auth/presentation/widgets/auth_text_field.dart';
 import 'settings_page_scaffold.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../feedback/presentation/feedback_screen.dart';
 
 /// Account-specific settings: password, data, and account deletion.
 class AccountSettingsScreen extends ConsumerStatefulWidget {
@@ -404,6 +405,19 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
                 isLast: true,
               ),
             ],
+          ),
+        ),
+        const SizedBox(height: 32),
+        const SettingsSectionHeader(label: 'Support'),
+        const SizedBox(height: 10),
+        SettingsObsidianCard(
+          child: _ActionRow(
+            title: 'Contact support',
+            subtitle: 'Questions, problems, or reports — we answer',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const FeedbackScreen()),
+            ),
+            isLast: true,
           ),
         ),
         const SizedBox(height: 40),

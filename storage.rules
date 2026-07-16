@@ -47,6 +47,49 @@ service firebase.storage {
         && fileName.matches(request.auth.uid + '_.*');
     }
 
+    // Stake photos (accountability PRD P-3, security-critical).
+    // Upload happens BEFORE the challenge doc exists (client uploads, then
+    // calls stakeCreateChallenge which validates the path), so create is
+    // gated on the uid-named filename, not the doc. Reads: the owner
+    // always; circle members ONLY while the server has flipped the
+    // challenge to photoState == 'revealed'. Deletion is server-side
+    // (Admin SDK bypasses rules) — clients can never delete or overwrite.
+    match /stake_photos/{challengeId}/{fileName} {
+      function stakeDoc() {
+        return firestore.get(
+          /databases/(default)/documents/stake_challenges/$(challengeId)
+        ).data;
+      }
+      allow create: if isSignedIn()
+        && fileName == (request.auth.uid + '.jpg')
+        && isValidImageUpload();
+      allow read: if isSignedIn() && (
+        fileName == (request.auth.uid + '.jpg')
+        || (stakeDoc().photoState == 'revealed'
+            && isCircleMember(stakeDoc().circleId))
+      );
+      allow update, delete: if false;
+    }
+
+    // Stake evidence photos (M-5) — in-app camera captures. uid-scoped
+    // folder, create-only, immutable; readable by the participant and, for
+    // dispute review, the challenge's circle.
+    match /stake_evidence/{challengeId}/{uid}/{fileName} {
+      function evidenceStakeDoc() {
+        return firestore.get(
+          /databases/(default)/documents/stake_challenges/$(challengeId)
+        ).data;
+      }
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && isValidImageUpload();
+      allow read: if isSignedIn() && (
+        request.auth.uid == uid
+        || isCircleMember(evidenceStakeDoc().circleId)
+      );
+      allow update, delete: if false;
+    }
+
     // Feedback screenshots — uid-scoped, create-only, images only, 5MB cap.
     // Tester captures are PNG; gallery attachments from the feedback form
     // are JPEG/HEIC. No client read: reports are reviewed in the Firebase

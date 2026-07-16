@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/ai_assistant/presentation/ai_assistant_screen.dart';
+import '../../features/accountability/presentation/accountability_hub_screen.dart';
 import '../../features/analytics/presentation/analytics_progress_screen.dart';
 import '../../features/auth/presentation/widgets/email_verification_banner.dart';
 import '../../features/community/presentation/community_screen.dart';
@@ -36,6 +37,7 @@ class MainTabShell extends ConsumerWidget {
                 AiAssistantScreen(),
                 MainTabInset(child: GoalSelectionScreen()),
                 MainTabInset(child: AnalyticsProgressScreen()),
+                MainTabInset(child: AccountabilityHubScreen()),
                 MainTabInset(child: CommunityScreen()),
                 MainTabInset(child: ProfileScreen()),
               ],

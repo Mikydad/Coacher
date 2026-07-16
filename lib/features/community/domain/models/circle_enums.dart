@@ -84,6 +84,15 @@ enum ActivityEventType {
   weeklyCommitmentMet,
   memberJoined,
   memberLeft,
+
+  /// Accountability stakes (server-written by the outcome engine): a
+  /// forfeited stake photo went live (entityId = challengeId,
+  /// value = revealExpiresAtMs).
+  stakePhotoRevealed,
+
+  /// Someone screenshotted a stake photo — the public naming (D11).
+  /// entityId = challengeId, value = ban duration in ms.
+  screenshotStrike,
 }
 
 extension ActivityEventTypeStorage on ActivityEventType {
