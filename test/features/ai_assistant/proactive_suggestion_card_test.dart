@@ -1,7 +1,6 @@
 /// Tasks 6.3, 6.4, 6.5 — Widget and integration tests for proactive suggestion UI.
 library;
 
-import 'package:coach_for_life/app/application/main_tab_navigation.dart';
 import 'package:coach_for_life/features/ai_assistant/application/ai_assistant_providers.dart';
 import 'package:coach_for_life/features/ai_assistant/data/dismissed_suggestion_repository.dart';
 import 'package:coach_for_life/features/ai_assistant/domain/models/proactive_suggestion.dart';
@@ -89,44 +88,46 @@ void main() {
       expect(dismissed, isTrue);
     });
 
-    testWidgets('"Let\'s do it" sets coach tab args with proactive context',
+    testWidgets('"Let\'s do it" opens the coach sheet with proactive context',
         (tester) async {
-      CoachRouteArgs? capturedArgs;
-
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             dismissedSuggestionRepositoryProvider
                 .overrideWithValue(_NoOpDismissedRepo()),
           ],
-          child: Consumer(
-            builder: (context, ref, _) {
-              ref.listen<CoachRouteArgs?>(coachTabArgsProvider, (_, next) {
-                capturedArgs = next;
-              });
-              return MaterialApp(
-                home: Scaffold(
-                  body: ProactiveSuggestionCard(
-                    suggestion: _testSuggestion,
-                    onDismiss: () {},
-                  ),
-                ),
-              );
-            },
+          child: MaterialApp(
+            home: Scaffold(
+              body: ProactiveSuggestionCard(
+                suggestion: _testSuggestion,
+                onDismiss: () {},
+              ),
+            ),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text("Let's do it"));
-      await tester.pumpAndSettle();
+      // No pumpAndSettle after the tap: the coach sheet's screen can sit
+      // in a perpetually-animating loading state in this bare test host.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
 
+      // Coach is a sheet now (decision log 2026-07-16): the args ride the
+      // sheet's RouteSettings instead of the old tab-args provider.
+      expect(find.byType(AiAssistantScreen), findsOneWidget);
+      final route = ModalRoute.of(
+        tester.element(find.byType(AiAssistantScreen)),
+      );
+      expect(route?.settings.name, AiAssistantScreen.routeName);
+      final capturedArgs = route?.settings.arguments as CoachRouteArgs?;
       expect(capturedArgs, isNotNull);
       expect(capturedArgs!.preDraftedText, equals('Schedule workout at 07:00'));
-      expect(capturedArgs!.proactiveSuggestionId, equals(_testSuggestion.id));
-      expect(capturedArgs!.proactiveSuggestionType,
+      expect(capturedArgs.proactiveSuggestionId, equals(_testSuggestion.id));
+      expect(capturedArgs.proactiveSuggestionType,
           equals(_testSuggestion.type.name));
-      expect(capturedArgs!.autoSendMessage, isTrue);
+      expect(capturedArgs.autoSendMessage, isTrue);
     });
 
     testWidgets('Slide-in animation completes on mount', (tester) async {

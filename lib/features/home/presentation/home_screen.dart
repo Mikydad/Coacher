@@ -51,6 +51,8 @@ import '../../goals/presentation/goal_detail_screen.dart';
 import '../../goals/presentation/goal_template_picker_screen.dart';
 import '../../plan_tomorrow/presentation/plan_tomorrow_screen.dart';
 import '../../../app/application/main_tab_navigation.dart';
+import '../../analytics/presentation/analytics_progress_screen.dart';
+import '../../ai_assistant/presentation/widgets/coach_ai_fab.dart';
 import '../../context_override/presentation/active_override_banner.dart';
 import '../../context_override/presentation/context_override_quick_activate_sheet.dart';
 import '../../context_override/presentation/post_override_review_card.dart';
@@ -88,7 +90,13 @@ class HomeScreen extends ConsumerWidget {
     _maybeTriggerMorningBrief(context, ref);
 
     return Scaffold(
-      floatingActionButton: const _CoachHomeFab(),
+      // Mini + lifted to match the satellite position on tabs that stack
+      // it above their own FAB — the coach button must not change size or
+      // hop vertically as you switch tabs.
+      floatingActionButton: const Padding(
+        padding: EdgeInsets.only(bottom: 58),
+        child: CoachAiFab(mini: true),
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       appBar: AppBar(
         title: const PathPalAppBarTitle(),
@@ -530,11 +538,9 @@ void _maybeTriggerMorningBrief(BuildContext context, WidgetRef ref) {
         action: SnackBarAction(
           label: 'Open',
           textColor: AppColors.accentDim,
-          onPressed: () => navigateToMainTab(
+          onPressed: () => showCoachAiSheet(
             context,
-            ref,
-            index: MainTabIndex.coach,
-            coachArgs: const CoachRouteArgs(
+            args: const CoachRouteArgs(
               openSuggestionsPanel: true,
               preDraftedText: 'Give me a quick plan for today',
             ),
@@ -655,10 +661,9 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
               return Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: () => navigateToMainTab(
+                  onTap: () => Navigator.pushNamed(
                     context,
-                    ref,
-                    index: MainTabIndex.progress,
+                    AnalyticsProgressScreen.routeName,
                   ),
                   borderRadius: BorderRadius.circular(12),
                   child: Column(
@@ -2399,27 +2404,3 @@ Future<void> _uncompleteTaskFromHome(
   }
 }
 
-// ─── Coach home FAB (icon only, bottom-right) ────────────────────────────────
-
-class _CoachHomeFab extends ConsumerWidget {
-  const _CoachHomeFab();
-
-  static Color get _accent => AppColors.cyan;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return FloatingActionButton(
-      // Quick access: Coach AI slides up as a 60% sheet over Home instead of
-      // switching tabs (the Coach tab remains the full-page presentation).
-      onPressed: () => showCoachAiSheet(context),
-      elevation: 0,
-      highlightElevation: 0,
-      splashColor: _accent.withValues(alpha: 0.12),
-      backgroundColor: AppColors.inkCard,
-      shape: CircleBorder(
-        side: BorderSide(color: _accent.withValues(alpha: 0.35)),
-      ),
-      child: Icon(Icons.auto_awesome_rounded, color: _accent, size: 22),
-    );
-  }
-}

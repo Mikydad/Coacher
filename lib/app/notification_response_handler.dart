@@ -123,18 +123,6 @@ bool _pushNowIfReady(
     return false;
   }
 
-  if (routeName == AnalyticsProgressScreen.routeName) {
-    final ctx = appNavigatorKey.currentContext;
-    final scope =
-        container ??
-        (ctx != null ? ProviderScope.containerOf(ctx, listen: false) : null);
-    if (scope != null) {
-      debugPrint('[NotifTap] switching to Progress tab');
-      navigateToMainTabWithContainer(scope, index: MainTabIndex.progress);
-      return true;
-    }
-  }
-
   debugPrint(
     '[NotifTap] pushing route=$routeName argsType=${arguments.runtimeType}',
   );

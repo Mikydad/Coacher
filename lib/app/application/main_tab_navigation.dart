@@ -15,12 +15,12 @@ final coachTabArgsProvider = StateProvider<CoachRouteArgs?>((ref) => null);
 
 abstract final class MainTabIndex {
   static const int home = 0;
-  static const int coach = 1;
-  static const int goals = 2;
-  static const int progress = 3;
-  static const int accountability = 4;
-  static const int community = 5;
-  static const int profile = 6;
+  static const int goals = 1;
+  static const int accountability = 2;
+  static const int community = 3;
+  static const int profile = 4;
+  // Not tabs anymore (see decision log): Progress lives in Profile / the
+  // '/progress' route; Coach is the omnipresent FAB + three-stage sheet.
 }
 
 /// Switches the main shell tab and returns to the root route stack.

@@ -1,14 +1,11 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import '../../features/ai_assistant/application/ai_assistant_providers.dart';
 
 import '../../core/presentation/app_colors.dart';
 
 /// Translucent “watermark” footer shared across main tabs.
-class ObsidianBottomNav extends ConsumerWidget {
+class ObsidianBottomNav extends StatelessWidget {
   const ObsidianBottomNav({
     super.key,
     required this.selectedIndex,
@@ -20,9 +17,7 @@ class ObsidianBottomNav extends ConsumerWidget {
 
   static const _items = [
     (icon: Icons.home_rounded, label: 'Home'),
-    (icon: Icons.auto_awesome_rounded, label: 'Coach'),
     (icon: Icons.track_changes_rounded, label: 'Goals'),
-    (icon: Icons.leaderboard_rounded, label: 'Progress'),
     (icon: Icons.handshake_rounded, label: 'Accountability'),
     (icon: Icons.group_rounded, label: 'Community'),
     (icon: Icons.person_rounded, label: 'Profile'),
@@ -33,14 +28,7 @@ class ObsidianBottomNav extends ConsumerWidget {
   static Color get _kActive => AppColors.accent;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final aiServiceAsync = ref.watch(resolvedAiAssistantProvider);
-    final hasBlockedPlan =
-        aiServiceAsync.whenOrNull(
-          data: (svc) => svc.pendingPlan?.isBlockedByContext == true,
-        ) ??
-        false;
-
+  Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Padding(
@@ -61,7 +49,6 @@ class ObsidianBottomNav extends ConsumerWidget {
                 children: List.generate(_items.length, (i) {
                   final item = _items[i];
                   final selected = i == selectedIndex;
-                  final showBadge = i == 1 && hasBlockedPlan;
                   final color = selected ? _kActive : _kVariant;
 
                   return Expanded(
@@ -71,26 +58,7 @@ class ObsidianBottomNav extends ConsumerWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Stack(
-                            clipBehavior: Clip.none,
-                            alignment: Alignment.center,
-                            children: [
-                              Icon(item.icon, size: 22, color: color),
-                              if (showBadge)
-                                Positioned(
-                                  right: -3,
-                                  top: -3,
-                                  child: Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: Colors.redAccent,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
+                          Icon(item.icon, size: 22, color: color),
                           const SizedBox(height: 3),
                           SizedBox(
                             width: double.infinity,

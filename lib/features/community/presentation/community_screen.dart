@@ -12,6 +12,7 @@ import 'circle_detail_screen.dart';
 import 'circle_discovery_screen.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../ai_assistant/presentation/widgets/coach_ai_fab.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../../../core/presentation/async_value_ui.dart';
 
@@ -89,15 +90,17 @@ class CommunityScreen extends ConsumerWidget {
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'community_tab_fab',
-        onPressed: () => _showCreateOrDiscover(context, ref),
-        backgroundColor: AppColors.accent,
-        foregroundColor: AppColors.onAccent,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text(
-          'Circle',
-          style: TextStyle(fontWeight: FontWeight.w700),
+      floatingActionButton: CoachSatelliteFabs(
+        pageFab: FloatingActionButton.extended(
+          heroTag: 'community_tab_fab',
+          onPressed: () => _showCreateOrDiscover(context, ref),
+          backgroundColor: AppColors.accent,
+          foregroundColor: AppColors.onAccent,
+          icon: const Icon(Icons.add_rounded),
+          label: const Text(
+            'Circle',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
         ),
       ),
     );

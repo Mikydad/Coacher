@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
+import '../../ai_assistant/presentation/widgets/coach_ai_fab.dart';
 import '../application/points_providers.dart';
 import '../application/stakes_providers.dart';
 import '../domain/models/points.dart';
@@ -84,11 +85,13 @@ class AccountabilityHubScreen extends ConsumerWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'accountability_new',
-        onPressed: () => openAccountabilityCreateFlow(context),
-        icon: const Icon(Icons.handshake_rounded),
-        label: const Text('New Challenge'),
+      floatingActionButton: CoachSatelliteFabs(
+        pageFab: FloatingActionButton.extended(
+          heroTag: 'accountability_new',
+          onPressed: () => openAccountabilityCreateFlow(context),
+          icon: const Icon(Icons.handshake_rounded),
+          label: const Text('New Challenge'),
+        ),
       ),
     );
   }

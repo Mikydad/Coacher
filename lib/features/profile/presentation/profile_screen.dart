@@ -15,6 +15,8 @@ import '../../../features/coaching/application/coaching_style_providers.dart';
 import '../../../features/coaching/domain/models/coaching_style.dart';
 import '../../../features/coaching/domain/models/enforcement_mode.dart';
 import '../../../features/context_override/application/context_override_providers.dart';
+import '../../analytics/presentation/analytics_progress_screen.dart';
+import '../../ai_assistant/presentation/ai_assistant_screen.dart';
 import '../../settings/presentation/account_settings_screen.dart';
 import '../../settings/presentation/notification_settings_screen.dart';
 import '../../settings/presentation/reminder_settings_screen.dart';
@@ -798,6 +800,31 @@ class _CoreOptimizationSection extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: Column(
         children: [
+          _SettingRow(
+            icon: Icons.auto_awesome_rounded,
+            title: 'Coach AI',
+            subtitle: 'Your coach, from anywhere',
+            trailing: Icon(
+              Icons.chevron_right_rounded,
+              color: _kOnSurfaceVariant,
+              size: 20,
+            ),
+            onTap: () => showCoachAiSheet(context),
+          ),
+          _SettingRow(
+            icon: Icons.leaderboard_rounded,
+            title: 'Progress',
+            subtitle: 'Score trends, streaks & analytics',
+            trailing: Icon(
+              Icons.chevron_right_rounded,
+              color: _kOnSurfaceVariant,
+              size: 20,
+            ),
+            onTap: () => Navigator.pushNamed(
+              context,
+              AnalyticsProgressScreen.routeName,
+            ),
+          ),
           _SettingRow(
             icon: Icons.account_circle_outlined,
             title: 'Account Settings',

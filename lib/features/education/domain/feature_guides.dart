@@ -1,3 +1,4 @@
+import '../../../app/application/main_tab_navigation.dart';
 import 'feature_guide.dart';
 
 /// Content registry for everything the app can teach about itself.
@@ -151,7 +152,7 @@ abstract final class FeatureGuides {
       'How do reminders work?',
       'What is Focus mode?',
     ],
-    tryItTabIndex: 5, // MainTabIndex.profile
+    tryItTabIndex: MainTabIndex.profile,
   );
 
   static const focus = FeatureGuide(
@@ -264,7 +265,7 @@ abstract final class FeatureGuides {
       'How does the streak work?',
       'What are Tasks?',
     ],
-    tryItTabIndex: 2, // MainTabIndex.goals
+    tryItTabIndex: MainTabIndex.goals,
   );
 
   static const circles = FeatureGuide(
@@ -303,7 +304,7 @@ abstract final class FeatureGuides {
       'What are Goals?',
       'How do I use Focus?',
     ],
-    tryItTabIndex: 4, // MainTabIndex.community
+    tryItTabIndex: MainTabIndex.community,
   );
 
   static const analytics = FeatureGuide(
@@ -343,7 +344,7 @@ abstract final class FeatureGuides {
       'How does the streak work?',
       'What are Goals?',
     ],
-    tryItTabIndex: 3, // MainTabIndex.progress
+    tryItTabIndex: MainTabIndex.profile, // Progress lives in Profile now
   );
 
   static const planTomorrow = FeatureGuide(
@@ -417,7 +418,7 @@ abstract final class FeatureGuides {
       'What is Plan Tomorrow?',
       'Which discipline mode fits a busy week?',
     ],
-    tryItTabIndex: 1, // MainTabIndex.coach
+    tryItRoute: '/coach', // Coach is a sheet now; the route presents it
   );
 
   // ─── Element help topics (the `?` dots + AI-askable) ─────────────────────

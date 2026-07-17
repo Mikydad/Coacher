@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../app/application/main_tab_navigation.dart';
 import '../../application/ai_assistant_providers.dart';
 import '../../application/proactive_suggestion_display.dart';
 import '../ai_assistant_screen.dart';
@@ -164,11 +163,10 @@ class SeeAllSuggestionsInCoachLink extends ConsumerWidget {
         alignment: Alignment.centerRight,
         child: TextButton(
           onPressed: () {
-            navigateToMainTab(
+            openCoachAi(
               context,
               ref,
-              index: MainTabIndex.coach,
-              coachArgs: const CoachRouteArgs(openSuggestionsPanel: true),
+              args: const CoachRouteArgs(openSuggestionsPanel: true),
             );
           },
           style: TextButton.styleFrom(

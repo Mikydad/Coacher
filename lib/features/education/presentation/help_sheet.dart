@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../app/application/main_tab_navigation.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../ai_assistant/presentation/ai_assistant_screen.dart';
 import '../domain/feature_guide.dart';
@@ -128,17 +127,21 @@ class HelpSheet extends ConsumerWidget {
           const SizedBox(height: 24),
           OutlinedButton.icon(
             onPressed: () {
+              // Capture the ROOT navigator before popping — this sheet's
+              // own context is defunct right after the pop.
+              final rootNavigator = Navigator.of(context, rootNavigator: true);
               Navigator.of(context).pop();
               // Prefill only — autoSendMessage would prepend "Help me with:"
               // and break the education phrasing the AI pipeline matches on.
-              navigateToMainTab(
-                context,
-                ref,
-                index: MainTabIndex.coach,
-                coachArgs: CoachRouteArgs(
-                  preDraftedText: 'Tell me about ${guide.title}',
-                ),
-              );
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!rootNavigator.context.mounted) return;
+                showCoachAiSheet(
+                  rootNavigator.context,
+                  args: CoachRouteArgs(
+                    preDraftedText: 'Tell me about ${guide.title}',
+                  ),
+                );
+              });
             },
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.accent,

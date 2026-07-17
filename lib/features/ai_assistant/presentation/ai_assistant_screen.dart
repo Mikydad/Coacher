@@ -50,12 +50,21 @@ class CoachRouteArgs {
   final bool autoSendMessage;
 }
 
-/// Opens Coach AI as a drag-expandable modal bottom sheet (~60% height,
-/// expandable toward full) over the current screen — quick AI access without
-/// leaving the page. The Coach tab remains the full-page presentation;
-/// conversation state lives in providers, so both show the same thread.
-/// The route keeps the '/coach' name for the feedback route tracker.
-Future<void> showCoachAiSheet(BuildContext context) {
+/// Opens Coach AI as the three-stage drag sheet over the current screen —
+/// the ONLY Coach presentation since the tab was retired (decision log
+/// 2026-07-16). Stages: ask-bar peek (input only, keyboard up) → 60%
+/// conversation → full page. Sending from the peek auto-grows to 60%.
+///
+/// [askBar] starts at the peek (the coach FAB path: tap → type → send).
+/// Flows with a payload ([args] — morning brief, proactive cards, help
+/// sheet) start at 60% where the payload is visible. Conversation state
+/// lives in providers, so every opening shows the same thread. The route
+/// keeps the '/coach' name for the feedback route tracker.
+Future<void> showCoachAiSheet(
+  BuildContext context, {
+  CoachRouteArgs? args,
+  bool askBar = false,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -64,19 +73,47 @@ Future<void> showCoachAiSheet(BuildContext context) {
     // gestures; the modal's own drag would fight it.
     enableDrag: false,
     backgroundColor: Colors.transparent,
-    routeSettings: const RouteSettings(name: AiAssistantScreen.routeName),
-    builder: (_) => const _CoachAiSheet(),
+    routeSettings: RouteSettings(
+      name: AiAssistantScreen.routeName,
+      arguments: args,
+    ),
+    builder: (_) => _CoachAiSheet(askBar: askBar),
   );
 }
 
-/// Owns the sheet's [DraggableScrollableController]: 60% initial, snaps to
-/// 60% / 93%, and pops the route when dragged to the minimum extent.
-class _CoachAiSheet extends StatefulWidget {
-  const _CoachAiSheet();
+/// Opens Coach with a payload from anywhere — or, when the coach sheet is
+/// already the active route (e.g. tapping "see all" INSIDE the sheet),
+/// just delivers the args to the live screen instead of stacking a second
+/// sheet ([_AiAssistantScreenState] listens to [coachTabArgsProvider]).
+void openCoachAi(
+  BuildContext context,
+  WidgetRef ref, {
+  CoachRouteArgs? args,
+  bool askBar = false,
+}) {
+  if (ModalRoute.of(context)?.settings.name == AiAssistantScreen.routeName) {
+    if (args != null) {
+      ref.read(coachTabArgsProvider.notifier).state = args;
+    }
+    return;
+  }
+  showCoachAiSheet(context, args: args, askBar: askBar);
+}
 
-  static const initialSize = 0.6;
-  static const minSize = 0.32;
-  static const maxSize = 0.93;
+/// Owns the sheet's [DraggableScrollableController]: three snap stages
+/// (peek ask-bar / 60% / full page), dismiss below the peek. Corners
+/// square off as the sheet approaches full — the sheet visually becomes
+/// a page.
+class _CoachAiSheet extends StatefulWidget {
+  const _CoachAiSheet({required this.askBar});
+
+  final bool askBar;
+
+  /// Ask-bar peek: grabber + input, the page still visible behind.
+  static const peekSize = 0.18;
+  static const midSize = 0.6;
+  static const minSize = 0.08;
+  static const maxSize = 1.0;
 
   @override
   State<_CoachAiSheet> createState() => _CoachAiSheetState();
@@ -85,6 +122,14 @@ class _CoachAiSheet extends StatefulWidget {
 class _CoachAiSheetState extends State<_CoachAiSheet> {
   final _sheetController = DraggableScrollableController();
   bool _popped = false;
+
+  /// Ask-bar height in PIXELS (grabber header + input card + insets). The
+  /// peek must be pixel-anchored: the sheet's fractions apply to the space
+  /// LEFT OVER above the keyboard, so a fractional peek collapses to
+  /// nothing the moment the keyboard opens (the on-device 132px overflow).
+  static const _peekPx = 244.0;
+
+  double? _lastPeekFraction;
 
   @override
   void dispose() {
@@ -98,35 +143,78 @@ class _CoachAiSheetState extends State<_CoachAiSheet> {
     Navigator.of(context).pop();
   }
 
+  /// When the keyboard changes the available height, the peek FRACTION
+  /// changes too. If the user is sitting at the peek, keep them pinned to
+  /// the recomputed one instead of stranding them at a stale fraction.
+  void _repinPeek(double peek) {
+    final old = _lastPeekFraction;
+    _lastPeekFraction = peek;
+    if (old == null || (peek - old).abs() < 0.005) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_sheetController.isAttached) return;
+      if ((_sheetController.size - old).abs() < 0.04) {
+        _sheetController.jumpTo(peek);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Keyboard: lift the whole sheet above it — the fractions then apply to
-    // the remaining space, so no fixed extent can overflow.
-    return AnimatedPadding(
-      duration: const Duration(milliseconds: 150),
-      curve: Curves.easeOut,
+    // Keyboard: lift the whole sheet above it. Plain (non-animated) padding
+    // tracks the keyboard frame-by-frame — an animation here lags the
+    // inset and paints transient overflows.
+    return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: NotificationListener<DraggableScrollableNotification>(
-        onNotification: (n) {
-          if (n.extent <= n.minExtent + 0.005) _popOnce();
-          return false;
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final available = constraints.maxHeight;
+          final peek = available <= _peekPx
+              ? _CoachAiSheet
+                    .maxSize // pathological; let content flex
+              : (_peekPx / available).clamp(_CoachAiSheet.peekSize, 0.5);
+          _repinPeek(peek);
+          return _buildSheet(context, peek);
         },
-        child: DraggableScrollableSheet(
-          controller: _sheetController,
-          expand: false,
-          initialChildSize: _CoachAiSheet.initialSize,
-          minChildSize: _CoachAiSheet.minSize,
-          maxChildSize: _CoachAiSheet.maxSize,
-          snap: true,
-          snapSizes: const [_CoachAiSheet.initialSize],
-          builder: (context, scrollController) => ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            child: AiAssistantScreen(
-              sheetMode: true,
-              sheetScrollController: scrollController,
-              sheetController: _sheetController,
-              onSheetDismiss: _popOnce,
-            ),
+      ),
+    );
+  }
+
+  Widget _buildSheet(BuildContext context, double peek) {
+    return NotificationListener<DraggableScrollableNotification>(
+      onNotification: (n) {
+        if (n.extent <= n.minExtent + 0.005) _popOnce();
+        return false;
+      },
+      child: DraggableScrollableSheet(
+        controller: _sheetController,
+        expand: false,
+        initialChildSize: widget.askBar ? peek : _CoachAiSheet.midSize,
+        minChildSize: _CoachAiSheet.minSize,
+        maxChildSize: _CoachAiSheet.maxSize,
+        snap: true,
+        snapSizes: [peek, _CoachAiSheet.midSize],
+        builder: (context, scrollController) => AnimatedBuilder(
+          animation: _sheetController,
+          builder: (context, child) {
+            // Corners square off over the last stretch toward full page —
+            // the sheet reads as BECOMING a page, not covering one.
+            final extent = _sheetController.isAttached
+                ? _sheetController.size
+                : _CoachAiSheet.midSize;
+            final t = ((extent - 0.9) / 0.1).clamp(0.0, 1.0);
+            final radius = 28.0 * (1 - t);
+            return ClipRRect(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
+              child: child,
+            );
+          },
+          child: AiAssistantScreen(
+            sheetMode: true,
+            autofocusInput: widget.askBar,
+            sheetPeekFraction: peek,
+            sheetScrollController: scrollController,
+            sheetController: _sheetController,
+            onSheetDismiss: _popOnce,
           ),
         ),
       ),
@@ -138,6 +226,8 @@ class AiAssistantScreen extends ConsumerStatefulWidget {
   const AiAssistantScreen({
     super.key,
     this.sheetMode = false,
+    this.autofocusInput = false,
+    this.sheetPeekFraction,
     this.sheetScrollController,
     this.sheetController,
     this.onSheetDismiss,
@@ -148,6 +238,14 @@ class AiAssistantScreen extends ConsumerStatefulWidget {
   /// True when presented via [showCoachAiSheet]: slim grabber header instead
   /// of the AppBar, and the message list drives the sheet's drag-resize.
   final bool sheetMode;
+
+  /// Ask-bar opening (peek stage): focus the input immediately — the whole
+  /// point of the peek is tap → type → send without leaving the page.
+  final bool autofocusInput;
+
+  /// The CURRENT peek fraction (pixel-anchored, so it changes with the
+  /// keyboard). Stage-snapping in the grabber uses this, not a constant.
+  final double? sheetPeekFraction;
 
   /// The [DraggableScrollableSheet]-provided controller (sheet mode only).
   final ScrollController? sheetScrollController;
@@ -181,7 +279,82 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         _applyCoachLaunchArgs(pending);
         ref.read(coachTabArgsProvider.notifier).state = null;
       }
+      if (widget.autofocusInput) _inputFocusNode.requestFocus();
     });
+  }
+
+  /// The ask-bar peek is ONLY for empty-handed quick asks. Whenever there
+  /// are messages to show — the sheet opened onto an existing conversation,
+  /// the user sent something, or an AI reply landed — the sheet rises to
+  /// the stage the CONTENT needs (decision log 2026-07-17):
+  ///   fits the 60% viewport → 60%; overflows it → full page.
+  /// Fires only on message events, only ever rises, and a manual drag in
+  /// between is respected until the next message.
+  Future<void> _growSheetForMessages() async {
+    if (!widget.sheetMode) return;
+    final sheet = widget.sheetController;
+    if (sheet == null) return;
+    if (!sheet.isAttached) {
+      // First frame of an opening: the controller attaches after layout.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _growSheetForMessages();
+      });
+      return;
+    }
+    if (sheet.size < _CoachAiSheet.midSize - 0.05) {
+      await sheet.animateTo(
+        _CoachAiSheet.midSize,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    // Measure AFTER the 60% stage has laid out: does the thread overflow
+    // its viewport? Then 60% would just mean cramped scrolling — continue
+    // to full in the same motion.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !sheet.isAttached) return;
+      if (sheet.size >= _CoachAiSheet.maxSize - 0.05) return; // already full
+      // The user dragged down while we animated — their position wins
+      // until the next message event.
+      if (sheet.size < _CoachAiSheet.midSize - 0.06) return;
+      final scroll = _activeScrollController;
+      if (!scroll.hasClients) return;
+      // Small tolerance: a few overflowing pixels aren't "a long chat".
+      if (scroll.position.maxScrollExtent > 32) {
+        sheet.animateTo(
+          _CoachAiSheet.maxSize,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
+  }
+
+  AiAssistantService? _listenedService;
+  int _seenMessageCount = 0;
+
+  /// One growth mechanism for every message source: watch the service and
+  /// grow when the thread gains a message (user send, auto-send, AI reply).
+  /// On first attach, an already-non-empty thread grows immediately — the
+  /// peek must never hide an existing conversation (on-device report).
+  void _attachServiceListener(AiAssistantService service) {
+    if (identical(_listenedService, service)) return;
+    _listenedService?.removeListener(_onServiceMessagesChanged);
+    _listenedService = service;
+    _seenMessageCount = service.messages.length;
+    service.addListener(_onServiceMessagesChanged);
+    if (widget.sheetMode && service.messages.isNotEmpty) {
+      _growSheetForMessages();
+    }
+  }
+
+  void _onServiceMessagesChanged() {
+    final service = _listenedService;
+    if (service == null || !mounted) return;
+    final count = service.messages.length;
+    final grew = count > _seenMessageCount;
+    _seenMessageCount = count;
+    if (grew) _growSheetForMessages();
   }
 
   void _applyCoachLaunchArgs(Object? args) {
@@ -229,6 +402,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
 
   @override
   void dispose() {
+    _listenedService?.removeListener(_onServiceMessagesChanged);
     _inputController.dispose();
     _inputFocusNode.dispose();
     _scrollController.dispose();
@@ -264,7 +438,10 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     final serviceAsync = ref.watch(resolvedAiAssistantProvider);
 
     final body = serviceAsync.when(
-      data: (service) => _buildBody(service),
+      data: (service) {
+        _attachServiceListener(service);
+        return _buildBody(service);
+      },
       loading: () => _buildLoadingBody(),
       error: (e, _) => _buildErrorBody(e),
     );
@@ -310,13 +487,24 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
           ? null
           : (details) {
               final flingDown = details.velocity.pixelsPerSecond.dy > 700;
-              if (flingDown || sheet.size < 0.45) {
+              // A fast fling closes; a gentle drag settles on the nearest
+              // of the three stages (peek / conversation / full page).
+              if (flingDown ||
+                  sheet.size <
+                      (widget.sheetPeekFraction ?? _CoachAiSheet.peekSize) *
+                          0.6) {
                 widget.onSheetDismiss?.call();
                 return;
               }
-              final target = sheet.size < 0.75
-                  ? _CoachAiSheet.initialSize
-                  : _CoachAiSheet.maxSize;
+              final peek = widget.sheetPeekFraction ?? _CoachAiSheet.peekSize;
+              const mid = _CoachAiSheet.midSize;
+              const full = _CoachAiSheet.maxSize;
+              final size = sheet.size;
+              final target = size < (peek + mid) / 2
+                  ? peek
+                  : size < (mid + full) / 2
+                  ? mid
+                  : full;
               sheet.animateTo(
                 target,
                 duration: const Duration(milliseconds: 220),
@@ -413,92 +601,129 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         ),
     ];
 
-    return Column(
-      children: [
-        Expanded(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: () => dismissKeyboard(context),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // The extras block is capped so the thread always keeps
-                // ~160px: with the keyboard up (or a short sheet) the extras
-                // scroll inside their cap instead of overflowing the Column.
-                final extrasMaxHeight = (constraints.maxHeight - 160).clamp(
-                  0.0,
-                  double.infinity,
-                );
-                return Column(
-                  children: [
-                    if (topExtras.isNotEmpty)
-                      ConstrainedBox(
-                        constraints: BoxConstraints(maxHeight: extrasMaxHeight),
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: topExtras,
+    return LayoutBuilder(
+      builder: (context, bodyBox) => Column(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => dismissKeyboard(context),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // The extras block is capped so the thread always keeps
+                  // ~160px: with the keyboard up (or a short sheet) the extras
+                  // scroll inside their cap instead of overflowing the Column.
+                  final extrasMaxHeight = (constraints.maxHeight - 160).clamp(
+                    0.0,
+                    double.infinity,
+                  );
+                  return Column(
+                    children: [
+                      if (topExtras.isNotEmpty)
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight: extrasMaxHeight,
+                          ),
+                          child: SingleChildScrollView(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: topExtras,
+                            ),
                           ),
                         ),
+                      // Conversation thread
+                      Expanded(
+                        child: hasMessages
+                            ? _MessageList(
+                                messages: messages,
+                                service: service,
+                                scrollController: _activeScrollController,
+                                isLoading: service.isLoading,
+                                onSuggestedPrompt: (prompt) {
+                                  _inputController.text = prompt;
+                                  _inputFocusNode.requestFocus();
+                                },
+                              )
+                            : _buildEmptyState(),
                       ),
-                    // Conversation thread
-                    Expanded(
-                      child: hasMessages
-                          ? _MessageList(
-                              messages: messages,
-                              service: service,
-                              scrollController: _activeScrollController,
-                              isLoading: service.isLoading,
-                              onSuggestedPrompt: (prompt) {
-                                _inputController.text = prompt;
-                                _inputFocusNode.requestFocus();
-                              },
-                            )
-                          : _buildEmptyState(),
-                    ),
-                  ],
-                );
-              },
+                    ],
+                  );
+                },
+              ),
             ),
           ),
-        ),
-        // Fixed bottom: input + quick directives. The tab clears the floating
-        // nav bar; the sheet only needs the home indicator (keyboard insets
-        // are handled by the sheet wrapper lifting the whole sheet).
-        Container(
-          color: AppColors.ink,
-          padding: EdgeInsets.only(
-            bottom: widget.sheetMode
-                ? MediaQuery.paddingOf(context).bottom + 8
-                : mainTabFooterPadding(context),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AiInputCard(
-                controller: _inputController,
-                focusNode: _inputFocusNode,
-                isLoading: service.isLoading,
-                onSend: () {
-                  final text = _inputController.text.trim();
-                  if (text.isEmpty) return;
-                  _inputController.clear();
-                  service.sendMessage(text);
-                },
+          // Fixed bottom: input + quick directives. The tab clears the floating
+          // nav bar; the sheet only needs the home indicator (keyboard insets
+          // are handled by the sheet wrapper lifting the whole sheet).
+          // Rebuilds on every sheet-extent tick: the composer extras must
+          // re-evaluate as the sheet grows/shrinks, not once per build.
+          // The ConstrainedBox + reverse scroll make overflow STRUCTURALLY
+          // impossible: if a frame's budget is too small for the composer
+          // (keyboard mid-animation, large fonts), it clips from the top
+          // instead of striping — the input row is always the visible part.
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: bodyBox.maxHeight),
+            child: SingleChildScrollView(
+              reverse: true,
+              physics: const NeverScrollableScrollPhysics(),
+              child: AnimatedBuilder(
+                animation:
+                    widget.sheetController ??
+                    const AlwaysStoppedAnimation<double>(0),
+                builder: (context, _) => Container(
+                  color: AppColors.ink,
+                  padding: EdgeInsets.only(
+                    bottom: widget.sheetMode
+                        ? MediaQuery.paddingOf(context).bottom + 8
+                        : mainTabFooterPadding(context),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AiInputCard(
+                        controller: _inputController,
+                        focusNode: _inputFocusNode,
+                        isLoading: service.isLoading,
+                        onSend: () {
+                          final text = _inputController.text.trim();
+                          if (text.isEmpty) return;
+                          _inputController.clear();
+                          service.sendMessage(text);
+                        },
+                      ),
+                      // The ask-bar peek is input-only; the extras appear once
+                      // the sheet is PIXEL-tall enough to hold them.
+                      if (_showComposerExtras) ...[
+                        const SizedBox(height: 6),
+                        _AiActionBar(service: service),
+                        const SizedBox(height: 4),
+                        QuickDirectivesRow(
+                          onSelected: (text) {
+                            _inputController.text = text;
+                            _inputFocusNode.requestFocus();
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 6),
-              _AiActionBar(service: service),
-              const SizedBox(height: 4),
-              QuickDirectivesRow(
-                onSelected: (text) {
-                  _inputController.text = text;
-                  _inputFocusNode.requestFocus();
-                },
-              ),
-            ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
+  }
+
+  /// Whether the composer extras (action bar + quick directives) fit.
+  /// PIXEL-based, not fraction-based: with the keyboard up even the 60%
+  /// stage can be too short for them. Defaults to hidden in sheet mode
+  /// until the controller attaches — the first frame must never overflow.
+  bool get _showComposerExtras {
+    if (!widget.sheetMode) return true;
+    final sheet = widget.sheetController;
+    if (sheet == null || !sheet.isAttached) return false;
+    return sheet.pixels >= _CoachAiSheetState._peekPx + 130;
   }
 
   /// Empty state. In sheet mode its scrollable attaches to the sheet's
@@ -523,24 +748,30 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   }
 
   Widget _buildLoadingBody() {
+    // FittedBox: this renders on the FIRST frame of every sheet opening,
+    // when the ask-bar peek may give it almost no height — scale down
+    // rather than stripe.
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircularProgressIndicator(color: AppColors.cyan, strokeWidth: 2),
-          SizedBox(height: 16),
-          Text(
-            'Initialising Coach AI…',
-            style: TextStyle(color: AppColors.textSoft, fontSize: 14),
-          ),
-        ],
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: AppColors.cyan, strokeWidth: 2),
+            SizedBox(height: 16),
+            Text(
+              'Initialising Coach AI…',
+              style: TextStyle(color: AppColors.textSoft, fontSize: 14),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildErrorBody(Object e) {
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(32),
         child: Text(
           'Could not load Coach AI.\n$e',

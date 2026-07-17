@@ -1,4 +1,4 @@
-import 'package:coach_for_life/app/application/main_tab_navigation.dart';
+import 'package:coach_for_life/features/ai_assistant/presentation/ai_assistant_screen.dart';
 import 'package:coach_for_life/features/education/presentation/help_dot.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -49,7 +49,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Ask Coach prefills the coach tab deep link', (tester) async {
+  testWidgets('Ask Coach opens the coach sheet over the current page', (
+    tester,
+  ) async {
     await tester.pumpWidget(_host('flowNow'));
     await tester.tap(find.byType(HelpDot));
     await tester.pumpAndSettle();
@@ -60,14 +62,22 @@ void main() {
       scrollable: find.byType(Scrollable).last,
     );
     await tester.tap(find.text('Ask Coach about this'));
-    await tester.pumpAndSettle();
+    // No pumpAndSettle: the coach screen shows a loading spinner in this
+    // bare test host, which animates forever.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(Scaffold).first),
+    // Coach is a sheet now (decision log 2026-07-16): the help sheet pops
+    // and the coach sheet presents with the prefill in its route args.
+    expect(find.byType(AiAssistantScreen), findsOneWidget);
+    final route = ModalRoute.of(
+      tester.element(find.byType(AiAssistantScreen)),
     );
-    expect(container.read(mainTabIndexProvider), MainTabIndex.coach);
+    expect(route?.settings.name, AiAssistantScreen.routeName);
+    final args = route?.settings.arguments;
+    expect(args, isA<CoachRouteArgs>());
     expect(
-      container.read(coachTabArgsProvider)?.preDraftedText,
+      (args as CoachRouteArgs).preDraftedText,
       'Tell me about Flow Now',
     );
   });

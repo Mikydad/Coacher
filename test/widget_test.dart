@@ -18,6 +18,9 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('PathPal'), findsOneWidget);
-    expect(find.text('Progress'), findsOneWidget);
+    // Progress left the bottom nav (lives in Profile now); Accountability
+    // took its slot.
+    expect(find.text('Accountability'), findsOneWidget);
+    expect(find.text('Progress'), findsNothing);
   });
 }

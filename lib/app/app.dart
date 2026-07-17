@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_navigator.dart';
-import 'application/main_tab_navigation.dart';
 import 'presentation/main_tab_shell.dart';
 import '../features/auth/presentation/auth_landing_screen.dart';
 import '../features/auth/presentation/change_password_screen.dart';
@@ -221,13 +220,9 @@ class _CoachTabRedirect extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!context.mounted) return;
-      navigateToMainTab(
-        context,
-        ref,
-        index: MainTabIndex.coach,
-        coachArgs: args,
-      );
+      // Coach is a sheet now, not a tab: land on the root, then present it.
       Navigator.of(context).popUntil((route) => route.isFirst);
+      showCoachAiSheet(context, args: args);
     });
     return Scaffold(
       backgroundColor: AppColors.scaffold,

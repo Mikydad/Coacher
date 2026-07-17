@@ -11,6 +11,7 @@ import 'widgets/category_chip_row.dart';
 import 'widgets/goal_card.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../ai_assistant/presentation/widgets/coach_ai_fab.dart';
 import '../../../core/presentation/page_headers.dart';
 
 /// Goals tab — list with fill-bar cards, horizontal category chips,
@@ -36,14 +37,16 @@ class GoalsHomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'goals_tab_fab',
-        onPressed: () =>
-            Navigator.pushNamed(context, GoalTemplatePickerScreen.routeName),
-        backgroundColor: AppColors.accent,
-        foregroundColor: AppColors.onAccent,
-        icon: const Icon(Icons.add),
-        label: const Text('New goal'),
+      floatingActionButton: CoachSatelliteFabs(
+        pageFab: FloatingActionButton.extended(
+          heroTag: 'goals_tab_fab',
+          onPressed: () =>
+              Navigator.pushNamed(context, GoalTemplatePickerScreen.routeName),
+          backgroundColor: AppColors.accent,
+          foregroundColor: AppColors.onAccent,
+          icon: const Icon(Icons.add),
+          label: const Text('New goal'),
+        ),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
