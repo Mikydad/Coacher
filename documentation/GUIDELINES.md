@@ -268,3 +268,63 @@ not silent reversal.
   is provider-independent and testable now); provider calls inside the
   decision transaction (rejected: retried transactions + network calls =
   double refunds).
+
+- **2026-07-16 · Progress leaves the bottom nav; Profile hosts it.** Seven
+  tabs crowded the watermark nav after Accountability landed, so Progress
+  is now a row at the top of Profile's settings card plus the pushed
+  '/progress' route (Home's score tile and notification taps push it
+  directly). Final tab order: Home, Coach, Goals, Accountability,
+  Community, Profile. `feature_guides.dart` now uses `MainTabIndex`
+  constants instead of raw ints — the raw 3/4/5 values had silently gone
+  stale when the Accountability tab shifted everything, sending "try it"
+  taps to the wrong tabs; named constants make the next renumbering a
+  compile-time non-event. *Considered:* removing Coach from the nav
+  (rejected: it's the product's face); a "More" overflow tab (rejected:
+  buries features two taps deep).
+
+- **2026-07-16 · Coach leaves the bottom nav; it's an omnipresent FAB +
+  three-stage sheet.** Five tabs remain (Home, Goals, Accountability,
+  Community, Profile). The Coach AI button (`CoachAiFab`) sits bottom-right
+  on every tab — standalone on Home/Profile, mini satellite stacked above
+  the page's own FAB on Goals/Community/Accountability — and carries the
+  blocked-plan red dot the nav icon used to. Tapping opens the sheet at
+  the ASK-BAR peek (18%: grabber + input, keyboard up — tap → type →
+  send); sending from the peek auto-grows to 60%; drag snaps peek → 60% →
+  full page (corners square off approaching full — the sheet BECOMES a
+  page). Payload flows (morning brief, proactive cards, help sheet, the
+  '/coach' route) open at 60% with `CoachRouteArgs` in RouteSettings;
+  `openCoachAi()` delivers args in-place when the sheet is already up
+  (via the existing coachTabArgsProvider listener) instead of stacking a
+  second sheet. Profile also has a "Coach AI" row as the discoverable
+  fallback. *Considered:* four stages with 85% (rejected: a thumb-flick
+  from full, snaps feel mushy); keeping a full-screen Coach route
+  (rejected: one surface, one mental model).
+
+- **2026-07-17 · Coach sheet growth is content-aware.** On any message
+  event (open-onto-history, user send, AI reply) the sheet rises to the
+  stage the content needs: thread fits the 60% viewport → 60%; overflows
+  it (measured via the message list's maxScrollExtent after layout, ~32px
+  tolerance) → continue to full page in the same motion. Rise-only, never
+  on drags/typing, and a manual drag between messages is respected until
+  the next message. *Considered:* message-count heuristics (rejected: two
+  long answers ARE "two pages"; five one-liners aren't).
+
+- **2026-07-17 · Accountability creation opens on the category page.**
+  Step order is now category (Photo stake / Challenge a friend / Money
+  stake (simulated, debug) / Practice) → commitment (title, target,
+  days, mode) → type-specific details (skipped for practice) → consent →
+  pledge → review. Previously commitment came first with the stake choice
+  buried second; the category IS the product decision, so it leads. The
+  hub is unchanged: open challenges list when they exist, and Start
+  Challenge slides the flow up starting on the categories. Money stays
+  simulated/debug-gated until the Stripe adapter lands.
+
+- **2026-07-17 · Optimistic mirror rows carry `updatedAtMs: 0`, never the
+  client clock.** For SERVER-OWNED collections (stake_challenges), the
+  client's optimistic insert exists only to render instantly; stamping it
+  with the device clock let a phone running seconds ahead of the server
+  outrank every later server write under LWW — the photo-screening result
+  only appeared after a logout wipe. Rule: placeholder rows use 0 so the
+  first server echo replaces them, and live snapshot listeners on
+  server-owned docs apply unconditionally (no LWW — there is no
+  legitimate competing client write). The general pull keeps LWW.

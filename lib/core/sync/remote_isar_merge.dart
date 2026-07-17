@@ -140,13 +140,19 @@ class RemoteIsarMerge {
     _abortIfUidChanged();
     await _pullOnboardingProfile();
     _abortIfUidChanged();
-    await _pullStakeChallenges();
+    // Stakes-era phases are individually fault-tolerant: until the stakes
+    // backend is deployed (rules + functions — see PHASE3/deploy notes),
+    // these queries come back permission-denied on the live project, and
+    // one denied mirror must NOT abort the whole account sync. A failed
+    // phase discards its own cursor advancement and is retried next pull.
+    await _pullGuarded('stake challenges', _pullStakeChallenges);
     _abortIfUidChanged();
-    await _pullBlockedUsers();
+    await _pullGuarded('blocked users', _pullBlockedUsers);
     _abortIfUidChanged();
-    await _pullPointsLedger();
+    await _pullGuarded('points ledger', _pullPointsLedger,
+        cursorKey: 'points_txns');
     _abortIfUidChanged();
-    await _pullCharities();
+    await _pullGuarded('charities', _pullCharities);
     // Only reached when every phase succeeded — safe to advance cursors.
     for (final entry in _maxSeen.entries) {
       await _cursors.advance(entry.key, entry.value);
@@ -419,6 +425,25 @@ class RemoteIsarMerge {
   /// a composite index (errors.md #16/#18) for no real saving. LWW makes
   /// re-merges no-ops. Evidence of NON-terminal challenges is pulled too so
   /// a second device sees this account's own logged units.
+  /// Runs one non-core pull phase, swallowing its failure so the rest of
+  /// the sync survives. [cursorKey] is dropped from this pull's cursor
+  /// advancement on failure — a partially-read phase must not skip docs
+  /// on the next attempt (unordered reads under a max-seen cursor would).
+  Future<void> _pullGuarded(
+    String label,
+    Future<void> Function() phase, {
+    String? cursorKey,
+  }) async {
+    try {
+      await phase();
+    } on StateError {
+      rethrow; // uid-changed abort — never swallow account isolation
+    } catch (e) {
+      if (cursorKey != null) _maxSeen.remove(cursorKey);
+      debugPrint('RemoteIsarMerge: $label pull failed, skipping: $e');
+    }
+  }
+
   Future<void> _pullStakeChallenges() async {
     final snap = await _client
         .topCollection('stake_challenges')

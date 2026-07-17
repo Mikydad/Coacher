@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:isar_community/isar.dart';
 
 import '../../../core/firebase/firestore_paths.dart';
@@ -49,6 +52,35 @@ class StakesRepository {
       await _isar.isarStakeChallenges.putByChallengeId(
         IsarStakeChallenge.fromDomain(challenge),
       );
+    });
+  }
+
+  /// Live hydration for ONE challenge while a transient server-side state
+  /// resolves (photo screening: the trigger flips draft → active within
+  /// seconds, but the background pull runs on start/resume/connectivity
+  /// and throttles to 30 s — far slower than the state itself). Snapshots
+  /// LWW-merge into the Isar mirror, so the UI still renders local-first;
+  /// this just hydrates the mirror at listener speed. Caller cancels.
+  StreamSubscription<void> hydrateChallengeLive(String challengeId) {
+    return FirebaseFirestore.instance
+        .doc('stake_challenges/$challengeId')
+        .snapshots()
+        .listen((snap) async {
+      final data = snap.data();
+      if (data == null) return;
+      final m = Map<String, dynamic>.from(data);
+      m['id'] = snap.id;
+      final incoming = StakeChallenge.fromMap(m);
+      // No LWW here, deliberately: this collection is SERVER-OWNED — the
+      // only client-side writes are optimistic placeholders, so a live
+      // server snapshot is authoritative by definition. (LWW here once
+      // let a clock-skewed placeholder outrank the real server flip and
+      // the screening result never showed until a logout wipe.)
+      await _isar.writeTxn(() async {
+        await _isar.isarStakeChallenges.putByChallengeId(
+          IsarStakeChallenge.fromDomain(incoming),
+        );
+      });
     });
   }
 

@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +17,7 @@ import '../application/stakes_providers.dart';
 import '../domain/models/stake_challenge.dart';
 import '../domain/models/stake_evidence.dart';
 import 'accountability_create_flow.dart';
+import 'stake_photo_cache.dart';
 import 'stake_reveal_viewer_screen.dart';
 import 'stake_timer_screen.dart';
 
@@ -71,8 +74,79 @@ class _Body extends ConsumerStatefulWidget {
 
 class _BodyState extends ConsumerState<_Body> {
   bool _busy = false;
+  StreamSubscription<void>? _screenWatch;
+  Uint8List? _stakePhotoBytes;
+  bool _stakePhotoLoading = false;
+  bool _stakePhotoAttempted = false;
 
   StakeChallenge get c => widget.challenge;
+
+  /// Owner-only preview of the staked photo. Cache-first: the creator's
+  /// device seeded the cache at create time, so the preview is instant
+  /// and works offline; only a reinstall/second device downloads (and
+  /// then caches). The photo is deleted server-side on success/veto/
+  /// expiry — a failed network load on decided challenges is normal.
+  void _loadStakePhoto() {
+    if (_stakePhotoBytes != null || _stakePhotoAttempted) return;
+    if (c.type != StakeChallengeType.soloPhoto) return;
+    final path = c.participant(FirestorePaths.activeUid)?.photoStoragePath;
+    if (path == null) return;
+    _stakePhotoAttempted = true;
+    if (c.status.isTerminal) {
+      // The server deletes the photo on decided challenges; drop the
+      // local copy too, quietly.
+      StakePhotoCache.evict(c.id);
+      return;
+    }
+    _stakePhotoLoading = true;
+    () async {
+      final cached = await StakePhotoCache.read(c.id);
+      if (cached != null) {
+        if (mounted) {
+          setState(() {
+            _stakePhotoBytes = cached;
+            _stakePhotoLoading = false;
+          });
+        }
+        return;
+      }
+      try {
+        final bytes =
+            await FirebaseStorage.instance.ref(path).getData(4 * 1024 * 1024);
+        if (bytes != null) {
+          await StakePhotoCache.write(c.id, bytes);
+          if (mounted) setState(() => _stakePhotoBytes = bytes);
+        }
+      } catch (_) {
+        // Quiet: slow/offline link — the card explains it's still loading
+        // only while we genuinely are; on failure it disappears.
+      } finally {
+        if (mounted) setState(() => _stakePhotoLoading = false);
+      }
+    }();
+  }
+
+  /// While the photo check is pending, listen to this one challenge doc
+  /// LIVE: the server flips draft → active within seconds of upload, and
+  /// the background pull (start/resume/connectivity, 30 s throttle) is far
+  /// slower than the state itself. A previous 10 s poll was silently eaten
+  /// by that throttle — the listener hears the flip in ~1 s.
+  void _watchScreeningLive() {
+    final waiting = c.status == StakeChallengeStatus.draft;
+    if (waiting && _screenWatch == null) {
+      _screenWatch =
+          ref.read(stakesRepositoryProvider).hydrateChallengeLive(c.id);
+    } else if (!waiting && _screenWatch != null) {
+      _screenWatch!.cancel();
+      _screenWatch = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _screenWatch?.cancel();
+    super.dispose();
+  }
 
   /// Sum of evidence per unit for the signed-in user.
   Map<int, int> get _loggedByUnit {
@@ -87,6 +161,8 @@ class _BodyState extends ConsumerState<_Body> {
 
   @override
   Widget build(BuildContext context) {
+    _watchScreeningLive();
+    _loadStakePhoto();
     final logged = _loggedByUnit;
     final mercy = c.mercyUnitTarget;
     final today = c.todayUnitIndex;
@@ -112,6 +188,10 @@ class _BodyState extends ConsumerState<_Body> {
         ),
         const SizedBox(height: 16),
         _statusBanner(),
+        if (_stakePhotoBytes != null || _stakePhotoLoading) ...[
+          const SizedBox(height: 12),
+          _stakePhotoCard(),
+        ],
         if (c.type.isMultiParty) ...[
           const SizedBox(height: 12),
           _h2hStakeCard(),
@@ -158,6 +238,74 @@ class _BodyState extends ConsumerState<_Body> {
                 c.creatorUid == FirestorePaths.activeUid))
           _cancelAction(),
       ],
+    );
+  }
+
+  /// What's on the line, visible ONLY to its owner while the challenge
+  /// lives (the circle sees it exclusively through a forfeit reveal).
+  /// Tap for full size.
+  Widget _stakePhotoCard() {
+    final bytes = _stakePhotoBytes;
+    return GestureDetector(
+      onTap: bytes == null
+          ? null
+          : () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => _StakePhotoFullscreen(bytes: bytes),
+                ),
+              ),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.inkCard,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.coral.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            if (bytes == null)
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: AppColors.fg12,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              )
+            else
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.memory(
+                  bytes,
+                  width: 64,
+                  height: 64,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                bytes == null
+                    ? 'Loading your photo…'
+                    : 'This is what\'s on the line. Only you can see it — '
+                        'unless you break your word. Tap to view.',
+                style: TextStyle(
+                  color: AppColors.textSoft,
+                  fontSize: 12.5,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -961,5 +1109,32 @@ class _BodyState extends ConsumerState<_Body> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+}
+
+/// Owner-only full-size view of the staked photo (tap target of the
+/// preview card). Plain viewer — the SECURE viewer with screenshot
+/// enforcement is for circle reveals; your own photo is your business.
+class _StakePhotoFullscreen extends StatelessWidget {
+  const _StakePhotoFullscreen({required this.bytes});
+
+  final Uint8List bytes;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        centerTitle: true,
+        title: const PageTitle('Your stake'),
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          maxScale: 4,
+          child: Image.memory(bytes, fit: BoxFit.contain),
+        ),
+      ),
+    );
   }
 }

@@ -25,6 +25,7 @@ import {
 } from './firestore_layout';
 import { escrowRef, markEscrow, processRefundQueue } from './escrows';
 import { balanceRef, writeLedgerTxn } from './ledger';
+import { applyVerdictToChallenge, PHOTO_SCREENS } from './nsfw_screen';
 import { EscrowDoc } from './payments';
 import { BalanceDoc, EARN_AMOUNTS } from './points';
 import { assertTransition } from './state_machine';
@@ -37,6 +38,12 @@ export async function runSweepOnce(
   now: number,
 ): Promise<Record<string, number>> {
   const counts = {
+    // Safety net for the upload/create race and lost trigger events: any
+    // draft whose screening verdict is already stored gets it applied
+    // here (idempotent), instead of waiting forever on a delivery that
+    // may never come (bit us on day one: uploads during the trigger's
+    // own deployment window were stuck in draft permanently).
+    screensApplied: await applyPendingScreens(now),
     expired: await expireInvites(now),
     toVerification: await moveToVerification(now),
     decided: await decideDue(now),
@@ -61,6 +68,32 @@ export const stakeSweep = onSchedule(
     await runSweepOnce(Date.now());
   },
 );
+
+async function applyPendingScreens(now: number): Promise<number> {
+  const db = getFirestore();
+  const snap = await db
+    .collection(CHALLENGES)
+    .where('status', '==', 'draft')
+    .limit(50)
+    .get();
+  let applied = 0;
+  for (const doc of snap.docs) {
+    if (doc.data().photoState !== 'pending_screen') continue;
+    const screen = (await db.collection(PHOTO_SCREENS).doc(doc.id).get()).data();
+    const status = screen?.status;
+    if (status !== 'approved' && status !== 'rejected') continue;
+    await applyVerdictToChallenge(
+      doc.id,
+      {
+        approved: status === 'approved',
+        reasons: (screen?.reasons as string[] | undefined) ?? [],
+      },
+      now,
+    );
+    applied += 1;
+  }
+  return applied;
+}
 
 async function expireInvites(now: number): Promise<number> {
   const db = getFirestore();

@@ -145,7 +145,9 @@ export async function applyVerdictToChallenge(
 
 export const stakePhotoUploaded = onObjectFinalized(
   {
-    region: 'us-central1',
+    // Storage triggers must live in the BUCKET's region — this project's
+    // default bucket is us-east1 (everything else stays us-central1).
+    region: 'us-east1',
     memory: '256MiB',
     maxInstances: 5,
     timeoutSeconds: 60,

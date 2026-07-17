@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -17,6 +19,7 @@ import '../application/stakes_providers.dart';
 import '../domain/models/points.dart';
 import '../domain/models/stake_challenge.dart';
 import 'stake_challenge_detail_screen.dart';
+import 'stake_photo_cache.dart';
 
 /// The unified accountability creation flow (PRD 1.4). All three entry
 /// points land here:
@@ -24,7 +27,10 @@ import 'stake_challenge_detail_screen.dart';
 ///  - Accountability hub → nothing prefilled
 ///  - circle → [prefilledCircleId]
 ///
-/// Steps: commitment → stake → consent (photo only) → pledge → review.
+/// Steps: category → commitment → details (skipped for practice) →
+/// consent (photo/money) → pledge → review. Category comes FIRST
+/// (decision log 2026-07-17): the flow opens on what's at stake, then
+/// the commitment, then type-specific setup.
 /// Multi-step back is intercepted (PopScope steps back, never exits
 /// mid-flow); step changes animate (~260 ms).
 Future<void> openAccountabilityCreateFlow(
@@ -58,7 +64,7 @@ class AccountabilityCreateFlow extends ConsumerStatefulWidget {
       _AccountabilityCreateFlowState();
 }
 
-enum _Step { commitment, stake, consent, pledge, review }
+enum _Step { category, commitment, details, consent, pledge, review }
 
 /// What's on the line: photo (P1), h2h points (P2), money ($ — SIMULATED
 /// until Stripe activates; debug builds only), practice.
@@ -66,7 +72,7 @@ enum _StakeChoice { photo, h2h, money, practice }
 
 class _AccountabilityCreateFlowState
     extends ConsumerState<AccountabilityCreateFlow> {
-  _Step _step = _Step.commitment;
+  _Step _step = _Step.category;
 
   // Commitment
   late final TextEditingController _title =
@@ -117,9 +123,13 @@ class _AccountabilityCreateFlowState
     super.dispose();
   }
 
+  // Category first (decision log 2026-07-17): pick WHAT'S on the line,
+  // then describe the commitment, then the type-specific setup. Practice
+  // has no setup, so it skips the details page.
   List<_Step> get _steps => [
+        _Step.category,
         _Step.commitment,
-        _Step.stake,
+        if (!_isPractice) _Step.details,
         if (_stake == _StakeChoice.photo || _isMoney) _Step.consent,
         _Step.pledge,
         _Step.review,
@@ -151,7 +161,8 @@ class _AccountabilityCreateFlowState
   bool get _stepValid => switch (_step) {
         _Step.commitment =>
           _title.text.trim().isNotEmpty && _unitTarget > 0 && _totalUnits > 0,
-        _Step.stake => switch (_stake) {
+        _Step.category => true, // a card is always selected
+        _Step.details => switch (_stake) {
             _StakeChoice.practice => true,
             _StakeChoice.photo => _circleId != null && _photo != null,
             _StakeChoice.h2h => _circleId != null &&
@@ -244,8 +255,9 @@ class _AccountabilityCreateFlowState
   }
 
   Widget _buildStep() => switch (_step) {
+        _Step.category => _categoryStep(),
         _Step.commitment => _commitmentStep(),
-        _Step.stake => _stakeStep(),
+        _Step.details => _detailsStep(),
         _Step.consent => _consentStep(),
         _Step.pledge => _pledgeStep(),
         _Step.review => _reviewStep(),
@@ -332,8 +344,7 @@ class _AccountabilityCreateFlowState
 
   // ─── Step: stake ───────────────────────────────────────────────────────────
 
-  Widget _stakeStep() {
-    final circlesAsync = ref.watch(myCirclesProvider);
+  Widget _categoryStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -378,6 +389,17 @@ class _AccountabilityCreateFlowState
           subtitle: 'No stake — learn the loop first.',
           onTap: () => setState(() => _stake = _StakeChoice.practice),
         ),
+      ],
+    );
+  }
+
+  /// Type-specific setup, now that the category and commitment are known.
+  Widget _detailsStep() {
+    final circlesAsync = ref.watch(myCirclesProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader('Set it up'),
         if (_isH2h) ..._h2hFields(),
         if (_isMoney) ..._moneyFields(),
         if (_stake == _StakeChoice.photo) ...[
@@ -669,13 +691,26 @@ class _AccountabilityCreateFlowState
     );
   }
 
+  bool _pickingPhoto = false;
+
   Future<void> _pickPhoto() async {
-    final picked = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1600,
-      imageQuality: 85,
-    );
-    if (picked != null) setState(() => _photo = picked);
+    // Double-tapping the tile before iOS presents the picker fires a
+    // second request that cancels the first with
+    // PlatformException(multiple_request) — guard + swallow that case.
+    if (_pickingPhoto) return;
+    _pickingPhoto = true;
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1600,
+        imageQuality: 85,
+      );
+      if (picked != null && mounted) setState(() => _photo = picked);
+    } on PlatformException catch (e) {
+      if (e.code != 'multiple_request') rethrow;
+    } finally {
+      _pickingPhoto = false;
+    }
   }
 
   // ─── Step: consent (P-1 — explicit, in-flow, not ToS) ─────────────────────
@@ -1047,24 +1082,49 @@ class _AccountabilityCreateFlowState
               ? StakePhotoState.pendingScreen
               : null,
           createdAtMs: nowMs,
-          updatedAtMs: nowMs,
+          // NOT the client clock: a phone running seconds ahead of the
+          // server would make this optimistic row "newer" than the real
+          // server writes, and LWW would reject every later flip (the
+          // photo-screen result only appeared after a logout wipe).
+          // 0 = "placeholder, first server echo replaces me".
+          updatedAtMs: 0,
         ),
       );
 
       if (!mounted) return;
       final nav = Navigator.of(context);
       nav.pop();
+      if (_stake == _StakeChoice.photo && _photo != null) {
+        // Seed the owner's preview cache — the detail screen then shows
+        // the photo instantly instead of re-downloading it (slow links
+        // made the preview take minutes).
+        unawaited(StakePhotoCache.seed(id, File(_photo!.path)));
+      }
       nav.push(
         MaterialPageRoute(
           builder: (_) => StakeChallengeDetailScreen(challengeId: id),
         ),
       );
     } on StakeActionException catch (e) {
+      final photoRejected = e.code == 'failed-precondition' &&
+          e.message.toLowerCase().contains('rejected');
       setState(() {
         _creating = false;
-        _createError = e.isRetryable
-            ? 'Couldn\'t reach the server. Check your connection and try again.'
-            : e.message;
+        if (photoRejected) {
+          // Content screening said no. Re-pressing the button would just
+          // re-upload the same doomed photo under a new id and sit at
+          // "checking" until it gets rejected again — bounce back to the
+          // photo step and demand a different one instead.
+          _photo = null;
+          _step = _Step.details;
+          _createError =
+              'That photo was rejected by content screening — pick a '
+              'different one.';
+        } else {
+          _createError = e.isRetryable
+              ? 'Couldn\'t reach the server. Check your connection and try again.'
+              : e.message;
+        }
       });
     } catch (e) {
       setState(() {
