@@ -57,7 +57,20 @@ void main() {
     // Times must be relative to the real clock: timed tasks are hidden until
     // their scheduled time is reached, so a fixed noon reference would make
     // "overdue" not-yet-due whenever the suite runs before noon.
-    final stableReference = DateTime.now();
+    //
+    // Near-midnight clamp: the ±20-minute offsets below must stay inside
+    // TODAY, or a fixture's reminder lands on the wrong side of midnight
+    // relative to its planDateKey and the expected order flips (this
+    // failed for real at 23:54 local).
+    final now = DateTime.now();
+    final dayStart = DateTime(now.year, now.month, now.day);
+    final dayEnd = dayStart.add(const Duration(hours: 24));
+    var stableReference = now;
+    if (now.subtract(const Duration(minutes: 21)).isBefore(dayStart)) {
+      stableReference = dayStart.add(const Duration(minutes: 21));
+    } else if (now.add(const Duration(minutes: 21)).isAfter(dayEnd)) {
+      stableReference = dayEnd.subtract(const Duration(minutes: 21));
+    }
 
     await repo.upsertTask(
       PlannedTask(
