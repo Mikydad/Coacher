@@ -87,20 +87,59 @@ class StakeFrozenGoal {
     required this.unitKind,
     required this.unitTarget,
     required this.totalUnits,
+    this.cadence = 'daily',
+    this.interval = 1,
+    this.scheduledWeekdays,
+    this.repeatDaysOfMonth,
+    this.startDateMs,
+    this.linkedGoalId,
   });
 
   final String title;
 
   /// `'minutes'` (timer evidence) or `'count'`.
   final String unitKind;
+
+  /// Per-ACTION-DAY target (2026-07-22 — units are action days).
   final int unitTarget;
+
+  /// Number of action days between start date and deadline.
   final int totalUnits;
+
+  /// `'daily' | 'weekly' | 'monthly'`; legacy docs default to daily.
+  final String cadence;
+
+  /// Daily cadence: every N days (1 = every day).
+  final int interval;
+
+  /// Weekly cadence: ISO weekdays 1 (Mon) – 7 (Sun).
+  final List<int>? scheduledWeekdays;
+
+  /// Monthly cadence: days of month 1–31.
+  final List<int>? repeatDaysOfMonth;
+
+  /// Local-midnight ms of day 0. May be in the future. Legacy docs: null
+  /// → the challenge's creation day.
+  final int? startDateMs;
+
+  /// The live UserGoal this snapshot was frozen from (staked badge).
+  final String? linkedGoalId;
 
   factory StakeFrozenGoal.fromMap(Map<String, dynamic> m) => StakeFrozenGoal(
         title: (m['title'] as String?) ?? '',
         unitKind: (m['unitKind'] as String?) ?? 'minutes',
         unitTarget: (m['unitTarget'] as num?)?.toInt() ?? 1,
         totalUnits: (m['totalUnits'] as num?)?.toInt() ?? 1,
+        cadence: (m['cadence'] as String?) ?? 'daily',
+        interval: (m['interval'] as num?)?.toInt() ?? 1,
+        scheduledWeekdays: (m['scheduledWeekdays'] as List?)
+            ?.map((e) => (e as num).toInt())
+            .toList(),
+        repeatDaysOfMonth: (m['repeatDaysOfMonth'] as List?)
+            ?.map((e) => (e as num).toInt())
+            .toList(),
+        startDateMs: (m['startDateMs'] as num?)?.toInt(),
+        linkedGoalId: m['linkedGoalId'] as String?,
       );
 
   Map<String, dynamic> toMap() => {
@@ -108,6 +147,12 @@ class StakeFrozenGoal {
         'unitKind': unitKind,
         'unitTarget': unitTarget,
         'totalUnits': totalUnits,
+        'cadence': cadence,
+        'interval': interval,
+        if (scheduledWeekdays != null) 'scheduledWeekdays': scheduledWeekdays,
+        if (repeatDaysOfMonth != null) 'repeatDaysOfMonth': repeatDaysOfMonth,
+        if (startDateMs != null) 'startDateMs': startDateMs,
+        if (linkedGoalId != null) 'linkedGoalId': linkedGoalId,
       };
 }
 
@@ -316,15 +361,50 @@ class StakeChallenge {
     return null;
   }
 
-  /// Units are LOCAL calendar days counted from the creation day (day 0).
-  /// Evidence carries the unitIndex; the server only enforces arrival time
-  /// (CC-5), so the day boundary is the user's own clock — consistent with
-  /// how the rest of the app treats "today".
+  /// Day 0 of the challenge: the frozen start date (may be in the future),
+  /// or the creation day for legacy docs. Local calendar day.
+  DateTime get startDay {
+    final ms = frozenGoal.startDateMs ?? createdAtMs;
+    final d = DateTime.fromMillisecondsSinceEpoch(ms);
+    return DateTime(d.year, d.month, d.day);
+  }
+
+  /// Whether [day] is an ACTION day under the frozen schedule
+  /// (2026-07-22 — units are action days, not every calendar day).
+  bool isActionDate(DateTime day) {
+    final d = DateTime(day.year, day.month, day.day);
+    switch (frozenGoal.cadence) {
+      case 'weekly':
+        return (frozenGoal.scheduledWeekdays ?? const []).contains(d.weekday);
+      case 'monthly':
+        return (frozenGoal.repeatDaysOfMonth ?? const []).contains(d.day);
+      default:
+        final interval = frozenGoal.interval < 1 ? 1 : frozenGoal.interval;
+        final sinceStart = d.difference(startDay).inDays;
+        return sinceStart >= 0 && sinceStart % interval == 0;
+    }
+  }
+
+  /// Units are LOCAL calendar ACTION days counted from [startDay] (day 0 =
+  /// the first action day). Evidence carries the unitIndex; the server only
+  /// enforces arrival time (CC-5), so the day boundary is the user's own
+  /// clock — consistent with how the rest of the app treats "today".
+  ///
+  /// Returns -1 before the start date and on non-action days (existing
+  /// `today >= 0` guards then hide today-actions naturally). For legacy
+  /// daily/interval-1 docs this is byte-identical to the old
+  /// days-since-creation math.
   int unitIndexAt(DateTime now) {
-    final created = DateTime.fromMillisecondsSinceEpoch(createdAtMs);
-    final startOfCreatedDay = DateTime(created.year, created.month, created.day);
-    final startOfNowDay = DateTime(now.year, now.month, now.day);
-    return startOfNowDay.difference(startOfCreatedDay).inDays;
+    final day = DateTime(now.year, now.month, now.day);
+    if (day.isBefore(startDay)) return -1;
+    if (!isActionDate(day)) return -1;
+    var index = -1;
+    for (var d = startDay;
+        !d.isAfter(day);
+        d = DateTime(d.year, d.month, d.day + 1)) {
+      if (isActionDate(d)) index++;
+    }
+    return index;
   }
 
   int get todayUnitIndex => unitIndexAt(DateTime.now());
@@ -384,4 +464,32 @@ class StakeChallenge {
 
   static String participantsToJson(List<StakeParticipant> list) =>
       jsonEncode(list.map((p) => p.toMap()).toList());
+}
+
+/// Pure schedule math for a PROSPECTIVE challenge (create flow): how many
+/// action days a date range + rhythm produces. Must agree with
+/// [StakeChallenge.isActionDate] — the created challenge's `totalUnits`
+/// comes from here.
+int countChallengeActionDays({
+  required DateTime start,
+  required DateTime end,
+  required String cadence,
+  int interval = 1,
+  Set<int> scheduledWeekdays = const {},
+  Set<int> repeatDaysOfMonth = const {},
+}) {
+  final s = DateTime(start.year, start.month, start.day);
+  final e = DateTime(end.year, end.month, end.day);
+  if (e.isBefore(s)) return 0;
+  final step = interval < 1 ? 1 : interval;
+  var count = 0;
+  for (var d = s; !d.isAfter(e); d = DateTime(d.year, d.month, d.day + 1)) {
+    final isAction = switch (cadence) {
+      'weekly' => scheduledWeekdays.contains(d.weekday),
+      'monthly' => repeatDaysOfMonth.contains(d.day),
+      _ => d.difference(s).inDays % step == 0,
+    };
+    if (isAction) count++;
+  }
+  return count;
 }

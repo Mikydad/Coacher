@@ -93,15 +93,39 @@ export const BACKFILL_FLAG_WINDOW_MS = 1 * HOUR_MS;
 
 // ─── Entities ────────────────────────────────────────────────────────────────
 
+/** Challenge rhythm (2026-07-22): units are ACTION DAYS, not every day. */
+export type ChallengeCadence = 'daily' | 'weekly' | 'monthly';
+
 /** CC-6 — goal criteria frozen at creation; later goal edits change nothing. */
 export interface FrozenGoal {
   title: string;
   /** What a unit measures: 'minutes' (timer) or 'count' (reps/pages/…). */
   unitKind: 'minutes' | 'count';
-  /** Per-unit target in unitKind units. Must be > 0. */
+  /** Per-ACTION-DAY target in unitKind units. Must be > 0. */
   unitTarget: number;
-  /** Number of cadence units (days) in the challenge. Must be > 0. */
+  /**
+   * Number of ACTION DAYS between the start date and the deadline — the
+   * unit-index space evidence logs against. Must be > 0. Measurement is
+   * pure index math; the calendar→index mapping lives client-side (the
+   * day boundary is the user's own clock, CC-5).
+   */
   totalUnits: number;
+  /** Absent on legacy docs → 'daily'. */
+  cadence?: ChallengeCadence;
+  /** Daily cadence: every N days (1 = every day). Absent → 1. */
+  interval?: number;
+  /** Weekly cadence: ISO weekdays 1 (Mon) – 7 (Sun), non-empty. */
+  scheduledWeekdays?: number[];
+  /** Monthly cadence: days of month 1–31, non-empty. */
+  repeatDaysOfMonth?: number[];
+  /**
+   * Local-midnight ms of day 0 on the CREATOR's clock. May be in the
+   * future (challenge arms at creation, measurement starts here). Absent
+   * on legacy docs → the creation day.
+   */
+  startDateMs?: number;
+  /** The linked live UserGoal this snapshot was frozen from (staked badge). */
+  linkedGoalId?: string;
 }
 
 export interface PhotoStake {

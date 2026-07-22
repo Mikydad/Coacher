@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/date_keys.dart';
+import '../../../accountability/application/stakes_providers.dart';
 import '../../application/goal_period_helpers.dart';
 import '../../application/goals_providers.dart';
 import '../../domain/models/goal_categories.dart';
@@ -127,6 +128,8 @@ class GoalCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final progressAsync = ref.watch(goalTodayProgressProvider(goal.id));
+    // CC-6 — a live challenge holds this goal hostage; say so.
+    final staked = ref.watch(stakedGoalIdsProvider).contains(goal.id);
 
     return progressAsync.when(
       loading: () => _CardShell(
@@ -136,6 +139,7 @@ class GoalCard extends ConsumerWidget {
         horizonLabel: _horizonLabel,
         measurementLabel: _targetLabel(0),
         metCommitment: false,
+        staked: staked,
         onTap: () {},
         onQuickAdd: null,
       ),
@@ -161,6 +165,7 @@ class GoalCard extends ConsumerWidget {
         measurementLabel: _targetLabel(p.currentValue),
         // Done styling: today explicitly met, or the window target reached.
         metCommitment: p.metCommitment || p.periodTargetMet,
+        staked: staked,
         onTap: () => showModalBottomSheet<void>(
           context: context,
           isScrollControlled: true,
@@ -186,6 +191,7 @@ class _CardShell extends StatelessWidget {
     required this.metCommitment,
     required this.onTap,
     required this.onQuickAdd,
+    this.staked = false,
   });
 
   final Color baseColor;
@@ -198,6 +204,9 @@ class _CardShell extends StatelessWidget {
   final bool metCommitment;
   final VoidCallback onTap;
   final VoidCallback? onQuickAdd;
+
+  /// A live challenge has this goal on the line (CC-6 staked badge).
+  final bool staked;
 
   @override
   Widget build(BuildContext context) {
@@ -257,14 +266,33 @@ class _CardShell extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 2),
-                        Text(
-                          '$horizonLabel · $measurementLabel',
-                          style: TextStyle(
-                            color: metCommitment
-                                ? Colors.black54
-                                : AppColors.fg70,
-                            fontSize: 12,
-                          ),
+                        Row(
+                          children: [
+                            if (staked) ...[
+                              Icon(
+                                Icons.handshake_rounded,
+                                size: 12,
+                                color: metCommitment
+                                    ? Colors.black54
+                                    : AppColors.accent,
+                              ),
+                              const SizedBox(width: 3),
+                            ],
+                            Flexible(
+                              child: Text(
+                                '${staked ? 'Staked · ' : ''}'
+                                '$horizonLabel · $measurementLabel',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: metCommitment
+                                      ? Colors.black54
+                                      : AppColors.fg70,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

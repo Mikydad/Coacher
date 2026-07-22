@@ -44,6 +44,7 @@ import {
 } from './firestore_layout';
 import { assertTransition } from './state_machine';
 import {
+  ChallengeCadence,
   ChallengeType,
   CONFIRM_WINDOW_MS,
   FrozenGoal,
@@ -211,6 +212,46 @@ export const stakeCreateChallenge = onCall(
       totalUnits: int(rawGoal.totalUnits, 'goal.totalUnits', 1, 90),
     };
 
+    // 2026-07-22 — schedule: units are ACTION DAYS. The calendar→index
+    // mapping is client-side (day boundary = the user's clock, CC-5);
+    // here we validate shape and freeze the rhythm.
+    const cadence: ChallengeCadence =
+      rawGoal.cadence === 'weekly'
+        ? 'weekly'
+        : rawGoal.cadence === 'monthly'
+          ? 'monthly'
+          : 'daily';
+    goal.cadence = cadence;
+    if (cadence === 'daily') {
+      goal.interval =
+        rawGoal.interval === undefined
+          ? 1
+          : int(rawGoal.interval, 'goal.interval', 1, 30);
+    } else {
+      const key =
+        cadence === 'weekly' ? 'scheduledWeekdays' : 'repeatDaysOfMonth';
+      const maxDay = cadence === 'weekly' ? 7 : 31;
+      const rawDays = rawGoal[key];
+      if (!Array.isArray(rawDays) || rawDays.length === 0 || rawDays.length > maxDay) {
+        throw new HttpsError('invalid-argument', `goal.${key} must be a non-empty array.`);
+      }
+      const days = [...new Set(rawDays.map((d) => int(d, `goal.${key}[]`, 1, maxDay)))]
+        .sort((a, b) => a - b);
+      if (cadence === 'weekly') goal.scheduledWeekdays = days;
+      else goal.repeatDaysOfMonth = days;
+    }
+    // Future starts allowed (up to 60 days out); 36h of past-grace covers
+    // timezone skew between the creator's local midnight and server now.
+    goal.startDateMs = int(
+      rawGoal.startDateMs ?? now,
+      'goal.startDateMs',
+      now - 36 * HOUR_MS,
+      now + 60 * DAY_MS,
+    );
+    if (typeof rawGoal.linkedGoalId === 'string' && rawGoal.linkedGoalId) {
+      goal.linkedGoalId = str(rawGoal.linkedGoalId, 'goal.linkedGoalId', 1, 64);
+    }
+
     const mode = str(request.data?.mode ?? 'flexible', 'mode', 1, 16);
     if (!['flexible', 'disciplined', 'extreme'].includes(mode)) {
       throw new HttpsError('invalid-argument', 'mode must be flexible|disciplined|extreme.');
@@ -222,6 +263,9 @@ export const stakeCreateChallenge = onCall(
       now + 1 * HOUR_MS,
       now + 120 * DAY_MS,
     );
+    if (deadlineMs <= goal.startDateMs) {
+      throw new HttpsError('invalid-argument', 'deadlineMs must be after goal.startDateMs.');
+    }
 
     // PSY-1 — the pledge is the activating gesture; recorded as an event.
     const rawPledge = (request.data?.pledge ?? {}) as Record<string, unknown>;

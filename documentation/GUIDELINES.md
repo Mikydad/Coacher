@@ -449,6 +449,26 @@ not silent reversal.
   release. Extends the existing D9 "RC-tunable launch constant" pattern
   to the whole monetization surface.
 
+- **2026-07-22 · Challenge commitments are goal-shaped: real linked Goal,
+  full schedule, future starts.** The accountability commitment step now
+  uses the goal editor's own sections (title, target+unit, duration
+  range, Daily/Weekly/Monthly schedule with picked days + every-N,
+  reminder) and MINTS a real UserGoal (staked badge in the hub via
+  `frozenGoal.linkedGoalId`, reminders through the goal machinery,
+  counts toward the future goal cap, same tier gate). Challenge units
+  became ACTION DAYS: `totalUnits` = action days in the picked range,
+  target is per action day, `unitIndexAt` returns -1 on off days (today
+  actions hide naturally), day 0 = the picked start date, which may be
+  in the future (server allows up to 60 days out, 36h back-grace for tz
+  skew). Server measurement stayed pure index math — only creation
+  validation and the client calendar→index mapping changed; legacy docs
+  (no schedule fields) behave byte-identically to days-since-creation.
+  Repeat=Off is rejected for challenges (a stake needs a rhythm to hold
+  you to). *Considered:* per-cycle targets for weekly challenges
+  (rejected: "3 sessions each picked day" is the product's mental model
+  and keeps per-unit mercy intact); staking an EXISTING goal (deferred,
+  anticipated by the tier decisions).
+
 - **2026-07-22 · Today's Goals/Habits % scores goals fractionally, per
   cadence (analytics schema v3).** Daily goals contribute proportionally
   (45/60 min → 0.75× weight, judged over the evaluation window so far);

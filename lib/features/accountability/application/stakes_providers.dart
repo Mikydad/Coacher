@@ -101,6 +101,17 @@ final stakeActionsNeededProvider = Provider<int>((ref) {
   return count;
 });
 
+/// Goal ids currently staked by a NON-TERMINAL challenge — the Goals hub
+/// renders the staked badge from this (CC-6).
+final stakedGoalIdsProvider = Provider<Set<String>>((ref) {
+  final list = ref.watch(stakeChallengesStreamProvider).value ?? const [];
+  return {
+    for (final c in list)
+      if (!c.status.isTerminal && c.frozenGoal.linkedGoalId != null)
+        c.frozenGoal.linkedGoalId!,
+  };
+});
+
 /// Challenges that still need something from the user (not terminal),
 /// newest deadline first — the Stakes hub's "active" list.
 final openStakeChallengesProvider =
