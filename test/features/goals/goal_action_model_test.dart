@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:coach_for_life/features/goals/domain/models/goal_action.dart';
+import 'package:sidepal/features/goals/domain/models/goal_action.dart';
 
 void main() {
   test('fromMap defaults completed to false', () {

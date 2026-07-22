@@ -1,4 +1,4 @@
-import 'package:coach_for_life/features/execution/domain/models/timer_session.dart';
+import 'package:sidepal/features/execution/domain/models/timer_session.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

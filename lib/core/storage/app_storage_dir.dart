@@ -20,7 +20,7 @@ Future<Directory> getAppStorageDirectory() async {
       'Storage fallback: getApplicationDocumentsDirectory failed: $error',
     );
     debugPrint('Storage fallback stack: $stackTrace');
-    final fallback = Directory('${Directory.systemTemp.path}/coach_for_life');
+    final fallback = Directory('${Directory.systemTemp.path}/sidepal');
     if (!await fallback.exists()) {
       await fallback.create(recursive: true);
     }

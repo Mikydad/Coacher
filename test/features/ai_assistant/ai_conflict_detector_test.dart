@@ -1,10 +1,10 @@
-import 'package:coach_for_life/features/ai_assistant/application/ai_conflict_detector.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/ai_action.dart';
-import 'package:coach_for_life/features/context_override/data/context_override_repository.dart';
-import 'package:coach_for_life/features/context_override/domain/models/context_override.dart';
-import 'package:coach_for_life/features/context_override/domain/models/user_attention_state.dart';
-import 'package:coach_for_life/features/reminders/data/reminder_repository.dart';
-import 'package:coach_for_life/features/reminders/domain/models/reminder_config.dart';
+import 'package:sidepal/features/ai_assistant/application/ai_conflict_detector.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/ai_action.dart';
+import 'package:sidepal/features/context_override/data/context_override_repository.dart';
+import 'package:sidepal/features/context_override/domain/models/context_override.dart';
+import 'package:sidepal/features/context_override/domain/models/user_attention_state.dart';
+import 'package:sidepal/features/reminders/data/reminder_repository.dart';
+import 'package:sidepal/features/reminders/domain/models/reminder_config.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // ─── Fakes ────────────────────────────────────────────────────────────────────

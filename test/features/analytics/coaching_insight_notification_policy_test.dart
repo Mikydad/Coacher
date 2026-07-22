@@ -1,6 +1,6 @@
-import 'package:coach_for_life/features/analytics/application/coaching_insight_notification_policy.dart';
-import 'package:coach_for_life/features/coaching/domain/models/enforcement_mode.dart';
-import 'package:coach_for_life/features/profile/domain/models/user_profile_preference.dart';
+import 'package:sidepal/features/analytics/application/coaching_insight_notification_policy.dart';
+import 'package:sidepal/features/coaching/domain/models/enforcement_mode.dart';
+import 'package:sidepal/features/profile/domain/models/user_profile_preference.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 UserProfilePreference _pref({

@@ -1,10 +1,10 @@
 import 'dart:io';
 
-import 'package:coach_for_life/core/offline/offline_store.dart';
-import 'package:coach_for_life/core/sync/sync_service.dart';
-import 'package:coach_for_life/features/reminders/data/isar_reminder_repository.dart';
-import 'package:coach_for_life/features/reminders/data/reminder_repository.dart';
-import 'package:coach_for_life/features/reminders/domain/models/reminder_config.dart';
+import 'package:sidepal/core/offline/offline_store.dart';
+import 'package:sidepal/core/sync/sync_service.dart';
+import 'package:sidepal/features/reminders/data/isar_reminder_repository.dart';
+import 'package:sidepal/features/reminders/data/reminder_repository.dart';
+import 'package:sidepal/features/reminders/domain/models/reminder_config.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isar_community/isar.dart';
 

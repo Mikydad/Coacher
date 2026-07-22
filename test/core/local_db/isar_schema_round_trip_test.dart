@@ -1,16 +1,16 @@
-import 'package:coach_for_life/core/local_db/isar_collections/isar_block.dart';
-import 'package:coach_for_life/core/local_db/isar_collections/isar_goal.dart';
-import 'package:coach_for_life/core/local_db/isar_collections/isar_reminder.dart';
-import 'package:coach_for_life/core/local_db/isar_collections/isar_routine.dart';
-import 'package:coach_for_life/core/local_db/isar_collections/isar_task.dart';
-import 'package:coach_for_life/features/goals/domain/models/goal_categories.dart';
-import 'package:coach_for_life/features/goals/domain/models/goal_enums.dart';
-import 'package:coach_for_life/features/goals/domain/models/user_goal.dart';
-import 'package:coach_for_life/features/planning/domain/models/block.dart';
-import 'package:coach_for_life/features/planning/domain/models/routine.dart';
-import 'package:coach_for_life/features/planning/domain/models/routine_mode.dart';
-import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
-import 'package:coach_for_life/features/reminders/domain/models/reminder_config.dart';
+import 'package:sidepal/core/local_db/isar_collections/isar_block.dart';
+import 'package:sidepal/core/local_db/isar_collections/isar_goal.dart';
+import 'package:sidepal/core/local_db/isar_collections/isar_reminder.dart';
+import 'package:sidepal/core/local_db/isar_collections/isar_routine.dart';
+import 'package:sidepal/core/local_db/isar_collections/isar_task.dart';
+import 'package:sidepal/features/goals/domain/models/goal_categories.dart';
+import 'package:sidepal/features/goals/domain/models/goal_enums.dart';
+import 'package:sidepal/features/goals/domain/models/user_goal.dart';
+import 'package:sidepal/features/planning/domain/models/block.dart';
+import 'package:sidepal/features/planning/domain/models/routine.dart';
+import 'package:sidepal/features/planning/domain/models/routine_mode.dart';
+import 'package:sidepal/features/planning/domain/models/task_item.dart';
+import 'package:sidepal/features/reminders/domain/models/reminder_config.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

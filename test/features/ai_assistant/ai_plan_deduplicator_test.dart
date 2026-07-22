@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/ai_assistant/application/ai_plan_deduplicator.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/ai_action.dart';
+import 'package:sidepal/features/ai_assistant/application/ai_plan_deduplicator.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/ai_action.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

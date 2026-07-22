@@ -1,10 +1,10 @@
 import 'dart:typed_data';
 
-import 'package:coach_for_life/features/feedback/application/feedback_context_collector.dart';
-import 'package:coach_for_life/features/feedback/application/feedback_submit_service.dart';
-import 'package:coach_for_life/features/feedback/data/feedback_repository.dart';
-import 'package:coach_for_life/features/feedback/domain/models/feedback_report.dart';
-import 'package:coach_for_life/features/feedback/presentation/feedback_screen.dart';
+import 'package:sidepal/features/feedback/application/feedback_context_collector.dart';
+import 'package:sidepal/features/feedback/application/feedback_submit_service.dart';
+import 'package:sidepal/features/feedback/data/feedback_repository.dart';
+import 'package:sidepal/features/feedback/domain/models/feedback_report.dart';
+import 'package:sidepal/features/feedback/presentation/feedback_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

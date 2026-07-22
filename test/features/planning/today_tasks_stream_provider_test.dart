@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:coach_for_life/core/di/providers.dart';
-import 'package:coach_for_life/core/sync/sync_service.dart';
-import 'package:coach_for_life/core/utils/date_keys.dart';
-import 'package:coach_for_life/features/planning/application/planned_task_collect.dart';
-import 'package:coach_for_life/core/offline/offline_store.dart';
-import 'package:coach_for_life/features/planning/application/planned_task_providers.dart';
-import 'package:coach_for_life/features/planning/data/isar_planning_repository.dart';
-import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
+import 'package:sidepal/core/di/providers.dart';
+import 'package:sidepal/core/sync/sync_service.dart';
+import 'package:sidepal/core/utils/date_keys.dart';
+import 'package:sidepal/features/planning/application/planned_task_collect.dart';
+import 'package:sidepal/core/offline/offline_store.dart';
+import 'package:sidepal/features/planning/application/planned_task_providers.dart';
+import 'package:sidepal/features/planning/data/isar_planning_repository.dart';
+import 'package:sidepal/features/planning/domain/models/task_item.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isar_community/isar.dart';

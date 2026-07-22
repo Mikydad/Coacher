@@ -1,4 +1,4 @@
-import 'package:coach_for_life/core/sync/post_sync_refresh_coordinator.dart';
+import 'package:sidepal/core/sync/post_sync_refresh_coordinator.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

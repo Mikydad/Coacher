@@ -1,7 +1,7 @@
-import 'package:coach_for_life/features/coaching/domain/models/enforcement_mode.dart';
-import 'package:coach_for_life/features/profile/application/profile_preference_service.dart';
-import 'package:coach_for_life/features/profile/data/profile_preference_repository.dart';
-import 'package:coach_for_life/features/profile/domain/models/user_profile_preference.dart';
+import 'package:sidepal/features/coaching/domain/models/enforcement_mode.dart';
+import 'package:sidepal/features/profile/application/profile_preference_service.dart';
+import 'package:sidepal/features/profile/data/profile_preference_repository.dart';
+import 'package:sidepal/features/profile/domain/models/user_profile_preference.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // ─── In-memory stub repo ──────────────────────────────────────────────────────

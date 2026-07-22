@@ -1,4 +1,4 @@
-import 'package:coach_for_life/features/education/presentation/first_time_feature_card.dart';
+import 'package:sidepal/features/education/presentation/first_time_feature_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

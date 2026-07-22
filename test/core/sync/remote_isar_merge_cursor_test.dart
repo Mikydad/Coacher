@@ -1,12 +1,12 @@
 import 'dart:io';
 
-import 'package:coach_for_life/core/firebase/firestore_client.dart';
-import 'package:coach_for_life/core/local_db/isar_collections/isar_task.dart';
-import 'package:coach_for_life/core/sync/remote_isar_merge.dart';
-import 'package:coach_for_life/core/sync/sync_cursor_store.dart';
-import 'package:coach_for_life/features/planning/domain/models/block.dart';
-import 'package:coach_for_life/features/planning/domain/models/routine.dart';
-import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
+import 'package:sidepal/core/firebase/firestore_client.dart';
+import 'package:sidepal/core/local_db/isar_collections/isar_task.dart';
+import 'package:sidepal/core/sync/remote_isar_merge.dart';
+import 'package:sidepal/core/sync/sync_cursor_store.dart';
+import 'package:sidepal/features/planning/domain/models/block.dart';
+import 'package:sidepal/features/planning/domain/models/routine.dart';
+import 'package:sidepal/features/planning/domain/models/task_item.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isar_community/isar.dart';

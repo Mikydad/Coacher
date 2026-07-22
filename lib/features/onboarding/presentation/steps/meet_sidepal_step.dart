@@ -4,9 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/onboarding_flow_controller.dart';
 import '../onboarding_ui.dart';
 
-/// Screen 4 — Meet PathPal.
-class MeetPathPalStep extends ConsumerWidget {
-  const MeetPathPalStep({super.key, required this.onSkip});
+/// Screen 4 — Meet SidePal.
+class MeetSidePalStep extends ConsumerWidget {
+  const MeetSidePalStep({super.key, required this.onSkip});
 
   final VoidCallback onSkip;
 
@@ -34,7 +34,7 @@ class MeetPathPalStep extends ConsumerWidget {
         children: [
           Text('Meet your AI coach.', style: OnboardingType.headline),
           const SizedBox(height: 10),
-          Text('PathPal helps you:', style: OnboardingType.body),
+          Text('SidePal helps you:', style: OnboardingType.body),
           const SizedBox(height: 18),
           Expanded(
             // 2-column feature cards — six items fit without scrolling.

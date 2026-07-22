@@ -1,6 +1,6 @@
 # ONBOARDING_PRD.md
 
-# PathPal Onboarding Product Requirements Document
+# SidePal Onboarding Product Requirements Document
 
 **Version:** 1.0\
 **Status:** Ready for Implementation\
@@ -63,7 +63,7 @@ Welcome the user and inspire them to begin their journey.
 
 ## Headline
 
-Welcome to PathPal
+Welcome to SidePal
 
 ## Subtitle
 
@@ -154,7 +154,7 @@ Focus on clarity.
 
 ---
 
-# Screen 4 --- Meet PathPal
+# Screen 4 --- Meet SidePal
 
 ## Purpose
 
@@ -166,7 +166,7 @@ Meet your AI coach.
 
 ## Body
 
-PathPal helps you:
+SidePal helps you:
 
 - Remember everything
 - Organize your goals
@@ -214,7 +214,7 @@ Show instead of tell.
 
 ## Headline
 
-Just tell PathPal what you want.
+Just tell SidePal what you want.
 
 ## Visual
 
@@ -387,7 +387,7 @@ No interaction.
 
 ---
 
-# Screen 12 --- Your PathPal
+# Screen 12 --- Your SidePal
 
 ## Purpose
 
@@ -395,7 +395,7 @@ Deliver the "wow" moment.
 
 ## Headline
 
-We've built your PathPal.
+We've built your SidePal.
 
 ## Dashboard Preview
 
@@ -422,7 +422,7 @@ Let's start with the easiest one.
 Beautiful dashboard preview.
 
 ---
-# Screen 13 --- Premium PathPal
+# Screen 13 --- Premium SidePal
 
 ## Purpose
 

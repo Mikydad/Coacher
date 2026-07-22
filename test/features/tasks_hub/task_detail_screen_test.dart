@@ -1,10 +1,10 @@
-import 'package:coach_for_life/core/di/providers.dart';
-import 'package:coach_for_life/features/planning/domain/models/block.dart';
-import 'package:coach_for_life/features/planning/domain/models/routine.dart';
-import 'package:coach_for_life/features/planning/domain/models/routine_mode.dart';
-import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
-import 'package:coach_for_life/features/scoring/application/scoring_controller.dart';
-import 'package:coach_for_life/features/tasks_hub/presentation/task_detail_screen.dart';
+import 'package:sidepal/core/di/providers.dart';
+import 'package:sidepal/features/planning/domain/models/block.dart';
+import 'package:sidepal/features/planning/domain/models/routine.dart';
+import 'package:sidepal/features/planning/domain/models/routine_mode.dart';
+import 'package:sidepal/features/planning/domain/models/task_item.dart';
+import 'package:sidepal/features/scoring/application/scoring_controller.dart';
+import 'package:sidepal/features/tasks_hub/presentation/task_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

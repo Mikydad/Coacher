@@ -1,4 +1,4 @@
-import 'package:coach_for_life/features/scoring/presentation/score_task_dialog.dart';
+import 'package:sidepal/features/scoring/presentation/score_task_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

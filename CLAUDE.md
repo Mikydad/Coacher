@@ -1,4 +1,4 @@
-# PathPal (Coach for Life) — Project Rules
+# SidePal (Coach for Life) — Project Rules
 
 Flutter + Riverpod + Isar (local source of truth) + Firebase (background
 replication). These rules apply to EVERY change; they are not suggestions.

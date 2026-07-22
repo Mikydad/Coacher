@@ -1,10 +1,10 @@
-import 'package:coach_for_life/features/execution/application/execution_controller.dart';
+import 'package:sidepal/features/execution/application/execution_controller.dart';
 import 'package:fake_async/fake_async.dart';
-import 'package:coach_for_life/features/execution/data/execution_repository.dart';
-import 'package:coach_for_life/features/execution/data/timer_runtime_cache.dart';
-import 'package:coach_for_life/features/execution/domain/models/timer_session.dart';
-import 'package:coach_for_life/features/execution/domain/task_timer_engine.dart';
-import 'package:coach_for_life/features/focus/data/focus_resume_store.dart';
+import 'package:sidepal/features/execution/data/execution_repository.dart';
+import 'package:sidepal/features/execution/data/timer_runtime_cache.dart';
+import 'package:sidepal/features/execution/domain/models/timer_session.dart';
+import 'package:sidepal/features/execution/domain/task_timer_engine.dart';
+import 'package:sidepal/features/focus/data/focus_resume_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeExecutionRepository implements ExecutionRepository {

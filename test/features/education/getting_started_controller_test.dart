@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/education/application/education_prefs.dart';
-import 'package:coach_for_life/features/education/application/getting_started_controller.dart';
+import 'package:sidepal/features/education/application/education_prefs.dart';
+import 'package:sidepal/features/education/application/getting_started_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

@@ -1,6 +1,6 @@
-import 'package:coach_for_life/features/planning/application/planned_task_collect.dart';
-import 'package:coach_for_life/features/planning/application/task_prioritizer.dart';
-import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
+import 'package:sidepal/features/planning/application/planned_task_collect.dart';
+import 'package:sidepal/features/planning/application/task_prioritizer.dart';
+import 'package:sidepal/features/planning/domain/models/task_item.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 PlannedTaskRow _row({

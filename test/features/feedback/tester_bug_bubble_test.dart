@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/feedback/application/tester_mode_controller.dart';
-import 'package:coach_for_life/features/feedback/presentation/tester_bug_bubble.dart';
+import 'package:sidepal/features/feedback/application/tester_mode_controller.dart';
+import 'package:sidepal/features/feedback/presentation/tester_bug_bubble.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

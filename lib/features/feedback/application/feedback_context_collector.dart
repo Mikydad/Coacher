@@ -23,7 +23,7 @@ final feedbackContextCollectorProvider = Provider<FeedbackContextCollector>(
 /// Native channel returning {model, osVersion} — implemented in
 /// AppDelegate.swift / MainActivity.kt. In-house instead of device_info_plus,
 /// whose iOS code doesn't compile against this Xcode SDK.
-const _deviceInfoChannel = MethodChannel('pathpal/device_info');
+const _deviceInfoChannel = MethodChannel('sidepal/device_info');
 
 Future<Map<String, String>> _loadDeviceInfo() async {
   final raw = await _deviceInfoChannel.invokeMapMethod<String, String>(

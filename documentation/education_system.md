@@ -2,7 +2,7 @@
 
 *Added 2026-07-10 for the friends-and-family beta.*
 
-Users learn PathPal by using it, not by reading slides. One content registry
+Users learn SidePal by using it, not by reading slides. One content registry
 powers three surfaces; updating a guide updates every surface at once.
 
 ## The registry (single source of truth)

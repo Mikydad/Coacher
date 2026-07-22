@@ -1,11 +1,11 @@
 import 'dart:io';
 
-import 'package:coach_for_life/core/offline/offline_store.dart';
-import 'package:coach_for_life/core/sync/sync_service.dart';
-import 'package:coach_for_life/features/analytics/data/analytics_repository.dart';
-import 'package:coach_for_life/features/analytics/data/isar_analytics_repository.dart';
-import 'package:coach_for_life/features/analytics/domain/models/analytics_event.dart';
-import 'package:coach_for_life/features/analytics/domain/models/analytics_stats_cache.dart';
+import 'package:sidepal/core/offline/offline_store.dart';
+import 'package:sidepal/core/sync/sync_service.dart';
+import 'package:sidepal/features/analytics/data/analytics_repository.dart';
+import 'package:sidepal/features/analytics/data/isar_analytics_repository.dart';
+import 'package:sidepal/features/analytics/domain/models/analytics_event.dart';
+import 'package:sidepal/features/analytics/domain/models/analytics_stats_cache.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isar_community/isar.dart';
 

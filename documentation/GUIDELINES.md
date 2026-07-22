@@ -1,4 +1,4 @@
-# PathPal Guidelines
+# SidePal Guidelines
 
 The working companion to [`CLAUDE.md`](../CLAUDE.md) (which holds the short,
 always-enforced rules). This file holds the fuller checklists and the
@@ -69,7 +69,7 @@ not silent reversal.
 - **2026-07-12 · One header hierarchy app-wide.** Page titles are quiet
   small-caps AppBar chrome (`PageTitle`); section headers are the loudest
   in-page text (`SectionHeader`, 18px); micro-labels stay 11px uppercase.
-  The PathPal logo appears only on Home. *Considered:* big-bold page titles
+  The SidePal logo appears only on Home. *Considered:* big-bold page titles
   (rejected: competed with content).
 
 - **2026-07-12 · Offline-first contract adopted app-wide** (see
@@ -328,3 +328,17 @@ not silent reversal.
   first server echo replaces them, and live snapshot listeners on
   server-owned docs apply unconditionally (no LWW — there is no
   legitimate competing client write). The general pull keeps LWW.
+
+- **2026-07-20 · The app is named SidePal everywhere.** Renamed from
+  PathPal / "Coach for Life": launcher name (iOS `CFBundleDisplayName`,
+  Android `android:label`), splash word, app-bar title, onboarding copy,
+  AI system prompt, reminder texts, export subject, MethodChannel
+  prefixes (`sidepal/…`, updated on both Dart and native sides), and all
+  docs. In a follow-up the internal names went too: Dart package
+  `coach_for_life` → `sidepal` (all imports rewritten), Android
+  namespace/applicationId `com.example.coach_for_life` → `io.sidepal.app`
+  (safe: no google-services.json existed yet, nothing shipped to Play),
+  macOS/Linux/Windows/web product names, and desktop binary names.
+  Still untouched: the Firebase project id (`coach4life-afaaa`) and the
+  repo folder name `Coach_for_life` — both invisible to users.
+

@@ -1,4 +1,4 @@
-import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
+import 'package:sidepal/features/planning/domain/models/task_item.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 PlannedTask _sample({String? modeRefId, bool strictModeRequired = false, bool isHabitAnchor = false}) {

@@ -59,7 +59,7 @@ import '../../context_override/presentation/post_override_review_card.dart';
 import '../../education/presentation/tour_targets.dart';
 import '../../education/presentation/help_dot.dart';
 import '../../timer/presentation/timer_session_screen.dart';
-import 'pathpal_app_bar_title.dart';
+import 'sidepal_app_bar_title.dart';
 
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/async_value_ui.dart';
@@ -99,7 +99,7 @@ class HomeScreen extends ConsumerWidget {
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       appBar: AppBar(
-        title: const PathPalAppBarTitle(),
+        title: const SidePalAppBarTitle(),
         actions: [
           const _SyncFromCloudAction(),
           IconButton(

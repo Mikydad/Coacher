@@ -12,7 +12,7 @@ import 'package:flutter/services.dart';
 class SecureScreen {
   SecureScreen._();
 
-  static const _channel = MethodChannel('pathpal/secure_screen');
+  static const _channel = MethodChannel('sidepal/secure_screen');
 
   static VoidCallback? _onScreenshot;
   static ValueChanged<bool>? _onCaptureChanged;

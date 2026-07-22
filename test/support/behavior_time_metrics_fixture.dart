@@ -1,4 +1,4 @@
-import 'package:coach_for_life/features/analytics/domain/models/behavior_feature_object.dart';
+import 'package:sidepal/features/analytics/domain/models/behavior_feature_object.dart';
 
 /// Compact factory for tests after Layer 1 metric split (schema v2).
 BehaviorTimeMetrics testBehaviorTimeMetrics({

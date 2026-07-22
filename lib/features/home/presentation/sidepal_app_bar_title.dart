@@ -5,8 +5,8 @@ import '../../../app/application/main_tab_navigation.dart';
 import '../../../app/presentation/main_tab_shell.dart';
 
 /// Tappable app bar brand: always returns the user to the Home tab.
-class PathPalAppBarTitle extends StatelessWidget {
-  const PathPalAppBarTitle({super.key});
+class SidePalAppBarTitle extends StatelessWidget {
+  const SidePalAppBarTitle({super.key});
 
   static void goHome(BuildContext context) {
     final container = ProviderScope.containerOf(context);
@@ -21,7 +21,7 @@ class PathPalAppBarTitle extends StatelessWidget {
     return Semantics(
       button: true,
       label: 'Go to home',
-      child: InkWell(onTap: () => goHome(context), child: const Text('PathPal')),
+      child: InkWell(onTap: () => goHome(context), child: const Text('SidePal')),
     );
   }
 }

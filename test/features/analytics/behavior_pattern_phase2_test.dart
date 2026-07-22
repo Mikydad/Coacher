@@ -1,9 +1,9 @@
-import 'package:coach_for_life/features/analytics/application/behavior_pattern_phase2.dart';
-import 'package:coach_for_life/features/analytics/application/pattern_detection_engine.dart';
-import 'package:coach_for_life/features/analytics/domain/models/behavior_feature_object.dart';
-import 'package:coach_for_life/features/analytics/domain/models/detected_behavior_pattern.dart';
-import 'package:coach_for_life/features/analytics/domain/models/detected_pattern.dart';
-import 'package:coach_for_life/features/analytics/domain/models/pattern_taxonomy.dart';
+import 'package:sidepal/features/analytics/application/behavior_pattern_phase2.dart';
+import 'package:sidepal/features/analytics/application/pattern_detection_engine.dart';
+import 'package:sidepal/features/analytics/domain/models/behavior_feature_object.dart';
+import 'package:sidepal/features/analytics/domain/models/detected_behavior_pattern.dart';
+import 'package:sidepal/features/analytics/domain/models/detected_pattern.dart';
+import 'package:sidepal/features/analytics/domain/models/pattern_taxonomy.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/behavior_time_metrics_fixture.dart';

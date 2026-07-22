@@ -1,4 +1,4 @@
-import 'package:coach_for_life/features/analytics/application/feature_builder_input_adapters.dart';
+import 'package:sidepal/features/analytics/application/feature_builder_input_adapters.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

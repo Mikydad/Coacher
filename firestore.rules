@@ -307,6 +307,26 @@ service cloud.firestore {
     // The hasOnly key list MUST mirror FeedbackReport.toMap() — a unit test
     // (feedback_report_model_test.dart "toMap key set…") guards the pair.
 
+    // ─── Waitlist (public website) ─────────────────────────────────────────
+    // Pre-launch signups from sidepal.io (SidePal_web repo, lib/waitlist.ts
+    // writes via REST). UNAUTHENTICATED create-only with a strict shape;
+    // reviewed in the console. No read/update/delete from any client — the
+    // email list must never be scrapeable.
+
+    match /waitlist/{signupId} {
+      allow create: if request.resource.data.keys().hasOnly(
+             ['email', 'source', 'createdAtMs'])
+        && request.resource.data.keys().hasAll(
+             ['email', 'source', 'createdAtMs'])
+        && request.resource.data.email is string
+        && request.resource.data.email.size() >= 5
+        && request.resource.data.email.size() <= 200
+        && request.resource.data.email.matches('.+@.+[.].+')
+        && request.resource.data.source == 'website'
+        && request.resource.data.createdAtMs is int;
+      allow read, update, delete: if false;
+    }
+
     match /feedback/{feedbackId} {
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:coach_for_life/features/planning/application/task_schedule_display.dart';
-import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
+import 'package:sidepal/features/planning/application/task_schedule_display.dart';
+import 'package:sidepal/features/planning/domain/models/task_item.dart';
 
 PlannedTask _sleepTask({
   required String reminderTimeIso,

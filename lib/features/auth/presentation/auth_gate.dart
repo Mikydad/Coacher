@@ -207,7 +207,7 @@ class _AuthFlowApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Coach for Life',
+      title: 'SidePal',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,

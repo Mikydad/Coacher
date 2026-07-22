@@ -1,7 +1,7 @@
-import 'package:coach_for_life/features/goals/domain/models/goal_editor_form_draft.dart';
-import 'package:coach_for_life/features/planning/application/form_draft_providers.dart';
-import 'package:coach_for_life/features/planning/data/form_draft_repository.dart';
-import 'package:coach_for_life/features/planning/domain/models/add_task_form_draft.dart';
+import 'package:sidepal/features/goals/domain/models/goal_editor_form_draft.dart';
+import 'package:sidepal/features/planning/application/form_draft_providers.dart';
+import 'package:sidepal/features/planning/data/form_draft_repository.dart';
+import 'package:sidepal/features/planning/domain/models/add_task_form_draft.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

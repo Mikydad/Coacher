@@ -1,4 +1,4 @@
-import 'package:coach_for_life/core/sync/lww_updated_at.dart';
+import 'package:sidepal/core/sync/lww_updated_at.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

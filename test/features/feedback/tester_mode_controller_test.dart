@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/auth/application/auth_providers.dart';
-import 'package:coach_for_life/features/feedback/application/tester_mode_controller.dart';
+import 'package:sidepal/features/auth/application/auth_providers.dart';
+import 'package:sidepal/features/feedback/application/tester_mode_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

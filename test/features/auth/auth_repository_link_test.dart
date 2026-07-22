@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:coach_for_life/features/auth/domain/auth_failure.dart';
+import 'package:sidepal/features/auth/domain/auth_failure.dart';
 
 /// Phase C — Tests for the anonymous-link code paths.
 ///

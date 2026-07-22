@@ -1,4 +1,4 @@
-import 'package:coach_for_life/features/planning/application/accountability_retention_worker.dart';
+import 'package:sidepal/features/planning/application/accountability_retention_worker.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

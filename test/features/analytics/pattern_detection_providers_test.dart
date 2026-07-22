@@ -1,9 +1,9 @@
-import 'package:coach_for_life/features/analytics/application/pattern_detection_orchestrator.dart';
-import 'package:coach_for_life/features/analytics/application/pattern_detection_providers.dart';
-import 'package:coach_for_life/features/analytics/data/pattern_detection_repository.dart';
-import 'package:coach_for_life/features/analytics/domain/models/behavior_feature_object.dart';
-import 'package:coach_for_life/features/analytics/domain/models/detected_behavior_pattern.dart';
-import 'package:coach_for_life/features/analytics/domain/models/detected_pattern.dart';
+import 'package:sidepal/features/analytics/application/pattern_detection_orchestrator.dart';
+import 'package:sidepal/features/analytics/application/pattern_detection_providers.dart';
+import 'package:sidepal/features/analytics/data/pattern_detection_repository.dart';
+import 'package:sidepal/features/analytics/domain/models/behavior_feature_object.dart';
+import 'package:sidepal/features/analytics/domain/models/detected_behavior_pattern.dart';
+import 'package:sidepal/features/analytics/domain/models/detected_pattern.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:coach_for_life/core/runtime/recompute_scope.dart';
-import 'package:coach_for_life/core/runtime/unified_recompute_graph.dart';
+import 'package:sidepal/core/runtime/recompute_scope.dart';
+import 'package:sidepal/core/runtime/unified_recompute_graph.dart';
 
 void main() {
   final graph = UnifiedRecomputeGraph.instance;

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:coach_for_life/features/community/data/circle_proof_storage.dart';
+import 'package:sidepal/features/community/data/circle_proof_storage.dart';
 
 void main() {
   group('imageExtensionFromPath', () {

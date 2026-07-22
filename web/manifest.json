@@ -1,6 +1,6 @@
 {
-    "name": "coach_for_life",
-    "short_name": "coach_for_life",
+    "name": "SidePal",
+    "short_name": "SidePal",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

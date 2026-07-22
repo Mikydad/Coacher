@@ -1,12 +1,12 @@
-# PathPal — Accountability Stakes System: Feature Specification
+# SidePal — Accountability Stakes System: Feature Specification
 
-**Purpose of this document:** Full specification of the new accountability features for PathPal (formerly CoachForLife). Use this to plan the implementation against the existing codebase (Flutter, Riverpod, Isar, Firebase, offline-first with SyncService, Cloud Functions already in use for the OpenAI proxy).
+**Purpose of this document:** Full specification of the new accountability features for SidePal (formerly CoachForLife). Use this to plan the implementation against the existing codebase (Flutter, Riverpod, Isar, Firebase, offline-first with SyncService, Cloud Functions already in use for the OpenAI proxy).
 
 ---
 
 ## 1. Product Overview
 
-PathPal is a goal/habit app with AI coaching and community circles. This feature set adds **accountability stakes**: users put something real on the line (social exposure, an embarrassing photo, or money) when committing to a goal. If they succeed, nothing is lost. If they fail, the stake is forfeited.
+SidePal is a goal/habit app with AI coaching and community circles. This feature set adds **accountability stakes**: users put something real on the line (social exposure, an embarrassing photo, or money) when committing to a goal. If they succeed, nothing is lost. If they fail, the stake is forfeited.
 
 **Core principle (legal + ethical): no user ever wins another user's money.** Winners get their own stake back. Losers' stakes go to charity. This keeps the system a commitment contract (StickK model), not gambling.
 
@@ -165,7 +165,7 @@ Same flow with points as the stake. Loser's points are burned (recorded for the 
 - Apple In-App Purchase via RevenueCat (or `in_app_purchase` + StoreKit). Enroll in the App Store Small Business Program (15% instead of 30%).
 - **Points can NEVER be cashed out to money** (Apple rule + gambling law). One-way only.
 - "Buy points" screen built now but hidden behind a Remote Config flag; flipping the flag + wiring RevenueCat adds `iap_purchase` as one more ledger source. Server-side receipt validation required.
-- Quarterly: forfeited/burned points are converted by PathPal into real charity donations from company revenue, published in-app (trust/marketing; no user money moves, no extra compliance).
+- Quarterly: forfeited/burned points are converted by SidePal into real charity donations from company revenue, published in-app (trust/marketing; no user money moves, no extra compliance).
 
 ---
 

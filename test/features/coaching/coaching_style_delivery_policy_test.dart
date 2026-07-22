@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/coaching/application/coaching_style_delivery_policy.dart';
-import 'package:coach_for_life/features/coaching/domain/models/coaching_style.dart';
+import 'package:sidepal/features/coaching/application/coaching_style_delivery_policy.dart';
+import 'package:sidepal/features/coaching/domain/models/coaching_style.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

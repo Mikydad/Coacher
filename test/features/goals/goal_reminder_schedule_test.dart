@@ -1,6 +1,6 @@
-import 'package:coach_for_life/features/goals/application/goal_reminder_schedule.dart';
-import 'package:coach_for_life/features/goals/domain/models/goal_enums.dart';
-import 'package:coach_for_life/features/goals/domain/models/user_goal.dart';
+import 'package:sidepal/features/goals/application/goal_reminder_schedule.dart';
+import 'package:sidepal/features/goals/domain/models/goal_enums.dart';
+import 'package:sidepal/features/goals/domain/models/user_goal.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 UserGoal _goal({

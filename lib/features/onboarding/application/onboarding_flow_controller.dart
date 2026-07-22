@@ -11,7 +11,7 @@ enum OnboardingStep {
   register,
   struggles,
   whyThisHappens,
-  meetPathPal,
+  meetSidePal,
   community,
   aiDemo,
   theProblem,
@@ -19,7 +19,7 @@ enum OnboardingStep {
   science,
   chooseGoals,
   personalizing,
-  yourPathPal,
+  yourSidePal,
   premium,
   journey,
 }

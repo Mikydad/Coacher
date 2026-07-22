@@ -1,6 +1,6 @@
-# coach_for_life
+# SidePal
 
-A new Flutter project.
+Personal productivity coach — build habits that last.
 
 ## Documentation
 

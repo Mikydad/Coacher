@@ -1196,8 +1196,8 @@ class _VersionFooterState extends ConsumerState<_VersionFooter> {
   Widget build(BuildContext context) {
     final info = ref.watch(packageInfoProvider).valueOrNull;
     final label = info == null
-        ? 'PATHPAL'
-        : 'PATHPAL V${info.version} BUILD ${info.buildNumber}';
+        ? 'SIDEPAL'
+        : 'SIDEPAL V${info.version} BUILD ${info.buildNumber}';
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _onTap,

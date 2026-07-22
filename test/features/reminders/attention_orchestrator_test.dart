@@ -1,12 +1,12 @@
-import 'package:coach_for_life/features/analytics/domain/models/current_coaching_focus.dart';
-import 'package:coach_for_life/features/context_override/domain/models/context_override.dart';
-import 'package:coach_for_life/features/context_override/domain/models/interruption_level.dart';
-import 'package:coach_for_life/features/context_override/domain/models/user_attention_state.dart';
-import 'package:coach_for_life/features/reminders/application/attention_orchestrator.dart';
-import 'package:coach_for_life/features/reminders/domain/models/attention_outcome.dart';
-import 'package:coach_for_life/features/reminders/domain/models/recent_delivery.dart';
-import 'package:coach_for_life/features/reminders/domain/models/reminder_intent.dart';
-import 'package:coach_for_life/features/reminders/domain/models/reminder_type.dart';
+import 'package:sidepal/features/analytics/domain/models/current_coaching_focus.dart';
+import 'package:sidepal/features/context_override/domain/models/context_override.dart';
+import 'package:sidepal/features/context_override/domain/models/interruption_level.dart';
+import 'package:sidepal/features/context_override/domain/models/user_attention_state.dart';
+import 'package:sidepal/features/reminders/application/attention_orchestrator.dart';
+import 'package:sidepal/features/reminders/domain/models/attention_outcome.dart';
+import 'package:sidepal/features/reminders/domain/models/recent_delivery.dart';
+import 'package:sidepal/features/reminders/domain/models/reminder_intent.dart';
+import 'package:sidepal/features/reminders/domain/models/reminder_type.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

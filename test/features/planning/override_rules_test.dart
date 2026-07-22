@@ -1,8 +1,8 @@
-import 'package:coach_for_life/features/planning/application/override_rules.dart';
-import 'package:coach_for_life/features/execution/domain/models/timer_session.dart';
-import 'package:coach_for_life/features/planning/domain/models/routine.dart';
-import 'package:coach_for_life/features/planning/domain/models/routine_mode.dart';
-import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
+import 'package:sidepal/features/planning/application/override_rules.dart';
+import 'package:sidepal/features/execution/domain/models/timer_session.dart';
+import 'package:sidepal/features/planning/domain/models/routine.dart';
+import 'package:sidepal/features/planning/domain/models/routine_mode.dart';
+import 'package:sidepal/features/planning/domain/models/task_item.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 PlannedTask _task({

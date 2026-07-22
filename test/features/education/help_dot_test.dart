@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/ai_assistant/presentation/ai_assistant_screen.dart';
-import 'package:coach_for_life/features/education/presentation/help_dot.dart';
+import 'package:sidepal/features/ai_assistant/presentation/ai_assistant_screen.dart';
+import 'package:sidepal/features/education/presentation/help_dot.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

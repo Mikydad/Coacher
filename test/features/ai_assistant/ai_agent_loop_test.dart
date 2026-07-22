@@ -1,8 +1,8 @@
-import 'package:coach_for_life/core/ai/ai_proxy_client.dart';
-import 'package:coach_for_life/features/ai_assistant/application/ai_operating_layer_client.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/ai_action.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/ai_operating_layer_payload.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/ai_response_type.dart';
+import 'package:sidepal/core/ai/ai_proxy_client.dart';
+import 'package:sidepal/features/ai_assistant/application/ai_operating_layer_client.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/ai_action.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/ai_operating_layer_payload.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/ai_response_type.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Scripted proxy: returns the queued results in order and records the

@@ -1,4 +1,4 @@
-import 'package:coach_for_life/features/feedback/domain/models/feedback_report.dart';
+import 'package:sidepal/features/feedback/domain/models/feedback_report.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 FeedbackReport _report({

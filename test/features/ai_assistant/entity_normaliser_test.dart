@@ -1,4 +1,4 @@
-import 'package:coach_for_life/features/ai_assistant/application/entity_normaliser.dart';
+import 'package:sidepal/features/ai_assistant/application/entity_normaliser.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

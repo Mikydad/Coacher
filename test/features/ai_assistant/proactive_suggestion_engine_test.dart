@@ -4,19 +4,19 @@
 library;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:coach_for_life/features/ai_assistant/application/schedule_optimisation_service.dart';
-import 'package:coach_for_life/features/ai_assistant/data/dismissed_suggestion_repository.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/proactive_suggestion.dart';
-import 'package:coach_for_life/features/planning/application/planned_task_collect.dart';
-import 'package:coach_for_life/features/planning/data/planning_repository.dart';
-import 'package:coach_for_life/features/planning/domain/models/accountability_log.dart';
-import 'package:coach_for_life/features/planning/domain/models/block.dart';
-import 'package:coach_for_life/features/planning/domain/models/flow_transition_event.dart';
-import 'package:coach_for_life/features/planning/domain/models/routine.dart';
-import 'package:coach_for_life/features/planning/domain/models/routine_mode.dart';
-import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
-import 'package:coach_for_life/features/reminders/data/reminder_repository.dart';
-import 'package:coach_for_life/features/reminders/domain/models/reminder_config.dart';
+import 'package:sidepal/features/ai_assistant/application/schedule_optimisation_service.dart';
+import 'package:sidepal/features/ai_assistant/data/dismissed_suggestion_repository.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/proactive_suggestion.dart';
+import 'package:sidepal/features/planning/application/planned_task_collect.dart';
+import 'package:sidepal/features/planning/data/planning_repository.dart';
+import 'package:sidepal/features/planning/domain/models/accountability_log.dart';
+import 'package:sidepal/features/planning/domain/models/block.dart';
+import 'package:sidepal/features/planning/domain/models/flow_transition_event.dart';
+import 'package:sidepal/features/planning/domain/models/routine.dart';
+import 'package:sidepal/features/planning/domain/models/routine_mode.dart';
+import 'package:sidepal/features/planning/domain/models/task_item.dart';
+import 'package:sidepal/features/reminders/data/reminder_repository.dart';
+import 'package:sidepal/features/reminders/domain/models/reminder_config.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // ─── Fakes ────────────────────────────────────────────────────────────────────

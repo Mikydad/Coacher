@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/planning/domain/models/accountability_log.dart';
-import 'package:coach_for_life/features/planning/domain/models/flow_transition_event.dart';
+import 'package:sidepal/features/planning/domain/models/accountability_log.dart';
+import 'package:sidepal/features/planning/domain/models/flow_transition_event.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,10 +1,10 @@
-import 'package:coach_for_life/core/local_db/isar_collections/isar_ai_interaction_history.dart';
-import 'package:coach_for_life/features/ai_assistant/application/ai_payload_assembler.dart';
-import 'package:coach_for_life/features/ai_assistant/data/ai_interaction_history_repository.dart';
-import 'package:coach_for_life/features/coaching/data/coaching_style_repository.dart';
-import 'package:coach_for_life/features/context_override/data/context_override_repository.dart';
-import 'package:coach_for_life/features/goals/data/goals_repository.dart';
-import 'package:coach_for_life/features/planning/data/planning_repository.dart';
+import 'package:sidepal/core/local_db/isar_collections/isar_ai_interaction_history.dart';
+import 'package:sidepal/features/ai_assistant/application/ai_payload_assembler.dart';
+import 'package:sidepal/features/ai_assistant/data/ai_interaction_history_repository.dart';
+import 'package:sidepal/features/coaching/data/coaching_style_repository.dart';
+import 'package:sidepal/features/context_override/data/context_override_repository.dart';
+import 'package:sidepal/features/goals/data/goals_repository.dart';
+import 'package:sidepal/features/planning/data/planning_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeHistoryRepo implements AiInteractionHistoryRepository {

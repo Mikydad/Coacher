@@ -1,7 +1,7 @@
-import 'package:coach_for_life/features/planning/application/auto_next_task_flow.dart';
-import 'package:coach_for_life/features/planning/application/planned_task_collect.dart';
-import 'package:coach_for_life/features/planning/application/task_prioritizer.dart';
-import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
+import 'package:sidepal/features/planning/application/auto_next_task_flow.dart';
+import 'package:sidepal/features/planning/application/planned_task_collect.dart';
+import 'package:sidepal/features/planning/application/task_prioritizer.dart';
+import 'package:sidepal/features/planning/domain/models/task_item.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 final _autoNextNow = DateTime(2026, 4, 30, 18, 0);

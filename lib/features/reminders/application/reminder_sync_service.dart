@@ -323,9 +323,9 @@ class ReminderSyncService {
     if (step.requireAppOpenNudge) {
       final t = reminder.taskTitle?.trim();
       if (t != null && t.isNotEmpty) {
-        return 'Please open Coach for Life: start "$t" or provide a logical reason.';
+        return 'Please open SidePal: start "$t" or provide a logical reason.';
       }
-      return 'Please open Coach for Life: start this task or provide a logical reason.';
+      return 'Please open SidePal: start this task or provide a logical reason.';
     }
     final t = reminder.taskTitle?.trim();
     if (t != null && t.isNotEmpty) return 'Time to start "$t".';

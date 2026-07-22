@@ -5,12 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'package:coach_for_life/features/auth/application/auth_providers.dart';
-import 'package:coach_for_life/features/auth/application/auth_repository_interface.dart';
-import 'package:coach_for_life/features/auth/domain/auth_failure.dart';
-import 'package:coach_for_life/features/auth/presentation/login_screen.dart';
-import 'package:coach_for_life/features/auth/presentation/widgets/auth_email_password_form.dart';
-import 'package:coach_for_life/features/auth/presentation/widgets/auth_error_text.dart';
+import 'package:sidepal/features/auth/application/auth_providers.dart';
+import 'package:sidepal/features/auth/application/auth_repository_interface.dart';
+import 'package:sidepal/features/auth/domain/auth_failure.dart';
+import 'package:sidepal/features/auth/presentation/login_screen.dart';
+import 'package:sidepal/features/auth/presentation/widgets/auth_email_password_form.dart';
+import 'package:sidepal/features/auth/presentation/widgets/auth_error_text.dart';
 
 // ── Fake repository ───────────────────────────────────────────────────────────
 

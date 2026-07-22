@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/goals/application/goal_intensity_mode.dart';
-import 'package:coach_for_life/features/planning/domain/models/routine_mode.dart';
+import 'package:sidepal/features/goals/application/goal_intensity_mode.dart';
+import 'package:sidepal/features/planning/domain/models/routine_mode.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

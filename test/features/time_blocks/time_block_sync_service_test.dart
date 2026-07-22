@@ -1,6 +1,6 @@
-import 'package:coach_for_life/features/time_blocks/application/time_block_sync_service.dart';
-import 'package:coach_for_life/features/time_blocks/data/time_block_repository.dart';
-import 'package:coach_for_life/features/time_blocks/domain/models/scheduled_time_block.dart';
+import 'package:sidepal/features/time_blocks/application/time_block_sync_service.dart';
+import 'package:sidepal/features/time_blocks/data/time_block_repository.dart';
+import 'package:sidepal/features/time_blocks/domain/models/scheduled_time_block.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // ─── Fake repository ──────────────────────────────────────────────────────────

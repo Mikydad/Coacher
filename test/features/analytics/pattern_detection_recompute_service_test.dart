@@ -1,14 +1,14 @@
-import 'package:coach_for_life/features/analytics/application/behavior_pattern_phase2.dart';
-import 'package:coach_for_life/features/analytics/application/pattern_aggregate_builder.dart';
-import 'package:coach_for_life/features/analytics/application/pattern_detection_orchestrator.dart';
-import 'package:coach_for_life/features/analytics/application/pattern_detection_debug.dart';
-import 'package:coach_for_life/features/analytics/application/pattern_detection_recompute_service.dart';
-import 'package:coach_for_life/features/analytics/application/pattern_detection_pipeline.dart';
-import 'package:coach_for_life/features/analytics/data/feature_cache_repository.dart';
-import 'package:coach_for_life/features/analytics/data/pattern_detection_repository.dart';
-import 'package:coach_for_life/features/analytics/domain/models/behavior_feature_object.dart';
-import 'package:coach_for_life/features/analytics/domain/models/detected_behavior_pattern.dart';
-import 'package:coach_for_life/features/analytics/domain/models/detected_pattern.dart';
+import 'package:sidepal/features/analytics/application/behavior_pattern_phase2.dart';
+import 'package:sidepal/features/analytics/application/pattern_aggregate_builder.dart';
+import 'package:sidepal/features/analytics/application/pattern_detection_orchestrator.dart';
+import 'package:sidepal/features/analytics/application/pattern_detection_debug.dart';
+import 'package:sidepal/features/analytics/application/pattern_detection_recompute_service.dart';
+import 'package:sidepal/features/analytics/application/pattern_detection_pipeline.dart';
+import 'package:sidepal/features/analytics/data/feature_cache_repository.dart';
+import 'package:sidepal/features/analytics/data/pattern_detection_repository.dart';
+import 'package:sidepal/features/analytics/domain/models/behavior_feature_object.dart';
+import 'package:sidepal/features/analytics/domain/models/detected_behavior_pattern.dart';
+import 'package:sidepal/features/analytics/domain/models/detected_pattern.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakePatternOrchestrator extends PatternDetectionOrchestrator {

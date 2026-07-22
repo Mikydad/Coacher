@@ -1,6 +1,6 @@
-import 'package:coach_for_life/features/context_override/application/override_attention_policy.dart';
-import 'package:coach_for_life/features/context_override/domain/models/context_override.dart';
-import 'package:coach_for_life/features/context_override/domain/models/interruption_level.dart';
+import 'package:sidepal/features/context_override/application/override_attention_policy.dart';
+import 'package:sidepal/features/context_override/domain/models/context_override.dart';
+import 'package:sidepal/features/context_override/domain/models/interruption_level.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

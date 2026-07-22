@@ -1,6 +1,6 @@
-import 'package:coach_for_life/features/analytics/application/delivery_selection_engine.dart';
-import 'package:coach_for_life/features/analytics/domain/models/delivery_decision.dart';
-import 'package:coach_for_life/features/analytics/domain/models/generated_insight.dart';
+import 'package:sidepal/features/analytics/application/delivery_selection_engine.dart';
+import 'package:sidepal/features/analytics/domain/models/delivery_decision.dart';
+import 'package:sidepal/features/analytics/domain/models/generated_insight.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:coach_for_life/core/local_db/isar_collections/isar_delivery_decision_snapshot.dart';
-import 'package:coach_for_life/core/local_db/isar_collections/isar_delivery_history_entry.dart';
-import 'package:coach_for_life/core/offline/offline_store.dart';
-import 'package:coach_for_life/features/analytics/data/delivery_repository.dart';
-import 'package:coach_for_life/features/analytics/domain/models/delivery_decision.dart';
-import 'package:coach_for_life/features/analytics/domain/models/generated_insight.dart';
+import 'package:sidepal/core/local_db/isar_collections/isar_delivery_decision_snapshot.dart';
+import 'package:sidepal/core/local_db/isar_collections/isar_delivery_history_entry.dart';
+import 'package:sidepal/core/offline/offline_store.dart';
+import 'package:sidepal/features/analytics/data/delivery_repository.dart';
+import 'package:sidepal/features/analytics/domain/models/delivery_decision.dart';
+import 'package:sidepal/features/analytics/domain/models/generated_insight.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isar_community/isar.dart';
 

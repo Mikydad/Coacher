@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
-import 'package:coach_for_life/core/sync/sync_service.dart';
-import 'package:coach_for_life/features/feedback/data/firestore_feedback_repository.dart';
-import 'package:coach_for_life/features/feedback/domain/models/feedback_report.dart';
+import 'package:sidepal/core/sync/sync_service.dart';
+import 'package:sidepal/features/feedback/data/firestore_feedback_repository.dart';
+import 'package:sidepal/features/feedback/domain/models/feedback_report.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 

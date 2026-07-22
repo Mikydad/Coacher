@@ -49,7 +49,7 @@ days. Realistic total: **3–10 weeks**, almost entirely IRS-dependent.
   non-resident path both agents push. Delaware buys nothing here unless
   raising VC.
 - [ ] Company name: check it's clean as an App Store seller name too
-  (e.g. "PathPal Labs LLC") — this becomes the public "Seller" line.
+  (e.g. "SidePal Labs LLC") — this becomes the public "Seller" line.
 - [ ] Agent provides: registered agent + US business address + Articles
   of Organization + operating agreement.
 
@@ -90,8 +90,8 @@ US address.
   entities — complete it there, nothing to prepare.
 - [ ] Business description: same commitment-contract story as A3.
   Category: software/SaaS. Do NOT describe it as donations processing or
-  crowdfunding — PathPal charges a service (the stake escrow), and
-  disbursement to charities is PathPal's own act (manual at first, per
+  crowdfunding — SidePal charges a service (the stake escrow), and
+  disbursement to charities is SidePal's own act (manual at first, per
   PRD §4.3).
 - [ ] Once activated: create restricted API keys, put the secret key in
   Cloud Functions secrets (same pattern as `OPENAI_API_KEY`), never in

@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/community/domain/models/circle_enums.dart';
-import 'package:coach_for_life/features/community/domain/models/circle_message.dart';
+import 'package:sidepal/features/community/domain/models/circle_enums.dart';
+import 'package:sidepal/features/community/domain/models/circle_message.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 CircleMessage _makeMessage({

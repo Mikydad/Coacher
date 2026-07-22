@@ -12,7 +12,7 @@ import 'steps/community_step.dart';
 import 'steps/day_one_step.dart';
 import 'steps/goals_step.dart';
 import 'steps/journey_step.dart';
-import 'steps/meet_pathpal_step.dart';
+import 'steps/meet_sidepal_step.dart';
 import 'steps/personalizing_step.dart';
 import 'steps/premium_step.dart';
 import 'steps/problem_step.dart';
@@ -21,7 +21,7 @@ import 'steps/science_step.dart';
 import 'steps/struggles_step.dart';
 import 'steps/welcome_step.dart';
 import 'steps/why_step.dart';
-import 'steps/your_pathpal_step.dart';
+import 'steps/your_sidepal_step.dart';
 
 /// Self-contained [MaterialApp] for the first-launch onboarding flow.
 ///
@@ -38,7 +38,7 @@ class OnboardingFlowApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'PathPal',
+      title: 'SidePal',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
@@ -158,8 +158,8 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
         return StrugglesStep(onSkip: _skip);
       case OnboardingStep.whyThisHappens:
         return WhyStep(onSkip: _skip);
-      case OnboardingStep.meetPathPal:
-        return MeetPathPalStep(onSkip: _skip);
+      case OnboardingStep.meetSidePal:
+        return MeetSidePalStep(onSkip: _skip);
       case OnboardingStep.community:
         return CommunityStep(onSkip: _skip);
       case OnboardingStep.aiDemo:
@@ -174,8 +174,8 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
         return GoalsStep(onSkip: _skip);
       case OnboardingStep.personalizing:
         return const PersonalizingStep();
-      case OnboardingStep.yourPathPal:
-        return YourPathPalStep(onSkip: _skip);
+      case OnboardingStep.yourSidePal:
+        return YourSidePalStep(onSkip: _skip);
       case OnboardingStep.premium:
         return PremiumStep(onSkip: _skip);
       case OnboardingStep.journey:

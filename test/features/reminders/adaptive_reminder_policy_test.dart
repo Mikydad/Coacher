@@ -1,4 +1,4 @@
-import 'package:coach_for_life/features/reminders/application/adaptive_reminder_policy.dart';
+import 'package:sidepal/features/reminders/application/adaptive_reminder_policy.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

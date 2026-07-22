@@ -1,6 +1,6 @@
-import 'package:coach_for_life/features/ai_assistant/application/ai_operating_layer_client.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/ai_operating_layer_payload.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/ai_response_type.dart';
+import 'package:sidepal/features/ai_assistant/application/ai_operating_layer_client.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/ai_operating_layer_payload.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/ai_response_type.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:coach_for_life/core/local_db/isar_collections/isar_ai_interaction_history.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/ai_action.dart';
-import 'package:coach_for_life/features/ai_assistant/presentation/widgets/quick_directives_row.dart';
+import 'package:sidepal/core/local_db/isar_collections/isar_ai_interaction_history.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/ai_action.dart';
+import 'package:sidepal/features/ai_assistant/presentation/widgets/quick_directives_row.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Tests for the dynamic quick-directives logic (extracted to a pure function

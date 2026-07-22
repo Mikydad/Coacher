@@ -1,15 +1,15 @@
-import 'package:coach_for_life/core/notifications/local_notifications_service.dart';
-import 'package:coach_for_life/features/analytics/data/focus_repository.dart';
-import 'package:coach_for_life/features/analytics/domain/models/analytics_event.dart';
-import 'package:coach_for_life/features/analytics/domain/models/current_coaching_focus.dart';
-import 'package:coach_for_life/features/context_override/data/context_override_repository.dart';
-import 'package:coach_for_life/features/context_override/domain/models/user_attention_state.dart';
-import 'package:coach_for_life/features/reminders/application/attention_orchestrator_service.dart';
-import 'package:coach_for_life/features/reminders/data/reminder_repository.dart';
-import 'package:coach_for_life/features/reminders/domain/models/attention_decision.dart';
-import 'package:coach_for_life/features/reminders/domain/models/notification_interaction_type.dart';
-import 'package:coach_for_life/features/reminders/domain/models/reminder_config.dart';
-import 'package:coach_for_life/features/reminders/domain/models/reminder_intent.dart';
+import 'package:sidepal/core/notifications/local_notifications_service.dart';
+import 'package:sidepal/features/analytics/data/focus_repository.dart';
+import 'package:sidepal/features/analytics/domain/models/analytics_event.dart';
+import 'package:sidepal/features/analytics/domain/models/current_coaching_focus.dart';
+import 'package:sidepal/features/context_override/data/context_override_repository.dart';
+import 'package:sidepal/features/context_override/domain/models/user_attention_state.dart';
+import 'package:sidepal/features/reminders/application/attention_orchestrator_service.dart';
+import 'package:sidepal/features/reminders/data/reminder_repository.dart';
+import 'package:sidepal/features/reminders/domain/models/attention_decision.dart';
+import 'package:sidepal/features/reminders/domain/models/notification_interaction_type.dart';
+import 'package:sidepal/features/reminders/domain/models/reminder_config.dart';
+import 'package:sidepal/features/reminders/domain/models/reminder_intent.dart';
 
 import 'no_op_notification_ledger.dart';
 

@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:coach_for_life/features/planning/data/planning_repository.dart';
-import 'package:coach_for_life/features/planning/domain/models/accountability_log.dart';
-import 'package:coach_for_life/features/planning/domain/models/block.dart';
-import 'package:coach_for_life/features/planning/domain/models/flow_transition_event.dart';
-import 'package:coach_for_life/features/planning/domain/models/routine.dart';
-import 'package:coach_for_life/features/planning/domain/models/routine_mode.dart';
-import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
+import 'package:sidepal/features/planning/data/planning_repository.dart';
+import 'package:sidepal/features/planning/domain/models/accountability_log.dart';
+import 'package:sidepal/features/planning/domain/models/block.dart';
+import 'package:sidepal/features/planning/domain/models/flow_transition_event.dart';
+import 'package:sidepal/features/planning/domain/models/routine.dart';
+import 'package:sidepal/features/planning/domain/models/routine_mode.dart';
+import 'package:sidepal/features/planning/domain/models/task_item.dart';
 
 /// Minimal [PlanningRepository] for tests where [IsarPlanningRepository] only
 /// touches Isar for routines/blocks/tasks.

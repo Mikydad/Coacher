@@ -1,4 +1,4 @@
-import 'package:coach_for_life/features/context_override/application/sleep_window_util.dart';
+import 'package:sidepal/features/context_override/application/sleep_window_util.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

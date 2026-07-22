@@ -104,7 +104,7 @@ class CoachForLifeApp extends ConsumerWidget {
     return MaterialApp(
       key: ValueKey(brightness),
       navigatorKey: appNavigatorKey,
-      title: 'Coach for Life',
+      title: 'SidePal',
       debugShowCheckedModeBanner: false,
       theme: _theme(brightness),
       navigatorObservers: [FeedbackRouteTracker()],

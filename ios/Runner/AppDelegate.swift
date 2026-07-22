@@ -36,9 +36,9 @@ import UserNotifications
     // secure mode enabled, a screenshot fires "screenshotTaken" back to
     // Dart (which self-reports the strike), and screen recording flips
     // "captureChanged" so Dart hides the photo behind a blur.
-    let secureRegistrar = engineBridge.pluginRegistry.registrar(forPlugin: "PathPalSecureScreen")
+    let secureRegistrar = engineBridge.pluginRegistry.registrar(forPlugin: "SidePalSecureScreen")
     let secureChannel = FlutterMethodChannel(
-      name: "pathpal/secure_screen",
+      name: "sidepal/secure_screen",
       binaryMessenger: secureRegistrar!.messenger())
     var secureObservers: [NSObjectProtocol] = []
     secureChannel.setMethodCallHandler { call, result in
@@ -71,9 +71,9 @@ import UserNotifications
       }
     }
 
-    let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "PathPalDeviceInfo")
+    let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "SidePalDeviceInfo")
     let channel = FlutterMethodChannel(
-      name: "pathpal/device_info",
+      name: "sidepal/device_info",
       binaryMessenger: registrar!.messenger())
     channel.setMethodCallHandler { call, result in
       guard call.method == "getDeviceInfo" else {

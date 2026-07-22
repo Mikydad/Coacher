@@ -1,13 +1,13 @@
-import 'package:coach_for_life/features/analytics/application/pattern_detection_pipeline.dart';
-import 'package:coach_for_life/features/analytics/application/pattern_layer2_compatibility.dart';
-import 'package:coach_for_life/features/analytics/data/analytics_repository.dart';
-import 'package:coach_for_life/features/analytics/data/pattern_detection_repository.dart';
-import 'package:coach_for_life/features/analytics/domain/models/analytics_event.dart';
-import 'package:coach_for_life/features/analytics/domain/models/analytics_stats_cache.dart';
-import 'package:coach_for_life/features/analytics/domain/models/behavior_feature_object.dart';
-import 'package:coach_for_life/features/analytics/domain/models/detected_behavior_pattern.dart';
-import 'package:coach_for_life/features/analytics/domain/models/detected_pattern.dart';
-import 'package:coach_for_life/features/analytics/domain/models/pattern_taxonomy.dart';
+import 'package:sidepal/features/analytics/application/pattern_detection_pipeline.dart';
+import 'package:sidepal/features/analytics/application/pattern_layer2_compatibility.dart';
+import 'package:sidepal/features/analytics/data/analytics_repository.dart';
+import 'package:sidepal/features/analytics/data/pattern_detection_repository.dart';
+import 'package:sidepal/features/analytics/domain/models/analytics_event.dart';
+import 'package:sidepal/features/analytics/domain/models/analytics_stats_cache.dart';
+import 'package:sidepal/features/analytics/domain/models/behavior_feature_object.dart';
+import 'package:sidepal/features/analytics/domain/models/detected_behavior_pattern.dart';
+import 'package:sidepal/features/analytics/domain/models/detected_pattern.dart';
+import 'package:sidepal/features/analytics/domain/models/pattern_taxonomy.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/behavior_time_metrics_fixture.dart';

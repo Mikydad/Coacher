@@ -1,12 +1,12 @@
-import 'package:coach_for_life/features/analytics/application/feature_builder_assembler.dart';
-import 'package:coach_for_life/features/analytics/application/feature_builder_input_adapters.dart';
-import 'package:coach_for_life/features/analytics/application/feature_builder_orchestrator.dart';
-import 'package:coach_for_life/features/analytics/application/feature_builder_recompute_service.dart';
-import 'package:coach_for_life/features/analytics/data/analytics_repository.dart';
-import 'package:coach_for_life/features/analytics/data/feature_cache_repository.dart';
-import 'package:coach_for_life/features/analytics/domain/models/analytics_event.dart';
-import 'package:coach_for_life/features/analytics/domain/models/analytics_stats_cache.dart';
-import 'package:coach_for_life/features/analytics/domain/models/behavior_feature_object.dart';
+import 'package:sidepal/features/analytics/application/feature_builder_assembler.dart';
+import 'package:sidepal/features/analytics/application/feature_builder_input_adapters.dart';
+import 'package:sidepal/features/analytics/application/feature_builder_orchestrator.dart';
+import 'package:sidepal/features/analytics/application/feature_builder_recompute_service.dart';
+import 'package:sidepal/features/analytics/data/analytics_repository.dart';
+import 'package:sidepal/features/analytics/data/feature_cache_repository.dart';
+import 'package:sidepal/features/analytics/domain/models/analytics_event.dart';
+import 'package:sidepal/features/analytics/domain/models/analytics_stats_cache.dart';
+import 'package:sidepal/features/analytics/domain/models/behavior_feature_object.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/behavior_time_metrics_fixture.dart';

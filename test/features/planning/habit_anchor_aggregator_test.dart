@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/planning/application/habit_anchor_aggregator.dart';
-import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
+import 'package:sidepal/features/planning/application/habit_anchor_aggregator.dart';
+import 'package:sidepal/features/planning/domain/models/task_item.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 PlannedTask _task({

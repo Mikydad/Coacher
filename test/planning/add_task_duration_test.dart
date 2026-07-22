@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:coach_for_life/features/planning/domain/add_task_duration.dart';
+import 'package:sidepal/features/planning/domain/add_task_duration.dart';
 
 void main() {
   group('addTaskDurationMinutes', () {

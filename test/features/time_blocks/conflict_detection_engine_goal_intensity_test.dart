@@ -1,4 +1,4 @@
-import 'package:coach_for_life/features/time_blocks/application/conflict_detection_engine.dart';
+import 'package:sidepal/features/time_blocks/application/conflict_detection_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

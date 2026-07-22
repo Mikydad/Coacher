@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:coach_for_life/core/local_db/isar_collections/isar_behavior_feature_cache.dart';
-import 'package:coach_for_life/core/offline/offline_store.dart';
-import 'package:coach_for_life/features/analytics/data/feature_cache_repository.dart';
-import 'package:coach_for_life/features/analytics/domain/models/behavior_feature_object.dart';
+import 'package:sidepal/core/local_db/isar_collections/isar_behavior_feature_cache.dart';
+import 'package:sidepal/core/offline/offline_store.dart';
+import 'package:sidepal/features/analytics/data/feature_cache_repository.dart';
+import 'package:sidepal/features/analytics/domain/models/behavior_feature_object.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isar_community/isar.dart';
 

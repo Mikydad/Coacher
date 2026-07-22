@@ -1,6 +1,6 @@
-import 'package:coach_for_life/features/analytics/domain/models/coaching_ai_payload.dart';
-import 'package:coach_for_life/features/analytics/domain/models/current_coaching_focus.dart';
-import 'package:coach_for_life/features/coaching/domain/models/coaching_style.dart';
+import 'package:sidepal/features/analytics/domain/models/coaching_ai_payload.dart';
+import 'package:sidepal/features/analytics/domain/models/current_coaching_focus.dart';
+import 'package:sidepal/features/coaching/domain/models/coaching_style.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Shorthand helper.

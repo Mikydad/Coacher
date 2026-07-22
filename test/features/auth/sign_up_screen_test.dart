@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'package:coach_for_life/features/auth/application/auth_providers.dart';
-import 'package:coach_for_life/features/auth/application/auth_repository_interface.dart';
-import 'package:coach_for_life/features/auth/domain/auth_failure.dart';
-import 'package:coach_for_life/features/auth/presentation/sign_up_screen.dart';
+import 'package:sidepal/features/auth/application/auth_providers.dart';
+import 'package:sidepal/features/auth/application/auth_repository_interface.dart';
+import 'package:sidepal/features/auth/domain/auth_failure.dart';
+import 'package:sidepal/features/auth/presentation/sign_up_screen.dart';
 
 // ── Fake repository ───────────────────────────────────────────────────────────
 

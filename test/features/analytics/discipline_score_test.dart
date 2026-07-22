@@ -1,6 +1,6 @@
-import 'package:coach_for_life/features/analytics/application/daily_analytics_engine.dart';
-import 'package:coach_for_life/features/analytics/application/analytics_period_bundle.dart';
-import 'package:coach_for_life/features/analytics/application/discipline_score.dart';
+import 'package:sidepal/features/analytics/application/daily_analytics_engine.dart';
+import 'package:sidepal/features/analytics/application/analytics_period_bundle.dart';
+import 'package:sidepal/features/analytics/application/discipline_score.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 RollupAnalyticsSnapshot _rollup({

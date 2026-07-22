@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/analytics/domain/models/behavior_feature_object.dart';
-import 'package:coach_for_life/features/analytics/domain/models/detected_pattern.dart';
+import 'package:sidepal/features/analytics/domain/models/behavior_feature_object.dart';
+import 'package:sidepal/features/analytics/domain/models/detected_pattern.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

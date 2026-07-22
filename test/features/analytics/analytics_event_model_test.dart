@@ -1,4 +1,4 @@
-import 'package:coach_for_life/features/analytics/domain/models/analytics_event.dart';
+import 'package:sidepal/features/analytics/domain/models/analytics_event.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

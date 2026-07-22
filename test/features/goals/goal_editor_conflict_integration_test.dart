@@ -6,14 +6,14 @@
 /// widgets, Firebase, or Isar.
 library;
 
-import 'package:coach_for_life/features/goals/application/goal_block_sync_service.dart';
-import 'package:coach_for_life/features/goals/domain/models/goal_enums.dart';
-import 'package:coach_for_life/features/goals/domain/models/user_goal.dart';
-import 'package:coach_for_life/features/time_blocks/application/conflict_detection_engine.dart';
-import 'package:coach_for_life/features/time_blocks/application/time_block_sync_service.dart';
-import 'package:coach_for_life/features/time_blocks/data/time_block_repository.dart';
-import 'package:coach_for_life/features/time_blocks/domain/models/scheduled_time_block.dart';
-import 'package:coach_for_life/features/time_blocks/domain/models/time_conflict.dart';
+import 'package:sidepal/features/goals/application/goal_block_sync_service.dart';
+import 'package:sidepal/features/goals/domain/models/goal_enums.dart';
+import 'package:sidepal/features/goals/domain/models/user_goal.dart';
+import 'package:sidepal/features/time_blocks/application/conflict_detection_engine.dart';
+import 'package:sidepal/features/time_blocks/application/time_block_sync_service.dart';
+import 'package:sidepal/features/time_blocks/data/time_block_repository.dart';
+import 'package:sidepal/features/time_blocks/domain/models/scheduled_time_block.dart';
+import 'package:sidepal/features/time_blocks/domain/models/time_conflict.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // ─── Fake repository ──────────────────────────────────────────────────────────

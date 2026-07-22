@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/context_override/domain/models/interruption_level.dart';
-import 'package:coach_for_life/features/reminders/application/interruption_level_resolver.dart';
+import 'package:sidepal/features/context_override/domain/models/interruption_level.dart';
+import 'package:sidepal/features/reminders/application/interruption_level_resolver.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

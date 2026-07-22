@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/coaching/application/default_mode_resolver.dart';
-import 'package:coach_for_life/features/coaching/domain/models/enforcement_mode.dart';
+import 'package:sidepal/features/coaching/application/default_mode_resolver.dart';
+import 'package:sidepal/features/coaching/domain/models/enforcement_mode.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

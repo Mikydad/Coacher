@@ -1,16 +1,16 @@
-import 'package:coach_for_life/features/ai_assistant/application/ai_assumption_engine.dart';
-import 'package:coach_for_life/features/ai_assistant/application/ai_intent_parser.dart';
-import 'package:coach_for_life/features/ai_assistant/application/ai_operating_layer_client.dart';
-import 'package:coach_for_life/features/ai_assistant/application/ai_payload_assembler.dart';
-import 'package:coach_for_life/features/ai_assistant/application/entity_normaliser.dart';
-import 'package:coach_for_life/features/ai_assistant/data/ai_interaction_history_repository.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/ai_action.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/ai_operating_layer_payload.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/ai_planned_changes.dart';
-import 'package:coach_for_life/features/planning/data/planning_repository.dart';
-import 'package:coach_for_life/features/planning/domain/models/block.dart';
-import 'package:coach_for_life/features/planning/domain/models/routine.dart';
-import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
+import 'package:sidepal/features/ai_assistant/application/ai_assumption_engine.dart';
+import 'package:sidepal/features/ai_assistant/application/ai_intent_parser.dart';
+import 'package:sidepal/features/ai_assistant/application/ai_operating_layer_client.dart';
+import 'package:sidepal/features/ai_assistant/application/ai_payload_assembler.dart';
+import 'package:sidepal/features/ai_assistant/application/entity_normaliser.dart';
+import 'package:sidepal/features/ai_assistant/data/ai_interaction_history_repository.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/ai_action.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/ai_operating_layer_payload.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/ai_planned_changes.dart';
+import 'package:sidepal/features/planning/data/planning_repository.dart';
+import 'package:sidepal/features/planning/domain/models/block.dart';
+import 'package:sidepal/features/planning/domain/models/routine.dart';
+import 'package:sidepal/features/planning/domain/models/task_item.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // ─── Fakes ────────────────────────────────────────────────────────────────────

@@ -1,10 +1,10 @@
-import 'package:coach_for_life/features/analytics/application/insight_generation_orchestrator.dart';
-import 'package:coach_for_life/features/analytics/application/insight_generation_recompute_service.dart';
-import 'package:coach_for_life/features/analytics/data/feature_cache_repository.dart';
-import 'package:coach_for_life/features/analytics/data/insight_cache_repository.dart';
-import 'package:coach_for_life/features/analytics/domain/models/behavior_feature_object.dart';
-import 'package:coach_for_life/features/analytics/domain/models/detected_pattern.dart';
-import 'package:coach_for_life/features/analytics/domain/models/generated_insight.dart';
+import 'package:sidepal/features/analytics/application/insight_generation_orchestrator.dart';
+import 'package:sidepal/features/analytics/application/insight_generation_recompute_service.dart';
+import 'package:sidepal/features/analytics/data/feature_cache_repository.dart';
+import 'package:sidepal/features/analytics/data/insight_cache_repository.dart';
+import 'package:sidepal/features/analytics/domain/models/behavior_feature_object.dart';
+import 'package:sidepal/features/analytics/domain/models/detected_pattern.dart';
+import 'package:sidepal/features/analytics/domain/models/generated_insight.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/behavior_time_metrics_fixture.dart';

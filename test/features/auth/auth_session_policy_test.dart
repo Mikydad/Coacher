@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:coach_for_life/features/auth/application/auth_session_policy.dart';
+import 'package:sidepal/features/auth/application/auth_session_policy.dart';
 
 void main() {
   setUp(() {

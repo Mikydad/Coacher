@@ -1,7 +1,7 @@
-import 'package:coach_for_life/features/context_override/application/context_override_service.dart';
-import 'package:coach_for_life/features/context_override/data/context_override_repository.dart';
-import 'package:coach_for_life/features/context_override/domain/models/context_override.dart';
-import 'package:coach_for_life/features/context_override/domain/models/user_attention_state.dart';
+import 'package:sidepal/features/context_override/application/context_override_service.dart';
+import 'package:sidepal/features/context_override/data/context_override_repository.dart';
+import 'package:sidepal/features/context_override/domain/models/context_override.dart';
+import 'package:sidepal/features/context_override/domain/models/user_attention_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // ─── Fake repository ──────────────────────────────────────────────────────────

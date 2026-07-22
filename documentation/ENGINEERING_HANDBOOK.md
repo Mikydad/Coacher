@@ -1,4 +1,4 @@
-# PathPal Engineering Handbook — How This System Actually Works
+# SidePal Engineering Handbook — How This System Actually Works
 
 *A mentoring document for developers joining the project. It teaches the
 **why** behind the architecture: the reasoning, the trade-offs, the patterns,
@@ -38,7 +38,7 @@ this handbook deliberately does **not** duplicate them:
 
 ### What the app is
 
-PathPal ("Coach for Life") is a **local-first productivity coach**: users plan
+SidePal ("Coach for Life") is a **local-first productivity coach**: users plan
 tasks into daily routines, execute them with a focus timer, self-score their
 completion, track goals, get AI coaching, and join accountability circles.
 iOS-first; Flutter + Riverpod + Isar + Firebase.
@@ -51,7 +51,7 @@ single product commitment:
 > **No user gesture ever waits on the network.**
 
 Most mobile apps are thin clients: the UI calls an API, shows a spinner, and
-renders the response. PathPal inverts this. The **local database (Isar) is the
+renders the response. SidePal inverts this. The **local database (Isar) is the
 source of truth**. The UI reads only from Isar. Writes commit to Isar first
 and the cloud copy catches up in the background. Airplane mode is supposed to
 be *indistinguishable* from online for the user's own data.

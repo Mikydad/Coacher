@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:coach_for_life/core/sync/offline_operation.dart';
-import 'package:coach_for_life/core/sync/sync_service.dart';
+import 'package:sidepal/core/sync/offline_operation.dart';
+import 'package:sidepal/core/sync/sync_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// VM tests for the offline queue: uid scoping, logout clearing, and

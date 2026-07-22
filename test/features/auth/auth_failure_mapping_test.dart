@@ -1,8 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:coach_for_life/features/auth/application/auth_repository.dart';
-import 'package:coach_for_life/features/auth/domain/auth_failure.dart';
+import 'package:sidepal/features/auth/application/auth_repository.dart';
+import 'package:sidepal/features/auth/domain/auth_failure.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

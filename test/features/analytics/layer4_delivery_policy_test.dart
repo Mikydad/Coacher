@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/analytics/application/layer4_delivery_policy.dart';
-import 'package:coach_for_life/features/analytics/domain/models/generated_insight.dart';
+import 'package:sidepal/features/analytics/application/layer4_delivery_policy.dart';
+import 'package:sidepal/features/analytics/domain/models/generated_insight.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

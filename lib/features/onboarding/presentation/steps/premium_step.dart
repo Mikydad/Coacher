@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/onboarding_flow_controller.dart';
 import '../onboarding_ui.dart';
 
-/// Screen 13 — Premium PathPal. UI ONLY for now: no purchase infrastructure
+/// Screen 13 — Premium SidePal. UI ONLY for now: no purchase infrastructure
 /// exists yet, so both CTAs advance the flow (decision log 2026-07-12).
 /// Sells outcomes, not features (PRD).
 class PremiumStep extends ConsumerWidget {

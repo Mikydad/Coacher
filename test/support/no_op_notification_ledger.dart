@@ -1,6 +1,6 @@
-import 'package:coach_for_life/core/local_db/isar_collections/isar_notification_ledger_entry.dart';
-import 'package:coach_for_life/core/notifications/notification_ledger_repository.dart';
-import 'package:coach_for_life/core/notifications/notification_ledger_state.dart';
+import 'package:sidepal/core/local_db/isar_collections/isar_notification_ledger_entry.dart';
+import 'package:sidepal/core/notifications/notification_ledger_repository.dart';
+import 'package:sidepal/core/notifications/notification_ledger_state.dart';
 
 /// Ledger stub for tests that construct [AttentionOrchestratorService]
 /// (or fakes of it) without an open Isar instance.

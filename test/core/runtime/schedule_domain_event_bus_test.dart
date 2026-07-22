@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:coach_for_life/core/runtime/schedule_domain_event.dart';
-import 'package:coach_for_life/core/runtime/schedule_domain_event_bus.dart';
+import 'package:sidepal/core/runtime/schedule_domain_event.dart';
+import 'package:sidepal/core/runtime/schedule_domain_event_bus.dart';
 
 void main() {
   final bus = ScheduleDomainEventBus.instance;

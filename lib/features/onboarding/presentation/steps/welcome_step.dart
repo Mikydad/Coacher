@@ -61,7 +61,7 @@ class WelcomeStep extends ConsumerWidget {
           ),
           const SizedBox(height: 28),
           Text(
-            'Welcome to PathPal.',
+            'Welcome to SidePal.',
             textAlign: TextAlign.center,
             style: OnboardingType.headlineLarge,
           ),

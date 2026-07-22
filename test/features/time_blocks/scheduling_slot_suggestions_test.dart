@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/time_blocks/application/scheduling_slot_suggestions.dart';
-import 'package:coach_for_life/features/time_blocks/domain/models/scheduled_time_block.dart';
+import 'package:sidepal/features/time_blocks/application/scheduling_slot_suggestions.dart';
+import 'package:sidepal/features/time_blocks/domain/models/scheduled_time_block.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 ScheduledTimeBlock _block({

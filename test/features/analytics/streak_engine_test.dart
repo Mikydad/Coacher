@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/analytics/application/streak_engine.dart';
-import 'package:coach_for_life/features/analytics/domain/models/analytics_event.dart';
+import 'package:sidepal/features/analytics/application/streak_engine.dart';
+import 'package:sidepal/features/analytics/domain/models/analytics_event.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 AnalyticsEvent _habitDone(String dateKey) {

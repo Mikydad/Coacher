@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/ai_assistant/application/ai_informational_output_guard.dart';
-import 'package:coach_for_life/features/education/domain/feature_guides.dart';
+import 'package:sidepal/features/ai_assistant/application/ai_informational_output_guard.dart';
+import 'package:sidepal/features/education/domain/feature_guides.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

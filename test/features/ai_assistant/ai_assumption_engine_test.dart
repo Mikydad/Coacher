@@ -1,15 +1,15 @@
-import 'package:coach_for_life/features/ai_assistant/application/ai_assumption_engine.dart';
-import 'package:coach_for_life/features/ai_assistant/application/entity_normaliser.dart';
-import 'package:coach_for_life/features/ai_assistant/data/ai_interaction_history_repository.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/ai_action.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/assumption_result.dart';
-import 'package:coach_for_life/features/planning/data/planning_repository.dart';
-import 'package:coach_for_life/features/planning/domain/models/accountability_log.dart';
-import 'package:coach_for_life/features/planning/domain/models/block.dart';
-import 'package:coach_for_life/features/planning/domain/models/flow_transition_event.dart';
-import 'package:coach_for_life/features/planning/domain/models/routine.dart';
-import 'package:coach_for_life/features/planning/domain/models/routine_mode.dart';
-import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
+import 'package:sidepal/features/ai_assistant/application/ai_assumption_engine.dart';
+import 'package:sidepal/features/ai_assistant/application/entity_normaliser.dart';
+import 'package:sidepal/features/ai_assistant/data/ai_interaction_history_repository.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/ai_action.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/assumption_result.dart';
+import 'package:sidepal/features/planning/data/planning_repository.dart';
+import 'package:sidepal/features/planning/domain/models/accountability_log.dart';
+import 'package:sidepal/features/planning/domain/models/block.dart';
+import 'package:sidepal/features/planning/domain/models/flow_transition_event.dart';
+import 'package:sidepal/features/planning/domain/models/routine.dart';
+import 'package:sidepal/features/planning/domain/models/routine_mode.dart';
+import 'package:sidepal/features/planning/domain/models/task_item.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // ─── Fakes ────────────────────────────────────────────────────────────────────

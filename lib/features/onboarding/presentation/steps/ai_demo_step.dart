@@ -62,7 +62,7 @@ class _AiDemoStepState extends ConsumerState<AiDemoStep> {
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Just tell PathPal what you want.',
+          Text('Just tell SidePal what you want.',
               style: OnboardingType.headline),
           const SizedBox(height: 10),
           Text(

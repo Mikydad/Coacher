@@ -78,7 +78,7 @@ abstract final class FeatureGuides {
     emoji: '✅',
     oneLiner: 'Plan your day as small, doable steps.',
     what:
-        'Tasks are the building blocks of your day in PathPal. Each one has '
+        'Tasks are the building blocks of your day in SidePal. Each one has '
         'a title, an optional time and duration, and a discipline mode that '
         'decides how firmly the app holds you to it.',
     why:
@@ -117,7 +117,7 @@ abstract final class FeatureGuides {
     emoji: '🎚️',
     oneLiner: 'Choose how firmly the app holds you to your plan.',
     what:
-        'Discipline Modes set how strictly PathPal treats your tasks — '
+        'Discipline Modes set how strictly SidePal treats your tasks — '
         'Flexible gives gentle nudges, Disciplined asks you to account for '
         'anything unfinished, and Extreme requires a completed focus '
         'session before a task can be checked off. New tasks inherit a mode '

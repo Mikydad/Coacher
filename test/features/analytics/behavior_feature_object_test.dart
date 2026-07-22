@@ -1,8 +1,8 @@
-import 'package:coach_for_life/features/analytics/application/behavior_feature_entity_kind.dart';
-import 'package:coach_for_life/features/analytics/domain/models/behavior_feature_object.dart';
-import 'package:coach_for_life/features/goals/domain/models/goal_enums.dart';
-import 'package:coach_for_life/features/goals/domain/models/user_goal.dart';
-import 'package:coach_for_life/features/planning/domain/models/task_item.dart';
+import 'package:sidepal/features/analytics/application/behavior_feature_entity_kind.dart';
+import 'package:sidepal/features/analytics/domain/models/behavior_feature_object.dart';
+import 'package:sidepal/features/goals/domain/models/goal_enums.dart';
+import 'package:sidepal/features/goals/domain/models/user_goal.dart';
+import 'package:sidepal/features/planning/domain/models/task_item.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

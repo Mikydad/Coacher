@@ -86,7 +86,7 @@ class _AuthLandingScreenState extends ConsumerState<AuthLandingScreen> {
                     _AppLogo(),
                     const SizedBox(height: 16),
                     Text(
-                      'Coach for Life',
+                      'SidePal',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: AppColors.fg,

@@ -1,4 +1,4 @@
-import 'package:coach_for_life/features/reminders/domain/models/reminder_config.dart';
+import 'package:sidepal/features/reminders/domain/models/reminder_config.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

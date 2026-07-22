@@ -1,4 +1,4 @@
-import 'package:coach_for_life/features/add_task/presentation/add_task_ui.dart';
+import 'package:sidepal/features/add_task/presentation/add_task_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

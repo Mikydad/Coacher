@@ -7,7 +7,7 @@ This file tracks implementation/runtime errors encountered during development of
 - **Error**: `"Coach_for_life" is not a valid Dart package name`
 - **Root cause**: Dart package names must be lowercase with underscores.
 - **Fix applied**: Re-ran create with explicit project name:
-  - `flutter create --project-name coach_for_life .`
+  - `flutter create --project-name sidepal .`
 - **Status**: Resolved
 
 ## 2) Dependency solver conflict: `isar_generator` vs `build_runner`

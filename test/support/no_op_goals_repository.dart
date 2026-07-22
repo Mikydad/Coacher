@@ -1,8 +1,8 @@
-import 'package:coach_for_life/features/goals/data/goals_repository.dart';
-import 'package:coach_for_life/features/goals/domain/models/goal_action.dart';
-import 'package:coach_for_life/features/goals/domain/models/goal_check_in.dart';
-import 'package:coach_for_life/features/goals/domain/models/goal_milestone.dart';
-import 'package:coach_for_life/features/goals/domain/models/user_goal.dart';
+import 'package:sidepal/features/goals/data/goals_repository.dart';
+import 'package:sidepal/features/goals/domain/models/goal_action.dart';
+import 'package:sidepal/features/goals/domain/models/goal_check_in.dart';
+import 'package:sidepal/features/goals/domain/models/goal_milestone.dart';
+import 'package:sidepal/features/goals/domain/models/user_goal.dart';
 
 /// Stub remote used with [IsarGoalsRepository] in tests (no Firestore).
 class NoOpGoalsRepository implements GoalsRepository {

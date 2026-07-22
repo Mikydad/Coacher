@@ -1,8 +1,8 @@
-import 'package:coach_for_life/core/utils/date_keys.dart';
-import 'package:coach_for_life/features/goals/application/goal_period_helpers.dart';
-import 'package:coach_for_life/features/goals/domain/models/goal_enums.dart';
-import 'package:coach_for_life/features/goals/domain/models/goal_categories.dart';
-import 'package:coach_for_life/features/goals/domain/models/user_goal.dart';
+import 'package:sidepal/core/utils/date_keys.dart';
+import 'package:sidepal/features/goals/application/goal_period_helpers.dart';
+import 'package:sidepal/features/goals/domain/models/goal_enums.dart';
+import 'package:sidepal/features/goals/domain/models/goal_categories.dart';
+import 'package:sidepal/features/goals/domain/models/user_goal.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 UserGoal _goalForMarch2025({

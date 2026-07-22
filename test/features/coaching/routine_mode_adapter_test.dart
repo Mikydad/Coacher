@@ -1,9 +1,9 @@
 // ignore_for_file: deprecated_member_use
 
-import 'package:coach_for_life/features/coaching/domain/models/coaching_style.dart';
-import 'package:coach_for_life/features/coaching/domain/models/enforcement_mode.dart';
-import 'package:coach_for_life/features/coaching/domain/models/routine_mode_adapter.dart';
-import 'package:coach_for_life/features/planning/domain/models/routine_mode.dart';
+import 'package:sidepal/features/coaching/domain/models/coaching_style.dart';
+import 'package:sidepal/features/coaching/domain/models/enforcement_mode.dart';
+import 'package:sidepal/features/coaching/domain/models/routine_mode_adapter.dart';
+import 'package:sidepal/features/planning/domain/models/routine_mode.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

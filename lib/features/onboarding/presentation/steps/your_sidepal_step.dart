@@ -5,11 +5,11 @@ import '../../application/onboarding_flow_controller.dart';
 import '../../domain/models/onboarding_profile.dart';
 import '../onboarding_ui.dart';
 
-/// Screen 12 — Your PathPal. Template-rendered dashboard preview
+/// Screen 12 — Your SidePal. Template-rendered dashboard preview
 /// personalized from the user's selections (no seeded data — decision log
 /// 2026-07-12: interests are tags, not auto-created goals).
-class YourPathPalStep extends ConsumerWidget {
-  const YourPathPalStep({super.key, required this.onSkip});
+class YourSidePalStep extends ConsumerWidget {
+  const YourSidePalStep({super.key, required this.onSkip});
 
   final VoidCallback onSkip;
 
@@ -72,7 +72,7 @@ class YourPathPalStep extends ConsumerWidget {
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('We\'ve built your PathPal.', style: OnboardingType.headline),
+          Text('We\'ve built your SidePal.', style: OnboardingType.headline),
           const SizedBox(height: 10),
           Text(
             'A coach shaped around what you told us.',

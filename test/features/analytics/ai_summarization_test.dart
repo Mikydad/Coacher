@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:coach_for_life/features/analytics/application/ai_response_validator.dart';
-import 'package:coach_for_life/features/analytics/application/coaching_ai_client.dart';
-import 'package:coach_for_life/features/analytics/application/deterministic_coaching_renderer.dart';
-import 'package:coach_for_life/features/analytics/domain/models/ai_summary_response.dart';
-import 'package:coach_for_life/features/analytics/domain/models/coaching_ai_payload.dart';
-import 'package:coach_for_life/features/analytics/domain/models/current_coaching_focus.dart';
-import 'package:coach_for_life/features/analytics/domain/models/generated_insight.dart';
+import 'package:sidepal/features/analytics/application/ai_response_validator.dart';
+import 'package:sidepal/features/analytics/application/coaching_ai_client.dart';
+import 'package:sidepal/features/analytics/application/deterministic_coaching_renderer.dart';
+import 'package:sidepal/features/analytics/domain/models/ai_summary_response.dart';
+import 'package:sidepal/features/analytics/domain/models/coaching_ai_payload.dart';
+import 'package:sidepal/features/analytics/domain/models/current_coaching_focus.dart';
+import 'package:sidepal/features/analytics/domain/models/generated_insight.dart';
 
 void main() {
   // ─── CoachingFraming derivation ─────────────────────────────────────────────

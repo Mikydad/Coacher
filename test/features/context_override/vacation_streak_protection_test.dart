@@ -1,6 +1,6 @@
-import 'package:coach_for_life/features/context_override/application/sleep_window_util.dart';
-import 'package:coach_for_life/features/context_override/domain/models/context_override.dart';
-import 'package:coach_for_life/features/context_override/domain/models/user_attention_state.dart';
+import 'package:sidepal/features/context_override/application/sleep_window_util.dart';
+import 'package:sidepal/features/context_override/domain/models/context_override.dart';
+import 'package:sidepal/features/context_override/domain/models/user_attention_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

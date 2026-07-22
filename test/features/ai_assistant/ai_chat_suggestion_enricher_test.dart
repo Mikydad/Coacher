@@ -1,10 +1,10 @@
-import 'package:coach_for_life/features/ai_assistant/application/ai_chat_suggestion_enricher.dart';
-import 'package:coach_for_life/features/ai_assistant/application/ai_schedule_answer_formatter.dart';
-import 'package:coach_for_life/features/ai_assistant/application/proactive_chat_conversion_tracker.dart';
-import 'package:coach_for_life/features/ai_assistant/application/proactive_suggestion_source.dart';
-import 'package:coach_for_life/features/ai_assistant/data/dismissed_suggestion_repository.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/ai_operating_layer_payload.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/proactive_suggestion.dart';
+import 'package:sidepal/features/ai_assistant/application/ai_chat_suggestion_enricher.dart';
+import 'package:sidepal/features/ai_assistant/application/ai_schedule_answer_formatter.dart';
+import 'package:sidepal/features/ai_assistant/application/proactive_chat_conversion_tracker.dart';
+import 'package:sidepal/features/ai_assistant/application/proactive_suggestion_source.dart';
+import 'package:sidepal/features/ai_assistant/data/dismissed_suggestion_repository.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/ai_operating_layer_payload.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/proactive_suggestion.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeEngine implements ProactiveSuggestionSource {

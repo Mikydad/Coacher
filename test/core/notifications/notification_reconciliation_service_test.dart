@@ -1,9 +1,9 @@
 import 'dart:io';
 
-import 'package:coach_for_life/core/local_db/isar_collections/isar_notification_ledger_entry.dart';
-import 'package:coach_for_life/core/notifications/notification_ledger_repository.dart';
-import 'package:coach_for_life/core/notifications/notification_ledger_state.dart';
-import 'package:coach_for_life/core/notifications/notification_reconciliation_service.dart';
+import 'package:sidepal/core/local_db/isar_collections/isar_notification_ledger_entry.dart';
+import 'package:sidepal/core/notifications/notification_ledger_repository.dart';
+import 'package:sidepal/core/notifications/notification_ledger_state.dart';
+import 'package:sidepal/core/notifications/notification_reconciliation_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isar_community/isar.dart';

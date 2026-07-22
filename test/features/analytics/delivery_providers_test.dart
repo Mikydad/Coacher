@@ -1,11 +1,11 @@
-import 'package:coach_for_life/core/di/providers.dart';
-import 'package:coach_for_life/core/utils/date_keys.dart';
-import 'package:coach_for_life/features/analytics/application/delivery_providers.dart';
-import 'package:coach_for_life/features/analytics/application/insight_generation_providers.dart';
-import 'package:coach_for_life/features/analytics/data/delivery_repository.dart';
-import 'package:coach_for_life/features/analytics/data/insight_cache_repository.dart';
-import 'package:coach_for_life/features/analytics/domain/models/delivery_decision.dart';
-import 'package:coach_for_life/features/analytics/domain/models/generated_insight.dart';
+import 'package:sidepal/core/di/providers.dart';
+import 'package:sidepal/core/utils/date_keys.dart';
+import 'package:sidepal/features/analytics/application/delivery_providers.dart';
+import 'package:sidepal/features/analytics/application/insight_generation_providers.dart';
+import 'package:sidepal/features/analytics/data/delivery_repository.dart';
+import 'package:sidepal/features/analytics/data/insight_cache_repository.dart';
+import 'package:sidepal/features/analytics/domain/models/delivery_decision.dart';
+import 'package:sidepal/features/analytics/domain/models/generated_insight.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 

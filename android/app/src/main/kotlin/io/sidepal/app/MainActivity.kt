@@ -1,4 +1,4 @@
-package com.example.coach_for_life
+package io.sidepal.app
 
 import android.content.Intent
 import android.os.Build
@@ -26,7 +26,7 @@ class MainActivity : FlutterActivity() {
         // out black. Cleared when the route pops.
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
-            "pathpal/secure_screen"
+            "sidepal/secure_screen"
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "enableSecure" -> {
@@ -43,7 +43,7 @@ class MainActivity : FlutterActivity() {
 
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
-            "pathpal/device_info"
+            "sidepal/device_info"
         ).setMethodCallHandler { call, result ->
             if (call.method == "getDeviceInfo") {
                 result.success(

@@ -130,7 +130,7 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
               name: 'coach_export_$date.json',
             ),
           ],
-          subject: 'Coach for Life — data export $date',
+          subject: 'SidePal — data export $date',
         ),
       );
     } catch (e) {

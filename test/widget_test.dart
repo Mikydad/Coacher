@@ -1,6 +1,6 @@
-import 'package:coach_for_life/app/app.dart';
-import 'package:coach_for_life/features/execution/application/execution_day_loader.dart';
-import 'package:coach_for_life/features/planning/application/planned_task_providers.dart';
+import 'package:sidepal/app/app.dart';
+import 'package:sidepal/features/execution/application/execution_day_loader.dart';
+import 'package:sidepal/features/planning/application/planned_task_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -17,7 +17,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('PathPal'), findsOneWidget);
+    expect(find.text('SidePal'), findsOneWidget);
     // Progress left the bottom nav (lives in Profile now); Accountability
     // took its slot.
     expect(find.text('Accountability'), findsOneWidget);

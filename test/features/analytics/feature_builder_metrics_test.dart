@@ -1,6 +1,6 @@
-import 'package:coach_for_life/features/analytics/application/feature_builder_metrics.dart';
-import 'package:coach_for_life/features/analytics/domain/models/analytics_event.dart';
-import 'package:coach_for_life/features/analytics/domain/models/behavior_feature_object.dart';
+import 'package:sidepal/features/analytics/application/feature_builder_metrics.dart';
+import 'package:sidepal/features/analytics/domain/models/analytics_event.dart';
+import 'package:sidepal/features/analytics/domain/models/behavior_feature_object.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

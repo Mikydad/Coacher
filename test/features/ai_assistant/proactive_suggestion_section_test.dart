@@ -3,11 +3,11 @@ library;
 
 import 'dart:async';
 
-import 'package:coach_for_life/features/ai_assistant/application/ai_assistant_providers.dart';
-import 'package:coach_for_life/features/ai_assistant/application/proactive_suggestion_display.dart';
-import 'package:coach_for_life/features/ai_assistant/data/dismissed_suggestion_repository.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/proactive_suggestion.dart';
-import 'package:coach_for_life/features/ai_assistant/presentation/widgets/proactive_suggestion_section.dart';
+import 'package:sidepal/features/ai_assistant/application/ai_assistant_providers.dart';
+import 'package:sidepal/features/ai_assistant/application/proactive_suggestion_display.dart';
+import 'package:sidepal/features/ai_assistant/data/dismissed_suggestion_repository.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/proactive_suggestion.dart';
+import 'package:sidepal/features/ai_assistant/presentation/widgets/proactive_suggestion_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

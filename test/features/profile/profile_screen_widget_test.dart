@@ -1,17 +1,17 @@
-import 'package:coach_for_life/features/coaching/application/coaching_style_providers.dart';
-import 'package:coach_for_life/features/coaching/domain/models/coaching_style.dart';
-import 'package:coach_for_life/features/coaching/domain/models/enforcement_mode.dart';
-import 'package:coach_for_life/features/coaching/domain/models/user_coaching_profile.dart';
-import 'package:coach_for_life/features/auth/application/auth_providers.dart';
-import 'package:coach_for_life/features/context_override/application/context_override_providers.dart';
-import 'package:coach_for_life/features/context_override/domain/models/user_attention_state.dart';
-import 'package:coach_for_life/features/goals/application/goals_providers.dart';
-import 'package:coach_for_life/features/goals/domain/models/user_goal.dart';
-import 'package:coach_for_life/features/analytics/application/discipline_score.dart';
-import 'package:coach_for_life/features/feedback/application/tester_mode_controller.dart';
-import 'package:coach_for_life/features/profile/application/profile_providers.dart';
-import 'package:coach_for_life/features/profile/domain/models/user_profile_preference.dart';
-import 'package:coach_for_life/features/profile/presentation/profile_screen.dart';
+import 'package:sidepal/features/coaching/application/coaching_style_providers.dart';
+import 'package:sidepal/features/coaching/domain/models/coaching_style.dart';
+import 'package:sidepal/features/coaching/domain/models/enforcement_mode.dart';
+import 'package:sidepal/features/coaching/domain/models/user_coaching_profile.dart';
+import 'package:sidepal/features/auth/application/auth_providers.dart';
+import 'package:sidepal/features/context_override/application/context_override_providers.dart';
+import 'package:sidepal/features/context_override/domain/models/user_attention_state.dart';
+import 'package:sidepal/features/goals/application/goals_providers.dart';
+import 'package:sidepal/features/goals/domain/models/user_goal.dart';
+import 'package:sidepal/features/analytics/application/discipline_score.dart';
+import 'package:sidepal/features/feedback/application/tester_mode_controller.dart';
+import 'package:sidepal/features/profile/application/profile_providers.dart';
+import 'package:sidepal/features/profile/domain/models/user_profile_preference.dart';
+import 'package:sidepal/features/profile/presentation/profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -176,7 +176,7 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       await tester.pumpWidget(_buildScreen());
       await tester.pump();
-      final footer = find.textContaining('PATHPAL');
+      final footer = find.textContaining('SIDEPAL');
       await tester.scrollUntilVisible(
         footer,
         200,

@@ -2,7 +2,7 @@
 
 **Status:** Confirmed with product owner (2026-07-16) after three rounds of
 semantic clarification. This document supersedes ambiguous parts of
-[`Pathpal accountability spec.md`](Pathpal%20accountability%20spec.md); where
+[`Sidepal accountability spec.md`](Sidepal%20accountability%20spec.md); where
 the two disagree, THIS document wins. The original spec remains the source
 for background rationale (legal model, Apple compliance research, payments
 rails).
@@ -14,7 +14,7 @@ explicit; every phase names the files it touches.
 
 ## 1. Introduction / Overview
 
-PathPal users set goals but abandon them without consequences. This feature
+SidePal users set goals but abandon them without consequences. This feature
 adds **accountability stakes**: something real is on the line — an
 embarrassing photo, or money — and a server-authoritative engine decides
 outcomes so nobody can dodge a forfeit.

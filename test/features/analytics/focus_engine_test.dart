@@ -1,13 +1,13 @@
-import 'package:coach_for_life/features/analytics/application/focus_candidate.dart';
-import 'package:coach_for_life/features/analytics/application/focus_scoring_engine.dart';
-import 'package:coach_for_life/features/analytics/application/focus_selector.dart';
-import 'package:coach_for_life/features/analytics/domain/models/behavior_feature_object.dart';
-import 'package:coach_for_life/features/analytics/domain/models/current_coaching_focus.dart';
-import 'package:coach_for_life/features/analytics/domain/models/detected_behavior_pattern.dart';
-import 'package:coach_for_life/features/analytics/domain/models/detected_pattern.dart';
-import 'package:coach_for_life/features/analytics/domain/models/generated_insight.dart';
-import 'package:coach_for_life/features/analytics/domain/models/pattern_taxonomy.dart';
-import 'package:coach_for_life/features/analytics/application/layer4_delivery_policy.dart';
+import 'package:sidepal/features/analytics/application/focus_candidate.dart';
+import 'package:sidepal/features/analytics/application/focus_scoring_engine.dart';
+import 'package:sidepal/features/analytics/application/focus_selector.dart';
+import 'package:sidepal/features/analytics/domain/models/behavior_feature_object.dart';
+import 'package:sidepal/features/analytics/domain/models/current_coaching_focus.dart';
+import 'package:sidepal/features/analytics/domain/models/detected_behavior_pattern.dart';
+import 'package:sidepal/features/analytics/domain/models/detected_pattern.dart';
+import 'package:sidepal/features/analytics/domain/models/generated_insight.dart';
+import 'package:sidepal/features/analytics/domain/models/pattern_taxonomy.dart';
+import 'package:sidepal/features/analytics/application/layer4_delivery_policy.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

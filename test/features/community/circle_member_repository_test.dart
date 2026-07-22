@@ -1,6 +1,6 @@
-import 'package:coach_for_life/features/community/data/circle_member_repository.dart';
-import 'package:coach_for_life/features/community/domain/models/circle_enums.dart';
-import 'package:coach_for_life/features/community/domain/models/circle_member.dart';
+import 'package:sidepal/features/community/data/circle_member_repository.dart';
+import 'package:sidepal/features/community/domain/models/circle_enums.dart';
+import 'package:sidepal/features/community/domain/models/circle_member.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 

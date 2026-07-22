@@ -1,11 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:coach_for_life/core/runtime/mutation_request.dart';
-import 'package:coach_for_life/core/runtime/schedule_domain_event.dart';
-import 'package:coach_for_life/core/runtime/schedule_domain_event_bus.dart';
-import 'package:coach_for_life/core/runtime/schedule_mutation_coordinator.dart';
-import 'package:coach_for_life/core/runtime/unified_recompute_graph.dart';
+import 'package:sidepal/core/runtime/mutation_request.dart';
+import 'package:sidepal/core/runtime/schedule_domain_event.dart';
+import 'package:sidepal/core/runtime/schedule_domain_event_bus.dart';
+import 'package:sidepal/core/runtime/schedule_mutation_coordinator.dart';
+import 'package:sidepal/core/runtime/unified_recompute_graph.dart';
 
 void main() {
   final coordinator = ScheduleMutationCoordinator.instance;

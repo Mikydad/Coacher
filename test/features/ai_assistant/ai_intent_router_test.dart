@@ -1,5 +1,5 @@
-import 'package:coach_for_life/features/ai_assistant/application/ai_intent_router.dart';
-import 'package:coach_for_life/features/ai_assistant/domain/models/ai_intent_kind.dart';
+import 'package:sidepal/features/ai_assistant/application/ai_intent_router.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/ai_intent_kind.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -5,7 +5,7 @@ import '../../core/presentation/app_colors.dart';
 /// Text-only animated launch splash shown over the app while it boots.
 ///
 /// Sequence (~3.4s, finite — never loops, so tests can settle):
-///  1. The letters of "PathPal" rise and fade in one by one ("Path" in the
+///  1. The letters of "SidePal" rise and fade in one by one ("Path" in the
 ///     foreground ink, "Pal" in the brand accent).
 ///  2. A lime underline sweeps across beneath the wordmark.
 ///  3. The tagline fades up, holds for ~1.5s, then the overlay fades out
@@ -24,7 +24,7 @@ class AnimatedSplashGate extends StatefulWidget {
 
 class _AnimatedSplashGateState extends State<AnimatedSplashGate>
     with SingleTickerProviderStateMixin {
-  static const String _word = 'PathPal';
+  static const String _word = 'SidePal';
   static const int _accentFrom = 4; // "Pal" gets the accent color.
 
   late final AnimationController _c;
