@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0e0e0e;
+            color: #ffffff;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+        .glass-card {
+            background: rgba(38, 38, 38, 0.6);
+            backdrop-filter: blur(20px);
+        }
+        .checkbox-custom:checked + label .check-icon {
+            opacity: 1;
+            transform: scale(1);
+        }
+        .scanline {
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, #eaffb8, transparent);
+            opacity: 0.1;
+            position: absolute;
+            animation: scan 3s linear infinite;
+        }
+        @keyframes scan {
+            from { top: 0%; }
+            to { top: 100%; }
+        }
+        .btn-disabled {
+            opacity: 0.2;
+            cursor: not-allowed;
+            filter: grayscale(1);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed-variant": "#005964",
+                      "on-error-container": "#ffd2c8",
+                      "surface-bright": "#2c2c2c",
+                      "on-background": "#ffffff",
+                      "on-tertiary-container": "#5e5400",
+                      "secondary": "#00e3fd",
+                      "outline": "#777575",
+                      "on-secondary-container": "#e8fbff",
+                      "inverse-primary": "#4c6800",
+                      "on-primary-fixed-variant": "#4c6800",
+                      "tertiary-container": "#fde74f",
+                      "primary-fixed-dim": "#b2ed00",
+                      "on-primary": "#4b6600",
+                      "surface-container": "#1a1919",
+                      "on-primary-container": "#445d00",
+                      "tertiary-fixed-dim": "#eed942",
+                      "on-secondary-fixed": "#003a42",
+                      "tertiary-fixed": "#fde74f",
+                      "surface-dim": "#0e0e0e",
+                      "primary": "#eaffb8",
+                      "on-tertiary": "#685c00",
+                      "tertiary": "#fff4c1",
+                      "surface": "#0e0e0e",
+                      "secondary-fixed": "#26e6ff",
+                      "primary-fixed": "#befc00",
+                      "surface-container-low": "#131313",
+                      "surface-variant": "#262626",
+                      "inverse-on-surface": "#565554",
+                      "error": "#ff7351",
+                      "primary-container": "#befc00",
+                      "surface-container-highest": "#262626",
+                      "on-tertiary-fixed": "#4a4100",
+                      "surface-container-high": "#201f1f",
+                      "on-error": "#450900",
+                      "on-primary-fixed": "#354900",
+                      "surface-container-lowest": "#000000",
+                      "primary-dim": "#b2ed00",
+                      "inverse-surface": "#fcf8f8",
+                      "on-surface-variant": "#adaaaa",
+                      "on-tertiary-fixed-variant": "#695e00",
+                      "secondary-fixed-dim": "#00d7f0",
+                      "outline-variant": "#494847",
+                      "secondary-dim": "#00d4ec",
+                      "on-surface": "#ffffff",
+                      "error-dim": "#d53d18",
+                      "secondary-container": "#006875",
+                      "tertiary-dim": "#eed942",
+                      "error-container": "#b92902",
+                      "surface-tint": "#eaffb8",
+                      "background": "#0e0e0e",
+                      "on-secondary": "#004d57"
+              },
+              "borderRadius": {
+                      "DEFAULT": "1rem",
+                      "lg": "2rem",
+                      "xl": "3rem",
+                      "full": "9999px"
+              },
+              "fontFamily": {
+                      "headline": ["Inter"],
+                      "display": ["Inter"],
+                      "body": ["Inter"],
+                      "label": ["Inter"]
+              }
+            },
+          },
+        }
+      </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface antialiased">
+<!-- Top Navigation Anchor (Shared Component Logic) -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-surface dark:bg-surface">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary scale-95 active:scale-90 transition-transform cursor-pointer">close</span>
+<span class="font-headline text-headline-sm uppercase tracking-widest text-on-surface-variant">2 / 4</span>
+</div>
+<h1 class="text-primary font-display font-black tracking-tighter text-xl">NEW OBJECTIVE</h1>
+<span class="material-symbols-outlined text-primary opacity-0">check_circle</span> <!-- Hidden to maintain spacing -->
+</header>
+<main class="min-h-screen pt-24 pb-32 px-6 flex flex-col max-w-xl mx-auto">
+<!-- Header Section -->
+<section class="mb-10">
+<h2 class="font-display font-black text-4xl lg:text-5xl tracking-tighter leading-none mb-2">
+                READ THIS <span class="text-error">CAREFULLY</span>
+</h2>
+<p class="text-on-surface-variant font-body text-sm tracking-wide opacity-80">
+                LITIGATION AND ETHICAL DISCLOSURE FOR THE NEW OBJECTIVE PROTOCOL.
+            </p>
+</section>
+<!-- Warning Card -->
+<div class="relative mb-12 overflow-hidden rounded-xl border border-error/30 bg-error-container/10 p-6 shadow-[0_0_40px_rgba(255,115,81,0.05)]">
+<div class="scanline"></div>
+<div class="flex items-start gap-4 mb-6">
+<div class="bg-error/20 p-2 rounded-lg">
+<span class="material-symbols-outlined text-error" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<div>
+<span class="text-error font-label text-[0.6875rem] uppercase tracking-[0.2em] font-bold">Priority: Critical Risk</span>
+</div>
+</div>
+<div class="space-y-4">
+<p class="font-body text-lg leading-relaxed text-on-surface">
+                    If you fail <span class="text-on-surface font-bold underline decoration-error/40 underline-offset-4">Weight Loss Streak</span> by the deadline, your verification photo will be posted to <span class="text-on-surface font-bold underline decoration-error/40 underline-offset-4">Public Circle Alpha</span> and remain visible to all members for <span class="text-on-surface font-bold underline decoration-error/40 underline-offset-4">7 Days</span>.
+                </p>
+<div class="bg-surface-container-highest p-4 rounded-lg border border-outline-variant/20">
+<p class="text-error font-bold text-sm tracking-tight flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">security_update_warning</span>
+                        AUTOMATED DECISION ENGINE ACTIVE
+                    </p>
+<p class="text-on-surface-variant text-xs mt-1">
+                        Going offline, disabling notifications, or deleting the app will not interrupt the server-side publishing sequence.
+                    </p>
+</div>
+</div>
+</div>
+<!-- Tactical Checkboxes -->
+<section class="space-y-6 mb-12">
+<div class="relative group">
+<input class="checkbox-custom absolute opacity-0 w-8 h-8 cursor-pointer z-10 peer" id="check-me" onchange="validateForm()" type="checkbox"/>
+<label class="flex items-center gap-4 cursor-pointer" for="check-me">
+<div class="w-8 h-8 rounded-md border-2 border-outline-variant group-hover:border-primary-dim transition-all flex items-center justify-center bg-surface-container-high peer-checked:border-primary-dim peer-checked:bg-primary-container/20">
+<span class="material-symbols-outlined text-primary-dim scale-0 opacity-0 check-icon transition-all duration-300 font-bold" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<span class="text-on-surface font-label text-sm uppercase tracking-widest transition-colors peer-checked:text-primary">This is a photo of me</span>
+</label>
+</div>
+<div class="relative group">
+<input class="checkbox-custom absolute opacity-0 w-8 h-8 cursor-pointer z-10 peer" id="check-fail" onchange="validateForm()" type="checkbox"/>
+<label class="flex items-center gap-4 cursor-pointer" for="check-fail">
+<div class="w-8 h-8 rounded-md border-2 border-outline-variant group-hover:border-primary-dim transition-all flex items-center justify-center bg-surface-container-high peer-checked:border-primary-dim peer-checked:bg-primary-container/20">
+<span class="material-symbols-outlined text-primary-dim scale-0 opacity-0 check-icon transition-all duration-300 font-bold" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<span class="text-on-surface font-label text-sm uppercase tracking-widest transition-colors peer-checked:text-primary">I understand it will be posted if I fail</span>
+</label>
+</div>
+<div class="relative group">
+<input class="checkbox-custom absolute opacity-0 w-8 h-8 cursor-pointer z-10 peer" id="check-age" onchange="validateForm()" type="checkbox"/>
+<label class="flex items-center gap-4 cursor-pointer" for="check-age">
+<div class="w-8 h-8 rounded-md border-2 border-outline-variant group-hover:border-primary-dim transition-all flex items-center justify-center bg-surface-container-high peer-checked:border-primary-dim peer-checked:bg-primary-container/20">
+<span class="material-symbols-outlined text-primary-dim scale-0 opacity-0 check-icon transition-all duration-300 font-bold" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<span class="text-on-surface font-label text-sm uppercase tracking-widest transition-colors peer-checked:text-primary">I am 18 or older</span>
+</label>
+</div>
+</section>
+<!-- Dynamic Context Info -->
+<div class="mt-auto pt-8 border-t border-outline-variant/10">
+<p class="text-on-surface-variant text-[0.625rem] leading-relaxed uppercase tracking-[0.15em] opacity-40 text-center">
+                Protocol ID: OBSIDIAN-771-KINETIC | Timestamp: 2024.10.12.04:11:09 | Server: Frankfurt-Main-Edge-12
+            </p>
+</div>
+</main>
+<!-- Bottom Action Area -->
+<div class="fixed bottom-0 w-full z-50 p-6 bg-surface-dim/80 backdrop-blur-md">
+<button class="btn-disabled w-full py-5 rounded-full bg-primary-container text-on-primary-container font-black uppercase tracking-widest text-sm flex items-center justify-center gap-3 transition-all active:scale-95 shadow-[0_0_20px_rgba(190,252,0,0.15)]" disabled="" id="submit-btn">
+            I ACCEPT THE RISK
+            <span class="material-symbols-outlined font-bold">bolt</span>
+</button>
+</div>
+<!-- Micro-interaction Script -->
+<script>
+        function validateForm() {
+            const checks = [
+                document.getElementById('check-me').checked,
+                document.getElementById('check-fail').checked,
+                document.getElementById('check-age').checked
+            ];
+            const btn = document.getElementById('submit-btn');
+            
+            if (checks.every(Boolean)) {
+                btn.classList.remove('btn-disabled');
+                btn.disabled = false;
+                btn.classList.add('animate-pulse');
+                btn.style.boxShadow = '0 0 40px rgba(190,252,0,0.3)';
+            } else {
+                btn.classList.add('btn-disabled');
+                btn.disabled = true;
+                btn.classList.remove('animate-pulse');
+                btn.style.boxShadow = 'none';
+            }
+        }
+
+        // Add some atmospheric flicker to the warning card
+        setInterval(() => {
+            const scanline = document.querySelector('.scanline');
+            if(scanline) {
+                scanline.style.opacity = Math.random() * 0.2;
+            }
+        }, 150);
+    </script>
+</body></html>

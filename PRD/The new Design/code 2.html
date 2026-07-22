@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Obsidian Pulse - Pledge</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed-variant": "#005964",
+                      "on-error-container": "#ffd2c8",
+                      "surface-bright": "#2c2c2c",
+                      "on-background": "#ffffff",
+                      "on-tertiary-container": "#5e5400",
+                      "secondary": "#00e3fd",
+                      "outline": "#777575",
+                      "on-secondary-container": "#e8fbff",
+                      "inverse-primary": "#4c6800",
+                      "on-primary-fixed-variant": "#4c6800",
+                      "tertiary-container": "#fde74f",
+                      "primary-fixed-dim": "#b2ed00",
+                      "on-primary": "#4b6600",
+                      "surface-container": "#1a1919",
+                      "on-primary-container": "#445d00",
+                      "tertiary-fixed-dim": "#eed942",
+                      "on-secondary-fixed": "#003a42",
+                      "tertiary-fixed": "#fde74f",
+                      "surface-dim": "#0e0e0e",
+                      "primary": "#eaffb8",
+                      "on-tertiary": "#685c00",
+                      "tertiary": "#fff4c1",
+                      "surface": "#0e0e0e",
+                      "secondary-fixed": "#26e6ff",
+                      "primary-fixed": "#befc00",
+                      "surface-container-low": "#131313",
+                      "surface-variant": "#262626",
+                      "inverse-on-surface": "#565554",
+                      "error": "#ff7351",
+                      "primary-container": "#befc00",
+                      "surface-container-highest": "#262626",
+                      "on-tertiary-fixed": "#4a4100",
+                      "surface-container-high": "#201f1f",
+                      "on-error": "#450900",
+                      "on-primary-fixed": "#354900",
+                      "surface-container-lowest": "#000000",
+                      "primary-dim": "#b2ed00",
+                      "inverse-surface": "#fcf8f8",
+                      "on-surface-variant": "#adaaaa",
+                      "on-tertiary-fixed-variant": "#695e00",
+                      "secondary-fixed-dim": "#00d7f0",
+                      "outline-variant": "#494847",
+                      "secondary-dim": "#00d4ec",
+                      "on-surface": "#ffffff",
+                      "error-dim": "#d53d18",
+                      "secondary-container": "#006875",
+                      "tertiary-dim": "#eed942",
+                      "error-container": "#b92902",
+                      "surface-tint": "#eaffb8",
+                      "background": "#0e0e0e",
+                      "on-secondary": "#004d57"
+              },
+              "borderRadius": {
+                      "DEFAULT": "1rem",
+                      "lg": "2rem",
+                      "xl": "3rem",
+                      "full": "9999px"
+              },
+              "fontFamily": {
+                      "headline": ["Inter"],
+                      "display": ["Inter"],
+                      "body": ["Inter"],
+                      "label": ["Inter"]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .hold-btn-glow {
+            box-shadow: 0 0 20px rgba(186, 252, 0, 0);
+            transition: box-shadow 0.3s ease;
+        }
+        .hold-btn-glow:active {
+            box-shadow: 0 0 40px rgba(186, 252, 0, 0.4);
+        }
+        .shimmer-bg {
+            background: linear-gradient(90deg, transparent, rgba(186, 252, 0, 0.05), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 4s infinite linear;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.1s linear;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: rgba(0, 227, 253, 0.3) !important;
+        }
+        .pulse-text {
+            animation: pulse-opacity 2s infinite;
+        }
+        @keyframes pulse-opacity {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container min-h-screen flex flex-col overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-surface-container-low dark:bg-surface-container-low">
+<button class="text-on-surface-variant hover:bg-surface-bright transition-colors p-2 rounded-full scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined">close</span>
+</button>
+<h1 class="text-primary font-headline text-[0.875rem] uppercase tracking-widest font-bold">NEW OBJECTIVE</h1>
+<div class="flex items-center gap-2">
+<span class="text-secondary font-label text-[0.6875rem] tracking-widest font-bold">3/4</span>
+<div class="w-12 h-1 bg-surface-variant rounded-full overflow-hidden">
+<div class="w-3/4 h-full bg-secondary"></div>
+</div>
+</div>
+</header>
+<main class="flex-1 flex flex-col items-center justify-center px-6 pt-24 pb-32 max-w-2xl mx-auto w-full text-center relative">
+<!-- Atmospheric Background Layer -->
+<div class="absolute inset-0 -z-10 opacity-20 pointer-events-none overflow-hidden">
+
+</div>
+<!-- Content Section -->
+<div class="w-full space-y-12 transition-all duration-700 ease-out translate-y-0 opacity-100">
+<!-- Header Group -->
+<div class="space-y-4">
+<span class="font-label text-[0.6875rem] uppercase tracking-[0.2em] text-secondary pulse-text">Commitment Protocol</span>
+<h2 class="font-display text-[2.5rem] md:text-[3.5rem] font-black tracking-tighter leading-none uppercase text-on-surface">
+                    WHY DOES THIS <br/> <span class="text-primary">MATTER?</span>
+</h2>
+<p class="text-on-surface-variant text-body-md max-w-md mx-auto">
+                    You'll see these words every time you log a day. <br/>
+<span class="text-on-surface italic opacity-80">Make them yours.</span>
+</p>
+</div>
+<!-- Pledge Input -->
+<div class="relative group">
+<div class="absolute -inset-0.5 bg-gradient-to-b from-primary/20 to-transparent rounded-xl blur opacity-30 group-focus-within:opacity-60 transition duration-1000"></div>
+<div class="relative bg-surface-container-low rounded-xl p-6 border-b-2 border-outline-variant/10 shadow-2xl">
+<textarea class="w-full bg-transparent border-none text-headline-sm font-medium text-on-surface placeholder:text-on-surface-variant/30 resize-none h-40 focus:ring-0 leading-relaxed transition-all" id="pledgeInput" maxlength="280" placeholder="So I stop failing exams I could pass... so I finally feel worthy of the life I'm building..."></textarea>
+<div class="flex justify-between items-center mt-4">
+<div class="flex items-center gap-2 text-on-surface-variant/40">
+<span class="material-symbols-outlined text-sm">history_edu</span>
+<span class="text-[0.6875rem] uppercase tracking-widest">Tactical Intent</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="font-label text-[0.6875rem] text-primary tracking-widest" id="charCount">0</span>
+<span class="text-on-surface-variant/40 font-label text-[0.6875rem]">/ 280</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Interactive Hold Button Container -->
+<div class="fixed bottom-0 w-full z-50 flex justify-around items-center px-6 py-10 pointer-events-none">
+<div class="w-full max-w-md pointer-events-auto relative group">
+<button class="w-full h-20 bg-primary-container rounded-full flex items-center justify-center gap-4 text-on-primary-container font-headline font-bold uppercase tracking-[0.15em] transition-all duration-300 active:scale-[0.98] hover:shadow-[0_0_30px_rgba(186,252,0,0.2)] overflow-hidden relative" id="holdButton">
+<!-- Progress Filler -->
+<div class="absolute left-0 top-0 h-full bg-on-primary-container/10 transition-all duration-100 w-0" id="holdProgressFill"></div>
+<div class="flex items-center gap-3 z-10">
+<div class="relative w-8 h-8 flex items-center justify-center">
+<svg class="absolute inset-0" height="32" width="32">
+<circle class="text-on-primary-container/20" cx="16" cy="16" fill="transparent" r="14" stroke="currentColor" stroke-width="3"></circle>
+<circle class="progress-ring__circle text-on-primary-container" cx="16" cy="16" fill="transparent" id="progressRing" r="14" stroke="currentColor" stroke-dasharray="88" stroke-dashoffset="88" stroke-linecap="round" stroke-width="3"></circle>
+</svg>
+<span class="material-symbols-outlined text-[1.25rem]" id="holdIcon">fingerprint</span>
+</div>
+<span id="holdText">Hold to give your word</span>
+</div>
+<!-- Particle Effect Container -->
+<div class="absolute inset-0 pointer-events-none" id="particles"></div>
+</button>
+<p class="mt-4 text-on-surface-variant/60 text-[0.6875rem] font-label uppercase tracking-widest text-center opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                    A binding psychological commitment
+                </p>
+</div>
+</div>
+</main>
+<!-- Invisible Success Overlay -->
+<div class="fixed inset-0 bg-primary z-[60] flex flex-col items-center justify-center opacity-0 pointer-events-none transition-opacity duration-700" id="successOverlay">
+<div class="text-on-primary text-center space-y-4">
+<span class="material-symbols-outlined text-6xl scale-50 transition-transform duration-1000">verified</span>
+<h3 class="text-3xl font-black uppercase tracking-tighter">Pledge Locked</h3>
+<p class="font-label uppercase tracking-widest opacity-80">Transitioning to Mission Vault</p>
+</div>
+</div>
+<script>
+        const textarea = document.getElementById('pledgeInput');
+        const charCount = document.getElementById('charCount');
+        const holdButton = document.getElementById('holdButton');
+        const holdProgressFill = document.getElementById('holdProgressFill');
+        const holdText = document.getElementById('holdText');
+        const holdIcon = document.getElementById('holdIcon');
+        const progressRing = document.getElementById('progressRing');
+        const successOverlay = document.getElementById('successOverlay');
+
+        // Character counter
+        textarea.addEventListener('input', () => {
+            charCount.textContent = textarea.value.length;
+            if (textarea.value.length > 250) {
+                charCount.classList.replace('text-primary', 'text-error');
+            } else {
+                charCount.classList.replace('text-error', 'text-primary');
+            }
+        });
+
+        // Hold to commit logic
+        let holdTimer;
+        let holdProgress = 0;
+        const holdDuration = 1500; // 1.5 seconds
+        const tickRate = 10;
+        const ringCircumference = 88;
+
+        function updateProgress() {
+            holdProgress += tickRate;
+            const percentage = Math.min(holdProgress / holdDuration, 1);
+            
+            // Update UI
+            holdProgressFill.style.width = `${percentage * 100}%`;
+            progressRing.style.strokeDashoffset = ringCircumference - (percentage * ringCircumference);
+            
+            if (holdProgress >= holdDuration) {
+                completePledge();
+            } else {
+                holdTimer = setTimeout(updateProgress, tickRate);
+            }
+        }
+
+        function startHolding() {
+            if (textarea.value.trim().length < 5) {
+                textarea.focus();
+                // Add a small shake to prompt input
+                textarea.parentElement.classList.add('animate-pulse');
+                setTimeout(() => textarea.parentElement.classList.remove('animate-pulse'), 500);
+                return;
+            }
+            
+            holdText.textContent = "Keep holding...";
+            holdIcon.textContent = "lock_open";
+            holdTimer = setTimeout(updateProgress, tickRate);
+        }
+
+        function cancelHolding() {
+            clearTimeout(holdTimer);
+            holdProgress = 0;
+            holdProgressFill.style.width = '0%';
+            progressRing.style.strokeDashoffset = ringCircumference;
+            holdText.textContent = "Hold to give your word";
+            holdIcon.textContent = "fingerprint";
+        }
+
+        function completePledge() {
+            clearTimeout(holdTimer);
+            holdText.textContent = "Oath Confirmed";
+            holdIcon.textContent = "check_circle";
+            holdButton.classList.add('scale-105', 'bg-white');
+            
+            // Trigger final success animation
+            setTimeout(() => {
+                successOverlay.style.opacity = '1';
+                successOverlay.style.pointerEvents = 'auto';
+                successOverlay.querySelector('span').style.transform = 'scale(1)';
+            }, 300);
+
+            // Simulate redirect
+            setTimeout(() => {
+                console.log('Transition to next screen...');
+            }, 2500);
+        }
+
+        // Event Listeners for hold interaction
+        holdButton.addEventListener('mousedown', startHolding);
+        holdButton.addEventListener('mouseup', cancelHolding);
+        holdButton.addEventListener('mouseleave', cancelHolding);
+        
+        // Touch support
+        holdButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startHolding();
+        });
+        holdButton.addEventListener('touchend', cancelHolding);
+
+        // Micro-interactions for the background
+        document.addEventListener('mousemove', (e) => {
+            const x = (e.clientX / window.innerWidth) - 0.5;
+            const y = (e.clientY / window.innerHeight) - 0.5;
+            document.querySelector('main').style.transform = `perspective(1000px) rotateY(${x * 2}deg) rotateX(${-y * 2}deg)`;
+        });
+    </script>
+</body></html>

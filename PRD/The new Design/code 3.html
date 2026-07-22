@@ -1,0 +1,255 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Review | The Obsidian Pulse</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;500;700;900&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed-variant": "#005964",
+                        "on-error-container": "#ffd2c8",
+                        "surface-bright": "#2c2c2c",
+                        "on-background": "#ffffff",
+                        "on-tertiary-container": "#5e5400",
+                        "secondary": "#00e3fd",
+                        "outline": "#777575",
+                        "on-secondary-container": "#e8fbff",
+                        "inverse-primary": "#4c6800",
+                        "on-primary-fixed-variant": "#4c6800",
+                        "tertiary-container": "#fde74f",
+                        "primary-fixed-dim": "#b2ed00",
+                        "on-primary": "#4b6600",
+                        "surface-container": "#1a1919",
+                        "on-primary-container": "#445d00",
+                        "tertiary-fixed-dim": "#eed942",
+                        "on-secondary-fixed": "#003a42",
+                        "tertiary-fixed": "#fde74f",
+                        "surface-dim": "#0e0e0e",
+                        "primary": "#eaffb8",
+                        "on-tertiary": "#685c00",
+                        "tertiary": "#fff4c1",
+                        "surface": "#0e0e0e",
+                        "secondary-fixed": "#26e6ff",
+                        "primary-fixed": "#befc00",
+                        "surface-container-low": "#131313",
+                        "surface-variant": "#262626",
+                        "inverse-on-surface": "#565554",
+                        "error": "#ff7351",
+                        "primary-container": "#befc00",
+                        "surface-container-highest": "#262626",
+                        "on-tertiary-fixed": "#4a4100",
+                        "surface-container-high": "#201f1f",
+                        "on-error": "#450900",
+                        "on-primary-fixed": "#354900",
+                        "surface-container-lowest": "#000000",
+                        "primary-dim": "#b2ed00",
+                        "inverse-surface": "#fcf8f8",
+                        "on-surface-variant": "#adaaaa",
+                        "on-tertiary-fixed-variant": "#695e00",
+                        "secondary-fixed-dim": "#00d7f0",
+                        "outline-variant": "#494847",
+                        "secondary-dim": "#00d4ec",
+                        "on-surface": "#ffffff",
+                        "error-dim": "#d53d18",
+                        "secondary-container": "#006875",
+                        "tertiary-dim": "#eed942",
+                        "error-container": "#b92902",
+                        "surface-tint": "#eaffb8",
+                        "background": "#0e0e0e",
+                        "on-secondary": "#004d57"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "display": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .terminal-grid {
+            background-image: radial-gradient(circle, #262626 1px, transparent 1px);
+            background-size: 32px 32px;
+        }
+        .glow-error {
+            box-shadow: 0 0 40px -10px rgba(255, 115, 81, 0.2);
+        }
+        .scanline {
+            width: 100%;
+            height: 100px;
+            z-index: 10;
+            background: linear-gradient(0deg, rgba(234, 255, 184, 0.03) 0%, rgba(255, 255, 255, 0) 100%);
+            opacity: 0.1;
+            position: absolute;
+            pointer-events: none;
+            animation: scan 4s linear infinite;
+        }
+        @keyframes scan {
+            0% { top: -100px; }
+            100% { top: 100%; }
+        }
+        @keyframes spin-fast {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .loader-spin {
+            animation: spin-fast 0.8s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary selection:text-on-primary-container overflow-hidden h-screen flex flex-col">
+<!-- Top Navigation Anchor (Manual Override for Linear Flow) -->
+<header class="fixed top-0 w-full bg-surface-container-low dark:bg-surface-container-low flex justify-between items-center px-6 h-16 z-50" style="transform: translateX(0.772px) translateY(-1.128px);">
+<button class="hover:bg-surface-bright transition-colors p-2 rounded-full scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-primary">close</span>
+</button>
+<h1 class="font-headline text-[0.6875rem] uppercase tracking-widest text-on-surface-variant font-bold">NEW OBJECTIVE</h1>
+<button class="hover:bg-surface-bright transition-colors p-2 rounded-full scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-primary">check_circle</span>
+</button>
+</header>
+<main class="flex-1 flex flex-col pt-20 pb-24 px-6 overflow-y-auto terminal-grid relative">
+<div class="scanline"></div>
+<!-- Progress Indicator -->
+<div class="flex justify-center mb-8">
+<div class="flex items-center gap-1">
+<div class="w-2 h-2 rounded-full bg-primary-dim"></div>
+<div class="w-2 h-2 rounded-full bg-primary-dim"></div>
+<div class="w-2 h-2 rounded-full bg-primary-dim"></div>
+<div class="w-8 h-2 rounded-full bg-primary shadow-[0_0_10px_#eaffb8]"></div>
+<span class="ml-4 font-label text-[0.6875rem] text-primary tracking-[0.2em] font-bold">4/4</span>
+</div>
+</div>
+<!-- Header -->
+<div class="text-center mb-12">
+<h2 class="font-display font-black text-[2.5rem] leading-none tracking-tighter text-on-surface mb-2">LOOK IT IN THE EYE</h2>
+<p class="font-label text-[0.6875rem] text-on-surface-variant tracking-[0.15em] uppercase">Final verification of commitment parameters</p>
+</div>
+<!-- Summary Rows Bento -->
+<div class="space-y-6 max-w-lg mx-auto w-full">
+<!-- Commitment -->
+<div class="bg-surface-container-low p-6 rounded-lg group transition-all hover:bg-surface-container-high" style="transform: translateX(0.772px) translateY(-1.128px);">
+<p class="font-label text-[0.6rem] text-on-surface-variant uppercase tracking-[0.2em] mb-3">COMMITMENT</p>
+<div class="flex justify-between items-end">
+<span class="text-2xl font-bold tracking-tight text-white">Digital Fast 2.0</span>
+<span class="material-symbols-outlined text-primary-dim opacity-50 group-hover:opacity-100 transition-opacity">offline_bolt</span>
+</div>
+</div>
+<!-- Target -->
+<div class="bg-surface-container-low p-6 rounded-lg group transition-all hover:bg-surface-container-high" style="transform: translateX(0.772px) translateY(-1.128px);">
+<p class="font-label text-[0.6rem] text-on-surface-variant uppercase tracking-[0.2em] mb-3">TARGET</p>
+<div class="flex flex-col gap-2">
+<div class="flex justify-between items-center">
+<span class="text-xl font-medium text-on-surface">60 min a day, 7 days</span>
+<span class="text-[0.6875rem] font-bold bg-primary-container text-on-primary-container px-2 py-0.5 rounded-sm">DISCIPLINED</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant text-sm">
+<span class="material-symbols-outlined text-[1rem]">task_alt</span>
+<span class="">Required threshold: Pass 6</span>
+</div>
+</div>
+</div>
+<!-- Stake (High Risk) -->
+<div class="bg-surface-container-low p-6 rounded-lg glow-error border border-error/10 relative overflow-hidden group" style="transform: translateX(0.772px) translateY(-1.128px);">
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-[4rem] text-error">warning</span>
+</div>
+<p class="font-label text-[0.6rem] text-error uppercase tracking-[0.2em] mb-3 font-bold">STAKE — CRITICAL RISK</p>
+<div class="flex flex-col gap-1">
+<span class="text-2xl font-black text-on-surface">Embarrassing Photo</span>
+<span class="text-sm text-error font-medium uppercase tracking-wider">1 Hour Public Reveal</span>
+<div class="mt-4 relative group/photo">
+    <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDhbw5FiH-tot016j9aDyJU9JyNKps52Z6Hof6tv9H8n7C-8TLEgvi6C9Kp0H4B1ZYgIY46Kb71pq2t3qaLcBgzhG8f2uSNAoiW1RLWG4qWLzMbjMN_yKqZeM7KCpPAql19v-EoGdEsmtgRy3HrYPGEp4LiUrzzxjgHTWS81mG_RyMAZWD8XUYNDW2MOhgnztCHPRAEk3-lueG6e_VSD1sgmOJfGiXvSLS3KFfpveX_FjpILLvTDJE4VNqphl3uBMcLkSajJooyynE" alt="Collateral" class="w-full rounded-lg border border-error/30 shadow-[0_0_15px_rgba(255,115,81,0.1)] transition-all group-hover/photo:shadow-[0_0_25px_rgba(255,115,81,0.2)]">
+    <div class="absolute inset-0 rounded-lg bg-gradient-to-t from-error/20 to-transparent opacity-40 pointer-events-none"></div>
+</div></div>
+<!-- Subtle coral pulse indicator -->
+<div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-error to-transparent opacity-30 animate-pulse"></div>
+</div>
+<!-- Your Word -->
+<div class="bg-surface-container-low p-6 rounded-lg border-l-2 border-primary-dim group" style="transform: translateX(0.772px) translateY(-1.128px);">
+<p class="font-label text-[0.6rem] text-on-surface-variant uppercase tracking-[0.2em] mb-3">YOUR WORD</p>
+<blockquote class="italic text-on-surface-variant text-lg font-light leading-relaxed">
+                    "I acknowledge that my evolution requires the death of my comfort. I commit to this target or face the public consequences of my failure."
+                </blockquote>
+</div>
+<div class="h-12"></div> <!-- Spacer for scroll -->
+</div>
+</main>
+<!-- Final Action - Bottom Section -->
+<section class="fixed bottom-0 w-full z-50 bg-surface/80 backdrop-blur-xl px-6 py-6 pb-safe">
+<button class="w-full bg-primary-container text-on-primary-container h-16 rounded-full font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-4 group active:scale-[0.98] transition-all shadow-[0_0_30px_rgba(190,252,0,0.2)]" id="mainAction" onclick="initiateChallenge()">
+<span id="btnText" class="">Start the Challenge</span>
+<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform" id="btnIcon">bolt</span>
+<div class="hidden" id="btnSpinner">
+<div class="w-6 h-6 border-2 border-on-primary-container/20 border-t-on-primary-container rounded-full loader-spin"></div>
+</div>
+</button>
+<p class="text-center mt-4 font-label text-[0.55rem] text-on-surface-variant uppercase tracking-widest opacity-50">
+            Encrypted tunnel secured • Server response: 200 OK
+        </p>
+</section>
+<!-- Invisible background shader for atmosphere -->
+<div class="fixed inset-0 -z-10 pointer-events-none opacity-40">
+
+</div>
+<script>
+        function initiateChallenge() {
+            const btn = document.getElementById('mainAction');
+            const text = document.getElementById('btnText');
+            const icon = document.getElementById('btnIcon');
+            const spinner = document.getElementById('btnSpinner');
+
+            // Set Loading State
+            btn.disabled = true;
+            text.innerText = "INITIALIZING...";
+            icon.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            btn.classList.add('opacity-80');
+
+            // Simulate high-stakes initialization
+            setTimeout(() => {
+                text.innerText = "TUNNEL ESTABLISHED";
+                setTimeout(() => {
+                    text.innerText = "COMMENCING...";
+                    btn.classList.replace('bg-primary-container', 'bg-secondary');
+                    btn.classList.replace('text-on-primary-container', 'text-on-secondary');
+                    
+                    // Final redirection mock
+                    setTimeout(() => {
+                        window.alert('Mission Active. Pulse Monitoring Started.');
+                        location.reload(); // Loop back for demo
+                    }, 1000);
+                }, 1000);
+            }, 1500);
+        }
+
+        // Add small float animation logic to bento cards on mouse move
+        document.addEventListener('mousemove', (e) => {
+            const cards = document.querySelectorAll('.bg-surface-container-low');
+            const x = (window.innerWidth / 2 - e.pageX) / 50;
+            const y = (window.innerHeight / 2 - e.pageY) / 50;
+            
+            cards.forEach(card => {
+                card.style.transform = `translateX(${x * 0.2}px) translateY(${y * 0.2}px)`;
+            });
+        });
+    </script>
+
+
+
+</body></html>

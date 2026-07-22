@@ -449,6 +449,27 @@ not silent reversal.
   release. Extends the existing D9 "RC-tunable launch constant" pattern
   to the whole monetization surface.
 
+- **2026-07-22 · Challenge creation is 3 pages: choose-&-configure →
+  promise → review.** Supersedes the 2026-07-17 six-step order (category
+  → commitment → details → consent → pledge → review). Category still
+  leads — but the chosen card now docks and expands into EVERYTHING:
+  stake setup (dropdown-first: circle, reveal window, opponent,
+  charities) then the full commitment (title/target/duration/schedule),
+  with strictness as a collapsed tile that expands to the three compact
+  mode cards (Add-Task pattern) and, for photo stakes, the upload as a
+  compact coral tile at the end that grows when the collateral lands.
+  Unchosen cards collapse to switch-pills; switching preserves each
+  card's typed state. Page 2 "Your Promise" merges pledge + consent:
+  write why → read consequences → check boxes → hold ("Before you
+  commit" is the human framing; the red card keeps its P-1 severity).
+  Practice survives as the fourth, quieter card. Zero system change —
+  same state, payloads, callables, gates. *Why:* the six steps read as
+  configure/configure/consent/reason/review; three pages tell a story —
+  what's on the line → the promise → look it in the eye. (Assessed from
+  a ChatGPT proposal; its commitment-first ordering was rejected to keep
+  the category-leads decision, its practice-card deletion rejected as an
+  onboarding regression.)
+
 - **2026-07-22 · Challenge commitments are goal-shaped: real linked Goal,
   full schedule, future starts.** The accountability commitment step now
   uses the goal editor's own sections (title, target+unit, duration

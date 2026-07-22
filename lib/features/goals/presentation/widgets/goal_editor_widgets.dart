@@ -103,9 +103,11 @@ class GoalEditorTextField extends StatelessWidget {
     this.keyboardType,
     this.helperText,
     this.autofocus = false,
+    this.focusNode,
   });
 
   final TextEditingController controller;
+  final FocusNode? focusNode;
   final String? hintText;
   final String? Function(String?)? validator;
   final TextInputType? keyboardType;
@@ -119,6 +121,7 @@ class GoalEditorTextField extends StatelessWidget {
       children: [
         TextFormField(
           controller: controller,
+          focusNode: focusNode,
           validator: validator,
           keyboardType: keyboardType,
           autofocus: autofocus,

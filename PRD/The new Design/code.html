@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Initialize Stakes | Obsidian Pulse</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Custom scrollbar for tactical feel */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #0e0e0e; }
+        ::-webkit-scrollbar-thumb { background: #262626; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #eaffb8; }
+
+        .glass-panel {
+            background: rgba(38, 38, 38, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        .neon-glow-primary {
+            box-shadow: 0 0 15px rgba(234, 255, 184, 0.2);
+        }
+
+        .neon-glow-error {
+            box-shadow: 0 0 20px rgba(255, 115, 81, 0.3);
+        }
+
+        @keyframes pulse-opacity {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse-slow {
+            animation: pulse-opacity 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed-variant": "#005964",
+                      "on-error-container": "#ffd2c8",
+                      "surface-bright": "#2c2c2c",
+                      "on-background": "#ffffff",
+                      "on-tertiary-container": "#5e5400",
+                      "secondary": "#00e3fd",
+                      "outline": "#777575",
+                      "on-secondary-container": "#e8fbff",
+                      "inverse-primary": "#4c6800",
+                      "on-primary-fixed-variant": "#4c6800",
+                      "tertiary-container": "#fde74f",
+                      "primary-fixed-dim": "#b2ed00",
+                      "on-primary": "#4b6600",
+                      "surface-container": "#1a1919",
+                      "on-primary-container": "#445d00",
+                      "tertiary-fixed-dim": "#eed942",
+                      "on-secondary-fixed": "#003a42",
+                      "tertiary-fixed": "#fde74f",
+                      "surface-dim": "#0e0e0e",
+                      "primary": "#eaffb8",
+                      "on-tertiary": "#685c00",
+                      "tertiary": "#fff4c1",
+                      "surface": "#0e0e0e",
+                      "secondary-fixed": "#26e6ff",
+                      "primary-fixed": "#befc00",
+                      "surface-container-low": "#131313",
+                      "surface-variant": "#262626",
+                      "inverse-on-surface": "#565554",
+                      "error": "#ff7351",
+                      "primary-container": "#befc00",
+                      "surface-container-highest": "#262626",
+                      "on-tertiary-fixed": "#4a4100",
+                      "surface-container-high": "#201f1f",
+                      "on-error": "#450900",
+                      "on-primary-fixed": "#354900",
+                      "surface-container-lowest": "#000000",
+                      "primary-dim": "#b2ed00",
+                      "inverse-surface": "#fcf8f8",
+                      "on-surface-variant": "#adaaaa",
+                      "on-tertiary-fixed-variant": "#695e00",
+                      "secondary-fixed-dim": "#00d7f0",
+                      "outline-variant": "#494847",
+                      "secondary-dim": "#00d4ec",
+                      "on-surface": "#ffffff",
+                      "error-dim": "#d53d18",
+                      "secondary-container": "#006875",
+                      "tertiary-dim": "#eed942",
+                      "error-container": "#b92902",
+                      "surface-tint": "#eaffb8",
+                      "background": "#0e0e0e",
+                      "on-secondary": "#004d57"
+              },
+              "borderRadius": {
+                      "DEFAULT": "1rem",
+                      "lg": "2rem",
+                      "xl": "3rem",
+                      "full": "9999px"
+              },
+              "fontFamily": {
+                      "headline": ["Inter"],
+                      "display": ["Inter"],
+                      "body": ["Inter"],
+                      "label": ["Inter"],
+                      "mono": ["JetBrains Mono"]
+              }
+            },
+          }
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary selection:text-on-primary-container min-h-screen pb-32">
+<!-- Top Navigation (Manual implementation following Shared Component logic) -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md h-16 flex justify-between items-center px-6">
+<button aria-label="Go back" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant transition-colors active:scale-90">
+<span class="material-symbols-outlined text-on-surface">arrow_back</span>
+</button>
+<div class="flex flex-col items-center">
+<h1 class="font-headline text-[0.75rem] uppercase tracking-[0.25em] font-black text-on-surface">INITIALIZE STAKES</h1>
+<div class="flex gap-1 mt-1.5">
+<div class="h-1 w-6 rounded-full bg-primary neon-glow-primary"></div>
+<div class="h-1 w-4 rounded-full bg-surface-container-highest"></div>
+<div class="h-1 w-4 rounded-full bg-surface-container-highest"></div>
+<div class="h-1 w-4 rounded-full bg-surface-container-highest"></div>
+</div>
+</div>
+<div class="w-10 h-10 flex items-center justify-center mono text-[0.6875rem] font-bold text-primary">
+            01/04
+        </div>
+</header>
+<main class="pt-24 px-6 max-w-lg mx-auto space-y-10">
+<!-- Section: Destination -->
+<section class="space-y-4">
+<div class="flex items-center justify-between">
+<label class="font-label text-[0.6875rem] uppercase tracking-[0.15em] text-on-surface-variant font-bold">POSTS TO</label>
+<span class="mono text-[0.6rem] text-primary opacity-60">ENCRYPTED_CHANNEL</span>
+</div>
+<div class="flex flex-wrap gap-2">
+<button class="px-4 py-2.5 rounded-xl bg-primary-container text-on-primary-container border-2 border-primary text-[0.8rem] font-bold transition-all flex items-center gap-2 neon-glow-primary">
+<span class="material-symbols-outlined text-[1.1rem]">group</span>
+                    Miko Circle
+                </button>
+<button class="px-4 py-2.5 rounded-xl bg-surface-container-high border-2 border-transparent text-on-surface-variant text-[0.8rem] font-medium hover:border-outline-variant transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-[1.1rem]">science</span>
+                    Miko Group Test 2
+                </button>
+<button class="px-4 py-2.5 rounded-xl bg-surface-container-high border-2 border-transparent text-on-surface-variant text-[0.8rem] font-medium hover:border-outline-variant transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-[1.1rem]">add</span>
+                    New Circle
+                </button>
+</div>
+</section>
+<!-- Section: The Stake -->
+<section class="space-y-4">
+<div class="flex items-center justify-between">
+<label class="font-label text-[0.6875rem] uppercase tracking-[0.15em] text-error font-bold">THE STAKE (HIGH RISK)</label>
+<span class="material-symbols-outlined text-error text-[1.1rem] animate-pulse">priority_high</span>
+</div>
+<!-- Image Upload Tile: Active State -->
+<div class="relative group cursor-pointer overflow-hidden rounded-xl h-[180px] border-2 border-error neon-glow-error transition-all hover:scale-[1.01] active:scale-[0.99]">
+<div class="absolute inset-0 bg-cover bg-center" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDJIwKciJZQrzQesNL_Ni-rRFESIOaAdmnTaJcOtQBzDkzbas4ALLz0y4lpPvoM0duAJa80wVmE3YXoSLnhTO1aaQhGUGlle30QNBtGbtSn5u5zggbEQpnzzCL-sbVGQVn-m19rJ39VNTIBg11SDmN-zwD61ZQurs4EhOhnXceljjefqe0IZGtZi5odLsflFQIzT99dssXovrtzRmpid87kJ_R9bLr_JTTm55gKDEp2fH-vXGOWGmH7kqFmtNt5i220eP_uelaZWDA')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+<div class="absolute bottom-4 left-4 right-4 flex justify-between items-end">
+<div>
+<p class="mono text-[0.6rem] text-white/60 mb-1">FILE_STAKE_01.JPEG</p>
+<p class="text-[0.75rem] font-bold text-white uppercase tracking-wider">COLLATERAL DETECTED</p>
+</div>
+<button class="w-8 h-8 rounded-full bg-error text-on-error flex items-center justify-center">
+<span class="material-symbols-outlined text-[1.1rem]">close</span>
+</button>
+</div>
+<div class="absolute top-4 right-4 px-2 py-1 bg-error text-white text-[0.6rem] font-black tracking-widest rounded-md animate-pulse">
+                    READY FOR RELEASE
+                </div>
+</div>
+<p class="text-on-surface-variant text-[0.75rem] leading-relaxed italic opacity-80 px-1">
+                This image will be automatically posted to your selected circles if you fail the challenge. 
+            </p>
+</section>
+<!-- Section: Reveal Window -->
+<section class="space-y-4">
+<div class="flex items-center justify-between">
+<label class="font-label text-[0.6875rem] uppercase tracking-[0.15em] text-on-surface-variant font-bold">REVEAL WINDOW</label>
+<span class="mono text-[0.6rem] text-secondary">AUTO_DESTRUCT_LATENCY</span>
+</div>
+<div class="grid grid-cols-3 gap-3">
+<button class="time-chip p-4 rounded-xl bg-surface-container-high border border-outline-variant/10 flex flex-col items-center justify-center gap-1 transition-all hover:bg-surface-bright" onclick="selectTime(this)">
+<span class="text-[0.9rem] font-bold text-on-surface">5</span>
+<span class="mono text-[0.6rem] uppercase text-on-surface-variant">MINS</span>
+</button>
+<button class="time-chip p-4 rounded-xl bg-surface-container-high border border-outline-variant/10 flex flex-col items-center justify-center gap-1 transition-all hover:bg-surface-bright" onclick="selectTime(this)">
+<span class="text-[0.9rem] font-bold text-on-surface">30</span>
+<span class="mono text-[0.6rem] uppercase text-on-surface-variant">MINS</span>
+</button>
+<button class="time-chip p-4 rounded-xl bg-primary-container/20 border-2 border-primary flex flex-col items-center justify-center gap-1 transition-all neon-glow-primary" onclick="selectTime(this)">
+<span class="text-[0.9rem] font-bold text-primary">1</span>
+<span class="mono text-[0.6rem] uppercase text-primary">HOUR</span>
+</button>
+<button class="time-chip p-4 rounded-xl bg-surface-container-high border border-outline-variant/10 flex flex-col items-center justify-center gap-1 transition-all hover:bg-surface-bright" onclick="selectTime(this)">
+<span class="text-[0.9rem] font-bold text-on-surface">3</span>
+<span class="mono text-[0.6rem] uppercase text-on-surface-variant">HOURS</span>
+</button>
+<button class="time-chip p-4 rounded-xl bg-surface-container-high border border-outline-variant/10 flex flex-col items-center justify-center gap-1 transition-all hover:bg-surface-bright" onclick="selectTime(this)">
+<span class="text-[0.9rem] font-bold text-on-surface">12</span>
+<span class="mono text-[0.6rem] uppercase text-on-surface-variant">HOURS</span>
+</button>
+<button class="time-chip p-4 rounded-xl bg-surface-container-high border border-outline-variant/10 flex flex-col items-center justify-center gap-1 transition-all hover:bg-surface-bright" onclick="selectTime(this)">
+<span class="text-[0.9rem] font-bold text-on-surface">24</span>
+<span class="mono text-[0.6rem] uppercase text-on-surface-variant">HOURS</span>
+</button>
+</div>
+</section>
+</main>
+<!-- Fixed Bottom Action Area -->
+<div class="fixed bottom-0 left-0 w-full p-6 bg-gradient-to-t from-surface via-surface to-transparent pt-12">
+<div class="max-w-lg mx-auto flex flex-col gap-4">
+<div class="flex justify-between items-end px-2">
+<div class="flex flex-col">
+<span class="mono text-[0.6rem] text-on-surface-variant opacity-60">PROTOCOL_LOCK</span>
+<span class="text-[0.7rem] font-bold uppercase text-on-surface">STAKE_VALID_&amp;_ENCRYPTED</span>
+</div>
+<div class="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_8px_#eaffb8]"></div>
+</div>
+<button class="w-full h-16 rounded-full bg-primary-container text-on-primary-container font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 neon-glow-primary shadow-xl">
+                CONTINUE
+                <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Atmospheric WebGL-like overlay (Simulated via SVG overlay for performance/compatibility) -->
+<div class="fixed inset-0 pointer-events-none z-[-1] opacity-20">
+<svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 100 100">
+<defs>
+<lineargradient id="gridGrad" x1="0%" x2="0%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#eaffb8" stop-opacity="0.1"></stop>
+<stop offset="100%" stop-color="#00e3fd" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+<pattern height="10" id="grid" patternunits="userSpaceOnUse" width="10">
+<path class="text-primary-dim" d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" stroke-width="0.1"></path>
+</pattern>
+<rect fill="url(#grid)" height="100" width="100"></rect>
+</svg>
+</div>
+<script>
+        function selectTime(el) {
+            // Remove active classes from all
+            document.querySelectorAll('.time-chip').forEach(chip => {
+                chip.classList.remove('bg-primary-container/20', 'border-primary', 'neon-glow-primary');
+                chip.classList.add('bg-surface-container-high', 'border-outline-variant/10');
+                
+                const spanMain = chip.querySelector('span:first-child');
+                const spanSub = chip.querySelector('span:last-child');
+                
+                spanMain.classList.remove('text-primary');
+                spanMain.classList.add('text-on-surface');
+                
+                spanSub.classList.remove('text-primary');
+                spanSub.classList.add('text-on-surface-variant');
+            });
+
+            // Add active classes to selected
+            el.classList.add('bg-primary-container/20', 'border-primary', 'neon-glow-primary');
+            el.classList.remove('bg-surface-container-high', 'border-outline-variant/10');
+            
+            const spanMain = el.querySelector('span:first-child');
+            const spanSub = el.querySelector('span:last-child');
+            
+            spanMain.classList.add('text-primary');
+            spanMain.classList.remove('text-on-surface');
+            
+            spanSub.classList.add('text-primary');
+            spanSub.classList.remove('text-on-surface-variant');
+        }
+
+        // Tactile vibration simulation on button clicks (where supported)
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator && window.navigator.vibrate) {
+                    window.navigator.vibrate(10);
+                }
+            });
+        });
+    </script>
+</body></html>
