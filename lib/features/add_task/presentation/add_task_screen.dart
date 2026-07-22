@@ -10,6 +10,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
+import '../../../core/tier/tier_providers.dart';
+import '../../../core/tier/tier_usage.dart';
+import '../../../core/tier/upgrade_prompt.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../coaching/application/default_mode_resolver.dart';
@@ -636,6 +639,30 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     required String blockId,
     required String modeRefId,
   }) async {
+    // New enabled reminder = one more active configuration — gate it (the
+    // task itself is already saved; only the reminder is withheld).
+    if (_existingReminderId == null && _reminder) {
+      final tierGate = ref.read(tierGateProvider);
+      if (!tierGate.isBypassed) {
+        final all = await ref
+            .read(reminderRepositoryProvider)
+            .listAllReminders();
+        final activeCount = all.where((r) => r.enabled).length;
+        if (!tierGate.canCreateReminder(activeCount)) {
+          if (mounted) {
+            await showTierLimitSheet(
+              context,
+              title: 'Reminder limit reached',
+              message:
+                  'The free plan includes ${tierGate.limits.freeReminders} '
+                  'active reminders, so this task was saved without one. '
+                  'SidePal Pro removes the limit.',
+            );
+          }
+          return;
+        }
+      }
+    }
     var blockUrgency = 50;
     try {
       final planning = ref.read(planningRepositoryProvider);
@@ -998,6 +1025,46 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     final planning = ref.read(planningRepositoryProvider);
     final planKey = _planDateKey();
     final nowMs = DateTime.now().millisecondsSinceEpoch;
+
+    // Free-tier creation gates (no-ops while enforcement is off / on Pro).
+    final tierGate = ref.read(tierGateProvider);
+    if (!tierGate.isBypassed) {
+      if (!_isEdit) {
+        final dayCount = await TierUsage.tasksPlannedForDay(planKey);
+        if (!tierGate.canCreateTaskForDay(dayCount)) {
+          setState(() => _saving = false);
+          if (mounted) {
+            await showTierLimitSheet(
+              context,
+              title: 'Daily task limit reached',
+              message:
+                  'The free plan includes ${tierGate.limits.freeTasksPerDay} '
+                  'tasks per day. SidePal Pro removes the limit.',
+            );
+          }
+          return;
+        }
+      }
+      final addingAnchor =
+          _isHabitAnchor && (!_isEdit || !(_loadedTask?.isHabitAnchor ?? false));
+      if (addingAnchor) {
+        final anchorCount = await TierUsage.habitAnchorsForDay(planKey);
+        if (!tierGate.canAddHabitAnchorForDay(anchorCount)) {
+          setState(() => _saving = false);
+          if (mounted) {
+            await showTierLimitSheet(
+              context,
+              title: 'Habit limit reached',
+              message:
+                  'The free plan includes '
+                  '${tierGate.limits.freeHabitAnchorsPerDay} active habits '
+                  'per day. SidePal Pro removes the limit.',
+            );
+          }
+          return;
+        }
+      }
+    }
 
     try {
       late final String routineId;

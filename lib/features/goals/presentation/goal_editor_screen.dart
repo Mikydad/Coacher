@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/presentation/keyboard_dismiss.dart';
+import '../../../core/tier/tier_providers.dart';
+import '../../../core/tier/upgrade_prompt.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../analytics/application/analytics_event_logger.dart';
@@ -695,8 +697,31 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
     final repeatInterval = _repeatCadence == GoalRepeatCadence.off
         ? 1
         : _repeatInterval.clamp(1, 999);
-    setState(() => _saving = true);
     final repo = ref.read(goalsRepositoryProvider);
+    // Free-tier goal cap — creation only; edits always save.
+    if (widget.goalId == null) {
+      final tierGate = ref.read(tierGateProvider);
+      if (!tierGate.isBypassed) {
+        final goals = await repo.fetchGoalsOnce();
+        final activeCount = goals
+            .where((g) => g.status == GoalStatus.active)
+            .length;
+        if (!tierGate.canCreateGoal(activeCount)) {
+          if (mounted) {
+            await showTierLimitSheet(
+              context,
+              title: 'Goal limit reached',
+              message:
+                  'The free plan includes ${tierGate.limits.freeGoals} active '
+                  'goals. Finish or archive one, or let SidePal Pro remove '
+                  'the limit.',
+            );
+          }
+          return;
+        }
+      }
+    }
+    setState(() => _saving = true);
     final now = DateTime.now().millisecondsSinceEpoch;
     final bounds = _periodBounds(durationDayCount: durationDayCount);
     final goalId = widget.goalId ?? StableId.generate('goal');

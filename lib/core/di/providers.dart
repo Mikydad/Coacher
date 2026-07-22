@@ -5,6 +5,7 @@ import '../firebase/firestore_client.dart';
 import '../notifications/local_notifications_service.dart';
 import '../offline/offline_store.dart';
 import '../sync/sync_service.dart';
+import '../tier/tier_providers.dart';
 import '../../features/auth/application/auth_providers.dart';
 import '../../features/planning/application/routine_mode_policy_resolver.dart';
 import '../../features/planning/data/isar_planning_repository.dart';
@@ -167,5 +168,10 @@ final userCircleMembershipServiceProvider =
         currentUserId: () => FirebaseAuth.instance.currentUser?.uid ?? '',
         currentDisplayName: () =>
             FirebaseAuth.instance.currentUser?.displayName ?? 'User',
+        maxCirclesPerUser: () => ref
+            .read(tierGateProvider)
+            .maxJoinedCircles(
+              legacyLimit: UserCircleMembershipService.kMaxCirclesPerUser,
+            ),
       );
     });

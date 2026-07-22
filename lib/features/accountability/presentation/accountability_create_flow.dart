@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
+import '../../../core/tier/tier_providers.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../community/application/circle_providers.dart';
 import '../application/points_providers.dart';
@@ -958,6 +959,40 @@ class _AccountabilityCreateFlowState
     final repository = ref.read(stakesRepositoryProvider);
     final uid = FirestorePaths.activeUid;
     final now = DateTime.now();
+
+    // Free-tier monthly photo-stake quota — polite pre-check against the
+    // local mirror; stakeCreateChallenge enforces the same rule
+    // authoritatively server-side. Only activated challenges count
+    // (draft/cancelled don't consume an allowance).
+    if (_stake == _StakeChoice.photo) {
+      final tierGate = ref.read(tierGateProvider);
+      if (!tierGate.isBypassed) {
+        final challenges =
+            ref.read(stakeChallengesStreamProvider).value ??
+            const <StakeChallenge>[];
+        final monthStartMs = DateTime(now.year, now.month).millisecondsSinceEpoch;
+        final usedThisMonth = challenges
+            .where(
+              (c) =>
+                  c.type == StakeChallengeType.soloPhoto &&
+                  c.createdAtMs >= monthStartMs &&
+                  c.status != StakeChallengeStatus.draft &&
+                  c.status != StakeChallengeStatus.cancelled,
+            )
+            .length;
+        if (!tierGate.canCreatePhotoStakeThisMonth(usedThisMonth)) {
+          setState(() {
+            _creating = false;
+            _createError =
+                'The free plan includes '
+                '${tierGate.limits.freePhotoStakesPerMonth} photo stakes per '
+                'month — the counter resets on the 1st. SidePal Pro removes '
+                'the limit.';
+          });
+          return;
+        }
+      }
+    }
     final startOfToday = DateTime(now.year, now.month, now.day);
     var deadline = startOfToday
         .add(Duration(days: _totalUnits))

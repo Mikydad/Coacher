@@ -342,3 +342,121 @@ not silent reversal.
   Still untouched: the Firebase project id (`coach4life-afaaa`) and the
   repo folder name `Coach_for_life` — both invisible to users.
 
+- **2026-07-20 · Two payment rails, split by Apple's rules, sharing one
+  server-side backbone.** Digital entitlements (Pro subscription, points
+  packs) go through Apple/Google IAP via RevenueCat; real-money stakes go
+  through Stripe (Apple prohibits charitable donations via IAP — Stripe is
+  the compliant rail, not a workaround). The rails never mix. Entitlement
+  flow: RevenueCat webhook → Cloud Function → `entitlements` on the user
+  doc → `RemoteIsarMerge` → Isar watch provider, so premium *checks* are
+  offline-first even though the purchase moment is inherently online
+  (grace window covers a lapsed cache). Points packs are consumable IAPs
+  credited to the ledger by the webhook (`iap_purchase` source), never by
+  the client. Build order: subscriptions first (points IAP rides the same
+  RevenueCat install behind the existing RC flag), money stakes last
+  (gated on LLC/Stripe). *Considered:* raw `in_app_purchase`/StoreKit 2
+  (rejected: renewals, refunds, and cross-platform receipt validation are
+  weeks of edge cases RevenueCat solves).
+
+- **2026-07-20 · Money challenges carry a transparent Challenge Fee:
+  greater of $2 or 7% of the stake, per participant, shown as its own
+  checkout line.** The fee is separate from the stake and non-refundable
+  once the challenge is active, win or lose: winners get their full stake
+  back, losers' full stake is donated — SidePal keeps only the fee either
+  way, so revenue is identical regardless of outcome (the business never
+  profits from failure). The 7% floor exists because Stripe's cut
+  (~2.9% + $0.30, not returned on refunds) is taken on the total charge —
+  a flat $2 goes underwater above a ~$58 stake. *Considered:* flat $2
+  (rejected: negative margin at higher stakes); flat $2 + $50 stake cap
+  (rejected: caps the product to save a pricing rule).
+
+- **2026-07-20 · Challenge Fee is fully refunded if a challenge never
+  activates.** Opponent declines, invite expires, or the account-deletion
+  cancel path fires before activation → refund stake + fee (full refund
+  of the single Stripe charge). Only activation starts the no-refund
+  clock. *Considered:* keeping the fee on declined invites (rejected:
+  users paying $2 for nothing breeds chargebacks and support load).
+
+- **2026-07-20 · Money challenges are a SidePal Pro feature.** Free tier
+  keeps the full core loop: tasks, habits, limited AI planning, photo
+  stakes, and points challenges. Pro adds money challenges, unlimited AI,
+  advanced analytics, community features, unlimited goals, and future
+  premium accountability features. *Why:* money challenges are the
+  highest-value accountability tier, the subscription absorbs their
+  operating costs (Stripe margins, verification, support), and it gives a
+  clear upgrade reason without making the free app feel crippled. Gating
+  a Stripe-paid feature behind an IAP subscription is App Store-compliant
+  (the subscription sells digital feature access; the stake is a
+  real-world transaction).
+
+- **2026-07-20 · Free/Pro tier matrix fixed; full table in
+  `PRD/Monetization/prd-monetization-tiers.md`.** Free: 5 tasks, 5 goals
+  (challenge-created goals count), 5 active habits, 5 active reminder
+  configurations (recurring = 1), 5 actionable AI instructions/day,
+  3 photo stakes/month (activated only), membership in 1 circle (max 5
+  members), practice challenges, points earning, streaks/notifications/
+  widgets/education, basic analytics (streaks, weekly %, calendar, task
+  history). Pro ($9.99/mo, $79.99/yr, 7-day trial, store price tiers for
+  regions): everything unlimited, 8-member circles, money challenges,
+  points H2H/team creation, buy + spend points, advanced analytics +
+  export. Mercy veto is free for everyone (1/month; Pro 3/month) — it's
+  a safety valve, and paywalling it puts the users who most need it
+  without it. *Supersedes:* the earlier same-day call that point buying
+  is free-tier — free users had no point sinks, making it a dead SKU;
+  buying and spending are now both Pro.
+
+- **2026-07-20 · Only the challenge creator needs Pro (the virality
+  rule).** H2H and team challenges, points and money alike: creator must
+  have Pro; invitees need only an account (+ verified payment method for
+  money) — an invitee is never shown "buy Pro first". A 4v4 needs
+  exactly one Pro user. *Why:* the invite-accept flow is the acquisition
+  loop; requiring Pro from all 8 turns every challenge into a sales
+  call. The Pro trial unlocks points H2H/team but NOT money challenges —
+  real charges require an active paid subscription (prevents
+  stake-then-cancel abuse; no financial liability on points).
+
+- **2026-07-20 · Downgrade and limit-introduction never destroy user
+  state.** Active challenges always run to completion (money is
+  escrowed). Over-limit tasks/goals/habits/reminders remain usable;
+  creating new ones over the limit requires Pro. Circles: the user
+  chooses which one stays active, the rest go read-only. Existing users
+  at limits-launch are grandfathered (keep all 12 goals; can't add a
+  13th; after deleting down to the cap it binds). Bought points are
+  never confiscated — balance persists through downgrade and reactivates
+  on upgrade. *Considered:* auto-picking the surviving circle (rejected:
+  could silently take the group the user cares about most).
+
+- **2026-07-20 · Free AI quota counts server-classified actionable
+  instructions only.** The backend AI tags each user message (greeting /
+  chat / action / planning / coaching); only actionable ones consume the
+  5/day. Clarify-then-confirm = 1 instruction. Onboarding demo and
+  AI-initiated check-ins never count. At 5/5 the conversation does NOT
+  hard-stop — action features stop with a soft upgrade line, chat
+  continues. Reset at midnight in the user's configured timezone,
+  server-side (device-clock changes can't bypass it). Pro "unlimited"
+  is a generous internal fair-use token budget, never literally
+  unlimited.
+
+- **2026-07-20 · Every tier limit lives in one Remote Config parameter
+  (`tier_limits_v1`), not in code.** Single JSON blob holds all caps,
+  quotas, fee constants (min $2 / 7%), veto counts. Compiled-in defaults
+  + cached RC keep limits resolving offline; Cloud Functions read the
+  same parameter via the Admin SDK so client and server never drift —
+  anything touching money/stakes/quotas/AI is enforced server-side,
+  client checks are UI politeness. Per-user `limitOverrides` on the user
+  doc (checked before RC) carries comps, promos, and grandfather flags
+  through the same mechanism. Changing any limit = one console edit, no
+  release. Extends the existing D9 "RC-tunable launch constant" pattern
+  to the whole monetization surface.
+
+- **2026-07-20 · Free task cap is per-day; "habits" are Habit Anchor
+  tasks.** Tasks in this codebase are per-day planned items, so "5 tasks"
+  = 5 tasks planned per day (5 total would be hit in the first session).
+  There is no habit entity: "5 active habits" = 5 Habit Anchor tasks per
+  day (anchors are their own Tasks-hub section — the closest product
+  match). *Considered:* goals in the Habits category (rejected: already
+  count against the 5-goal cap, a second cap would be redundant).
+  Implementation note: gates are creation-time count checks behind the
+  `tier_limits_v1.enforced` kill switch (ships false — never enforce
+  limits before the paywall gives an upgrade path); grandfathering falls
+  out for free since existing over-limit data is never touched.

@@ -1,0 +1,76 @@
+{
+  "_comment": "D7 curated charity list — the versioned source of truth. Doc id = key. DEV placeholders: charityRegistration/donationMethod MUST be vetted and filled by the admin before any real money moves (Phase 4 live). Deactivate an entry by setting active:false and re-running the seeder; never delete.",
+  "red-cross": {
+    "name": "International Red Cross",
+    "category": "humanitarian",
+    "charityRegistration": "DEV-PLACEHOLDER",
+    "donationMethod": "manual",
+    "logo": null,
+    "active": true,
+    "tags": ["humanitarian", "disaster-relief", "neutral"],
+    "platformDefault": true
+  },
+  "unicef": {
+    "name": "UNICEF",
+    "category": "children",
+    "charityRegistration": "DEV-PLACEHOLDER",
+    "donationMethod": "manual",
+    "logo": null,
+    "active": true,
+    "tags": ["children", "neutral"]
+  },
+  "doctors-without-borders": {
+    "name": "Doctors Without Borders",
+    "category": "health",
+    "charityRegistration": "DEV-PLACEHOLDER",
+    "donationMethod": "manual",
+    "logo": null,
+    "active": true,
+    "tags": ["health", "neutral"]
+  },
+  "wwf": {
+    "name": "WWF (World Wildlife Fund)",
+    "category": "environment",
+    "charityRegistration": "DEV-PLACEHOLDER",
+    "donationMethod": "manual",
+    "logo": null,
+    "active": true,
+    "tags": ["environment", "neutral"]
+  },
+  "lfc-foundation": {
+    "name": "LFC Foundation (Liverpool)",
+    "category": "sport",
+    "charityRegistration": "DEV-PLACEHOLDER",
+    "donationMethod": "manual",
+    "logo": null,
+    "active": true,
+    "tags": ["football", "premier-league", "rivalry:manchester-united"]
+  },
+  "man-united-foundation": {
+    "name": "Manchester United Foundation",
+    "category": "sport",
+    "charityRegistration": "DEV-PLACEHOLDER",
+    "donationMethod": "manual",
+    "logo": null,
+    "active": true,
+    "tags": ["football", "premier-league", "rivalry:liverpool"]
+  },
+  "real-madrid-foundation": {
+    "name": "Real Madrid Foundation",
+    "category": "sport",
+    "charityRegistration": "DEV-PLACEHOLDER",
+    "donationMethod": "manual",
+    "logo": null,
+    "active": true,
+    "tags": ["football", "la-liga", "rivalry:barcelona"]
+  },
+  "barca-foundation": {
+    "name": "Barça Foundation",
+    "category": "sport",
+    "charityRegistration": "DEV-PLACEHOLDER",
+    "donationMethod": "manual",
+    "logo": null,
+    "active": true,
+    "tags": ["football", "la-liga", "rivalry:real-madrid"]
+  }
+}

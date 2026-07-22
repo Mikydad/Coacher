@@ -7,10 +7,17 @@ import '../domain/models/accountability_circle.dart';
 import '../domain/models/circle_enums.dart';
 import '../domain/models/circle_member.dart';
 
-/// Thrown when the user tries to join a 4th circle (max is 3 per user).
+/// Thrown when joining would exceed the user's circle-membership limit
+/// (tier-dependent — see `tier_limits_v1`; legacy app-wide cap is 3).
 class CircleLimitException implements Exception {
+  CircleLimitException([this.limit = UserCircleMembershipService.kMaxCirclesPerUser]);
+
+  final int limit;
+
   @override
-  String toString() => 'You can only be in 3 circles at a time.';
+  String toString() => limit == 1
+      ? 'Free accounts can be in 1 circle at a time.'
+      : 'You can only be in $limit circles at a time.';
 }
 
 /// Thrown when the target circle already has 8 members.
@@ -36,17 +43,24 @@ class UserCircleMembershipService {
     required CircleRepository circleRepo,
     required String Function() currentUserId,
     required String Function() currentDisplayName,
+    int Function()? maxCirclesPerUser,
   }) : _memberRepo = memberRepo,
        _circleRepo = circleRepo,
        _currentUserId = currentUserId,
-       _currentDisplayName = currentDisplayName;
+       _currentDisplayName = currentDisplayName,
+       _maxCirclesPerUser = maxCirclesPerUser ?? (() => kMaxCirclesPerUser);
 
+  /// Legacy app-wide cap, used while tier enforcement is off (and as the
+  /// default when no tier-aware callback is injected, e.g. in tests).
   static const int kMaxCirclesPerUser = 3;
 
   final CircleMemberRepository _memberRepo;
   final CircleRepository _circleRepo;
   final String Function() _currentUserId;
   final String Function() _currentDisplayName;
+
+  /// Tier-aware membership limit; -1 = unlimited.
+  final int Function() _maxCirclesPerUser;
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -60,6 +74,8 @@ class UserCircleMembershipService {
     if (circle.creatorId != uid) {
       throw ArgumentError('creatorId must match the signed-in user');
     }
+    // Creating a circle also joins it — same membership limit applies.
+    await _guardLimit(uid);
 
     circle.validate();
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -343,8 +359,10 @@ class UserCircleMembershipService {
     if (uid.isEmpty) {
       throw StateError('Not signed in');
     }
+    final max = _maxCirclesPerUser();
+    if (max < 0) return; // unlimited
     final count = await myCircleCount();
-    if (count >= kMaxCirclesPerUser) throw CircleLimitException();
+    if (count >= max) throw CircleLimitException(max);
   }
 
   Future<void> _removeMemberInternal(String circleId, String userId) async {

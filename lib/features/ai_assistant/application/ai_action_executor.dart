@@ -22,6 +22,7 @@ import '../../time_blocks/application/time_block_sync_service.dart';
 import '../domain/models/ai_action.dart';
 import 'ai_action_batch_repository.dart';
 import 'ai_action_batch_state.dart';
+import 'ai_tier_guard.dart';
 
 // ─── Execution result ─────────────────────────────────────────────────────────
 
@@ -95,6 +96,7 @@ class AiActionExecutor {
     required this.contextOverrideService,
     required this.batchRepository,
     this.defaultModeRefId,
+    this.tierGuard,
   });
 
   final PlanningRepository planningRepository;
@@ -108,6 +110,10 @@ class AiActionExecutor {
   /// Default enforcement mode ref-id applied to AI-created tasks when the
   /// action does not specify one. Sourced from [defaultEnforcementModeProvider].
   final String? defaultModeRefId;
+
+  /// Free-tier creation gates, so the chat path can't sidestep the limits
+  /// the manual screens enforce. Null (tests) = no gating.
+  final AiTierGuard? tierGuard;
 
   // ─── Public execute ────────────────────────────────────────────────────────
 
@@ -522,10 +528,15 @@ class AiActionExecutor {
     // Use action-provided modeRefId first, then executor default, then null.
     final modeRefId = p['modeRefId'] as String? ?? defaultModeRefId;
 
+    await tierGuard?.ensureCanCreateTask(dateStr);
+
     final (:routineId, :blockId) = await planningRepository
         .ensureDefaultDayPlan(dateStr);
     final orderIndex = await _nextOrderIndexForDate(dateStr);
     final reminderTime = _parseReminderDateTime(dateStr, timeStr);
+    if (reminderTime != null) {
+      await tierGuard?.ensureCanAddReminder();
+    }
 
     final task = PlannedTask(
       id: StableId.generate('task'),
@@ -638,6 +649,7 @@ class AiActionExecutor {
   // ─── Goal handlers ────────────────────────────────────────────────────────
 
   Future<String> _createGoal(Map<String, dynamic> p) async {
+    await tierGuard?.ensureCanCreateGoal();
     final title = p['title'] as String? ?? 'New Goal';
     final target = p['target'] as String? ?? '';
     final deadlineStr = p['deadline'] as String?;

@@ -16,9 +16,11 @@ import '../../../core/local_db/isar_collections/isar_ai_action_batch.dart';
 import '../../../core/offline/offline_store.dart';
 import '../data/dismissed_suggestion_repository.dart';
 import '../domain/models/proactive_suggestion.dart';
+import '../../../core/tier/tier_providers.dart';
 import 'ai_action_batch_repository.dart';
 import 'ai_action_batch_state.dart';
 import 'ai_action_executor.dart';
+import 'ai_tier_guard.dart';
 import 'ai_assistant_service.dart';
 import 'ai_assumption_engine.dart';
 import 'ai_chat_suggestion_enricher.dart';
@@ -183,6 +185,11 @@ final aiActionExecutorProvider = Provider<AiActionExecutor>((ref) {
     batchRepository: ref.read(aiActionBatchRepositoryProvider),
     defaultModeRefId: DefaultModeResolver.resolveModeRefId(
       profileDefault: enforcementMode,
+    ),
+    tierGuard: AiTierGuard(
+      gate: () => ref.read(tierGateProvider),
+      goalsRepository: ref.read(goalsRepositoryProvider),
+      reminderRepository: ref.read(reminderRepositoryProvider),
     ),
   );
 });
