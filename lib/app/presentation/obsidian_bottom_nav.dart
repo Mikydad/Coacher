@@ -10,10 +10,15 @@ class ObsidianBottomNav extends StatelessWidget {
     super.key,
     required this.selectedIndex,
     required this.onTap,
+    this.badgeCounts = const <int, int>{},
   });
 
   final int selectedIndex;
   final ValueChanged<int> onTap;
+
+  /// tab index → needs-action count; > 0 renders a count bubble on the
+  /// tab's icon (e.g. pending challenge invites on Accountability).
+  final Map<int, int> badgeCounts;
 
   static const _items = [
     (icon: Icons.home_rounded, label: 'Home'),
@@ -50,6 +55,7 @@ class ObsidianBottomNav extends StatelessWidget {
                   final item = _items[i];
                   final selected = i == selectedIndex;
                   final color = selected ? _kActive : _kVariant;
+                  final badge = badgeCounts[i] ?? 0;
 
                   return Expanded(
                     child: GestureDetector(
@@ -58,7 +64,11 @@ class ObsidianBottomNav extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(item.icon, size: 22, color: color),
+                          _BadgedIcon(
+                            icon: item.icon,
+                            color: color,
+                            count: badge,
+                          ),
                           const SizedBox(height: 3),
                           SizedBox(
                             width: double.infinity,
@@ -90,6 +100,53 @@ class ObsidianBottomNav extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Tab icon with an optional needs-action count bubble, top-right.
+class _BadgedIcon extends StatelessWidget {
+  const _BadgedIcon({
+    required this.icon,
+    required this.color,
+    required this.count,
+  });
+
+  final IconData icon;
+  final Color color;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final iconWidget = Icon(icon, size: 22, color: color);
+    if (count <= 0) return iconWidget;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        iconWidget,
+        Positioned(
+          right: -7,
+          top: -4,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+            constraints: const BoxConstraints(minWidth: 14),
+            decoration: BoxDecoration(
+              color: AppColors.danger,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              count > 9 ? '9+' : '$count',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 9,
+                height: 1.2,
+                fontWeight: FontWeight.w700,
+                color: AppColors.fg,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

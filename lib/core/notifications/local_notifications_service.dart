@@ -134,6 +134,32 @@ class LocalNotificationsService implements ActiveNotificationsSource {
     await _indexNotificationTaskMapping(id: id, payload: payload);
   }
 
+  /// Immediate one-shot notification (no scheduling) — e.g. a challenge
+  /// invite the sync layer just discovered while the app is running.
+  /// Separate channel from task reminders so users can tune them apart.
+  Future<void> showNow({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    await _plugin.show(
+      id,
+      title,
+      body,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'sidepal_events',
+          'SidePal Events',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      payload: payload,
+    );
+  }
+
   @override
   Future<void> cancel(int id) async {
     await _plugin.cancel(id);

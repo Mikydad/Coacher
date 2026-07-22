@@ -449,6 +449,20 @@ not silent reversal.
   release. Extends the existing D9 "RC-tunable launch constant" pattern
   to the whole monetization surface.
 
+- **2026-07-21 · Accountability tab badge uses SEEN semantics, not
+  done-semantics.** The badge counts badge-worthy items (invite to
+  accept, today's evidence due, their-word confirm) the user has not yet
+  LOOKED at; opening the challenge's detail screen marks its current
+  state seen and drops the count — acting is not required. New state =
+  new marker key (`invite_{id}` / `evidence_{id}_{unit}` /
+  `confirm_{id}`), so the badge re-arms on genuinely new events,
+  including each new day's due evidence. Seen markers are device-local
+  per uid (`stake_seen_v1_{uid}`, notification-tray model — a fresh
+  install shows pending items as new again). *Considered:* action-based
+  clearing (built first; rejected — the badge nagged about things the
+  user had consciously deferred); tab-visit clears all (rejected: zeroes
+  the badge without the user seeing what was in it).
+
 - **2026-07-20 · Free task cap is per-day; "habits" are Habit Anchor
   tasks.** Tasks in this codebase are per-day planned items, so "5 tasks"
   = 5 tasks planned per day (5 total would be hit in the first session).

@@ -13,7 +13,9 @@ import '../../../core/presentation/page_headers.dart';
 import '../../community/application/circle_providers.dart';
 import '../application/points_providers.dart';
 import '../application/stake_functions.dart';
+import '../application/stake_seen_store.dart';
 import '../application/stakes_providers.dart';
+import '../data/stakes_repository.dart';
 import '../domain/models/stake_challenge.dart';
 import '../domain/models/stake_evidence.dart';
 import 'accountability_create_flow.dart';
@@ -74,7 +76,8 @@ class _Body extends ConsumerStatefulWidget {
 
 class _BodyState extends ConsumerState<_Body> {
   bool _busy = false;
-  StreamSubscription<void>? _screenWatch;
+  StakeLiveHydration? _liveWatch;
+  String? _lastSeenSignature;
   Uint8List? _stakePhotoBytes;
   bool _stakePhotoLoading = false;
   bool _stakePhotoAttempted = false;
@@ -126,26 +129,60 @@ class _BodyState extends ConsumerState<_Body> {
     }();
   }
 
-  /// While the photo check is pending, listen to this one challenge doc
-  /// LIVE: the server flips draft → active within seconds of upload, and
-  /// the background pull (start/resume/connectivity, 30 s throttle) is far
-  /// slower than the state itself. A previous 10 s poll was silently eaten
-  /// by that throttle — the listener hears the flip in ~1 s.
-  void _watchScreeningLive() {
-    final waiting = c.status == StakeChallengeStatus.draft;
-    if (waiting && _screenWatch == null) {
-      _screenWatch =
+  /// While the challenge is NON-TERMINAL, listen to it LIVE (doc +
+  /// evidence): photo screening flips draft → active in seconds, the
+  /// opponent's accept flips pending_accept → active, and their day marks
+  /// land mid-challenge — all far faster than the background pull
+  /// (start/resume/connectivity, 30 s throttle). A previous 10 s poll was
+  /// silently eaten by that throttle — the listener hears changes in ~1 s.
+  /// Cancels itself once the challenge reaches a terminal state.
+  void _watchChallengeLive() {
+    final wantLive = !c.status.isTerminal;
+    if (wantLive && _liveWatch == null) {
+      _liveWatch =
           ref.read(stakesRepositoryProvider).hydrateChallengeLive(c.id);
-    } else if (!waiting && _screenWatch != null) {
-      _screenWatch!.cancel();
-      _screenWatch = null;
+    } else if (!wantLive && _liveWatch != null) {
+      _liveWatch!.cancel();
+      _liveWatch = null;
     }
   }
 
   @override
   void dispose() {
-    _screenWatch?.cancel();
+    _liveWatch?.cancel();
     super.dispose();
+  }
+
+  /// Looking at this screen counts as SEEING the challenge's current
+  /// badge-worthy state — the tab badge drops without requiring the
+  /// action itself (notification-tray semantics, decided 2026-07-21).
+  /// Signature-guarded so rebuilds don't spam the store; a state change
+  /// (new day, new status) mints new keys and marks them seen too.
+  void _markSeen() {
+    final uid = FirestorePaths.activeUid;
+    final keys = <String>[];
+    if (c.status == StakeChallengeStatus.pendingAccept &&
+        c.creatorUid != uid) {
+      keys.add(StakeSeenKeys.invite(c.id));
+    }
+    if (c.status == StakeChallengeStatus.active) {
+      final today = c.todayUnitIndex;
+      if (today >= 0 && today < c.frozenGoal.totalUnits) {
+        keys.add(StakeSeenKeys.evidence(c.id, today));
+      }
+    }
+    if (c.status == StakeChallengeStatus.pendingVerification &&
+        c.type.isMultiParty) {
+      keys.add(StakeSeenKeys.confirm(c.id));
+    }
+    if (keys.isEmpty) return;
+    final signature = keys.join('|');
+    if (signature == _lastSeenSignature) return;
+    _lastSeenSignature = signature;
+    // Deferred: provider state must not change during build.
+    Future.microtask(
+      () => ref.read(stakeSeenProvider.notifier).markSeen(keys),
+    );
   }
 
   /// Sum of evidence per unit for the signed-in user.
@@ -161,7 +198,8 @@ class _BodyState extends ConsumerState<_Body> {
 
   @override
   Widget build(BuildContext context) {
-    _watchScreeningLive();
+    _watchChallengeLive();
+    _markSeen();
     _loadStakePhoto();
     final logged = _loggedByUnit;
     final mercy = c.mercyUnitTarget;
@@ -788,6 +826,10 @@ class _BodyState extends ConsumerState<_Body> {
             challengeId: c.id,
             charityId: picked!,
           );
+      // Flip the local mirror NOW — the accept succeeded server-side and
+      // the next throttled pull is up to 30 s away; without this the
+      // acceptor keeps staring at "waiting for opponent".
+      await ref.read(stakesRepositoryProvider).refreshChallenge(c.id);
     } on StakeActionException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -802,6 +844,7 @@ class _BodyState extends ConsumerState<_Body> {
     setState(() => _busy = true);
     try {
       await ref.read(stakeFunctionsProvider).declineChallenge(c.id);
+      await ref.read(stakesRepositoryProvider).refreshChallenge(c.id);
       if (mounted) Navigator.of(context).pop();
     } on StakeActionException catch (e) {
       if (mounted) {
