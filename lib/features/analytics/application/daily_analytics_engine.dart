@@ -1,7 +1,9 @@
 import '../../../core/utils/date_keys.dart';
 import '../../coaching/application/enforcement_mode_policy.dart';
 import '../../coaching/domain/models/enforcement_mode.dart';
+import '../../goals/application/goal_period_helpers.dart';
 import '../../goals/domain/models/goal_check_in.dart';
+import '../../goals/domain/models/goal_enums.dart';
 import '../../goals/domain/models/user_goal.dart';
 import '../../planning/domain/models/task_item.dart';
 
@@ -23,8 +25,11 @@ class DailyAnalyticsSnapshot {
   final String dateKey;
   final int createdCount;
   final int completedCount;
-  final int weightedCreated;
-  final int weightedCompleted;
+
+  /// Doubles since schema v3: goals contribute FRACTIONALLY (a daily goal
+  /// at 45/60 min adds 0.75 × weight), not just met/not-met.
+  final double weightedCreated;
+  final double weightedCompleted;
   final double completionRate;
   final double weightedCompletionRate;
   final int schemaVersion;
@@ -49,8 +54,8 @@ class DailyAnalyticsSnapshot {
       dateKey: payload['dateKey'] as String? ?? '',
       createdCount: (payload['createdCount'] as num?)?.toInt() ?? 0,
       completedCount: (payload['completedCount'] as num?)?.toInt() ?? 0,
-      weightedCreated: (payload['weightedCreated'] as num?)?.toInt() ?? 0,
-      weightedCompleted: (payload['weightedCompleted'] as num?)?.toInt() ?? 0,
+      weightedCreated: (payload['weightedCreated'] as num?)?.toDouble() ?? 0,
+      weightedCompleted: (payload['weightedCompleted'] as num?)?.toDouble() ?? 0,
       completionRate: completionRate.clamp(0.0, 1.0),
       weightedCompletionRate: weightedCompletionRate.clamp(0.0, 1.0),
       schemaVersion: (payload['schemaVersion'] as num?)?.toInt() ?? 2,
@@ -74,8 +79,8 @@ class RollupAnalyticsSnapshot {
   final int daysCount;
   final int createdCount;
   final int completedCount;
-  final int weightedCreated;
-  final int weightedCompleted;
+  final double weightedCreated;
+  final double weightedCompleted;
   final double completionRate;
   final double weightedCompletionRate;
   final int currentStreakDays;
@@ -93,8 +98,8 @@ DailyAnalyticsSnapshot computeTaskDailyAnalytics({
 }) {
   var createdCount = 0;
   var completedCount = 0;
-  var weightedCreated = 0;
-  var weightedCompleted = 0;
+  var weightedCreated = 0.0;
+  var weightedCompleted = 0.0;
   for (final task in tasks) {
     createdCount++;
     final w = linearPriorityWeight(task.priority);
@@ -118,37 +123,108 @@ DailyAnalyticsSnapshot computeTaskDailyAnalytics({
     weightedCompleted: weightedCompleted,
     completionRate: completionRate,
     weightedCompletionRate: weightedCompletionRate,
-    schemaVersion: 2,
+    schemaVersion: 3,
   );
+}
+
+/// How one goal participates in one day's Goals/Habits % (schema v3,
+/// formula decided 2026-07-22 — see the decision log).
+class GoalDayContribution {
+  const GoalDayContribution({required this.weight, required this.fraction});
+
+  /// [linearPriorityWeight] of the goal's intensity.
+  final int weight;
+
+  /// 0..1 — how much of this goal's day-credit is earned.
+  final double fraction;
+}
+
+/// Pure per-goal day scoring. [checkIns] may span the whole period (only
+/// this goal's rows are read); windowing happens here so callers just
+/// fetch a range. Returns null when the goal is NOT part of [dateKey]'s
+/// denominator (weekly/monthly goals off their action days — mirroring
+/// Home's "Today's goals" membership).
+///
+///  * daily cadence   → proportional: evaluation-window total ÷ cycle target
+///  * weekly/monthly  → action days only; 1.0 if anything was logged that
+///    day (or the cycle already met), else 0 — "did I show up today"
+///  * repeat-off      → overall period progress ÷ target, every period day
+///    (passive outcome goals count via long-horizon progress)
+///
+/// Legacy boolean check-ins (null value, metCommitment true) count as a
+/// full cycle target.
+GoalDayContribution? computeGoalDayContribution({
+  required UserGoal goal,
+  required String dateKey,
+  required Iterable<GoalCheckIn> checkIns,
+}) {
+  final date = DateKeys.parseLocalDateKey(dateKey);
+  final weight = linearPriorityWeight(goal.intensity);
+
+  double effectiveValue(GoalCheckIn c) =>
+      c.value ?? (c.metCommitment ? goal.targetValue : 0.0);
+
+  double sumRange(String startKey, String endKey) => checkIns
+      .where(
+        (c) =>
+            c.goalId == goal.id &&
+            c.dateKey.compareTo(startKey) >= 0 &&
+            c.dateKey.compareTo(endKey) <= 0,
+      )
+      .fold(0.0, (sum, c) => sum + effectiveValue(c));
+
+  double fractionOf(double total) {
+    if (goal.targetValue <= 0) return total > 0 ? 1.0 : 0.0;
+    return (total / goal.targetValue).clamp(0.0, 1.0);
+  }
+
+  switch (goal.repeatCadence) {
+    case GoalRepeatCadence.off:
+      final startKey = DateKeys.yyyymmdd(
+        DateTime.fromMillisecondsSinceEpoch(goal.periodStartMs),
+      );
+      return GoalDayContribution(
+        weight: weight,
+        fraction: fractionOf(sumRange(startKey, dateKey)),
+      );
+    case GoalRepeatCadence.daily:
+      final window = GoalPeriodHelpers.evaluationWindow(goal, date);
+      // Progress so far in the cycle — never credit future days.
+      return GoalDayContribution(
+        weight: weight,
+        fraction: fractionOf(sumRange(DateKeys.yyyymmdd(window.start), dateKey)),
+      );
+    case GoalRepeatCadence.weekly:
+    case GoalRepeatCadence.monthly:
+      if (!goal.isActionDay(date)) return null;
+      final didAnything = checkIns.any(
+        (c) =>
+            c.goalId == goal.id &&
+            c.dateKey == dateKey &&
+            ((c.value ?? 0) > 0 || c.metCommitment),
+      );
+      return GoalDayContribution(
+        weight: weight,
+        fraction: didAnything ? 1.0 : 0.0,
+      );
+  }
 }
 
 DailyAnalyticsSnapshot computeGoalHabitDailyAnalytics({
   required String dateKey,
-  required Iterable<UserGoal> goals,
-  required Iterable<GoalCheckIn> checkIns,
+  required Iterable<GoalDayContribution> goalContributions,
   required Iterable<PlannedTask> habitTasks,
 }) {
-  final doneByGoalId = <String, bool>{};
-  for (final checkIn in checkIns) {
-    if (checkIn.dateKey != dateKey) continue;
-    if (checkIn.metCommitment) {
-      doneByGoalId[checkIn.goalId] = true;
-    }
-  }
-
   var createdCount = 0;
   var completedCount = 0;
-  var weightedCreated = 0;
-  var weightedCompleted = 0;
+  var weightedCreated = 0.0;
+  var weightedCompleted = 0.0;
 
-  for (final goal in goals) {
+  for (final c in goalContributions) {
     createdCount++;
-    final w = linearPriorityWeight(goal.intensity);
-    weightedCreated += w;
-    if (doneByGoalId[goal.id] == true) {
-      completedCount++;
-      weightedCompleted += w;
-    }
+    weightedCreated += c.weight;
+    weightedCompleted += c.weight * c.fraction;
+    if (c.fraction >= 0.999) completedCount++;
   }
 
   // Hybrid source: habit task completions also contribute as habit units.
@@ -176,7 +252,7 @@ DailyAnalyticsSnapshot computeGoalHabitDailyAnalytics({
     weightedCompleted: weightedCompleted,
     completionRate: completionRate,
     weightedCompletionRate: weightedCompletionRate,
-    schemaVersion: 2,
+    schemaVersion: 3,
   );
 }
 
@@ -205,8 +281,8 @@ RollupAnalyticsSnapshot rollupDailyAnalytics({
 
   var createdCount = 0;
   var completedCount = 0;
-  var weightedCreated = 0;
-  var weightedCompleted = 0;
+  var weightedCreated = 0.0;
+  var weightedCompleted = 0.0;
   for (final d in sorted) {
     createdCount += d.createdCount;
     completedCount += d.completedCount;

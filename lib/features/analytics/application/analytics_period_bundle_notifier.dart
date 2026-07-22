@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../context_override/application/context_override_providers.dart';
@@ -38,8 +39,12 @@ class AnalyticsPeriodBundleNotifier
       final fresh = await computeAnalyticsPeriodBundle(ref);
       if (generation != _refreshGeneration) return;
       state = AsyncData(fresh);
-    } catch (_) {
-      // Keep showing cached bundle if background refresh fails.
+    } catch (e) {
+      // Keep showing cached bundle if background refresh fails — but never
+      // silently: a throwing fresh compute freezes the visible numbers at
+      // the cached value, which is exactly how the 2026-07-22 "0% forever"
+      // class of bug hides (repo rule: log all swallowed errors).
+      debugPrint('analytics_period_bundle: swallowed error: $e');
     }
   }
 }

@@ -449,6 +449,37 @@ not silent reversal.
   release. Extends the existing D9 "RC-tunable launch constant" pattern
   to the whole monetization surface.
 
+- **2026-07-22 · Today's Goals/Habits % scores goals fractionally, per
+  cadence (analytics schema v3).** Daily goals contribute proportionally
+  (45/60 min → 0.75× weight, judged over the evaluation window so far);
+  weekly/monthly goals count only on their action days (mirroring Home's
+  Today membership) and are binary "did anything today" (any logged value
+  or met cycle → 1.0); repeat-off passive goals contribute their overall
+  period progress every day; habit-anchor tasks stay binary. Weighted
+  fields became doubles; `completedCount` still means fraction ≥ 1. The
+  old formula (goal counts only when the whole CYCLE target's
+  metCommitment fired that day) read 0% mid-cycle for weekly goals and
+  was never actually specified anywhere. Streak qualification
+  (`isStreakQualifyingDay` on weightedCompletionRate) is unchanged and
+  now follows the new rates. *Why:* users completing everything Home
+  asked still saw "0% today"; the number must reflect what the Today
+  surfaces asked of them.
+
+- **2026-07-22 · Goals whose period has ended stay EXCLUDED from
+  analytics; the UI stops offering to log them.** The bug behind "old
+  goals don't count": analytics filtered by `isDateKeyInPeriod` while
+  goal cards used the period-blind `UserGoal.allowsLoggingOn` — an ended
+  goal kept a live quick-add card whose check-ins counted nowhere. Now
+  cards/counter-sheet use the period-aware helper, ended cards show
+  "Ended" instead of their repeat summary, and the detail screen's
+  toggle explains ("extend the period from Edit to continue").
+  *Considered:* counting active goals past their period end (rejected: a
+  30-day challenge that ended should end); auto-archiving at period end
+  (rejected for now: silently moving user goals is worse than labeling).
+  Also: the analytics bundle's background refresh now LOGS swallowed
+  errors — a throwing fresh compute silently freezes the visible numbers
+  at the cached snapshot, which is how this class of bug hides.
+
 - **2026-07-21 · Accountability tab badge uses SEEN semantics, not
   done-semantics.** The badge counts badge-worthy items (invite to
   accept, today's evidence due, their-word confirm) the user has not yet

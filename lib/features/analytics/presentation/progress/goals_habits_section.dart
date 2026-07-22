@@ -73,7 +73,7 @@ class GoalsHabitsSection extends StatelessWidget {
             ratio: shownDay,
             color: ProgressDesignTokens.primaryDim,
             detail:
-                '${day.completedCount}/${day.createdCount} · weighted ${day.weightedCompleted}/${day.weightedCreated}',
+                '${day.completedCount}/${day.createdCount} · weighted ${_weighted(day.weightedCompleted)}/${_weighted(day.weightedCreated)}',
           ),
           const SizedBox(height: 14),
           ProgressThinBar(
@@ -81,7 +81,7 @@ class GoalsHabitsSection extends StatelessWidget {
             ratio: shownWeek,
             color: ProgressDesignTokens.primaryDim,
             detail:
-                '${week.completedCount}/${week.createdCount} · weighted ${week.weightedCompleted}/${week.weightedCreated}',
+                '${week.completedCount}/${week.createdCount} · weighted ${_weighted(week.weightedCompleted)}/${_weighted(week.weightedCreated)}',
           ),
           const SizedBox(height: 14),
           ProgressThinBar(
@@ -89,10 +89,15 @@ class GoalsHabitsSection extends StatelessWidget {
             ratio: shownMonth,
             color: ProgressDesignTokens.primaryDim.withValues(alpha: 0.75),
             detail:
-                '${month.completedCount}/${month.createdCount} · weighted ${month.weightedCompleted}/${month.weightedCreated}',
+                '${month.completedCount}/${month.createdCount} · weighted ${_weighted(month.weightedCompleted)}/${_weighted(month.weightedCreated)}',
           ),
         ],
       ),
     );
   }
 }
+
+/// Weighted sums are fractional since analytics schema v3 — show one
+/// decimal only when it exists ("9/13", "9.5/13").
+String _weighted(double v) =>
+    v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);

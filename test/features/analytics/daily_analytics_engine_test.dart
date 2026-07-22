@@ -25,17 +25,9 @@ void main() {
     test('goal/habit daily counts goal checkins and habit tasks', () {
       final out = computeGoalHabitDailyAnalytics(
         dateKey: '2026-05-04',
-        goals: [
-          _goal(id: 'g1', intensity: 1),
-          _goal(id: 'g2', intensity: 3),
-        ],
-        checkIns: [
-          const GoalCheckIn(
-            goalId: 'g1',
-            dateKey: '2026-05-04',
-            metCommitment: true,
-            updatedAtMs: 1,
-          ),
+        goalContributions: const [
+          GoalDayContribution(weight: 5, fraction: 1.0), // intensity 1, done
+          GoalDayContribution(weight: 3, fraction: 0.0), // intensity 3, not
         ],
         habitTasks: [
           _task(id: 'h1', priority: 2, done: true, habitAnchor: true),
@@ -48,6 +40,152 @@ void main() {
       expect(out.weightedCompleted, 9); // g1 + h1
       expect(out.completionRate, 0.5);
       expect(out.weightedCompletionRate, closeTo(9 / 13, 0.0001));
+      expect(out.schemaVersion, 3);
+    });
+
+    test('fractional contributions weight the day partially', () {
+      final out = computeGoalHabitDailyAnalytics(
+        dateKey: '2026-05-04',
+        goalContributions: const [
+          GoalDayContribution(weight: 4, fraction: 0.75), // 45/60 min
+        ],
+        habitTasks: const [],
+      );
+      expect(out.completedCount, 0); // partial is not "completed"
+      expect(out.weightedCompletionRate, closeTo(0.75, 0.0001));
+    });
+
+    group('computeGoalDayContribution', () {
+      test('daily goal is proportional to today (45/60 → 0.75)', () {
+        final c = computeGoalDayContribution(
+          goal: _goal(id: 'g', intensity: 3, targetValue: 60),
+          dateKey: '2026-05-04',
+          checkIns: const [
+            GoalCheckIn(
+              goalId: 'g',
+              dateKey: '2026-05-04',
+              metCommitment: false,
+              value: 45,
+              updatedAtMs: 1,
+            ),
+          ],
+        );
+        expect(c, isNotNull);
+        expect(c!.fraction, closeTo(0.75, 0.0001));
+        expect(c.weight, 3);
+      });
+
+      test('legacy boolean check-in (null value, met) counts as full', () {
+        final c = computeGoalDayContribution(
+          goal: _goal(id: 'g', intensity: 1, targetValue: 60),
+          dateKey: '2026-05-04',
+          checkIns: const [
+            GoalCheckIn(
+              goalId: 'g',
+              dateKey: '2026-05-04',
+              metCommitment: true,
+              updatedAtMs: 1,
+            ),
+          ],
+        );
+        expect(c!.fraction, 1.0);
+      });
+
+      test('weekly goal on an action day: did-anything-today is binary', () {
+        // 2026-05-04 is a Monday.
+        final goal = _goal(
+          id: 'g',
+          intensity: 2,
+          targetValue: 5,
+          cadence: GoalRepeatCadence.weekly,
+          scheduledWeekdays: const [DateTime.monday],
+        );
+        final logged = computeGoalDayContribution(
+          goal: goal,
+          dateKey: '2026-05-04',
+          checkIns: const [
+            GoalCheckIn(
+              goalId: 'g',
+              dateKey: '2026-05-04',
+              metCommitment: false,
+              value: 1, // 1 of 5 — but showed up today
+              updatedAtMs: 1,
+            ),
+          ],
+        );
+        expect(logged!.fraction, 1.0);
+
+        final silent = computeGoalDayContribution(
+          goal: goal,
+          dateKey: '2026-05-04',
+          checkIns: const [],
+        );
+        expect(silent!.fraction, 0.0);
+      });
+
+      test('weekly goal off its action day is excluded (null)', () {
+        final goal = _goal(
+          id: 'g',
+          intensity: 2,
+          targetValue: 5,
+          cadence: GoalRepeatCadence.weekly,
+          scheduledWeekdays: const [DateTime.tuesday],
+        );
+        final c = computeGoalDayContribution(
+          goal: goal,
+          dateKey: '2026-05-04', // a Monday
+          checkIns: const [],
+        );
+        expect(c, isNull);
+      });
+
+      test('passive (repeat-off) goal contributes overall period progress',
+          () {
+        final goal = _goal(
+          id: 'g',
+          intensity: 3,
+          targetValue: 20,
+          cadence: GoalRepeatCadence.off,
+        );
+        final c = computeGoalDayContribution(
+          goal: goal,
+          dateKey: '2026-05-04',
+          checkIns: const [
+            GoalCheckIn(
+              goalId: 'g',
+              dateKey: '2026-05-02',
+              metCommitment: false,
+              value: 6,
+              updatedAtMs: 1,
+            ),
+            GoalCheckIn(
+              goalId: 'g',
+              dateKey: '2026-05-04',
+              metCommitment: false,
+              value: 4,
+              updatedAtMs: 1,
+            ),
+          ],
+        );
+        expect(c!.fraction, closeTo(0.5, 0.0001)); // 10 of 20
+      });
+
+      test('fraction clamps at 1.0 when over target', () {
+        final c = computeGoalDayContribution(
+          goal: _goal(id: 'g', intensity: 1, targetValue: 30),
+          dateKey: '2026-05-04',
+          checkIns: const [
+            GoalCheckIn(
+              goalId: 'g',
+              dateKey: '2026-05-04',
+              metCommitment: true,
+              value: 90,
+              updatedAtMs: 1,
+            ),
+          ],
+        );
+        expect(c!.fraction, 1.0);
+      });
     });
 
     test('rollup computes streak from full-completion days', () {
@@ -103,15 +241,22 @@ void main() {
   });
 }
 
-UserGoal _goal({required String id, required int intensity}) {
+UserGoal _goal({
+  required String id,
+  required int intensity,
+  double targetValue = 1,
+  GoalRepeatCadence cadence = GoalRepeatCadence.daily,
+  List<int>? scheduledWeekdays,
+}) {
   return UserGoal(
     id: id,
     title: id,
     categoryId: 'habits',
-    repeatCadence: GoalRepeatCadence.daily,
+    repeatCadence: cadence,
+    scheduledWeekdays: scheduledWeekdays,
     status: GoalStatus.active,
     measurementKind: MeasurementKind.sessions,
-    targetValue: 1,
+    targetValue: targetValue,
     intensity: intensity,
     periodStartMs: DateTime(2026, 5, 1).millisecondsSinceEpoch,
     periodEndMs: DateTime(2026, 5, 31).millisecondsSinceEpoch,

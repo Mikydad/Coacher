@@ -9,10 +9,10 @@ DailyAnalyticsSnapshot _day(String key, double rate) {
     createdCount: 3,
     completedCount: (rate * 3).round(),
     weightedCreated: 10,
-    weightedCompleted: (rate * 10).round(),
+    weightedCompleted: rate * 10,
     completionRate: rate,
     weightedCompletionRate: rate,
-    schemaVersion: 2,
+    schemaVersion: 3,
   );
 }
 

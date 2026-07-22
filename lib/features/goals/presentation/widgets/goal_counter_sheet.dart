@@ -103,7 +103,10 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
     return repeat.isEmpty ? period : '$period · $repeat';
   }
 
-  bool get _loggableToday => _goal.allowsLoggingOn(DateTime.now());
+  // Period-aware: an ended goal offers no logging controls (its check-ins
+  // would no longer count in analytics — 2026-07-22 decision).
+  bool get _loggableToday =>
+      GoalPeriodHelpers.allowsLoggingOnDateKey(_goal, DateKeys.todayKey());
 
   Color get _accentColor => goalCategoryColor(_goal.categoryId);
 

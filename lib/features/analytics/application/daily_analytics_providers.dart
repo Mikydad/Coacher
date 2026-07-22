@@ -6,7 +6,6 @@ import '../../../core/utils/date_keys.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../goals/application/goal_period_helpers.dart';
 import '../../goals/application/goals_providers.dart';
-import '../../goals/domain/models/goal_check_in.dart';
 import '../../goals/domain/models/goal_enums.dart';
 import '../../context_override/application/context_override_providers.dart';
 import '../../planning/application/planned_task_collect.dart';
@@ -66,14 +65,25 @@ Future<DailyAnalyticsSnapshot> _computeGoalHabitDailyForDate(
     return GoalPeriodHelpers.isDateKeyInPeriod(goal, dateKey);
   }).toList();
 
-  final checkIns = <GoalCheckIn>[];
+  // Per-goal fractional scoring (schema v3): passive and daily goals need
+  // their accumulated history, so fetch each goal's check-ins from period
+  // start; the engine windows them per cadence.
+  final contributions = <GoalDayContribution>[];
   for (final goal in inPeriodGoals) {
+    final startKey = DateKeys.yyyymmdd(
+      DateTime.fromMillisecondsSinceEpoch(goal.periodStartMs),
+    );
     final rows = await goalsRepo.getCheckInsForGoal(
       goal.id,
-      startDateKey: dateKey,
+      startDateKey: startKey,
       endDateKey: dateKey,
     );
-    checkIns.addAll(rows);
+    final contribution = computeGoalDayContribution(
+      goal: goal,
+      dateKey: dateKey,
+      checkIns: rows,
+    );
+    if (contribution != null) contributions.add(contribution);
   }
 
   final dayRows = await collectTasksForDateKey(
@@ -87,8 +97,7 @@ Future<DailyAnalyticsSnapshot> _computeGoalHabitDailyForDate(
 
   return computeGoalHabitDailyAnalytics(
     dateKey: dateKey,
-    goals: inPeriodGoals,
-    checkIns: checkIns,
+    goalContributions: contributions,
     habitTasks: habitTasks,
   );
 }

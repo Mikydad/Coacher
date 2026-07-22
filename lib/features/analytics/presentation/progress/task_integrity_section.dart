@@ -74,10 +74,15 @@ class TaskIntegritySection extends StatelessWidget {
             ratio: shownWeek,
             color: ProgressDesignTokens.secondary,
             detail:
-                '${week.completedCount}/${week.createdCount} · weighted ${week.weightedCompleted}/${week.weightedCreated}',
+                '${week.completedCount}/${week.createdCount} · weighted ${_weighted(week.weightedCompleted)}/${_weighted(week.weightedCreated)}',
           ),
         ],
       ),
     );
   }
 }
+
+/// Weighted sums are fractional since analytics schema v3 — show one
+/// decimal only when it exists ("9/13", "9.5/13").
+String _weighted(double v) =>
+    v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);

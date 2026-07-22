@@ -19,7 +19,7 @@ DailyAnalyticsSnapshot emptyDailySnapshot(String dateKey) {
     weightedCompleted: 0,
     completionRate: 0,
     weightedCompletionRate: 0,
-    schemaVersion: 2,
+    schemaVersion: 3,
   );
 }
 

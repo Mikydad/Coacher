@@ -48,7 +48,11 @@ class GoalCard extends ConsumerWidget {
 
   /// Repeat summary when the goal has one ("Every week on Mon · Wed"),
   /// otherwise the evaluation period ("This month", "Entire goal").
+  /// An ended period overrides both — the card must say so, because
+  /// analytics stopped counting this goal the day its period lapsed and
+  /// a live-looking card was silently misleading (2026-07-22 decision).
   String get _horizonLabel {
+    if (_periodEnded) return 'Ended';
     final repeat = GoalPeriodHelpers.formatRepeatSummary(goal);
     if (repeat.isNotEmpty) return repeat;
     return switch (goal.horizon) {
@@ -59,7 +63,18 @@ class GoalCard extends ConsumerWidget {
     };
   }
 
-  bool get _loggableToday => goal.allowsLoggingOn(DateTime.now());
+  bool get _periodEnded {
+    final now = DateTime.now();
+    final end = DateTime.fromMillisecondsSinceEpoch(goal.periodEndMs);
+    return DateTime(now.year, now.month, now.day)
+        .isAfter(DateTime(end.year, end.month, end.day));
+  }
+
+  /// Period-aware (unlike the model's [UserGoal.allowsLoggingOn]): a goal
+  /// whose period has ended stops offering quick-add — logging it would
+  /// no longer count anywhere.
+  bool get _loggableToday =>
+      GoalPeriodHelpers.allowsLoggingOnDateKey(goal, DateKeys.todayKey());
 
   String get _unitLabel {
     if (goal.measurementKind == MeasurementKind.custom &&

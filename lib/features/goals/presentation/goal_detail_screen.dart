@@ -458,6 +458,19 @@ class GoalDetailScreen extends ConsumerWidget {
   ) async {
     final repo = ref.read(goalsRepositoryProvider);
     final todayKey = DateKeys.todayKey();
+    // Ended goals are excluded from analytics — logging them would look
+    // successful while counting nowhere (2026-07-22 decision).
+    if (!GoalPeriodHelpers.isDateKeyInPeriod(g, todayKey)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "This goal's period has ended — progress can no longer be "
+            'logged. Extend the period from Edit to continue.',
+          ),
+        ),
+      );
+      return;
+    }
     final now = DateTime.now().millisecondsSinceEpoch;
     try {
       await repo.upsertCheckIn(
