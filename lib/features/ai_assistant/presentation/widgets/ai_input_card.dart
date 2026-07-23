@@ -12,12 +12,17 @@ class AiInputCard extends StatelessWidget {
     required this.focusNode,
     required this.onSend,
     required this.isLoading,
+    this.onVoiceModeRequested,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final VoidCallback onSend;
   final bool isLoading;
+
+  /// Long-press on the mic enters Voice Mode (humanizing Phase 3);
+  /// plain tap stays one-shot dictation. Null hides the affordance.
+  final VoidCallback? onVoiceModeRequested;
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +57,11 @@ class AiInputCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _VoiceInputButton(controller: controller, enabled: !isLoading),
+              _VoiceInputButton(
+                controller: controller,
+                enabled: !isLoading,
+                onVoiceModeRequested: onVoiceModeRequested,
+              ),
               // Send button
               ValueListenableBuilder<TextEditingValue>(
                 valueListenable: controller,
@@ -109,12 +118,18 @@ class AiInputCard extends StatelessWidget {
 }
 
 /// Tap-to-dictate mic button. Streams recognised words into [controller] so
-/// the user can review the text before sending.
+/// the user can review the text before sending. Long-press enters Voice
+/// Mode when [onVoiceModeRequested] is provided.
 class _VoiceInputButton extends StatefulWidget {
-  const _VoiceInputButton({required this.controller, required this.enabled});
+  const _VoiceInputButton({
+    required this.controller,
+    required this.enabled,
+    this.onVoiceModeRequested,
+  });
 
   final TextEditingController controller;
   final bool enabled;
+  final VoidCallback? onVoiceModeRequested;
 
   @override
   State<_VoiceInputButton> createState() => _VoiceInputButtonState();
@@ -199,6 +214,16 @@ class _VoiceInputButtonState extends State<_VoiceInputButton> {
     final accent = AppColors.cyan;
     return GestureDetector(
       onTap: widget.enabled ? _toggle : null,
+      onLongPress: widget.enabled && widget.onVoiceModeRequested != null
+          ? () async {
+              // Never enter Voice Mode with the dictation mic still open.
+              if (_listening) {
+                await _speech.stop();
+                if (mounted) setState(() => _listening = false);
+              }
+              widget.onVoiceModeRequested!();
+            }
+          : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         width: 40,

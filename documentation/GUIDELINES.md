@@ -733,3 +733,33 @@ not silent reversal.
   clears the nudge on the next recompute. *Considered:* wiring people
   into the BehaviorFeatureObject engine (rejected — people have no
   feature cache and the engine's Layer-1 metric contract doesn't apply).
+
+- **2026-07-23 · Voice Mode (Phase 3) is a composer state, not a screen —
+  and the loop is a plugin-free state machine.** Voice Mode swaps the
+  Coach sheet's input card for an orb card (`VoiceModeCard`); the chat
+  thread stays visible behind it (one-surface rule). The loop lives in
+  `VoiceModeController` (listen → send → speak sentence-chunked →
+  auto-relisten) behind two adapter seams (`VoiceSpeechAdapter` /
+  `VoiceTtsAdapter`), so the whole state machine is unit-tested with
+  fakes and the plugins (`speech_to_text`, `flutter_tts`) only appear in
+  `voice_mode_adapters.dart`. A generation counter guards every async
+  hop — interrupt/exit bumps it and in-flight listens/speaks abandon
+  themselves instead of clobbering newer state. Utterances travel the
+  EXACT same `sendMessage` path as typed text (memory extraction,
+  auto-commit, purpose routing all come free); the spoken reply is
+  whatever assistant bubble lands — including the deterministic mock and
+  honest error copy, so voice output works in airplane mode (on-device
+  platform voices, PRD §6). Replies pass through `sanitizeForSpeech`
+  (strips `[mem:…]` markers, markdown-lite) then `splitIntoSentences` —
+  chunked playback starts instantly and tap-to-interrupt lands between
+  sentences. Entry: long-press the existing dictation mic (tap stays
+  one-shot dictation) or `CoachRouteArgs.startVoiceMode` — the
+  programmatic hook Phase 4's Siri AppIntent will use. Politeness: two
+  consecutive silent listens pause the loop to idle ("Tap when you're
+  ready") instead of holding the mic open forever; a plan-card reply is
+  spoken as "take a look and confirm on screen" (plans stay visual).
+  iOS audio: `playAndRecord` category + `defaultToSpeaker` +
+  `duckOthers` so STT and TTS share one session. *Considered:* a
+  dedicated voice screen (rejected — one-surface rule) and interrupting
+  mid-request during `thinking` (rejected — nothing sensible to cancel;
+  the reply lands and can be tapped away in one gesture).

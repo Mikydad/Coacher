@@ -14,8 +14,11 @@ import '../application/ai_action_executor.dart';
 import '../data/ai_interaction_history_repository.dart';
 import '../domain/models/ai_chat_message.dart';
 import '../domain/models/ai_planned_changes.dart';
+import '../application/voice_mode_adapters.dart';
+import '../application/voice_mode_controller.dart';
 import 'widgets/ai_input_card.dart';
 import 'widgets/chat_bubbles.dart';
+import 'widgets/voice_mode_card.dart';
 import 'widgets/planned_changes_card.dart';
 import 'widgets/proactive_suggestions_coach_panel.dart';
 import 'widgets/quick_directives_row.dart';
@@ -34,6 +37,7 @@ class CoachRouteArgs {
     this.proactiveSuggestionId,
     this.proactiveSuggestionType,
     this.autoSendMessage = false,
+    this.startVoiceMode = false,
   });
 
   final String? preDraftedText;
@@ -48,6 +52,10 @@ class CoachRouteArgs {
 
   /// When true, auto-sends a suggest-mode message on Coach open.
   final bool autoSendMessage;
+
+  /// Opens Coach directly in Voice Mode (humanizing Phase 3) — the
+  /// programmatic entry the Phase 4 Siri AppIntent will use.
+  final bool startVoiceMode;
 }
 
 /// Opens Coach AI as the three-stage drag sheet over the current screen —
@@ -269,6 +277,10 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   ({String id, String? type})? _pendingProactiveContext;
   bool _autoSendHandled = false;
 
+  /// Non-null while Voice Mode owns the composer (humanizing Phase 3).
+  VoiceModeController? _voiceController;
+  bool _pendingStartVoiceMode = false;
+
   @override
   void initState() {
     super.initState();
@@ -380,6 +392,9 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       _pendingAutoSendMessage = 'Help me with: ${args.preDraftedText}';
       _autoSendHandled = false;
     }
+    if (args.startVoiceMode) {
+      _pendingStartVoiceMode = true;
+    }
   }
 
   void _handlePendingCoachLaunch(AiAssistantService service) {
@@ -398,11 +413,66 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       _pendingAutoSendMessage = null;
       service.sendMessage(autoMessage);
     }
+
+    if (_pendingStartVoiceMode) {
+      _pendingStartVoiceMode = false;
+      // Post-frame: _handlePendingCoachLaunch runs during build and
+      // _enterVoiceMode calls setState.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _enterVoiceMode(service);
+      });
+    }
+  }
+
+  // ─── Voice Mode (humanizing Phase 3) ──────────────────────────────────────
+
+  /// Swaps the composer for the Voice Mode orb and starts the
+  /// listen → send → speak → relisten loop.
+  void _enterVoiceMode(AiAssistantService service) {
+    if (_voiceController != null) return;
+    dismissKeyboard(context);
+    final controller = VoiceModeController(
+      speech: SpeechToTextVoiceAdapter(),
+      tts: FlutterTtsVoiceAdapter(),
+      sendAndGetReply: (text) => _voiceSendAndGetReply(service, text),
+    );
+    setState(() => _voiceController = controller);
+    controller.start();
+    // The spoken conversation needs the thread visible behind the orb.
+    _growSheetForMessages();
+  }
+
+  Future<void> _exitVoiceMode() async {
+    final controller = _voiceController;
+    if (controller == null) return;
+    setState(() => _voiceController = null);
+    await controller.stopAndExit();
+    controller.dispose();
+  }
+
+  /// Voice utterances travel the exact same path as typed messages; the
+  /// spoken reply is whatever assistant bubble lands — including honest
+  /// error copy and the deterministic mock, which TTS reads offline.
+  Future<String?> _voiceSendAndGetReply(
+    AiAssistantService service,
+    String text,
+  ) async {
+    await service.sendMessage(text);
+    for (final message in service.messages.reversed) {
+      if (message.role != ChatRole.assistant || message.isLoading) continue;
+      if (message.content.trim().isNotEmpty) return message.content;
+      if (message.plannedChanges != null || message.draftPlan != null) {
+        return 'I put a plan together — take a look and confirm on screen.';
+      }
+      return null;
+    }
+    return null;
   }
 
   @override
   void dispose() {
     _listenedService?.removeListener(_onServiceMessagesChanged);
+    _voiceController?.dispose();
     _inputController.dispose();
     _inputFocusNode.dispose();
     _scrollController.dispose();
@@ -680,20 +750,27 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      AiInputCard(
-                        controller: _inputController,
-                        focusNode: _inputFocusNode,
-                        isLoading: service.isLoading,
-                        onSend: () {
-                          final text = _inputController.text.trim();
-                          if (text.isEmpty) return;
-                          _inputController.clear();
-                          service.sendMessage(text);
-                        },
-                      ),
+                      if (_voiceController != null)
+                        VoiceModeCard(
+                          controller: _voiceController!,
+                          onExit: _exitVoiceMode,
+                        )
+                      else
+                        AiInputCard(
+                          controller: _inputController,
+                          focusNode: _inputFocusNode,
+                          isLoading: service.isLoading,
+                          onSend: () {
+                            final text = _inputController.text.trim();
+                            if (text.isEmpty) return;
+                            _inputController.clear();
+                            service.sendMessage(text);
+                          },
+                          onVoiceModeRequested: () => _enterVoiceMode(service),
+                        ),
                       // The ask-bar peek is input-only; the extras appear once
                       // the sheet is PIXEL-tall enough to hold them.
-                      if (_showComposerExtras) ...[
+                      if (_voiceController == null && _showComposerExtras) ...[
                         const SizedBox(height: 6),
                         _AiActionBar(service: service),
                         const SizedBox(height: 4),
