@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../core/scheduling/free_window_calculator.dart';
@@ -8,6 +10,12 @@ import '../../goals/application/goal_period_helpers.dart';
 import '../../goals/data/goals_repository.dart';
 import '../../goals/domain/models/goal_check_in.dart';
 import '../../goals/domain/models/goal_enums.dart';
+import '../../intentions/data/intentions_repository.dart';
+import '../../intentions/domain/models/intention.dart';
+import '../../memory/data/memory_facts_repository.dart';
+import '../../memory/data/people_repository.dart';
+import '../../memory/domain/models/memory_fact.dart';
+import '../../memory/domain/models/person.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/data/planning_repository.dart';
 import '../../profile/application/profile_preference_service.dart';
@@ -30,6 +38,9 @@ class AiPayloadAssembler {
     required this.coachingStyleRepository,
     required this.historyRepository,
     this.profilePreferenceService,
+    this.memoryFactsRepository,
+    this.peopleRepository,
+    this.intentionsRepository,
     EntityNormaliser? normaliser,
     Duration scheduleCacheTtl = const Duration(seconds: 30),
   }) : _normaliser = normaliser ?? const EntityNormaliser(),
@@ -41,6 +52,9 @@ class AiPayloadAssembler {
   final CoachingStyleRepository coachingStyleRepository;
   final AiInteractionHistoryRepository historyRepository;
   final ProfilePreferenceService? profilePreferenceService;
+  final MemoryFactsRepository? memoryFactsRepository;
+  final PeopleRepository? peopleRepository;
+  final IntentionsRepository? intentionsRepository;
   final EntityNormaliser _normaliser;
   final Duration _scheduleCacheTtl;
 
@@ -65,6 +79,13 @@ class AiPayloadAssembler {
       _buildSessionHistory(sessionId),
       buildConversationHistory(sessionId),
       _buildCompletedInSession(sessionId),
+      // Memory sections are per-turn (never session-cached): rememberFact /
+      // updateFact / forgetFact auto-commit mid-session and the local write
+      // IS the update.
+      _buildMemoryFacts(),
+      _buildPeopleDigest(),
+      _buildEpisodicSummaries(),
+      _buildOpenPromises(),
     ]);
 
     return AiOperatingLayerPayload(
@@ -94,6 +115,10 @@ class AiPayloadAssembler {
         fromMinuteOfDay: _nowMinuteOfDay(),
       ),
       tomorrowFreeWindows: computeFreeWindows(schedule.tomorrowSchedule),
+      memoryFacts: dynamicResults[3] as List<String>,
+      peopleDigest: dynamicResults[4] as List<String>,
+      episodicSummaries: dynamicResults[5] as List<String>,
+      openPromises: dynamicResults[6] as List<String>,
     );
   }
 
@@ -116,6 +141,150 @@ class AiPayloadAssembler {
       scheduleMaps,
       fromMinuteOfDay: fromMinuteOfDay,
     );
+  }
+
+  // ─── Memory sections (humanizing Phase 2) ──────────────────────────────────
+
+  static const int _kMaxMemoryFacts = 20;
+  static const int _kMaxPeople = 10;
+  static const int _kMaxEpisodicSummaries = 3;
+  static const Duration _kReferenceStampThrottle = Duration(hours: 6);
+
+  /// Long-term memory as grounded lines `[mem:<id>|<label>] content`.
+  /// Injected facts get their [MemoryFact.lastReferencedAtMs] stamped
+  /// fire-and-forget (throttled — a chatty session must not produce
+  /// dozens of outbox writes per turn).
+  Future<List<String>> _buildMemoryFacts() async {
+    final repo = memoryFactsRepository;
+    if (repo == null) return const [];
+    try {
+      final all = await repo.fetchFactsOnce();
+      final facts = all
+          .where((f) => f.kind != MemoryFactKind.episodicSummary)
+          .take(_kMaxMemoryFacts)
+          .toList(growable: false);
+      if (facts.isEmpty) return const [];
+
+      final cutoff = DateTime.now()
+          .subtract(_kReferenceStampThrottle)
+          .millisecondsSinceEpoch;
+      final toStamp = facts
+          .where((f) => (f.lastReferencedAtMs ?? 0) < cutoff)
+          .map((f) => f.id)
+          .toList(growable: false);
+      if (toStamp.isNotEmpty) {
+        unawaited(
+          repo.markReferenced(toStamp).catchError((Object e) {
+            debugPrint('[AiPayloadAssembler] markReferenced failed: $e');
+          }),
+        );
+      }
+
+      return facts.map(renderMemoryFactLine).toList(growable: false);
+    } catch (e) {
+      debugPrint('[AiPayloadAssembler] memory facts failed: $e');
+      return const [];
+    }
+  }
+
+  /// The grounding contract line format (PRD §5.3). The label tells the
+  /// model how hard it may lean on the fact: stated → assert, observed →
+  /// assert as pattern, inferred → hedge or ask.
+  @visibleForTesting
+  static String renderMemoryFactLine(MemoryFact fact) {
+    final label = switch (fact.provenance) {
+      MemoryProvenance.userStated ||
+      MemoryProvenance.userConfirmed => 'stated',
+      MemoryProvenance.derivedDeterministic => 'observed',
+      MemoryProvenance.aiInferred => 'inferred',
+    };
+    return '[mem:${fact.id}|$label] ${fact.content}';
+  }
+
+  Future<List<String>> _buildPeopleDigest() async {
+    final repo = peopleRepository;
+    if (repo == null) return const [];
+    try {
+      final people = await repo.fetchPeopleOnce();
+      return people
+          .take(_kMaxPeople)
+          .map(renderPersonLine)
+          .toList(growable: false);
+    } catch (e) {
+      debugPrint('[AiPayloadAssembler] people digest failed: $e');
+      return const [];
+    }
+  }
+
+  @visibleForTesting
+  static String renderPersonLine(Person person) {
+    final rel = person.relationship?.trim();
+    final relPart = (rel == null || rel.isEmpty) ? person.kind.name : rel;
+    final buffer = StringBuffer('${person.displayName} ($relPart)');
+    final last = person.lastInteractionAtMs;
+    if (last != null) {
+      final days = DateTime.now()
+          .difference(DateTime.fromMillisecondsSinceEpoch(last))
+          .inDays;
+      if (days <= 0) {
+        buffer.write(' — interacted today');
+      } else if (days == 1) {
+        buffer.write(' — last interaction yesterday');
+      } else {
+        buffer.write(' — last interaction $days days ago');
+      }
+    }
+    return buffer.toString();
+  }
+
+  /// Latest summarize-then-purge outputs, newest first, dated.
+  Future<List<String>> _buildEpisodicSummaries() async {
+    final repo = memoryFactsRepository;
+    if (repo == null) return const [];
+    try {
+      final all = await repo.fetchFactsOnce();
+      return all
+          .where((f) => f.kind == MemoryFactKind.episodicSummary)
+          .take(_kMaxEpisodicSummaries)
+          .map((f) {
+            final day = DateTime.fromMillisecondsSinceEpoch(f.createdAtMs);
+            final key =
+                '${day.year}-${day.month.toString().padLeft(2, '0')}-'
+                '${day.day.toString().padLeft(2, '0')}';
+            return '($key) ${f.content}';
+          })
+          .toList(growable: false);
+    } catch (e) {
+      debugPrint('[AiPayloadAssembler] episodic summaries failed: $e');
+      return const [];
+    }
+  }
+
+  /// Open + dormant intentions — the Coach must never re-capture a promise
+  /// it already holds.
+  Future<List<String>> _buildOpenPromises() async {
+    final repo = intentionsRepository;
+    if (repo == null) return const [];
+    try {
+      final all = await repo.fetchIntentionsOnce();
+      final lines = <String>[];
+      for (final i in all) {
+        if (!i.active) continue;
+        if (i.status == IntentionStatus.open) {
+          final end = DateTime.fromMillisecondsSinceEpoch(i.windowEndMs);
+          final key =
+              '${end.year}-${end.month.toString().padLeft(2, '0')}-'
+              '${end.day.toString().padLeft(2, '0')}';
+          lines.add('${i.title} (by $key)');
+        } else if (i.status == IntentionStatus.dormant) {
+          lines.add('${i.title} (dormant — waiting for an opportunity)');
+        }
+      }
+      return lines.take(15).toList(growable: false);
+    } catch (e) {
+      debugPrint('[AiPayloadAssembler] open promises failed: $e');
+      return const [];
+    }
   }
 
   Future<_CachedScheduleSlice> _scheduleSliceForSession(

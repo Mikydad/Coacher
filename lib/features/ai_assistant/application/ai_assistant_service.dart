@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/utils/stable_id.dart';
 import '../../intentions/application/intention_capture.dart';
+import '../../memory/application/memory_extraction_service.dart';
 import '../data/ai_interaction_history_repository.dart';
 import '../domain/models/ai_action.dart';
 import '../domain/models/ai_chat_message.dart';
@@ -34,17 +35,20 @@ class AiAssistantService extends ChangeNotifier {
     AiAnalyticsLogger? analyticsLogger,
     EntityNormaliser? normaliser,
     AiScheduleCacheInvalidator? onScheduleMutated,
+    MemoryExtractionService? memoryExtraction,
   }) : _intentParser = intentParser,
        _actionExecutor = actionExecutor,
        _historyRepository = historyRepository,
        _analyticsLogger = analyticsLogger,
        _normaliser = normaliser ?? const EntityNormaliser(),
        _onScheduleMutated = onScheduleMutated,
+       _memoryExtraction = memoryExtraction,
        _sessionId = StableId.generate('session');
 
   final AiIntentParser _intentParser;
   final AiActionExecutor _actionExecutor;
   final AiInteractionHistoryRepository _historyRepository;
+  final MemoryExtractionService? _memoryExtraction;
 
   /// Exposed for UI (e.g. pick-up-where-you-left-off banner).
   AiInteractionHistoryRepository get historyRepository => _historyRepository;
@@ -98,6 +102,10 @@ class AiAssistantService extends ChangeNotifier {
 
   Future<void> sendMessage(String userInput) async {
     if (userInput.trim().isEmpty) return;
+
+    // Memory Phase 2: keep the session's inactivity clock fresh so
+    // summarize-then-purge knows when this session actually ended.
+    unawaited(_memoryExtraction?.noteSessionActivity(_sessionId));
 
     // Guests get a sign-in nudge instead of the server's permission error —
     // the aiChat function rejects anonymous accounts (cost-abuse guard).
@@ -227,12 +235,18 @@ class AiAssistantService extends ChangeNotifier {
     // relaxation of the confirm-gate (decision log 2026-07-23): stating a
     // promise IS the permission; the real confirmation happens at delivery,
     // where the nudge is phrased as a question.
+    // Memory actions ride the same relaxation (Phase 2): "remember this"
+    // must feel like telling a friend, not filing a form.
+    const autoCommitTypes = {
+      ActionType.createIntention,
+      ActionType.rememberFact,
+      ActionType.updateFact,
+      ActionType.forgetFact,
+    };
     final isIntentionAutoCommit =
         !result.requiresFollowUp &&
         result.actions.isNotEmpty &&
-        result.actions.every(
-          (a) => a.actionType == ActionType.createIntention,
-        );
+        result.actions.every((a) => autoCommitTypes.contains(a.actionType));
     if (isIntentionAutoCommit) {
       await _autoCommitIntentionActions(
         result.actions,
@@ -378,8 +392,16 @@ class AiAssistantService extends ChangeNotifier {
       exec = ExecutionResult(failures: [e.toString()]);
     }
     final trimmedModel = modelMessage?.trim();
+    final isMemoryBatch = actions.every(
+      (a) =>
+          a.actionType == ActionType.rememberFact ||
+          a.actionType == ActionType.updateFact ||
+          a.actionType == ActionType.forgetFact,
+    );
     final content = exec.hasFailures
-        ? "I couldn't save that promise — please try again."
+        ? (isMemoryBatch
+              ? exec.toSummaryMessage()
+              : "I couldn't save that promise — please try again.")
         : (trimmedModel?.isNotEmpty == true
               ? trimmedModel!
               : exec.toSummaryMessage());
@@ -417,7 +439,7 @@ class AiAssistantService extends ChangeNotifier {
       );
     } else if (idx != -1) {
       _messages[idx] = _messages[idx].copyWith(
-        content: 'Undone — that promise is off the list.',
+        content: 'Undone.',
         clearAutoCommittedBatchId: true,
         isExecuted: false,
       );
@@ -622,6 +644,10 @@ class AiAssistantService extends ChangeNotifier {
   }
 
   void startNewSession() {
+    // The old session visibly ended — extract its memory now (best-effort;
+    // failures stay pending and the bootstrap sweep retries).
+    final endedSessionId = _sessionId;
+    unawaited(_memoryExtraction?.onSessionEnded(endedSessionId));
     _sessionId = StableId.generate('session');
     _messages.clear();
     _pendingPlan = null;

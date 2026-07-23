@@ -9,6 +9,9 @@ enum CoachingInsightFamily {
   reinforcement,
   focus,
   globalSummary,
+
+  /// Humanizing Phase 2 — deterministic people patterns.
+  relationshipCare,
 }
 
 CoachingInsightFamily coachingInsightFamilyFromStorage(String? raw) {
@@ -42,6 +45,8 @@ CoachingInsightFamily coachingInsightFamilyForType(InsightType type) {
     case InsightType.overloadTrend:
     case InsightType.unstableRoutinePattern:
       return CoachingInsightFamily.globalSummary;
+    case InsightType.relationshipCareNudge:
+      return CoachingInsightFamily.relationshipCare;
   }
 }
 
@@ -288,5 +293,17 @@ kCoachingInsightTaxonomy = <InsightType, CoachingInsightSpec>{
     requiredPatternCodes: {PatternCode.scheduleRhythmVolatile},
     cooldown: InsightCooldownPolicy.twoDays,
     resolutionRule: InsightResolutionRule.noAutoResolve,
+  ),
+  InsightType.relationshipCareNudge: CoachingInsightSpec(
+    insightType: InsightType.relationshipCareNudge,
+    family: CoachingInsightFamily.relationshipCare,
+    description:
+        'No deterministically-recorded interaction with a family/partner '
+        'person for the configured gap window (humanizing Phase 2).',
+    requiredPatternCodes: {PatternCode.relationshipGap},
+    cooldown: InsightCooldownPolicy.twoDays,
+    resolutionRule: InsightResolutionRule(
+      resolvedWhenPatternsAbsent: {PatternCode.relationshipGap},
+    ),
   ),
 };

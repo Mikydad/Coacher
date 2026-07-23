@@ -28,6 +28,7 @@ import '../features/feedback/application/feedback_route_tracker.dart';
 import '../features/feedback/presentation/feedback_screen.dart';
 import '../features/education/presentation/getting_started_tour.dart';
 import '../features/feedback/presentation/tester_bug_bubble.dart';
+import '../features/memory/presentation/memory_knowledge_screen.dart';
 import '../features/profile/presentation/default_enforcement_mode_selection_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/settings/presentation/account_settings_screen.dart';
@@ -191,6 +192,7 @@ class CoachForLifeApp extends ConsumerWidget {
             const DefaultEnforcementModeSelectionScreen(),
         CoachingStyleSelectionScreen.routeName: (_) =>
             const CoachingStyleSelectionScreen(),
+        MemoryKnowledgeScreen.routeName: (_) => const MemoryKnowledgeScreen(),
         // ── Coach AI ──────────────────────────────────────────────────────
         AiAssistantScreen.routeName: (context) {
           final args = ModalRoute.of(context)?.settings.arguments;

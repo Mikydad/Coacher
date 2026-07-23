@@ -596,5 +596,7 @@ String _shortInsightType(InsightType type) {
       return 'improving';
     case InsightType.unstableRoutinePattern:
       return 'unstable routine';
+    case InsightType.relationshipCareNudge:
+      return 'stay in touch';
   }
 }

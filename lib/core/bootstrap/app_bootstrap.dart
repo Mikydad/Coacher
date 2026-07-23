@@ -18,6 +18,7 @@ import '../../features/planning/application/accountability_retention_worker.dart
 import '../../features/planning/data/planning_repository.dart';
 import '../../features/community/application/community_bridge_coordinator.dart';
 import '../../features/ai_assistant/application/ai_assistant_providers.dart';
+import '../../features/memory/application/memory_providers.dart';
 import '../../features/reminders/application/attention_orchestrator_providers.dart';
 import '../runtime/schedule_mutation_coordinator.dart';
 
@@ -74,12 +75,11 @@ class AppBootstrap {
     await SyncService.instance.initialize();
     await container.read(reminderSyncServiceProvider).scheduleFromCache();
 
-    // Purge Coach AI interaction history older than 48 hours.
-    unawaited(
-      container
-          .read(aiInteractionHistoryRepositoryProvider)
-          .purgeBefore(DateTime.now().subtract(const Duration(hours: 48))),
-    );
+    // Summarize-then-purge (Phase 2, §5.2) replaces the blind 48h delete:
+    // sessions are distilled into memory before their raw turns purge; if
+    // extraction can't run, the purge defers up to 7 days, then writes a
+    // deterministic truncation summary. Continuity is never silently lost.
+    unawaited(container.read(memoryExtractionServiceProvider).runMaintenance());
 
     // Purge dismissed proactive suggestion logs older than 7 days (Phase 4).
     unawaited(

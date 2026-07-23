@@ -20,6 +20,7 @@ import '../../../core/tier/tier_providers.dart';
 import 'ai_action_batch_repository.dart';
 import 'ai_action_batch_state.dart';
 import '../../intentions/application/intentions_providers.dart';
+import '../../memory/application/memory_providers.dart';
 import 'ai_action_executor.dart';
 import 'ai_tier_guard.dart';
 import 'ai_assistant_service.dart';
@@ -77,6 +78,9 @@ final aiPayloadAssemblerProvider = Provider<AiPayloadAssembler>((ref) {
     coachingStyleRepository: ref.read(coachingStyleRepositoryProvider),
     historyRepository: ref.read(aiInteractionHistoryRepositoryProvider),
     profilePreferenceService: ref.read(profilePreferenceServiceProvider),
+    memoryFactsRepository: ref.read(memoryFactsRepositoryProvider),
+    peopleRepository: ref.read(peopleRepositoryProvider),
+    intentionsRepository: ref.read(intentionsRepositoryProvider),
   );
 });
 
@@ -194,6 +198,8 @@ final aiActionExecutorProvider = Provider<AiActionExecutor>((ref) {
     ),
     intentionsRepository: ref.read(intentionsRepositoryProvider),
     intentionNudgeSyncService: ref.read(intentionNudgeSyncServiceProvider),
+    memoryFactsRepository: ref.read(memoryFactsRepositoryProvider),
+    peopleRepository: ref.read(peopleRepositoryProvider),
   );
 });
 
@@ -212,6 +218,7 @@ final aiAssistantServiceProvider =
         intentParser: parser,
         actionExecutor: ref.read(aiActionExecutorProvider),
         historyRepository: ref.read(aiInteractionHistoryRepositoryProvider),
+        memoryExtraction: ref.read(memoryExtractionServiceProvider),
         onScheduleMutated: assembler.invalidateSessionCache,
         analyticsLogger: (eventName, props) {
           final type = AnalyticsEventType.values.firstWhere(

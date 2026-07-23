@@ -5,7 +5,7 @@ import '../domain/models/generated_insight.dart';
 // (canonical evidence + taxonomy) instead of legacy [DetectedPattern]. Until then,
 // [kDeferredLayer2PatternCodesForInsightMapping] gates subtle new codes from user-facing copy.
 
-const int kLayer3InsightPolicyConfigVersion = 2;
+const int kLayer3InsightPolicyConfigVersion = 3;
 
 class InsightOutputCaps {
   const InsightOutputCaps({
@@ -306,6 +306,23 @@ kLayer3InsightPolicyConfig = Layer3InsightPolicyConfig(
           'Routine instability detected across multiple habits. Pick one anchor.',
       scopeType: InsightScopeType.global,
       requiredAllPatterns: <PatternCode>{PatternCode.scheduleRhythmVolatile},
+    ),
+
+    // Humanizing Phase 2 — relationship care. Entity scope = personId;
+    // RelationshipCareService personalizes the message with the person's
+    // name/relationship after mapping (the fallback stays generic).
+    InsightMappingRule(
+      ruleId: 'relationship_care_gap',
+      insightType: InsightType.relationshipCareNudge,
+      insightBucket: InsightBucket.neutral,
+      priority: InsightPriority.medium,
+      action: InsightAction.doNow,
+      messageKey: 'relationship_care_gap_1',
+      fallbackMessage:
+          "It's been a while since you connected with someone important. "
+          'A quick call goes a long way.',
+      scopeType: InsightScopeType.entity,
+      requiredAllPatterns: <PatternCode>{PatternCode.relationshipGap},
     ),
   ],
 );

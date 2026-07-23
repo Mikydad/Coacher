@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/presentation/app_colors.dart';
+import '../../../memory/presentation/memory_knowledge_screen.dart';
 
 // ─── User bubble ─────────────────────────────────────────────────────────────
 
@@ -46,6 +47,11 @@ class AssistantMessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Grounding contract (humanizing Phase 2): the model cites memory as
+    // "[mem:<id>]" markers. Strip them from the visible text and surface
+    // one quiet "from your memory" chip instead — tapping opens the fact
+    // in "What SidePal knows".
+    final grounded = extractMemoryReferences(content);
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
@@ -53,15 +59,94 @@ class AssistantMessageBubble extends StatelessWidget {
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.85,
         ),
-        child: Text.rich(
-          markdownLiteSpan(
-            content,
-            TextStyle(fontSize: 14, color: AppColors.textSoft),
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text.rich(
+              markdownLiteSpan(
+                grounded.text,
+                TextStyle(fontSize: 14, color: AppColors.textSoft),
+              ),
+            ),
+            if (grounded.factIds.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: MemoryReferenceChip(factId: grounded.factIds.first),
+              ),
+          ],
         ),
       ),
     );
   }
+}
+
+/// The quiet "from your memory" affordance — the user always sees WHY the
+/// Coach knows something personal, and one tap shows the fact itself.
+class MemoryReferenceChip extends StatelessWidget {
+  const MemoryReferenceChip({super.key, required this.factId});
+
+  final String factId;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: () => Navigator.pushNamed(
+        context,
+        MemoryKnowledgeScreen.routeName,
+        arguments: factId,
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppColors.fg12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.auto_awesome_rounded, size: 12, color: AppColors.fg54),
+            const SizedBox(width: 5),
+            Text(
+              'From your memory',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.fg54,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Result of stripping memory citations out of an assistant reply.
+class GroundedMessage {
+  const GroundedMessage({required this.text, required this.factIds});
+
+  final String text;
+  final List<String> factIds;
+}
+
+final RegExp _kMemMarker = RegExp(r'\s*\[mem:([A-Za-z0-9_-]+)(?:\|[^\]]*)?\]');
+
+/// Extracts `[mem:<id>]` citation markers (with or without the `|label`
+/// suffix the payload lines carry) and returns the cleaned display text
+/// plus the referenced fact ids in order of first appearance.
+GroundedMessage extractMemoryReferences(String content) {
+  final ids = <String>[];
+  final cleaned = content.replaceAllMapped(_kMemMarker, (m) {
+    final id = m.group(1)!;
+    if (!ids.contains(id)) ids.add(id);
+    return '';
+  });
+  return GroundedMessage(
+    text: cleaned.trim(),
+    factIds: List.unmodifiable(ids),
+  );
 }
 
 /// Renders the markdown-lite subset the Coach agent is allowed to produce:

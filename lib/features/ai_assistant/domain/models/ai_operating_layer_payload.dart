@@ -29,6 +29,10 @@ class AiOperatingLayerPayload {
     this.todayFreeWindows = const [],
     this.tomorrowFreeWindows = const [],
     this.featureGuide,
+    this.memoryFacts = const [],
+    this.peopleDigest = const [],
+    this.episodicSummaries = const [],
+    this.openPromises = const [],
   });
 
   /// The raw user input for this turn.
@@ -104,6 +108,24 @@ class AiOperatingLayerPayload {
   /// (see FeatureGuides.matchTopic) — grounds "what is X?" teaching answers.
   final String? featureGuide;
 
+  /// Long-term memory facts, prerendered as grounded lines:
+  /// `[mem:<id>|<label>] content`. The mem-id is the ONE deliberate
+  /// exception to the "no raw IDs" rule — it is the grounding contract
+  /// (PRD §5.3): the model cites it, the app renders the citation as a
+  /// tappable "from your memory" affordance.
+  final List<String> memoryFacts;
+
+  /// People in the user's life — e.g. "Sarah (sister) — last interaction
+  /// 12 days ago".
+  final List<String> peopleDigest;
+
+  /// Latest episodic summaries (summarize-then-purge output), newest first.
+  final List<String> episodicSummaries;
+
+  /// Open + dormant intentions, so the Coach never re-captures a promise
+  /// it already holds.
+  final List<String> openPromises;
+
   Map<String, dynamic> toJson() => {
     'userInput': userInput,
     'activeTasks': activeTasks,
@@ -130,5 +152,9 @@ class AiOperatingLayerPayload {
     if (tomorrowFreeWindows.isNotEmpty)
       'tomorrowFreeWindows': tomorrowFreeWindows,
     if (featureGuide != null) 'featureGuide': featureGuide,
+    if (memoryFacts.isNotEmpty) 'memoryFacts': memoryFacts,
+    if (peopleDigest.isNotEmpty) 'peopleDigest': peopleDigest,
+    if (episodicSummaries.isNotEmpty) 'episodicSummaries': episodicSummaries,
+    if (openPromises.isNotEmpty) 'openPromises': openPromises,
   };
 }

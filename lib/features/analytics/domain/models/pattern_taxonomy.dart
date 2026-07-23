@@ -7,6 +7,7 @@ enum PatternTaxonomyFamily {
   effortDifficulty,
   goalAlignment,
   behavioralStability,
+  relationshipCare,
 }
 
 PatternTaxonomyFamily patternTaxonomyFamilyFromStorage(String? raw) {
@@ -28,6 +29,8 @@ PatternTaxonomyFamily patternTaxonomyFamilyForGroup(PatternGroup group) {
       return PatternTaxonomyFamily.goalAlignment;
     case PatternGroup.behavioralStability:
       return PatternTaxonomyFamily.behavioralStability;
+    case PatternGroup.relationshipCare:
+      return PatternTaxonomyFamily.relationshipCare;
   }
 }
 
@@ -163,5 +166,17 @@ kPatternTaxonomyByCode = <PatternCode, PatternTaxonomySpec>{
     ],
     severityRuleId: 'layer2_hybrid_v1',
     confidenceRuleId: 'layer2_hybrid_confidence_v1',
+  ),
+  PatternCode.relationshipGap: PatternTaxonomySpec(
+    code: PatternCode.relationshipGap,
+    family: PatternTaxonomyFamily.relationshipCare,
+    description:
+        'No deterministically-recorded interaction with a family/partner '
+        'person for at least the configured gap window (humanizing Phase 2). '
+        'Computed by RelationshipCareService from Person.lastInteractionAtMs '
+        '— never LLM-estimated.',
+    requiredLayer1MetricPaths: <String>['person.lastInteractionAtMs'],
+    severityRuleId: 'relationship_gap_v1',
+    confidenceRuleId: 'deterministic_v1',
   ),
 };

@@ -16,6 +16,10 @@ import '../../intentions/application/intention_capture.dart';
 import '../../intentions/application/intention_nudge_sync_service.dart';
 import '../../intentions/data/intentions_repository.dart';
 import '../../intentions/domain/models/intention.dart';
+import '../../memory/application/memory_extraction_parser.dart';
+import '../../memory/data/memory_facts_repository.dart';
+import '../../memory/data/people_repository.dart';
+import '../../memory/domain/models/memory_fact.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/data/planning_repository.dart';
 import '../../planning/domain/models/task_item.dart';
@@ -103,6 +107,8 @@ class AiActionExecutor {
     this.tierGuard,
     this.intentionsRepository,
     this.intentionNudgeSyncService,
+    this.memoryFactsRepository,
+    this.peopleRepository,
   });
 
   final PlanningRepository planningRepository;
@@ -126,6 +132,11 @@ class AiActionExecutor {
   final IntentionsRepository? intentionsRepository;
   final IntentionNudgeSyncService? intentionNudgeSyncService;
 
+  /// Memory (humanizing Phase 2). Null in legacy tests — memory actions
+  /// then fail loudly instead of silently no-oping.
+  final MemoryFactsRepository? memoryFactsRepository;
+  final PeopleRepository? peopleRepository;
+
   // ─── Public execute ────────────────────────────────────────────────────────
 
   Future<ExecutionResult> execute(List<AiAction> actions) async {
@@ -140,6 +151,23 @@ class AiActionExecutor {
       if (action.actionType == ActionType.createIntention &&
           action.parameters['_intentionId'] == null) {
         action.parameters['_intentionId'] = StableId.generate('intention');
+      }
+      if (action.actionType == ActionType.rememberFact &&
+          action.parameters['_factId'] == null) {
+        action.parameters['_factId'] = StableId.generate('memfact');
+      }
+      // update/forget mutate an EXISTING fact: resolve the target and stash
+      // its pre-mutation state in the persisted params so rollback/undo can
+      // restore it exactly (the task snapshot cannot cover facts).
+      if (action.actionType == ActionType.updateFact ||
+          action.actionType == ActionType.forgetFact) {
+        final target = await _resolveFactRef(
+          action.parameters['factRef'] as String?,
+        );
+        if (target != null) {
+          action.parameters['_targetFactId'] = target.id;
+          action.parameters['_prevFactJson'] = jsonEncode(target.toMap());
+        }
       }
     }
 
@@ -336,6 +364,7 @@ class AiActionExecutor {
   /// recompute through the coordinator.
   Future<void> _rollbackBatch(String batchId, String snapshotJson) async {
     await _rollbackCreatedIntentions(batchId);
+    await _rollbackMemoryActions(batchId);
     try {
       final snapshot = jsonDecode(snapshotJson) as Map<String, dynamic>?;
       final taskList = (snapshot?['tasks'] as List<dynamic>? ?? [])
@@ -400,6 +429,39 @@ class AiActionExecutor {
         if (intentionId == null || intentionId.isEmpty) continue;
         await intentionNudgeSyncService?.cancelForIntention(intentionId);
         await repo.deleteIntention(intentionId);
+      }
+    } catch (e) {
+      debugPrint('ai_action_executor: swallowed error: $e');
+    }
+  }
+
+  /// Undo of memory actions: created facts are tombstoned; updated or
+  /// forgotten facts are restored from the pre-mutation state stashed in
+  /// the persisted actionsJson (`_prevFactJson`).
+  Future<void> _rollbackMemoryActions(String batchId) async {
+    final repo = memoryFactsRepository;
+    if (repo == null) return;
+    try {
+      final batch = await batchRepository.findByBatchId(batchId);
+      if (batch == null) return;
+      final actionList = (jsonDecode(batch.actionsJson) as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+      for (final entry in actionList) {
+        final params = (entry['params'] as Map?)?.cast<String, dynamic>();
+        if (entry['type'] == ActionType.rememberFact.name) {
+          final factId = params?['_factId'] as String?;
+          if (factId != null && factId.isNotEmpty) {
+            await repo.deleteFact(factId);
+          }
+        } else if (entry['type'] == ActionType.updateFact.name ||
+            entry['type'] == ActionType.forgetFact.name) {
+          final prevJson = params?['_prevFactJson'] as String?;
+          if (prevJson == null) continue;
+          final restored = MemoryFact.fromMap(
+            (jsonDecode(prevJson) as Map).cast<String, dynamic>(),
+          ).copyWith(updatedAtMs: DateTime.now().millisecondsSinceEpoch);
+          await repo.upsertFact(restored);
+        }
       }
     } catch (e) {
       debugPrint('ai_action_executor: swallowed error: $e');
@@ -540,6 +602,10 @@ class AiActionExecutor {
         // Planning happens directly in _createIntention (unthrottled) —
         // no schedule mutation to notify.
         return null;
+      case ActionType.rememberFact:
+      case ActionType.updateFact:
+      case ActionType.forgetFact:
+        return null; // memory writes never touch the schedule
     }
   }
 
@@ -579,6 +645,12 @@ class AiActionExecutor {
         );
       case ActionType.createIntention:
         return _createIntention(action.parameters);
+      case ActionType.rememberFact:
+        return _rememberFact(action.parameters);
+      case ActionType.updateFact:
+        return _updateFact(action.parameters);
+      case ActionType.forgetFact:
+        return _forgetFact(action.parameters);
     }
   }
 
@@ -654,6 +726,125 @@ class AiActionExecutor {
       IntentionWindowKind.thisWeek => 'this week',
     };
     return 'Got it — I\'ll find a good time $windowLabel for "$title".';
+  }
+
+  // ─── Memory handlers (humanizing Phase 2) ─────────────────────────────────
+
+  /// "Remember this" — auto-committed with undo. Explicit remembering is
+  /// userStated by definition: the utterance IS the statement.
+  Future<String> _rememberFact(Map<String, dynamic> p) async {
+    final repo = memoryFactsRepository;
+    if (repo == null) {
+      throw StateError('Memory is not available in this build.');
+    }
+    final content = (p['content'] as String?)?.trim() ?? '';
+    if (content.isEmpty) {
+      throw ArgumentError('content is required to remember something');
+    }
+    final capped = content.length > 200 ? content.substring(0, 200) : content;
+
+    var kind = MemoryFactKind.semanticFact;
+    final rawKind = p['kind'] as String?;
+    if (rawKind != null) {
+      final parsed = memoryFactKindFromStorage(rawKind);
+      if (parsed != MemoryFactKind.episodicSummary) kind = parsed;
+    }
+
+    // Link to a known person when the fact names one — never create people
+    // from this path (extraction owns quote-verified person creation).
+    String? personId;
+    final personName = (p['personName'] as String?)?.trim();
+    if (personName != null && personName.isNotEmpty) {
+      personId = (await peopleRepository?.findByReference(personName))?.id;
+    }
+
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final fact = MemoryFact(
+      id: (p['_factId'] as String?) ?? StableId.generate('memfact'),
+      kind: kind,
+      content: capped,
+      personId: personId,
+      provenance: MemoryProvenance.userStated,
+      confidence: 1.0,
+      sourceQuote: (p['rawUtterance'] as String?)?.trim(),
+      createdAtMs: nowMs,
+      updatedAtMs: nowMs,
+    );
+    fact.validate();
+    await repo.upsertFact(fact);
+    return 'Noted — I\'ll remember that.';
+  }
+
+  /// Edit an existing fact. The user correcting the record is confirmation
+  /// (provenance promotes to userConfirmed, PRD §5.3).
+  Future<String> _updateFact(Map<String, dynamic> p) async {
+    final repo = memoryFactsRepository;
+    if (repo == null) {
+      throw StateError('Memory is not available in this build.');
+    }
+    final newContent = (p['newContent'] as String?)?.trim() ?? '';
+    if (newContent.isEmpty) {
+      throw ArgumentError('newContent is required to update a memory');
+    }
+    final targetId = p['_targetFactId'] as String?;
+    final target = targetId != null ? await repo.getFact(targetId) : null;
+    if (target == null) {
+      throw ArgumentError(
+        'I couldn\'t find that memory — check "What SidePal knows".',
+      );
+    }
+    final capped = newContent.length > 200
+        ? newContent.substring(0, 200)
+        : newContent;
+    await repo.upsertFact(
+      target.copyWith(
+        content: capped,
+        provenance: MemoryProvenance.userConfirmed,
+        confidence: 1.0,
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+    return 'Updated — "$capped".';
+  }
+
+  /// Forget a fact — soft tombstone (kept for LWW, gone from every surface).
+  Future<String> _forgetFact(Map<String, dynamic> p) async {
+    final repo = memoryFactsRepository;
+    if (repo == null) {
+      throw StateError('Memory is not available in this build.');
+    }
+    final targetId = p['_targetFactId'] as String?;
+    final target = targetId != null ? await repo.getFact(targetId) : null;
+    if (target == null) {
+      throw ArgumentError(
+        'I couldn\'t find that memory — check "What SidePal knows".',
+      );
+    }
+    await repo.deleteFact(target.id);
+    return 'Forgotten.';
+  }
+
+  /// Resolves a model-provided fact reference ("prefers morning workouts")
+  /// to a live fact: exact normalized match first, then containment either
+  /// way. Null when nothing matches — the handler surfaces the failure.
+  Future<MemoryFact?> _resolveFactRef(String? factRef) async {
+    final repo = memoryFactsRepository;
+    if (repo == null || factRef == null || factRef.trim().isEmpty) {
+      return null;
+    }
+    final needle = MemoryExtractionParser.normalizeForMatch(factRef);
+    if (needle.isEmpty) return null;
+    final facts = await repo.fetchFactsOnce();
+    for (final f in facts) {
+      if (MemoryExtractionParser.normalizeForMatch(f.content) == needle) {
+        return f;
+      }
+    }
+    for (final f in facts) {
+      final content = MemoryExtractionParser.normalizeForMatch(f.content);
+      if (content.contains(needle) || needle.contains(content)) return f;
+    }
+    return null;
   }
 
   // ─── Task handlers ────────────────────────────────────────────────────────

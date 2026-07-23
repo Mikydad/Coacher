@@ -158,6 +158,28 @@ class AiInteractionHistoryRepository {
         .findFirst();
   }
 
+  /// Full transcript order for one session (oldest first) — what the
+  /// memory extraction pipeline reads.
+  Future<List<IsarAiInteractionHistory>> getAllForSession(
+    String sessionId,
+  ) async {
+    return _isar.isarAiInteractionHistorys
+        .filter()
+        .sessionIdEqualTo(sessionId)
+        .sortByTimestampMs()
+        .findAll();
+  }
+
+  /// All entries older than [cutoffMs] — summarize-then-purge groups these
+  /// by session to decide what still needs extraction. Bounded: rows never
+  /// outlive the 7-day deferral ceiling.
+  Future<List<IsarAiInteractionHistory>> getOlderThan(int cutoffMs) async {
+    return _isar.isarAiInteractionHistorys
+        .filter()
+        .timestampMsLessThan(cutoffMs)
+        .findAll();
+  }
+
   // ─── TTL purge ────────────────────────────────────────────────────────────
 
   /// Deletes all entries with [timestampMs] < [cutoff] milliseconds since epoch.
@@ -168,6 +190,21 @@ class AiInteractionHistoryRepository {
           .filter()
           .timestampMsLessThan(cutoffMs)
           .deleteAll();
+    });
+  }
+
+  /// Deletes ALL raw turns of the given sessions — called by
+  /// summarize-then-purge only after a session is extracted or truncated,
+  /// never blindly by age.
+  Future<void> purgeSessions(List<String> sessionIds) async {
+    if (sessionIds.isEmpty) return;
+    await _isar.writeTxn(() async {
+      for (final sessionId in sessionIds) {
+        await _isar.isarAiInteractionHistorys
+            .filter()
+            .sessionIdEqualTo(sessionId)
+            .deleteAll();
+      }
     });
   }
 }

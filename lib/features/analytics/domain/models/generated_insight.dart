@@ -136,6 +136,9 @@ enum InsightType {
   overloadTrend,
   improvingConsistency,
   unstableRoutinePattern,
+  // Humanizing Phase 2 — relationship care ("you haven't talked to your
+  // sister in a while"): computed truth, warm phrasing, zero invention.
+  relationshipCareNudge,
 }
 
 InsightType insightTypeFromStorage(String? raw) {
@@ -166,6 +169,12 @@ const Set<InsightType> kLayer3V2InsightTypes = <InsightType>{
   InsightType.overloadTrend,
   InsightType.improvingConsistency,
   InsightType.unstableRoutinePattern,
+};
+
+/// V3 = V2 + humanizing Phase 2 relationship care.
+const Set<InsightType> kLayer3V3InsightTypes = <InsightType>{
+  ...kLayer3V2InsightTypes,
+  InsightType.relationshipCareNudge,
 };
 
 class GeneratedInsight {

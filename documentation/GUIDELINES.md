@@ -641,3 +641,95 @@ not silent reversal.
   (hours with ≥3 ignores and ignores > 2× positive interactions score
   zero responsiveness). Weights are compile-time constants — promote to
   Remote Config only if tuning demands it.
+
+- **2026-07-23 · Phase 2a (Memory & People): provenance is enforced by
+  quote verification, not trust.** `IsarMemoryFact` + `IsarPerson` ship as
+  full sync sets (outbox + pull, LWW, soft tombstones). A fact or person
+  claiming `userStated` must carry a sourceQuote that string-matches the
+  transcript (normalized for whitespace/smart quotes only) or the parser
+  DEMOTES it to `aiInferred` before it is saved — the model cannot promote
+  its own inferences. Unknown stored provenance also reads as `aiInferred`
+  (never promote by accident). Explicit "remember this" in chat is
+  `userStated` by definition; edits promote to `userConfirmed`. Extraction
+  is the only path that creates people; `rememberFact` only links existing
+  ones. Local-only `IsarMemorySessionState` tracks per-session extraction
+  bookkeeping (derived per-device state — not synced, same reasoning as
+  opportunity plans).
+
+- **2026-07-23 · Summarize-then-purge replaces the blind 48h chat delete.**
+  Bootstrap now runs `MemoryExtractionService.runMaintenance()` instead of
+  `purgeBefore(48h)`: sessions are distilled (facts + people + dormant
+  observations + episodic summary, ≤1 extract_memory call per session end)
+  before their raw turns purge. If extraction can't run (offline, AI down,
+  budget out) the purge DEFERS for that session up to 7 days, then a
+  deterministic truncation summary ("Talked about: …",
+  `derivedDeterministic`) is written and the turns purge — continuity is
+  never silently lost, raw turns never outlive the ceiling. LLM episodic
+  summaries are `aiInferred`; only the truncation fallback is
+  `derivedDeterministic` (no LLM in that loop). Weekly compression of
+  90-day-old summaries is deferred to a later slice.
+
+- **2026-07-23 · aiChat purposes route server-side; system calls never
+  touch the user's quota.** The Cloud Function resolves every call's
+  `purpose` through a routing table (compile-time defaults in
+  `functions/src/ai_routing.ts`, overridable per-field via Remote Config
+  `ai_purpose_routes`, models allow-listed so a config typo can't select
+  an expensive model). Only user-facing purposes (`coach_agent`, `chat`,
+  `coaching_summary`, `circle_pulse`, unknown/legacy) charge the 40/hr
+  quota; system purposes (`extract_memory`, `parse_intention`,
+  `phrase_nudge`, `summarize`) draw from a separate RC-capped per-user
+  daily budget (`ai_system_daily_budget`, default 20/day, UTC window) with
+  silent-skip semantics — clients run deterministic fallbacks and the user
+  never sees a quota error for a call they didn't make. Per-purpose kill
+  switches (`enabled` in the routes JSON) and per-purpose `aiUsage`
+  telemetry (`byPurpose.<purpose>.count/tokens`) ship with the phase.
+  Remote Config failure falls back to compiled defaults — config can
+  degrade the table, never break the proxy.
+
+- **2026-07-23 · Phase 2b: mem-id markers are the ONE exception to
+  "no raw IDs in the payload".** Memory facts inject as
+  `[mem:<id>|<label>] content` lines; the label collapses provenance to
+  what the model needs (`stated` = assert, `observed` = assert as
+  pattern, `inferred` = hedge or ask). The model cites `[mem:<id>]` at
+  the end of any sentence that uses a fact; the renderer strips markers
+  and shows one quiet "From your memory" chip that opens the fact in
+  "What SidePal knows". Stored message content keeps the markers (so the
+  model sees its own citations in history); only display strips them.
+  Memory sections are per-turn, never in the 30s session cache — an
+  auto-committed rememberFact must be visible on the very next turn.
+  `lastReferencedAtMs` stamping is throttled to 6h per fact so a chatty
+  session doesn't spam the outbox. Open + dormant intentions also inject
+  ("do NOT create these again") to stop duplicate capture.
+
+- **2026-07-23 · "What SidePal knows" lives under Profile, three tabs,
+  all actions Isar-first.** Facts (provenance-badged: STATED/CONFIRMED
+  cyan, OBSERVED neutral, INFERRED amber — the label is the trust UI),
+  People (name/relationship editable; saving is the strongest correction
+  signal → `userConfirmed`), Timeline (episodic summaries, newest
+  first). ✓ Correct shows only on non-asserted facts and promotes to
+  `userConfirmed` @ 1.0 confidence; ✏ Edit does the same with new
+  content; 🗑 Forget is the soft tombstone. "Forget everything" (confirm
+  dialog) tombstones every fact AND every person. The chat chip
+  deep-links here with the factId as route argument and auto-opens that
+  fact's sheet.
+
+- **2026-07-23 · Relationship care is a deterministic Layer-2 addition,
+  not a new pipeline.** `RelationshipCareService` (memory feature) runs
+  from the recompute graph's layer34 step (6h internal throttle): first
+  it derives `Person.lastInteractionAtMs` from COMPLETED intentions whose
+  title references the person (monotonic, never LLM-estimated), then for
+  family/partner people with a ≥21-day gap it emits
+  `PatternCode.relationshipGap` (new `BehaviorEntityKind.person` +
+  `PatternGroup.relationshipCare`; deliberately OUTSIDE
+  `kLayer2V1PatternCodes` and the hybrid scoring config — it has its own
+  deterministic severity: 0.4 at threshold, +0.01/day) and maps it
+  through the standard policy (`relationship_care_gap` rule, policy
+  version 2→3, `kLayer3V3InsightTypes`). The service personalizes the
+  copy ("It's been 4 weeks since you last connected with Sarah (your
+  sister)…") and caches it under the person's entity scope — the
+  delivery-day loader already merges entity insights, so Layer 4 picks it
+  up with zero delivery changes. People with NO recorded interaction emit
+  nothing (no baseline → no claim); a completed "Call Sarah" intention
+  clears the nudge on the next recompute. *Considered:* wiring people
+  into the BehaviorFeatureObject engine (rejected — people have no
+  feature cache and the engine's Layer-1 metric contract doesn't apply).

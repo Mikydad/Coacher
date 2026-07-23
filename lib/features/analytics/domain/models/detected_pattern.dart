@@ -10,6 +10,9 @@ enum PatternGroup {
   effortDifficulty,
   goalAlignment,
   behavioralStability,
+
+  /// Humanizing Phase 2 — deterministic people patterns (relationship care).
+  relationshipCare,
 }
 
 PatternGroup patternGroupFromStorage(String? raw) {
@@ -33,6 +36,12 @@ enum PatternCode {
 
   /// Task/habit: high share of missed scheduled days vs scheduled opportunities in 7d window.
   scheduleRhythmVolatile,
+
+  /// Person: no deterministically-recorded interaction with a family/partner
+  /// person in N weeks (humanizing Phase 2). Emitted by
+  /// RelationshipCareService, NOT the feature-cache engine — deliberately
+  /// outside [kLayer2V1PatternCodes] and the hybrid scoring config.
+  relationshipGap,
 }
 
 PatternCode patternCodeFromStorage(String? raw) {

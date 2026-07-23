@@ -3,7 +3,15 @@ import '../../../../core/validation/model_validators.dart';
 /// Bump when [BehaviorTimeMetrics] semantics or shape change (invalidates cached features).
 const int kBehaviorFeatureSchemaVersion = 2;
 
-enum BehaviorEntityKind { task, habit, goal }
+enum BehaviorEntityKind {
+  task,
+  habit,
+  goal,
+
+  /// Humanizing Phase 2 — people carry no behavior feature cache; only the
+  /// deterministic relationship-care pattern uses this kind.
+  person,
+}
 
 BehaviorEntityKind behaviorEntityKindFromStorage(String? raw) {
   for (final value in BehaviorEntityKind.values) {

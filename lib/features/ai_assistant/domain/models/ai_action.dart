@@ -28,6 +28,13 @@ enum ActionType {
   // Intentions (humanizing Phase 1) — AUTO-COMMITS with undo, the one
   // deliberate relaxation of the confirm-gate (decision log 2026-07-23).
   createIntention,
+
+  // Memory (humanizing Phase 2) — "remember this" and friends. Same
+  // auto-commit + undo treatment as intentions: low-risk, trivially
+  // reversible, capture friction kills the habit.
+  rememberFact,
+  updateFact,
+  forgetFact,
 }
 
 // ─── Risk level enum ─────────────────────────────────────────────────────────
@@ -77,6 +84,9 @@ class AiAction {
       case ActionType.endContextOverride:
       case ActionType.suggestFreeTimeBlock:
       case ActionType.createIntention:
+      case ActionType.rememberFact:
+      case ActionType.updateFact:
+      case ActionType.forgetFact:
         return AiActionRiskLevel.low;
     }
   }

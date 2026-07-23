@@ -124,5 +124,8 @@ String coachingInsightTypeShortLabel(InsightType type) {
       return 'Rising consistency';
     case InsightType.unstableRoutinePattern:
       return 'Routine instability';
+    // Humanizing Phase 2
+    case InsightType.relationshipCareNudge:
+      return 'Stay in touch';
   }
 }

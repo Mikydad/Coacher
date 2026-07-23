@@ -94,6 +94,21 @@ class AiMissingFieldDetector {
           _Field('title', 'What did you promise to do?'),
         ]);
 
+      // Auto-committed memory actions (Phase 2) — one required field each.
+      case ActionType.rememberFact:
+        return _checkFields(p, [
+          _Field('content', 'What should I remember?'),
+        ]);
+      case ActionType.updateFact:
+        return _checkFields(p, [
+          _Field('factRef', 'Which memory should I update?'),
+          _Field('newContent', 'What should it say instead?'),
+        ]);
+      case ActionType.forgetFact:
+        return _checkFields(p, [
+          _Field('factRef', 'Which memory should I forget?'),
+        ]);
+
       case ActionType.activateContextOverride:
         return _checkFields(p, [
           _Field(

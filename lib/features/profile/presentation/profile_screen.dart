@@ -17,6 +17,7 @@ import '../../../features/coaching/domain/models/enforcement_mode.dart';
 import '../../../features/context_override/application/context_override_providers.dart';
 import '../../analytics/presentation/analytics_progress_screen.dart';
 import '../../ai_assistant/presentation/ai_assistant_screen.dart';
+import '../../memory/presentation/memory_knowledge_screen.dart';
 import '../../settings/presentation/account_settings_screen.dart';
 import '../../settings/presentation/notification_settings_screen.dart';
 import '../../settings/presentation/reminder_settings_screen.dart';
@@ -810,6 +811,18 @@ class _CoreOptimizationSection extends StatelessWidget {
               size: 20,
             ),
             onTap: () => showCoachAiSheet(context),
+          ),
+          _SettingRow(
+            icon: Icons.psychology_outlined,
+            title: 'What SidePal knows',
+            subtitle: 'Remembered facts, people & summaries',
+            trailing: Icon(
+              Icons.chevron_right_rounded,
+              color: _kOnSurfaceVariant,
+              size: 20,
+            ),
+            onTap: () =>
+                Navigator.pushNamed(context, MemoryKnowledgeScreen.routeName),
           ),
           _SettingRow(
             icon: Icons.leaderboard_rounded,

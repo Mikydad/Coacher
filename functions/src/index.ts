@@ -2,7 +2,10 @@ import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https
 import { defineSecret } from "firebase-functions/params";
 import { logger } from "firebase-functions/v2";
 import { initializeApp } from "firebase-admin/app";
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { getFirestore, Timestamp, FieldValue } from "firebase-admin/firestore";
+import { getRemoteConfig, ServerTemplate } from "firebase-admin/remote-config";
+
+import { parseRouteOverrides, resolveRoute, utcDayKey } from "./ai_routing";
 
 initializeApp();
 
@@ -30,8 +33,8 @@ export { stakeAccountPurge } from "./stakes/account_purge";
 
 const openAiApiKey = defineSecret("OPENAI_API_KEY");
 
-// Model is pinned server-side; clients cannot request a different one.
-const MODEL = "gpt-4o-mini";
+// The model comes from the purpose routing table (ai_routing.ts) — pinned
+// server-side per purpose; clients cannot request a different one.
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 
 const MAX_TOKENS_CAP = 800;
@@ -148,10 +151,109 @@ function clampTemperature(raw: unknown): number {
   return Math.min(Math.max(value, 0), 1);
 }
 
-function clampMaxTokens(raw: unknown): number {
-  const value =
-    typeof raw === "number" && Number.isFinite(raw) ? Math.floor(raw) : MAX_TOKENS_CAP;
-  return Math.min(Math.max(value, 1), MAX_TOKENS_CAP);
+function clampMaxTokens(raw: unknown, cap: number = MAX_TOKENS_CAP): number {
+  const value = typeof raw === "number" && Number.isFinite(raw) ? Math.floor(raw) : cap;
+  return Math.min(Math.max(value, 1), cap);
+}
+
+// ─── Purpose routing config (Remote Config server template) ─────────────────
+//
+// Config can DEGRADE the routing table (kill a purpose, swap a model) but
+// never break the proxy: any Remote Config failure falls back to the
+// compile-time defaults in ai_routing.ts.
+
+const RC_DEFAULTS = {
+  ai_purpose_routes: "{}",
+  ai_system_daily_budget: 20,
+};
+const RC_TTL_MS = 5 * 60 * 1000;
+
+let rcTemplate: ServerTemplate | undefined;
+let rcLoadedAtMs = 0;
+
+async function aiServerConfig(): Promise<{
+  routesJson: string;
+  systemDailyBudget: number;
+}> {
+  const now = Date.now();
+  try {
+    if (rcTemplate === undefined || now - rcLoadedAtMs > RC_TTL_MS) {
+      rcTemplate = await getRemoteConfig().getServerTemplate({
+        defaultConfig: RC_DEFAULTS,
+      });
+      rcLoadedAtMs = now;
+    }
+    const config = rcTemplate.evaluate();
+    const budget = config.getNumber("ai_system_daily_budget");
+    return {
+      routesJson: config.getString("ai_purpose_routes"),
+      systemDailyBudget: budget > 0 ? budget : RC_DEFAULTS.ai_system_daily_budget,
+    };
+  } catch (error) {
+    logger.warn("Remote Config unavailable; using default AI routes", {
+      error: `${error}`,
+    });
+    return {
+      routesJson: RC_DEFAULTS.ai_purpose_routes,
+      systemDailyBudget: RC_DEFAULTS.ai_system_daily_budget,
+    };
+  }
+}
+
+/// Per-user daily budget for SYSTEM purposes (extraction, parsing, nudge
+/// phrasing) — separate from the user's hourly chat quota so background
+/// work can never eat the quota the user sees. UTC-day window on the same
+/// aiUsage doc.
+async function enforceSystemBudget(uid: string, dailyBudget: number): Promise<void> {
+  const db = getFirestore();
+  const ref = db.collection("aiUsage").doc(uid);
+  const dayKey = utcDayKey(Date.now());
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.data();
+    const currentKey = typeof data?.systemDayKey === "string" ? data.systemDayKey : "";
+    const count =
+      currentKey === dayKey && typeof data?.systemCount === "number" ? data.systemCount : 0;
+    if (count >= dailyBudget) {
+      // Clients treat this as silent-skip: deterministic fallbacks run and
+      // the user never sees a quota error for a call they didn't make.
+      throw new HttpsError("resource-exhausted", "System AI budget exhausted for today.");
+    }
+    tx.set(ref, { systemDayKey: dayKey, systemCount: count + 1 }, { merge: true });
+  });
+}
+
+/// Per-purpose usage telemetry (ships WITH Phase 2, not after). Firestore
+/// field keys must be path-safe.
+function telemetryKey(purpose: string): string {
+  return purpose.replace(/[^a-zA-Z0-9_]/g, "_");
+}
+
+async function recordPurposeUsage(
+  uid: string,
+  purpose: string,
+  totalTokens: number,
+): Promise<void> {
+  try {
+    await getFirestore()
+      .collection("aiUsage")
+      .doc(uid)
+      .set(
+        {
+          byPurpose: {
+            [telemetryKey(purpose)]: {
+              count: FieldValue.increment(1),
+              tokens: FieldValue.increment(totalTokens > 0 ? totalTokens : 0),
+            },
+          },
+        },
+        { merge: true },
+      );
+  } catch (error) {
+    // Telemetry must never fail a successful AI call.
+    logger.warn("aiUsage telemetry write failed", { uid, purpose, error: `${error}` });
+  }
 }
 
 /// Sliding-hour quota counted per TURN, not per OpenAI call: follow-up calls
@@ -239,8 +341,6 @@ export const aiChat = onCall(
     const uid = request.auth.uid;
 
     const messages = validateMessages(request.data?.messages);
-    const temperature = clampTemperature(request.data?.temperature);
-    const maxTokens = clampMaxTokens(request.data?.maxTokens);
     const tools = validateTools(request.data?.tools);
     const purpose =
       typeof request.data?.purpose === "string" ? request.data.purpose.slice(0, 64) : "unknown";
@@ -253,7 +353,22 @@ export const aiChat = onCall(
       throw new HttpsError("invalid-argument", "loopIndex out of range.");
     }
 
-    await enforceRateLimit(uid, turnId, loopIndex);
+    // Purpose routing: model / temperature / cap / quota class per purpose.
+    const { routesJson, systemDailyBudget } = await aiServerConfig();
+    const route = resolveRoute(purpose, parseRouteOverrides(routesJson));
+    if (!route.enabled) {
+      // Per-purpose kill switch. System callers fall back deterministically;
+      // chat surfaces its normal degraded path.
+      throw new HttpsError("failed-precondition", "This AI feature is disabled.");
+    }
+    const temperature = route.temperature ?? clampTemperature(request.data?.temperature);
+    const maxTokens = clampMaxTokens(request.data?.maxTokens, route.maxTokens);
+
+    if (route.quotaClass === "system") {
+      await enforceSystemBudget(uid, systemDailyBudget);
+    } else {
+      await enforceRateLimit(uid, turnId, loopIndex);
+    }
 
     let response: Response;
     try {
@@ -264,7 +379,7 @@ export const aiChat = onCall(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: MODEL,
+          model: route.model,
           temperature,
           max_tokens: maxTokens,
           // Tool-calling turns return natural text or tool calls; only
@@ -321,12 +436,16 @@ export const aiChat = onCall(
       throw new HttpsError("internal", "AI returned an empty response.");
     }
 
+    const totalTokens = json.usage?.total_tokens ?? -1;
     logger.info("aiChat ok", {
       uid,
       purpose,
+      model: route.model,
+      quotaClass: route.quotaClass,
       toolCallCount: toolCalls.length,
-      totalTokens: json.usage?.total_tokens ?? -1,
+      totalTokens,
     });
+    await recordPurposeUsage(uid, purpose, totalTokens);
     return { content, toolCalls };
   },
 );

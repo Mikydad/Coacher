@@ -39,6 +39,12 @@ class FirestorePaths {
   static String get timeBlocks => '$userRoot/timeBlocks';
   static String timeBlockDocument(String blockId) => '$timeBlocks/$blockId';
 
+  static String get memoryFacts => '$userRoot/memoryFacts';
+  static String memoryFactDocument(String factId) => '$memoryFacts/$factId';
+
+  static String get people => '$userRoot/people';
+  static String personDocument(String personId) => '$people/$personId';
+
   /// Singleton doc (collection `onboarding`, doc `profile`) — what the user
   /// told us during first-launch onboarding (struggles / interests).
   static String get onboardingProfileDoc => '$userRoot/onboarding/profile';

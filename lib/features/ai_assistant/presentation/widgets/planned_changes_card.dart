@@ -144,7 +144,14 @@ class _ActionRow extends StatelessWidget {
       case ActionType.createGoal:
       case ActionType.addReminder:
       case ActionType.createIntention:
+      case ActionType.rememberFact:
         return (icon: Icons.add_rounded, color: AppColors.accentDim);
+
+      case ActionType.updateFact:
+        return (icon: Icons.edit_rounded, color: AppColors.textSoft);
+
+      case ActionType.forgetFact:
+        return (icon: Icons.remove_rounded, color: Colors.redAccent);
 
       case ActionType.deleteTask:
       case ActionType.deleteGoal:
@@ -222,6 +229,15 @@ class _ActionRow extends StatelessWidget {
       // case an intention rides along in a mixed batch.
       case ActionType.createIntention:
         return 'Remember "${p['title'] ?? 'promise'}"';
+
+      case ActionType.rememberFact:
+        return 'Remember "${p['content'] ?? 'fact'}"';
+
+      case ActionType.updateFact:
+        return 'Update memory to "${p['newContent'] ?? '?'}"';
+
+      case ActionType.forgetFact:
+        return 'Forget "${p['factRef'] ?? 'memory'}"';
     }
   }
 }

@@ -11,6 +11,7 @@ import '../../features/ai_assistant/application/ai_assistant_providers.dart';
 import '../../features/analytics/application/ai_summary_providers.dart';
 import '../../features/goals/application/goals_providers.dart';
 import '../../features/intentions/application/intentions_providers.dart';
+import '../../features/memory/application/memory_providers.dart';
 import '../di/providers.dart';
 import 'recompute_scope.dart';
 
@@ -112,6 +113,17 @@ class UnifiedRecomputeGraph {
 
     // ── Step 5: Layer 3 + Layer 4 delivery ────────────────────────────────
     if (scope.layer34) {
+      // Relationship care runs BEFORE the delivery invalidation so a fresh
+      // gap insight is in the cache when Layer 4 re-reads (humanizing
+      // Phase 2). Throttled internally; Isar-only — airplane-mode safe.
+      try {
+        await container.read(relationshipCareServiceProvider).rearmIfStale();
+      } catch (e) {
+        debugPrint(
+          '[UnifiedRecomputeGraph] step:layer34(relationshipCare) failed: $e',
+        );
+      }
+      if (_generationChanged(capturedGeneration)) return;
       invalidateTodayCoachingDeliveryFromContainer(container);
       debugPrint('[UnifiedRecomputeGraph] step:layer34');
     }

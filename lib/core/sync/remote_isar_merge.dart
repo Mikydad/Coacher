@@ -10,6 +10,8 @@ import '../../features/goals/domain/models/goal_check_in.dart';
 import '../../features/goals/domain/models/goal_milestone.dart';
 import '../../features/goals/domain/models/user_goal.dart';
 import '../../features/intentions/domain/models/intention.dart';
+import '../../features/memory/domain/models/memory_fact.dart';
+import '../../features/memory/domain/models/person.dart';
 import '../../features/analytics/domain/models/analytics_event.dart';
 import '../../features/analytics/domain/models/analytics_stats_cache.dart';
 import '../../features/planning/domain/models/block.dart';
@@ -31,6 +33,8 @@ import '../local_db/isar_collections/isar_goal_action.dart';
 import '../local_db/isar_collections/isar_goal_check_in.dart';
 import '../local_db/isar_collections/isar_goal_milestone.dart';
 import '../local_db/isar_collections/isar_intention.dart';
+import '../local_db/isar_collections/isar_memory_fact.dart';
+import '../local_db/isar_collections/isar_person.dart';
 import '../local_db/isar_collections/isar_onboarding_profile.dart';
 import '../local_db/isar_collections/isar_scheduled_time_block.dart';
 import '../local_db/isar_collections/isar_reminder.dart';
@@ -143,6 +147,10 @@ class RemoteIsarMerge {
     await _pullIntentions();
     _abortIfUidChanged();
     await _pullTimeBlocks();
+    _abortIfUidChanged();
+    await _pullMemoryFacts();
+    _abortIfUidChanged();
+    await _pullPeople();
     _abortIfUidChanged();
     await _pullAnalytics();
     _abortIfUidChanged();
@@ -415,6 +423,48 @@ class RemoteIsarMerge {
         await _mergeTimeBlock(block);
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip time block ${doc.id}: $e\n$st');
+      }
+    }
+  }
+
+  /// Memory facts (`users/{uid}/memoryFacts`) — cursor pull, LWW upsert.
+  /// Deletes arrive as soft tombstones (`active: false`), Phase 2 §5.1.
+  Future<void> _pullMemoryFacts() async {
+    final cursor = await _cursorFor('memory_facts');
+    final snap = await _afterCursor(
+      _client.userCollection('memoryFacts'),
+      cursor,
+    ).get();
+    for (final doc in snap.docs) {
+      try {
+        final m = Map<String, dynamic>.from(doc.data());
+        m['id'] = _docFieldId(doc, m);
+        final fact = MemoryFact.fromMap(m);
+        _noteSeen('memory_facts', fact.updatedAtMs);
+        await _mergeMemoryFact(fact);
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip memory fact ${doc.id}: $e\n$st');
+      }
+    }
+  }
+
+  /// People (`users/{uid}/people`) — cursor pull, LWW upsert, soft
+  /// tombstones. Phase 2 §5.5.
+  Future<void> _pullPeople() async {
+    final cursor = await _cursorFor('people');
+    final snap = await _afterCursor(
+      _client.userCollection('people'),
+      cursor,
+    ).get();
+    for (final doc in snap.docs) {
+      try {
+        final m = Map<String, dynamic>.from(doc.data());
+        m['id'] = _docFieldId(doc, m);
+        final person = Person.fromMap(m);
+        _noteSeen('people', person.updatedAtMs);
+        await _mergePerson(person);
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip person ${doc.id}: $e\n$st');
       }
     }
   }
@@ -821,6 +871,42 @@ class RemoteIsarMerge {
       await _isar.isarScheduledTimeBlocks.putByBlockId(
         IsarScheduledTimeBlock.fromDomain(incoming),
       );
+    });
+    _appliedCount++;
+  }
+
+  Future<void> _mergeMemoryFact(MemoryFact incoming) async {
+    final existing = await _isar.isarMemoryFacts
+        .filter()
+        .factIdEqualTo(incoming.id)
+        .findFirst();
+    if (!shouldApplyRemoteUpdatedAt(
+      localUpdatedAtMs: existing?.updatedAtMs,
+      remoteUpdatedAtMs: incoming.updatedAtMs,
+    )) {
+      return;
+    }
+    await _isar.writeTxn(() async {
+      await _isar.isarMemoryFacts.putByFactId(
+        IsarMemoryFact.fromDomain(incoming),
+      );
+    });
+    _appliedCount++;
+  }
+
+  Future<void> _mergePerson(Person incoming) async {
+    final existing = await _isar.isarPersons
+        .filter()
+        .personIdEqualTo(incoming.id)
+        .findFirst();
+    if (!shouldApplyRemoteUpdatedAt(
+      localUpdatedAtMs: existing?.updatedAtMs,
+      remoteUpdatedAtMs: incoming.updatedAtMs,
+    )) {
+      return;
+    }
+    await _isar.writeTxn(() async {
+      await _isar.isarPersons.putByPersonId(IsarPerson.fromDomain(incoming));
     });
     _appliedCount++;
   }

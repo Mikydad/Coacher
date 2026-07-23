@@ -18,8 +18,11 @@ import 'isar_goal_action.dart';
 import 'isar_goal_check_in.dart';
 import 'isar_goal_milestone.dart';
 import 'isar_intention.dart';
+import 'isar_memory_fact.dart';
+import 'isar_memory_session_state.dart';
 import 'isar_notification_ledger_entry.dart';
 import 'isar_opportunity_plan.dart';
+import 'isar_person.dart';
 import 'isar_onboarding_profile.dart';
 import 'isar_points.dart';
 import 'isar_reminder.dart';
@@ -69,4 +72,7 @@ const isarSchemaList = [
   IsarCharitySchema,
   IsarIntentionSchema,
   IsarOpportunityPlanSchema,
+  IsarMemoryFactSchema,
+  IsarPersonSchema,
+  IsarMemorySessionStateSchema,
 ];

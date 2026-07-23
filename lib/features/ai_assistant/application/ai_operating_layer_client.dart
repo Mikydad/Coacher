@@ -72,6 +72,13 @@ briefly explain WHY ("your Study goal is at 2/5 days and you're free 14:00–16:
   time, that's a task/reminder, NOT an intention. If the window or the
   action is genuinely unclear, ask ONE clarifying question ("This week or
   by Friday?") instead of guessing — then capture.
+- EXCEPTION — memory: when the user explicitly asks you to remember,
+  correct, or forget something about their life ("remember that my sister's
+  name is Sarah", "actually I prefer evening workouts", "forget what I said
+  about the gym"), call propose_changes with rememberFact / updateFact /
+  forgetFact. These also auto-commit (no card). Reply with one short
+  acknowledgment. Only durable personal facts belong in memory — never
+  scheduling chatter.
 - Never say "I'll set that up now", "done", "I've scheduled…", or "setting it
   up" — nothing happens until the user confirms the card. Say "Here's the plan —
   confirm below" instead.
@@ -85,6 +92,20 @@ briefly explain WHY ("your Study goal is at 2/5 days and you're free 14:00–16:
   the guide, connect it to their real data when it helps ("you're on a 3-day
   streak, so strict mode…"). Keep it under 100 words and end with one concrete
   next step they can take in the app.
+
+## Memory grounding
+- Long-term memory arrives as lines like "[mem:<id>|<label>] content".
+  When something you say about the user's life comes from one of these,
+  append its marker — just "[mem:<id>]" — at the END of the sentence that
+  uses it. The app renders the marker as a small "from your memory" chip,
+  so the user always sees WHY you know. Never read the marker aloud or
+  explain it; never invent mem ids.
+- Respect the label: "stated" facts you may assert plainly. "observed"
+  facts are patterns the app measured — assert them as patterns ("you
+  usually…"). "inferred" facts are guesses — hedge ("seems like…",
+  "I have a feeling…") or ask, never assert.
+- Never claim something personal about the user that is in neither the
+  provided data nor memory. If you need it, ask — one question.
 
 ## When the user accepts your last suggestion
 If your previous message suggested a plan and the user approves it
@@ -104,6 +125,13 @@ pick sensible times from the free windows yourself instead of asking again.
   aiHints ({"preferredTimeBlock": "morning" | "afternoon" | "evening"} when
   you have a real basis for an opinion). Never mix createIntention with
   other action types in one call.
+- rememberFact parameters: content (third-person statement, ≤200 chars,
+  e.g. "Prefers morning workouts"), kind ("semanticFact" | "preference" |
+  "learnedPattern" | "promiseNote" | "observation"), rawUtterance (the
+  user's exact words), optional personName. updateFact parameters: factRef
+  (the current content of the fact to change, as close to verbatim as you
+  know it) and newContent. forgetFact parameters: factRef. Never mix
+  memory actions with other action types in one call.
 - Presentation "suggestion" → the plan is YOUR idea ("help me plan tomorrow",
   "what should I do?"). Write a short coaching message: one sentence reading
   their day, the items with times and a reason each, one engaging closing line.
@@ -217,6 +245,9 @@ const List<Map<String, dynamic>> kCoachAgentTools = [
                     'suggestFreeTimeBlock',
                     'moveConflictingTasks',
                     'createIntention',
+                    'rememberFact',
+                    'updateFact',
+                    'forgetFact',
                   ],
                 },
                 'parameters': {'type': 'object'},
@@ -565,6 +596,43 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
           '${p['lastUsedTime'] != null ? ", usually at ${p['lastUsedTime']}" : ""}'
           '${p['lastUsedDuration'] != null ? ", ~${p['lastUsedDuration']}" : ""}',
         );
+      }
+      buffer.writeln();
+    }
+
+    if (payload.memoryFacts.isNotEmpty) {
+      buffer.writeln(
+        'What you know about the user (long-term memory — cite the [mem:…] '
+        'marker when you use one):',
+      );
+      for (final line in payload.memoryFacts) {
+        buffer.writeln('  - $line');
+      }
+      buffer.writeln();
+    }
+
+    if (payload.peopleDigest.isNotEmpty) {
+      buffer.writeln('People in their life:');
+      for (final line in payload.peopleDigest) {
+        buffer.writeln('  - $line');
+      }
+      buffer.writeln();
+    }
+
+    if (payload.episodicSummaries.isNotEmpty) {
+      buffer.writeln('Summaries of recent conversations:');
+      for (final line in payload.episodicSummaries) {
+        buffer.writeln('  - $line');
+      }
+      buffer.writeln();
+    }
+
+    if (payload.openPromises.isNotEmpty) {
+      buffer.writeln(
+        'Promises already captured (do NOT create these again):',
+      );
+      for (final line in payload.openPromises) {
+        buffer.writeln('  - $line');
       }
       buffer.writeln();
     }
