@@ -290,6 +290,80 @@ void main() {
       expect(decision.outcome, AttentionOutcome.approved);
     });
 
+    test('far-future recent delivery does not delay an immediate intent', () {
+      // Regression (humanizing Phase 0): goal reminders scheduled for
+      // tomorrow enter recentDeliveries with a FUTURE delivery time; an
+      // immediate intent (stake invite, proposedAt = now) must not be
+      // "delayed" all the way to tomorrow + gap.
+      final tomorrow = _now.add(const Duration(hours: 22));
+      final futureDelivery = RecentDelivery(
+        entityId: 'goal_1',
+        deliveredAtMs: tomorrow.millisecondsSinceEpoch,
+        interruptionLevel: InterruptionLevel.medium,
+      );
+
+      final decision = AttentionOrchestrator.evaluate(
+        intent: _intent(proposedAt: _now),
+        attentionState: _attentionState(),
+        now: _now,
+        recentDeliveries: [futureDelivery],
+      );
+
+      expect(decision.outcome, AttentionOutcome.approved);
+      expect(decision.deliverAt, _now);
+    });
+
+    test('intent within gap of a future-scheduled delivery is still spaced',
+        () {
+      final scheduledAt = _now.add(const Duration(hours: 2));
+      final futureDelivery = RecentDelivery(
+        entityId: 'goal_1',
+        deliveredAtMs: scheduledAt.millisecondsSinceEpoch,
+        interruptionLevel: InterruptionLevel.medium,
+      );
+
+      final decision = AttentionOrchestrator.evaluate(
+        intent: _intent(
+          proposedAt: scheduledAt.add(const Duration(minutes: 1)),
+        ),
+        attentionState: _attentionState(),
+        now: _now,
+        recentDeliveries: [futureDelivery],
+      );
+
+      expect(decision.outcome, AttentionOutcome.delayed);
+      expect(
+        decision.deliverAt,
+        scheduledAt.add(const Duration(minutes: kMinNotificationGapMinutes)),
+      );
+    });
+
+    // ── Override suppression horizon ──────────────────────────────────────────
+
+    test('override does NOT suppress a far-future intent', () {
+      // Regression (humanizing Phase 0): arming tomorrow's goal reminder at
+      // bedtime (sleep window active) must schedule it — the sleep window
+      // ends by pure time computation, so a suppressed intent would never
+      // be re-armed and the morning reminder silently lost.
+      final decision = AttentionOrchestrator.evaluate(
+        intent: _intent(proposedAt: _now.add(const Duration(hours: 10))),
+        attentionState: _attentionState(override: ContextOverride.sleep),
+        now: _now,
+      );
+
+      expect(decision.outcome, AttentionOutcome.approved);
+    });
+
+    test('override still suppresses an imminent intent', () {
+      final decision = AttentionOrchestrator.evaluate(
+        intent: _intent(proposedAt: _now.add(const Duration(minutes: 5))),
+        attentionState: _attentionState(override: ContextOverride.sleep),
+        now: _now,
+      );
+
+      expect(decision.outcome, AttentionOutcome.suppressed);
+    });
+
     // ── Semantic batching ─────────────────────────────────────────────────────
 
     test('batches two low-level non-extreme intents within 5 minutes', () {

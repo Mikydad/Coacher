@@ -1,9 +1,13 @@
 import 'package:sidepal/app/app_navigator.dart';
+import 'package:sidepal/app/application/main_tab_navigation.dart';
 import 'package:sidepal/app/notification_response_handler.dart';
 import 'package:sidepal/core/di/providers.dart';
 import 'package:sidepal/core/notifications/local_notifications_service.dart';
+import 'package:sidepal/core/notifications/notification_action_ids.dart';
 import 'package:sidepal/core/utils/date_keys.dart';
+import 'package:sidepal/features/ai_assistant/presentation/ai_assistant_screen.dart';
 import 'package:sidepal/features/focus/presentation/focus_selection_screen.dart';
+import 'package:sidepal/features/reminders/domain/models/notification_interaction_type.dart';
 import 'package:sidepal/features/planning/domain/models/block.dart';
 import 'package:sidepal/features/planning/domain/models/routine.dart';
 import 'package:sidepal/features/planning/domain/models/task_item.dart';
@@ -112,6 +116,50 @@ NotificationResponse _bodyTapResponse({required String? payload, int? id}) {
     payload: payload,
     id: id,
   );
+}
+
+NotificationResponse _actionResponse({
+  required String payload,
+  required String actionId,
+}) {
+  return NotificationResponse(
+    notificationResponseType: NotificationResponseType.selectedNotificationAction,
+    payload: payload,
+    actionId: actionId,
+  );
+}
+
+/// Planning fake whose task carries the strict-mode contract — a
+/// notification "Done" must NOT complete it.
+class _StrictTaskPlanningRepository extends _FakePlanningRepository {
+  _StrictTaskPlanningRepository({required super.taskId, required super.title});
+
+  @override
+  Future<List<PlannedTask>> getTasks({
+    required String routineId,
+    required String blockId,
+  }) async {
+    final base = await super.getTasks(routineId: routineId, blockId: blockId);
+    return [
+      for (final t in base)
+        PlannedTask(
+          id: t.id,
+          routineId: t.routineId,
+          blockId: t.blockId,
+          title: t.title,
+          durationMinutes: t.durationMinutes,
+          priority: t.priority,
+          orderIndex: t.orderIndex,
+          reminderEnabled: t.reminderEnabled,
+          reminderTimeIso: t.reminderTimeIso,
+          status: t.status,
+          createdAtMs: t.createdAtMs,
+          updatedAtMs: t.updatedAtMs,
+          planDateKey: t.planDateKey,
+          strictModeRequired: true,
+        ),
+    ];
+  }
 }
 
 void main() {
@@ -239,5 +287,228 @@ void main() {
 
     final pushed = observer.pushed.where((r) => r.settings.name == FocusSelectionScreen.routeName).toList();
     expect(pushed, hasLength(1));
+  });
+
+  testWidgets('wrong-time action records dismissed interaction, no navigation',
+      (tester) async {
+    debugClearPendingNotificationNavigationIntent();
+    const taskId = 'task-wrong-time';
+    final orchestrator = NoOpOrchestratorService();
+    final container = ProviderContainer(
+      overrides: [
+        planningRepositoryProvider.overrideWithValue(
+          _FakePlanningRepository(taskId: taskId, title: 'T'),
+        ),
+        reminderRepositoryProvider
+            .overrideWithValue(_FakeReminderRepository(const [])),
+        attentionOrchestratorServiceProvider.overrideWithValue(orchestrator),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final observer = _RecordingNavigatorObserver();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: appNavigatorKey,
+        navigatorObservers: [observer],
+        routes: {
+          '/': (_) => const SizedBox.shrink(),
+          FocusSelectionScreen.routeName: (_) => const SizedBox.shrink(),
+        },
+      ),
+    );
+
+    await handleNotificationResponse(
+      _actionResponse(
+        payload: 'task:${Uri.encodeComponent(taskId)}',
+        actionId: NotificationActionIds.wrongTime,
+      ),
+      container,
+    );
+    await tester.pump();
+
+    expect(
+      orchestrator.interactions,
+      [(taskId, NotificationInteractionType.dismissed)],
+    );
+    expect(
+      observer.pushed.where((r) => r.settings.name != '/'),
+      isEmpty,
+    );
+  });
+
+  testWidgets('open-coach action pushes the coach route', (tester) async {
+    debugClearPendingNotificationNavigationIntent();
+    const taskId = 'task-open-coach';
+    final orchestrator = NoOpOrchestratorService();
+    final container = ProviderContainer(
+      overrides: [
+        planningRepositoryProvider.overrideWithValue(
+          _FakePlanningRepository(taskId: taskId, title: 'T'),
+        ),
+        reminderRepositoryProvider
+            .overrideWithValue(_FakeReminderRepository(const [])),
+        attentionOrchestratorServiceProvider.overrideWithValue(orchestrator),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final observer = _RecordingNavigatorObserver();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: appNavigatorKey,
+        navigatorObservers: [observer],
+        routes: {
+          '/': (_) => const SizedBox.shrink(),
+          AiAssistantScreen.routeName: (_) => const SizedBox.shrink(),
+        },
+      ),
+    );
+
+    await handleNotificationResponse(
+      _actionResponse(
+        payload: 'task:${Uri.encodeComponent(taskId)}',
+        actionId: NotificationActionIds.openCoach,
+      ),
+      container,
+    );
+    await tester.pump();
+
+    expect(
+      orchestrator.interactions,
+      [(taskId, NotificationInteractionType.opened)],
+    );
+    final pushed = observer.pushed
+        .where((r) => r.settings.name == AiAssistantScreen.routeName)
+        .toList();
+    expect(pushed, hasLength(1));
+  });
+
+  testWidgets('done action on unknown task falls back to the tap flow',
+      (tester) async {
+    debugClearPendingNotificationNavigationIntent();
+    const taskId = 'task-unknown';
+    final orchestrator = NoOpOrchestratorService();
+    final container = ProviderContainer(
+      overrides: [
+        // NoOp planning: task not found -> completion helper declines.
+        planningRepositoryProvider.overrideWithValue(NoOpPlanningRepository()),
+        reminderRepositoryProvider
+            .overrideWithValue(_FakeReminderRepository(const [])),
+        attentionOrchestratorServiceProvider.overrideWithValue(orchestrator),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final observer = _RecordingNavigatorObserver();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: appNavigatorKey,
+        navigatorObservers: [observer],
+        routes: {
+          '/': (_) => const SizedBox.shrink(),
+          FocusSelectionScreen.routeName: (_) => const SizedBox.shrink(),
+        },
+      ),
+    );
+
+    await handleNotificationResponse(
+      _actionResponse(
+        payload: 'task:${Uri.encodeComponent(taskId)}',
+        actionId: NotificationActionIds.done,
+      ),
+      container,
+    );
+    await tester.pump();
+
+    // Fallback = normal tap behavior: opened interaction + focus route.
+    expect(
+      orchestrator.interactions,
+      [(taskId, NotificationInteractionType.opened)],
+    );
+    final pushed = observer.pushed
+        .where((r) => r.settings.name == FocusSelectionScreen.routeName)
+        .toList();
+    expect(pushed, hasLength(1));
+  });
+
+  testWidgets('done action on a strict task falls back to the focus flow',
+      (tester) async {
+    debugClearPendingNotificationNavigationIntent();
+    const taskId = 'task-strict';
+    final orchestrator = NoOpOrchestratorService();
+    final container = ProviderContainer(
+      overrides: [
+        planningRepositoryProvider.overrideWithValue(
+          _StrictTaskPlanningRepository(taskId: taskId, title: 'Deep work'),
+        ),
+        reminderRepositoryProvider
+            .overrideWithValue(_FakeReminderRepository(const [])),
+        attentionOrchestratorServiceProvider.overrideWithValue(orchestrator),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final observer = _RecordingNavigatorObserver();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: appNavigatorKey,
+        navigatorObservers: [observer],
+        routes: {
+          '/': (_) => const SizedBox.shrink(),
+          FocusSelectionScreen.routeName: (_) => const SizedBox.shrink(),
+        },
+      ),
+    );
+
+    await handleNotificationResponse(
+      _actionResponse(
+        payload: 'task:${Uri.encodeComponent(taskId)}',
+        actionId: NotificationActionIds.done,
+      ),
+      container,
+    );
+    await tester.pump();
+
+    // The strict-mode contract survives: no silent completion, the focus
+    // (timer) flow opens instead.
+    final pushed = observer.pushed
+        .where((r) => r.settings.name == FocusSelectionScreen.routeName)
+        .toList();
+    expect(pushed, hasLength(1));
+  });
+
+  testWidgets('stake payload switches to the accountability tab',
+      (tester) async {
+    debugClearPendingNotificationNavigationIntent();
+    final orchestrator = NoOpOrchestratorService();
+    final container = ProviderContainer(
+      overrides: [
+        planningRepositoryProvider.overrideWithValue(NoOpPlanningRepository()),
+        reminderRepositoryProvider
+            .overrideWithValue(_FakeReminderRepository(const [])),
+        attentionOrchestratorServiceProvider.overrideWithValue(orchestrator),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: appNavigatorKey,
+        routes: {'/': (_) => const SizedBox.shrink()},
+      ),
+    );
+
+    await handleNotificationResponse(
+      _bodyTapResponse(payload: 'stake:challenge-1'),
+      container,
+    );
+    await tester.pump();
+
+    expect(container.read(mainTabIndexProvider), MainTabIndex.accountability);
+    expect(
+      orchestrator.interactions,
+      [('challenge-1', NotificationInteractionType.opened)],
+    );
   });
 }

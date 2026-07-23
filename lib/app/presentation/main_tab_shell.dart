@@ -3,15 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/firebase/firestore_paths.dart';
-import '../../core/notifications/local_notifications_service.dart';
+import '../../core/utils/stable_id.dart';
 import '../../features/accountability/application/stakes_providers.dart';
 import '../../features/accountability/domain/models/stake_challenge.dart';
 import '../../features/accountability/presentation/accountability_hub_screen.dart';
 import '../../features/auth/presentation/widgets/email_verification_banner.dart';
 import '../../features/community/presentation/community_screen.dart';
+import '../../features/context_override/domain/models/interruption_level.dart';
 import '../../features/goals/presentation/goal_selection_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
+import '../../features/reminders/application/attention_orchestrator_providers.dart';
+import '../../features/reminders/application/notification_route_resolver.dart';
+import '../../features/reminders/domain/models/reminder_intent.dart';
 import '../../core/presentation/cloud_sync_global_indicator.dart';
 import '../application/main_tab_navigation.dart';
 import 'main_tab_bar_inset.dart';
@@ -84,13 +88,27 @@ class MainTabShell extends ConsumerWidget {
     if (fresh.isEmpty) return;
     await prefs.setStringList(key, {...seen, ...fresh.map((c) => c.id)}.toList());
 
+    // Routed through the AttentionOrchestrator (Phase 0, decision log
+    // 2026-07-23): invites respect overrides/collision spacing, land in the
+    // notification ledger, and carry a `stake:` payload so taps navigate.
+    final orchestrator = ref.read(attentionOrchestratorServiceProvider);
     for (final c in fresh) {
-      await LocalNotificationsService.instance.showNow(
-        // Stable per challenge so a re-emit can't stack duplicates.
-        id: c.id.hashCode & 0x7fffffff,
-        title: 'You\'ve been challenged',
-        body:
-            '"${c.frozenGoal.title}" — accept or decline in Accountability.',
+      final now = DateTime.now();
+      await orchestrator.evaluate(
+        ReminderIntent(
+          id: StableId.generate('ri_stake'),
+          entityId: c.id,
+          entityKind: ReminderEntityKinds.stakeInvite,
+          entityTitle: 'You\'ve been challenged',
+          proposedAt: now,
+          importance: 70,
+          interruptionLevel: InterruptionLevel.high,
+          enforcementMode: 'flexible',
+          sourceReason: 'stake_invite_announce',
+          bodyOverride:
+              '"${c.frozenGoal.title}" — accept or decline in Accountability.',
+          createdAtMs: now.millisecondsSinceEpoch,
+        ),
       );
     }
 

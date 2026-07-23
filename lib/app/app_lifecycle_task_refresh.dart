@@ -4,6 +4,8 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/notifications/local_notifications_service.dart';
+import '../core/runtime/recompute_scope.dart';
+import '../core/runtime/unified_recompute_graph.dart';
 import '../core/sync/post_sync_refresh_coordinator.dart';
 import '../core/sync/sync_service.dart';
 import '../core/utils/date_keys.dart';
@@ -97,6 +99,12 @@ class _AppLifecycleTaskRefreshState
       // Check for notifications that were delivered but never interacted with.
       unawaited(
         ref.read(attentionOrchestratorServiceProvider).checkIgnoredTimeouts(),
+      );
+      // One-shot goal reminders (Phase 0 reroute) roll forward on app
+      // activity: a warm resume must re-arm the next occurrence too, not
+      // just cold starts and mutations. Throttled inside rearmIfStale.
+      UnifiedRecomputeGraph.instance.schedule(
+        RecomputeScope.forReminderChange(),
       );
       WidgetsBinding.instance.addPostFrameCallback((_) {
         flushPendingNotificationNavigationIntent();

@@ -1,19 +1,48 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/notifications/local_notifications_service.dart';
+import '../../../core/utils/stable_id.dart';
 import '../../planning/domain/models/routine_mode.dart';
-import '../domain/models/goal_enums.dart';
+import '../../reminders/application/attention_orchestrator_service.dart';
+import '../../reminders/application/interruption_level_resolver.dart';
+import '../../reminders/application/notification_route_resolver.dart';
+import '../../reminders/domain/models/reminder_intent.dart';
 import '../domain/models/user_goal.dart';
 import 'goal_intensity_mode.dart';
 import 'goal_reminder_schedule.dart';
 
-/// Maps [UserGoal] reminder fields to OS daily notifications (V1: [GoalReminderStyle.dailyOnce] only).
+/// Maps [UserGoal] reminder fields to OS notifications
+/// (V1: [GoalReminderStyle.dailyOnce] only).
+///
+/// Phase 0 reroute (decision log 2026-07-23): goal reminders no longer call
+/// the OS repeat matchers directly. Each goal schedules ONE next occurrence
+/// as a `ReminderIntent(entityKind: 'goal')` through the
+/// [AttentionOrchestratorService] — inheriting override suppression,
+/// collision spacing, batching and the notification ledger — and is rolled
+/// forward by bootstrap, goal saves, and the recompute graph's notification
+/// step (the pattern interval repeats always used). This also collapses up
+/// to 39 pending OS slots per goal down to one (iOS caps pending at 64).
 class GoalReminderSyncService {
-  GoalReminderSyncService({required LocalNotificationsService notifications})
-    : _n = notifications;
+  GoalReminderSyncService({
+    required GoalNotificationsPort notifications,
+    required AttentionOrchestratorService orchestrator,
+    DateTime Function()? now,
+  }) : _n = notifications,
+       _orchestrator = orchestrator,
+       _now = now ?? DateTime.now;
 
-  final LocalNotificationsService _n;
+  final GoalNotificationsPort _n;
+  final AttentionOrchestratorService _orchestrator;
+  final DateTime Function() _now;
 
+  /// Throttle for [rearmIfStale] — recompute flushes are frequent; the
+  /// roll-forward only needs to catch day changes and fired reminders.
+  static const Duration kRearmMinInterval = Duration(minutes: 5);
+  int _lastRearmMs = 0;
+
+  /// Cancels every notification id a goal may ever have pinned — including
+  /// the retired per-weekday/per-month-day slots from before the Phase 0
+  /// reroute, so upgrading users don't keep stale repeating notifications.
   Future<void> cancelForGoal(String goalId) async {
     await _n.cancel(_n.idFromGoalId(goalId));
     for (var wd = DateTime.monday; wd <= DateTime.sunday; wd++) {
@@ -22,11 +51,15 @@ class GoalReminderSyncService {
     for (var dom = 1; dom <= 31; dom++) {
       await _n.cancel(_n.idFromGoalIdMonthDay(goalId, dom));
     }
+    await _orchestrator.cancelForEntity(goalId);
   }
 
   Future<void> applyForGoal(UserGoal goal) async {
     await cancelForGoal(goal.id);
-    if (!goalShouldScheduleDailyReminder(goal, DateTime.now())) return;
+    final now = _now();
+    // Passive goals stay silent: goalShouldScheduleDailyReminder returns
+    // false when repeatCadence == off (decision log 2026-07-11).
+    if (!goalShouldScheduleDailyReminder(goal, now)) return;
     final minutes = goal.reminderMinutesFromMidnight!;
     final mode = GoalIntensityMode.routineModeFromGoalIntensity(goal.intensity);
     final body = switch (mode) {
@@ -35,110 +68,41 @@ class GoalReminderSyncService {
       RoutineMode.extreme =>
         'Goal commitment: time to act or consciously adjust.',
     };
-    final title = 'Goal: ${goal.title}';
-    final payload = 'goal:${Uri.encodeComponent(goal.id)}';
 
+    // Single next occurrence across ALL cadences: isActionDay handles daily,
+    // weekly weekday selections, monthly days, and interval repeats.
+    final first = nextGoalActionDayReminderLocal(
+      goal: goal,
+      minutesFromMidnight: minutes,
+      now: now,
+    );
+    if (first == null) {
+      debugPrint('Goal reminder skipped (no slot in period): goal=${goal.id}');
+      return;
+    }
+
+    final intent = ReminderIntent(
+      id: StableId.generate('ri_goal'),
+      entityId: goal.id,
+      entityKind: ReminderEntityKinds.goal,
+      entityTitle: 'Goal: ${goal.title}',
+      proposedAt: first,
+      importance: 50,
+      interruptionLevel: InterruptionLevelResolver.resolve(
+        enforcementMode: mode.name,
+        escalationLevel: 0,
+        emergencyBypass: false,
+      ),
+      enforcementMode: mode.name,
+      sourceReason: 'goal_reminder',
+      bodyOverride: body,
+      createdAtMs: now.millisecondsSinceEpoch,
+    );
     try {
-      // Interval repeats (every 2 days/weeks/months…) can't use an OS
-      // auto-repeat matcher — schedule the single next occurrence; bootstrap
-      // and goal saves roll it forward.
-      if (goal.repeatInterval > 1) {
-        final first = nextGoalActionDayReminderLocal(
-          goal: goal,
-          minutesFromMidnight: minutes,
-          now: DateTime.now(),
-        );
-        if (first == null) return;
-        await _n.schedule(
-          id: _n.idFromGoalId(goal.id),
-          title: title,
-          body: body,
-          when: first,
-          payload: payload,
-        );
-        return;
-      }
-
-      switch (goal.repeatCadence) {
-        case GoalRepeatCadence.off:
-          return;
-        case GoalRepeatCadence.daily:
-          final first = nextGoalDailyReminderLocal(
-            goal: goal,
-            minutesFromMidnight: minutes,
-            now: DateTime.now(),
-          );
-          if (first == null) {
-            debugPrint(
-              'Goal reminder skipped (no slot in period): goal=${goal.id}',
-            );
-            return;
-          }
-          await _n.scheduleDailyAtLocalTime(
-            id: _n.idFromGoalId(goal.id),
-            title: title,
-            body: body,
-            firstFireLocal: first,
-            payload: payload,
-          );
-        case GoalRepeatCadence.weekly:
-          // One weekly-repeating notification per selected weekday.
-          for (final weekday in goal.scheduledWeekdays ?? const <int>[]) {
-            final first = nextGoalWeekdayReminderLocal(
-              goal: goal,
-              weekday: weekday,
-              minutesFromMidnight: minutes,
-              now: DateTime.now(),
-            );
-            if (first == null) continue;
-            await _n.scheduleWeeklyAtLocalTime(
-              id: _n.idFromGoalIdWeekday(goal.id, weekday),
-              title: title,
-              body: body,
-              firstFireLocal: first,
-              payload: payload,
-            );
-          }
-        case GoalRepeatCadence.monthly:
-          // One monthly-repeating notification per selected day of month.
-          for (final dom in goal.repeatDaysOfMonth ?? const <int>[]) {
-            final first = _nextMonthDayFire(goal, dom, minutes);
-            if (first == null) continue;
-            await _n.scheduleMonthlyAtLocalTime(
-              id: _n.idFromGoalIdMonthDay(goal.id, dom),
-              title: title,
-              body: body,
-              firstFireLocal: first,
-              payload: payload,
-            );
-          }
-      }
+      await _orchestrator.evaluate(intent);
     } catch (e, st) {
       debugPrint('Goal reminder schedule failed: $e $st');
     }
-  }
-
-  /// Next future fire on day-of-month [dom] within the goal period, or null.
-  static DateTime? _nextMonthDayFire(UserGoal goal, int dom, int minutes) {
-    final now = DateTime.now();
-    final end = DateTime.fromMillisecondsSinceEpoch(goal.periodEndMs);
-    var probe = DateTime.fromMillisecondsSinceEpoch(goal.periodStartMs);
-    if (now.isAfter(probe)) probe = now;
-    // Scan up to 13 months to skip months lacking the day (e.g. the 31st).
-    for (var i = 0; i <= 13; i++) {
-      final candidate = DateTime(
-        probe.year,
-        probe.month + i,
-        dom,
-        minutes ~/ 60,
-        minutes % 60,
-      );
-      if (candidate.day != dom) continue; // rolled over a short month
-      if (!candidate.isAfter(now)) continue;
-      if (candidate.isAfter(end)) return null;
-      return candidate;
-    }
-    return null;
   }
 
   Future<void> applyForGoals(Iterable<UserGoal> goals) async {
@@ -146,4 +110,18 @@ class GoalReminderSyncService {
       await applyForGoal(g);
     }
   }
+
+  /// Roll-forward hook for the recompute graph's notification step: since
+  /// goal reminders are one-shot now, a fired reminder needs the next
+  /// occurrence re-armed on the next app activity. Throttled so frequent
+  /// recompute flushes don't re-cancel/re-schedule constantly.
+  Future<void> rearmIfStale(Iterable<UserGoal> goals) async {
+    final nowMs = _now().millisecondsSinceEpoch;
+    if (nowMs - _lastRearmMs < kRearmMinInterval.inMilliseconds) return;
+    _lastRearmMs = nowMs;
+    await applyForGoals(goals);
+  }
+
+  @visibleForTesting
+  void debugResetRearmThrottle() => _lastRearmMs = 0;
 }

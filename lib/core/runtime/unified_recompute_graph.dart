@@ -9,6 +9,8 @@ import '../../features/analytics/application/focus_providers.dart';
 import '../../features/execution/application/execution_day_loader.dart';
 import '../../features/ai_assistant/application/ai_assistant_providers.dart';
 import '../../features/analytics/application/ai_summary_providers.dart';
+import '../../features/goals/application/goals_providers.dart';
+import '../di/providers.dart';
 import 'recompute_scope.dart';
 
 /// Debounced, generation-protected, dependency-ordered recompute pipeline.
@@ -124,11 +126,22 @@ class UnifiedRecomputeGraph {
     if (_generationChanged(capturedGeneration)) return;
 
     // ── Step 7: Notification reconciliation ───────────────────────────────
-    // Wired in Phase 1-B when NotificationLedger is in place.
+    // Goal reminders are one-shot since the Phase 0 orchestrator reroute
+    // (decision log 2026-07-23): a fired reminder needs its next occurrence
+    // re-armed on the next app activity. This step is that roll-forward —
+    // throttled inside rearmIfStale so frequent flushes stay cheap. All
+    // reads are local (IsarGoalsRepository), so this is airplane-mode safe.
     if (scope.notifications) {
-      debugPrint(
-        '[UnifiedRecomputeGraph] step:notifications (pending Phase 1-B wiring)',
-      );
+      try {
+        final goals = await container
+            .read(goalsRepositoryProvider)
+            .fetchGoalsOnce();
+        if (_generationChanged(capturedGeneration)) return;
+        await container.read(goalReminderSyncServiceProvider).rearmIfStale(goals);
+        debugPrint('[UnifiedRecomputeGraph] step:notifications');
+      } catch (e) {
+        debugPrint('[UnifiedRecomputeGraph] step:notifications failed: $e');
+      }
     }
   }
 

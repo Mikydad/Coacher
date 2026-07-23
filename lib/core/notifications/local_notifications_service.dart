@@ -8,9 +8,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
+import 'notification_action_ids.dart';
+import 'notification_budget.dart';
 import 'notification_reconciliation_service.dart';
 
-class LocalNotificationsService implements ActiveNotificationsSource {
+/// Narrow OS-notification surface needed by goal reminders (test seam).
+abstract interface class GoalNotificationsPort {
+  int idFromGoalId(String goalId);
+  int idFromGoalIdWeekday(String goalId, int weekday);
+  int idFromGoalIdMonthDay(String goalId, int dayOfMonth);
+  Future<void> cancel(int id);
+}
+
+class LocalNotificationsService
+    implements
+        ActiveNotificationsSource,
+        PendingNotificationsSource,
+        GoalNotificationsPort {
   LocalNotificationsService._();
 
   static final LocalNotificationsService instance =
@@ -31,9 +45,41 @@ class LocalNotificationsService implements ActiveNotificationsSource {
     // the wrong absolute time (off by the device's UTC offset) — the root cause
     // of reminders silently not appearing. Point `tz.local` at the device zone.
     await _configureLocalTimeZone();
-    const initializationSettings = InitializationSettings(
-      iOS: DarwinInitializationSettings(),
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+    // Every action opens the app (`foreground`), mirroring the Android
+    // snooze action's `showsUserInterface: true` — so all responses arrive
+    // in the normal foreground handler and no background isolate (which has
+    // no Isar/Riverpod) is needed.
+    final initializationSettings = InitializationSettings(
+      iOS: DarwinInitializationSettings(
+        notificationCategories: [
+          DarwinNotificationCategory(
+            NotificationCategoryIds.taskReminder,
+            actions: [
+              DarwinNotificationAction.plain(
+                NotificationActionIds.done,
+                'Done',
+                options: {DarwinNotificationActionOption.foreground},
+              ),
+              DarwinNotificationAction.plain(
+                NotificationActionIds.later,
+                'Later',
+                options: {DarwinNotificationActionOption.foreground},
+              ),
+              DarwinNotificationAction.plain(
+                NotificationActionIds.wrongTime,
+                'Wrong time',
+                options: {DarwinNotificationActionOption.foreground},
+              ),
+              DarwinNotificationAction.plain(
+                NotificationActionIds.openCoach,
+                'Open Coach',
+                options: {DarwinNotificationActionOption.foreground},
+              ),
+            ],
+          ),
+        ],
+      ),
+      android: const AndroidInitializationSettings('@mipmap/ic_launcher'),
     );
     await _plugin.initialize(
       initializationSettings,
@@ -104,6 +150,11 @@ class LocalNotificationsService implements ActiveNotificationsSource {
     required String body,
     required DateTime when,
     String? payload,
+
+    /// iOS category (see [NotificationCategoryIds]) — null means no action
+    /// buttons on iOS. Only pass a category whose actions the response
+    /// handler actually supports for this payload kind.
+    String? darwinCategoryId,
   }) async {
     final scheduled = _normalizeScheduleTime(when);
     await _plugin.zonedSchedule(
@@ -112,21 +163,21 @@ class LocalNotificationsService implements ActiveNotificationsSource {
       body,
       tz.TZDateTime.from(scheduled, tz.local),
       NotificationDetails(
-        android: AndroidNotificationDetails(
+        android: const AndroidNotificationDetails(
           'coach4life_reminders',
           'Coach4Life Reminders',
           importance: Importance.max,
           priority: Priority.high,
           actions: <AndroidNotificationAction>[
             AndroidNotificationAction(
-              'snooze',
+              NotificationActionIds.later,
               'Snooze',
               showsUserInterface: true,
               cancelNotification: true,
             ),
           ],
         ),
-        iOS: const DarwinNotificationDetails(),
+        iOS: DarwinNotificationDetails(categoryIdentifier: darwinCategoryId),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       payload: payload,
@@ -184,19 +235,33 @@ class LocalNotificationsService implements ActiveNotificationsSource {
     }
   }
 
+  /// Notifications scheduled but not yet delivered (the queue iOS caps at 64).
+  /// Distinct from [getActiveNotifications], which reads the delivered tray.
+  @override
+  Future<List<PendingNotificationRequest>> getPendingNotificationRequests() async {
+    try {
+      return await _plugin.pendingNotificationRequests();
+    } catch (_) {
+      return const [];
+    }
+  }
+
   int idFromTaskId(String taskId, {int slot = 0}) =>
       ('task:$taskId:$slot').hashCode.abs() % 2147483647;
 
   /// Distinct from [idFromTaskId] to reduce id collisions between modules.
+  @override
   int idFromGoalId(String goalId) =>
       (goalId.hashCode ^ 0x474f414c).abs() % 2147483647;
 
   /// Per-weekday slot (1=Mon…7=Sun) for goals restricted to specific days —
   /// each weekday gets its own weekly-repeating notification.
+  @override
   int idFromGoalIdWeekday(String goalId, int weekday) =>
       ('goalw:$goalId:$weekday').hashCode.abs() % 2147483647;
 
   /// Per day-of-month slot (1–31) for monthly-repeating goal reminders.
+  @override
   int idFromGoalIdMonthDay(String goalId, int dayOfMonth) =>
       ('goalm:$goalId:$dayOfMonth').hashCode.abs() % 2147483647;
 

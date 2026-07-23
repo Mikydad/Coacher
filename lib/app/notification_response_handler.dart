@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/di/providers.dart';
+import '../core/notifications/notification_action_ids.dart';
+import '../features/ai_assistant/presentation/ai_assistant_screen.dart';
 import '../features/analytics/presentation/analytics_progress_screen.dart';
 import '../features/community/presentation/circle_detail_screen.dart';
 import '../features/focus/presentation/focus_selection_screen.dart';
@@ -17,10 +19,12 @@ import '../features/reminders/application/attention_orchestrator_providers.dart'
 import '../features/reminders/domain/models/notification_interaction_type.dart';
 import 'app_navigator.dart';
 import 'application/main_tab_navigation.dart';
+import 'notification_task_actions.dart';
 
 const _taskPayloadPrefix = 'task:';
 const _goalPayloadPrefix = 'goal:';
 const _layer4PayloadPrefix = 'layer4:';
+const _stakePayloadPrefix = 'stake:';
 const _pendingNotificationIntentPrefsKey = 'pending_notification_intent_v1';
 
 class _PendingRouteIntent {
@@ -49,6 +53,9 @@ class _PendingRouteIntent {
          taskDurationMinutes: taskDurationMinutes,
        );
 
+  const _PendingRouteIntent.coach()
+    : this._(routeName: AiAssistantScreen.routeName);
+
   final String routeName;
   final String? goalId;
   final String? taskId;
@@ -58,6 +65,7 @@ class _PendingRouteIntent {
   Object? get arguments {
     if (routeName == GoalDetailScreen.routeName) return goalId;
     if (routeName == AnalyticsProgressScreen.routeName) return null;
+    if (routeName == AiAssistantScreen.routeName) return null;
     if (routeName == FocusSelectionScreen.routeName) {
       final id = taskId;
       if (id == null || id.isEmpty) return null;
@@ -92,6 +100,9 @@ class _PendingRouteIntent {
     }
     if (routeName == AnalyticsProgressScreen.routeName) {
       return const _PendingRouteIntent.progress();
+    }
+    if (routeName == AiAssistantScreen.routeName) {
+      return const _PendingRouteIntent.coach();
     }
     if (routeName == FocusSelectionScreen.routeName) {
       final taskId = map['taskId'];
@@ -249,6 +260,32 @@ Future<void> handleNotificationResponse(
     return;
   }
 
+  // Stake-challenge invite (humanizing Phase 0): jump to the Accountability
+  // tab where the invite's accept/decline lives (badge shows the count).
+  if (raw.startsWith(_stakePayloadPrefix)) {
+    final challengeId = Uri.decodeComponent(
+      raw.substring(_stakePayloadPrefix.length),
+    );
+    debugPrint('[NotifTap] stake invite tap challengeId=$challengeId');
+    if (challengeId.isNotEmpty) {
+      unawaited(
+        container
+            .read(attentionOrchestratorServiceProvider)
+            .onInteractionReceived(
+              challengeId,
+              NotificationInteractionType.opened,
+            ),
+      );
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      navigateToMainTabWithContainer(
+        container,
+        index: MainTabIndex.accountability,
+      );
+    });
+    return;
+  }
+
   if (!raw.startsWith(_taskPayloadPrefix)) {
     debugPrint('[NotifTap] payload not task/goal/layer4/circle -> ignore');
     return;
@@ -263,7 +300,7 @@ Future<void> handleNotificationResponse(
   final sync = container.read(reminderSyncServiceProvider);
   final orchestrator = container.read(attentionOrchestratorServiceProvider);
 
-  if (response.actionId == 'snooze') {
+  if (response.actionId == NotificationActionIds.later) {
     debugPrint('[NotifTap] snooze action for task=$taskId');
     // Record snooze interaction (logs analytics + detects repeated snooze pattern).
     unawaited(
@@ -274,6 +311,53 @@ Future<void> handleNotificationResponse(
     );
     await sync.requestSnooze(taskId);
     return;
+  }
+
+  if (response.actionId == NotificationActionIds.wrongTime) {
+    debugPrint('[NotifTap] wrong-time action for task=$taskId');
+    // Ledgered as dismissed ("this moment was wrong") — no follow-up
+    // escalation. The opportunity planner (humanizing Phase 1) reads these
+    // to avoid similar moments.
+    unawaited(
+      orchestrator.onInteractionReceived(
+        taskId,
+        NotificationInteractionType.dismissed,
+      ),
+    );
+    return;
+  }
+
+  if (response.actionId == NotificationActionIds.openCoach) {
+    debugPrint('[NotifTap] open-coach action for task=$taskId');
+    unawaited(
+      orchestrator.onInteractionReceived(
+        taskId,
+        NotificationInteractionType.opened,
+      ),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_pushNowIfReady(AiAssistantScreen.routeName)) {
+        _queuePendingIntent(const _PendingRouteIntent.coach());
+      }
+    });
+    return;
+  }
+
+  if (response.actionId == NotificationActionIds.done) {
+    debugPrint('[NotifTap] done action for task=$taskId');
+    final completed = await completeTaskFromNotification(taskId, container);
+    if (completed) {
+      unawaited(
+        orchestrator.onInteractionReceived(
+          taskId,
+          NotificationInteractionType.opened,
+        ),
+      );
+      return;
+    }
+    // Strict/extreme (or unknown) tasks keep their contract: fall through
+    // to the normal tap flow, which records the opened interaction and
+    // lands on the focus screen with the timer.
   }
 
   // Tap = opened interaction.

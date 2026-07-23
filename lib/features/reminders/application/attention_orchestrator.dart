@@ -14,6 +14,14 @@ import '../domain/models/reminder_type.dart';
 /// Minimum gap (in minutes) enforced between any two delivered notifications.
 const int kMinNotificationGapMinutes = 3;
 
+/// Override suppression only applies to intents due within this horizon.
+/// Far-future intents (tomorrow's goal reminder scheduled at bedtime) must
+/// not be killed by an override that is active NOW — the override state at
+/// delivery time is unknowable, and with pre-scheduled local notifications
+/// there is no later chance to re-arm (the sleep window in particular ends
+/// by pure time computation, so no onOverrideEnded flush ever fires).
+const int kOverrideSuppressionHorizonMinutes = 30;
+
 /// Time (in minutes) after a notification fires with no user interaction
 /// before it is treated as ignored and a follow-up intent is produced.
 const int kIgnoredTimeoutMinutes = 15;
@@ -82,7 +90,14 @@ abstract final class AttentionOrchestrator {
     }
 
     // ── Suppression check (after potential boost) ─────────────────────────────
-    if (OverrideAttentionPolicy.shouldSuppress(level, activeOverride)) {
+    // Only intents due soon are suppressed; scheduling tomorrow's reminder
+    // while tonight's sleep window is active must succeed (see
+    // [kOverrideSuppressionHorizonMinutes]).
+    final dueWithinHorizon = !intent.proposedAt.isAfter(
+      now.add(const Duration(minutes: kOverrideSuppressionHorizonMinutes)),
+    );
+    if (dueWithinHorizon &&
+        OverrideAttentionPolicy.shouldSuppress(level, activeOverride)) {
       return AttentionDecision.suppressed(
         intentId: intent.id,
         reason: 'Active override: ${activeOverride.displayName}',
@@ -194,8 +209,14 @@ abstract final class AttentionOrchestrator {
     for (final delivery in recentDeliveries) {
       final deliveredAt = delivery.deliveredAt;
       final gapEnd = deliveredAt.add(gapDuration);
-      if (intent.proposedAt.isBefore(gapEnd)) {
-        // Collision — our proposed time falls within the gap window.
+      final gapStart = deliveredAt.subtract(gapDuration);
+      // Collision only when the proposed time falls INSIDE the ±gap window.
+      // The lower bound matters: entries may carry future delivery times
+      // (reminders scheduled ahead), and without it every intent proposed
+      // before such an entry — including immediate announcements — would be
+      // "delayed" all the way to that future time + gap.
+      if (intent.proposedAt.isBefore(gapEnd) &&
+          intent.proposedAt.isAfter(gapStart)) {
         if (latestConflictEnd == null || gapEnd.isAfter(latestConflictEnd)) {
           latestConflictEnd = gapEnd;
         }

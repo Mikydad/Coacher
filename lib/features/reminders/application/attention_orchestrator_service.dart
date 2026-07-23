@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/local_db/isar_collections/isar_notification_ledger_entry.dart';
 import '../../../core/notifications/local_notifications_service.dart';
+import '../../../core/notifications/notification_budget.dart';
 import '../../../core/notifications/notification_ledger_repository.dart';
 import '../../../core/notifications/notification_ledger_state.dart';
 import '../../../core/notifications/notification_reconciliation_service.dart';
@@ -24,6 +25,7 @@ import '../domain/models/reminder_intent.dart';
 import '../domain/models/reminder_type.dart';
 import 'attention_orchestrator.dart';
 import 'interruption_level_resolver.dart';
+import 'notification_route_resolver.dart';
 
 const String kAttentionOrchestratorSurface = 'attention_orchestrator';
 
@@ -63,6 +65,10 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
     /// Callback to read the user's current [CoachingStyle] synchronously.
     /// Injected so this service stays free of Riverpod (FR-D-16).
     CoachingStyle Function()? getCoachingStyle,
+
+    /// Optional guard against iOS's 64-pending-notification cap.
+    /// Null (tests, legacy wiring) means unlimited.
+    NotificationBudget? budget,
     DateTime Function()? now,
   }) : _getCoachingStyle = getCoachingStyle ?? (() => CoachingStyle.balanced),
        _overrideRepo = contextOverrideRepository,
@@ -71,6 +77,7 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
        _notifications = notifications,
        _ledger = ledger,
        _logEvent = logEvent,
+       _budget = budget,
        _now = now ?? DateTime.now;
 
   final CoachingStyle Function() _getCoachingStyle;
@@ -88,6 +95,7 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
     String? reason,
   })
   _logEvent;
+  final NotificationBudget? _budget;
   final DateTime Function() _now;
 
   // ── In-memory state ────────────────────────────────────────────────────────
@@ -153,6 +161,7 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
         await _logFatigueEvent(
           type: AnalyticsEventType.notificationOpened,
           entityId: entityId,
+          entityKind: ledgerEntry?.entityKind ?? 'task',
         );
 
       case NotificationInteractionType.snoozed:
@@ -168,6 +177,7 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
         await _logFatigueEvent(
           type: AnalyticsEventType.notificationDismissed,
           entityId: entityId,
+          entityKind: ledgerEntry?.entityKind ?? 'task',
         );
 
       case NotificationInteractionType.ignored:
@@ -181,6 +191,7 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
         await _logFatigueEvent(
           type: AnalyticsEventType.notificationIgnored,
           entityId: entityId,
+          entityKind: ledgerEntry?.entityKind ?? 'task',
         );
         await _scheduleFollowUp(entityId);
     }
@@ -208,7 +219,14 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
     };
 
     for (final intent in toReEvaluate.values) {
-      final isEntityStillPending = enabledTaskIds.contains(intent.entityId);
+      // The reminder-config existence check only applies to task/habit
+      // intents; goal and stake-invite intents (Phase 0 reroute) have no
+      // ReminderConfig — their staleness is judged by age alone.
+      final isTaskKind =
+          intent.entityKind == ReminderEntityKinds.task ||
+          intent.entityKind == ReminderEntityKinds.habit;
+      final isEntityStillPending =
+          !isTaskKind || enabledTaskIds.contains(intent.entityId);
       final age = now.difference(intent.proposedAt);
       final isStale = age > kSuppressedIntentStaleThreshold;
 
@@ -324,22 +342,51 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
       case AttentionOutcome.approved:
       case AttentionOutcome.batched:
       case AttentionOutcome.delayed:
-        await _cancelActiveNotification(intent.entityId);
         final deliverAt = decision.deliverAt ?? _now();
-        final notifId = _notifications.idFromTaskId(intent.entityId);
+        final route = resolveNotificationRoute(intent);
         final body = _buildNotificationBody(intent, decision);
+        // Immediate announcements (stake invites) must bypass schedule():
+        // its normalize step pushes a non-future `when` forward by a day.
+        final immediate = route.immediate && !deliverAt.isAfter(_now());
+        // Guard the iOS 64-pending cap BEFORE cancelling the entity's
+        // existing notification: a denied budget must leave whatever the
+        // user already has, not destroy it. (Immediate showNow goes to the
+        // tray, not the pending queue — no budget needed.)
+        if (!immediate) {
+          final budgetOk = await (_budget?.canSchedule() ?? Future.value(true));
+          if (!budgetOk) {
+            await _logFatigueEvent(
+              type: AnalyticsEventType.reminderSuppressed,
+              entityId: intent.entityId,
+              entityKind: intent.entityKind,
+              reason: 'notification_budget_exhausted',
+            );
+            return;
+          }
+        }
+        await _cancelActiveNotification(intent.entityId);
         try {
-          await _notifications.schedule(
-            id: notifId,
-            title: intent.entityTitle,
-            body: body,
-            when: deliverAt,
-            payload: 'task:${Uri.encodeComponent(intent.entityId)}',
-          );
+          if (immediate) {
+            await _notifications.showNow(
+              id: route.notifId,
+              title: intent.entityTitle,
+              body: body,
+              payload: route.payload,
+            );
+          } else {
+            await _notifications.schedule(
+              id: route.notifId,
+              title: intent.entityTitle,
+              body: body,
+              when: deliverAt,
+              payload: route.payload,
+              darwinCategoryId: route.darwinCategoryId,
+            );
+          }
           // Persist scheduled state to the ledger (replaces _activeNotificationIds).
           await _ledger.upsertEntry(
             IsarNotificationLedgerEntry()
-              ..notifId = notifId
+              ..notifId = route.notifId
               ..entityId = intent.entityId
               ..entityKind = intent.entityKind
               ..state = NotificationLedgerState.scheduled.name
@@ -347,6 +394,11 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
               ..sourceContext = kAttentionOrchestratorSurface
               ..updatedAtMs = _now().millisecondsSinceEpoch,
           );
+          if (immediate) {
+            // showNow delivered to the tray already — record it so the
+            // reconciliation service doesn't treat it as an undelivered ghost.
+            await _ledger.markDelivered(route.notifId);
+          }
           _recentDeliveries.add(
             RecentDelivery(
               entityId: intent.entityId,
@@ -357,6 +409,7 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
           await _logFatigueEvent(
             type: AnalyticsEventType.notificationDelivered,
             entityId: intent.entityId,
+            entityKind: intent.entityKind,
             reason: decision.priorityBoosted ? 'focus_boosted' : null,
           );
         } catch (e, st) {
@@ -373,6 +426,7 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
         await _logFatigueEvent(
           type: AnalyticsEventType.reminderSuppressed,
           entityId: intent.entityId,
+          entityKind: intent.entityKind,
           reason: decision.suppressedReason,
         );
     }
@@ -400,6 +454,9 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
       final partnerIds = decision.batchedWith.join(', ');
       return 'Time to start: ${intent.entityTitle} + $partnerIds';
     }
+    // Goal reminders and invites carry their own copy; tasks keep the default.
+    final override = intent.bodyOverride;
+    if (override != null && override.isNotEmpty) return override;
     return 'Time to start: ${intent.entityTitle}';
   }
 
@@ -465,6 +522,7 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
   Future<void> _logFatigueEvent({
     required AnalyticsEventType type,
     required String entityId,
+    String entityKind = 'task',
     String? reason,
   }) async {
     final ts = _now();
@@ -472,7 +530,7 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
       await _logEvent(
         type: type,
         entityId: entityId,
-        entityKind: 'task',
+        entityKind: entityKind,
         sourceSurface: kAttentionOrchestratorSurface,
         idempotencyKey: StableId.generate(
           '${type.name}_${entityId}_${DateKeys.todayKey(ts)}',

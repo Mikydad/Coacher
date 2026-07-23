@@ -546,3 +546,62 @@ not silent reversal.
   `tier_limits_v1.enforced` kill switch (ships false — never enforce
   limits before the paywall gives an upgrade path); grandfathering falls
   out for free since existing over-limit data is never touched.
+
+- **2026-07-23 · Humanizing feature: product decisions settled in the PRD.**
+  The full decision set for the humanizing feature (intentions, memory,
+  people, voice) lives in `PRD/humanizing_feature/humanizing_implementation_PRD.md`
+  §10/§16 — settled with Miko 2026-07-22/23. Load-bearing ones: intentions
+  are a new first-class synced entity (planner output stays in a local-only
+  cache — never churn synced records with derived data); LLM proposes /
+  deterministic engine disposes (no live LLM call on any delivery path);
+  nudges are suggestions phrased as questions, confirmation happens at
+  delivery, not capture; inferred memories auto-save labeled (not
+  confirm-gated) with hedged phrasing; iOS-first — Android deferred
+  (PRD Appendix A has the manifest fix); voice L2 before Siri; system AI
+  budget separate from the user's chat quota. *Why:* one pointer entry
+  keeps this log readable; the PRD is the source of truth.
+
+- **2026-07-23 · Phase 0: all notification producers route through the
+  AttentionOrchestrator.** Goal reminders and stake-invite announcements no
+  longer schedule OS notifications directly — they build `ReminderIntent`s
+  (entityKind `goal` / `stake_invite`) evaluated by the orchestrator, so
+  every notification respects override suppression, collision spacing,
+  batching, ignore back-off, and lands in the notification ledger.
+  Id/payload/category mapping is centralized in
+  `notification_route_resolver.dart` (the orchestrator must never hardcode
+  the task shape). Passive (repeat=off) goals still get NO reminders —
+  guard unchanged in `goalShouldScheduleDailyReminder`. *Considered:*
+  leaving producers direct (rejected: three parallel notification brains,
+  and un-ledgered notifications get cancelled as phantoms by boot
+  reconciliation).
+
+- **2026-07-23 · Goal reminders are next-occurrence-only (no OS repeat
+  matchers).** Each goal pins ONE pending notification (was up to 39: 7
+  weekday + 31 month-day + 1 base slots); bootstrap, goal saves, and the
+  recompute graph's notification step (throttled `rearmIfStale`, 5 min)
+  roll it forward — the pattern interval repeats always used. Trade-off
+  accepted: if the app isn't opened for multiple days, later occurrences
+  don't fire until next open (the Phase 5 server sweep is the real fix;
+  Android was already non-functional). *Why:* the ledger models one active
+  notification per entity, and multi-slot repeats alone could exhaust
+  iOS's 64-pending cap.
+
+- **2026-07-23 · iOS notification categories are versioned; all actions
+  open the app.** Category `sidepalTaskReminder.v1` ships Done / Later /
+  Wrong time / Open Coach. iOS treats a shipped category's actions as
+  immutable per install — changing them requires a NEW identifier (bump
+  `.v1`). Every action carries `foreground` (mirrors Android snooze's
+  `showsUserInterface: true`) so responses arrive in the normal foreground
+  handler — no background isolate (which has no Isar/Riverpod).
+  "Done" respects enforcement: strict/extreme tasks fall through to the
+  focus/timer flow instead of completing silently; completions score 100%.
+  "Wrong time" is ledgered as `dismissed` (no escalation follow-up) —
+  the Phase 1 opportunity planner reads it as timing feedback.
+
+- **2026-07-23 · NotificationBudget guards the iOS 64-pending cap.**
+  The orchestrator consults `NotificationBudget` (safety cap 56) before
+  scheduling any future notification; exhaustion is an explicit, logged,
+  analytics-tracked skip — never the OS silently discarding an arbitrary
+  pending reminder. Immediate `showNow` announcements bypass the budget
+  (tray, not pending queue). Cap is a code constant for now — it is a
+  platform guard, not a user-facing tier limit (those stay Remote Config).

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../firebase/firestore_client.dart';
 import '../notifications/local_notifications_service.dart';
+import '../notifications/notification_budget.dart';
 import '../offline/offline_store.dart';
 import '../sync/sync_service.dart';
 import '../tier/tier_providers.dart';
@@ -44,6 +45,14 @@ final firestoreClientProvider = Provider<FirestoreClient>((ref) {
 });
 final localNotificationsServiceProvider = Provider<LocalNotificationsService>(
   (ref) => LocalNotificationsService.instance,
+);
+
+/// Guard against iOS's 64-pending-local-notification cap — consulted by the
+/// AttentionOrchestrator before scheduling any future notification.
+final notificationBudgetProvider = Provider<NotificationBudget>(
+  (ref) => NotificationBudget(
+    pending: ref.read(localNotificationsServiceProvider),
+  ),
 );
 final offlineStoreProvider = Provider<OfflineStore>(
   (ref) => OfflineStore.instance,
@@ -124,6 +133,7 @@ final reminderSyncServiceProvider = Provider<ReminderSyncService>(
 final goalReminderSyncServiceProvider = Provider<GoalReminderSyncService>(
   (ref) => GoalReminderSyncService(
     notifications: ref.read(localNotificationsServiceProvider),
+    orchestrator: ref.read(attentionOrchestratorServiceProvider),
   ),
 );
 

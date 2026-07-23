@@ -18,6 +18,7 @@ class ReminderIntent {
     this.escalationLevel = 0,
     this.reminderType = ReminderType.scheduled,
     this.sourceReason = '',
+    this.bodyOverride,
     required this.createdAtMs,
   });
 
@@ -53,6 +54,10 @@ class ReminderIntent {
   /// Human-readable reason for debug/trace.
   final String sourceReason;
 
+  /// Notification body for non-task intents (goal reminders, stake invites).
+  /// Null means the orchestrator's default "Time to start: …" body.
+  final String? bodyOverride;
+
   final int createdAtMs;
 
   void validate() {
@@ -85,6 +90,7 @@ class ReminderIntent {
     'escalationLevel': escalationLevel,
     'reminderType': reminderType.toStorage(),
     'sourceReason': sourceReason,
+    if (bodyOverride != null) 'bodyOverride': bodyOverride,
     'createdAtMs': createdAtMs,
   };
 
@@ -102,6 +108,7 @@ class ReminderIntent {
     escalationLevel: (map['escalationLevel'] as num?)?.toInt() ?? 0,
     reminderType: ReminderType.fromStorage(map['reminderType'] as String?),
     sourceReason: map['sourceReason'] as String? ?? '',
+    bodyOverride: map['bodyOverride'] as String?,
     createdAtMs: (map['createdAtMs'] as num).toInt(),
   );
 
@@ -114,6 +121,7 @@ class ReminderIntent {
     int? escalationLevel,
     ReminderType? reminderType,
     String? sourceReason,
+    String? bodyOverride,
   }) => ReminderIntent(
     id: id,
     entityId: entityId,
@@ -126,6 +134,7 @@ class ReminderIntent {
     escalationLevel: escalationLevel ?? this.escalationLevel,
     reminderType: reminderType ?? this.reminderType,
     sourceReason: sourceReason ?? this.sourceReason,
+    bodyOverride: bodyOverride ?? this.bodyOverride,
     createdAtMs: createdAtMs,
   );
 }

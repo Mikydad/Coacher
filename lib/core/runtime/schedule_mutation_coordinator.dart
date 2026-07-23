@@ -175,10 +175,12 @@ class ScheduleMutationCoordinator {
     );
   }
 
-  // ── Notification reconciliation (Phase 1-B stub) ─────────────────────────
+  // ── Notification reconciliation ──────────────────────────────────────────
 
   void _reconcileNotifications(MutationRequest request) {
-    // Wired in Phase 1-B when NotificationLedger is in place.
+    // Owned by UnifiedRecomputeGraph step 7 (scope.notifications) since the
+    // humanizing Phase 0 reroute — kept as a pipeline placeholder so the
+    // documented step order in the class doc stays true.
   }
 
   // ── Scope matrix ─────────────────────────────────────────────────────────────

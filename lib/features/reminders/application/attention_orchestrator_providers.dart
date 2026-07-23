@@ -78,5 +78,6 @@ final attentionOrchestratorServiceProvider =
         logEvent: logEvent,
         // Synchronous getter — reads cached Riverpod state without suspending.
         getCoachingStyle: () => ref.read(activeCoachingStyleProvider),
+        budget: ref.read(notificationBudgetProvider),
       );
     });
