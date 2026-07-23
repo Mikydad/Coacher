@@ -36,6 +36,7 @@ class _PendingRouteIntent {
     this.taskId,
     this.taskLabel,
     this.taskDurationMinutes,
+    this.startVoiceMode = false,
   });
 
   const _PendingRouteIntent.goal(String goalId)
@@ -58,16 +59,26 @@ class _PendingRouteIntent {
   const _PendingRouteIntent.coach()
     : this._(routeName: AiAssistantScreen.routeName);
 
+  /// Siri "Talk to SidePal" (humanizing Phase 4): Coach sheet straight
+  /// into Voice Mode.
+  const _PendingRouteIntent.coachVoice()
+    : this._(routeName: AiAssistantScreen.routeName, startVoiceMode: true);
+
   final String routeName;
   final String? goalId;
   final String? taskId;
   final String? taskLabel;
   final int? taskDurationMinutes;
+  final bool startVoiceMode;
 
   Object? get arguments {
     if (routeName == GoalDetailScreen.routeName) return goalId;
     if (routeName == AnalyticsProgressScreen.routeName) return null;
-    if (routeName == AiAssistantScreen.routeName) return null;
+    if (routeName == AiAssistantScreen.routeName) {
+      return startVoiceMode
+          ? const CoachRouteArgs(startVoiceMode: true)
+          : null;
+    }
     if (routeName == FocusSelectionScreen.routeName) {
       final id = taskId;
       if (id == null || id.isEmpty) return null;
@@ -88,6 +99,7 @@ class _PendingRouteIntent {
     if (taskId != null) 'taskId': taskId,
     if (taskLabel != null) 'taskLabel': taskLabel,
     if (taskDurationMinutes != null) 'taskDurationMinutes': taskDurationMinutes,
+    if (startVoiceMode) 'startVoiceMode': true,
   };
 
   static _PendingRouteIntent? fromJson(Map<String, dynamic> map) {
@@ -104,7 +116,9 @@ class _PendingRouteIntent {
       return const _PendingRouteIntent.progress();
     }
     if (routeName == AiAssistantScreen.routeName) {
-      return const _PendingRouteIntent.coach();
+      return map['startVoiceMode'] == true
+          ? const _PendingRouteIntent.coachVoice()
+          : const _PendingRouteIntent.coach();
     }
     if (routeName == FocusSelectionScreen.routeName) {
       final taskId = map['taskId'];
@@ -199,6 +213,20 @@ Future<void> _flushPendingNotificationNavigationIntent() async {
   } else {
     debugPrint('[NotifTap] flush: navigator still unavailable');
   }
+}
+
+/// Siri "Talk to SidePal" lands here (humanizing Phase 4, PRD §6): open
+/// the Coach sheet in Voice Mode, cold-start-safe via the same
+/// queue-then-flush template notification taps use.
+void requestCoachVoiceEntryNavigation() {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!_pushNowIfReady(
+      AiAssistantScreen.routeName,
+      arguments: const CoachRouteArgs(startVoiceMode: true),
+    )) {
+      _queuePendingIntent(const _PendingRouteIntent.coachVoice());
+    }
+  });
 }
 
 @visibleForTesting

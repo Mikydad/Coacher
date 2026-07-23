@@ -12,6 +12,7 @@ import '../core/utils/date_keys.dart';
 import '../features/context_override/application/context_override_expiry_poller.dart';
 import '../features/reminders/application/attention_orchestrator_providers.dart';
 import 'notification_response_handler.dart';
+import 'siri_voice_entry.dart';
 
 /// Invalidates task-list providers when the app resumes and when the local calendar day changes
 /// while the app is foregrounded (avoids stale `FutureProvider` data after midnight).
@@ -40,6 +41,9 @@ class _AppLifecycleTaskRefreshState
       const Duration(minutes: 1),
       (_) => _invalidateIfDayChanged(),
     );
+    // Siri voice entry (humanizing Phase 4): install the warm-path handler
+    // before any pending flag could be consumed.
+    SiriVoiceEntry.init();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_drainLaunchNotificationResponse());
     });
@@ -52,6 +56,9 @@ class _AppLifecycleTaskRefreshState
       (response) => handleNotificationResponse(response, container),
     );
     flushPendingNotificationNavigationIntent();
+    // Runs on launch AND resume — Siri always foregrounds the app, so this
+    // is the cold-start consume path for "Talk to SidePal".
+    unawaited(SiriVoiceEntry.consumePendingVoiceEntry());
   }
 
   @override

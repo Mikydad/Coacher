@@ -28,6 +28,29 @@ import UserNotifications
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
 
+    // Siri voice entry (humanizing Phase 4): "Hey Siri, talk to SidePal".
+    // The AppIntent stamps a UserDefaults flag + posts a NotificationCenter
+    // event (SiriVoiceEntry.swift); Dart consumes the flag idempotently on
+    // launch/resume, and this observer covers the warm in-app case.
+    let siriRegistrar = engineBridge.pluginRegistry.registrar(forPlugin: "SidePalSiriVoiceEntry")
+    let siriChannel = FlutterMethodChannel(
+      name: "sidepal/siri_voice_entry",
+      binaryMessenger: siriRegistrar!.messenger())
+    siriChannel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "consumePendingVoiceEntry":
+        result(SiriVoiceEntryBridge.consumePending())
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    NotificationCenter.default.addObserver(
+      forName: SiriVoiceEntryBridge.notificationName,
+      object: nil, queue: .main
+    ) { _ in
+      siriChannel.invokeMethod("voiceEntryRequested", arguments: nil)
+    }
+
     // Device model + OS version for feedback reports. In-house instead of
     // device_info_plus: its 13.2.0 iOS code fails to compile against this
     // SDK (unknown NSProcessInfo selector 'isiOSAppOnVision').

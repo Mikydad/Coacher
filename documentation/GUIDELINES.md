@@ -763,3 +763,28 @@ not silent reversal.
   dedicated voice screen (rejected — one-surface rule) and interrupting
   mid-request during `thinking` (rejected — nothing sensible to cancel;
   the reply lands and can be tapped away in one gesture).
+
+- **2026-07-24 · Siri entry (Phase 4a) is an AppIntent in the Runner
+  target, and cold start reuses the pending-intent template.** "Hey
+  Siri, talk to SidePal" is a `TalkToSidePalIntent` +
+  `SidePalAppShortcuts` compiled DIRECTLY into Runner
+  (`ios/Runner/SiriVoiceEntry.swift`) — no extension target, no App
+  Groups, no new signing surface (judge-verified PRD §6 correction);
+  Action Button support comes free. The deployment target stays 13.0:
+  everything AppIntents is behind `#if canImport` + `@available(iOS
+  16.0, *)`, so older iOS simply has no shortcut. Handoff protocol:
+  `perform()` (openAppWhenRun) stamps a UserDefaults pending flag AND
+  posts a NotificationCenter event; AppDelegate forwards the event over
+  the `sidepal/siri_voice_entry` channel (warm path), and Dart consumes
+  the flag **idempotently** (native clears on read) from launch, resume,
+  and the event — whichever fires first wins, so the cold-start race
+  between `perform()` and Dart's startup consume is harmless. Navigation
+  reuses the notification queue-then-flush template: a new
+  `coachVoice` pending-intent variant carries
+  `CoachRouteArgs(startVoiceMode: true)` through `/coach` →
+  `_CoachTabRedirect` → Coach sheet → Phase 3's Voice Mode. *Considered:*
+  a deep-link URL scheme (rejected — the pending-intent template already
+  solves cold start and adds no new attack/registration surface).
+  Verified: `flutter build ios --no-codesign` compiles the Swift +
+  pbxproj registration; real-Siri phrase test needs a signed device
+  build.
