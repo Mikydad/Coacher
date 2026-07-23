@@ -55,6 +55,56 @@ void main() {
       expect(slots, isEmpty);
     });
 
+    test('pre-meeting micro-gap wins over a plain window (Phase 4b)', () {
+      final slots = OpportunityPlanner.plan(
+        intention: makeIntention(estimatedMinutes: 10),
+        now: now,
+        freeWindowsByDateKey: const {
+          '2026-07-20': [
+            // Plain free window, comfortably big.
+            FreeWindow(startMinute: 10 * 60, endMinute: 11 * 60),
+            // 20-minute micro-gap right before a calendar event.
+            FreeWindow(
+              startMinute: 13 * 60 + 40,
+              endMinute: 14 * 60,
+              beforeTitle: 'your 14:00',
+              beforeIsCalendar: true,
+            ),
+          ],
+        },
+      );
+      final primary = slots.first;
+      expect(
+        primary.deliverAtMs,
+        DateTime(2026, 7, 20, 13, 40).millisecondsSinceEpoch,
+      );
+      expect(primary.body, contains('before your 14:00'));
+      expect(primary.reasonText, contains('before your 14:00'));
+    });
+
+    test('ill-fitting micro-gap does not beat a plain window', () {
+      final slots = OpportunityPlanner.plan(
+        // 45-minute task cannot fit a 15-minute pre-meeting gap.
+        intention: makeIntention(estimatedMinutes: 45),
+        now: now,
+        freeWindowsByDateKey: const {
+          '2026-07-20': [
+            FreeWindow(startMinute: 10 * 60, endMinute: 11 * 60),
+            FreeWindow(
+              startMinute: 13 * 60 + 45,
+              endMinute: 14 * 60,
+              beforeTitle: 'your 14:00',
+              beforeIsCalendar: true,
+            ),
+          ],
+        },
+      );
+      expect(
+        slots.first.deliverAtMs,
+        DateTime(2026, 7, 20, 10).millisecondsSinceEpoch,
+      );
+    });
+
     test('primary slot lands in a free window, safety near the deadline', () {
       final slots = OpportunityPlanner.plan(
         intention: makeIntention(),

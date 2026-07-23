@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/context/calendar_signal.dart';
+import '../../../core/context/context_snapshot_service.dart';
 import '../../../core/notifications/notification_budget.dart';
 import '../../../core/notifications/notification_ledger_repository.dart';
 import '../../../core/scheduling/free_window_calculator.dart';
@@ -61,6 +63,7 @@ class IntentionNudgeSyncService {
     required NotificationLedgerRepository ledger,
     required AttentionOrchestratorService orchestrator,
     NotificationBudget? budget,
+    Future<List<CalendarBusyInterval>?> Function(DateTime day)? calendarBusy,
     DateTime Function()? now,
   }) : _intentions = intentions,
        _plans = plans,
@@ -69,6 +72,7 @@ class IntentionNudgeSyncService {
        _ledger = ledger,
        _orchestrator = orchestrator,
        _budget = budget,
+       _calendarBusy = calendarBusy,
        _now = now ?? DateTime.now;
 
   final IntentionsRepository _intentions;
@@ -78,6 +82,11 @@ class IntentionNudgeSyncService {
   final NotificationLedgerRepository _ledger;
   final AttentionOrchestratorService _orchestrator;
   final NotificationBudget? _budget;
+
+  /// Ephemeral calendar feed (Phase 4b) — null function or null result
+  /// means "no calendar signal", and planning proceeds without it.
+  final Future<List<CalendarBusyInterval>?> Function(DateTime day)?
+  _calendarBusy;
   final DateTime Function() _now;
 
   /// Throttle for [rearmIfStale] (same rhythm as goal reminders).
@@ -249,6 +258,19 @@ class IntentionNudgeSyncService {
       } catch (_) {
         busyMaps = const [];
       }
+      // Calendar busy intervals join as pseudo-blocks (Phase 4b) — the
+      // planner then avoids meetings and prefers pre-meeting micro-gaps.
+      // Ephemeral: fetched per plan, never stored (the plan cache holds
+      // only the resulting slots).
+      try {
+        final calendar = await _calendarBusy?.call(day);
+        if (calendar != null) {
+          busyMaps = [
+            ...busyMaps,
+            ...calendarBusyToScheduleMaps(calendar, day),
+          ];
+        }
+      } catch (_) {}
       final isToday = DateKeys.yyyymmdd(now) == dateKey;
       result[dateKey] = FreeWindowCalculator.computeWindows(
         busyMaps,

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/context/context_providers.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
@@ -81,6 +82,7 @@ final aiPayloadAssemblerProvider = Provider<AiPayloadAssembler>((ref) {
     memoryFactsRepository: ref.read(memoryFactsRepositoryProvider),
     peopleRepository: ref.read(peopleRepositoryProvider),
     intentionsRepository: ref.read(intentionsRepositoryProvider),
+    contextSnapshotService: ref.read(contextSnapshotServiceProvider),
   );
 });
 

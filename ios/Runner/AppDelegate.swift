@@ -51,6 +51,39 @@ import UserNotifications
       siriChannel.invokeMethod("voiceEntryRequested", arguments: nil)
     }
 
+    // Ephemeral calendar signal (humanizing Phase 4b): busy intervals only,
+    // never titles — see CalendarSignal.swift for the privacy contract.
+    let calendarRegistrar = engineBridge.pluginRegistry.registrar(forPlugin: "SidePalCalendarSignal")
+    let calendarChannel = FlutterMethodChannel(
+      name: "sidepal/calendar_signal",
+      binaryMessenger: calendarRegistrar!.messenger())
+    calendarChannel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "getAuthorizationStatus":
+        result(CalendarSignalBridge.authorizationStatus())
+      case "requestAccess":
+        CalendarSignalBridge.requestAccess { granted in
+          result(granted)
+        }
+      case "getBusyIntervals":
+        guard let args = call.arguments as? [String: Any],
+              let startMs = (args["startMs"] as? NSNumber)?.int64Value,
+              let endMs = (args["endMs"] as? NSNumber)?.int64Value
+        else {
+          result(FlutterError(
+            code: "bad_args", message: "startMs/endMs required", details: nil))
+          return
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+          let intervals = CalendarSignalBridge.busyIntervals(
+            startMs: startMs, endMs: endMs)
+          DispatchQueue.main.async { result(intervals) }
+        }
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
     // Device model + OS version for feedback reports. In-house instead of
     // device_info_plus: its 13.2.0 iOS code fails to compile against this
     // SDK (unknown NSProcessInfo selector 'isiOSAppOnVision').

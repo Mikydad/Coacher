@@ -11,6 +11,7 @@ class FreeWindow {
     required this.startMinute,
     required this.endMinute,
     this.beforeTitle,
+    this.beforeIsCalendar = false,
   });
 
   final int startMinute;
@@ -19,6 +20,11 @@ class FreeWindow {
   /// Title of the busy block that ends this gap; null when the gap runs to
   /// the end of the waking day. Powers "20 free minutes before Dinner".
   final String? beforeTitle;
+
+  /// True when the block ending this gap is a device-calendar event
+  /// (Phase 4b): the planner prefers these pre-meeting gaps, and short
+  /// ones survive the min-window cut as micro-gaps.
+  final bool beforeIsCalendar;
 
   int get durationMinutes => endMinute - startMinute;
 }
@@ -30,12 +36,19 @@ class FreeWindowCalculator {
   static const int dayEndMinute = 22 * 60; // 22:00
   static const int minWindowMinutes = 30;
 
+  /// Gaps at least this long survive the [minWindowMinutes] cut when they
+  /// end at a calendar event — the pre-meeting micro-gap (Phase 4b,
+  /// "a few free minutes before your 2:00").
+  static const int minMicroGapMinutes = 10;
+
   /// Structured free windows between scheduled blocks inside the waking day.
   ///
   /// [scheduleMaps] is the `{ title, startTime, endTime }` shape ("HH:mm")
-  /// the assembler produces from planned rows. For today pass
-  /// [fromMinuteOfDay] so already-past windows are excluded. Windows shorter
-  /// than [minWindowMinutes] are dropped.
+  /// the assembler produces from planned rows; entries carrying
+  /// `calendar: true` are device-calendar pseudo-blocks (Phase 4b). For
+  /// today pass [fromMinuteOfDay] so already-past windows are excluded.
+  /// Windows shorter than [minWindowMinutes] are dropped — unless they are
+  /// micro-gaps before a calendar event (≥ [minMicroGapMinutes]).
   static List<FreeWindow> computeWindows(
     List<Map<String, dynamic>> scheduleMaps, {
     int fromMinuteOfDay = 0,
@@ -50,21 +63,27 @@ class FreeWindowCalculator {
       return h * 60 + m;
     }
 
-    // Collect busy intervals (clamped to the day), keeping titles.
-    final busy = <(int, int, String?)>[];
+    // Collect busy intervals (clamped to the day), keeping titles and the
+    // calendar marker.
+    final busy = <(int, int, String?, bool)>[];
     for (final block in scheduleMaps) {
       final start = parseMinute(block['startTime']);
       if (start == null) continue;
       final end = parseMinute(block['endTime']) ?? (start + 30);
       final clampedStart = start.clamp(0, 24 * 60);
       final clampedEnd = end < start ? clampedStart : end.clamp(0, 24 * 60);
-      busy.add((clampedStart, clampedEnd, block['title'] as String?));
+      busy.add((
+        clampedStart,
+        clampedEnd,
+        block['title'] as String?,
+        block['calendar'] == true,
+      ));
     }
     busy.sort((a, b) => a.$1.compareTo(b.$1));
 
     // Merge overlaps; a merged interval keeps the earliest block's title
-    // (that block is what the preceding gap runs into).
-    final merged = <(int, int, String?)>[];
+    // and calendar flag (that block is what the preceding gap runs into).
+    final merged = <(int, int, String?, bool)>[];
     for (final interval in busy) {
       if (merged.isEmpty || interval.$1 > merged.last.$2) {
         merged.add(interval);
@@ -73,6 +92,7 @@ class FreeWindowCalculator {
           merged.last.$1,
           interval.$2,
           merged.last.$3,
+          merged.last.$4,
         );
       }
     }
@@ -81,14 +101,24 @@ class FreeWindowCalculator {
     var cursor = fromMinuteOfDay > dayStartMinute
         ? fromMinuteOfDay
         : dayStartMinute;
-    for (final interval in [...merged, (dayEndMinute, dayEndMinute, null)]) {
-      final gapEnd = interval.$1 < dayEndMinute ? interval.$1 : dayEndMinute;
-      if (gapEnd - cursor >= minWindowMinutes) {
+    for (final interval in [
+      ...merged,
+      (dayEndMinute, dayEndMinute, null, false),
+    ]) {
+      final endsAtBlock = interval.$1 < dayEndMinute;
+      final gapEnd = endsAtBlock ? interval.$1 : dayEndMinute;
+      final gap = gapEnd - cursor;
+      final beforeCalendar = endsAtBlock && interval.$4;
+      final keep =
+          gap >= minWindowMinutes ||
+          (beforeCalendar && gap >= minMicroGapMinutes);
+      if (keep) {
         windows.add(
           FreeWindow(
             startMinute: cursor,
             endMinute: gapEnd,
-            beforeTitle: interval.$1 < dayEndMinute ? interval.$3 : null,
+            beforeTitle: endsAtBlock ? interval.$3 : null,
+            beforeIsCalendar: beforeCalendar,
           ),
         );
       }

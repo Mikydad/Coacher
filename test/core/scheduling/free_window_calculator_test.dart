@@ -70,6 +70,70 @@ void main() {
     });
   });
 
+  group('calendar pseudo-blocks (Phase 4b)', () {
+    Map<String, dynamic> calendarBlock(String start, String end) => {
+      'title': 'your $start',
+      'startTime': start,
+      'endTime': end,
+      'calendar': true,
+    };
+
+    test('gap before a calendar event carries beforeIsCalendar', () {
+      final windows = FreeWindowCalculator.computeWindows([
+        calendarBlock('14:00', '15:00'),
+      ]);
+      expect(windows.first.beforeIsCalendar, isTrue);
+      expect(windows.first.beforeTitle, 'your 14:00');
+      // The window after the meeting runs to day end: not calendar-bounded.
+      expect(windows.last.beforeIsCalendar, isFalse);
+    });
+
+    test('micro-gap before a calendar event survives the 30-minute cut', () {
+      final windows = FreeWindowCalculator.computeWindows([
+        block('Standup', '09:00', '13:45'),
+        calendarBlock('14:00', '15:00'),
+      ]);
+      // 13:45–14:00 is 15 min — kept ONLY because it ends at a calendar
+      // event (minMicroGapMinutes ≤ 15 < minWindowMinutes).
+      final micro = windows.firstWhere((w) => w.startMinute == 13 * 60 + 45);
+      expect(micro.durationMinutes, 15);
+      expect(micro.beforeIsCalendar, isTrue);
+    });
+
+    test('same-size gap before a plain block is still dropped', () {
+      final windows = FreeWindowCalculator.computeWindows([
+        block('Standup', '09:00', '13:45'),
+        block('Meeting', '14:00', '15:00'),
+      ]);
+      expect(
+        windows.where((w) => w.startMinute == 13 * 60 + 45),
+        isEmpty,
+      );
+    });
+
+    test('sub-micro gaps are dropped even before calendar events', () {
+      final windows = FreeWindowCalculator.computeWindows([
+        block('Standup', '09:00', '13:55'),
+        calendarBlock('14:00', '15:00'),
+      ]);
+      expect(
+        windows.where((w) => w.startMinute == 13 * 60 + 55),
+        isEmpty,
+      );
+    });
+
+    test('overlap merge keeps the earliest block\'s calendar flag', () {
+      final windows = FreeWindowCalculator.computeWindows([
+        calendarBlock('14:00', '15:00'),
+        block('Overlap task', '14:30', '15:30'),
+      ]);
+      // The merged 14:00–15:30 interval starts with the calendar event, so
+      // the preceding gap is calendar-bounded.
+      expect(windows.first.beforeIsCalendar, isTrue);
+      expect(windows.first.endMinute, 14 * 60);
+    });
+  });
+
   group('formatting', () {
     test('computeFormatted matches the legacy assembler shape', () {
       final formatted = FreeWindowCalculator.computeFormatted([

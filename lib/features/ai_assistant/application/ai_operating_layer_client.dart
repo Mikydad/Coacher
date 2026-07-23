@@ -637,6 +637,17 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
       buffer.writeln();
     }
 
+    if (payload.deviceContext.isNotEmpty) {
+      buffer.writeln(
+        'Device context (coarse labels only — never invent details '
+        'beyond them):',
+      );
+      for (final label in payload.deviceContext) {
+        buffer.writeln('  - $label');
+      }
+      buffer.writeln();
+    }
+
     if (payload.completedInSession.isNotEmpty) {
       buffer.writeln(
         'Already applied this session (do NOT repeat in actions or follow-ups):',

@@ -5,6 +5,7 @@ import '../../../core/presentation/app_colors.dart';
 import '../application/intentions_providers.dart';
 import '../data/opportunity_plan_repository.dart';
 import '../domain/models/intention.dart';
+import 'calendar_ask_card.dart';
 import 'intention_quick_add_sheet.dart';
 
 /// The Promises strip (humanizing Phase 1) — top of Home, the ambient
@@ -70,6 +71,9 @@ class PromisesSection extends ConsumerWidget {
               ],
             ),
           ),
+        // Just-in-time calendar ask (Phase 4b): first open promise is the
+        // first moment calendar access has a nameable benefit.
+        if (open.isNotEmpty) const CalendarAskCard(),
         // "On your radar" — dormant standing understandings. Empty until
         // Phase 2 extraction ships; hidden entirely when empty.
         if (radar.isNotEmpty) ...[

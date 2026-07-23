@@ -25,6 +25,16 @@ class OpportunityPlanner {
   static const double wDeadlinePressure = 1;
   static const double wAiHintAffinity = 1;
 
+  /// Phase 4b: gaps that end at a device-calendar event are the best
+  /// honest moments we know ("a few free minutes before your 2:00") —
+  /// you're about to be interrupted anyway, so a quick task fits there
+  /// better than inside a big open block. Boosted in proportion to how
+  /// well the intention actually fits, so a micro-gap never wins for a
+  /// task that doesn't fit it. 2.5 is calibrated to outweigh the
+  /// window-size + earliness edge a plain 1h window has over a fitting
+  /// 20m micro-gap (~0.9 points), but not an ill-fitting one.
+  static const double wPreMeetingGap = 2.5;
+
   /// Minimum lead time before a candidate may fire.
   static const Duration minLeadTime = Duration(minutes: 5);
 
@@ -196,13 +206,16 @@ class OpportunityPlanner {
         final hintAffinity =
             aiPreferredBlock != null && block == aiPreferredBlock ? 1.0 : 0.0;
 
+        final preMeeting = w.beforeIsCalendar ? durationFit : 0.0;
+
         final score = wFreeWindowFit * freeWindowFit +
             wDurationFit * durationFit +
             wActivityCompatibility * activity +
             wBestTimeBlockAffinity * blockAffinity +
             wLedgerResponsiveness * responsive +
             wDeadlinePressure * earliness +
-            wAiHintAffinity * hintAffinity;
+            wAiHintAffinity * hintAffinity +
+            wPreMeetingGap * preMeeting;
 
         candidates.add(
           _ScoredCandidate(

@@ -33,6 +33,7 @@ class AiOperatingLayerPayload {
     this.peopleDigest = const [],
     this.episodicSummaries = const [],
     this.openPromises = const [],
+    this.deviceContext = const [],
   });
 
   /// The raw user input for this turn.
@@ -126,6 +127,11 @@ class AiOperatingLayerPayload {
   /// it already holds.
   final List<String> openPromises;
 
+  /// Coarse ContextSnapshot labels (Phase 4b, PRD §9): "free_25m",
+  /// "next_calendar_event_14:00", "mode_focus", "offline". NEVER raw
+  /// signals — no event contents, no locations, no identifiers.
+  final List<String> deviceContext;
+
   Map<String, dynamic> toJson() => {
     'userInput': userInput,
     'activeTasks': activeTasks,
@@ -156,5 +162,6 @@ class AiOperatingLayerPayload {
     if (peopleDigest.isNotEmpty) 'peopleDigest': peopleDigest,
     if (episodicSummaries.isNotEmpty) 'episodicSummaries': episodicSummaries,
     if (openPromises.isNotEmpty) 'openPromises': openPromises,
+    if (deviceContext.isNotEmpty) 'deviceContext': deviceContext,
   };
 }

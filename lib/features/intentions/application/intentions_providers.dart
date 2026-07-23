@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/context/context_providers.dart';
+import '../../../core/context/context_snapshot_service.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/notifications/notification_ledger_repository.dart';
 import '../../../core/offline/offline_store.dart';
@@ -99,6 +101,16 @@ final seizeTheMomentProvider = FutureProvider<SeizeTheMomentCandidate?>((
   } catch (_) {
     busyMaps = const [];
   }
+  // Calendar busy joins the picture (Phase 4b): "free right now" must not
+  // claim a window a meeting occupies. Ephemeral, nullable degradation.
+  try {
+    final calendar = await ref
+        .read(contextSnapshotServiceProvider)
+        .calendarBusyForDay(now);
+    if (calendar != null) {
+      busyMaps = [...busyMaps, ...calendarBusyToScheduleMaps(calendar, now)];
+    }
+  } catch (_) {}
   final nowMinute = now.hour * 60 + now.minute;
   final windows = FreeWindowCalculator.computeWindows(busyMaps);
   FreeWindow? current;
@@ -138,5 +150,7 @@ final intentionNudgeSyncServiceProvider = Provider<IntentionNudgeSyncService>(
     ledger: NotificationLedgerRepository(OfflineStore.instance.isar!),
     orchestrator: ref.read(attentionOrchestratorServiceProvider),
     budget: ref.read(notificationBudgetProvider),
+    calendarBusy: (day) =>
+        ref.read(contextSnapshotServiceProvider).calendarBusyForDay(day),
   ),
 );

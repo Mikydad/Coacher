@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/context/context_snapshot_service.dart';
 import '../../../core/scheduling/free_window_calculator.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../coaching/data/coaching_style_repository.dart';
@@ -41,6 +42,7 @@ class AiPayloadAssembler {
     this.memoryFactsRepository,
     this.peopleRepository,
     this.intentionsRepository,
+    this.contextSnapshotService,
     EntityNormaliser? normaliser,
     Duration scheduleCacheTtl = const Duration(seconds: 30),
   }) : _normaliser = normaliser ?? const EntityNormaliser(),
@@ -55,6 +57,10 @@ class AiPayloadAssembler {
   final MemoryFactsRepository? memoryFactsRepository;
   final PeopleRepository? peopleRepository;
   final IntentionsRepository? intentionsRepository;
+
+  /// Phase 4b: coarse device-context labels ("free_25m") — never raw
+  /// signals — join the prompt when available.
+  final ContextSnapshotService? contextSnapshotService;
   final EntityNormaliser _normaliser;
   final Duration _scheduleCacheTtl;
 
@@ -86,6 +92,7 @@ class AiPayloadAssembler {
       _buildPeopleDigest(),
       _buildEpisodicSummaries(),
       _buildOpenPromises(),
+      _buildDeviceContext(),
     ]);
 
     return AiOperatingLayerPayload(
@@ -119,7 +126,20 @@ class AiPayloadAssembler {
       peopleDigest: dynamicResults[4] as List<String>,
       episodicSummaries: dynamicResults[5] as List<String>,
       openPromises: dynamicResults[6] as List<String>,
+      deviceContext: dynamicResults[7] as List<String>,
     );
+  }
+
+  /// Coarse ContextSnapshot labels — per-turn, best-effort, never raw.
+  Future<List<String>> _buildDeviceContext() async {
+    final service = contextSnapshotService;
+    if (service == null) return const [];
+    try {
+      final snapshot = await service.capture();
+      return snapshot.coarseLabels();
+    } catch (_) {
+      return const [];
+    }
   }
 
   static int _nowMinuteOfDay() {

@@ -4,8 +4,12 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/context/calendar_signal.dart';
+import '../../../core/context/context_providers.dart';
 import '../../../core/presentation/theme_brightness_controller.dart';
 import '../../../core/presentation/page_headers.dart';
+import '../../../core/runtime/recompute_scope.dart';
+import '../../../core/runtime/unified_recompute_graph.dart';
 
 import '../../../app/application/main_tab_navigation.dart';
 import '../../auth/application/auth_providers.dart';
@@ -824,6 +828,7 @@ class _CoreOptimizationSection extends StatelessWidget {
             onTap: () =>
                 Navigator.pushNamed(context, MemoryKnowledgeScreen.routeName),
           ),
+          const _CalendarSignalRow(),
           _SettingRow(
             icon: Icons.leaderboard_rounded,
             title: 'Progress',
@@ -918,6 +923,54 @@ class _CoreOptimizationSection extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Calendar-aware timing toggle (humanizing Phase 4b): the persistent
+/// switch behind the one-time ask card. On → OS grant is requested if
+/// needed; the signal stays ephemeral (busy intervals only, never stored).
+/// Off → remembered decline, the ask card never returns.
+class _CalendarSignalRow extends ConsumerWidget {
+  const _CalendarSignalRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final choice = ref.watch(calendarSignalChoiceProvider).valueOrNull;
+    final enabled = choice == CalendarSignalChoice.enabled;
+    return _SettingRow(
+      icon: Icons.calendar_month_rounded,
+      title: 'Calendar-aware timing',
+      subtitle: 'Plan promises around your real meetings — read-only',
+      trailing: Switch.adaptive(
+        value: enabled,
+        onChanged: (v) => _toggle(context, ref, v),
+      ),
+      onTap: () => _toggle(context, ref, !enabled),
+    );
+  }
+
+  Future<void> _toggle(BuildContext context, WidgetRef ref, bool on) async {
+    final service = ref.read(calendarSignalServiceProvider);
+    if (on) {
+      final granted = await service.enable();
+      if (granted) {
+        UnifiedRecomputeGraph.instance.schedule(
+          RecomputeScope.forReminderChange(),
+        );
+      } else if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Calendar access is off at the system level — allow it in '
+              'iOS Settings > SidePal, then try again.',
+            ),
+          ),
+        );
+      }
+    } else {
+      await service.decline();
+    }
+    ref.invalidate(calendarSignalChoiceProvider);
   }
 }
 

@@ -788,3 +788,45 @@ not silent reversal.
   Verified: `flutter build ios --no-codesign` compiles the Swift +
   pbxproj registration; real-Siri phrase test needs a signed device
   build.
+
+- **2026-07-24 · ContextSnapshot + ephemeral calendar signal (Phase 4b):
+  busy intervals only, in-house EventKit, nullable degradation.** The
+  Context Engine is formalized as `ContextSnapshot`
+  (`lib/core/context/`): an immutable capture where EVERY signal field
+  is nullable — null means "signal doesn't exist right now" and
+  consumers degrade silently (PRD §9). Snapshots are never persisted;
+  only `coarseLabels()` ("free_25m", "next_calendar_event_14:00",
+  "mode_focus", "offline") may enter AI payloads (new `deviceContext`
+  prompt section). The calendar feed is in-house EventKit
+  (`ios/Runner/CalendarSignal.swift`, ~80 lines, same precedent as
+  device_info) instead of the device_calendar plugin — the channel can
+  ONLY return `{startMs, endMs, allDay}`, so the privacy contract
+  (titles/locations/attendees never cross the bridge, never persist,
+  never leave the device) holds by construction. iOS 17 write-only
+  grants count as denied; all-day events are dropped (a birthday
+  doesn't occupy time slots); Android returns "unavailable" and
+  everything upstream plans without it. **Consumption:** calendar busy
+  joins free-window math as pseudo-blocks titled with coarse time
+  labels ("your 14:00") in the nudge planner, seize-the-moment, and
+  `ContextSnapshotService.capture` — so nudge copy says "20 free
+  minutes before your 14:00" without ever knowing what the meeting is.
+  `FreeWindowCalculator` keeps 10–29-minute gaps ONLY when they end at
+  a calendar event (pre-meeting micro-gaps); `OpportunityPlanner` adds
+  `wPreMeetingGap = 2.5`, scaled by duration-fit, calibrated so a
+  fitting quick task prefers the pre-meeting gap over a big open block
+  but an ill-fitting one never does. **Ask UX (settled):**
+  just-in-time — a one-time card under the Promises strip appears at
+  the first open promise (the first nameable benefit), "Not now" is
+  remembered forever (tri-state SharedPreferences, device-local BY
+  DESIGN — a device permission must not sync); the persistent switch
+  lives in Profile ("Calendar-aware timing"), and an OS-level denial
+  routes to iOS Settings instead of re-prompting. Granting schedules a
+  reminder-scope recompute so promises replan immediately.
+  *Considered:* battery/charging in the snapshot (deferred — no
+  consumer yet, and battery_plus adds a dep for an unread field);
+  syncing the calendar choice (rejected — permission state is
+  per-device truth). Verified: 21 new tests (channel-fake service
+  semantics, micro-gap retention, planner preference both ways,
+  snapshot label shapes), full suite 1,313 green, analyze clean in
+  touched files, `flutter build ios --no-codesign` compiles the new
+  Swift + Info.plist keys.
