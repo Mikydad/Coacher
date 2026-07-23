@@ -10,6 +10,7 @@ import '../../features/execution/application/execution_day_loader.dart';
 import '../../features/ai_assistant/application/ai_assistant_providers.dart';
 import '../../features/analytics/application/ai_summary_providers.dart';
 import '../../features/goals/application/goals_providers.dart';
+import '../../features/intentions/application/intentions_providers.dart';
 import '../di/providers.dart';
 import 'recompute_scope.dart';
 
@@ -141,6 +142,20 @@ class UnifiedRecomputeGraph {
         debugPrint('[UnifiedRecomputeGraph] step:notifications');
       } catch (e) {
         debugPrint('[UnifiedRecomputeGraph] step:notifications failed: $e');
+      }
+      // Intention opportunity nudges replan on the same rhythm (Phase 1):
+      // fired slots roll forward, schedule changes re-score windows. Also
+      // throttled internally; all reads are local — airplane-mode safe.
+      try {
+        if (_generationChanged(capturedGeneration)) return;
+        await container
+            .read(intentionNudgeSyncServiceProvider)
+            .rearmIfStale();
+        debugPrint('[UnifiedRecomputeGraph] step:notifications(intentions)');
+      } catch (e) {
+        debugPrint(
+          '[UnifiedRecomputeGraph] step:notifications(intentions) failed: $e',
+        );
       }
     }
   }

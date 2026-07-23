@@ -77,6 +77,31 @@ class LocalNotificationsService
               ),
             ],
           ),
+          DarwinNotificationCategory(
+            NotificationCategoryIds.intentionNudge,
+            actions: [
+              DarwinNotificationAction.plain(
+                NotificationActionIds.done,
+                'Done',
+                options: {DarwinNotificationActionOption.foreground},
+              ),
+              DarwinNotificationAction.plain(
+                NotificationActionIds.later,
+                'Later',
+                options: {DarwinNotificationActionOption.foreground},
+              ),
+              DarwinNotificationAction.plain(
+                NotificationActionIds.wrongTime,
+                'Wrong time',
+                options: {DarwinNotificationActionOption.foreground},
+              ),
+              DarwinNotificationAction.plain(
+                NotificationActionIds.openCoach,
+                'Open Coach',
+                options: {DarwinNotificationActionOption.foreground},
+              ),
+            ],
+          ),
         ],
       ),
       android: const AndroidInitializationSettings('@mipmap/ic_launcher'),
@@ -253,6 +278,11 @@ class LocalNotificationsService
   @override
   int idFromGoalId(String goalId) =>
       (goalId.hashCode ^ 0x474f414c).abs() % 2147483647;
+
+  /// Slot-aware intention nudge ids (0 = primary, 1 = deadline-eve safety,
+  /// 2 = fallback). Mirrored by resolveNotificationRoute for intentions.
+  int idFromIntentionId(String intentionId, {int slot = 0}) =>
+      ('intention:$intentionId:$slot').hashCode.abs() % 2147483647;
 
   /// Per-weekday slot (1=Mon…7=Sun) for goals restricted to specific days —
   /// each weekday gets its own weekly-repeating notification.

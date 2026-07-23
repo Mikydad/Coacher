@@ -1204,6 +1204,46 @@ class _MessageItem extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AssistantMessageBubble(content: message.content),
+        // Auto-committed intention (the one confirmless action type):
+        // inline [View] [Undo] instead of a preview card.
+        if (message.autoCommittedBatchId != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: Wrap(
+              spacing: 8,
+              children: [
+                ActionChip(
+                  label: const Text('View', style: TextStyle(fontSize: 12)),
+                  backgroundColor: AppColors.inkCard,
+                  side: BorderSide(
+                    color: AppColors.cyan.withValues(alpha: 0.25),
+                  ),
+                  onPressed: () {
+                    // Promises live at the top of Home.
+                    Navigator.of(context).maybePop();
+                    final container = appRootProviderContainer;
+                    if (container != null) {
+                      navigateToMainTabWithContainer(
+                        container,
+                        index: MainTabIndex.home,
+                      );
+                    }
+                  },
+                ),
+                ActionChip(
+                  label: const Text('Undo', style: TextStyle(fontSize: 12)),
+                  backgroundColor: AppColors.inkCard,
+                  side: BorderSide(
+                    color: AppColors.amber.withValues(alpha: 0.35),
+                  ),
+                  onPressed: () => service.undoAutoCommittedBatch(
+                    message.id,
+                    message.autoCommittedBatchId!,
+                  ),
+                ),
+              ],
+            ),
+          ),
         if (message.suggestedPrompts.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),

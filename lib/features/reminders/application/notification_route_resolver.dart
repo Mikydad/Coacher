@@ -9,6 +9,7 @@ abstract final class ReminderEntityKinds {
   static const String habit = 'habit';
   static const String goal = 'goal';
   static const String stakeInvite = 'stake_invite';
+  static const String intention = 'intention';
 }
 
 /// Where an intent's notification goes: deterministic OS id, tap payload,
@@ -54,6 +55,18 @@ NotificationRoute resolveNotificationRoute(ReminderIntent intent) {
         notifId: intent.entityId.hashCode & 0x7fffffff,
         payload: 'stake:$encoded',
         immediate: true,
+      );
+    case ReminderEntityKinds.intention:
+      return NotificationRoute(
+        // Slot-aware ladder ids (0 = primary, 1 = deadline-eve, 2 =
+        // fallback) so siblings can be cancelled individually. Mirrors
+        // LocalNotificationsService.idFromIntentionId.
+        notifId: ('intention:${intent.entityId}:${intent.slot}')
+                .hashCode
+                .abs() %
+            2147483647,
+        payload: 'intention:$encoded',
+        darwinCategoryId: NotificationCategoryIds.intentionNudge,
       );
     default: // task / habit
       return NotificationRoute(

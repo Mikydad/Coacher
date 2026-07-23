@@ -269,6 +269,24 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
     await _cancelActiveNotification(entityId);
   }
 
+  /// Cancel every pending ladder slot for an intention (done / dismissed /
+  /// replan). Slot ids are deterministic, so this needs no ledger lookup to
+  /// know what exists — cancelling a non-pending id is a no-op.
+  Future<void> cancelIntentionSlots(
+    String intentionId, {
+    int slotCount = 3,
+  }) async {
+    for (var slot = 0; slot < slotCount; slot++) {
+      final notifId = _notifications.idFromIntentionId(intentionId, slot: slot);
+      try {
+        await _notifications.cancel(notifId);
+      } catch (e) {
+        debugPrint('attention_orchestrator_service: swallowed error: $e');
+      }
+      await _ledger.markCancelledByNotifId(notifId);
+    }
+  }
+
   /// Re-evaluate whether a notification should be re-scheduled for [entityId].
   ///
   /// Called by [NotificationReconciliationService] when a ledger entry is
@@ -364,7 +382,14 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
             return;
           }
         }
-        await _cancelActiveNotification(intent.entityId);
+        // Intentions pre-schedule a ladder of slots per entity — cancel only
+        // THIS slot's previous incarnation, or scheduling slot 1 would
+        // destroy slot 0. Single-slot kinds keep the entity-scoped cancel.
+        if (intent.entityKind == ReminderEntityKinds.intention) {
+          await _cancelByNotifId(route.notifId);
+        } else {
+          await _cancelActiveNotification(intent.entityId);
+        }
         try {
           if (immediate) {
             await _notifications.showNow(
@@ -429,6 +454,21 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
           entityKind: intent.entityKind,
           reason: decision.suppressedReason,
         );
+    }
+  }
+
+  /// Slot-scoped cancel: only the given OS notification id (and its ledger
+  /// row), leaving the entity's sibling slots untouched.
+  Future<void> _cancelByNotifId(int notifId) async {
+    final entry = await _ledger.findByNotifId(notifId);
+    if (entry != null &&
+        entry.state != NotificationLedgerState.cancelled.name) {
+      try {
+        await _notifications.cancel(notifId);
+      } catch (e) {
+        debugPrint('attention_orchestrator_service: swallowed error: $e');
+      }
+      await _ledger.markCancelledByNotifId(notifId);
     }
   }
 

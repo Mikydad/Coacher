@@ -605,3 +605,39 @@ not silent reversal.
   pending reminder. Immediate `showNow` announcements bypass the budget
   (tray, not pending queue). Cap is a code constant for now — it is a
   platform guard, not a user-facing tier limit (those stay Remote Config).
+
+- **2026-07-23 · Phase 1 (Intentions v1): planner output is a local-only
+  cache; delivery is slot-scoped.** `IsarIntention` ships the full sync
+  set (outbox + pull, soft tombstone `active=false` for LWW-safe deletes);
+  `IsarOpportunityPlan` deliberately does NOT sync — it's derived data,
+  recomputed per device, keyed by `inputsHash` so unchanged plans never
+  churn the OS queue. Each intention gets a ladder of ≤3 slots (0 primary,
+  1 deadline-eve safety, 2 optional fallback ≥2h apart; slot 2 only when
+  the notification budget allows). Notif ids hash
+  `intention:{id}:{slot}` so one fired/cancelled slot doesn't kill its
+  siblings; "Done" cancels all slots. `ScheduledTimeBlock` was promoted
+  to a full sync set in the same change (planner inputs must agree across
+  devices). *Considered:* syncing plans (rejected — free windows are
+  device-local reads anyway and syncing derived data churns Firestore).
+
+- **2026-07-23 · Intention capture is auto-commit + undo, not
+  preview-confirm.** `createIntention` is the one AI action that skips
+  the preview card: the executor pre-assigns the intention id, commits
+  immediately, and the chat bubble carries [View] [Undo] (undo deletes
+  the intention and cancels its slots via the batch rollback path).
+  Offline, `IntentionHeuristicParser` handles "lead-in + action + time
+  phrase" utterances through the SAME executor path; anything it can't
+  parse opens the 3-field quick-add sheet (what / when-ish / kind — never
+  a clock time). *Why:* capture friction kills the habit; a promise is
+  low-risk and trivially reversible, unlike schedule mutations.
+
+- **2026-07-23 · Nudge copy is prerendered at planning time.**
+  `OpportunityPlanner` is pure Dart (no clock reads, no I/O, no LLM):
+  AI hints participate only as persisted `aiHintsJson` with advisory
+  weight — a hint can tilt between real candidates, never fabricate a
+  slot. Question-form bodies ("…now's a good time to X. What do you
+  think?") are rendered into the plan rows, so delivery is 100% network-
+  and token-free. Quiet hours are derived from the notification ledger
+  (hours with ≥3 ignores and ignores > 2× positive interactions score
+  zero responsiveness). Weights are compile-time constants — promote to
+  Remote Config only if tuning demands it.

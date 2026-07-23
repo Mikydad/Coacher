@@ -19,12 +19,14 @@ import '../features/reminders/application/attention_orchestrator_providers.dart'
 import '../features/reminders/domain/models/notification_interaction_type.dart';
 import 'app_navigator.dart';
 import 'application/main_tab_navigation.dart';
+import 'notification_intention_actions.dart';
 import 'notification_task_actions.dart';
 
 const _taskPayloadPrefix = 'task:';
 const _goalPayloadPrefix = 'goal:';
 const _layer4PayloadPrefix = 'layer4:';
 const _stakePayloadPrefix = 'stake:';
+const _intentionPayloadPrefix = 'intention:';
 const _pendingNotificationIntentPrefsKey = 'pending_notification_intent_v1';
 
 class _PendingRouteIntent {
@@ -282,6 +284,86 @@ Future<void> handleNotificationResponse(
         container,
         index: MainTabIndex.accountability,
       );
+    });
+    return;
+  }
+
+  // Intention opportunity nudge (humanizing Phase 1). The response IS the
+  // confirmation moment (PRD §4.4): Done corroborates, Later/Wrong time
+  // decay through the ledger, tap opens the app on the Promises strip.
+  if (raw.startsWith(_intentionPayloadPrefix)) {
+    final intentionId = Uri.decodeComponent(
+      raw.substring(_intentionPayloadPrefix.length),
+    );
+    if (intentionId.isEmpty) {
+      debugPrint('[NotifTap] intention payload empty id -> abort');
+      return;
+    }
+    final orchestrator = container.read(attentionOrchestratorServiceProvider);
+
+    if (response.actionId == NotificationActionIds.done) {
+      debugPrint('[NotifTap] done action for intention=$intentionId');
+      unawaited(
+        orchestrator.onInteractionReceived(
+          intentionId,
+          NotificationInteractionType.opened,
+        ),
+      );
+      await completeIntentionFromNotification(intentionId, container);
+      return;
+    }
+
+    if (response.actionId == NotificationActionIds.later) {
+      debugPrint('[NotifTap] snooze action for intention=$intentionId');
+      unawaited(
+        orchestrator.onInteractionReceived(
+          intentionId,
+          NotificationInteractionType.snoozed,
+        ),
+      );
+      await snoozeIntentionFromNotification(intentionId, container);
+      return;
+    }
+
+    if (response.actionId == NotificationActionIds.wrongTime) {
+      debugPrint('[NotifTap] wrong-time action for intention=$intentionId');
+      // Dismissed in the ledger — the planner's quiet-hours signal.
+      unawaited(
+        orchestrator.onInteractionReceived(
+          intentionId,
+          NotificationInteractionType.dismissed,
+        ),
+      );
+      await wrongTimeIntentionFromNotification(intentionId, container);
+      return;
+    }
+
+    if (response.actionId == NotificationActionIds.openCoach) {
+      debugPrint('[NotifTap] open-coach action for intention=$intentionId');
+      unawaited(
+        orchestrator.onInteractionReceived(
+          intentionId,
+          NotificationInteractionType.opened,
+        ),
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_pushNowIfReady(AiAssistantScreen.routeName)) {
+          _queuePendingIntent(const _PendingRouteIntent.coach());
+        }
+      });
+      return;
+    }
+
+    // Plain tap → Home, where the Promises strip carries the intention.
+    debugPrint('[NotifTap] intention tap intentionId=$intentionId');
+    unawaited(
+      orchestrator.onInteractionReceived(
+        intentionId,
+        NotificationInteractionType.opened,
+      ),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      navigateToMainTabWithContainer(container, index: MainTabIndex.home);
     });
     return;
   }

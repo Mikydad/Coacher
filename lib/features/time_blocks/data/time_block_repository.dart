@@ -1,9 +1,11 @@
 import 'package:isar_community/isar.dart';
 
+import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/local_db/isar_collections/isar_goal.dart';
 import '../../../core/local_db/isar_collections/isar_scheduled_time_block.dart';
 import '../../../core/local_db/isar_collections/isar_task.dart';
 import '../../../core/offline/offline_store.dart';
+import '../../../core/sync/outbox_writer.dart';
 import '../domain/models/scheduled_time_block.dart';
 
 // ─── Abstract interface ───────────────────────────────────────────────────────
@@ -46,6 +48,13 @@ class IsarTimeBlockRepository implements TimeBlockRepository {
         IsarScheduledTimeBlock.fromDomain(block),
       );
     });
+    // Sync set completed in Phase 1 (Miko directive): time blocks replicate
+    // like every other user-owned entity — outbox push + merge pull, LWW.
+    await outboxUpsert(
+      entityType: 'timeBlock',
+      documentPath: FirestorePaths.timeBlockDocument(block.id),
+      payload: block.toMap(),
+    );
   }
 
   @override
@@ -56,16 +65,31 @@ class IsarTimeBlockRepository implements TimeBlockRepository {
           .blockIdEqualTo(id)
           .deleteAll();
     });
+    await outboxDelete(
+      entityType: 'timeBlock',
+      documentPath: FirestorePaths.timeBlockDocument(id),
+    );
   }
 
   @override
   Future<void> deleteBlockForEntity(String entityId) async {
+    final blockIds = await _isar.isarScheduledTimeBlocks
+        .filter()
+        .entityIdEqualTo(entityId)
+        .blockIdProperty()
+        .findAll();
     await _isar.writeTxn(() async {
       await _isar.isarScheduledTimeBlocks
           .filter()
           .entityIdEqualTo(entityId)
           .deleteAll();
     });
+    for (final blockId in blockIds) {
+      await outboxDelete(
+        entityType: 'timeBlock',
+        documentPath: FirestorePaths.timeBlockDocument(blockId),
+      );
+    }
   }
 
   @override

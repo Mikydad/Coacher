@@ -48,6 +48,8 @@ import '../../goals/domain/models/goal_categories.dart';
 import '../../goals/domain/models/goal_enums.dart';
 import '../../goals/domain/models/user_goal.dart';
 import '../../goals/presentation/goal_detail_screen.dart';
+import '../../intentions/presentation/promises_section.dart';
+import '../../intentions/presentation/seize_the_moment_card.dart';
 import '../../goals/presentation/goal_template_picker_screen.dart';
 import '../../plan_tomorrow/presentation/plan_tomorrow_screen.dart';
 import '../../../app/application/main_tab_navigation.dart';
@@ -183,6 +185,12 @@ class HomeScreen extends ConsumerWidget {
               ),
             ],
           ),
+          const SizedBox(height: 20),
+          // Humanizing Phase 1 — promises live near the top: seize-the-moment
+          // (only when a free window fits an open promise right now), then
+          // the ambient promises strip.
+          const SeizeTheMomentCard(),
+          const PromisesSection(),
           const SizedBox(height: 20),
           const ActiveOverrideBanner(),
           const PostOverrideReviewCard(),

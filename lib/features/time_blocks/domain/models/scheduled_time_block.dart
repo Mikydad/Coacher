@@ -20,7 +20,8 @@ FlexibilityType flexibilityTypeFromStorage(String? raw) {
 /// A concrete occupied time window derived from a scheduled task or habit.
 ///
 /// Created automatically when an entity is saved with both a scheduled time
-/// and an expected duration. Stored locally in Isar — no Firestore sync.
+/// and an expected duration. Isar is the source of truth; replicated via the
+/// outbox and pulled by RemoteIsarMerge (sync set completed in Phase 1).
 class ScheduledTimeBlock {
   const ScheduledTimeBlock({
     required this.id,

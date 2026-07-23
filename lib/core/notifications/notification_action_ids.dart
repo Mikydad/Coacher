@@ -28,4 +28,9 @@ abstract final class NotificationCategoryIds {
   /// Task reminders scheduled through the AttentionOrchestrator:
   /// Done / Later / Wrong time / Open Coach.
   static const String taskReminder = 'sidepalTaskReminder.v1';
+
+  /// Opportunity nudges for intentions (humanizing Phase 1). Same action
+  /// set as task reminders but its own category so the two surfaces can
+  /// diverge later without an app reinstall (see class doc above).
+  static const String intentionNudge = 'sidepalIntentionNudge.v1';
 }

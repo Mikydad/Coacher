@@ -143,6 +143,7 @@ class _ActionRow extends StatelessWidget {
       case ActionType.createTask:
       case ActionType.createGoal:
       case ActionType.addReminder:
+      case ActionType.createIntention:
         return (icon: Icons.add_rounded, color: AppColors.accentDim);
 
       case ActionType.deleteTask:
@@ -216,6 +217,11 @@ class _ActionRow extends StatelessWidget {
 
       case ActionType.moveConflictingTasks:
         return 'Resolve schedule conflicts';
+
+      // Normally auto-committed and never previewed; described anyway in
+      // case an intention rides along in a mixed batch.
+      case ActionType.createIntention:
+        return 'Remember "${p['title'] ?? 'promise'}"';
     }
   }
 }

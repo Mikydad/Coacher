@@ -9,6 +9,7 @@ import '../../features/goals/domain/models/goal_action.dart';
 import '../../features/goals/domain/models/goal_check_in.dart';
 import '../../features/goals/domain/models/goal_milestone.dart';
 import '../../features/goals/domain/models/user_goal.dart';
+import '../../features/intentions/domain/models/intention.dart';
 import '../../features/analytics/domain/models/analytics_event.dart';
 import '../../features/analytics/domain/models/analytics_stats_cache.dart';
 import '../../features/planning/domain/models/block.dart';
@@ -20,6 +21,7 @@ import '../../features/accountability/domain/models/stake_evidence.dart';
 import '../../features/planning/domain/models/task_item.dart';
 import '../../features/reminders/data/reminder_repository.dart';
 import '../../features/reminders/domain/models/reminder_config.dart';
+import '../../features/time_blocks/domain/models/scheduled_time_block.dart';
 import '../firebase/firestore_client.dart';
 import '../local_db/isar_collections/isar_block.dart';
 import '../local_db/isar_collections/isar_analytics_event.dart';
@@ -28,7 +30,9 @@ import '../local_db/isar_collections/isar_goal.dart';
 import '../local_db/isar_collections/isar_goal_action.dart';
 import '../local_db/isar_collections/isar_goal_check_in.dart';
 import '../local_db/isar_collections/isar_goal_milestone.dart';
+import '../local_db/isar_collections/isar_intention.dart';
 import '../local_db/isar_collections/isar_onboarding_profile.dart';
+import '../local_db/isar_collections/isar_scheduled_time_block.dart';
 import '../local_db/isar_collections/isar_reminder.dart';
 import '../local_db/isar_collections/isar_blocked_user.dart';
 import '../local_db/isar_collections/isar_points.dart';
@@ -135,6 +139,10 @@ class RemoteIsarMerge {
     await _pullGoals();
     _abortIfUidChanged();
     await _pullGoalSubcollections();
+    _abortIfUidChanged();
+    await _pullIntentions();
+    _abortIfUidChanged();
+    await _pullTimeBlocks();
     _abortIfUidChanged();
     await _pullAnalytics();
     _abortIfUidChanged();
@@ -362,6 +370,51 @@ class RemoteIsarMerge {
         }
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip check-ins of $goalId: $e\n$st');
+      }
+    }
+  }
+
+  /// Intentions (`users/{uid}/intentions`) — cursor pull, LWW upsert.
+  /// Deletes arrive as soft tombstones (`active: false` rows), so the
+  /// merge-never-deletes rule holds and a delete still wins LWW.
+  Future<void> _pullIntentions() async {
+    final cursor = await _cursorFor('intentions');
+    final snap = await _afterCursor(
+      _client.userCollection('intentions'),
+      cursor,
+    ).get();
+    for (final doc in snap.docs) {
+      try {
+        final m = Map<String, dynamic>.from(doc.data());
+        m['id'] = _docFieldId(doc, m);
+        final intention = Intention.fromMap(m);
+        _noteSeen('intentions', intention.updatedAtMs);
+        await _mergeIntention(intention);
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip intention ${doc.id}: $e\n$st');
+      }
+    }
+  }
+
+  /// Scheduled time blocks (`users/{uid}/timeBlocks`) — cursor pull, LWW.
+  /// Completes the sync set that was device-local before Phase 1
+  /// (Miko directive, PRD §11). Remote deletes reconcile through the local
+  /// delete path / force pull, same as goals.
+  Future<void> _pullTimeBlocks() async {
+    final cursor = await _cursorFor('time_blocks');
+    final snap = await _afterCursor(
+      _client.userCollection('timeBlocks'),
+      cursor,
+    ).get();
+    for (final doc in snap.docs) {
+      try {
+        final m = Map<String, dynamic>.from(doc.data());
+        m['id'] = _docFieldId(doc, m);
+        final block = ScheduledTimeBlock.fromMap(m);
+        _noteSeen('time_blocks', block.updatedAtMs);
+        await _mergeTimeBlock(block);
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip time block ${doc.id}: $e\n$st');
       }
     }
   }
@@ -730,6 +783,44 @@ class RemoteIsarMerge {
     }
     await _isar.writeTxn(() async {
       await _isar.isarGoals.putByGoalId(IsarGoal.fromDomain(incoming));
+    });
+    _appliedCount++;
+  }
+
+  Future<void> _mergeIntention(Intention incoming) async {
+    final existing = await _isar.isarIntentions
+        .filter()
+        .intentionIdEqualTo(incoming.id)
+        .findFirst();
+    if (!shouldApplyRemoteUpdatedAt(
+      localUpdatedAtMs: existing?.updatedAtMs,
+      remoteUpdatedAtMs: incoming.updatedAtMs,
+    )) {
+      return;
+    }
+    await _isar.writeTxn(() async {
+      await _isar.isarIntentions.putByIntentionId(
+        IsarIntention.fromDomain(incoming),
+      );
+    });
+    _appliedCount++;
+  }
+
+  Future<void> _mergeTimeBlock(ScheduledTimeBlock incoming) async {
+    final existing = await _isar.isarScheduledTimeBlocks
+        .filter()
+        .blockIdEqualTo(incoming.id)
+        .findFirst();
+    if (!shouldApplyRemoteUpdatedAt(
+      localUpdatedAtMs: existing?.updatedAtMs,
+      remoteUpdatedAtMs: incoming.updatedAtMs,
+    )) {
+      return;
+    }
+    await _isar.writeTxn(() async {
+      await _isar.isarScheduledTimeBlocks.putByBlockId(
+        IsarScheduledTimeBlock.fromDomain(incoming),
+      );
     });
     _appliedCount++;
   }

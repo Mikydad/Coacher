@@ -34,6 +34,19 @@ class NotificationLedgerRepository {
     await upsertEntry(entry);
   }
 
+  /// Transition an entry to [NotificationLedgerState.cancelled] by notifId.
+  /// Slot-scoped cancel for entities with several pending notifications
+  /// (intention ladders) — the entityId variant would only hit the latest.
+  Future<void> markCancelledByNotifId(int notifId) async {
+    final entry = await findByNotifId(notifId);
+    if (entry == null) return;
+    entry
+      ..state = NotificationLedgerState.cancelled.name
+      ..cancelledAtMs = DateTime.now().millisecondsSinceEpoch
+      ..updatedAtMs = DateTime.now().millisecondsSinceEpoch;
+    await upsertEntry(entry);
+  }
+
   /// Transition an entry to [NotificationLedgerState.delivered] by notifId.
   Future<void> markDelivered(int notifId) async {
     final entry = await findByNotifId(notifId);
@@ -78,6 +91,12 @@ class NotificationLedgerRepository {
         .entityIdEqualTo(entityId)
         .sortByUpdatedAtMsDesc()
         .findFirst();
+  }
+
+  /// All ledger entries (pruned to ~recent history by [pruneOlderThan]).
+  /// Used by the opportunity planner to derive engagement-by-hour.
+  Future<List<IsarNotificationLedgerEntry>> getAllEntries() async {
+    return _isar.isarNotificationLedgerEntrys.where().findAll();
   }
 
   /// Return all entries in a given [state] (used for boot reconciliation).

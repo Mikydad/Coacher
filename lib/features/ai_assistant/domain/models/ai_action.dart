@@ -24,6 +24,10 @@ enum ActionType {
   // Scheduling helpers
   suggestFreeTimeBlock,
   moveConflictingTasks,
+
+  // Intentions (humanizing Phase 1) — AUTO-COMMITS with undo, the one
+  // deliberate relaxation of the confirm-gate (decision log 2026-07-23).
+  createIntention,
 }
 
 // ─── Risk level enum ─────────────────────────────────────────────────────────
@@ -72,6 +76,7 @@ class AiAction {
       case ActionType.activateContextOverride:
       case ActionType.endContextOverride:
       case ActionType.suggestFreeTimeBlock:
+      case ActionType.createIntention:
         return AiActionRiskLevel.low;
     }
   }

@@ -5,7 +5,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/utils/stable_id.dart';
+import '../../intentions/application/intention_capture.dart';
 import '../data/ai_interaction_history_repository.dart';
+import '../domain/models/ai_action.dart';
 import '../domain/models/ai_chat_message.dart';
 import '../domain/models/ai_planned_changes.dart';
 import 'ai_action_executor.dart';
@@ -189,6 +191,26 @@ class AiAssistantService extends ChangeNotifier {
         proactiveContext: _proactiveContextForPayload,
       );
     } catch (e) {
+      // Offline / AI-down: intention capture must not depend on the network
+      // (PRD §4.2). If the utterance parses as a simple promise, capture it
+      // locally through the same executor path the online AI uses.
+      final heuristicParams = IntentionHeuristicParser.parseToActionParams(
+        userInput.trim(),
+      );
+      if (heuristicParams != null) {
+        _removeMessage(loadingId);
+        _setLoading(false);
+        await _autoCommitIntentionActions(
+          [
+            AiAction(
+              actionType: ActionType.createIntention,
+              parameters: heuristicParams,
+            ),
+          ],
+          modelMessage: null,
+        );
+        return;
+      }
       _replaceLoadingMessage(
         loadingId,
         "I ran into an unexpected error. Please try again.",
@@ -201,7 +223,22 @@ class AiAssistantService extends ChangeNotifier {
     _removeMessage(loadingId);
     _setLoading(false);
 
-    if (result.requiresFollowUp) {
+    // Intentions AUTO-COMMIT with inline undo — the one deliberate
+    // relaxation of the confirm-gate (decision log 2026-07-23): stating a
+    // promise IS the permission; the real confirmation happens at delivery,
+    // where the nudge is phrased as a question.
+    final isIntentionAutoCommit =
+        !result.requiresFollowUp &&
+        result.actions.isNotEmpty &&
+        result.actions.every(
+          (a) => a.actionType == ActionType.createIntention,
+        );
+    if (isIntentionAutoCommit) {
+      await _autoCommitIntentionActions(
+        result.actions,
+        modelMessage: result.informationalMessage,
+      );
+    } else if (result.requiresFollowUp) {
       final question = AiInformationalOutputGuard.sanitize(
         result.followUpQuestion!,
       );
@@ -322,6 +359,73 @@ class AiAssistantService extends ChangeNotifier {
       });
     }
 
+    notifyListeners();
+  }
+
+  /// Executes createIntention actions immediately (no preview card) and
+  /// appends one assistant bubble with inline [View] [Undo] affordances
+  /// ([AiChatMessage.autoCommittedBatchId]). Frictionless capture,
+  /// PRD §4.2 — errors surface honestly, per-item, Telegram-style.
+  Future<void> _autoCommitIntentionActions(
+    List<AiAction> actions, {
+    String? modelMessage,
+  }) async {
+    _pendingPlan = null;
+    ExecutionResult exec;
+    try {
+      exec = await _actionExecutor.execute(actions);
+    } catch (e) {
+      exec = ExecutionResult(failures: [e.toString()]);
+    }
+    final trimmedModel = modelMessage?.trim();
+    final content = exec.hasFailures
+        ? "I couldn't save that promise — please try again."
+        : (trimmedModel?.isNotEmpty == true
+              ? trimmedModel!
+              : exec.toSummaryMessage());
+    _addMessage(
+      AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.assistant,
+        content: content.isEmpty ? 'Got it — consider it on my radar.' : content,
+        timestamp: DateTime.now(),
+        autoCommittedBatchId: exec.hasFailures ? null : exec.batchId,
+        isExecuted: !exec.hasFailures,
+      ),
+    );
+    _logEvent('aiIntentionAutoCommitted', {
+      'sessionId': _sessionId,
+      'actionCount': actions.length,
+      'failed': exec.hasFailures,
+    });
+    notifyListeners();
+  }
+
+  /// Inline Undo on an auto-committed intention message: tombstones the
+  /// created intention(s), cancels their nudges, and rewrites the bubble.
+  Future<void> undoAutoCommittedBatch(String messageId, String batchId) async {
+    final result = await _actionExecutor.undoBatchById(batchId);
+    final idx = _messages.indexWhere((m) => m.id == messageId);
+    if (result is UndoNotAvailable) {
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content: result.reason,
+          timestamp: DateTime.now(),
+        ),
+      );
+    } else if (idx != -1) {
+      _messages[idx] = _messages[idx].copyWith(
+        content: 'Undone — that promise is off the list.',
+        clearAutoCommittedBatchId: true,
+        isExecuted: false,
+      );
+    }
+    _logEvent('aiIntentionAutoCommitUndone', {
+      'sessionId': _sessionId,
+      'available': result is! UndoNotAvailable,
+    });
     notifyListeners();
   }
 

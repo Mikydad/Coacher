@@ -95,6 +95,11 @@ class IsarGoalsRepository implements GoalsRepository {
         .goalIdEqualTo(goalId)
         .dateKeyProperty()
         .findAll();
+    final timeBlockIds = await _isar.isarScheduledTimeBlocks
+        .filter()
+        .entityIdEqualTo(goalId)
+        .blockIdProperty()
+        .findAll();
 
     await _isar.writeTxn(() async {
       final row = await _isar.isarGoals
@@ -127,6 +132,12 @@ class IsarGoalsRepository implements GoalsRepository {
       await outboxDelete(
         entityType: 'goalCheckIn',
         documentPath: '${FirestorePaths.goalCheckIns(goalId)}/$dateKey',
+      );
+    }
+    for (final blockId in timeBlockIds) {
+      await outboxDelete(
+        entityType: 'timeBlock',
+        documentPath: FirestorePaths.timeBlockDocument(blockId),
       );
     }
     await outboxDelete(

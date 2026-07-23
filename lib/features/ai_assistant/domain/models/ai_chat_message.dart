@@ -24,6 +24,7 @@ class AiChatMessage {
     this.isLoading = false,
     this.isCurrentPlan = false,
     this.isExecuted = false,
+    this.autoCommittedBatchId,
   });
 
   final String id;
@@ -50,6 +51,11 @@ class AiChatMessage {
   /// True after the user confirmed and actions were applied.
   final bool isExecuted;
 
+  /// Batch id of an auto-committed write (createIntention — the one action
+  /// type that skips the preview card, decision log 2026-07-23). Non-null
+  /// renders inline [View] [Undo] affordances under the bubble.
+  final String? autoCommittedBatchId;
+
   bool get hasPreviewCard => plannedChanges != null && !isLoading;
   bool get hasDraftPlan =>
       draftPlan != null && plannedChanges == null && !isLoading;
@@ -65,8 +71,10 @@ class AiChatMessage {
     bool? isLoading,
     bool? isCurrentPlan,
     bool? isExecuted,
+    String? autoCommittedBatchId,
     bool clearDraftPlan = false,
     bool clearPlannedChanges = false,
+    bool clearAutoCommittedBatchId = false,
   }) {
     return AiChatMessage(
       id: id ?? this.id,
@@ -85,6 +93,9 @@ class AiChatMessage {
       isLoading: isLoading ?? this.isLoading,
       isCurrentPlan: isCurrentPlan ?? this.isCurrentPlan,
       isExecuted: isExecuted ?? this.isExecuted,
+      autoCommittedBatchId: clearAutoCommittedBatchId
+          ? null
+          : (autoCommittedBatchId ?? this.autoCommittedBatchId),
     );
   }
 

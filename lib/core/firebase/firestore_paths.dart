@@ -32,6 +32,13 @@ class FirestorePaths {
 
   static String get goals => '$userRoot/goals';
 
+  static String get intentions => '$userRoot/intentions';
+  static String intentionDocument(String intentionId) =>
+      '$intentions/$intentionId';
+
+  static String get timeBlocks => '$userRoot/timeBlocks';
+  static String timeBlockDocument(String blockId) => '$timeBlocks/$blockId';
+
   /// Singleton doc (collection `onboarding`, doc `profile`) — what the user
   /// told us during first-launch onboarding (struggles / interests).
   static String get onboardingProfileDoc => '$userRoot/onboarding/profile';

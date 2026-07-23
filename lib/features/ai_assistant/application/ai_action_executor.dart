@@ -12,6 +12,10 @@ import '../../goals/data/goals_repository.dart';
 import '../../goals/domain/models/goal_categories.dart';
 import '../../goals/domain/models/goal_enums.dart';
 import '../../goals/domain/models/user_goal.dart';
+import '../../intentions/application/intention_capture.dart';
+import '../../intentions/application/intention_nudge_sync_service.dart';
+import '../../intentions/data/intentions_repository.dart';
+import '../../intentions/domain/models/intention.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/data/planning_repository.dart';
 import '../../planning/domain/models/task_item.dart';
@@ -97,6 +101,8 @@ class AiActionExecutor {
     required this.batchRepository,
     this.defaultModeRefId,
     this.tierGuard,
+    this.intentionsRepository,
+    this.intentionNudgeSyncService,
   });
 
   final PlanningRepository planningRepository;
@@ -115,11 +121,27 @@ class AiActionExecutor {
   /// the manual screens enforce. Null (tests) = no gating.
   final AiTierGuard? tierGuard;
 
+  /// Intentions (humanizing Phase 1). Null in legacy tests — the
+  /// createIntention action then fails loudly instead of silently no-oping.
+  final IntentionsRepository? intentionsRepository;
+  final IntentionNudgeSyncService? intentionNudgeSyncService;
+
   // ─── Public execute ────────────────────────────────────────────────────────
 
   Future<ExecutionResult> execute(List<AiAction> actions) async {
     final batchId = StableId.generate('ai_batch');
     final now = DateTime.now().millisecondsSinceEpoch;
+
+    // Pre-assign client ids to createIntention actions so the persisted
+    // actionsJson carries them — rollback/undo can then tombstone exactly
+    // the intentions this batch created (task-style snapshot restore
+    // cannot cover creates).
+    for (final action in actions) {
+      if (action.actionType == ActionType.createIntention &&
+          action.parameters['_intentionId'] == null) {
+        action.parameters['_intentionId'] = StableId.generate('intention');
+      }
+    }
 
     // Idempotency guard: if this batchId somehow already exists as completed, skip.
     final existing = await batchRepository.findByBatchId(batchId);
@@ -208,6 +230,17 @@ class AiActionExecutor {
   /// state and was created within the last 30 minutes.
   Future<UndoResult> undoLastAiBatch() async {
     final batch = await batchRepository.findMostRecent();
+    return _undoBatch(batch);
+  }
+
+  /// Undo a SPECIFIC batch by id — the inline [Undo] on an auto-committed
+  /// createIntention message targets its own batch, not whatever ran last.
+  Future<UndoResult> undoBatchById(String batchId) async {
+    final batch = await batchRepository.findByBatchId(batchId);
+    return _undoBatch(batch);
+  }
+
+  Future<UndoResult> _undoBatch(IsarAiActionBatch? batch) async {
     if (batch == null) {
       return const UndoNotAvailable('No AI changes to undo.');
     }
@@ -302,6 +335,7 @@ class AiActionExecutor {
   /// Restore all snapshotted entities from [snapshotJson] and trigger
   /// recompute through the coordinator.
   Future<void> _rollbackBatch(String batchId, String snapshotJson) async {
+    await _rollbackCreatedIntentions(batchId);
     try {
       final snapshot = jsonDecode(snapshotJson) as Map<String, dynamic>?;
       final taskList = (snapshot?['tasks'] as List<dynamic>? ?? [])
@@ -343,6 +377,30 @@ class AiActionExecutor {
         AiActionBatchState.rolledBack,
         undoneAtMs: DateTime.now().millisecondsSinceEpoch,
       );
+    } catch (e) {
+      debugPrint('ai_action_executor: swallowed error: $e');
+    }
+  }
+
+  /// Tombstones intentions created by this batch (undo of an auto-committed
+  /// createIntention) and cancels their pending nudges. Ids come from the
+  /// persisted actionsJson (`_intentionId`, pre-assigned in [execute]).
+  Future<void> _rollbackCreatedIntentions(String batchId) async {
+    final repo = intentionsRepository;
+    if (repo == null) return;
+    try {
+      final batch = await batchRepository.findByBatchId(batchId);
+      if (batch == null) return;
+      final actionList = (jsonDecode(batch.actionsJson) as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+      for (final entry in actionList) {
+        if (entry['type'] != ActionType.createIntention.name) continue;
+        final params = (entry['params'] as Map?)?.cast<String, dynamic>();
+        final intentionId = params?['_intentionId'] as String?;
+        if (intentionId == null || intentionId.isEmpty) continue;
+        await intentionNudgeSyncService?.cancelForIntention(intentionId);
+        await repo.deleteIntention(intentionId);
+      }
     } catch (e) {
       debugPrint('ai_action_executor: swallowed error: $e');
     }
@@ -478,6 +536,10 @@ class AiActionExecutor {
       case ActionType.suggestFreeTimeBlock:
       case ActionType.moveConflictingTasks:
         return null; // read-only actions — no mutation to notify
+      case ActionType.createIntention:
+        // Planning happens directly in _createIntention (unthrottled) —
+        // no schedule mutation to notify.
+        return null;
     }
   }
 
@@ -515,7 +577,83 @@ class AiActionExecutor {
         throw UnsupportedError(
           '${action.actionType.name} requires manual follow-up in chat',
         );
+      case ActionType.createIntention:
+        return _createIntention(action.parameters);
     }
+  }
+
+  // ─── Intention handler (humanizing Phase 1) ───────────────────────────────
+
+  /// Auto-committed with undo: stating an intention is permission
+  /// (settled: Q1). SidePal picks the delivery moment; the confirmation
+  /// happens at delivery, where the suggestion is phrased as a question.
+  Future<String> _createIntention(Map<String, dynamic> p) async {
+    final repo = intentionsRepository;
+    if (repo == null) {
+      throw StateError('Intentions are not available in this build.');
+    }
+    final title = (p['title'] as String?)?.trim() ?? '';
+    if (title.isEmpty) {
+      throw ArgumentError('title is required to capture an intention');
+    }
+
+    final now = DateTime.now();
+    final windowKind = switch (p['window'] as String?) {
+      'today' => IntentionWindowKind.today,
+      'tomorrow' => IntentionWindowKind.tomorrow,
+      'weekend' => IntentionWindowKind.weekend,
+      _ => IntentionWindowKind.thisWeek,
+    };
+    final window = resolveIntentionWindow(windowKind, now);
+
+    final tagsRaw = p['activityTags'];
+    final tags = tagsRaw is List
+        ? tagsRaw.whereType<String>().toList(growable: false)
+        : const <String>[];
+    final importance = switch (p['importance'] as String?) {
+      'high' => IntentionImportance.high,
+      'low' => IntentionImportance.low,
+      _ => IntentionImportance.normal,
+    };
+    final hints = p['aiHints'];
+
+    final draft = IntentionDraft(
+      title: title,
+      rawUtterance: p['rawUtterance'] as String? ?? title,
+      windowStart: window.start,
+      windowEnd: window.end,
+      estimatedMinutes: ((p['estimatedMinutes'] as num?)?.toInt() ?? 20)
+          .clamp(1, 1440),
+      importance: importance,
+      activityTags: tags,
+      aiHintsJson: hints is Map ? jsonEncode(hints) : null,
+    );
+    var intention = buildIntention(draft, now: now);
+    // Keep the batch-persisted id so undo can tombstone this exact record.
+    final presetId = p['_intentionId'] as String?;
+    if (presetId != null && presetId.isNotEmpty) {
+      intention = Intention.fromMap(
+        intention.toMap()..['id'] = presetId,
+      );
+    }
+    intention.validate();
+
+    await repo.upsertIntention(intention);
+    // Plan the ladder right away (unthrottled) so the Promises strip shows
+    // "planned for …" the moment the chat bubble appears. Airplane-safe.
+    try {
+      await intentionNudgeSyncService?.applyForIntention(intention);
+    } catch (e) {
+      debugPrint('ai_action_executor: intention planning failed: $e');
+    }
+
+    final windowLabel = switch (windowKind) {
+      IntentionWindowKind.today => 'today',
+      IntentionWindowKind.tomorrow => 'tomorrow',
+      IntentionWindowKind.weekend => 'this weekend',
+      IntentionWindowKind.thisWeek => 'this week',
+    };
+    return 'Got it — I\'ll find a good time $windowLabel for "$title".';
   }
 
   // ─── Task handlers ────────────────────────────────────────────────────────

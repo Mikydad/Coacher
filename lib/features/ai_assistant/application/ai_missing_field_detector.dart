@@ -87,6 +87,13 @@ class AiMissingFieldDetector {
           _Field('taskTitle', 'Which task should I remove the reminder from?'),
         ]);
 
+      // Auto-committed capture (Phase 1) — only the title is required;
+      // window/duration/tags all have defaults, so never interrogate.
+      case ActionType.createIntention:
+        return _checkFields(p, [
+          _Field('title', 'What did you promise to do?'),
+        ]);
+
       case ActionType.activateContextOverride:
         return _checkFields(p, [
           _Field(

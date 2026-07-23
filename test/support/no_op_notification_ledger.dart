@@ -12,6 +12,9 @@ class NoOpNotificationLedger implements NotificationLedgerRepository {
   Future<void> markCancelled(String entityId) async {}
 
   @override
+  Future<void> markCancelledByNotifId(int notifId) async {}
+
+  @override
   Future<void> markDelivered(int notifId) async {}
 
   @override
@@ -22,6 +25,9 @@ class NoOpNotificationLedger implements NotificationLedgerRepository {
 
   @override
   Future<IsarNotificationLedgerEntry?> findByEntityId(String entityId) async => null;
+
+  @override
+  Future<List<IsarNotificationLedgerEntry>> getAllEntries() async => const [];
 
   @override
   Future<List<IsarNotificationLedgerEntry>> getByState(

@@ -19,6 +19,7 @@ class ReminderIntent {
     this.reminderType = ReminderType.scheduled,
     this.sourceReason = '',
     this.bodyOverride,
+    this.slot = 0,
     required this.createdAtMs,
   });
 
@@ -58,6 +59,12 @@ class ReminderIntent {
   /// Null means the orchestrator's default "Time to start: …" body.
   final String? bodyOverride;
 
+  /// Ladder slot for entities that pre-schedule several delivery moments
+  /// (intentions: 0 = primary, 1 = deadline-eve safety, 2 = fallback).
+  /// Feeds the deterministic notification id so siblings can cancel each
+  /// other. Always 0 for single-slot kinds.
+  final int slot;
+
   final int createdAtMs;
 
   void validate() {
@@ -91,6 +98,7 @@ class ReminderIntent {
     'reminderType': reminderType.toStorage(),
     'sourceReason': sourceReason,
     if (bodyOverride != null) 'bodyOverride': bodyOverride,
+    'slot': slot,
     'createdAtMs': createdAtMs,
   };
 
@@ -109,6 +117,7 @@ class ReminderIntent {
     reminderType: ReminderType.fromStorage(map['reminderType'] as String?),
     sourceReason: map['sourceReason'] as String? ?? '',
     bodyOverride: map['bodyOverride'] as String?,
+    slot: (map['slot'] as num?)?.toInt() ?? 0,
     createdAtMs: (map['createdAtMs'] as num).toInt(),
   );
 
@@ -122,6 +131,7 @@ class ReminderIntent {
     ReminderType? reminderType,
     String? sourceReason,
     String? bodyOverride,
+    int? slot,
   }) => ReminderIntent(
     id: id,
     entityId: entityId,
@@ -135,6 +145,7 @@ class ReminderIntent {
     reminderType: reminderType ?? this.reminderType,
     sourceReason: sourceReason ?? this.sourceReason,
     bodyOverride: bodyOverride ?? this.bodyOverride,
+    slot: slot ?? this.slot,
     createdAtMs: createdAtMs,
   );
 }

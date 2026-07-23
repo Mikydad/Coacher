@@ -19,6 +19,7 @@ import '../domain/models/proactive_suggestion.dart';
 import '../../../core/tier/tier_providers.dart';
 import 'ai_action_batch_repository.dart';
 import 'ai_action_batch_state.dart';
+import '../../intentions/application/intentions_providers.dart';
 import 'ai_action_executor.dart';
 import 'ai_tier_guard.dart';
 import 'ai_assistant_service.dart';
@@ -191,6 +192,8 @@ final aiActionExecutorProvider = Provider<AiActionExecutor>((ref) {
       goalsRepository: ref.read(goalsRepositoryProvider),
       reminderRepository: ref.read(reminderRepositoryProvider),
     ),
+    intentionsRepository: ref.read(intentionsRepositoryProvider),
+    intentionNudgeSyncService: ref.read(intentionNudgeSyncServiceProvider),
   );
 });
 
