@@ -21,7 +21,7 @@
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions/v2';
 import { getFirestore } from 'firebase-admin/firestore';
-import { getMessaging, Message } from 'firebase-admin/messaging';
+import { Message } from 'firebase-admin/messaging';
 
 import {
   CLOSING_HORIZON_MS,
@@ -30,11 +30,12 @@ import {
   RescueState,
   rescueAction,
 } from './rescue_rules';
+import { DeviceToken, sendToTokens } from './push_send';
 
 const BATCH_LIMIT = 200;
 
 interface UserDevices {
-  tokens: { docId: string; token: string }[];
+  tokens: DeviceToken[];
   lastSeenMs: number | null;
   tzOffsetMinutes: number;
 }
@@ -100,7 +101,9 @@ export async function runIntentionSweepOnce(
       continue;
     }
 
-    const pruned = await sendToDevices(uid, devices, intention.id, action);
+    const pruned = await sendToTokens(uid, devices.tokens, (token) =>
+      rescueMessage(token, intention.id, action),
+    );
     counts.tokensPruned += pruned;
 
     if (action.kind === 'data') {
@@ -149,7 +152,7 @@ async function devicesFor(
   const snap = await db.collection(`users/${uid}/deviceTokens`).get();
   let lastSeenMs: number | null = null;
   let tzOffsetMinutes = 0;
-  const tokens: { docId: string; token: string }[] = [];
+  const tokens: DeviceToken[] = [];
   for (const doc of snap.docs) {
     const data = doc.data();
     const token = data.token as string | undefined;
@@ -188,56 +191,31 @@ async function projectionFor(
   };
 }
 
-/** Sends to every device; returns how many dead tokens were pruned. */
-async function sendToDevices(
-  uid: string,
-  devices: UserDevices,
+function rescueMessage(
+  token: string,
   intentionId: string,
   action: { kind: 'data' } | { kind: 'notification'; title: string; body: string },
-): Promise<number> {
-  const db = getFirestore();
-  const messaging = getMessaging();
-  let pruned = 0;
-  for (const { docId, token } of devices.tokens) {
-    let message: Message;
-    if (action.kind === 'data') {
-      message = {
-        token,
-        data: { type: 'intention_replan' },
-        apns: {
-          headers: {
-            'apns-push-type': 'background',
-            'apns-priority': '5',
-          },
-          payload: { aps: { 'content-available': 1 } },
+): Message {
+  if (action.kind === 'data') {
+    return {
+      token,
+      data: { type: 'intention_replan' },
+      apns: {
+        headers: {
+          'apns-push-type': 'background',
+          'apns-priority': '5',
         },
-      };
-    } else {
-      message = {
-        token,
-        notification: { title: action.title, body: action.body },
-        data: { type: 'intention_rescue', intentionId },
-        apns: {
-          // Repeated rescues replace, never stack.
-          headers: { 'apns-collapse-id': `rescue_${intentionId}` },
-        },
-      };
-    }
-    try {
-      await messaging.send(message);
-    } catch (e) {
-      const code = (e as { code?: string }).code ?? '';
-      if (
-        code === 'messaging/registration-token-not-registered' ||
-        code === 'messaging/invalid-registration-token' ||
-        code === 'messaging/invalid-argument'
-      ) {
-        await db.doc(`users/${uid}/deviceTokens/${docId}`).delete();
-        pruned += 1;
-      } else {
-        logger.warn('intentionSweep send failed', { uid, code });
-      }
-    }
+        payload: { aps: { 'content-available': 1 } },
+      },
+    };
   }
-  return pruned;
+  return {
+    token,
+    notification: { title: action.title, body: action.body },
+    data: { type: 'intention_rescue', intentionId },
+    apns: {
+      // Repeated rescues replace, never stack.
+      headers: { 'apns-collapse-id': `rescue_${intentionId}` },
+    },
+  };
 }

@@ -7,7 +7,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../app/notification_response_handler.dart'
+    show requestCoachBriefNavigation;
 import '../../features/intentions/application/intentions_providers.dart';
+import '../../features/profile/application/profile_providers.dart';
 import '../firebase/firestore_paths.dart';
 import '../sync/outbox_writer.dart';
 import '../utils/stable_id.dart';
@@ -94,6 +97,7 @@ class PushMessagingService {
         payload: heartbeatPayload(
           nowMs: (now ?? DateTime.now()).millisecondsSinceEpoch,
           tzOffsetMinutes: (now ?? DateTime.now()).timeZoneOffset.inMinutes,
+          morningBriefEnabled: await _morningBriefEnabled(),
         ),
       );
       await prefs.setString(_lastHeartbeatDayKey, today);
@@ -114,6 +118,7 @@ class PushMessagingService {
           platform: _platformName,
           nowMs: DateTime.now().millisecondsSinceEpoch,
           tzOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes,
+          morningBriefEnabled: await _morningBriefEnabled(),
         ),
       );
     } catch (e) {
@@ -132,13 +137,55 @@ class PushMessagingService {
     _replan();
   }
 
-  /// User tapped a rescue notification (or launched the app from one). The
-  /// app is alive again, so the local ladder resumes ownership of the
-  /// window; default navigation already lands on Home where the Promises
-  /// strip shows the closing intention.
+  /// User tapped a server push (or launched the app from one). A rescue
+  /// tap means the app is alive again — the local ladder resumes
+  /// ownership, so replan; default navigation lands on Home where the
+  /// Promises strip shows the closing intention. A morning-brief tap
+  /// opens the Coach with the suggestions panel — the same destination
+  /// as the in-app snackbar the push replaces.
   void _onRescueInteraction(RemoteMessage message) {
+    if (isMorningBrief(message.data)) {
+      requestCoachBriefNavigation();
+      return;
+    }
     if (!isRescueNotification(message.data)) return;
     _replan();
+  }
+
+  /// The morning-brief opt-in lives per-device (the preference never
+  /// synced), mirrored onto the deviceTokens doc. Toggling in Profile
+  /// calls this immediately — waiting for tomorrow's heartbeat would
+  /// mean a user who enables the brief and then doesn't open the app
+  /// never gets one.
+  Future<void> mirrorMorningBriefEnabled(bool enabled) async {
+    if (!_firebaseReady) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deviceId = await _deviceId(prefs);
+      await outboxUpsert(
+        entityType: 'deviceToken',
+        documentPath: FirestorePaths.deviceTokenDocument(deviceId),
+        payload: morningBriefFlagPayload(
+          enabled: enabled,
+          nowMs: DateTime.now().millisecondsSinceEpoch,
+        ),
+      );
+    } catch (e) {
+      debugPrint('[Push] brief flag mirror skipped: $e');
+    }
+  }
+
+  Future<bool> _morningBriefEnabled() async {
+    final container = _container;
+    if (container == null) return false;
+    try {
+      final pref = await container
+          .read(profilePreferenceRepositoryProvider)
+          .getPreference();
+      return pref?.morningBriefEnabled ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   void _replan() {

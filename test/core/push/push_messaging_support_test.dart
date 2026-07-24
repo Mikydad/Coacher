@@ -24,22 +24,37 @@ void main() {
         platform: 'ios',
         nowMs: 42,
         tzOffsetMinutes: 180,
+        morningBriefEnabled: true,
       );
       expect(p, {
         'token': 'abc',
         'platform': 'ios',
         'lastSeenMs': 42,
         'tzOffsetMinutes': 180,
+        'morningBriefEnabled': true,
         'updatedAtMs': 42,
       });
     });
 
-    test('heartbeatPayload carries no token (merge-only) but refreshes tz', () {
-      final p = heartbeatPayload(nowMs: 7, tzOffsetMinutes: -300);
+    test('heartbeatPayload carries no token (merge-only) but refreshes '
+        'tz + brief flag', () {
+      final p = heartbeatPayload(
+        nowMs: 7,
+        tzOffsetMinutes: -300,
+        morningBriefEnabled: false,
+      );
       expect(p.containsKey('token'), isFalse);
       expect(p['lastSeenMs'], 7);
       expect(p['tzOffsetMinutes'], -300);
+      expect(p['morningBriefEnabled'], isFalse);
       expect(p['updatedAtMs'], 7);
+    });
+
+    test('morningBriefFlagPayload is a minimal merge write', () {
+      expect(morningBriefFlagPayload(enabled: true, nowMs: 9), {
+        'morningBriefEnabled': true,
+        'updatedAtMs': 9,
+      });
     });
   });
 
@@ -54,10 +69,16 @@ void main() {
       expect(isRescueNotification({'type': 'intention_replan'}), isFalse);
     });
 
+    test('isMorningBrief true only for the brief push', () {
+      expect(isMorningBrief({'type': 'morning_brief'}), isTrue);
+      expect(isMorningBrief({'type': 'intention_rescue'}), isFalse);
+    });
+
     test('false for other/empty payloads', () {
       expect(isRescueReplan({'type': 'chat'}), isFalse);
       expect(isRescueReplan(const {}), isFalse);
       expect(isRescueNotification(const {}), isFalse);
+      expect(isMorningBrief(const {}), isFalse);
     });
   });
 }

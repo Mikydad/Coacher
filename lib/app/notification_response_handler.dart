@@ -37,6 +37,7 @@ class _PendingRouteIntent {
     this.taskLabel,
     this.taskDurationMinutes,
     this.startVoiceMode = false,
+    this.openBrief = false,
   });
 
   const _PendingRouteIntent.goal(String goalId)
@@ -64,20 +65,26 @@ class _PendingRouteIntent {
   const _PendingRouteIntent.coachVoice()
     : this._(routeName: AiAssistantScreen.routeName, startVoiceMode: true);
 
+  /// Morning-brief push tap (humanizing Phase 5c): Coach with the
+  /// suggestions panel — the same destination as the in-app snackbar.
+  const _PendingRouteIntent.coachBrief()
+    : this._(routeName: AiAssistantScreen.routeName, openBrief: true);
+
   final String routeName;
   final String? goalId;
   final String? taskId;
   final String? taskLabel;
   final int? taskDurationMinutes;
   final bool startVoiceMode;
+  final bool openBrief;
 
   Object? get arguments {
     if (routeName == GoalDetailScreen.routeName) return goalId;
     if (routeName == AnalyticsProgressScreen.routeName) return null;
     if (routeName == AiAssistantScreen.routeName) {
-      return startVoiceMode
-          ? const CoachRouteArgs(startVoiceMode: true)
-          : null;
+      if (startVoiceMode) return const CoachRouteArgs(startVoiceMode: true);
+      if (openBrief) return _coachBriefArgs;
+      return null;
     }
     if (routeName == FocusSelectionScreen.routeName) {
       final id = taskId;
@@ -100,6 +107,7 @@ class _PendingRouteIntent {
     if (taskLabel != null) 'taskLabel': taskLabel,
     if (taskDurationMinutes != null) 'taskDurationMinutes': taskDurationMinutes,
     if (startVoiceMode) 'startVoiceMode': true,
+    if (openBrief) 'openBrief': true,
   };
 
   static _PendingRouteIntent? fromJson(Map<String, dynamic> map) {
@@ -116,9 +124,13 @@ class _PendingRouteIntent {
       return const _PendingRouteIntent.progress();
     }
     if (routeName == AiAssistantScreen.routeName) {
-      return map['startVoiceMode'] == true
-          ? const _PendingRouteIntent.coachVoice()
-          : const _PendingRouteIntent.coach();
+      if (map['startVoiceMode'] == true) {
+        return const _PendingRouteIntent.coachVoice();
+      }
+      if (map['openBrief'] == true) {
+        return const _PendingRouteIntent.coachBrief();
+      }
+      return const _PendingRouteIntent.coach();
     }
     if (routeName == FocusSelectionScreen.routeName) {
       final taskId = map['taskId'];
@@ -225,6 +237,28 @@ void requestCoachVoiceEntryNavigation() {
       arguments: const CoachRouteArgs(startVoiceMode: true),
     )) {
       _queuePendingIntent(const _PendingRouteIntent.coachVoice());
+    }
+  });
+}
+
+/// Args shared by the morning-brief tap and its pending-intent replay —
+/// identical to the Home snackbar's "Open" action, so push and fallback
+/// land in the same place.
+const _coachBriefArgs = CoachRouteArgs(
+  openSuggestionsPanel: true,
+  preDraftedText: 'Give me a quick plan for today',
+);
+
+/// Morning-brief push tap lands here (humanizing Phase 5c): open the
+/// Coach with the suggestions panel, cold-start-safe via the same
+/// queue-then-flush template notification taps use.
+void requestCoachBriefNavigation() {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!_pushNowIfReady(
+      AiAssistantScreen.routeName,
+      arguments: _coachBriefArgs,
+    )) {
+      _queuePendingIntent(const _PendingRouteIntent.coachBrief());
     }
   });
 }

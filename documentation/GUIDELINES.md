@@ -911,3 +911,43 @@ not silent reversal.
   push token already does). Deploy note: needs `firebase deploy --only
   functions,firestore:indexes` — bundled with the already-pending
   Phase 2a functions deploy. Slice (c) — morning-brief push — remains.
+
+- **2026-07-24 · Morning-brief push (Phase 5, slice c): the push owns
+  absent mornings, the snackbar owns opened ones, and the opt-in flag
+  rides the deviceTokens doc.** PRD §8's last line ("morning brief as
+  push, with the existing local snackbar as the no-push fallback")
+  ships as a second 15-minute cron (`morningBrief`, pure rules in
+  `brief_rules.ts`, deterministic copy, no LLM): device opted in +
+  local clock in **08:00–10:00** (narrower than the snackbar's 06:00 —
+  a push at dawn is ruder than a snackbar) + **no app open today on ANY
+  device** (`seen_today` skip — the moment a device checks in, the
+  server goes quiet and Home's snackbar owns the morning) + **≥1 open
+  promise** (a quiet app stays quiet: zero promises → no push) → ONE
+  brief per local day ("Good morning — N open promises today — want a
+  quick plan?", `apns-collapse-id: morning_brief`). **The flag
+  placement is the decision:** `morningBriefEnabled` was Isar-local and
+  never synced, so instead of building a whole sync set for one bool it
+  is mirrored per-device onto the already-synced deviceTokens doc —
+  which is MORE faithful, since the preference never synced between
+  devices anyway. Heartbeats refresh it daily, and the Profile toggle
+  mirrors immediately (`mirrorMorningBriefEnabled`, fire-and-forget via
+  outbox) because waiting for tomorrow's heartbeat would mean a user
+  who enables the brief and then doesn't open the app never gets one.
+  The cron finds devices via a single collection-group equality on that
+  flag (one `fieldOverride`, no composite — errors.md discipline);
+  promise counts use a plain single-field equality on the user's own
+  intentions (automatic index), active/window filtered in memory.
+  Freshness reads ALL devices; the local clock follows the most
+  recently seen opted-in device; state is server-owned
+  (`users/{uid}/briefState/morning`). **Tap = snackbar parity:** the
+  push opens Coach with the suggestions panel + the same pre-drafted
+  "Give me a quick plan for today", cold-start-safe via a new
+  `_PendingRouteIntent.coachBrief()` (the Phase 4a coachVoice
+  template); FCM sends share one `sendToTokens` helper with dead-token
+  pruning (extracted from the 5b sweep). *Considered:* making the whole
+  preference record a synced entity (rejected — one bool doesn't
+  justify a sync set, and per-user semantics would be WRONG for a
+  per-device notification opt-in); sending a contentless brief when no
+  promises are open (rejected — nothing to say means silence). Phase 5
+  is complete; deploy of functions + indexes remains bundled with the
+  pending Phase 2a deploy.

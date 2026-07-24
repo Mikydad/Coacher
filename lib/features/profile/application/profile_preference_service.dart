@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import '../../../core/push/push_messaging_service.dart';
 import '../../../features/analytics/application/coaching_insight_notification_policy.dart'
     as coaching_notify_policy;
 import '../../../features/coaching/domain/models/enforcement_mode.dart';
@@ -96,6 +99,11 @@ class ProfilePreferenceService {
       updatedAtMs: nowMs,
     );
     await _repository.upsertPreference(updated);
+    // Mirror onto this device's token doc immediately so the Phase 5c
+    // morning-brief push honors the toggle from tomorrow, not the day
+    // after (heartbeats refresh it, but only on app open). Fire-and-
+    // forget: the local write above is the source of truth.
+    unawaited(PushMessagingService.instance.mirrorMorningBriefEnabled(enabled));
   }
 
   /// Returns the persisted preference, or an in-memory default if none exists.
