@@ -46,8 +46,9 @@ class NoOpOrchestratorService extends AttentionOrchestratorService {
   @override
   Future<void> onInteractionReceived(
     String entityId,
-    NotificationInteractionType type,
-  ) async {
+    NotificationInteractionType type, {
+    int? notifId,
+  }) async {
     interactions.add((entityId, type));
   }
 

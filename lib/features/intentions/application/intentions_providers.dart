@@ -34,12 +34,10 @@ final intentionsStreamProvider = StreamProvider<List<Intention>>((ref) {
   return ref.watch(intentionsRepositoryProvider).watchIntentions();
 });
 
-/// Open intentions — the Promises strip's main content.
+/// Live (open + nudged) intentions — the Promises strip's main content.
 final openIntentionsProvider = Provider<List<Intention>>((ref) {
   final all = ref.watch(intentionsStreamProvider).valueOrNull ?? const [];
-  return all
-      .where((i) => i.status == IntentionStatus.open)
-      .toList(growable: false);
+  return all.where((i) => i.isLive).toList(growable: false);
 });
 
 /// Dormant intentions — the "on your radar" section (hidden when empty;

@@ -68,10 +68,19 @@ class AssistantMessageBubble extends StatelessWidget {
                 TextStyle(fontSize: 14, color: AppColors.textSoft),
               ),
             ),
+            // One chip per distinct cited fact (P3-01) — a reply grounded
+            // in several memories shows every source, not just the first.
             if (grounded.factIds.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
-                child: MemoryReferenceChip(factId: grounded.factIds.first),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final factId in grounded.factIds)
+                      MemoryReferenceChip(factId: factId),
+                  ],
+                ),
               ),
           ],
         ),

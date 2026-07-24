@@ -2,8 +2,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/notifications/local_notifications_service.dart';
 import '../../../core/offline/offline_store.dart';
+import '../../../core/push/push_messaging_service.dart';
 import '../../../core/sync/sync_cursor_store.dart';
 import '../../../core/sync/sync_service.dart';
+import '../../intentions/application/geofence_arming.dart';
+import '../../thinking/application/thinking_loop_service.dart';
 
 // ── Feature flag ──────────────────────────────────────────────────────────────
 
@@ -63,6 +66,17 @@ abstract final class AuthSessionPolicy {
   /// for that (so the order is: clear local → then sign out, giving the
   /// reactive [AuthGate] a clean state to present).
   static Future<void> clearLocalSession() async {
+    // 0. Account boundary for device-scoped transports (runs FIRST, while
+    //    the outgoing user is still authenticated):
+    //    - remove this device's push-token doc from the outgoing user's
+    //      tree so their rescue/brief pushes never reach the next user
+    //      (P1-01; best-effort with timeout, no-op without Firebase);
+    //    - disarm the native home-exit geofence, whose armed list carries
+    //      the outgoing user's intention copy and fires without Flutter
+    //      alive (P1-02; no-op without the iOS channel).
+    await PushMessagingService.instance.deregisterDevice();
+    await GeofenceArmingService().clearForLogout();
+
     // 1. Cancel all pending OS notifications.
     await LocalNotificationsService.instance.cancelAll();
 
@@ -89,6 +103,11 @@ abstract final class AuthSessionPolicy {
       // Onboarding is per-account (a different sign-in re-evaluates new vs
       // existing); seen feature cards stay device-level on purpose.
       prefs.remove('education_onboarding_state_v1'),
+      // Thinking Loop cadence is per-account (P2-10): without this, user
+      // A's morning reflection would make user B silently skip theirs for
+      // the rest of the local day after an account switch.
+      prefs.remove(ThinkingLoopService.lastDayPrefsKey),
+      prefs.remove(ThinkingLoopService.inputsHashPrefsKey),
     ]);
   }
 }

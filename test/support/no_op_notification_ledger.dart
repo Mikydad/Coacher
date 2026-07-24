@@ -36,5 +36,13 @@ class NoOpNotificationLedger implements NotificationLedgerRepository {
       const [];
 
   @override
+  Future<List<IsarNotificationLedgerEntry>> getDeliveryClaimsByKindInRange({
+    required String entityKind,
+    required int startMs,
+    required int endMs,
+  }) async =>
+      const [];
+
+  @override
   Future<void> pruneOlderThan(Duration age) async {}
 }

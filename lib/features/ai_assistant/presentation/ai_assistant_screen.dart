@@ -65,14 +65,21 @@ class CoachRouteArgs {
 ///
 /// [askBar] starts at the peek (the coach FAB path: tap → type → send).
 /// Flows with a payload ([args] — morning brief, proactive cards, help
-/// sheet) start at 60% where the payload is visible. Conversation state
-/// lives in providers, so every opening shows the same thread. The route
-/// keeps the '/coach' name for the feedback route tracker.
+/// sheet) start at 60% where the payload is visible. The route keeps the
+/// '/coach' name for the feedback route tracker.
+///
+/// Closing the sheet IS the conversation boundary (P1-04): memory
+/// extraction runs on the turns just gathered and the session id rotates,
+/// so each opening starts a fresh conversation. Without this, the only
+/// session end was a 30-minute idle timer INSIDE the sheet — a normal
+/// chat-then-close never extracted, and the raw turns raced the purge.
 Future<void> showCoachAiSheet(
   BuildContext context, {
   CoachRouteArgs? args,
   bool askBar = false,
 }) {
+  // Resolve before awaiting the sheet — [context] may be gone by then.
+  final container = ProviderScope.containerOf(context, listen: false);
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -86,7 +93,15 @@ Future<void> showCoachAiSheet(
       arguments: args,
     ),
     builder: (_) => _CoachAiSheet(askBar: askBar),
-  );
+  ).whenComplete(() {
+    try {
+      // The service is created via the parser future; if it never resolved
+      // (sheet closed before AI booted) there is no session to end.
+      container.read(resolvedAiAssistantProvider).value?.startNewSession();
+    } catch (e) {
+      debugPrint('[Coach] session-end extraction skipped: $e');
+    }
+  });
 }
 
 /// Opens Coach with a payload from anywhere — or, when the coach sheet is

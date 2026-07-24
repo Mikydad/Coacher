@@ -99,23 +99,31 @@ class GeofenceArmingService {
   Future<GeofenceSignalChoice> getChoice() => _settings.getChoice();
 
   /// Whether arming can work right now: enabled + OS grant + home set.
+  ///
+  /// Only `always` counts (P2-04): the headline use case is a region exit
+  /// with the app dead, which `whenInUse` cannot deliver. Treating a
+  /// partial grant as live would show a healthy armed list that never
+  /// fires in the background — the opt-in must be honest instead.
   Future<bool> isLive() async {
     if (await _settings.getChoice() != GeofenceSignalChoice.enabled) {
       return false;
     }
     final status = await _channel.getAuthorizationStatus();
-    if (status != 'always' && status != 'whenInUse') return false;
+    if (status != 'always') return false;
     return _channel.hasHome();
   }
 
   /// User said yes (per-intention toggle or Profile switch): request the
   /// OS ladder, remember the outcome. Home setup is a separate step.
+  /// Granted means `always` — a `whenInUse` outcome is recorded as
+  /// declined so the opt-in flow tells the user what is missing rather
+  /// than silently arming a geofence that cannot fire dead-app (P2-04).
   Future<bool> enable() async {
     var status = await _channel.getAuthorizationStatus();
     if (status == 'notDetermined' || status == 'whenInUse') {
       status = await _channel.requestAccess();
     }
-    final granted = status == 'always' || status == 'whenInUse';
+    final granted = status == 'always';
     await _settings.setChoice(
       granted ? GeofenceSignalChoice.enabled : GeofenceSignalChoice.declined,
     );
@@ -126,6 +134,18 @@ class GeofenceArmingService {
   /// off means off, nothing keeps firing.
   Future<void> decline() async {
     await _settings.setChoice(GeofenceSignalChoice.declined);
+    await _channel.setArmedIntents(const []);
+    await _channel.clearHome();
+  }
+
+  /// Logout / account-switch boundary (P1-02): the native armed list
+  /// carries the outgoing user's prerendered intention copy and fires
+  /// WITHOUT Flutter alive, so account cleanup must disarm it and forget
+  /// the device-local location state. The next account starts from
+  /// "undecided" — no inherited home anchor, no inherited opt-ins.
+  Future<void> clearForLogout() async {
+    await _optIns.retainAll(const <String>{});
+    await _settings.setChoice(GeofenceSignalChoice.undecided);
     await _channel.setArmedIntents(const []);
     await _channel.clearHome();
   }
@@ -157,11 +177,13 @@ class GeofenceArmingService {
     if (!await isLive()) return;
     final nowMs = _now().millisecondsSinceEpoch;
     final opted = await _optIns.ids();
+    // Dependency-gated promises (P1-07) stay silent on every channel —
+    // a home-exit fire is a nudge too.
     final armable = intentions
         .where(
           (i) =>
               opted.contains(i.id) &&
-              i.status == IntentionStatus.open &&
+              i.isNudgeable &&
               i.windowEndMs > nowMs,
         )
         .toList(growable: false);

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -47,6 +49,12 @@ class PushMessagingService {
   bool _wired = false;
   ProviderContainer? _container;
 
+  /// Uid whose Firestore tree holds this device's token doc. Account
+  /// boundary state (P1-01): a sign-in with a DIFFERENT uid must re-scope
+  /// the token immediately instead of waiting for a process restart or an
+  /// FCM token rotation.
+  String? _registeredUid;
+
   /// Wires token registration + message handlers. Safe to call more than
   /// once; only the first call takes effect.
   Future<void> initialize(ProviderContainer container) async {
@@ -74,10 +82,61 @@ class PushMessagingService {
       messaging.onTokenRefresh.listen((token) {
         unawaited(_registerToken(token));
       });
+      // Account boundary (P1-01): re-scope the token when the signed-in
+      // uid changes. authStateChanges emits the current user on listen,
+      // which also covers the signed-out-boot race where the initial
+      // registration was enqueued under the fallback uid and dropped.
+      FirebaseAuth.instance.authStateChanges().listen((user) {
+        unawaited(_onAuthChanged(user?.uid));
+      });
       final token = await messaging.getToken();
       if (token != null) await _registerToken(token);
     } catch (e) {
       debugPrint('[Push] initialize skipped: $e');
+    }
+  }
+
+  /// Sign-in with a different account than the token doc was written
+  /// under: refresh the registration under the NEW user's tree and reset
+  /// the heartbeat day gate so the new account is "seen today" at once.
+  Future<void> _onAuthChanged(String? uid) async {
+    if (uid == null || uid == _registeredUid) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_lastHeartbeatDayKey);
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) await _registerToken(token);
+      await recordHeartbeat();
+    } catch (e) {
+      debugPrint('[Push] auth re-registration skipped: $e');
+    }
+  }
+
+  /// Logout boundary (P1-01): remove this device's token doc from the
+  /// OUTGOING user's tree so their rescue / morning-brief pushes can never
+  /// appear on a device someone else now uses. Must be called while the
+  /// outgoing user is still authenticated (before `signOut()`).
+  ///
+  /// Network-inherent by nature — the doc lives server-side and the outbox
+  /// queue is about to be cleared — so this is a direct best-effort delete
+  /// with a short timeout. An offline logout leaves the doc behind
+  /// (accepted residual risk: the sweep prunes dead tokens on first
+  /// failed send).
+  Future<void> deregisterDevice() async {
+    if (!_firebaseReady) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // The next account must not inherit this account's heartbeat gate.
+      await prefs.remove(_lastHeartbeatDayKey);
+      _registeredUid = null;
+      final deviceId = prefs.getString(_deviceIdKey);
+      if (deviceId == null || deviceId.isEmpty) return;
+      await FirebaseFirestore.instance
+          .doc(FirestorePaths.deviceTokenDocument(deviceId))
+          .delete()
+          .timeout(const Duration(seconds: 3));
+    } catch (e) {
+      debugPrint('[Push] deregister skipped: $e');
     }
   }
 
@@ -121,6 +180,9 @@ class PushMessagingService {
           morningBriefEnabled: await _morningBriefEnabled(),
         ),
       );
+      // Remember which user's tree the write was scoped to, so a later
+      // sign-in under a different uid triggers a re-registration.
+      _registeredUid = FirestorePaths.activeUid;
     } catch (e) {
       debugPrint('[Push] token register skipped: $e');
     }

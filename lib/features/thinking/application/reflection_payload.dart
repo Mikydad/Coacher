@@ -116,7 +116,10 @@ String reflectionInputsHash({
 }) {
   final parts = <String>[
     for (final f in facts) 'f:${f.id}:${f.updatedAtMs}',
-    for (final p in people) 'p:${p.id}:${p.lastInteractionAtMs ?? 0}',
+    // updatedAtMs matters too (P2-10): renaming a person or editing their
+    // relationship must re-arm reflection, not only a new interaction.
+    for (final p in people)
+      'p:${p.id}:${p.updatedAtMs}:${p.lastInteractionAtMs ?? 0}',
     for (final i in intentions)
       'i:${i.id}:${i.status.name}:${i.updatedAtMs}:'
           '${i.nudgeCount}:${i.snoozeCount}',

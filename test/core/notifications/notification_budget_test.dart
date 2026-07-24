@@ -46,9 +46,11 @@ void main() {
     expect(await budget.canSchedule(needed: 3), isFalse);
   });
 
-  test('fails open when the pending queue cannot be read', () async {
+  test(
+      'fails CLOSED when the pending queue cannot be read (P2-12) — '
+      'scheduling blind past 64 means silent OS drops', () async {
     final budget = NotificationBudget(pending: _FakePending(0, throws: true));
-    expect(await budget.canSchedule(), isTrue);
+    expect(await budget.canSchedule(), isFalse);
   });
 
   test('custom cap is honored', () async {

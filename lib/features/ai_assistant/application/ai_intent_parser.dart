@@ -132,7 +132,12 @@ class AiIntentParser {
     try {
       result = await client.parseIntent(payload);
     } on AiOperatingLayerException catch (e) {
-      final msg = e.isRateLimit
+      // Network-honest copy (P2-13): being offline is a fact of the world,
+      // not a failure of the request — say so instead of a vague apology.
+      final msg = e.isNetwork
+          ? "You're offline — I need a connection for this. "
+                "Ask me again once you're back online."
+          : e.isRateLimit
           ? "I've hit my request limit. Please try again in a moment."
           : "Something went wrong processing your request. Please try again.";
       return AiPlannedChanges(sessionId: sessionId, followUpQuestion: msg);

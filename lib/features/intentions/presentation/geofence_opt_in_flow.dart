@@ -24,8 +24,10 @@ Future<bool> ensureGeofenceReady(BuildContext context, WidgetRef ref) async {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Location access is off at the system level — allow it in '
-              'iOS Settings > SidePal, then try again from Profile.',
+              'SidePal needs \u201cAlways\u201d location access to notice '
+              'when you head out — even with the app closed. Allow Always '
+              'in iOS Settings > SidePal > Location, then try again from '
+              'Profile.',
             ),
           ),
         );

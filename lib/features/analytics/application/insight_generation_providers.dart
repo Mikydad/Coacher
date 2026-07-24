@@ -19,6 +19,17 @@ bool layer3InsightActiveOnDateKey(GeneratedInsight insight, String dateKey) {
   return start.compareTo(day) <= 0 && end.compareTo(day) >= 0;
 }
 
+/// Whether [insight] may enter the generic delivery surfaces (coaching
+/// focus, Layer-4 selection, Progress, Home top insights).
+///
+/// Reflection observations are excluded by settled decision (humanizing
+/// Phase 7, P1-08): standing understanding lives ONLY in the quiet
+/// "On your radar" row, which reads the reflection entity scope directly —
+/// it must never compete with deterministic insights for the focus card
+/// or a notification slot.
+bool isDeliverySurfaceEligible(GeneratedInsight insight) =>
+    insight.insightType != InsightType.reflectionObservation;
+
 Future<List<GeneratedInsight>> loadLayer3DeliveryInsightsForDay(
   InsightCacheRepository repo,
   String dateKey,
@@ -33,10 +44,14 @@ Future<List<GeneratedInsight>> loadLayer3DeliveryInsightsForDay(
   final entity = <GeneratedInsight>[];
   for (final insight in all) {
     if (insight.scopeType != InsightScopeType.entity) continue;
+    if (!isDeliverySurfaceEligible(insight)) continue;
     if (!layer3InsightActiveOnDateKey(insight, trimmed)) continue;
     entity.add(insight);
   }
-  final merged = <GeneratedInsight>[...global, ...entity];
+  final merged = <GeneratedInsight>[
+    ...global.where(isDeliverySurfaceEligible),
+    ...entity,
+  ];
   merged.sort(compareInsightOrdering);
   return merged;
 }

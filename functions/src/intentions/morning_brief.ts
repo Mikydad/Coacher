@@ -9,10 +9,11 @@
  * remains the in-app fallback: any check-in today silences the push.
  *
  * Index note (errors.md discipline): the collection-group query is a
- * single equality on morningBriefEnabled — one declared fieldOverride,
- * no composite. Open promises are counted with a plain single-field
- * equality query on the user's own intentions collection (automatic
- * index), active/window filtered in memory.
+ * single equality on morningBriefEnabled ordered by documentId — the
+ * declared fieldOverride's index entries carry __name__ as tiebreaker,
+ * so the cursor pagination needs no composite. Open promises are counted
+ * with a plain single-field `in` query on the user's own intentions
+ * collection (automatic index), active/window filtered in memory.
  *
  * Bookkeeping is server-owned (`users/{uid}/briefState/morning`) —
  * client outbox upserts can never clobber it.
@@ -20,7 +21,7 @@
 
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions/v2';
-import { getFirestore } from 'firebase-admin/firestore';
+import { FieldPath, getFirestore } from 'firebase-admin/firestore';
 import { Message } from 'firebase-admin/messaging';
 
 import { briefAction, localDayKey } from './brief_rules';
@@ -28,22 +29,45 @@ import { DeviceToken, sendToTokens } from './push_send';
 
 const BATCH_LIMIT = 500;
 
+/** Pagination bound (P1-03): the old single `.limit(500)` silently
+ * dropped opted-in device 501+ forever once the base grew past the
+ * limit. Cursor pages keep every device visible while capping one run's
+ * work; the day-key bookkeeping makes re-visits across runs idempotent. */
+const MAX_PAGES = 6;
+
 /** One full brief pass — extracted so tests/dev tools can run it on demand. */
 export async function runMorningBriefOnce(
   now: number,
 ): Promise<Record<string, number>> {
   const db = getFirestore();
-  const counts = { users: 0, sent: 0, skipped: 0, tokensPruned: 0 };
+  const counts = {
+    users: 0,
+    sent: 0,
+    skipped: 0,
+    sendFailures: 0,
+    tokensPruned: 0,
+  };
 
-  const optedIn = await db
-    .collectionGroup('deviceTokens')
-    .where('morningBriefEnabled', '==', true)
-    .limit(BATCH_LIMIT)
-    .get();
+  // Collect all opted-in device docs across cursor pages BEFORE grouping,
+  // so a user whose devices straddle a page boundary is still seen whole.
+  const optedInDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+  let cursor: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    let query = db
+      .collectionGroup('deviceTokens')
+      .where('morningBriefEnabled', '==', true)
+      .orderBy(FieldPath.documentId())
+      .limit(BATCH_LIMIT);
+    if (cursor) query = query.startAfter(cursor);
+    const snap = await query.get();
+    optedInDocs.push(...snap.docs);
+    if (snap.docs.length < BATCH_LIMIT) break;
+    cursor = snap.docs[snap.docs.length - 1];
+  }
 
   // Group opted-in device docs by user.
   const byUid = new Map<string, FirebaseFirestore.QueryDocumentSnapshot[]>();
-  for (const doc of optedIn.docs) {
+  for (const doc of optedInDocs) {
     const uid = doc.ref.parent.parent?.id;
     if (!uid) continue;
     const list = byUid.get(uid) ?? [];
@@ -120,9 +144,17 @@ export async function runMorningBriefOnce(
       continue;
     }
 
-    counts.tokensPruned += await sendToTokens(uid, tokens, (token) =>
+    const result = await sendToTokens(uid, tokens, (token) =>
       briefMessage(token, action.title, action.body),
     );
+    counts.tokensPruned += result.pruned;
+    if (result.delivered === 0) {
+      // Honest bookkeeping (P2-02): no send reached FCM, so the day key
+      // stays unstamped and the next 15-minute run retries while the
+      // 08:00–10:00 window is still open.
+      counts.sendFailures += 1;
+      continue;
+    }
     counts.sent += 1;
     await stateRef.set(
       { lastBriefDayKey: localDayKey(now, tzOffsetMinutes), updatedAtMs: now },
@@ -149,9 +181,10 @@ export const morningBrief = onSchedule(
 
 async function countOpenPromises(uid: string, now: number): Promise<number> {
   const db = getFirestore();
+  // `nudged` is a live status (P1-05) — a deferred promise still counts.
   const snap = await db
     .collection(`users/${uid}/intentions`)
-    .where('status', '==', 'open')
+    .where('status', 'in', ['open', 'nudged'])
     .get();
   let count = 0;
   for (const doc of snap.docs) {

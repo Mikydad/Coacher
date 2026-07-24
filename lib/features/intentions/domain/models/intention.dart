@@ -107,8 +107,28 @@ class Intention {
 
   bool get isPinned => pinnedAtMs != null;
 
-  /// Open intentions are the planner's input; dormant ones wait silently.
-  bool get isPlannable => active && status == IntentionStatus.open;
+  /// Live statuses: the user still means to do it. `nudged` is an open
+  /// promise that has demonstrably reached the user at least once
+  /// (P1-05 learning loop) — every live surface (planner, Promises strip,
+  /// geofence, Coach payload) treats the two identically; the distinction
+  /// feeds reflection and future planner scoring.
+  bool get isLive =>
+      status == IntentionStatus.open || status == IntentionStatus.nudged;
+
+  /// Live intentions are the planner's input; dormant ones wait silently.
+  bool get isPlannable => active && isLive;
+
+  /// "Before visiting parents" / anchored on another promise (P1-07):
+  /// captured and radar-visible, but the dependency is unresolved, so the
+  /// promise must stay silent — no nudge ladder, no geofence fire — until
+  /// the anchor completes (auto-promotion clears the link) or the user
+  /// edits the dependency away.
+  bool get hasUnresolvedDependency =>
+      (dependsOnText?.trim().isNotEmpty ?? false) ||
+      (anchorEntityId?.trim().isNotEmpty ?? false);
+
+  /// The nudge planner's true input: live AND not dependency-gated.
+  bool get isNudgeable => isPlannable && !hasUnresolvedDependency;
 
   void validate() {
     ModelValidators.requireNotBlank(id, 'intention.id');
@@ -197,6 +217,7 @@ class Intention {
     int? snoozeCount,
     bool? active,
     int? updatedAtMs,
+    bool clearDependency = false,
   }) {
     return Intention(
       id: id,
@@ -209,8 +230,10 @@ class Intention {
       importance: importance ?? this.importance,
       activityTags: activityTags ?? this.activityTags,
       aiHintsJson: aiHintsJson ?? this.aiHintsJson,
-      dependsOnText: dependsOnText ?? this.dependsOnText,
-      anchorEntityId: anchorEntityId ?? this.anchorEntityId,
+      dependsOnText:
+          clearDependency ? null : (dependsOnText ?? this.dependsOnText),
+      anchorEntityId:
+          clearDependency ? null : (anchorEntityId ?? this.anchorEntityId),
       locationHintText: locationHintText ?? this.locationHintText,
       status: status ?? this.status,
       pinnedAtMs: pinnedAtMs ?? this.pinnedAtMs,

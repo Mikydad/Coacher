@@ -1,4 +1,6 @@
 import '../../../core/notifications/notification_action_ids.dart';
+import '../../analytics/application/coaching_insight_notification_policy.dart'
+    show kCoachingInsightNotificationId;
 import '../domain/models/reminder_intent.dart';
 
 /// Entity kinds the orchestrator can deliver notifications for.
@@ -10,6 +12,12 @@ abstract final class ReminderEntityKinds {
   static const String goal = 'goal';
   static const String stakeInvite = 'stake_invite';
   static const String intention = 'intention';
+
+  /// Layer-4 "coach insight ready" push (V-01): routed through the
+  /// orchestrator so politeness (overrides, quiet hours, collision gap)
+  /// and the ledger apply — its own 3/day + 4h producer budget still
+  /// gates upstream.
+  static const String coachInsight = 'coach_insight';
 }
 
 /// Where an intent's notification goes: deterministic OS id, tap payload,
@@ -55,6 +63,15 @@ NotificationRoute resolveNotificationRoute(ReminderIntent intent) {
         notifId: intent.entityId.hashCode & 0x7fffffff,
         payload: 'stake:$encoded',
         immediate: true,
+      );
+    case ReminderEntityKinds.coachInsight:
+      return NotificationRoute(
+        // Fixed slot — every coach-insight push replaces the previous one
+        // (same contract the direct dispatch had). Payload matches the
+        // existing `layer4:` tap route; the insight id is used raw, as
+        // the tap handler splits on `::` without percent-decoding.
+        notifId: kCoachingInsightNotificationId,
+        payload: 'layer4:${intent.entityId}',
       );
     case ReminderEntityKinds.intention:
       return NotificationRoute(

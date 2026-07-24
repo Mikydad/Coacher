@@ -50,7 +50,7 @@ describe('rescueAction — the four-condition gate', () => {
     }
   });
 
-  it('non-open or tombstoned intentions are never rescued', () => {
+  it('non-live or tombstoned intentions are never rescued', () => {
     assert.equal(
       rescueAction(base({ intention: intention({ status: 'completed' }) })).kind,
       'skip',
@@ -59,6 +59,13 @@ describe('rescueAction — the four-condition gate', () => {
       rescueAction(base({ intention: intention({ active: false }) })).kind,
       'skip',
     );
+  });
+
+  it('nudged intentions stay live and keep the safety net (P1-05)', () => {
+    const action = rescueAction(
+      base({ intention: intention({ status: 'nudged' }) }),
+    );
+    assert.equal(action.kind, 'notification');
   });
 
   it('windows not yet closing (or already past) are skipped', () => {

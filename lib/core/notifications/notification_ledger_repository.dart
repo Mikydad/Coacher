@@ -99,6 +99,32 @@ class NotificationLedgerRepository {
     return _isar.isarNotificationLedgerEntrys.where().findAll();
   }
 
+  /// "Delivery claims" for [entityKind] whose scheduled time falls inside
+  /// [startMs]..[endMs] (inclusive): rows still pending, plus rows that
+  /// actually reached the user (deliveredAtMs stamped — even if the slot
+  /// was later replaced). Rows cancelled BEFORE delivery are free, so a
+  /// replan never counts its own replaced slots.
+  ///
+  /// Powers the daily intention-nudge caps (P1-06).
+  Future<List<IsarNotificationLedgerEntry>> getDeliveryClaimsByKindInRange({
+    required String entityKind,
+    required int startMs,
+    required int endMs,
+  }) async {
+    final rows = await _isar.isarNotificationLedgerEntrys
+        .filter()
+        .entityKindEqualTo(entityKind)
+        .scheduledForMsBetween(startMs, endMs)
+        .findAll();
+    return rows
+        .where(
+          (r) =>
+              r.deliveredAtMs != null ||
+              r.state != NotificationLedgerState.cancelled.name,
+        )
+        .toList(growable: false);
+  }
+
   /// Return all entries in a given [state] (used for boot reconciliation).
   Future<List<IsarNotificationLedgerEntry>> getByState(
     NotificationLedgerState state,

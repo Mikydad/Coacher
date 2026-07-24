@@ -24,17 +24,26 @@ abstract class AiOperatingLayerClient {
 // ─── Exception ────────────────────────────────────────────────────────────────
 
 class AiOperatingLayerException implements Exception {
-  const AiOperatingLayerException(this.message, {this.statusCode});
+  const AiOperatingLayerException(
+    this.message, {
+    this.statusCode,
+    this.isNetwork = false,
+  });
 
   final String message;
   final int? statusCode;
+
+  /// Connectivity failure (P2-13) — surfaces show "you're offline" copy
+  /// instead of a generic error that blames the request.
+  final bool isNetwork;
 
   bool get isRateLimit => statusCode == 429;
 
   @override
   String toString() =>
       'AiOperatingLayerException($message'
-      '${statusCode != null ? ", status=$statusCode" : ""})';
+      '${statusCode != null ? ", status=$statusCode" : ""}'
+      '${isNetwork ? ", network" : ""})';
 }
 
 // ─── System prompt (agent mode) ───────────────────────────────────────────────
@@ -326,7 +335,11 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
           timeout: Duration(seconds: timeoutSeconds),
         );
       } on AiProxyException catch (e) {
-        throw AiOperatingLayerException(e.message, statusCode: e.statusCode);
+        throw AiOperatingLayerException(
+          e.message,
+          statusCode: e.statusCode,
+          isNetwork: e.isNetwork,
+        );
       }
 
       // A propose_changes call is terminal — map it to the preview pipeline.

@@ -214,12 +214,13 @@ class GeofenceSignalBridge: NSObject, CLLocationManagerDelegate {
 
     let nowMs = Int64(now.timeIntervalSince1970 * 1000)
     let hour = Calendar.current.component(.hour, from: now)
+    var candidates: [[String: Any]] = []
     var remaining: [[String: Any]] = []
 
     for intent in armed {
-      guard let id = intent["intentionId"] as? String,
-        let title = intent["title"] as? String,
-        let body = intent["body"] as? String
+      guard intent["intentionId"] is String,
+        intent["title"] is String,
+        intent["body"] is String
       else { continue }
       let windowStart = (intent["windowStartMs"] as? NSNumber)?.int64Value ?? 0
       let windowEnd =
@@ -232,17 +233,43 @@ class GeofenceSignalBridge: NSObject, CLLocationManagerDelegate {
         remaining.append(intent)  // not yet / impolite — stays armed
         continue
       }
+      candidates.append(intent)
+    }
 
+    // One exit, ONE nudge (P2-06): a departure is a moment, not a slot for
+    // a checklist. Fire only the most urgent eligible intent (soonest
+    // deadline); the others stay armed for the next departure.
+    func deadline(_ intent: [String: Any]) -> Int64 {
+      (intent["windowEndMs"] as? NSNumber)?.int64Value ?? Int64.max
+    }
+    if let best = candidates.min(by: { deadline($0) < deadline($1) }),
+      let id = best["intentionId"] as? String,
+      let title = best["title"] as? String,
+      let body = best["body"] as? String
+    {
       let content = UNMutableNotificationContent()
       content.title = title
       content.body = body
       content.sound = .default
-      content.userInfo = ["sidepal": "geofence", "intentionId": id]
+      // flutter_local_notifications surfaces userInfo["payload"] as
+      // response.payload, so a tap on this native notification routes
+      // through the same intention flow as a Dart-scheduled nudge, and
+      // the category attaches the Done / Later / Wrong time actions
+      // (P2-05). Keep the string in sync with NotificationCategoryIds.
+      content.userInfo = [
+        "sidepal": "geofence",
+        "intentionId": id,
+        "payload": "intention:\(id)",
+      ]
+      content.categoryIdentifier = "sidepalIntentionNudge.v1"
       UNUserNotificationCenter.current().add(
         UNNotificationRequest(
           identifier: "geofence_\(id)", content: content, trigger: nil))
-      // Fired → disarmed. One exit, one nudge; Dart re-arms on app open
-      // if the promise is still open and the user still wants it.
+      // Fired → disarmed. Dart re-arms on app open if the promise is
+      // still open and the user still wants it.
+      remaining += candidates.filter {
+        ($0["intentionId"] as? String) != id
+      }
     }
 
     defaults.set(remaining, forKey: Self.armedDefaultsKey)

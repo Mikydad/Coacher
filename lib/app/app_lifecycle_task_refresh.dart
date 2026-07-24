@@ -11,6 +11,7 @@ import '../core/sync/post_sync_refresh_coordinator.dart';
 import '../core/sync/sync_service.dart';
 import '../core/utils/date_keys.dart';
 import '../features/context_override/application/context_override_expiry_poller.dart';
+import '../features/memory/application/memory_providers.dart';
 import '../features/reminders/application/attention_orchestrator_providers.dart';
 import '../features/thinking/application/thinking_providers.dart';
 import 'notification_response_handler.dart';
@@ -33,6 +34,12 @@ class _AppLifecycleTaskRefreshState
     with WidgetsBindingObserver {
   Timer? _dayCheckTimer;
   String? _lastTodayKey;
+
+  /// Memory maintenance re-runs on resume, throttled (P1-04): bootstrap
+  /// alone means a device that stays warm for days never re-enforces the
+  /// purge ceilings or retries deferred extractions.
+  static const Duration _kMaintenanceMinInterval = Duration(hours: 6);
+  int _lastMaintenanceMs = 0;
 
   @override
   void initState() {
@@ -121,6 +128,15 @@ class _AppLifecycleTaskRefreshState
       // Thinking Loop (Phase 7) — once per local day, fresh inputs only;
       // both gates live inside the service.
       unawaited(ref.read(thinkingLoopServiceProvider).reflectIfDue());
+      // Summarize-then-purge sweep (Phase 2) — bootstrap runs it once,
+      // but long-lived warm processes must re-enforce the raw-turn purge
+      // ceilings too. Cheap when nothing is due; throttled here.
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      if (nowMs - _lastMaintenanceMs >
+          _kMaintenanceMinInterval.inMilliseconds) {
+        _lastMaintenanceMs = nowMs;
+        unawaited(ref.read(memoryExtractionServiceProvider).runMaintenance());
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         flushPendingNotificationNavigationIntent();
       });

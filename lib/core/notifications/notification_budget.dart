@@ -30,14 +30,18 @@ class NotificationBudget {
   final int _safeCap;
 
   /// True when [needed] more notifications can be scheduled without crossing
-  /// the safety margin. Fails open (true) if the pending queue can't be read.
+  /// the safety margin. Fails CLOSED (false) if the pending queue can't be
+  /// read (P2-12): the budget exists because iOS silently discards overflow
+  /// past 64 pending — scheduling blind into a possibly-full queue recreates
+  /// exactly the failure this class prevents. Skipping is explicit, logged,
+  /// and self-heals on the next replan.
   Future<bool> canSchedule({int needed = 1}) async {
     final List<PendingNotificationRequest> pending;
     try {
       pending = await _pending.getPendingNotificationRequests();
     } catch (e) {
-      debugPrint('[NotificationBudget] pending query failed, allowing: $e');
-      return true;
+      debugPrint('[NotificationBudget] pending query failed, denying: $e');
+      return false;
     }
     final ok = pending.length + needed <= _safeCap;
     if (!ok) {

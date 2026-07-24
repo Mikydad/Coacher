@@ -19,6 +19,7 @@ import '../data/opportunity_plan_repository.dart';
 import '../domain/models/intention.dart';
 import '../domain/models/intention_projection.dart';
 import '../domain/models/opportunity_slot.dart';
+import 'intention_nudge_cap_policy.dart';
 import 'opportunity_planner.dart';
 
 /// Same `{title, startTime, endTime}` conversion the payload assembler
@@ -194,7 +195,10 @@ class IntentionNudgeSyncService {
       return;
     }
 
-    if (!intention.isPlannable) {
+    // Dependency-gated promises (P1-07) behave dormant: radar-visible,
+    // zero notifications, until the anchor completes (auto-promotion in
+    // IntentionsRepository.updateStatus) or the user edits the dependency.
+    if (!intention.isNudgeable) {
       await cancelForIntention(intention.id);
       return;
     }
@@ -213,14 +217,23 @@ class IntentionNudgeSyncService {
       return;
     }
 
+    // Daily politeness ceilings (P1-06): 2 nudges per intention per local
+    // day, 4 intention nudges across all intentions. Applied BEFORE the
+    // inputs hash so cap effects participate in change detection.
+    final capped = await _cappedLadder(intention, slots, now);
+    if (capped.isEmpty) {
+      await cancelForIntention(intention.id);
+      return;
+    }
+
     // Slot ladder budget (PRD §4.3): two slots by default, the third only
     // when the 64-cap headroom allows all three.
-    var ladder = slots;
-    if (slots.length > 2) {
+    var ladder = capped;
+    if (capped.length > 2) {
       final roomForAll =
-          await (_budget?.canSchedule(needed: slots.length) ??
+          await (_budget?.canSchedule(needed: capped.length) ??
               Future.value(true));
-      if (!roomForAll) ladder = slots.take(2).toList(growable: false);
+      if (!roomForAll) ladder = capped.take(2).toList(growable: false);
     }
 
     final hash = _inputsHash(intention, ladder);
@@ -339,6 +352,57 @@ class IntentionNudgeSyncService {
       );
     }
     return result;
+  }
+
+  /// P1-06 enforcement: filter the ladder through the daily caps using the
+  /// ledger's delivery claims. The intention's OWN pending rows are
+  /// excluded — they are this ladder's previous incarnation, about to be
+  /// cancelled and replaced; its already-delivered rows still count (the
+  /// user heard about this promise today). Fails open on a ledger error:
+  /// the cap is politeness, not correctness.
+  Future<List<OpportunitySlot>> _cappedLadder(
+    Intention intention,
+    List<OpportunitySlot> slots,
+    DateTime now,
+  ) async {
+    try {
+      var lastMs = slots.first.deliverAtMs;
+      for (final s in slots) {
+        if (s.deliverAtMs > lastMs) lastMs = s.deliverAtMs;
+      }
+      final dayStartMs = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).millisecondsSinceEpoch;
+      final last = DateTime.fromMillisecondsSinceEpoch(lastMs);
+      final horizonEndMs =
+          DateTime(last.year, last.month, last.day + 1).millisecondsSinceEpoch -
+          1;
+      final claims = await _ledger.getDeliveryClaimsByKindInRange(
+        entityKind: ReminderEntityKinds.intention,
+        startMs: dayStartMs,
+        endMs: horizonEndMs,
+      );
+      final ownByDay = <String, int>{};
+      final globalByDay = <String, int>{};
+      for (final row in claims) {
+        final ms = row.scheduledForMs;
+        if (ms == null) continue;
+        final isOwn = row.entityId == intention.id;
+        if (isOwn && row.deliveredAtMs == null) continue;
+        final day = DateKeys.yyyymmdd(DateTime.fromMillisecondsSinceEpoch(ms));
+        globalByDay[day] = (globalByDay[day] ?? 0) + 1;
+        if (isOwn) ownByDay[day] = (ownByDay[day] ?? 0) + 1;
+      }
+      return applyIntentionDailyCaps(
+        slots: slots,
+        intentionCountByDay: ownByDay,
+        globalCountByDay: globalByDay,
+      );
+    } catch (_) {
+      return slots;
+    }
   }
 
   /// Hours where the ledger shows the user ignores nudges (w5 input).

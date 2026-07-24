@@ -29,6 +29,12 @@ void main() {
     // loading + error feedback (optimistic-then-honest class).
     'lib/features/community/application/user_circle_membership_service.dart':
         'multi-user transactions require server truth',
+    // Logout deregistration (P1-01): deleting the outgoing user's
+    // device-token doc must happen while they are still authenticated, and
+    // the outbox queue is cleared moments later — best-effort direct
+    // delete with a 3s timeout; offline failure is accepted residual risk.
+    'lib/core/push/push_messaging_service.dart':
+        'logout device-token removal is network-inherent (server truth)',
   };
 
   test('no awaited Firestore writes outside the sync outbox', () {

@@ -84,8 +84,18 @@ class ThinkingLoopService {
   /// observations — "on your radar", zero notifications until engaged.
   static const observationWindow = Duration(days: 60);
 
+  /// In-flight guard (P2-11): bootstrap and resume both launch this
+  /// unawaited within seconds of each other on a cold start; without the
+  /// guard, two overlapping runs could each pass the day/hash checks and
+  /// double-spend the system AI budget.
+  Future<void>? _inFlight;
+
   /// Entry point — bootstrap and app resume. Cheap when not due.
-  Future<void> reflectIfDue() async {
+  Future<void> reflectIfDue() {
+    return _inFlight ??= _reflectIfDue().whenComplete(() => _inFlight = null);
+  }
+
+  Future<void> _reflectIfDue() async {
     try {
       final now = _now();
       final today = DateKeys.todayKey(now);
@@ -96,8 +106,11 @@ class ThinkingLoopService {
       final people = await _people.fetchPeopleOnce();
       final intentions = await _intentions.fetchIntentionsOnce();
       if (facts.isEmpty && people.isEmpty && intentions.isEmpty) {
-        // Nothing to reflect on — mark the day so we stay cheap.
-        await prefs.setString(lastDayPrefsKey, today);
+        // Nothing to reflect on — but do NOT mark the day (P2-10): an
+        // empty snapshot is usually a fresh install or a just-wiped
+        // account switch, and onboarding/remote merge can fill Isar
+        // minutes later. Leaving the day unmarked keeps the loop armed;
+        // the empty re-check costs three Isar reads.
         return;
       }
 
@@ -152,7 +165,7 @@ class ThinkingLoopService {
         ),
         openIntentionIds: {
           for (final i in live)
-            if (i.status == IntentionStatus.open && !i.isPinned) i.id,
+            if (i.isLive && !i.isPinned) i.id,
         },
         existingTitleKeys: {
           for (final i in live) ReflectionParser.titleKey(i.title),
@@ -217,6 +230,11 @@ class ThinkingLoopService {
     }
     hints['preferredTimeBlock'] = hint.preferredTimeBlock;
     hints['hintSource'] = 'reflect';
+    if (hint.basedOn.isNotEmpty) {
+      // Provenance for the confirm-at-delivery loop: "wrong time" strikes
+      // contradict these sourcing records (P1-05).
+      hints['basedOn'] = hint.basedOn;
+    }
     return jsonEncode(hints);
   }
 

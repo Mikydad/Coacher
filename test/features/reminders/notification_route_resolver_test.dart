@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sidepal/core/notifications/local_notifications_service.dart';
 import 'package:sidepal/core/notifications/notification_action_ids.dart';
+import 'package:sidepal/features/analytics/application/coaching_insight_notification_policy.dart';
 import 'package:sidepal/features/context_override/domain/models/interruption_level.dart';
 import 'package:sidepal/features/reminders/application/notification_route_resolver.dart';
 import 'package:sidepal/features/reminders/domain/models/reminder_intent.dart';
@@ -61,6 +62,24 @@ void main() {
     expect(route.payload, 'stake:e1');
     expect(route.darwinCategoryId, isNull);
     expect(route.immediate, isTrue);
+  });
+
+  test(
+      'coach insight routes to the fixed COIN slot with a layer4 payload '
+      '(V-01)', () {
+    final route = resolveNotificationRoute(
+      _intent(
+        ReminderEntityKinds.coachInsight,
+        entityId: 'entity::goal-1::streak',
+      ),
+    );
+
+    expect(route.notifId, kCoachingInsightNotificationId);
+    // Raw id, no percent-encoding — the layer4 tap handler splits on '::'
+    // without decoding.
+    expect(route.payload, 'layer4:entity::goal-1::streak');
+    expect(route.darwinCategoryId, isNull);
+    expect(route.immediate, isFalse);
   });
 
   test('entity ids are uri-encoded in payloads', () {

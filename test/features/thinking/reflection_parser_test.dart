@@ -135,21 +135,64 @@ void main() {
     test('only open intention ids and known time blocks survive', () {
       final parsed = _parse({
         'hintUpdates': [
-          {'intentionId': 'intention_1', 'preferredTimeBlock': 'evening'},
-          {'intentionId': 'memfact_1', 'preferredTimeBlock': 'morning'},
-          {'intentionId': 'intention_2', 'preferredTimeBlock': 'midnight'},
+          {
+            'intentionId': 'intention_1',
+            'preferredTimeBlock': 'evening',
+            'basedOn': ['memfact_1'],
+          },
+          {
+            'intentionId': 'memfact_1',
+            'preferredTimeBlock': 'morning',
+            'basedOn': ['memfact_1'],
+          },
+          {
+            'intentionId': 'intention_2',
+            'preferredTimeBlock': 'midnight',
+            'basedOn': ['memfact_1'],
+          },
         ],
       });
       final hint = parsed.hintUpdates.single;
       expect(hint.intentionId, 'intention_1');
       expect(hint.preferredTimeBlock, 'evening');
+      expect(hint.basedOn, ['memfact_1']);
+    });
+
+    test('grounding-or-drop applies to hints too (P1-09)', () {
+      final parsed = _parse({
+        'hintUpdates': [
+          // No basedOn at all.
+          {'intentionId': 'intention_1', 'preferredTimeBlock': 'evening'},
+          // Empty basedOn.
+          {
+            'intentionId': 'intention_1',
+            'preferredTimeBlock': 'evening',
+            'basedOn': <String>[],
+          },
+          // One invented ref poisons the whole proposal.
+          {
+            'intentionId': 'intention_2',
+            'preferredTimeBlock': 'morning',
+            'basedOn': ['memfact_1', 'invented_id'],
+          },
+        ],
+      });
+      expect(parsed.hintUpdates, isEmpty);
     });
 
     test('one hint per intention — the first wins', () {
       final parsed = _parse({
         'hintUpdates': [
-          {'intentionId': 'intention_1', 'preferredTimeBlock': 'evening'},
-          {'intentionId': 'intention_1', 'preferredTimeBlock': 'morning'},
+          {
+            'intentionId': 'intention_1',
+            'preferredTimeBlock': 'evening',
+            'basedOn': ['memfact_1'],
+          },
+          {
+            'intentionId': 'intention_1',
+            'preferredTimeBlock': 'morning',
+            'basedOn': ['memfact_1'],
+          },
         ],
       });
       expect(parsed.hintUpdates, hasLength(1));

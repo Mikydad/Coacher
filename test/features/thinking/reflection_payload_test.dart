@@ -21,16 +21,17 @@ MemoryFact _fact(String id, {int updatedAtMs = 1000}) => MemoryFact(
   updatedAtMs: updatedAtMs,
 );
 
-Person _person(String id, {int? lastInteractionAtMs}) => Person(
-  id: id,
-  displayName: 'Sarah',
-  relationship: 'sister',
-  kind: PersonKind.family,
-  provenance: MemoryProvenance.userStated,
-  lastInteractionAtMs: lastInteractionAtMs,
-  createdAtMs: 1000,
-  updatedAtMs: 1000,
-);
+Person _person(String id, {int? lastInteractionAtMs, int updatedAtMs = 1000}) =>
+    Person(
+      id: id,
+      displayName: 'Sarah',
+      relationship: 'sister',
+      kind: PersonKind.family,
+      provenance: MemoryProvenance.userStated,
+      lastInteractionAtMs: lastInteractionAtMs,
+      createdAtMs: 1000,
+      updatedAtMs: updatedAtMs,
+    );
 
 Intention _intention(
   String id, {
@@ -163,6 +164,20 @@ void main() {
       expect(snoozed, isNot(done));
     });
 
+    test('changes when a person record is edited (P2-10)', () {
+      final before = reflectionInputsHash(
+        facts: const [],
+        people: [_person('person_1', updatedAtMs: 1000)],
+        intentions: const [],
+      );
+      final after = reflectionInputsHash(
+        facts: const [],
+        people: [_person('person_1', updatedAtMs: 2000)],
+        intentions: const [],
+      );
+      expect(before, isNot(after));
+    });
+
     test('changes when a fact is updated', () {
       final before = reflectionInputsHash(
         facts: [_fact('memfact_1', updatedAtMs: 1000)],
@@ -201,6 +216,18 @@ void main() {
         ),
       );
       expect(merged, contains('"preferredTimeBlock":"morning"'));
+    });
+
+    test('carries basedOn provenance for the confirm-at-delivery loop', () {
+      final merged = ThinkingLoopService.mergeHints(
+        null,
+        const ReflectionHintUpdate(
+          intentionId: 'intention_1',
+          preferredTimeBlock: 'evening',
+          basedOn: ['memfact_1', 'person_1'],
+        ),
+      );
+      expect(merged, contains('"basedOn":["memfact_1","person_1"]'));
     });
   });
 }

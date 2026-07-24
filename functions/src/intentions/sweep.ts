@@ -34,6 +34,12 @@ import { DeviceToken, sendToTokens } from './push_send';
 
 const BATCH_LIMIT = 200;
 
+/** Pagination bound (P1-03): pages per run × BATCH_LIMIT is the per-run
+ * ceiling; anything beyond is picked up by the next 15-minute run. The
+ * old single `.limit(200)` silently ignored user 201's closing promise
+ * FOREVER once the backlog crossed the limit. */
+const MAX_PAGES = 10;
+
 interface UserDevices {
   tokens: DeviceToken[];
   lastSeenMs: number | null;
@@ -50,79 +56,102 @@ export async function runIntentionSweepOnce(
     dataPushes: 0,
     rescues: 0,
     skipped: 0,
+    sendFailures: 0,
     tokensPruned: 0,
   };
 
-  const snap = await db
-    .collectionGroup('intentions')
-    .where('windowEndMs', '>', now)
-    .where('windowEndMs', '<=', now + CLOSING_HORIZON_MS)
-    .limit(BATCH_LIMIT)
-    .get();
-
   const deviceCache = new Map<string, UserDevices>();
 
-  for (const doc of snap.docs) {
-    counts.scanned += 1;
-    const uid = doc.ref.parent.parent?.id;
-    if (!uid) continue;
+  let cursor: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    let query = db
+      .collectionGroup('intentions')
+      .where('windowEndMs', '>', now)
+      .where('windowEndMs', '<=', now + CLOSING_HORIZON_MS)
+      .orderBy('windowEndMs')
+      .limit(BATCH_LIMIT);
+    if (cursor) query = query.startAfter(cursor);
+    const snap = await query.get();
+    if (snap.empty) break;
 
-    const data = doc.data();
-    const intention: IntentionSnapshot = {
-      id: doc.id,
-      title: (data.title as string | undefined) ?? 'a promise',
-      status: (data.status as string | undefined) ?? '',
-      active: data.active !== false,
-      windowEndMs: (data.windowEndMs as number | undefined) ?? 0,
-    };
-    // Cheap in-memory pre-filter before any extra reads (the pure rules
-    // re-check — this only saves Firestore round-trips).
-    if (intention.status !== 'open' || !intention.active) {
-      counts.skipped += 1;
-      continue;
-    }
+    for (const doc of snap.docs) {
+      counts.scanned += 1;
+      const uid = doc.ref.parent.parent?.id;
+      if (!uid) continue;
 
-    const devices = await devicesFor(uid, deviceCache);
-    const projection = await projectionFor(uid, doc.id);
-    const stateRef = db.doc(`users/${uid}/rescueState/${doc.id}`);
-    const state = ((await stateRef.get()).data() ?? null) as RescueState | null;
+      const data = doc.data();
+      const intention: IntentionSnapshot = {
+        id: doc.id,
+        title: (data.title as string | undefined) ?? 'a promise',
+        status: (data.status as string | undefined) ?? '',
+        active: data.active !== false,
+        windowEndMs: (data.windowEndMs as number | undefined) ?? 0,
+      };
+      // Cheap in-memory pre-filter before any extra reads (the pure rules
+      // re-check — this only saves Firestore round-trips). `nudged` is a
+      // live status (P1-05) — an intention the user deferred still
+      // deserves the rescue net.
+      if (
+        (intention.status !== 'open' && intention.status !== 'nudged') ||
+        !intention.active
+      ) {
+        counts.skipped += 1;
+        continue;
+      }
 
-    const action = rescueAction({
-      intention,
-      projection,
-      lastSeenMs: devices.lastSeenMs,
-      tzOffsetMinutes: devices.tzOffsetMinutes,
-      state,
-      nowMs: now,
-    });
+      const devices = await devicesFor(uid, deviceCache);
+      const projection = await projectionFor(uid, doc.id);
+      const stateRef = db.doc(`users/${uid}/rescueState/${doc.id}`);
+      const state = ((await stateRef.get()).data() ??
+        null) as RescueState | null;
 
-    if (action.kind === 'skip') {
-      counts.skipped += 1;
-      continue;
-    }
+      const action = rescueAction({
+        intention,
+        projection,
+        lastSeenMs: devices.lastSeenMs,
+        tzOffsetMinutes: devices.tzOffsetMinutes,
+        state,
+        nowMs: now,
+      });
 
-    const pruned = await sendToTokens(uid, devices.tokens, (token) =>
-      rescueMessage(token, intention.id, action),
-    );
-    counts.tokensPruned += pruned;
+      if (action.kind === 'skip') {
+        counts.skipped += 1;
+        continue;
+      }
 
-    if (action.kind === 'data') {
-      counts.dataPushes += 1;
-      await stateRef.set(
-        { lastDataPushAtMs: now, updatedAtMs: now },
-        { merge: true },
+      const result = await sendToTokens(uid, devices.tokens, (token) =>
+        rescueMessage(token, intention.id, action),
       );
-    } else {
-      counts.rescues += 1;
-      await stateRef.set(
-        {
-          lastRescueAtMs: now,
-          rescuedWindowEndMs: intention.windowEndMs,
-          updatedAtMs: now,
-        },
-        { merge: true },
-      );
+      counts.tokensPruned += result.pruned;
+      if (result.delivered === 0) {
+        // Honest bookkeeping (P2-02): nothing reached FCM, so the state
+        // stays untouched and the next run retries — stamping here would
+        // record a rescue the user never received.
+        counts.sendFailures += 1;
+        continue;
+      }
+
+      if (action.kind === 'data') {
+        counts.dataPushes += 1;
+        await stateRef.set(
+          { lastDataPushAtMs: now, updatedAtMs: now },
+          { merge: true },
+        );
+      } else {
+        counts.rescues += 1;
+        await stateRef.set(
+          {
+            lastRescueAtMs: now,
+            rescuedWindowEndMs: intention.windowEndMs,
+            updatedAtMs: now,
+          },
+          { merge: true },
+        );
+      }
     }
+
+    if (snap.docs.length < BATCH_LIMIT) break;
+    cursor = snap.docs[snap.docs.length - 1];
   }
 
   logger.info('intentionSweep done', counts);

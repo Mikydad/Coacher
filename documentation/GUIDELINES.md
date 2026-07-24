@@ -1104,3 +1104,63 @@ not silent reversal.
   analyze clean. Phase 7 slice (b) closes the humanizing roadmap's
   implementation phases; deferred remainder: L3 streaming spike,
   Android (Appendix A), morning brief as the loop's voice.
+
+- **2026-07-24 · Humanizing audit fix pass — the settled semantics (full
+  rationale in `documentation/HUMANIZING_FIXES.md`).** Scope settled with
+  Miko: every defect-class audit finding + minimal P1-05 learning loop +
+  P1-07 dependency gating; P2-07/08/09 and P3-02 deferred as feature
+  work. The decisions that must not be relitigated:
+  - **Intention nudge caps: 2 per intention per local day, 4 intention
+    nudges per day globally** (values chosen by Miko). Pure policy in
+    `intention_nudge_cap_policy.dart`, seeded from ledger delivery claims
+    (scheduled + delivered count; the intention's own pending rows don't —
+    they're the ladder being replaced). Fails open: caps are politeness,
+    not correctness.
+  - **`nudged` is a live status.** `Intention.isLive = open || nudged`;
+    every surface (planner, Promises, geofence, Coach payload, server
+    sweep + brief count) treats the two identically — the distinction is
+    observational fuel for reflection/learning, never a behavior change
+    the user didn't ask for. Learning semantics: any notification
+    response records `nudged` + nudgeCount; "Wrong time" strikes twice →
+    drop `preferredTimeBlock` + `registerContradiction()` on the hint's
+    `basedOn` facts.
+  - **Logout cleanup boundary:** push token deregistration is a direct
+    (non-outbox) best-effort Firestore delete — the outbox dies with the
+    session, so the guard-test allowlist entry is correct, not a smell.
+    Geofence state + thinking-loop cadence prefs are wiped in
+    `clearLocalSession()`.
+  - **Rules exclusion pattern:** overlapping Firestore allows are OR'd —
+    server-owned subtrees (`rescueState`, `briefState`) are excluded
+    INSIDE the users wildcard condition
+    (`!(collection in [...])`), never via a parallel `write: if false`
+    match (which would be dead code). Rules test files each use a
+    distinct emulator project id (`node --test` runs files in parallel;
+    `clearFirestore()` is project-scoped).
+  - **Crons paginate with cursors** (sweep: `orderBy(windowEndMs)`,
+    brief: `orderBy(documentId())`), bounded pages per run, next run
+    continues — a bare `.limit(n)` is a population cap, not a page size.
+    **Send bookkeeping is honest:** rescue/brief state is stamped only
+    when `sendToTokens` reports `delivered > 0`.
+  - **Reflection observations are radar-only** — filtered out of the
+    shared Layer-3 delivery loader at one choke point
+    (`isDeliverySurfaceEligible`); the radar row reads the `reflection`
+    entity scope directly.
+  - **Geofence: `always`-only and single-fire.** `whenInUse` cannot
+    deliver background region exits, so it is honestly "not live"; one
+    home exit fires only the soonest-deadline armed intent. Native
+    notification carries `payload = intention:<id>` (device verification
+    pending).
+  - **Notification budget fails closed**; **every OS notification goes
+    through the AttentionOrchestrator** (the Layer-4 home bridge was the
+    last bypass — now `coachInsight` intents through `evaluate()`).
+  - **Coach session boundary = sheet close** (`whenComplete` →
+    `startNewSession()`); resume runs a ~6h-throttled `runMaintenance()`.
+  - **Dependency gating:** non-blank `dependsOnText`/`anchorEntityId`
+    ⇒ `isNudgeable == false` (radar-visible, silent); completing an
+    anchor auto-promotes dependents by clearing the link in
+    `updateStatus(done)`. Free-text dependencies stay gated until edited
+    — that IS the standing-understanding contract.
+  - **Network honesty:** `AiProxyException.isNetwork` →
+    "You're offline…" copy, never generic blame.
+  Verified: analyze at the 96-issue baseline (zero errors), 1,411 Flutter
+  tests, 204 functions tests, 31 rules tests — all green.

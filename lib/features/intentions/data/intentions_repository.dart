@@ -82,7 +82,30 @@ class IntentionsRepository {
       updatedAtMs: _now(),
     );
     await upsertIntention(updated);
+    if (status == IntentionStatus.done) {
+      await _promoteDependents(intentionId);
+    }
     return updated;
+  }
+
+  /// P1-07 auto-promotion: promises anchored on [anchorId] ("after I call
+  /// mom, send her the photos") sit dependency-gated — radar-visible but
+  /// silent. When the anchor completes, clearing the link makes them
+  /// nudgeable; the write re-stamps updatedAtMs, so it replicates like any
+  /// edit and the next replan pass (recompute graph / app resume, ≤5 min)
+  /// picks them up.
+  Future<void> _promoteDependents(String anchorId) async {
+    final rows = await _isar.isarIntentions
+        .filter()
+        .anchorEntityIdEqualTo(anchorId)
+        .findAll();
+    for (final row in rows) {
+      final dependent = row.toDomain();
+      if (!dependent.active || !dependent.isLive) continue;
+      await upsertIntention(
+        dependent.copyWith(clearDependency: true, updatedAtMs: _now()),
+      );
+    }
   }
 
   /// Soft delete: tombstone row kept locally + replicated so the delete

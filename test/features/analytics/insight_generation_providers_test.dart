@@ -136,6 +136,51 @@ void main() {
     expect(vm.primary!.insightId, 'high');
   });
 
+  test(
+      'reflection observations never enter the delivery surfaces — '
+      'radar-only (P1-08)', () async {
+    final today = DateKeys.todayKey();
+    final repo = _FakeInsightCacheRepository(<GeneratedInsight>[
+      _insight(
+        id: 'reflection-1',
+        scopeType: InsightScopeType.entity,
+        scopeId: 'reflection',
+        detectedAtMs: 100,
+        insightType: InsightType.reflectionObservation,
+        sourceWindowStartDateKey: today,
+        sourceWindowEndDateKey: today,
+      ),
+      _insight(
+        id: 'deterministic-1',
+        scopeType: InsightScopeType.entity,
+        scopeId: 'task-1',
+        detectedAtMs: 100,
+        sourceWindowStartDateKey: today,
+        sourceWindowEndDateKey: today,
+      ),
+    ]);
+
+    final delivery = await loadLayer3DeliveryInsightsForDay(repo, today);
+    expect(
+      delivery.map((i) => i.insightId),
+      ['deterministic-1'],
+      reason: 'reflection observations are radar-only',
+    );
+
+    // The radar row reads the reflection entity scope directly — the
+    // observation must still be visible there.
+    final container = ProviderContainer(
+      overrides: <Override>[
+        insightCacheRepositoryProvider.overrideWithValue(repo),
+      ],
+    );
+    addTearDown(container.dispose);
+    final radar = await container.read(
+      layer3EntityInsightsProvider('reflection').future,
+    );
+    expect(radar.map((i) => i.insightId), ['reflection-1']);
+  });
+
   test('home provider includes entity insights active on today', () async {
     final today = DateKeys.todayKey();
     final repo = _FakeInsightCacheRepository(<GeneratedInsight>[
@@ -175,12 +220,13 @@ GeneratedInsight _insight({
   double confidence = 0.9,
   String? sourceWindowStartDateKey,
   String? sourceWindowEndDateKey,
+  InsightType insightType = InsightType.streakRiskWarning,
 }) {
   return GeneratedInsight(
     insightId: id,
     scopeType: scopeType,
     scopeId: scopeId,
-    insightType: InsightType.streakRiskWarning,
+    insightType: insightType,
     insightBucket: InsightBucket.risk,
     priority: priority,
     messageKey: 'streak_risk_1',

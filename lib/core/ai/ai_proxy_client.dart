@@ -1,21 +1,38 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:cloud_functions/cloud_functions.dart';
 
 /// Thrown when the AI proxy call fails.
 ///
 /// [statusCode] is a best-effort HTTP-style code mapped from the Cloud
 /// Functions error code so existing callers can keep their 429/5xx handling.
+///
+/// [isNetwork] tags connectivity failures (P2-13) so surfaces can say
+/// "you're offline" instead of the misleading generic "something went
+/// wrong" — network-inherent features get honesty, not fake blame.
 class AiProxyException implements Exception {
-  const AiProxyException(this.message, {this.statusCode});
+  const AiProxyException(this.message, {this.statusCode, this.isNetwork = false});
 
   final String message;
   final int? statusCode;
+  final bool isNetwork;
 
   bool get isRateLimit => statusCode == 429;
 
   @override
   String toString() =>
-      'AiProxyException($message${statusCode != null ? ', status=$statusCode' : ''})';
+      'AiProxyException($message${statusCode != null ? ', status=$statusCode' : ''}'
+      '${isNetwork ? ', network' : ''})';
 }
+
+/// Cloud Functions codes that mean "couldn't reach the server", as opposed
+/// to "the server said no".
+bool _isNetworkFunctionsCode(String code) =>
+    code == 'unavailable' || code == 'deadline-exceeded';
+
+bool _looksLikeNetworkError(Object e) =>
+    e is SocketException || e is TimeoutException || e is HttpException;
 
 /// One tool invocation requested by the model during an agent turn.
 class AiProxyToolCall {
@@ -88,11 +105,15 @@ class AiProxyClient {
       throw AiProxyException(
         e.message ?? e.code,
         statusCode: _statusCodeForFunctionsError(e.code),
+        isNetwork: _isNetworkFunctionsCode(e.code),
       );
     } on AiProxyException {
       rethrow;
     } catch (e) {
-      throw AiProxyException('Network error: $e');
+      throw AiProxyException(
+        'Network error: $e',
+        isNetwork: _looksLikeNetworkError(e),
+      );
     }
   }
 
@@ -159,11 +180,15 @@ class AiProxyClient {
       throw AiProxyException(
         e.message ?? e.code,
         statusCode: _statusCodeForFunctionsError(e.code),
+        isNetwork: _isNetworkFunctionsCode(e.code),
       );
     } on AiProxyException {
       rethrow;
     } catch (e) {
-      throw AiProxyException('Network error: $e');
+      throw AiProxyException(
+        'Network error: $e',
+        isNetwork: _looksLikeNetworkError(e),
+      );
     }
   }
 

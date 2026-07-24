@@ -107,8 +107,10 @@ export function rescueAction(args: {
     args;
 
   // Terminal / tombstoned intentions are the client's to display, never
-  // the server's to rescue.
-  if (intention.status !== 'open' || !intention.active) {
+  // the server's to rescue. `nudged` is a live status (P1-05): a promise
+  // the user deferred from a notification still deserves the safety net.
+  const live = intention.status === 'open' || intention.status === 'nudged';
+  if (!live || !intention.active) {
     return { kind: 'skip', reason: 'not_open' };
   }
   if (intention.windowEndMs <= nowMs) {

@@ -338,6 +338,7 @@ Future<void> handleNotificationResponse(
             .onInteractionReceived(
               challengeId,
               NotificationInteractionType.opened,
+              notifId: response.id,
             ),
       );
     }
@@ -369,6 +370,7 @@ Future<void> handleNotificationResponse(
         orchestrator.onInteractionReceived(
           intentionId,
           NotificationInteractionType.opened,
+          notifId: response.id,
         ),
       );
       await completeIntentionFromNotification(intentionId, container);
@@ -381,6 +383,7 @@ Future<void> handleNotificationResponse(
         orchestrator.onInteractionReceived(
           intentionId,
           NotificationInteractionType.snoozed,
+          notifId: response.id,
         ),
       );
       await snoozeIntentionFromNotification(intentionId, container);
@@ -394,6 +397,7 @@ Future<void> handleNotificationResponse(
         orchestrator.onInteractionReceived(
           intentionId,
           NotificationInteractionType.dismissed,
+          notifId: response.id,
         ),
       );
       await wrongTimeIntentionFromNotification(intentionId, container);
@@ -406,6 +410,7 @@ Future<void> handleNotificationResponse(
         orchestrator.onInteractionReceived(
           intentionId,
           NotificationInteractionType.opened,
+          notifId: response.id,
         ),
       );
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -422,6 +427,7 @@ Future<void> handleNotificationResponse(
       orchestrator.onInteractionReceived(
         intentionId,
         NotificationInteractionType.opened,
+        notifId: response.id,
       ),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -451,6 +457,7 @@ Future<void> handleNotificationResponse(
       orchestrator.onInteractionReceived(
         taskId,
         NotificationInteractionType.snoozed,
+        notifId: response.id,
       ),
     );
     await sync.requestSnooze(taskId);
@@ -466,6 +473,7 @@ Future<void> handleNotificationResponse(
       orchestrator.onInteractionReceived(
         taskId,
         NotificationInteractionType.dismissed,
+        notifId: response.id,
       ),
     );
     return;
@@ -477,6 +485,7 @@ Future<void> handleNotificationResponse(
       orchestrator.onInteractionReceived(
         taskId,
         NotificationInteractionType.opened,
+        notifId: response.id,
       ),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -495,6 +504,7 @@ Future<void> handleNotificationResponse(
         orchestrator.onInteractionReceived(
           taskId,
           NotificationInteractionType.opened,
+          notifId: response.id,
         ),
       );
       return;
@@ -509,6 +519,7 @@ Future<void> handleNotificationResponse(
     orchestrator.onInteractionReceived(
       taskId,
       NotificationInteractionType.opened,
+      notifId: response.id,
     ),
   );
 

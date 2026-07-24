@@ -55,14 +55,31 @@ service cloud.firestore {
     }
 
     // ─── Users ─────────────────────────────────────────────────────────────
-    // Users can read/write their own document and ALL subcollections
+    // Users can read/write their own document and subcollections
     // (routines, blocks, tasks, reminders, goals, analytics, circleIds, etc.)
+    // EXCEPT the server-owned bookkeeping trees below (P2-03): overlapping
+    // allow statements are OR'd in Firestore rules, so the exclusion must
+    // live inside the wildcard's condition — a separate `allow write: if
+    // false` match would NOT revoke what the wildcard grants.
 
     match /users/{uid} {
       allow read, write: if isUser(uid);
 
-      match /{document=**} {
-        allow read, write: if isUser(uid);
+      match /{collection}/{document=**} {
+        allow read, write: if isUser(uid)
+          && !(collection in ['rescueState', 'briefState']);
+      }
+
+      // Rescue-net + morning-brief state (Phase 5): written ONLY by the
+      // crons via Admin SDK. A client that could write here could clobber
+      // "already rescued today" and re-trigger pushes — or suppress them.
+      match /rescueState/{intentionId} {
+        allow read: if isUser(uid);
+        allow write: if false;
+      }
+      match /briefState/{docId} {
+        allow read: if isUser(uid);
+        allow write: if false;
       }
     }
 

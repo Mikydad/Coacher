@@ -127,6 +127,14 @@ void main() {
       expect(await service.getChoice(), GeofenceSignalChoice.declined);
     });
 
+    test(
+        'whenInUse is NOT treated as granted — dead-app exits need Always '
+        '(P2-04)', () async {
+      channel.requestOutcome = 'whenInUse';
+      expect(await service.enable(), isFalse);
+      expect(await service.getChoice(), GeofenceSignalChoice.declined);
+    });
+
     test('decline clears home and the native armed list — off means off',
         () async {
       await makeLive();
@@ -146,6 +154,31 @@ void main() {
       expect(await service.isLive(), isFalse); // no home
       channel.homeSet = true;
       expect(await service.isLive(), isTrue);
+    });
+
+    test('whenInUse authorization is not live (P2-04)', () async {
+      await GeofenceSignalSettings().setChoice(GeofenceSignalChoice.enabled);
+      channel.status = 'whenInUse';
+      channel.homeSet = true;
+      expect(await service.isLive(), isFalse);
+    });
+  });
+
+  group('clearForLogout', () {
+    test(
+        'disarms native state and forgets choice, home, and opt-ins '
+        '(P1-02)', () async {
+      await makeLive();
+      await service.optIn('opted');
+      await service.syncArmed([_intention('opted')]);
+      expect(channel.lastArmed, hasLength(1));
+
+      await service.clearForLogout();
+
+      expect(channel.lastArmed, isEmpty);
+      expect(channel.homeSet, isFalse);
+      expect(await service.getChoice(), GeofenceSignalChoice.undecided);
+      expect(await service.optedInIds(), isEmpty);
     });
   });
 

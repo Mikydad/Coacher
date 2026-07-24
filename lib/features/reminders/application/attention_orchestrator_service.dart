@@ -145,19 +145,29 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
   }
 
   /// Record a user interaction with a delivered notification.
+  ///
+  /// Pass [notifId] when the OS response carries it (P2-01): entities with
+  /// several pending notifications (intention ladders) need the feedback
+  /// to land on the TAPPED slot's ledger row — the entityId lookup always
+  /// resolves to the most recently updated sibling.
   Future<void> onInteractionReceived(
     String entityId,
-    NotificationInteractionType type,
-  ) async {
-    final ledgerEntry = await _ledger.findByEntityId(entityId);
-    final notifId = ledgerEntry?.notifId;
+    NotificationInteractionType type, {
+    int? notifId,
+  }) async {
+    final ledgerEntry = notifId != null
+        ? await _ledger.findByNotifId(notifId)
+        : await _ledger.findByEntityId(entityId);
+    final resolvedNotifId = ledgerEntry?.notifId;
 
     switch (type) {
       case NotificationInteractionType.opened:
-        if (notifId != null) {
-          await _ledger.markInteraction(notifId, 'opened');
+        if (resolvedNotifId != null) {
+          await _ledger.markInteraction(resolvedNotifId, 'opened');
+          await _cancelByNotifId(resolvedNotifId);
+        } else {
+          await _cancelActiveNotification(entityId);
         }
-        await _cancelActiveNotification(entityId);
         await _logFatigueEvent(
           type: AnalyticsEventType.notificationOpened,
           entityId: entityId,
@@ -165,14 +175,14 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
         );
 
       case NotificationInteractionType.snoozed:
-        if (notifId != null) {
-          await _ledger.markInteraction(notifId, 'snoozed');
+        if (resolvedNotifId != null) {
+          await _ledger.markInteraction(resolvedNotifId, 'snoozed');
         }
         await _recordSnooze(entityId);
 
       case NotificationInteractionType.dismissed:
-        if (notifId != null) {
-          await _ledger.markInteraction(notifId, 'dismissed');
+        if (resolvedNotifId != null) {
+          await _ledger.markInteraction(resolvedNotifId, 'dismissed');
         }
         await _logFatigueEvent(
           type: AnalyticsEventType.notificationDismissed,
@@ -408,17 +418,23 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
               darwinCategoryId: route.darwinCategoryId,
             );
           }
-          // Persist scheduled state to the ledger (replaces _activeNotificationIds).
-          await _ledger.upsertEntry(
-            IsarNotificationLedgerEntry()
-              ..notifId = route.notifId
-              ..entityId = intent.entityId
-              ..entityKind = intent.entityKind
-              ..state = NotificationLedgerState.scheduled.name
-              ..scheduledForMs = deliverAt.millisecondsSinceEpoch
-              ..sourceContext = kAttentionOrchestratorSurface
-              ..updatedAtMs = _now().millisecondsSinceEpoch,
-          );
+          // Persist scheduled state to the ledger. notifId is a UNIQUE
+          // non-replacing index, so a reschedule must reuse the existing
+          // row's Isar id — a fresh row would throw (and previously did,
+          // silently, inside this try). Reusing the row also keeps the
+          // slot's behavioral memory (deliveredAtMs, ignore/snooze counts)
+          // which the daily caps and back-off logic read.
+          final priorEntry = await _ledger.findByNotifId(route.notifId);
+          final entry = priorEntry ?? IsarNotificationLedgerEntry();
+          entry
+            ..notifId = route.notifId
+            ..entityId = intent.entityId
+            ..entityKind = intent.entityKind
+            ..state = NotificationLedgerState.scheduled.name
+            ..scheduledForMs = deliverAt.millisecondsSinceEpoch
+            ..sourceContext = kAttentionOrchestratorSurface
+            ..updatedAtMs = _now().millisecondsSinceEpoch;
+          await _ledger.upsertEntry(entry);
           if (immediate) {
             // showNow delivered to the tray already — record it so the
             // reconciliation service doesn't treat it as an undelivered ghost.

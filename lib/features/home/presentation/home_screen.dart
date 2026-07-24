@@ -55,9 +55,14 @@ import '../../plan_tomorrow/presentation/plan_tomorrow_screen.dart';
 import '../../../app/application/main_tab_navigation.dart';
 import '../../analytics/presentation/analytics_progress_screen.dart';
 import '../../ai_assistant/presentation/widgets/coach_ai_fab.dart';
+import '../../context_override/domain/models/interruption_level.dart';
 import '../../context_override/presentation/active_override_banner.dart';
 import '../../context_override/presentation/context_override_quick_activate_sheet.dart';
 import '../../context_override/presentation/post_override_review_card.dart';
+import '../../reminders/application/attention_orchestrator_providers.dart';
+import '../../reminders/application/notification_route_resolver.dart';
+import '../../reminders/domain/models/attention_outcome.dart';
+import '../../reminders/domain/models/reminder_intent.dart';
 import '../../education/presentation/tour_targets.dart';
 import '../../education/presentation/help_dot.dart';
 import '../../timer/presentation/timer_session_screen.dart';
@@ -976,14 +981,34 @@ class _Layer4NotificationDispatchBridgeState
           .evaluateCoachingInsightNotificationSend();
       if (!budgetAfter.allowed) return;
 
-      await notifications.schedule(
-        id: kCoachingInsightNotificationId,
-        title: 'Coach Insight Ready',
-        body: body,
-        when: DateTime.now().add(const Duration(minutes: 1)),
-        payload: 'layer4:$primaryId',
-      );
-      await prefService.recordCoachingInsightNotificationSent();
+      // V-01: this producer keeps its own 3/day + 4h budget, but the send
+      // itself goes through the AttentionOrchestrator — a coach insight
+      // must never banner into a context override, a coaching-focus
+      // silence, or a collision window, and it must land in the ledger
+      // like every other surface (Phase 0 single-brain rule).
+      final decision = await ref
+          .read(attentionOrchestratorServiceProvider)
+          .evaluate(
+            ReminderIntent(
+              id: StableId.generate('ri_coach_insight'),
+              entityId: primaryId,
+              entityKind: ReminderEntityKinds.coachInsight,
+              entityTitle: 'Coach Insight Ready',
+              proposedAt: DateTime.now().add(const Duration(minutes: 1)),
+              importance: 55,
+              interruptionLevel: InterruptionLevel.low,
+              enforcementMode: 'flexible',
+              sourceReason: 'layer4_insight_ready',
+              bodyOverride: body,
+              createdAtMs: DateTime.now().millisecondsSinceEpoch,
+            ),
+          );
+      if (decision.outcome != AttentionOutcome.suppressed) {
+        // Count against the producer budget only when something was
+        // actually scheduled; a suppressed intent retries via the
+        // orchestrator's own queue.
+        await prefService.recordCoachingInsightNotificationSent();
+      }
       _lastScheduledPrimaryInsightId = primaryId;
     } finally {
       if (_dispatchInFlightForInsightId == primaryId) {

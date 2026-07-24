@@ -28,10 +28,17 @@ class ReflectionHintUpdate {
   const ReflectionHintUpdate({
     required this.intentionId,
     required this.preferredTimeBlock,
+    this.basedOn = const [],
   });
 
   final String intentionId;
   final String preferredTimeBlock;
+
+  /// Grounding refs (fact/person/intention ids from the snapshot). Kept on
+  /// the hint so the intention's `aiHintsJson` can carry provenance — the
+  /// confirm-at-delivery loop uses it to contradict the sourcing facts
+  /// when the user says "wrong time".
+  final List<String> basedOn;
 }
 
 class ReflectionObservation {
@@ -105,11 +112,17 @@ class ReflectionParser {
         continue;
       }
       if (block == null || !timeBlocks.contains(block)) continue;
+      // Grounding-or-drop applies to hints too (P1-09): an ungrounded
+      // model response must not steer real planner scoring through
+      // `preferredTimeBlock`. Same rule as dormant/observation proposals.
+      final basedOn = _groundedRefs(raw['basedOn'], knownIds);
+      if (basedOn == null) continue;
       if (!seenIntentions.add(intentionId)) continue;
       hints.add(
         ReflectionHintUpdate(
           intentionId: intentionId,
           preferredTimeBlock: block,
+          basedOn: basedOn,
         ),
       );
     }

@@ -290,7 +290,7 @@ class AiPayloadAssembler {
       final lines = <String>[];
       for (final i in all) {
         if (!i.active) continue;
-        if (i.status == IntentionStatus.open) {
+        if (i.isLive) {
           final end = DateTime.fromMillisecondsSinceEpoch(i.windowEndMs);
           final key =
               '${end.year}-${end.month.toString().padLeft(2, '0')}-'

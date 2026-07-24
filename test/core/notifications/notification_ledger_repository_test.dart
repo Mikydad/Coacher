@@ -130,6 +130,69 @@ void main() {
       expect(delivered.length, equals(1));
     });
 
+    test(
+        'getDeliveryClaimsByKindInRange counts pending + reached-user rows, '
+        'never pure cancellations (P1-06)', () async {
+      final dayStart = DateTime(2026, 7, 24).millisecondsSinceEpoch;
+      final dayEnd =
+          DateTime(2026, 7, 25).millisecondsSinceEpoch - 1;
+      const hour = 60 * 60 * 1000;
+
+      // Pending intention slot today → counts.
+      await repo.upsertEntry(
+        _makeEntry(
+          notifId: 1,
+          entityId: 'intention-a',
+          entityKind: 'intention',
+          scheduledForMs: dayStart + 10 * hour,
+        ),
+      );
+      // Cancelled before delivery (replan replaced it) → free.
+      await repo.upsertEntry(
+        _makeEntry(
+          notifId: 2,
+          entityId: 'intention-a',
+          entityKind: 'intention',
+          state: NotificationLedgerState.cancelled,
+          scheduledForMs: dayStart + 12 * hour,
+        ),
+      );
+      // Cancelled AFTER it reached the tray → still counts.
+      await repo.upsertEntry(
+        _makeEntry(
+          notifId: 3,
+          entityId: 'intention-b',
+          entityKind: 'intention',
+          state: NotificationLedgerState.cancelled,
+          scheduledForMs: dayStart + 9 * hour,
+        )..deliveredAtMs = dayStart + 9 * hour,
+      );
+      // Wrong kind → out.
+      await repo.upsertEntry(
+        _makeEntry(
+          notifId: 4,
+          entityId: 'task-z',
+          scheduledForMs: dayStart + 11 * hour,
+        ),
+      );
+      // Outside the range → out.
+      await repo.upsertEntry(
+        _makeEntry(
+          notifId: 5,
+          entityId: 'intention-c',
+          entityKind: 'intention',
+          scheduledForMs: dayEnd + 2 * hour,
+        ),
+      );
+
+      final claims = await repo.getDeliveryClaimsByKindInRange(
+        entityKind: 'intention',
+        startMs: dayStart,
+        endMs: dayEnd,
+      );
+      expect(claims.map((e) => e.notifId).toSet(), {1, 3});
+    });
+
     test('pruneOlderThan deletes old entries and leaves fresh ones', () async {
       final now = DateTime.now().millisecondsSinceEpoch;
       final oldMs = now - const Duration(hours: 80).inMilliseconds;
