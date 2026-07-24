@@ -10,6 +10,11 @@ import UserNotifications
   ) -> Bool {
     // Ensure iOS notification tap callbacks are routed through AppDelegate.
     UNUserNotificationCenter.current().delegate = self
+    // Home-exit geofence (humanizing Phase 6b): recreate the location
+    // manager + delegate at every launch — iOS relaunches a force-quit app
+    // into the background on a region crossing, and only a live delegate
+    // receives the event.
+    GeofenceSignalBridge.shared.activateAtLaunch()
     NSLog("[NotifTap][iOS] didFinishLaunching launchOptions=%@", String(describing: launchOptions))
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
@@ -105,6 +110,52 @@ import UserNotifications
         ActivitySignalBridge.currentActivity(lookbackMs: lookbackMs) { reading in
           result(reading)
         }
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
+    // Home-exit geofence (humanizing Phase 6b): one region, explicit home,
+    // native-fired notifications — see GeofenceSignal.swift.
+    let geofenceRegistrar = engineBridge.pluginRegistry.registrar(forPlugin: "SidePalGeofenceSignal")
+    let geofenceChannel = FlutterMethodChannel(
+      name: "sidepal/geofence_signal",
+      binaryMessenger: geofenceRegistrar!.messenger())
+    geofenceChannel.setMethodCallHandler { call, result in
+      let bridge = GeofenceSignalBridge.shared
+      switch call.method {
+      case "getAuthorizationStatus":
+        result(bridge.authorizationStatus())
+      case "requestAccess":
+        bridge.requestAccess { status in
+          result(status)
+        }
+      case "getCurrentLocation":
+        bridge.currentLocation { location in
+          result(location)
+        }
+      case "setHome":
+        guard let args = call.arguments as? [String: Any],
+              let latitude = (args["latitude"] as? NSNumber)?.doubleValue,
+              let longitude = (args["longitude"] as? NSNumber)?.doubleValue
+        else {
+          result(FlutterError(
+            code: "bad_args", message: "latitude/longitude required",
+            details: nil))
+          return
+        }
+        bridge.setHome(latitude: latitude, longitude: longitude)
+        result(true)
+      case "clearHome":
+        bridge.clearHome()
+        result(true)
+      case "hasHome":
+        result(bridge.hasHome())
+      case "setArmedIntents":
+        let intents =
+          (call.arguments as? [String: Any])?["intents"] as? [[String: Any]]
+        bridge.setArmedIntents(intents ?? [])
+        result(true)
       default:
         result(FlutterMethodNotImplemented)
       }

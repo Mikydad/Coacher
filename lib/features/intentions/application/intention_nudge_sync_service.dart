@@ -68,6 +68,7 @@ class IntentionNudgeSyncService {
     Future<void> Function(String intentionId, Map<String, dynamic> payload)?
     writeProjection,
     Future<void> Function(String intentionId)? clearProjection,
+    Future<void> Function(List<Intention> intentions)? syncGeofence,
     DateTime Function()? now,
   }) : _intentions = intentions,
        _plans = plans,
@@ -79,6 +80,7 @@ class IntentionNudgeSyncService {
        _calendarBusy = calendarBusy,
        _writeProjection = writeProjection,
        _clearProjection = clearProjection,
+       _syncGeofence = syncGeofence,
        _now = now ?? DateTime.now;
 
   final IntentionsRepository _intentions;
@@ -99,6 +101,12 @@ class IntentionNudgeSyncService {
   final Future<void> Function(String intentionId, Map<String, dynamic> payload)?
   _writeProjection;
   final Future<void> Function(String intentionId)? _clearProjection;
+
+  /// Home-exit arming re-sync (Phase 6b) — every replan hands the fresh
+  /// intention set to the geofence layer so done/expired promises disarm.
+  /// Null (tests, non-iOS) means no geofence; planning is unaffected.
+  final Future<void> Function(List<Intention> intentions)? _syncGeofence;
+
   final DateTime Function() _now;
 
   /// Throttle for [rearmIfStale] (same rhythm as goal reminders).
@@ -124,6 +132,11 @@ class IntentionNudgeSyncService {
         quietHours: quietHours,
         bestTimeBlock: bestBlock,
       );
+    }
+    try {
+      await _syncGeofence?.call(all);
+    } catch (_) {
+      // Best-effort: the time-based ladder is the correctness floor.
     }
   }
 

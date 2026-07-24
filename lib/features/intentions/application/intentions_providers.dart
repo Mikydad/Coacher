@@ -14,8 +14,10 @@ import '../../planning/application/planned_task_collect.dart';
 import '../../reminders/application/attention_orchestrator_providers.dart';
 import '../data/intentions_repository.dart';
 import '../data/opportunity_plan_repository.dart';
+import '../../../core/context/geofence_signal.dart';
 import '../domain/models/intention.dart';
 import 'activity_moment_rules.dart';
+import 'geofence_arming.dart';
 import 'intention_nudge_sync_service.dart';
 
 final intentionsRepositoryProvider = Provider<IntentionsRepository>(
@@ -185,5 +187,23 @@ final intentionNudgeSyncServiceProvider = Provider<IntentionNudgeSyncService>(
       entityType: 'intentionProjection',
       documentPath: FirestorePaths.intentionProjectionDocument(intentionId),
     ),
+    syncGeofence: (intentions) =>
+        ref.read(geofenceArmingServiceProvider).syncArmed(intentions),
   ),
 );
+
+/// Home-exit arming (Phase 6b): per-intention opt-in, device-local.
+final geofenceArmingServiceProvider = Provider<GeofenceArmingService>(
+  (ref) => GeofenceArmingService(),
+);
+
+/// The user's remembered location decision — Profile row + opt-in UI
+/// read this. Invalidate after enable/decline/home changes.
+final geofenceStateProvider =
+    FutureProvider<({GeofenceSignalChoice choice, bool hasHome})>((ref) async {
+      final service = ref.watch(geofenceArmingServiceProvider);
+      return (
+        choice: await service.getChoice(),
+        hasHome: await service.hasHome(),
+      );
+    });

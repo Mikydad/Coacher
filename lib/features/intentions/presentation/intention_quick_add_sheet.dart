@@ -1,9 +1,13 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/presentation/app_colors.dart';
 import '../application/intention_capture.dart';
 import '../application/intentions_providers.dart';
+import 'geofence_opt_in_flow.dart';
 
 /// 3-field quick-add for promises (PRD §4.2): what / when-ish / kind.
 /// No clock time anywhere — SidePal picks the moment. Works fully offline;
@@ -36,7 +40,12 @@ class _IntentionQuickAddSheetState
   final _titleController = TextEditingController();
   IntentionWindowKind _window = IntentionWindowKind.tomorrow;
   _IntentionKind _kind = _IntentionKind.other;
+  bool _headOutReminder = false;
   bool _saving = false;
+
+  /// The per-intention location ask (Phase 6b) only exists where the
+  /// geofence can — iOS with the in-house channel.
+  bool get _geofenceEligible => !kIsWeb && Platform.isIOS;
 
   @override
   void dispose() {
@@ -69,6 +78,21 @@ class _IntentionQuickAddSheetState
           .read(intentionNudgeSyncServiceProvider)
           .applyForIntention(intention);
     } catch (_) {}
+    // Per-intention location opt-in (Phase 6b): remembered even when the
+    // enable/home ladder isn't finished yet — arming starts once it is.
+    // The time-based ladder above stays the correctness floor either way.
+    if (_headOutReminder && _geofenceEligible) {
+      final arming = ref.read(geofenceArmingServiceProvider);
+      await arming.optIn(intention.id);
+      try {
+        if (mounted && await ensureGeofenceReady(context, ref)) {
+          final all = await ref
+              .read(intentionsRepositoryProvider)
+              .fetchIntentionsOnce();
+          await arming.syncArmed(all);
+        }
+      } catch (_) {}
+    }
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -136,6 +160,45 @@ class _IntentionQuickAddSheetState
                 ),
             ],
           ),
+          // The per-intention location ask (PRD §9: "Want me to use your
+          // location for this one?") — errands are the shape that benefits
+          // ("buy flowers on the way"). Quiet inline row, not a dialog.
+          if (_geofenceEligible && _kind == _IntentionKind.errand) ...[
+            const SizedBox(height: 12),
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () =>
+                  setState(() => _headOutReminder = !_headOutReminder),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.near_me_outlined,
+                      size: 18,
+                      color: _headOutReminder
+                          ? AppColors.cyan
+                          : AppColors.fg54,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Remind me when I head out',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    Switch(
+                      value: _headOutReminder,
+                      onChanged: (v) => setState(() => _headOutReminder = v),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,

@@ -994,3 +994,42 @@ not silent reversal.
   1,342 green, analyze clean in touched files, `flutter build ios
   --no-codesign` compiles the new Swift + NSMotionUsageDescription.
   Slice (b) — home-exit geofence per-intention — is next.
+
+- **2026-07-24 · Home-exit geofence (Phase 6b): ONE region, per-intention
+  opt-in, native-fired copy — because the exit event may arrive with no
+  Flutter engine alive.** The platform reality drives the whole shape:
+  iOS relaunches a force-quit app into the background on a region
+  crossing, so the nudge can't wait for Dart. `GeofenceSignal.swift`
+  (`sidepal/geofence_signal`) monitors exactly one CLCircularRegion
+  ("sidepal_home", 150 m, exit-only) and Dart writes an **armed list**
+  (intention id + PRERENDERED copy + window + polite hours 08–22) to
+  UserDefaults at arm time; on exit the native side filters (expired →
+  dropped, not-yet/impolite → stays armed) and presents UNNotifications
+  directly. **Each arm fires at most once**; Dart re-syncs the list on
+  every replan (`applyAll` → injected `syncGeofence` hook, same seam
+  pattern as `calendarBusy`), so done/expired promises disarm on the
+  next app open at latest — a stale fire between opens is the accepted
+  failure story, and the time-based ladder remains the correctness
+  floor throughout. This native path deliberately bypasses the
+  AttentionOrchestrator (it can't be consulted with the app dead); the
+  window + polite-hour checks at fire time are the compensating gates.
+  **Privacy by construction:** no POI regions, no tracking, no history;
+  raw coordinates cross the bridge only during the one-shot home setup
+  and live device-local in UserDefaults — never Isar, Firestore, or an
+  AI payload. **Florist honesty rule:** copy is "Buy flowers on the
+  way?" — a claim about the user's departure, which we measured — never
+  "you're near a florist", a POI claim we can't make. **Opt-in is per
+  intention and device-local** (prefs set, not the synced record — the
+  geofence lives on this device): a "Remind me when I head out" row in
+  quick-add for errand-shaped promises runs the enable → explicit
+  set-home ladder (`ensureGeofenceReady`, shared with Profile); "Later"
+  on home setup keeps the opt-in remembered so arming starts the moment
+  home is set. The "Head-out nudges" Profile row completes the ladder
+  (subtitle flags "home not set yet"), and **off means off**: decline
+  clears the native region AND the armed list. iOS 13 note:
+  `manager.authorizationStatus` (instance) is iOS 14+ — use the class
+  method behind `#available`, and implement both delegate spellings of
+  the authorization callback. Verified: 13 new tests (copy/payload,
+  enable/decline, isLive ladder, syncArmed filter/prune/opt-out), full
+  suite 1,355 green, analyze clean in touched files, `flutter build ios
+  --no-codesign` compiles the new Swift + both location usage keys.

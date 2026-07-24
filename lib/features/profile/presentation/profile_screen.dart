@@ -7,6 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/context/activity_signal.dart';
 import '../../../core/context/calendar_signal.dart';
 import '../../../core/context/context_providers.dart';
+import '../../../core/context/geofence_signal.dart';
+import '../../intentions/application/intentions_providers.dart';
+import '../../intentions/presentation/geofence_opt_in_flow.dart';
 import '../../../core/presentation/theme_brightness_controller.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../../../core/runtime/recompute_scope.dart';
@@ -831,6 +834,7 @@ class _CoreOptimizationSection extends StatelessWidget {
           ),
           const _CalendarSignalRow(),
           const _ActivitySignalRow(),
+          const _GeofenceSignalRow(),
           _SettingRow(
             icon: Icons.leaderboard_rounded,
             title: 'Progress',
@@ -1017,6 +1021,45 @@ class _ActivitySignalRow extends ConsumerWidget {
       await service.decline();
     }
     ref.invalidate(activitySignalChoiceProvider);
+  }
+}
+
+/// Head-out nudges toggle (humanizing Phase 6b): the persistent switch
+/// behind the per-intention capture ask. On → runs the enable + explicit
+/// set-home ladder (one home area, device-local, exit-only). Off →
+/// remembered decline; the native region and armed list are cleared —
+/// off means off. Tapping the row when enabled re-opens home setup, so
+/// a "Later" at capture time or a move can be fixed here.
+class _GeofenceSignalRow extends ConsumerWidget {
+  const _GeofenceSignalRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(geofenceStateProvider).valueOrNull;
+    final enabled = state?.choice == GeofenceSignalChoice.enabled;
+    final subtitle = enabled && state?.hasHome != true
+        ? 'Home not set yet — tap to set it while you\u2019re there'
+        : 'Nudge chosen promises when you leave home — one area, '
+              'on-device only';
+    return _SettingRow(
+      icon: Icons.near_me_outlined,
+      title: 'Head-out nudges',
+      subtitle: subtitle,
+      trailing: Switch.adaptive(
+        value: enabled,
+        onChanged: (v) => _toggle(context, ref, v),
+      ),
+      onTap: () => _toggle(context, ref, !enabled || state?.hasHome != true),
+    );
+  }
+
+  Future<void> _toggle(BuildContext context, WidgetRef ref, bool on) async {
+    if (on) {
+      await ensureGeofenceReady(context, ref);
+    } else {
+      await ref.read(geofenceArmingServiceProvider).decline();
+    }
+    ref.invalidate(geofenceStateProvider);
   }
 }
 
