@@ -11,21 +11,29 @@ String dayKey(DateTime now) =>
 
 /// Device-token registration payload. `lastSeenMs` doubles as the initial
 /// heartbeat so a freshly registered device is immediately "seen today".
+/// `tzOffsetMinutes` (east of UTC) lets the sweep clamp notification-type
+/// rescues into polite LOCAL hours without ever knowing the timezone name.
 Map<String, dynamic> deviceTokenPayload({
   required String token,
   required String platform,
   required int nowMs,
+  required int tzOffsetMinutes,
 }) => {
   'token': token,
   'platform': platform,
   'lastSeenMs': nowMs,
+  'tzOffsetMinutes': tzOffsetMinutes,
   'updatedAtMs': nowMs,
 };
 
 /// Heartbeat-only merge payload (no token churn — token writes carry their
-/// own lastSeenMs).
-Map<String, dynamic> heartbeatPayload({required int nowMs}) => {
+/// own lastSeenMs). Refreshes the tz offset too: travel changes it.
+Map<String, dynamic> heartbeatPayload({
+  required int nowMs,
+  required int tzOffsetMinutes,
+}) => {
   'lastSeenMs': nowMs,
+  'tzOffsetMinutes': tzOffsetMinutes,
   'updatedAtMs': nowMs,
 };
 
@@ -34,3 +42,11 @@ Map<String, dynamic> heartbeatPayload({required int nowMs}) => {
 /// left for other handlers (or ignored).
 bool isRescueReplan(Map<String, dynamic> data) =>
     data['type'] == 'intention_replan';
+
+/// True for the days-absent rescue (notification-type). When one reaches a
+/// LIVE app — foreground arrival or tap — the honest response is the same
+/// as a replan signal: recompute locally so the ladder covers the window;
+/// the local plan, not the push, is the source of truth (client-side
+/// dedupe, PRD §8).
+bool isRescueNotification(Map<String, dynamic> data) =>
+    data['type'] == 'intention_rescue';

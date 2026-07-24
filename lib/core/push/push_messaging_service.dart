@@ -53,8 +53,21 @@ class PushMessagingService {
     try {
       final messaging = FirebaseMessaging.instance;
       await messaging.requestPermission();
+      // A rescue that arrives while the app is OPEN must not banner over
+      // the user — the app replans instead (client-side dedupe). The OS
+      // still displays it normally when the app is backgrounded/killed.
+      await messaging.setForegroundNotificationPresentationOptions(
+        alert: false,
+        badge: false,
+        sound: false,
+      );
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       FirebaseMessaging.onMessage.listen(_onForegroundMessage);
+      // Tap on a rescue notification (background → foreground): the app is
+      // now alive, so the local ladder takes over — replan immediately.
+      FirebaseMessaging.onMessageOpenedApp.listen(_onRescueInteraction);
+      final launchMessage = await messaging.getInitialMessage();
+      if (launchMessage != null) _onRescueInteraction(launchMessage);
       messaging.onTokenRefresh.listen((token) {
         unawaited(_registerToken(token));
       });
@@ -80,6 +93,7 @@ class PushMessagingService {
         documentPath: FirestorePaths.deviceTokenDocument(deviceId),
         payload: heartbeatPayload(
           nowMs: (now ?? DateTime.now()).millisecondsSinceEpoch,
+          tzOffsetMinutes: (now ?? DateTime.now()).timeZoneOffset.inMinutes,
         ),
       );
       await prefs.setString(_lastHeartbeatDayKey, today);
@@ -99,6 +113,7 @@ class PushMessagingService {
           token: token,
           platform: _platformName,
           nowMs: DateTime.now().millisecondsSinceEpoch,
+          tzOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes,
         ),
       );
     } catch (e) {
@@ -106,10 +121,27 @@ class PushMessagingService {
     }
   }
 
-  /// App-alive data push → replan locally through the orchestrator. We only
-  /// act on our own rescue payloads; everything else is ignored.
+  /// App-alive data push → replan locally through the orchestrator. A
+  /// rescue NOTIFICATION arriving in foreground gets the same treatment
+  /// (its banner is suppressed above — the replan IS the dedupe). Anything
+  /// else is ignored.
   void _onForegroundMessage(RemoteMessage message) {
-    if (!isRescueReplan(message.data)) return;
+    if (!isRescueReplan(message.data) && !isRescueNotification(message.data)) {
+      return;
+    }
+    _replan();
+  }
+
+  /// User tapped a rescue notification (or launched the app from one). The
+  /// app is alive again, so the local ladder resumes ownership of the
+  /// window; default navigation already lands on Home where the Promises
+  /// strip shows the closing intention.
+  void _onRescueInteraction(RemoteMessage message) {
+    if (!isRescueNotification(message.data)) return;
+    _replan();
+  }
+
+  void _replan() {
     final container = _container;
     if (container == null) return;
     unawaited(() async {

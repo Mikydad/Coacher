@@ -872,3 +872,42 @@ not silent reversal.
   rescue-detection helpers), full suite 1,326 green, analyze clean in
   touched files, `flutter build ios --no-codesign` compiles the new pod +
   entitlement + Info.plist key.
+
+- **2026-07-24 · Rescue-net sweep (Phase 5, slice b): pure rules, one
+  polite save, and the transport picked by platform honesty.** The
+  `intentionSweep` cron (every 15 min, cloned from `stakeSweep`'s shape:
+  `runIntentionSweepOnce(now)` testable, maxInstances 1) implements the
+  PRD §8 rule verbatim — *open intention + window closing (≤24h) + no
+  covering client slot + user hasn't checked in today* — with the entire
+  policy in a pure module (`functions/src/intentions/rescue_rules.ts`),
+  NO server LLM. **Transport choice (settled):** a device seen within
+  24h gets a silent data push (`{type: intention_replan}`,
+  `content-available`, throttled 6h/intention) — the app replans through
+  the attention orchestrator; a days-absent device gets ONE
+  notification-type push per window ("Your window to *action* is closing
+  — is now a good moment?" — deterministic, question-form, the exact
+  client deadline template incl. `asAction` lowercasing), because iOS
+  never delivers data-only pushes to force-quit apps. **Politeness is
+  server-side too:** clients now report `tzOffsetMinutes` in
+  token/heartbeat payloads (refreshed on heartbeat — travel changes it),
+  and notification rescues only send inside 09:00–21:00 LOCAL; an
+  impolite pass simply retries on a later 15-minute tick. Bookkeeping
+  lives in a **server-owned** doc (`users/{uid}/rescueState/{id}` =
+  `{lastRescueAtMs, rescuedWindowEndMs, lastDataPushAtMs}`) — NOT on the
+  projection, which client outbox upserts would clobber. **Index
+  (errors.md #10/#16/#18 lesson):** the collection-group query ranges on
+  a SINGLE field (`windowEndMs`, declared `fieldOverride` with
+  COLLECTION_GROUP scope in `firestore.indexes.json`); status/active
+  filter in memory — no composite. **Client-side dedupe:** foreground
+  presentation is `alert: false` and a rescue arriving at (or tapped
+  into) a live app just triggers `applyAll()` — the local plan, not the
+  push, is truth; repeated rescues collapse via
+  `apns-collapse-id: rescue_{intentionId}`; dead tokens are pruned on
+  `registration-token-not-registered`. *Considered:* skipping
+  checked-in-today users entirely (rejected — the silent data push is
+  free and fixes a stale projection the moment the app is alive);
+  storing tz as an IANA name (rejected — the offset is enough for an
+  hour clamp and never identifies a location more precisely than the
+  push token already does). Deploy note: needs `firebase deploy --only
+  functions,firestore:indexes` — bundled with the already-pending
+  Phase 2a functions deploy. Slice (c) — morning-brief push — remains.

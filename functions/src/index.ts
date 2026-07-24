@@ -26,6 +26,7 @@ export {
 } from "./stakes/callables";
 export { grantPoints, pointsSignupBonus } from "./stakes/ledger";
 export { stakeSweep } from "./stakes/sweep";
+export { intentionSweep } from "./intentions/sweep";
 export { devRunSweep } from "./stakes/dev";
 export { stakeEvidenceArrived, stakeDisbursementReceipt } from "./stakes/triggers";
 export { stakePhotoUploaded } from "./stakes/nsfw_screen";

@@ -19,31 +19,45 @@ void main() {
 
   group('payloads', () {
     test('deviceTokenPayload seeds lastSeenMs so the device is seen today', () {
-      final p = deviceTokenPayload(token: 'abc', platform: 'ios', nowMs: 42);
+      final p = deviceTokenPayload(
+        token: 'abc',
+        platform: 'ios',
+        nowMs: 42,
+        tzOffsetMinutes: 180,
+      );
       expect(p, {
         'token': 'abc',
         'platform': 'ios',
         'lastSeenMs': 42,
+        'tzOffsetMinutes': 180,
         'updatedAtMs': 42,
       });
     });
 
-    test('heartbeatPayload carries no token (merge-only)', () {
-      final p = heartbeatPayload(nowMs: 7);
+    test('heartbeatPayload carries no token (merge-only) but refreshes tz', () {
+      final p = heartbeatPayload(nowMs: 7, tzOffsetMinutes: -300);
       expect(p.containsKey('token'), isFalse);
       expect(p['lastSeenMs'], 7);
+      expect(p['tzOffsetMinutes'], -300);
       expect(p['updatedAtMs'], 7);
     });
   });
 
-  group('isRescueReplan', () {
-    test('true only for the tagged rescue payload', () {
+  group('rescue payload tags', () {
+    test('isRescueReplan true only for the tagged data push', () {
       expect(isRescueReplan({'type': 'intention_replan'}), isTrue);
+      expect(isRescueReplan({'type': 'intention_rescue'}), isFalse);
+    });
+
+    test('isRescueNotification true only for the days-absent rescue', () {
+      expect(isRescueNotification({'type': 'intention_rescue'}), isTrue);
+      expect(isRescueNotification({'type': 'intention_replan'}), isFalse);
     });
 
     test('false for other/empty payloads', () {
       expect(isRescueReplan({'type': 'chat'}), isFalse);
       expect(isRescueReplan(const {}), isFalse);
+      expect(isRescueNotification(const {}), isFalse);
     });
   });
 }
