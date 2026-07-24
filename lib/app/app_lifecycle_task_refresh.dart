@@ -12,6 +12,7 @@ import '../core/sync/sync_service.dart';
 import '../core/utils/date_keys.dart';
 import '../features/context_override/application/context_override_expiry_poller.dart';
 import '../features/reminders/application/attention_orchestrator_providers.dart';
+import '../features/thinking/application/thinking_providers.dart';
 import 'notification_response_handler.dart';
 import 'siri_voice_entry.dart';
 
@@ -117,6 +118,9 @@ class _AppLifecycleTaskRefreshState
       // App-open heartbeat for the server rescue-net (Phase 5) — throttled
       // to once per local day inside the service.
       unawaited(PushMessagingService.instance.recordHeartbeat());
+      // Thinking Loop (Phase 7) — once per local day, fresh inputs only;
+      // both gates live inside the service.
+      unawaited(ref.read(thinkingLoopServiceProvider).reflectIfDue());
       WidgetsBinding.instance.addPostFrameCallback((_) {
         flushPendingNotificationNavigationIntent();
       });

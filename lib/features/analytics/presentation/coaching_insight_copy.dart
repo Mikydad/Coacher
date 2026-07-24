@@ -127,5 +127,8 @@ String coachingInsightTypeShortLabel(InsightType type) {
     // Humanizing Phase 2
     case InsightType.relationshipCareNudge:
       return 'Stay in touch';
+    // Humanizing Phase 7
+    case InsightType.reflectionObservation:
+      return 'Worth a look';
   }
 }

@@ -8,6 +8,7 @@ enum PatternTaxonomyFamily {
   goalAlignment,
   behavioralStability,
   relationshipCare,
+  reflection,
 }
 
 PatternTaxonomyFamily patternTaxonomyFamilyFromStorage(String? raw) {
@@ -31,6 +32,8 @@ PatternTaxonomyFamily patternTaxonomyFamilyForGroup(PatternGroup group) {
       return PatternTaxonomyFamily.behavioralStability;
     case PatternGroup.relationshipCare:
       return PatternTaxonomyFamily.relationshipCare;
+    case PatternGroup.reflection:
+      return PatternTaxonomyFamily.reflection;
   }
 }
 
@@ -178,5 +181,18 @@ kPatternTaxonomyByCode = <PatternCode, PatternTaxonomySpec>{
     requiredLayer1MetricPaths: <String>['person.lastInteractionAtMs'],
     severityRuleId: 'relationship_gap_v1',
     confidenceRuleId: 'deterministic_v1',
+  ),
+  PatternCode.reflectionSignal: PatternTaxonomySpec(
+    code: PatternCode.reflectionSignal,
+    family: PatternTaxonomyFamily.reflection,
+    description:
+        'The Thinking Loop reflection pass proposed an observation that '
+        'survived validation (grounding refs exist, caps respected) — '
+        'humanizing Phase 7. Emitted by ThinkingLoopService, outside the '
+        'feature-cache engine; the insight message is AI text labeled '
+        'aiInferred.',
+    requiredLayer1MetricPaths: <String>[],
+    severityRuleId: 'reflection_fixed_v1',
+    confidenceRuleId: 'ai_inferred_v1',
   ),
 };

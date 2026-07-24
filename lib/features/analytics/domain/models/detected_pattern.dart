@@ -13,6 +13,9 @@ enum PatternGroup {
 
   /// Humanizing Phase 2 — deterministic people patterns (relationship care).
   relationshipCare,
+
+  /// Humanizing Phase 7 — Thinking Loop reflection proposals.
+  reflection,
 }
 
 PatternGroup patternGroupFromStorage(String? raw) {
@@ -42,6 +45,13 @@ enum PatternCode {
   /// RelationshipCareService, NOT the feature-cache engine — deliberately
   /// outside [kLayer2V1PatternCodes] and the hybrid scoring config.
   relationshipGap,
+
+  /// The Thinking Loop's daily reflection produced an observation worth
+  /// surfacing (humanizing Phase 7). Emitted by ThinkingLoopService, NOT
+  /// the feature-cache engine — the "pattern" is the validated existence
+  /// of an AI-proposed observation; the message carries the AI text and
+  /// is labeled aiInferred in metadata.
+  reflectionSignal,
 }
 
 PatternCode patternCodeFromStorage(String? raw) {

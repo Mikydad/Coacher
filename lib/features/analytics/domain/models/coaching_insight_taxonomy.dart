@@ -12,6 +12,9 @@ enum CoachingInsightFamily {
 
   /// Humanizing Phase 2 — deterministic people patterns.
   relationshipCare,
+
+  /// Humanizing Phase 7 — Thinking Loop reflection observations.
+  reflection,
 }
 
 CoachingInsightFamily coachingInsightFamilyFromStorage(String? raw) {
@@ -47,6 +50,8 @@ CoachingInsightFamily coachingInsightFamilyForType(InsightType type) {
       return CoachingInsightFamily.globalSummary;
     case InsightType.relationshipCareNudge:
       return CoachingInsightFamily.relationshipCare;
+    case InsightType.reflectionObservation:
+      return CoachingInsightFamily.reflection;
   }
 }
 
@@ -304,6 +309,19 @@ kCoachingInsightTaxonomy = <InsightType, CoachingInsightSpec>{
     cooldown: InsightCooldownPolicy.twoDays,
     resolutionRule: InsightResolutionRule(
       resolvedWhenPatternsAbsent: {PatternCode.relationshipGap},
+    ),
+  ),
+  InsightType.reflectionObservation: CoachingInsightSpec(
+    insightType: InsightType.reflectionObservation,
+    family: CoachingInsightFamily.reflection,
+    description:
+        'The Thinking Loop\'s daily reflection produced an observation that '
+        'survived validation (humanizing Phase 7). AI-authored message, '
+        'labeled aiInferred, at most one per day, hedged phrasing.',
+    requiredPatternCodes: {PatternCode.reflectionSignal},
+    cooldown: InsightCooldownPolicy.oneDay,
+    resolutionRule: InsightResolutionRule(
+      resolvedWhenPatternsAbsent: {PatternCode.reflectionSignal},
     ),
   ),
 };

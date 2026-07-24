@@ -1030,6 +1030,48 @@ not silent reversal.
   `manager.authorizationStatus` (instance) is iOS 14+ — use the class
   method behind `#available`, and implement both delegate spellings of
   the authorization callback. Verified: 13 new tests (copy/payload,
-  enable/decline, isLive ladder, syncArmed filter/prune/opt-out), full
+  enable/decline, isLive   ladder, syncArmed filter/prune/opt-out), full
   suite 1,355 green, analyze clean in touched files, `flutter build ios
   --no-codesign` compiles the new Swift + both location usage keys.
+
+- **2026-07-24 · Thinking Loop (Phase 7, slice a): one budgeted
+  reflection pass per device-day; output is NEVER an action, only
+  proposals that ride existing validation machinery.** Scoping settled
+  with Miko: two slices — (a) reflection call + parser + proposal
+  application, (b) "on your radar" surfacing UX (quiet collapsed row at
+  the tail of Promises); all three proposal types allowed; cadence = at
+  most once per local day AND only when the durable inputs changed
+  ("fresh inputs"). Server: purpose `reflect` (system quota class,
+  silent-skip, temperature 0.2, 700 tokens; `enabled:false` via Remote
+  Config is the kill switch). Client: `ThinkingLoopService`
+  (bootstrap + resume, extraction-service twin) assembles a capped
+  snapshot of everything local (`reflection_payload.dart`: ≤30 facts,
+  ≤15 people, ≤30 intentions incl. dormant and ≤14-day-expired ones as
+  avoidance evidence) and skips via `reflectionInputsHash` — a hash of
+  DURABLE identity (ids/status/updatedAt/snooze counts), deliberately
+  not the rendered payload, so midnight-relative numbers don't force a
+  re-reflection of an unchanged life. Failure = day left unmarked →
+  retry next open (extraction's stay-pending pattern).
+  **Grounding-or-drop** (`reflection_parser.dart`, the reflection
+  sibling of quote verification): every proposal must cite `basedOn`
+  ids from the snapshot we sent — the model may connect dots, but only
+  OUR dots; ungrounded/malformed proposals drop, never repaired.
+  Proposal → machinery mapping: dormant intentions (≤3, title-deduped
+  via punctuation-stripped `titleKey` — plain `normalizeForMatch`
+  keeps punctuation and let "Call Mom!" duplicate "call mom") become
+  `IntentionStatus.dormant` (zero notifications until engaged); hint
+  updates (≤5, open+unpinned targets only) merge
+  `preferredTimeBlock` into `aiHintsJson`, the advisory input the
+  planner already sanity-checks at weight wAiHintAffinity; exactly ≤1
+  observation becomes `InsightType.reflectionObservation` (new enum
+  ladder: `PatternCode.reflectionSignal`, `PatternGroup/Family
+  .reflection`, `BehaviorEntityKind.reflection`, policy v3→4) through
+  the standard Layer-3 policy under the synthetic entity scope
+  `reflection`, severity 0.3 / confidence 0.6 so it can never outrank a
+  deterministic insight, source window today..today so reflections
+  don't linger past their day, message = validated AI text labeled
+  `aiInferred` in metadata. Verified: 20 new Dart tests (parser
+  grounding/caps/dedupe, snapshot relevance + hash semantics,
+  mergeHints), 199 functions tests (incl. `reflect` route), full suite
+  1,375 green, analyze clean in touched files. Slice (b) — radar row —
+  is next; the morning brief becoming the loop's voice is post-slice-b.

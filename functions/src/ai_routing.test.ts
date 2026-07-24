@@ -28,6 +28,13 @@ describe('resolveRoute', () => {
     assert.equal(route.temperature, 0);
   });
 
+  it('reflect (Thinking Loop, Phase 7) is a system purpose', () => {
+    const route = resolveRoute('reflect', {});
+    assert.equal(route.quotaClass, 'system');
+    assert.equal(route.enabled, true);
+    assert.equal(route.temperature, 0.2);
+  });
+
   it('overrides replace only the provided fields', () => {
     const route = resolveRoute('extract_memory', {
       extract_memory: { model: 'gpt-4o', enabled: false },

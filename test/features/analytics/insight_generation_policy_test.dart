@@ -21,8 +21,8 @@ void main() {
       expect(mappedTypes, containsAll(kLayer3V1InsightTypes));
       // V3 catalog covers all types including Phase 3 additions and the
       // humanizing Phase 2 relationship-care nudge.
-      expect(mappedTypes, equals(kLayer3V3InsightTypes));
-      expect(kLayer3InsightPolicyConfig.rules, hasLength(kLayer3V3InsightTypes.length));
+      expect(mappedTypes, equals(kLayer3V4InsightTypes));
+      expect(kLayer3InsightPolicyConfig.rules, hasLength(kLayer3V4InsightTypes.length));
     });
 
     test('includes deterministic combination rule for goal_at_risk', () {

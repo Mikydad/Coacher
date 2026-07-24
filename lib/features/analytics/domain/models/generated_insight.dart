@@ -139,6 +139,11 @@ enum InsightType {
   // Humanizing Phase 2 — relationship care ("you haven't talked to your
   // sister in a while"): computed truth, warm phrasing, zero invention.
   relationshipCareNudge,
+
+  // Humanizing Phase 7 — Thinking Loop reflection: an AI-proposed,
+  // validation-surviving observation. Always labeled aiInferred; the
+  // message hedges ("you might be avoiding…"), never commands.
+  reflectionObservation,
 }
 
 InsightType insightTypeFromStorage(String? raw) {
@@ -175,6 +180,12 @@ const Set<InsightType> kLayer3V2InsightTypes = <InsightType>{
 const Set<InsightType> kLayer3V3InsightTypes = <InsightType>{
   ...kLayer3V2InsightTypes,
   InsightType.relationshipCareNudge,
+};
+
+/// V4 = V3 + humanizing Phase 7 Thinking Loop reflection.
+const Set<InsightType> kLayer3V4InsightTypes = <InsightType>{
+  ...kLayer3V3InsightTypes,
+  InsightType.reflectionObservation,
 };
 
 class GeneratedInsight {

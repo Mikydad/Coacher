@@ -5,7 +5,7 @@ import '../domain/models/generated_insight.dart';
 // (canonical evidence + taxonomy) instead of legacy [DetectedPattern]. Until then,
 // [kDeferredLayer2PatternCodesForInsightMapping] gates subtle new codes from user-facing copy.
 
-const int kLayer3InsightPolicyConfigVersion = 3;
+const int kLayer3InsightPolicyConfigVersion = 4;
 
 class InsightOutputCaps {
   const InsightOutputCaps({
@@ -323,6 +323,22 @@ kLayer3InsightPolicyConfig = Layer3InsightPolicyConfig(
           'A quick call goes a long way.',
       scopeType: InsightScopeType.entity,
       requiredAllPatterns: <PatternCode>{PatternCode.relationshipGap},
+    ),
+    // ThinkingLoopService replaces the message with the validated AI
+    // observation after mapping (the fallback stays generic); the insight
+    // is always labeled aiInferred in metadata.
+    InsightMappingRule(
+      ruleId: 'reflection_observation',
+      insightType: InsightType.reflectionObservation,
+      insightBucket: InsightBucket.neutral,
+      priority: InsightPriority.low,
+      action: InsightAction.focus,
+      messageKey: 'reflection_observation_1',
+      fallbackMessage:
+          'SidePal noticed something that might be worth a look when you '
+          'have a moment.',
+      scopeType: InsightScopeType.entity,
+      requiredAllPatterns: <PatternCode>{PatternCode.reflectionSignal},
     ),
   ],
 );

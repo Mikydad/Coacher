@@ -54,6 +54,12 @@ export const DEFAULT_ROUTES: Record<string, PurposeRoute> = {
   summarize: {
     model: "gpt-4o-mini", maxTokens: 600, quotaClass: "system", enabled: true, temperature: 0.2,
   },
+  // Thinking Loop (humanizing Phase 7): ≤1 budgeted reflection pass per
+  // device-day over the user's full local picture. `enabled: false` here or
+  // via Remote Config is the kill switch — the client silent-skips.
+  reflect: {
+    model: "gpt-4o-mini", maxTokens: 700, quotaClass: "system", enabled: true, temperature: 0.2,
+  },
 };
 
 /** Models the routing table may select. A config typo must not let a

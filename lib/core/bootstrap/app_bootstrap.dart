@@ -21,6 +21,7 @@ import '../../features/community/application/community_bridge_coordinator.dart';
 import '../../features/ai_assistant/application/ai_assistant_providers.dart';
 import '../../features/memory/application/memory_providers.dart';
 import '../../features/reminders/application/attention_orchestrator_providers.dart';
+import '../../features/thinking/application/thinking_providers.dart';
 import '../runtime/schedule_mutation_coordinator.dart';
 
 /// App startup is split in two so the first frame is never blocked on the
@@ -87,6 +88,11 @@ class AppBootstrap {
     // extraction can't run, the purge defers up to 7 days, then writes a
     // deterministic truncation summary. Continuity is never silently lost.
     unawaited(container.read(memoryExtractionServiceProvider).runMaintenance());
+
+    // Thinking Loop (Phase 7, §12): one budgeted reflection pass per
+    // device-day over the full local picture, and only when the inputs
+    // actually changed. Failures silent-skip and retry on the next open.
+    unawaited(container.read(thinkingLoopServiceProvider).reflectIfDue());
 
     // Purge dismissed proactive suggestion logs older than 7 days (Phase 4).
     unawaited(

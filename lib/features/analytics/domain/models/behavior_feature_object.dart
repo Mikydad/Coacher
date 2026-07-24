@@ -11,6 +11,10 @@ enum BehaviorEntityKind {
   /// Humanizing Phase 2 — people carry no behavior feature cache; only the
   /// deterministic relationship-care pattern uses this kind.
   person,
+
+  /// Humanizing Phase 7 — the Thinking Loop's synthetic reflection scope.
+  /// No feature cache; only ThinkingLoopService emits patterns of this kind.
+  reflection,
 }
 
 BehaviorEntityKind behaviorEntityKindFromStorage(String? raw) {
