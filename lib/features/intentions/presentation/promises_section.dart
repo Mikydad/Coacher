@@ -9,6 +9,7 @@ import '../domain/models/intention.dart';
 import 'activity_ask_card.dart';
 import 'calendar_ask_card.dart';
 import 'intention_quick_add_sheet.dart';
+import 'on_your_radar_section.dart';
 
 /// The Promises strip (humanizing Phase 1) — top of Home, the ambient
 /// answer to "what did I say I'd do?". Each row shows the planned moment
@@ -20,7 +21,6 @@ class PromisesSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final open = ref.watch(openIntentionsProvider);
-    final radar = ref.watch(radarIntentionsProvider);
     final plans =
         ref.watch(opportunityPlansProvider).valueOrNull ??
         const <String, OpportunityPlan>{};
@@ -84,29 +84,9 @@ class PromisesSection extends ConsumerWidget {
           (i) => i.activityTags.any(handsFreeCompatibleTags.contains),
         ))
           const ActivityAskCard(),
-        // "On your radar" — dormant standing understandings. Empty until
-        // Phase 2 extraction ships; hidden entirely when empty.
-        if (radar.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          Text(
-            'ON YOUR RADAR',
-            style: TextStyle(
-              color: AppColors.fg54,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 8),
-          for (final intention in radar)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                '· ${intention.title}',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-              ),
-            ),
-        ],
+        // "On your radar" (Phase 7b) — dormant understandings + today's
+        // reflection observation, collapsed by default, hidden when empty.
+        const OnYourRadarSection(),
       ],
     );
   }

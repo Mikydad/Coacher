@@ -1075,3 +1075,32 @@ not silent reversal.
   mergeHints), 199 functions tests (incl. `reflect` route), full suite
   1,375 green, analyze clean in touched files. Slice (b) — radar row —
   is next; the morning brief becoming the loop's voice is post-slice-b.
+
+- **2026-07-24 · "On your radar" (Phase 7, slice b): a collapsed tail
+  row, because standing understandings must never compete with open
+  promises.** `OnYourRadarSection` replaces Phase 1's read-only bullet
+  list at the tail of Promises (placement settled with Miko: quiet
+  collapsed row, not the Coach panel). Collapsed = just
+  "ON YOUR RADAR · N" with a chevron; expanded (AnimatedSize, 260 ms
+  per the design-system rule that nothing snaps) shows today's
+  reflection observation and every dormant intention. Contents and
+  their exits: the observation renders the AI message with an
+  **INFERRED micro-label** (provenance honesty — same contract as
+  memory facts) and an ✕ that clears the `reflection` insight scope;
+  it can't linger past its day anyway because slice (a) scoped the
+  source window today..today, and the row filters by
+  `layer3InsightActiveOnDateKey`. Dormant intentions get exactly two
+  quiet exits — **"Remind me"** promotes to `open` via the repo's
+  `updateStatus` (synced, LWW) and immediately plans the nudge ladder
+  with the returned updated record (Isar-only, airplane-safe), and
+  **✕** retires to `dismissed` (synced, so it stays dismissed on every
+  device). Zero notifications from anything in this section until the
+  user wakes it — the PRD §13 "no reminders yet, just understanding"
+  contract, now with the understanding actually actionable. Verified:
+  7 new widget tests (hidden-when-empty, collapsed-by-default,
+  expansion, yesterday's-observation exclusion, promote → open +
+  applyForIntention, dismiss paths for both content kinds via
+  noSuchMethod-fakes over the concrete repos), full suite 1,382 green,
+  analyze clean. Phase 7 slice (b) closes the humanizing roadmap's
+  implementation phases; deferred remainder: L3 streaming spike,
+  Android (Appendix A), morning brief as the loop's voice.
