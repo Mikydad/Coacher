@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../application/activity_moment_rules.dart';
 import '../application/intentions_providers.dart';
 import '../domain/models/intention.dart';
 
@@ -17,7 +18,12 @@ class SeizeTheMomentCard extends ConsumerWidget {
     if (candidate == null) return const SizedBox.shrink();
     final intention = candidate.intention;
 
-    final contextLine = candidate.beforeTitle == null
+    // Provenance-honest motion phrasing (Phase 6a): "you're walking" is
+    // said only when a fresh reading exists — no signal, no claim.
+    final motion = activityMomentPhrase(candidate.activity);
+    final contextLine = motion != null
+        ? "Looks like $motion with about ${candidate.freeMinutes} min free."
+        : candidate.beforeTitle == null
         ? 'You have about ${candidate.freeMinutes} min free.'
         : 'About ${candidate.freeMinutes} min before '
               '${candidate.beforeTitle}.';

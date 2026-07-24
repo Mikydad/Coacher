@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/context/activity_signal.dart';
 import '../../../core/context/calendar_signal.dart';
 import '../../../core/context/context_providers.dart';
 import '../../../core/presentation/theme_brightness_controller.dart';
@@ -829,6 +830,7 @@ class _CoreOptimizationSection extends StatelessWidget {
                 Navigator.pushNamed(context, MemoryKnowledgeScreen.routeName),
           ),
           const _CalendarSignalRow(),
+          const _ActivitySignalRow(),
           _SettingRow(
             icon: Icons.leaderboard_rounded,
             title: 'Progress',
@@ -971,6 +973,50 @@ class _CalendarSignalRow extends ConsumerWidget {
       await service.decline();
     }
     ref.invalidate(calendarSignalChoiceProvider);
+  }
+}
+
+/// Motion-aware timing toggle (humanizing Phase 6a): the persistent
+/// switch behind the one-time ask card. On → OS grant is requested if
+/// needed (the first Core Motion query IS the prompt); readings stay
+/// decision-time snapshots, never stored. Off → remembered decline.
+class _ActivitySignalRow extends ConsumerWidget {
+  const _ActivitySignalRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final choice = ref.watch(activitySignalChoiceProvider).valueOrNull;
+    final enabled = choice == ActivitySignalChoice.enabled;
+    return _SettingRow(
+      icon: Icons.directions_walk_rounded,
+      title: 'Motion-aware timing',
+      subtitle: "Suggest calls when you're walking — checked in the moment",
+      trailing: Switch.adaptive(
+        value: enabled,
+        onChanged: (v) => _toggle(context, ref, v),
+      ),
+      onTap: () => _toggle(context, ref, !enabled),
+    );
+  }
+
+  Future<void> _toggle(BuildContext context, WidgetRef ref, bool on) async {
+    final service = ref.read(activitySignalServiceProvider);
+    if (on) {
+      final granted = await service.enable();
+      if (!granted && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Motion access is off at the system level — allow it in '
+              'iOS Settings > SidePal > Motion & Fitness, then try again.',
+            ),
+          ),
+        );
+      }
+    } else {
+      await service.decline();
+    }
+    ref.invalidate(activitySignalChoiceProvider);
   }
 }
 

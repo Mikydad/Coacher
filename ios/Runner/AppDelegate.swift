@@ -84,6 +84,32 @@ import UserNotifications
       }
     }
 
+    // Activity-recognition snapshot (humanizing Phase 6a): coarse kind
+    // only, decision-time reads, no background stream — see
+    // ActivitySignal.swift for the privacy contract.
+    let activityRegistrar = engineBridge.pluginRegistry.registrar(forPlugin: "SidePalActivitySignal")
+    let activityChannel = FlutterMethodChannel(
+      name: "sidepal/activity_signal",
+      binaryMessenger: activityRegistrar!.messenger())
+    activityChannel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "getAuthorizationStatus":
+        result(ActivitySignalBridge.authorizationStatus())
+      case "requestAccess":
+        ActivitySignalBridge.requestAccess { granted in
+          result(granted)
+        }
+      case "getCurrentActivity":
+        let args = call.arguments as? [String: Any]
+        let lookbackMs = (args?["lookbackMs"] as? NSNumber)?.int64Value ?? 600_000
+        ActivitySignalBridge.currentActivity(lookbackMs: lookbackMs) { reading in
+          result(reading)
+        }
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
     // Device model + OS version for feedback reports. In-house instead of
     // device_info_plus: its 13.2.0 iOS code fails to compile against this
     // SDK (unknown NSProcessInfo selector 'isiOSAppOnVision').

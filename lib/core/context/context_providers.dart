@@ -8,6 +8,7 @@ import '../../features/intentions/application/intention_nudge_sync_service.dart'
 import '../../features/planning/application/planned_task_collect.dart';
 import '../di/providers.dart';
 import '../utils/date_keys.dart';
+import 'activity_signal.dart';
 import 'calendar_signal.dart';
 import 'context_snapshot_service.dart';
 
@@ -24,6 +25,16 @@ final calendarSignalServiceProvider = Provider<CalendarSignalService>(
 /// Invalidate after [CalendarSignalService.enable]/[decline].
 final calendarSignalChoiceProvider = FutureProvider<CalendarSignalChoice>(
   (ref) => ref.watch(calendarSignalServiceProvider).getChoice(),
+);
+
+final activitySignalServiceProvider = Provider<ActivitySignalService>(
+  (ref) => ActivitySignalService(),
+);
+
+/// The user's remembered motion decision (Tier 2, Phase 6a) — same
+/// tri-state contract as the calendar choice above.
+final activitySignalChoiceProvider = FutureProvider<ActivitySignalChoice>(
+  (ref) => ref.watch(activitySignalServiceProvider).getChoice(),
 );
 
 final contextSnapshotServiceProvider = Provider<ContextSnapshotService>((ref) {
@@ -48,5 +59,6 @@ final contextSnapshotServiceProvider = Provider<ContextSnapshotService>((ref) {
       return results.any((r) => r != ConnectivityResult.none);
     },
     calendarSignal: ref.read(calendarSignalServiceProvider),
+    activitySignal: ref.read(activitySignalServiceProvider),
   );
 });

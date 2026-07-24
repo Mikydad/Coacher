@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../application/activity_moment_rules.dart';
 import '../application/intentions_providers.dart';
 import '../data/opportunity_plan_repository.dart';
 import '../domain/models/intention.dart';
+import 'activity_ask_card.dart';
 import 'calendar_ask_card.dart';
 import 'intention_quick_add_sheet.dart';
 
@@ -74,6 +76,14 @@ class PromisesSection extends ConsumerWidget {
         // Just-in-time calendar ask (Phase 4b): first open promise is the
         // first moment calendar access has a nameable benefit.
         if (open.isNotEmpty) const CalendarAskCard(),
+        // Just-in-time motion ask (Phase 6a): first CALL-shaped promise is
+        // the first moment motion access has a nameable benefit. Its
+        // provider hides it while the calendar ask is undecided, so two
+        // permission cards never stack (Q6 progressive ladder).
+        if (open.any(
+          (i) => i.activityTags.any(handsFreeCompatibleTags.contains),
+        ))
+          const ActivityAskCard(),
         // "On your radar" — dormant standing understandings. Empty until
         // Phase 2 extraction ships; hidden entirely when empty.
         if (radar.isNotEmpty) ...[

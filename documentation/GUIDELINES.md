@@ -944,10 +944,53 @@ not silent reversal.
   "Give me a quick plan for today", cold-start-safe via a new
   `_PendingRouteIntent.coachBrief()` (the Phase 4a coachVoice
   template); FCM sends share one `sendToTokens` helper with dead-token
-  pruning (extracted from the 5b sweep). *Considered:* making the whole
+  pruning (extracted from the 5b sweep).   *Considered:* making the whole
   preference record a synced entity (rejected — one bool doesn't
   justify a sync set, and per-user semantics would be WRONG for a
   per-device notification opt-in); sending a contentless brief when no
   promises are open (rejected — nothing to say means silence). Phase 5
   is complete; deploy of functions + indexes remains bundled with the
   pending Phase 2a deploy.
+
+- **2026-07-24 · Phase 6 scoping (settled with Miko) + activity
+  snapshots (slice a): a decision-time motion reading that filters and
+  phrases, never streams.** Phase 6 ships in two slices — (a) activity
+  snapshots, (b) home-exit geofence — with the **L3 streaming spike and
+  Android enablement both deferred** (Miko, 2026-07-24). Signals are
+  **in-house Swift channels** (calendar-channel precedent), and the
+  geofence's "home" anchor will be an **explicit one-time setup**
+  stored device-local (inference rejected as magic-with-complexity;
+  "current location as home" rejected as silently wrong when enabled
+  away from home). Slice (a): `ActivitySignal.swift`
+  (`sidepal/activity_signal`) wraps CMMotionActivityManager and can
+  ONLY return coarse kind + confidence + query-time timestamp — the
+  privacy contract holds by construction; there is NO background
+  stream, a reading is taken at decision time. Platform quirk worth
+  remembering: Core Motion has no standalone permission API — the
+  first history query IS the prompt (`requestAccess` queries a 60s
+  window); and `capturedAtMs` is the QUERY time, not the state's
+  `startDate` (a 40-minute walk is still a current walk — startDate
+  would flunk any freshness check). `ActivitySignalService` mirrors the
+  calendar tri-state (undecided/enabled/declined, device-local prefs)
+  and degrades to null on: undecided, declined, OS-denied, non-iOS,
+  `low` confidence, `unknown` kind, or staler than 15 min — **fresh +
+  confident or nothing; a wrong "you're driving" is worse than
+  silence**. `ContextSnapshot.activity` (nullable) adds the
+  `activity_walking` coarse label to AI payloads automatically.
+  **Consumption is decision-time only** (`activity_moment_rules.dart`,
+  pure): the planner's window-type compatibility is untouched (future
+  slots have no motion); seize-the-moment filters candidates — null/
+  still = pre-Phase-6 behavior, walking = only `call`/`handsFree`
+  intentions, driving/cycling/running = card suppressed entirely — and
+  the card copy says "Looks like you're walking with ~N min free" ONLY
+  when a reading exists (provenance honesty). **Ask UX:** just-in-time
+  card at the first CALL-shaped open promise (the first nameable
+  benefit), gated to never show while the calendar ask is undecided
+  (Q6 progressive ladder — permission cards never stack), plus a
+  persistent "Motion-aware timing" Profile toggle; OS-level denial
+  routes to iOS Settings > Motion & Fitness. Verified: 13 new tests
+  (channel-fake service semantics incl. low-confidence/stale
+  degradation, snapshot label, moment rules both ways), full suite
+  1,342 green, analyze clean in touched files, `flutter build ios
+  --no-codesign` compiles the new Swift + NSMotionUsageDescription.
+  Slice (b) — home-exit geofence per-intention — is next.

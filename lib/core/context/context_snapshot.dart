@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../scheduling/free_window_calculator.dart';
+import 'activity_signal.dart';
 import 'calendar_signal.dart';
 
 /// The formalized Context Engine value object (humanizing Phase 4b,
@@ -24,6 +25,7 @@ class ContextSnapshot {
     this.currentWindowEndsBefore,
     this.calendarBusyToday,
     this.nextCalendarEventStartMs,
+    this.activity,
   });
 
   /// When this snapshot was assembled (epoch ms). Consumers should treat
@@ -55,7 +57,14 @@ class ContextSnapshot {
   /// remain today or the signal is unavailable.
   final int? nextCalendarEventStartMs;
 
+  /// Coarse motion state at capture time (Tier 2, humanizing Phase 6a) —
+  /// **null when the signal is unavailable** (declined, denied, non-iOS,
+  /// stale, or low-confidence). Provenance honesty: copy may say "you're
+  /// walking" only when this is non-null.
+  final ActivityKind? activity;
+
   bool get hasCalendarSignal => calendarBusyToday != null;
+  bool get hasActivitySignal => activity != null;
 
   /// Coarse, non-identifying labels — the ONLY calendar/context shape
   /// allowed into AI payloads ("free_25m", never event contents).
@@ -74,6 +83,8 @@ class ContextSnapshot {
     final mode = overrideMode;
     if (mode != null) labels.add('mode_$mode');
     if (online == false) labels.add('offline');
+    final motion = activity;
+    if (motion != null) labels.add('activity_${motion.name}');
     return labels;
   }
 }

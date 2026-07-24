@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../scheduling/free_window_calculator.dart';
+import 'activity_signal.dart';
 import 'calendar_signal.dart';
 import 'context_snapshot.dart';
 
@@ -50,6 +51,7 @@ class ContextSnapshotService {
     required this.overrideMode,
     required this.isOnline,
     required this.calendarSignal,
+    this.activitySignal,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now;
 
@@ -64,6 +66,11 @@ class ContextSnapshotService {
   final Future<bool?> Function() isOnline;
 
   final CalendarSignalService calendarSignal;
+
+  /// Tier-2 motion signal (Phase 6a); null keeps the snapshot activity-
+  /// free — pre-Phase-6 callers and tests need no change.
+  final ActivitySignalService? activitySignal;
+
   final DateTime Function() _now;
 
   /// Calendar busy intervals for one calendar day — the planner feed.
@@ -135,6 +142,13 @@ class ContextSnapshotService {
       online = null;
     }
 
+    ActivityKind? activity;
+    try {
+      activity = (await activitySignal?.currentActivity(now: now))?.kind;
+    } catch (_) {
+      activity = null;
+    }
+
     return ContextSnapshot(
       capturedAtMs: now.millisecondsSinceEpoch,
       online: online,
@@ -143,6 +157,7 @@ class ContextSnapshotService {
       currentWindowEndsBefore: endsBefore,
       calendarBusyToday: calendarBusy,
       nextCalendarEventStartMs: nextEventStartMs,
+      activity: activity,
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/context/activity_signal.dart';
 import '../../../core/context/context_providers.dart';
 import '../../../core/context/context_snapshot_service.dart';
 import '../../../core/di/providers.dart';
@@ -14,6 +15,7 @@ import '../../reminders/application/attention_orchestrator_providers.dart';
 import '../data/intentions_repository.dart';
 import '../data/opportunity_plan_repository.dart';
 import '../domain/models/intention.dart';
+import 'activity_moment_rules.dart';
 import 'intention_nudge_sync_service.dart';
 
 final intentionsRepositoryProvider = Provider<IntentionsRepository>(
@@ -64,11 +66,16 @@ class SeizeTheMomentCandidate {
     required this.intention,
     required this.freeMinutes,
     this.beforeTitle,
+    this.activity,
   });
 
   final Intention intention;
   final int freeMinutes;
   final String? beforeTitle;
+
+  /// Coarse motion state at decision time (Phase 6a); null = no signal,
+  /// and the card copy makes no motion claim.
+  final ActivityKind? activity;
 }
 
 /// Intention ids the user said "Not now" to this session — the card must
@@ -84,12 +91,26 @@ final seizeTheMomentProvider = FutureProvider<SeizeTheMomentCandidate?>((
   final dismissed = ref.watch(dismissedSeizeCandidatesProvider);
   final now = DateTime.now();
   final nowMs = now.millisecondsSinceEpoch;
+
+  // Motion snapshot (Phase 6a): read once at decision time, nullable
+  // degradation — no signal means no filtering and no claims.
+  ActivityKind? activity;
+  try {
+    activity = (await ref
+            .read(activitySignalServiceProvider)
+            .currentActivity(now: now))
+        ?.kind;
+  } catch (_) {
+    activity = null;
+  }
+
   final candidates = open.where(
     (i) =>
         !dismissed.contains(i.id) &&
         !i.isPinned &&
         i.windowStartMs <= nowMs &&
-        i.windowEndMs > nowMs,
+        i.windowEndMs > nowMs &&
+        seizeAllowedFor(activity, i.activityTags),
   );
   if (candidates.isEmpty) return null;
 
@@ -140,6 +161,7 @@ final seizeTheMomentProvider = FutureProvider<SeizeTheMomentCandidate?>((
     intention: fitting.first,
     freeMinutes: remaining,
     beforeTitle: current.beforeTitle,
+    activity: activity,
   );
 });
 
