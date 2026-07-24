@@ -33,8 +33,13 @@ const IsarOpportunityPlanSchema = CollectionSchema(
       name: r'intentionId',
       type: IsarType.string,
     ),
-    r'slotsJson': PropertySchema(
+    r'projectionSig': PropertySchema(
       id: 3,
+      name: r'projectionSig',
+      type: IsarType.string,
+    ),
+    r'slotsJson': PropertySchema(
+      id: 4,
       name: r'slotsJson',
       type: IsarType.string,
     ),
@@ -77,6 +82,7 @@ int _isarOpportunityPlanEstimateSize(
   var bytesCount = offsets.last;
   bytesCount += 3 + object.inputsHash.length * 3;
   bytesCount += 3 + object.intentionId.length * 3;
+  bytesCount += 3 + object.projectionSig.length * 3;
   bytesCount += 3 + object.slotsJson.length * 3;
   return bytesCount;
 }
@@ -90,7 +96,8 @@ void _isarOpportunityPlanSerialize(
   writer.writeLong(offsets[0], object.computedAtMs);
   writer.writeString(offsets[1], object.inputsHash);
   writer.writeString(offsets[2], object.intentionId);
-  writer.writeString(offsets[3], object.slotsJson);
+  writer.writeString(offsets[3], object.projectionSig);
+  writer.writeString(offsets[4], object.slotsJson);
 }
 
 IsarOpportunityPlan _isarOpportunityPlanDeserialize(
@@ -104,7 +111,8 @@ IsarOpportunityPlan _isarOpportunityPlanDeserialize(
   object.id = id;
   object.inputsHash = reader.readString(offsets[1]);
   object.intentionId = reader.readString(offsets[2]);
-  object.slotsJson = reader.readString(offsets[3]);
+  object.projectionSig = reader.readString(offsets[3]);
+  object.slotsJson = reader.readString(offsets[4]);
   return object;
 }
 
@@ -122,6 +130,8 @@ P _isarOpportunityPlanDeserializeProp<P>(
     case 2:
       return (reader.readString(offset)) as P;
     case 3:
+      return (reader.readString(offset)) as P;
+    case 4:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -741,6 +751,147 @@ extension IsarOpportunityPlanQueryFilter
   }
 
   QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterFilterCondition>
+  projectionSigEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'projectionSig',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterFilterCondition>
+  projectionSigGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'projectionSig',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterFilterCondition>
+  projectionSigLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'projectionSig',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterFilterCondition>
+  projectionSigBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'projectionSig',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterFilterCondition>
+  projectionSigStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'projectionSig',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterFilterCondition>
+  projectionSigEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'projectionSig',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterFilterCondition>
+  projectionSigContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'projectionSig',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterFilterCondition>
+  projectionSigMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'projectionSig',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterFilterCondition>
+  projectionSigIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'projectionSig', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterFilterCondition>
+  projectionSigIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'projectionSig', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterFilterCondition>
   slotsJsonEqualTo(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -943,6 +1094,20 @@ extension IsarOpportunityPlanQuerySortBy
   }
 
   QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterSortBy>
+  sortByProjectionSig() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'projectionSig', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterSortBy>
+  sortByProjectionSigDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'projectionSig', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterSortBy>
   sortBySlotsJson() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'slotsJson', Sort.asc);
@@ -1016,6 +1181,20 @@ extension IsarOpportunityPlanQuerySortThenBy
   }
 
   QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterSortBy>
+  thenByProjectionSig() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'projectionSig', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterSortBy>
+  thenByProjectionSigDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'projectionSig', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QAfterSortBy>
   thenBySlotsJson() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'slotsJson', Sort.asc);
@@ -1054,6 +1233,16 @@ extension IsarOpportunityPlanQueryWhereDistinct
   }
 
   QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QDistinct>
+  distinctByProjectionSig({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'projectionSig',
+        caseSensitive: caseSensitive,
+      );
+    });
+  }
+
+  QueryBuilder<IsarOpportunityPlan, IsarOpportunityPlan, QDistinct>
   distinctBySlotsJson({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'slotsJson', caseSensitive: caseSensitive);
@@ -1087,6 +1276,13 @@ extension IsarOpportunityPlanQueryProperty
   intentionIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'intentionId');
+    });
+  }
+
+  QueryBuilder<IsarOpportunityPlan, String, QQueryOperations>
+  projectionSigProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'projectionSig');
     });
   }
 

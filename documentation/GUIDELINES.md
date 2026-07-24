@@ -830,3 +830,45 @@ not silent reversal.
   snapshot label shapes), full suite 1,313 green, analyze clean in
   touched files, `flutter build ios --no-codesign` compiles the new
   Swift + Info.plist keys.
+
+- **2026-07-24 · Push transport + coarse projection (Phase 5, slice a):
+  the server can see coverage without the plan ever syncing, and a push
+  never bypasses the attention gate.** Phase 5 ("alive while closed") is
+  sliced three ways; slice (a) lays the transport + visibility floor with
+  NO server behaviour yet. `firebase_messaging` added with the iOS
+  `aps-environment` entitlement + `UIBackgroundModes: remote-notification`;
+  `PushMessagingService` (singleton, every plugin call guarded so it
+  no-ops without Firebase/APNs) registers a per-device token doc
+  (`users/{uid}/deviceTokens/{deviceId}`, stable id in prefs) and stamps
+  an **app-open heartbeat** (`lastSeenMs`, throttled once per local day) —
+  the freshness signal the Phase 5b sweep will use to choose a quiet data
+  push over a louder notification-fallback push (settled: check-in = app
+  foregrounded today). The **coarse projection**
+  (`users/{uid}/intentionProjections/{id}` = `{covered, nextSlotMs,
+  windowEndMs}`) is the crux: the local `IsarOpportunityPlan` stays
+  local-only (syncing it would churn Firestore + leak delivery
+  internals), so this tiny mirror answers the ONE thing the server can't —
+  *does a client already cover this closing window, and when?*
+  Compared-before-write via a `signature` that deliberately excludes
+  `updatedAtMs`/`windowEndMs` (those flow through the synced intention
+  doc), persisted as `projectionSig` on the local plan row; mirrored only
+  on material change, tombstoned on cancel ONLY when one was written
+  (the common not-plannable path stays churn-free). A fired slot changes
+  coverage without changing the inputs hash, so the projection is
+  recomputed even on the plan-unchanged fast-path. Mirror hooks are
+  injected (`writeProjection`/`clearProjection`, null in tests) — same
+  seam as the Phase 4b calendar feed — so the planner stays framework-
+  free. App-alive data push (`{type: intention_replan}`) → `applyAll()`,
+  which reschedules through `AttentionOrchestrator.evaluate()`: the second
+  gate (overrides, quiet hours, 64-cap) is reused, never bypassed. iOS
+  force-quit gets no data push (platform reality) — the background
+  handler is intentionally empty and the local alarm ladder remains the
+  permanent correctness floor. *Considered:* making the projection a full
+  bidirectional synced entity (rejected — it's derived + one-directional
+  client→server; a pull phase would re-import stale coverage). APNs key
+  upload is a manual console step (deferred by Miko): build/tests/iOS
+  compile don't need it, a real device push does. Verified: 13 new pure
+  tests (projection coverage/next-slot/signature, payload + heartbeat +
+  rescue-detection helpers), full suite 1,326 green, analyze clean in
+  touched files, `flutter build ios --no-codesign` compiles the new pod +
+  entitlement + Info.plist key.

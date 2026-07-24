@@ -12,6 +12,7 @@ import '../notifications/local_notifications_service.dart';
 import '../notifications/notification_ledger_repository.dart';
 import '../notifications/notification_reconciliation_service.dart';
 import '../offline/offline_store.dart';
+import '../push/push_messaging_service.dart';
 import '../sync/sync_service.dart';
 import '../../features/goals/application/goals_providers.dart';
 import '../../features/planning/application/accountability_retention_worker.dart';
@@ -74,6 +75,12 @@ class AppBootstrap {
 
     await SyncService.instance.initialize();
     await container.read(reminderSyncServiceProvider).scheduleFromCache();
+
+    // Push transport for the server rescue-net (Phase 5): register this
+    // device's token + stamp the app-open heartbeat. No-op without Firebase
+    // or APNs; the local alarm ladder stays the correctness floor.
+    unawaited(PushMessagingService.instance.initialize(container));
+    unawaited(PushMessagingService.instance.recordHeartbeat());
 
     // Summarize-then-purge (Phase 2, §5.2) replaces the blind 48h delete:
     // sessions are distilled into memory before their raw turns purge; if

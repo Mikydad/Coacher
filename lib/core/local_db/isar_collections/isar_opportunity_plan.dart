@@ -23,4 +23,10 @@ class IsarOpportunityPlan {
   late String inputsHash;
 
   late int computedAtMs;
+
+  /// Signature (`covered|nextSlotMs`) of the coarse projection last mirrored
+  /// to Firestore for the server rescue-net (Phase 5). Local-only bookkeeping
+  /// so the projection is written ONLY on material change (compared-before-
+  /// write), never on every copy tweak. Empty = never mirrored.
+  String projectionSig = '';
 }

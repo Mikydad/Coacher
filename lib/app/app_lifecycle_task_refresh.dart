@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/notifications/local_notifications_service.dart';
+import '../core/push/push_messaging_service.dart';
 import '../core/runtime/recompute_scope.dart';
 import '../core/runtime/unified_recompute_graph.dart';
 import '../core/sync/post_sync_refresh_coordinator.dart';
@@ -113,6 +114,9 @@ class _AppLifecycleTaskRefreshState
       UnifiedRecomputeGraph.instance.schedule(
         RecomputeScope.forReminderChange(),
       );
+      // App-open heartbeat for the server rescue-net (Phase 5) — throttled
+      // to once per local day inside the service.
+      unawaited(PushMessagingService.instance.recordHeartbeat());
       WidgetsBinding.instance.addPostFrameCallback((_) {
         flushPendingNotificationNavigationIntent();
       });

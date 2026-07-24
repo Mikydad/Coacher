@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/context/context_providers.dart';
 import '../../../core/context/context_snapshot_service.dart';
 import '../../../core/di/providers.dart';
+import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/notifications/notification_ledger_repository.dart';
 import '../../../core/offline/offline_store.dart';
 import '../../../core/scheduling/free_window_calculator.dart';
+import '../../../core/sync/outbox_writer.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../reminders/application/attention_orchestrator_providers.dart';
@@ -152,5 +154,14 @@ final intentionNudgeSyncServiceProvider = Provider<IntentionNudgeSyncService>(
     budget: ref.read(notificationBudgetProvider),
     calendarBusy: (day) =>
         ref.read(contextSnapshotServiceProvider).calendarBusyForDay(day),
+    writeProjection: (intentionId, payload) => outboxUpsert(
+      entityType: 'intentionProjection',
+      documentPath: FirestorePaths.intentionProjectionDocument(intentionId),
+      payload: payload,
+    ),
+    clearProjection: (intentionId) => outboxDelete(
+      entityType: 'intentionProjection',
+      documentPath: FirestorePaths.intentionProjectionDocument(intentionId),
+    ),
   ),
 );

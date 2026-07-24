@@ -39,6 +39,10 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>SidePal reads your calendar only to find good moments for your promises. Events are never stored and never leave your device.</string>
 	<key>NSCalendarsUsageDescription</key>

@@ -39,7 +39,8 @@ class OpportunityPlanRepository {
         plan.slots.map((s) => s.toMap()).toList(growable: false),
       )
       ..inputsHash = plan.inputsHash
-      ..computedAtMs = plan.computedAtMs;
+      ..computedAtMs = plan.computedAtMs
+      ..projectionSig = plan.projectionSig;
     await _isar.writeTxn(() async {
       await _isar.isarOpportunityPlans.putByIntentionId(row);
     });
@@ -62,12 +63,25 @@ class OpportunityPlan {
     required this.slots,
     required this.inputsHash,
     required this.computedAtMs,
+    this.projectionSig = '',
   });
 
   final String intentionId;
   final List<OpportunitySlot> slots;
   final String inputsHash;
   final int computedAtMs;
+
+  /// Signature of the coarse projection last mirrored to Firestore for the
+  /// server rescue-net (Phase 5). Empty = never mirrored.
+  final String projectionSig;
+
+  OpportunityPlan copyWith({String? projectionSig}) => OpportunityPlan(
+    intentionId: intentionId,
+    slots: slots,
+    inputsHash: inputsHash,
+    computedAtMs: computedAtMs,
+    projectionSig: projectionSig ?? this.projectionSig,
+  );
 
   static OpportunityPlan fromRow(IsarOpportunityPlan row) {
     List<OpportunitySlot> slots = const [];
@@ -84,6 +98,7 @@ class OpportunityPlan {
       slots: slots,
       inputsHash: row.inputsHash,
       computedAtMs: row.computedAtMs,
+      projectionSig: row.projectionSig,
     );
   }
 }

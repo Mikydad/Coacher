@@ -36,6 +36,21 @@ class FirestorePaths {
   static String intentionDocument(String intentionId) =>
       '$intentions/$intentionId';
 
+  /// Coarse plan projection the server rescue-net reads (humanizing Phase 5):
+  /// one tiny doc per intention carrying only the next planned slot + a
+  /// coverage flag, so the cron knows whether a client already covers a
+  /// closing window WITHOUT the local-only OpportunityPlan ever syncing.
+  static String get intentionProjections => '$userRoot/intentionProjections';
+  static String intentionProjectionDocument(String intentionId) =>
+      '$intentionProjections/$intentionId';
+
+  /// Per-device FCM registration + presence (humanizing Phase 5). `lastSeenMs`
+  /// is the app-open heartbeat the sweep uses to decide quiet data-push vs.
+  /// a louder notification-fallback push.
+  static String get deviceTokens => '$userRoot/deviceTokens';
+  static String deviceTokenDocument(String deviceId) =>
+      '$deviceTokens/$deviceId';
+
   static String get timeBlocks => '$userRoot/timeBlocks';
   static String timeBlockDocument(String blockId) => '$timeBlocks/$blockId';
 

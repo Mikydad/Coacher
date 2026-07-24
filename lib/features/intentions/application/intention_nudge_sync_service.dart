@@ -17,6 +17,7 @@ import '../../reminders/domain/models/reminder_intent.dart';
 import '../data/intentions_repository.dart';
 import '../data/opportunity_plan_repository.dart';
 import '../domain/models/intention.dart';
+import '../domain/models/intention_projection.dart';
 import '../domain/models/opportunity_slot.dart';
 import 'opportunity_planner.dart';
 
@@ -64,6 +65,9 @@ class IntentionNudgeSyncService {
     required AttentionOrchestratorService orchestrator,
     NotificationBudget? budget,
     Future<List<CalendarBusyInterval>?> Function(DateTime day)? calendarBusy,
+    Future<void> Function(String intentionId, Map<String, dynamic> payload)?
+    writeProjection,
+    Future<void> Function(String intentionId)? clearProjection,
     DateTime Function()? now,
   }) : _intentions = intentions,
        _plans = plans,
@@ -73,6 +77,8 @@ class IntentionNudgeSyncService {
        _orchestrator = orchestrator,
        _budget = budget,
        _calendarBusy = calendarBusy,
+       _writeProjection = writeProjection,
+       _clearProjection = clearProjection,
        _now = now ?? DateTime.now;
 
   final IntentionsRepository _intentions;
@@ -87,6 +93,12 @@ class IntentionNudgeSyncService {
   /// means "no calendar signal", and planning proceeds without it.
   final Future<List<CalendarBusyInterval>?> Function(DateTime day)?
   _calendarBusy;
+
+  /// Coarse-projection mirror hooks for the server rescue-net (Phase 5).
+  /// Null (tests, pre-sync) means "don't mirror" — planning is unaffected.
+  final Future<void> Function(String intentionId, Map<String, dynamic> payload)?
+  _writeProjection;
+  final Future<void> Function(String intentionId)? _clearProjection;
   final DateTime Function() _now;
 
   /// Throttle for [rearmIfStale] (same rhythm as goal reminders).
@@ -135,9 +147,17 @@ class IntentionNudgeSyncService {
   }
 
   /// Cancels the ladder + drops the cached plan (Done / dismissed / undo).
+  /// Also tombstones the server projection — but only when one was actually
+  /// mirrored, so the common "not plannable" path stays churn-free.
   Future<void> cancelForIntention(String intentionId) async {
     await _orchestrator.cancelIntentionSlots(intentionId);
+    final had = await _plans.getByIntentionId(intentionId);
     await _plans.deleteByIntentionId(intentionId);
+    if (_clearProjection != null &&
+        had != null &&
+        had.projectionSig.isNotEmpty) {
+      await _clearProjection(intentionId);
+    }
   }
 
   @visibleForTesting
@@ -192,7 +212,31 @@ class IntentionNudgeSyncService {
 
     final hash = _inputsHash(intention, ladder);
     final cached = await _plans.getByIntentionId(intention.id);
-    if (cached != null && cached.inputsHash == hash) return; // unchanged
+
+    // Coarse server projection (Phase 5): compare-before-write. Recomputed
+    // even on the unchanged fast-path, because a fired slot changes coverage
+    // without changing the inputs hash — and a plan cached before Phase 5
+    // has an empty sig that must mirror once.
+    final projection = IntentionProjection.fromPlan(
+      intention: intention,
+      slots: ladder,
+      nowMs: now.millisecondsSinceEpoch,
+    );
+    final priorSig = cached?.projectionSig ?? '';
+    final needsMirror =
+        _writeProjection != null && projection.signature != priorSig;
+
+    if (cached != null && cached.inputsHash == hash) {
+      // Plan unchanged — never touch the OS queue, but mirror coverage if
+      // it materially shifted (or was never mirrored).
+      if (needsMirror) {
+        await _writeProjection(intention.id, projection.toMap());
+        await _plans.upsertPlan(
+          cached.copyWith(projectionSig: projection.signature),
+        );
+      }
+      return;
+    }
 
     await _orchestrator.cancelIntentionSlots(intention.id);
     for (final slot in ladder) {
@@ -227,8 +271,12 @@ class IntentionNudgeSyncService {
         slots: ladder,
         inputsHash: hash,
         computedAtMs: now.millisecondsSinceEpoch,
+        projectionSig: needsMirror ? projection.signature : priorSig,
       ),
     );
+    if (needsMirror) {
+      await _writeProjection(intention.id, projection.toMap());
+    }
   }
 
   /// Free windows per day across the intention's deadline window
