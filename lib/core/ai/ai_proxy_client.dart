@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart' show Uint8List;
 
 /// Thrown when the AI proxy call fails.
 ///
@@ -176,6 +178,44 @@ class AiProxyClient {
         content: content is String && content.isNotEmpty ? content : null,
         toolCalls: toolCalls,
       );
+    } on FirebaseFunctionsException catch (e) {
+      throw AiProxyException(
+        e.message ?? e.code,
+        statusCode: _statusCodeForFunctionsError(e.code),
+        isNetwork: _isNetworkFunctionsCode(e.code),
+      );
+    } on AiProxyException {
+      rethrow;
+    } catch (e) {
+      throw AiProxyException(
+        'Network error: $e',
+        isNetwork: _looksLikeNetworkError(e),
+      );
+    }
+  }
+
+  /// Synthesizes [text] into audio bytes (mp3) via the `aiSpeech` proxy.
+  ///
+  /// Voice Mode's OpenAI voice. The voice itself is pinned server-side
+  /// (Remote Config); the caller only sends the sanitized reply text.
+  /// Throws [AiProxyException] on any failure — the voice stack treats
+  /// every failure as "use the on-device voice", so no failure here is
+  /// user-visible.
+  Future<Uint8List> speak(
+    String text, {
+    Duration timeout = const Duration(seconds: 20),
+  }) async {
+    try {
+      final callable = _functions.httpsCallable(
+        'aiSpeech',
+        options: HttpsCallableOptions(timeout: timeout),
+      );
+      final result = await callable.call<Map<dynamic, dynamic>>({'text': text});
+      final audioB64 = result.data['audioB64'];
+      if (audioB64 is! String || audioB64.isEmpty) {
+        throw const AiProxyException('Empty speech response');
+      }
+      return base64Decode(audioB64);
     } on FirebaseFunctionsException catch (e) {
       throw AiProxyException(
         e.message ?? e.code,

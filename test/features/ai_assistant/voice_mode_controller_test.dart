@@ -40,11 +40,12 @@ class FakeSpeechAdapter implements VoiceSpeechAdapter {
   void emitDone() => _onStatus!('done');
 }
 
-/// TTS fake — records chunks; can hold playback open so tests can
-/// interrupt mid-sentence.
+/// TTS fake — records replies (one speak per reply); can hold playback
+/// open so tests can interrupt mid-reply.
 class FakeTtsAdapter implements VoiceTtsAdapter {
   final List<String> spoken = [];
   int stopCalls = 0;
+  int releaseCalls = 0;
   bool holdPlayback = false;
   Completer<void>? _playing;
 
@@ -65,6 +66,11 @@ class FakeTtsAdapter implements VoiceTtsAdapter {
     stopCalls++;
     _playing?.complete();
     _playing = null;
+  }
+
+  @override
+  Future<void> release() async {
+    releaseCalls++;
   }
 }
 
@@ -102,16 +108,19 @@ void main() {
   });
 
   test(
-    'final result → sends → speaks reply in chunks → auto-relistens',
+    'final result → sends → speaks the sanitized reply → auto-relistens',
     () async {
       final controller = build();
+      nextReply = '**Sounds good.** Anything else? [mem:f_1|stated]';
       await controller.start();
 
       speech.emitFinal('call my cousin tomorrow');
       await pumpEventQueue();
 
       expect(sentMessages, ['call my cousin tomorrow']);
-      expect(tts.spoken, ['Sounds good.', 'Anything else?']);
+      // One speak per reply — chunking is the adapter's business now —
+      // with chat chrome (markdown, mem markers) stripped.
+      expect(tts.spoken, ['Sounds good. Anything else?']);
       // Loop closed: mic reopened for the next turn.
       expect(controller.phase, VoiceModePhase.listening);
       expect(speech.listenCalls, 2);
@@ -158,14 +167,25 @@ void main() {
     speech.emitFinal('hello');
     await pumpEventQueue();
     expect(controller.phase, VoiceModePhase.speaking);
-    expect(tts.spoken, hasLength(1)); // first chunk still "playing"
+    expect(tts.spoken, hasLength(1)); // reply still "playing"
 
     await controller.onOrbTap();
     await pumpEventQueue();
 
     expect(tts.stopCalls, greaterThanOrEqualTo(1));
-    expect(tts.spoken, hasLength(1)); // second chunk never played
+    expect(tts.spoken, hasLength(1)); // nothing new spoken after interrupt
     expect(controller.phase, VoiceModePhase.listening);
+  });
+
+  test('dispose releases the TTS adapter', () async {
+    final controller = build();
+    await controller.start();
+
+    controller.dispose();
+    await pumpEventQueue();
+
+    expect(tts.stopCalls, greaterThanOrEqualTo(1));
+    expect(tts.releaseCalls, 1);
   });
 
   test('null reply pauses to idle with a retry hint', () async {

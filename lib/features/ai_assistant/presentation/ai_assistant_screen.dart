@@ -14,8 +14,10 @@ import '../application/ai_action_executor.dart';
 import '../data/ai_interaction_history_repository.dart';
 import '../domain/models/ai_chat_message.dart';
 import '../domain/models/ai_planned_changes.dart';
+import '../../../core/ai/ai_proxy_client.dart';
 import '../application/voice_mode_adapters.dart';
 import '../application/voice_mode_controller.dart';
+import '../application/voice_tts_resilience.dart';
 import 'widgets/ai_input_card.dart';
 import 'widgets/chat_bubbles.dart';
 import 'widgets/voice_mode_card.dart';
@@ -446,9 +448,19 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   void _enterVoiceMode(AiAssistantService service) {
     if (_voiceController != null) return;
     dismissKeyboard(context);
+    // Coach voice: OpenAI TTS through the aiSpeech proxy (voice pinned
+    // server-side), degrading silently to the on-device system voice when
+    // the network can't deliver — the loop itself never stalls.
+    final proxy = AiProxyClient();
     final controller = VoiceModeController(
       speech: SpeechToTextVoiceAdapter(),
-      tts: FlutterTtsVoiceAdapter(),
+      tts: ResilientVoiceTtsAdapter(
+        primary: OpenAiTtsVoiceAdapter(
+          synthesize: (text) =>
+              proxy.speak(text, timeout: const Duration(seconds: 8)),
+        ),
+        fallback: FlutterTtsVoiceAdapter(),
+      ),
       sendAndGetReply: (text) => _voiceSendAndGetReply(service, text),
     );
     setState(() => _voiceController = controller);

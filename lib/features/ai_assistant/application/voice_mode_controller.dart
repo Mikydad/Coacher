@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'voice_speech_text.dart';
@@ -35,12 +37,18 @@ abstract class VoiceSpeechAdapter {
   Future<void> stop();
 }
 
-/// TTS seam. [speak] must complete only when playback finishes — the
-/// controller chains sentence chunks on that contract.
+/// TTS seam. [speak] receives one whole sanitized reply and must complete
+/// when playback finishes OR [stop] interrupts it — chunking/streaming is
+/// the adapter's own business (flutter_tts chunks sentences; OpenAI TTS
+/// synthesizes the reply in one or two calls).
 abstract class VoiceTtsAdapter {
   Future<void> configure();
   Future<void> speak(String text);
   Future<void> stop();
+
+  /// End-of-session cleanup (native players etc.). Called once from
+  /// [VoiceModeController.dispose].
+  Future<void> release();
 }
 
 /// The Voice Mode loop (humanizing Phase 3, PRD §6 L2):
@@ -232,14 +240,13 @@ class VoiceModeController extends ChangeNotifier {
   }
 
   Future<void> _speak(String reply, int generation) async {
-    _setPhase(VoiceModePhase.speaking);
-    final chunks = speechChunksFor(reply);
-    for (final chunk in chunks) {
-      if (_disposed || !_active || generation != _generation) return;
+    final text = sanitizeForSpeech(reply);
+    if (text.isNotEmpty) {
+      _setPhase(VoiceModePhase.speaking);
       try {
-        await tts.speak(chunk);
+        await tts.speak(text);
       } catch (_) {
-        break; // TTS failure: fall through to relisten — text is on screen.
+        // TTS failure: fall through to relisten — text is on screen.
       }
     }
     if (_disposed || !_active || generation != _generation) return;
@@ -266,8 +273,19 @@ class VoiceModeController extends ChangeNotifier {
     _disposed = true;
     _active = false;
     _generation++;
-    speech.stop();
-    tts.stop();
+    unawaited(_teardown());
     super.dispose();
+  }
+
+  Future<void> _teardown() async {
+    try {
+      await speech.stop();
+    } catch (_) {}
+    try {
+      await tts.stop();
+    } catch (_) {}
+    try {
+      await tts.release();
+    } catch (_) {}
   }
 }

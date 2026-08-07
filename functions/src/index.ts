@@ -1,11 +1,11 @@
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
-import { defineSecret } from "firebase-functions/params";
 import { logger } from "firebase-functions/v2";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, Timestamp, FieldValue } from "firebase-admin/firestore";
 import { getRemoteConfig, ServerTemplate } from "firebase-admin/remote-config";
 
 import { parseRouteOverrides, resolveRoute, utcDayKey } from "./ai_routing";
+import { openAiApiKey } from "./secrets";
 
 initializeApp();
 
@@ -32,8 +32,7 @@ export { devRunSweep } from "./stakes/dev";
 export { stakeEvidenceArrived, stakeDisbursementReceipt } from "./stakes/triggers";
 export { stakePhotoUploaded } from "./stakes/nsfw_screen";
 export { stakeAccountPurge } from "./stakes/account_purge";
-
-const openAiApiKey = defineSecret("OPENAI_API_KEY");
+export { aiSpeech } from "./speech";
 
 // The model comes from the purpose routing table (ai_routing.ts) — pinned
 // server-side per purpose; clients cannot request a different one.

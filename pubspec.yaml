@@ -60,6 +60,7 @@ dependencies:
   firebase_crashlytics: ^4.3.10
   flutter_timezone: ^5.1.0
   flutter_tts: ^4.2.5
+  audioplayers: ^6.8.1
 
 dev_dependencies:
   flutter_test:

@@ -1164,3 +1164,33 @@ not silent reversal.
     "You're offline…" copy, never generic blame.
   Verified: analyze at the 96-issue baseline (zero errors), 1,411 Flutter
   tests, 204 functions tests, 31 rules tests — all green.
+
+- **2026-08-07 · Voice Mode voice upgrade: OpenAI TTS behind the adapter
+  seam (Level 1 — turn-based stays; Realtime speech-to-speech is a
+  separate future phase).** Settled with Miko; voice = **coral**.
+  - **Transport:** new `aiSpeech` callable (`functions/src/speech.ts`)
+    proxies `POST /v1/audio/speech`, model `gpt-4o-mini-tts` — the API
+    key never ships in the app. Voice and kill switch are Remote Config
+    (`ai_speech_voice`, `ai_speech_enabled`, defaults compiled in);
+    unknown voice values degrade to the default (`speech_rules.ts`,
+    pure + tested). Quota: speech-scoped sliding hour (90/h) on the
+    shared `aiUsage` doc — a voice conversation can never eat the chat
+    quota. Text capped at 2,000 chars (a reply is ≤800 tokens).
+  - **`VoiceTtsAdapter.speak()` is per-reply now,** not per-sentence:
+    chunking is each adapter's own business. flutter_tts chunks
+    sentences internally (interrupt lands between sentences); the OpenAI
+    adapter synthesizes first-sentence + remainder in parallel and plays
+    sequentially, so time-to-first-audio ≈ one short synthesis. A
+    tail-only synthesis failure is swallowed (the head was heard;
+    falling back would double-speak). New `release()` lifecycle method
+    disposes the audio player at session end.
+  - **Degradation is silent and floor-guaranteed:**
+    `ResilientVoiceTtsAdapter` (pure, tested) tries OpenAI, falls back
+    to the on-device system voice on ANY failure, and skips the primary
+    for a 60s cooldown after a failure so an offline stretch doesn't pay
+    the synthesis timeout every turn. The system-voice floor (and the
+    Phase 3 auto-voice-selection) stays — airplane mode still speaks.
+  - **Audio session contract** (the earpiece lesson, 2026-07-24):
+    audioplayers' global iOS context is set to `playAndRecord` +
+    `defaultToSpeaker` + Bluetooth options, same as the flutter_tts
+    adapter re-asserts per turn.
