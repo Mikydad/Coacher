@@ -1194,3 +1194,50 @@ not silent reversal.
     audioplayers' global iOS context is set to `playAndRecord` +
     `defaultToSpeaker` + Bluetooth options, same as the flutter_tts
     adapter re-asserts per turn.
+
+- **2026-08-08 · Add Task file split: flows to `add_task/application/`,
+  sections to `presentation/sections/`.** `add_task_screen.dart` had grown
+  to 2,184 lines (entry points + ~25 form fields + ~1,000 lines of flows +
+  ~800 lines of section builders). Split following house idioms — no new
+  patterns invented:
+  - **Flows are top-level `(BuildContext, WidgetRef, {...})` functions**
+    in `lib/features/add_task/application/` (the `planned_task_actions.dart`
+    precedent): mode seeding/effective-mode resolution, draft-restore flow,
+    edit loader, reminder persistence (+ permission notice), sleep
+    side-effects, conflict flow (habit-overlap confirm, time-block check,
+    block sync), tier gates, save-target resolution, pure duration-label
+    helpers.
+  - **Sections are stateless widgets** under `presentation/sections/`
+    (values in / callbacks out): sleep extras, advanced, accountability
+    row + accountability/deep-work pair, category, duration, reminder.
+    Every mutation runs through a State-side `setState` closure, so the
+    screen's `setState` override keeps marking the form draft dirty with
+    zero changes — that invariant is the load-bearing design rule for any
+    future section work.
+  - **Deliberately kept in the State** (~915-line screen): `_onSave`
+    orchestration (Isar-write → outbox sequencing stays visible in one
+    place), `_captureDraft`/`_applyDraft`/`_buildPlannedTask` field
+    marshalling, `_applySleepCategoryDefaults` (direct-mutate inside the
+    caller's setState), both scroll `GlobalKey`s, seed/load/restore
+    wrappers with their `_modeUserCustomized`/`mounted` guard pairs. No
+    form controller/Notifier — loose State fields remain the form-state
+    convention.
+  - Entry points live in `add_task_args.dart` + `add_task_sheet.dart`
+    (`AddTaskScreen.routeName` stays on the screen class — the guided tour
+    compares `'/add-task'`); the custom-category dialog and accountability
+    picker sheet got their own files mirroring `custom_duration_dialog.dart`.
+    `add_task_ui.dart` untouched.
+  - *Declared micro-changes:* conflict-sheet schedule adjustments (live
+    and outcome paths) now funnel through one
+    `onAdjustSchedule(DateTime?, int?)` → `_applyAdjustedSchedule` seam
+    (two setStates instead of the inline path's one — identical net state
+    within a frame, `markDirty` idempotent); draft-restore cancels the
+    autosave debounce before (not after) the stored-draft delete;
+    swallowed-error debugPrint tags name the new files; the thrice-repeated
+    max-orderIndex block deduped into `_nextOrderIndex`.
+  - **Safety net built first:** `add_task_screen_smoke_test.dart` (create
+    renders, Sleep swaps layout, edit prefills, draft restore) written
+    against the untouched screen, kept green through all 7 stages; analyzer
+    held at the 96-issue baseline and the full suite (1,430) after every
+    stage. Save path has no widget test (tier gates reach
+    FirebaseAuth/static-Isar) — guarded by pure code motion + manual pass.

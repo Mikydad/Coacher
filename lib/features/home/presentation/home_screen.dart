@@ -39,7 +39,7 @@ import '../../planning/domain/models/task_item.dart';
 import '../../planning/presentation/accountability_history_screen.dart';
 import '../../scoring/application/scoring_controller.dart';
 import '../../scoring/presentation/score_task_dialog.dart';
-import '../../add_task/presentation/add_task_screen.dart';
+import '../../add_task/presentation/add_task_sheet.dart';
 import '../../tasks_hub/presentation/task_detail_screen.dart';
 import '../../tasks_hub/presentation/tasks_hub_screen.dart';
 import '../../focus/presentation/focus_selection_screen.dart';

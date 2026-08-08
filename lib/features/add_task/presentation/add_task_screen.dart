@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
-import '../../../core/presentation/bento_category_card.dart';
 import '../../../core/presentation/page_headers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,107 +8,40 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
-import '../../../core/tier/tier_providers.dart';
-import '../../../core/tier/tier_usage.dart';
-import '../../../core/tier/upgrade_prompt.dart';
 import '../../../core/utils/date_keys.dart';
-import '../../../core/utils/stable_id.dart';
-import '../../coaching/application/default_mode_resolver.dart';
-import '../../planning/application/effective_task_mode.dart';
-import '../../planning/application/habit_anchor_aggregator.dart';
-import '../../profile/application/profile_providers.dart';
-import '../../analytics/application/analytics_event_logger.dart';
-import '../../analytics/domain/models/analytics_event.dart';
 import '../../planning/domain/models/routine.dart';
-import '../../planning/data/planning_repository.dart';
-import '../../context_override/application/context_override_providers.dart';
-import '../../context_override/domain/models/context_override.dart';
-import '../../planning/application/task_schedule_display.dart';
 import '../../planning/application/form_draft_autosave.dart';
 import '../../planning/application/form_draft_providers.dart';
 import '../../planning/domain/add_task_duration.dart';
 import '../../planning/domain/models/add_task_form_draft.dart';
 import '../../planning/domain/models/task_item.dart';
 import '../../planning/domain/sleep_task.dart';
-import '../../planning/presentation/sleep_task_ios_guidance.dart';
+import '../application/add_task_conflict_flow.dart';
+import '../application/add_task_draft_restore.dart';
+import '../application/add_task_duration_labels.dart';
+import '../application/add_task_edit_loader.dart';
+import '../application/add_task_mode_resolution.dart';
+import '../application/add_task_reminder_persistence.dart';
+import '../application/add_task_save_target.dart';
+import '../application/add_task_sleep_side_effects.dart';
+import '../application/add_task_tier_gates.dart';
+import 'add_task_accountability_picker_sheet.dart';
+import 'add_task_args.dart';
 import 'custom_duration_dialog.dart';
-import '../../reminders/domain/models/reminder_config.dart';
-import '../../time_blocks/application/conflict_entity_title_resolver.dart';
-import '../../time_blocks/application/scheduling_conflict_analytics.dart';
-import '../../time_blocks/application/time_block_providers.dart';
-import '../../time_blocks/domain/models/time_conflict.dart';
-import '../../time_blocks/domain/models/conflict_resolution_outcome.dart';
-import '../../time_blocks/presentation/scheduling_conflict_sheet.dart';
 import '../../education/application/getting_started_controller.dart';
 import '../../education/presentation/help_dot.dart';
 import '../../education/presentation/tour_targets.dart';
 import 'add_task_ui.dart';
+import 'sections/add_task_accountability_deep_work_row.dart';
+import 'sections/add_task_accountability_row.dart';
+import 'sections/add_task_advanced_section.dart';
+import 'sections/add_task_category_section.dart';
+import 'sections/add_task_duration_section.dart';
+import 'sections/add_task_reminder_section.dart';
+import 'sections/add_task_sleep_extras_section.dart';
 
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/keyboard_dismiss.dart';
-
-class AddTaskEditArgs {
-  const AddTaskEditArgs({
-    required this.taskId,
-    required this.routineId,
-    required this.blockId,
-    required this.dateKey,
-  });
-
-  final String taskId;
-  final String routineId;
-  final String blockId;
-
-  /// `Routine.dateKey` for this task’s current plan day.
-  final String dateKey;
-}
-
-/// Passed when opening Add Task from a specific routine slot (e.g. Plan Tomorrow).
-/// Saves directly under [routineId]/[blockId] without calling [ensureDefaultDayPlan].
-class AddTaskSlotArgs {
-  const AddTaskSlotArgs({
-    required this.routineId,
-    required this.blockId,
-    required this.dateKey,
-  });
-
-  final String routineId;
-  final String blockId;
-  final String dateKey;
-}
-
-/// Opens Add Task as a modal bottom sheet — the one way to reach the form
-/// (create, edit, and Plan Tomorrow slots all come through here).
-///
-/// The sheet slides up over the caller, dismisses by swipe-down / tapping the
-/// scrim / save, and keeps the caller's context underneath. Dismissing
-/// mid-entry is safe: the form's draft autosave offers a restore next open.
-/// The route is still named [AddTaskScreen.routeName] so the guided tour and
-/// the feedback route tracker see the same signal as the old pushed page.
-Future<void> showAddTaskSheet(
-  BuildContext context, {
-  AddTaskEditArgs? editArgs,
-  AddTaskSlotArgs? slotArgs,
-}) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: true,
-    backgroundColor: AddTaskColors.surface,
-    clipBehavior: Clip.antiAlias,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-    ),
-    routeSettings: const RouteSettings(name: AddTaskScreen.routeName),
-    builder: (_) => FractionallySizedBox(
-      // Tall overlay: a sliver of the caller stays visible so the sheet
-      // reads as "on top of" the screen, not a new page.
-      heightFactor: 0.93,
-      child: AddTaskScreen(editArgs: editArgs, slotArgs: slotArgs),
-    ),
-  );
-}
 
 class AddTaskScreen extends ConsumerStatefulWidget {
   const AddTaskScreen({super.key, this.editArgs, this.slotArgs});
@@ -126,24 +57,6 @@ class AddTaskScreen extends ConsumerStatefulWidget {
 
 class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     with WidgetsBindingObserver {
-  // 'Plan' superseded 'Planning' (2026-07-15); older tasks may still carry
-  // the long value, so the icon/color maps keep a legacy alias.
-  static const _categoryOptions = [
-    'Study',
-    'Fitness',
-    'Work',
-    'Personal',
-    'Plan',
-    kSleepTaskCategory,
-  ];
-  static const _modeChoiceIds = ['flexible', 'disciplined', 'extreme'];
-  static const _modeLabels = ['Flexible', 'Disciplined', 'Extreme'];
-  static const _modeDescriptions = [
-    'Reminders are gentle. Missing a day is okay.',
-    'Hold me accountable. Streaks matter.',
-    'No excuses. Follow up until I act.',
-  ];
-
   final _controller = TextEditingController();
   final _notesController = TextEditingController();
   final _scheduleSectionKey = GlobalKey();
@@ -333,241 +246,73 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
   Future<void> _offerDraftRestoreIfNeeded() async {
     if (_draftRestoreOffered || !mounted) return;
     _draftRestoreOffered = true;
-
-    final repo = ref.read(formDraftRepositoryProvider);
-    final raw = await repo.load(_draftKey);
-    if (!mounted || raw == null) return;
-
-    final draft = AddTaskFormDraft.fromJson(raw);
-    if (repo.isExpired(draft.savedAtMs)) {
-      await repo.delete(_draftKey);
-      return;
-    }
-    if (!draft.hasMeaningfulContent) {
-      await repo.delete(_draftKey);
-      return;
-    }
-
-    final current = _captureDraft();
-    if (current.contentEquals(draft)) {
-      await repo.delete(_draftKey);
-      return;
-    }
-
-    final restore = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Restore draft?'),
-        content: const Text(
-          'You have unsaved changes from earlier. Restore them or start fresh?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Start fresh'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Restore'),
-          ),
-        ],
-      ),
-    );
-    if (!mounted) return;
-    if (restore == true) {
-      _applyDraft(draft);
-      await repo.delete(_draftKey);
-      _draftAutosave?.cancel();
-      fireAndForgetAnalyticsEvent(
-        ref,
-        type: AnalyticsEventType.formDraftRestored,
-        entityId: _draftKey,
-        entityKind: 'form_draft',
-        sourceSurface: _isEdit ? 'add_task_edit' : 'add_task_create',
-        idempotencyKey: 'form_draft_restored_$_draftKey',
-      );
-    } else {
-      await repo.delete(_draftKey);
-      fireAndForgetAnalyticsEvent(
-        ref,
-        type: AnalyticsEventType.formDraftDiscarded,
-        entityId: _draftKey,
-        entityKind: 'form_draft',
-        sourceSurface: _isEdit ? 'add_task_edit' : 'add_task_create',
-        idempotencyKey: 'form_draft_discarded_$_draftKey',
-      );
-    }
-  }
-
-  void _logOverlapResolvedInline({
-    required String taskId,
-    required String movedEntity,
-    required Object suggestionIndex,
-    String? conflictingEntityId,
-  }) {
-    fireAndForgetAnalyticsEvent(
+    await offerAddTaskDraftRestoreIfNeeded(
+      context,
       ref,
-      type: AnalyticsEventType.overlapResolvedInline,
-      entityId: taskId,
-      entityKind: 'task',
-      sourceSurface: _isEdit ? 'add_task_edit' : 'add_task_create',
-      idempotencyKey:
-          'overlap_resolved_inline_${taskId}_${DateTime.now().millisecondsSinceEpoch}',
-      reason: inlineConflictResolutionReason(
-        movedEntity: movedEntity,
-        suggestionIndex: suggestionIndex,
-        conflictingEntityId: conflictingEntityId,
-      ),
+      draftKey: _draftKey,
+      isEdit: _isEdit,
+      captureCurrent: _captureDraft,
+      applyDraft: (draft) {
+        _applyDraft(draft);
+        // Cancel the pending autosave debounce so it can't re-persist the
+        // content that was just restored-and-deleted.
+        _draftAutosave?.cancel();
+      },
     );
   }
 
-  String _planDateKey() {
-    if (!_reminder) {
-      // Respect a preset plan day (e.g. from Plan Tomorrow slot) when no reminder is set.
-      return widget.slotArgs?.dateKey ??
-          widget.editArgs?.dateKey ??
-          DateKeys.todayKey();
-    }
-    final rd = DateTime(
-      _reminderTime.year,
-      _reminderTime.month,
-      _reminderTime.day,
-    );
-    return DateKeys.yyyymmdd(rd);
-  }
+  String _planDateKey() => addTaskPlanDateKey(
+    reminderEnabled: _reminder,
+    reminderTime: _reminderTime,
+    // Respect a preset plan day (e.g. from Plan Tomorrow slot) when no reminder is set.
+    presetDateKey: widget.slotArgs?.dateKey ?? widget.editArgs?.dateKey,
+  );
 
+  /// Inherit the slot routine's mode (create-from-slot only). Never overrides
+  /// a user choice: guarded before the fetch and re-guarded before applying.
   Future<void> _seedModeFromRoutineSlot() async {
     if (_isEdit || widget.slotArgs == null || _modeUserCustomized || !mounted) {
       return;
     }
-    try {
-      final planning = ref.read(planningRepositoryProvider);
-      final routines = await planning.getRoutinesForDate(
-        widget.slotArgs!.dateKey,
-      );
-      for (final r in routines) {
-        if (r.id == widget.slotArgs!.routineId) {
-          if (!mounted || _modeUserCustomized) return;
-          final id = r.modeId.trim().toLowerCase();
-          // Only inherit a known routine mode; otherwise keep the
-          // profile-scaled seed from _seedModeFromProfileDefault.
-          if (_modeChoiceIds.contains(id)) {
-            setState(() {
-              _modeRefId = id;
-              _modeInheritSource = 'routine';
-            });
-          }
-          return;
-        }
-      }
-    } catch (e) {
-      debugPrint('add_task_screen: swallowed error: $e');
-    }
-  }
-
-  /// Seeds the mode from the profile-level Discipline Mode, scaled by the
-  /// target block's urgency when the slot is known ("how strict is the app
-  /// overall" — see [DefaultModeResolver]). Never overrides a user choice.
-  Future<void> _seedModeFromProfileDefault() async {
-    if (_isEdit || _modeUserCustomized || !mounted) return;
-    final profileDefault = ref.read(defaultEnforcementModeProvider);
-    final urgency = await _blockUrgencyForSlot();
-    if (!mounted || _modeUserCustomized) return;
+    final seed = await resolveRoutineSlotModeSeed(
+      ref,
+      slotDateKey: widget.slotArgs!.dateKey,
+      slotRoutineId: widget.slotArgs!.routineId,
+    );
+    if (seed == null || !mounted || _modeUserCustomized) return;
     setState(() {
-      _modeRefId = DefaultModeResolver.resolveModeRefId(
-        profileDefault: profileDefault,
-        blockUrgencyScore: urgency,
-      );
-      _modeInheritSource = 'profile';
+      _modeRefId = seed.modeRefId;
+      _modeInheritSource = seed.inheritSource;
     });
   }
 
-  Future<int?> _blockUrgencyForSlot() async {
-    final slot = widget.slotArgs;
-    if (slot == null) return null;
-    try {
-      final planning = ref.read(planningRepositoryProvider);
-      final blocks = await planning.getBlocks(slot.routineId);
-      for (final b in blocks) {
-        if (b.id == slot.blockId) return b.urgencyScore;
-      }
-    } catch (e) {
-      debugPrint('add_task_screen: swallowed error: $e');
-    }
-    return null;
-  }
-
-  Future<String> _effectiveModeRefIdForSave({
-    required PlanningRepository planning,
-    required String routineId,
-    required String planDateKey,
-    required String blockId,
-  }) async {
-    Routine? routine;
-    var blockUrgency = 50;
-    try {
-      final routines = await planning.getRoutinesForDate(planDateKey);
-      for (final r in routines) {
-        if (r.id == routineId) {
-          routine = r;
-          break;
-        }
-      }
-      final blocks = await planning.getBlocks(routineId);
-      for (final b in blocks) {
-        if (b.id == blockId) {
-          blockUrgency = b.urgencyScore;
-          break;
-        }
-      }
-    } catch (e) {
-      debugPrint('add_task_screen: swallowed error: $e');
-    }
-
-    final explicit = (!_isEdit && !_modeUserCustomized) ? null : _modeRefId;
-    final task = PlannedTask(
-      id: '',
-      routineId: routineId,
-      blockId: blockId,
-      title: '',
-      durationMinutes: 1,
-      priority: 3,
-      orderIndex: 0,
-      reminderEnabled: false,
-      reminderTimeIso: null,
-      status: TaskStatus.notStarted,
-      createdAtMs: 0,
-      updatedAtMs: 0,
-      modeRefId: explicit,
+  /// Seeds the mode from the profile-level Discipline Mode, scaled by the
+  /// target block's urgency when the slot is known. Never overrides a user
+  /// choice.
+  Future<void> _seedModeFromProfileDefault() async {
+    if (_isEdit || _modeUserCustomized || !mounted) return;
+    final seed = await resolveProfileDefaultModeSeed(
+      ref,
+      slotRoutineId: widget.slotArgs?.routineId,
+      slotBlockId: widget.slotArgs?.blockId,
     );
-    final fallback = DefaultModeResolver.resolveModeRefId(
-      profileDefault: ref.read(defaultEnforcementModeProvider),
-      priority: _loadedTask?.priority ?? 3,
-      blockUrgencyScore: blockUrgency,
-    );
-    return EffectiveTaskMode.effectiveModeRefId(
-      task: task,
-      routine: routine,
-      fallbackModeRefId: fallback,
-    );
+    if (!mounted || _modeUserCustomized) return;
+    setState(() {
+      _modeRefId = seed.modeRefId;
+      _modeInheritSource = seed.inheritSource;
+    });
   }
 
   Future<void> _loadEdit() async {
     final args = widget.editArgs!;
-    final planning = ref.read(planningRepositoryProvider);
     try {
-      final tasks = await planning.getTasks(
+      final load = await loadAddTaskForEdit(
+        ref,
+        taskId: args.taskId,
         routineId: args.routineId,
         blockId: args.blockId,
       );
-      PlannedTask? task;
-      for (final t in tasks) {
-        if (t.id == args.taskId) {
-          task = t;
-          break;
-        }
-      }
-      if (task == null) {
+      if (load == null) {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
@@ -577,12 +322,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         return;
       }
 
-      final reminders = await ref
-          .read(reminderRepositoryProvider)
-          .getRemindersForTasks([task.id]);
-
       if (!mounted) return;
-      final loaded = task;
+      final loaded = load.task;
       _suppressDraftDirty = true;
       setState(() {
         _loadedTask = loaded;
@@ -606,9 +347,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
             _reminderTime = parsed.toLocal();
           }
         }
-        if (reminders.isNotEmpty) {
-          _existingReminderId = reminders.first.id;
-          _reminderCreatedAtMs = reminders.first.createdAtMs;
+        if (load.reminderId != null) {
+          _existingReminderId = load.reminderId;
+          _reminderCreatedAtMs = load.reminderCreatedAtMs;
         }
         _modeRefId = loaded.modeRefId?.trim().isNotEmpty == true
             ? loaded.modeRefId!
@@ -630,69 +371,6 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         Navigator.pop(context);
       }
     }
-  }
-
-  Future<void> _persistReminder({
-    required String taskId,
-    required String taskTitle,
-    required String routineId,
-    required String blockId,
-    required String modeRefId,
-  }) async {
-    // New enabled reminder = one more active configuration — gate it (the
-    // task itself is already saved; only the reminder is withheld).
-    if (_existingReminderId == null && _reminder) {
-      final tierGate = ref.read(tierGateProvider);
-      if (!tierGate.isBypassed) {
-        final all = await ref
-            .read(reminderRepositoryProvider)
-            .listAllReminders();
-        final activeCount = all.where((r) => r.enabled).length;
-        if (!tierGate.canCreateReminder(activeCount)) {
-          if (mounted) {
-            await showTierLimitSheet(
-              context,
-              title: 'Reminder limit reached',
-              message:
-                  'The free plan includes ${tierGate.limits.freeReminders} '
-                  'active reminders, so this task was saved without one. '
-                  'SidePal Pro removes the limit.',
-            );
-          }
-          return;
-        }
-      }
-    }
-    var blockUrgency = 50;
-    try {
-      final planning = ref.read(planningRepositoryProvider);
-      final blocks = await planning.getBlocks(routineId);
-      for (final b in blocks) {
-        if (b.id == blockId) {
-          blockUrgency = b.urgencyScore;
-          break;
-        }
-      }
-    } catch (e) {
-      debugPrint('add_task_screen: swallowed error: $e');
-    }
-
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final createdAt = _reminderCreatedAtMs ?? now;
-    final reminder = ReminderConfig(
-      id: _existingReminderId ?? StableId.generate('reminder'),
-      taskId: taskId,
-      taskTitle: taskTitle,
-      enabled: _reminder,
-      scheduledAtIso: _reminder ? _reminderTime.toIso8601String() : null,
-      modeRefId: modeRefId,
-      blockUrgencyScore: blockUrgency,
-      createdAtMs: createdAt,
-      updatedAtMs: now,
-    );
-    await ref.read(reminderRepositoryProvider).upsertReminder(reminder);
-    _existingReminderId ??= reminder.id;
-    await ref.read(reminderSyncServiceProvider).syncForTaskIds([taskId]);
   }
 
   PlannedTask _buildPlannedTask({
@@ -730,190 +408,6 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     );
   }
 
-  Future<bool> _confirmOverlapIfNeeded(
-    PlannedTask task,
-    String planDateKey,
-  ) async {
-    if (!task.reminderEnabled || task.reminderTimeIso == null) return true;
-    final anchors = await readHabitAnchorsForDate(ref, dateKey: planDateKey);
-    if (!mounted) return false;
-    final conflicts = findOverlappingHabitAnchorsForTask(
-      task,
-      anchors,
-      ignoredTaskId: _isEdit ? task.id : null,
-    );
-    if (conflicts.isEmpty) return true;
-    final proceed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Overlaps habit time'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'This task overlaps one or more habit anchors. Are you sure you want to continue?',
-            ),
-            const SizedBox(height: 10),
-            for (final c in conflicts.take(3))
-              Text(
-                '• ${c.label} (${_timeLabel(c.startLocal)}-${_timeLabel(c.endLocal)})'
-                ' ${c.source == HabitAnchorSource.goal ? '[Goal]' : '[Task Habit]'}',
-                style: TextStyle(fontSize: 12, color: AppColors.fg70),
-              ),
-            if (conflicts.length > 3)
-              Text(
-                '• +${conflicts.length - 3} more',
-                style: TextStyle(fontSize: 12, color: AppColors.fg54),
-              ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Change time'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Save anyway'),
-          ),
-        ],
-      ),
-    );
-    if (proceed == true) {
-      fireAndForgetAnalyticsEvent(
-        ref,
-        type: AnalyticsEventType.overlapOverride,
-        entityId: task.id,
-        entityKind: 'task',
-        sourceSurface: _isEdit ? 'add_task_edit' : 'add_task_create',
-        idempotencyKey:
-            'overlap_override_${task.id}_${task.reminderTimeIso ?? 'na'}_${conflicts.length}',
-        modeRefId: task.modeRefId,
-        reason: 'save_anyway_after_overlap_warning',
-      );
-    }
-    return proceed == true;
-  }
-
-  String _timeLabel(DateTime dt) {
-    final tod = TimeOfDay.fromDateTime(dt);
-    return tod.format(context);
-  }
-
-  // ─── Phase A: time block helpers ──────────────────────────────────────────
-
-  Future<bool> _checkTimeBlockConflicts(PlannedTask task) async {
-    if (!taskHasFocusDuration(task.durationMinutes)) return true;
-    final reminderIso = task.reminderTimeIso;
-    if (reminderIso == null) return true;
-    final startAt = DateTime.tryParse(reminderIso);
-    if (startAt == null) return true;
-
-    final service = ref.read(timeBlockSyncServiceProvider);
-    final proposed = service.deriveBlock(
-      entityId: task.id,
-      entityKind: 'task',
-      startAt: startAt,
-      durationMinutes: task.durationMinutes,
-      modeRefId: task.modeRefId,
-      isRigid: _isRigid,
-    );
-    if (proposed == null) return true;
-
-    final repo = ref.read(timeBlockRepositoryProvider);
-    final overlapping = await repo.listOverlappingBlocks(proposed);
-    final entityTitles = await buildSchedulingConflictEntityTitles(
-      ref,
-      overlapping: overlapping,
-    );
-
-    final result = await service.checkConflicts(
-      proposed,
-      entityTitles: entityTitles,
-    );
-    if (!result.hasConflicts) {
-      // Still log overlapCreated = false (no event needed — clean save).
-      return true;
-    }
-
-    if (!mounted) return false;
-
-    // Minor conflicts: show inline banner only (no bottom sheet).
-    if (result.worstSeverity == ConflictSeverity.minor) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Minor time overlap with ${result.conflicts.first.conflictingEntityTitle}. '
-            'Saved anyway.',
-          ),
-          duration: const Duration(seconds: 3),
-        ),
-      );
-      _logOverlapCreated(task, overridden: true);
-      return true;
-    }
-
-    final planDay = DateTime(
-      proposed.startAt.year,
-      proposed.startAt.month,
-      proposed.startAt.day,
-    );
-
-    final outcome = await SchedulingConflictSheet.show(
-      context: context,
-      proposedTitle: task.title,
-      proposedKind: 'task',
-      proposedBlock: proposed,
-      conflicts: result.conflicts,
-      resolutionPort: ref.read(conflictResolutionServiceProvider),
-      loadEntityTitles: () async {
-        final overlapping = await ref
-            .read(timeBlockRepositoryProvider)
-            .listOverlappingBlocks(proposed);
-        return buildSchedulingConflictEntityTitles(
-          ref,
-          overlapping: overlapping,
-        );
-      },
-      planDay: planDay,
-      ignoreEntityIds: {task.id},
-      onEntityMoved: () => ScheduleMutationCoordinator.instance.run(
-        // migrated to coordinator
-        TimeBlockChangedMutation(
-          entityId: task.id,
-          sourceContext: 'add_task_screen.conflict_resolution',
-          dateStr: DateKeys.todayKey(planDay),
-        ),
-        commitOverride: () async {}, // move already done by conflict resolution
-      ),
-      onAdjustProposedSchedule: (start, durationMinutes) {
-        setState(() {
-          _reminder = true;
-          _reminderTime = start;
-          _duration = durationLabelFromMinutes(
-            durationMinutes,
-            category: _category,
-          );
-        });
-        _scrollToScheduleSection();
-      },
-      onOverlapResolvedInline:
-          ({
-            required movedEntity,
-            required suggestionIndex,
-            conflictingEntityId,
-          }) => _logOverlapResolvedInline(
-            taskId: task.id,
-            movedEntity: movedEntity,
-            suggestionIndex: suggestionIndex,
-            conflictingEntityId: conflictingEntityId,
-          ),
-    );
-
-    return _handleConflictResolutionOutcome(task, outcome);
-  }
-
   void _scrollToScheduleSection() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final ctx = _scheduleSectionKey.currentContext;
@@ -927,92 +421,25 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     });
   }
 
-  bool _handleConflictResolutionOutcome(
-    PlannedTask task,
-    ConflictResolutionOutcome? outcome,
-  ) {
-    if (outcome == null) return false;
-    switch (outcome.kind) {
-      case ConflictResolutionKind.proceedToSave:
-        if (outcome.overlapOverridden) {
-          _logOverlapCreated(task, overridden: true);
-          fireAndForgetAnalyticsEvent(
-            ref,
-            type: AnalyticsEventType.overlapOverridden,
-            entityId: task.id,
-            entityKind: 'task',
-            sourceSurface: _isEdit ? 'add_task_edit' : 'add_task_create',
-            idempotencyKey:
-                'overlap_overridden_${task.id}_${DateTime.now().millisecondsSinceEpoch}',
-            modeRefId: task.modeRefId,
-          );
-        }
-        return true;
-      case ConflictResolutionKind.stayOnForm:
-        return false;
-      case ConflictResolutionKind.proposedScheduleAdjusted:
-        if (outcome.adjustedStart != null) {
-          setState(() {
-            _reminder = true;
-            _reminderTime = outcome.adjustedStart!;
-          });
-        }
-        if (outcome.adjustedDurationMinutes != null) {
-          setState(() {
-            _duration = durationLabelFromMinutes(
-              outcome.adjustedDurationMinutes!,
-              category: _category,
-            );
-          });
-        }
-        _scrollToScheduleSection();
-        return false;
+  /// Applies a schedule adjustment coming back from the conflict flow (live
+  /// mid-sheet or via the resolution outcome) and scrolls the reminder card
+  /// into view. Field writes stay inside setState so draft-dirtiness fires.
+  void _applyAdjustedSchedule(DateTime? start, int? durationMinutes) {
+    if (start != null) {
+      setState(() {
+        _reminder = true;
+        _reminderTime = start;
+      });
     }
-  }
-
-  Future<void> _syncTimeBlock(PlannedTask task) async {
-    if (!taskHasFocusDuration(task.durationMinutes)) {
-      await ref
-          .read(timeBlockSyncServiceProvider)
-          .removeBlockForEntity(task.id);
-      return;
+    if (durationMinutes != null) {
+      setState(() {
+        _duration = durationLabelFromMinutes(
+          durationMinutes,
+          category: _category,
+        );
+      });
     }
-    final reminderIso = task.reminderTimeIso;
-    if (reminderIso == null) {
-      await ref
-          .read(timeBlockSyncServiceProvider)
-          .removeBlockForEntity(task.id);
-      return;
-    }
-    final startAt = DateTime.tryParse(reminderIso);
-    if (startAt == null) return;
-
-    final service = ref.read(timeBlockSyncServiceProvider);
-    final block = service.deriveBlock(
-      entityId: task.id,
-      entityKind: 'task',
-      startAt: startAt,
-      durationMinutes: task.durationMinutes,
-      modeRefId: task.modeRefId,
-      isRigid: _isRigid,
-    );
-    if (block != null) {
-      await service.syncBlock(block);
-    }
-  }
-
-  void _logOverlapCreated(PlannedTask task, {required bool overridden}) {
-    fireAndForgetAnalyticsEvent(
-      ref,
-      type: AnalyticsEventType.overlapCreated,
-      entityId: task.id,
-      entityKind: 'task',
-      sourceSurface: _isEdit ? 'add_task_edit' : 'add_task_create',
-      idempotencyKey:
-          'overlap_created_${task.id}_${DateTime.now().millisecondsSinceEpoch}',
-      modeRefId: task.modeRefId,
-      reason: overridden ? 'override' : 'detected',
-    );
+    _scrollToScheduleSection();
   }
 
   Future<void> _onSave() async {
@@ -1027,120 +454,45 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     final nowMs = DateTime.now().millisecondsSinceEpoch;
 
     // Free-tier creation gates (no-ops while enforcement is off / on Pro).
-    final tierGate = ref.read(tierGateProvider);
-    if (!tierGate.isBypassed) {
-      if (!_isEdit) {
-        final dayCount = await TierUsage.tasksPlannedForDay(planKey);
-        if (!tierGate.canCreateTaskForDay(dayCount)) {
-          setState(() => _saving = false);
-          if (mounted) {
-            await showTierLimitSheet(
-              context,
-              title: 'Daily task limit reached',
-              message:
-                  'The free plan includes ${tierGate.limits.freeTasksPerDay} '
-                  'tasks per day. SidePal Pro removes the limit.',
-            );
-          }
-          return;
-        }
-      }
-      final addingAnchor =
-          _isHabitAnchor && (!_isEdit || !(_loadedTask?.isHabitAnchor ?? false));
-      if (addingAnchor) {
-        final anchorCount = await TierUsage.habitAnchorsForDay(planKey);
-        if (!tierGate.canAddHabitAnchorForDay(anchorCount)) {
-          setState(() => _saving = false);
-          if (mounted) {
-            await showTierLimitSheet(
-              context,
-              title: 'Habit limit reached',
-              message:
-                  'The free plan includes '
-                  '${tierGate.limits.freeHabitAnchorsPerDay} active habits '
-                  'per day. SidePal Pro removes the limit.',
-            );
-          }
-          return;
-        }
-      }
-    }
+    final gatesPass = await checkAddTaskTierGates(
+      context,
+      ref,
+      isEdit: _isEdit,
+      planDateKey: planKey,
+      addingHabitAnchor:
+          _isHabitAnchor &&
+          (!_isEdit || !(_loadedTask?.isHabitAnchor ?? false)),
+      onBlocked: () => setState(() => _saving = false),
+    );
+    if (!gatesPass) return;
 
     try {
-      late final String routineId;
-      late final String blockId;
-      late final int orderIndex;
-      late final String taskId;
-      late final int createdAtMs;
-
-      if (_isEdit) {
-        final args = widget.editArgs!;
-        taskId = _loadedTask!.id;
-        createdAtMs = _loadedTask!.createdAtMs;
-
-        if (planKey != args.dateKey) {
-          await planning.deleteTask(
-            routineId: args.routineId,
-            blockId: args.blockId,
-            taskId: taskId,
-          );
-          final day = await planning.ensureDefaultDayPlan(planKey);
-          routineId = day.routineId;
-          blockId = day.blockId;
-          final existing = await planning.getTasks(
-            routineId: routineId,
-            blockId: blockId,
-          );
-          orderIndex = existing.isEmpty
-              ? 0
-              : existing
-                        .map((t) => t.orderIndex)
-                        .reduce((a, b) => a > b ? a : b) +
-                    1;
-        } else {
-          routineId = args.routineId;
-          blockId = args.blockId;
-          orderIndex = _loadedTask!.orderIndex;
-        }
-      } else {
-        taskId = StableId.generate('task');
-        createdAtMs = nowMs;
-        if (widget.slotArgs != null) {
-          // Save directly into the preset slot — no ensureDefaultDayPlan needed.
-          routineId = widget.slotArgs!.routineId;
-          blockId = widget.slotArgs!.blockId;
-          final existing = await planning.getTasks(
-            routineId: routineId,
-            blockId: blockId,
-          );
-          orderIndex = existing.isEmpty
-              ? 0
-              : existing
-                        .map((t) => t.orderIndex)
-                        .reduce((a, b) => a > b ? a : b) +
-                    1;
-        } else {
-          final day = await planning.ensureDefaultDayPlan(planKey);
-          routineId = day.routineId;
-          blockId = day.blockId;
-          final existing = await planning.getTasks(
-            routineId: routineId,
-            blockId: blockId,
-          );
-          orderIndex = existing.isEmpty
-              ? 0
-              : existing
-                        .map((t) => t.orderIndex)
-                        .reduce((a, b) => a > b ? a : b) +
-                    1;
-        }
-      }
-
-      final modeRefId = await _effectiveModeRefIdForSave(
-        planning: planning,
-        routineId: routineId,
+      final target = await resolveAddTaskSaveTarget(
+        ref,
         planDateKey: planKey,
+        nowMs: nowMs,
+        loadedTask: _isEdit ? _loadedTask : null,
+        editRoutineId: widget.editArgs?.routineId,
+        editBlockId: widget.editArgs?.blockId,
+        editDateKey: widget.editArgs?.dateKey,
+        slotRoutineId: widget.slotArgs?.routineId,
+        slotBlockId: widget.slotArgs?.blockId,
+      );
+      final routineId = target.routineId;
+      final blockId = target.blockId;
+      final orderIndex = target.orderIndex;
+      final taskId = target.taskId;
+      final createdAtMs = target.createdAtMs;
+
+      final modeRefId = await resolveEffectiveModeRefIdForSave(
+        ref,
+        routineId: routineId,
         blockId: blockId,
+        planDateKey: planKey,
+        explicitModeRefId: (!_isEdit && !_modeUserCustomized)
+            ? null
+            : _modeRefId,
+        fallbackPriority: _loadedTask?.priority ?? 3,
       );
 
       final task = _buildPlannedTask(
@@ -1153,27 +505,58 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         planDateKey: planKey,
         modeRefId: modeRefId,
       );
-      final proceed = await _confirmOverlapIfNeeded(task, planKey);
-      if (!proceed) return;
+      if (!mounted) return;
+      final proceed = await confirmAddTaskHabitOverlap(
+        context,
+        ref,
+        task: task,
+        planDateKey: planKey,
+        isEdit: _isEdit,
+      );
+      if (!proceed || !mounted) return;
 
       // Phase A — time block conflict check.
-      final tbProceed = await _checkTimeBlockConflicts(task);
+      final tbProceed = await checkAddTaskTimeBlockConflicts(
+        context,
+        ref,
+        task: task,
+        isRigid: _isRigid,
+        isEdit: _isEdit,
+        onAdjustSchedule: _applyAdjustedSchedule,
+      );
       if (!tbProceed) return;
 
       await planning.upsertTask(task);
 
       // Phase A — sync time block after successful save.
-      await _syncTimeBlock(task);
+      await syncAddTaskTimeBlock(ref, task: task, isRigid: _isRigid);
 
-      await _applySleepSchedulingSideEffects(task);
+      // The task is saved; these must run even if the sheet was dismissed
+      // mid-save. Both callees guard every context use with context.mounted.
+      await applyAddTaskSleepSideEffects(
+        // ignore: use_build_context_synchronously
+        context,
+        ref,
+        task: task,
+        syncSleepWindowAndQuietMode: _syncSleepWindowAndQuietMode,
+        inAppQuietMode: _inAppQuietMode,
+      );
 
-      await _persistReminder(
+      final reminderId = await persistAddTaskReminder(
+        // ignore: use_build_context_synchronously
+        context,
+        ref,
         taskId: taskId,
         taskTitle: title,
         routineId: routineId,
         blockId: blockId,
         modeRefId: modeRefId,
+        reminderEnabled: _reminder,
+        reminderTime: _reminderTime,
+        existingReminderId: _existingReminderId,
+        reminderCreatedAtMs: _reminderCreatedAtMs,
       );
+      if (reminderId != null) _existingReminderId ??= reminderId;
       // migrated to coordinator
       await ScheduleMutationCoordinator.instance.run(
         _isEdit
@@ -1211,39 +594,12 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     }
   }
 
-  List<String> get _activeDurationOptions => isSleepCategory(_category)
-      ? sleepDurationChipKeys
-      : standardDurationChipKeys;
-
-  List<String> get _activeDurationLabels {
-    if (isSleepCategory(_category)) {
-      return [
-        ...sleepDurationChipLabels.sublist(
-          0,
-          sleepDurationChipLabels.length - 1,
-        ),
-        isCustomDurationKey(_duration)
-            ? formatAddTaskDurationChipLabel(_customDurationMinutes)
-            : sleepDurationChipLabels.last,
-      ];
-    }
-    return [
-      ...standardDurationChipLabels.sublist(0, 4),
-      isCustomDurationKey(_duration)
-          ? formatAddTaskDurationChipLabel(_customDurationMinutes)
-          : 'Custom',
-    ];
-  }
-
-  int get _resolvedDurationMinutes {
-    if (isSleepCategory(_category) || _durationEnabled) {
-      return addTaskDurationMinutes(
-        _duration,
-        customMinutes: _customDurationMinutes,
-      );
-    }
-    return kReminderOnlyDurationMinutes;
-  }
+  int get _resolvedDurationMinutes => resolvedAddTaskDurationMinutes(
+    category: _category,
+    durationEnabled: _durationEnabled,
+    duration: _duration,
+    customMinutes: _customDurationMinutes,
+  );
 
   int get _effectiveDurationMinutes => _resolvedDurationMinutes;
 
@@ -1286,184 +642,36 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     }
   }
 
-  Future<void> _applySleepSchedulingSideEffects(PlannedTask task) async {
-    if (!isSleepTask(task)) return;
-    if (!task.reminderEnabled || task.reminderTimeIso == null) return;
-
-    final start = DateTime.tryParse(task.reminderTimeIso!)?.toLocal();
-    if (start == null) return;
-    final end = start.add(Duration(minutes: task.durationMinutes));
-
-    final overrideService = ref.read(contextOverrideServiceProvider);
-    await overrideService.setSleepWindow(
-      start: formatSleepWindowHHmm(start),
-      end: formatSleepWindowHHmm(end),
-    );
-
-    if (!_syncSleepWindowAndQuietMode) return;
-
-    if (Platform.isIOS && mounted) {
-      await showSleepTaskIosFocusGuidance(
-        context,
-        onUseInAppSleep: () async {
-          await overrideService.activateOverride(
-            type: ContextOverride.sleep,
-            expiresAt: end,
-          );
-        },
-        onUseInAppDnd: () async {
-          await overrideService.activateOverride(
-            type: ContextOverride.doNotDisturb,
-            expiresAt: end,
-          );
-        },
-      );
-      return;
-    }
-
-    final type = _inAppQuietMode == 'dnd'
-        ? ContextOverride.doNotDisturb
-        : ContextOverride.sleep;
-    await overrideService.activateOverride(type: type, expiresAt: end);
-  }
-
   int get _selectedModeIndex {
-    final i = _modeChoiceIds.indexOf(_modeRefId);
+    final i = kAddTaskModeChoiceIds.indexOf(_modeRefId);
     return i >= 0 ? i : 0;
   }
 
-  String get _durationDisplayLabel {
-    if (isCustomDurationKey(_duration)) {
-      return formatAddTaskDurationChipLabel(_customDurationMinutes);
-    }
-    final i = _activeDurationOptions.indexOf(_duration);
-    if (i >= 0) return _activeDurationLabels[i];
-    return isSleepCategory(_category) ? sleepDurationChipLabels.last : '25m';
-  }
-
-  /// No chip highlighted until duration is enabled (sleep always has duration).
-  String? get _durationSegmentSelection {
-    if (isSleepCategory(_category) || _durationEnabled) {
-      return _durationDisplayLabel;
-    }
-    return null;
-  }
-
-  String get _advancedSubtitle {
-    final parts = <String>[];
-    if (_isHabitAnchor) parts.add('Habit anchor');
-    if (_strictModeRequired) parts.add('Strict');
-    if (_isRigid) parts.add('Fixed time');
-    if (parts.isEmpty) return 'Habit, strict rules, fixed time';
-    return parts.join(' · ');
+  /// Expand/collapse Advanced; on expand, scroll the revealed toggles into
+  /// view (the section sits at the bottom of the list, below the fold).
+  void _toggleAdvancedExpanded() {
+    setState(() => _advancedExpanded = !_advancedExpanded);
+    if (!_advancedExpanded) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _advancedSectionKey.currentContext;
+      if (ctx == null || !mounted) return;
+      Scrollable.ensureVisible(
+        ctx,
+        alignment: 0.05,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   String _accountabilitySubtitle(int index) {
-    final label = _modeLabels[index].toUpperCase();
+    final label = kAddTaskModeLabels[index].toUpperCase();
     // Until the user picks a mode themselves, the value is inherited from
     // the routine or the profile Discipline Mode — show which one.
     if (!_isEdit && !_modeUserCustomized) {
       return '$label · FROM ${_modeInheritSource.toUpperCase()}';
     }
     return label;
-  }
-
-  /// Card matching the reminder section: a single toggle row when off, the
-  /// duration chips revealed beneath it when on. Sleep always has a length,
-  /// so it gets a static header instead of a switch.
-  Widget _buildDurationSection() {
-    final sleep = isSleepCategory(_category);
-    final showChips = sleep || _durationEnabled;
-
-    return Material(
-      color: AddTaskColors.card,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (sleep)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: AddTaskColors.accentDim.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        Icons.hourglass_bottom_rounded,
-                        size: 18,
-                        color: AddTaskColors.accentDim,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Sleep length',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AddTaskColors.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Pick a preset or tap Custom',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AddTaskColors.muted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              AddTaskToggleRow(
-                icon: Icons.timer_outlined,
-                iconColor: AddTaskColors.accentDim,
-                title: 'Duration',
-                subtitle: _durationEnabled
-                    ? 'Define your focus sprint'
-                    : 'Reminder only — no time block',
-                value: _durationEnabled,
-                onChanged: (value) => setState(() => _durationEnabled = value),
-              ),
-            if (showChips) ...[
-              const SizedBox(height: 2),
-              AddTaskDurationSegment(
-                options: _activeDurationLabels,
-                selected: _durationSegmentSelection,
-                onSelected: (label) async {
-                  final i = _activeDurationLabels.indexOf(label);
-                  if (i < 0) return;
-                  final key = _activeDurationOptions[i];
-                  if (isCustomDurationKey(key)) {
-                    await _editCustomDuration();
-                    return;
-                  }
-                  setState(() {
-                    _durationEnabled = true;
-                    _duration = key;
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
-            ],
-          ],
-        ),
-      ),
-    );
   }
 
   /// Sets the category inline ([category] null clears it — no category is a
@@ -1481,512 +689,16 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     });
   }
 
-  Future<void> _promptCustomCategory() async {
-    final name = await showDialog<String?>(
-      context: context,
-      builder: (_) => const _CustomCategoryDialog(),
-    );
-    if (name == null || name.trim().isEmpty || !mounted) return;
-    _selectCategory(name.trim());
-  }
-
-  /// Ink-drawn glyphs for the bento cards — the reference design uses clean
-  /// line icons, not emoji.
-  static IconData _categoryIcon(String label) => switch (label) {
-    'Study' => CupertinoIcons.book_fill,
-    'Fitness' => CupertinoIcons.flame_fill,
-    'Work' => CupertinoIcons.briefcase_fill,
-    'Personal' => CupertinoIcons.heart_fill,
-    'Plan' || 'Planning' => CupertinoIcons.calendar,
-    kSleepTaskCategory => CupertinoIcons.moon_fill,
-    _ => CupertinoIcons.tag_fill,
-  };
-
-  /// Fixed bento color per category — bright in both themes, matching the
-  /// mosaic these mini cards replace. Custom / unknown labels fall back to a
-  /// soft neutral so the dark ink text stays readable.
-  static Color _categoryColor(String label) => switch (label) {
-    'Study' => BentoPalette.yellow,
-    'Work' => BentoPalette.orange,
-    'Plan' || 'Planning' => BentoPalette.green,
-    'Fitness' => BentoPalette.purple,
-    'Personal' => BentoPalette.blue,
-    kSleepTaskCategory => BentoPalette.teal,
-    _ => const Color(0xFFDADDE2),
-  };
-
-  /// One fixed-size mini bento chip for the inline category row: icon +
-  /// uppercase label on a single centered line (the row is too short for the
-  /// stacked bento layout). Selection inverts the chip — dark-ink background
-  /// with the category color as ink — so the pick is unmissable at a glance.
-  Widget _categoryMiniCard(
-    String label, {
-    required Color color,
-    required IconData icon,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    final bg = selected ? BentoPalette.ink : color;
-    final fg = selected ? color : BentoPalette.ink;
-    return SizedBox(
-      width: 73,
-      child: Material(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 13, color: fg),
-              const SizedBox(width: 5),
-              Flexible(
-                child: Text(
-                  label.toUpperCase(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: fg,
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Inline category picker (replaces the old full-screen category step):
-  /// a single horizontally scrolling line of mini bento cards, shown under
-  /// Notes. Tapping the selected card clears it — no category is a valid
-  /// choice — and a trailing Custom card opens the name dialog (showing the
-  /// chosen custom name once set).
-  Widget _buildCategoryPickerRow() {
-    final customActive =
-        _category != null && !_categoryOptions.contains(_category);
-
-    return SizedBox(
-      height: 40,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.zero,
-        physics: const BouncingScrollPhysics(),
-        children: [
-          for (final label in _categoryOptions) ...[
-            _categoryMiniCard(
-              label,
-              color: _categoryColor(label),
-              icon: _categoryIcon(label),
-              selected: _category == label,
-              onTap: () => _selectCategory(_category == label ? null : label),
-            ),
-            const SizedBox(width: 10),
-          ],
-          _categoryMiniCard(
-            customActive ? _category! : 'Custom',
-            color: _categoryColor(customActive ? _category! : 'Custom'),
-            icon: CupertinoIcons.tag_fill,
-            selected: customActive,
-            onTap: _promptCustomCategory,
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _showAccountabilityPicker() async {
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: AddTaskColors.card,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        final bottom = MediaQuery.paddingOf(ctx).bottom;
-        return Padding(
-          padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + bottom),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.fg.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Text(
-                'Accountability',
-                style: TextStyle(
-                  fontSize: 5,
-                  fontWeight: FontWeight.w700,
-                  color: AddTaskColors.onSurface,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'How we remind you and follow up on this task',
-                style: TextStyle(fontSize: 12, color: AddTaskColors.muted),
-              ),
-              const SizedBox(height: 16),
-              for (var i = 0; i < _modeChoiceIds.length; i++) ...[
-                if (i > 0) const SizedBox(height: 8),
-                AddTaskEnforcementTile(
-                  modeId: _modeChoiceIds[i],
-                  label: _modeLabels[i],
-                  description: _modeDescriptions[i],
-                  isSelected: _modeRefId == _modeChoiceIds[i],
-                  onTap: () => Navigator.pop(ctx, _modeChoiceIds[i]),
-                ),
-              ],
-            ],
-          ),
-        );
-      },
+    final picked = await showAccountabilityPickerSheet(
+      context,
+      selectedModeId: _modeRefId,
     );
-
     if (picked == null || !mounted) return;
     setState(() {
       _modeUserCustomized = true;
       _modeRefId = picked;
     });
-  }
-
-  Widget _buildAccountabilityRow() {
-    final selectedIndex = _selectedModeIndex;
-
-    return AddTaskSettingsActionRow(
-      icon: Icons.verified_user_outlined,
-      title: 'Accountability',
-      subtitle: _accountabilitySubtitle(selectedIndex),
-      actionLabel: 'CHANGE',
-      onTap: _showAccountabilityPicker,
-    );
-  }
-
-  /// Accountability and Deep Work share one row of half-width cards.
-  /// IntrinsicHeight bounds the stretch: inside the ListView height is
-  /// unbounded, and stretching into it crashes layout.
-  Widget _buildAccountabilityAndDeepWorkRow() {
-    final selectedIndex = _selectedModeIndex;
-
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: AddTaskSplitSettingCard(
-              icon: Icons.verified_user_outlined,
-              title: 'Accountability',
-              // Short label only — the picker sheet explains the rest.
-              // No HelpDot here: 'Accountability' barely fits the half-width
-              // card, and a dot on one card but not its twin looks lopsided.
-              subtitle: _modeLabels[selectedIndex].toUpperCase(),
-              onTap: _showAccountabilityPicker,
-              trailing: Text(
-                'CHANGE',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.6,
-                  color: AddTaskColors.accentDim,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: AddTaskSplitSettingCard(
-              icon: Icons.bolt_rounded,
-              title: 'Deep Work',
-              subtitle: 'BLOCKS ALERTS',
-              onTap: () => setState(() => _focusSession = !_focusSession),
-              trailing: Switch.adaptive(
-                value: _focusSession,
-                onChanged: (v) => setState(() => _focusSession = v),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                activeTrackColor: AddTaskColors.accentDim.withValues(
-                  alpha: 0.55,
-                ),
-                activeThumbColor: AddTaskColors.accentContainer,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReminderSection() {
-    final timeLabel = TimeOfDay.fromDateTime(_reminderTime).format(context);
-    final dateLabel = MaterialLocalizations.of(
-      context,
-    ).formatMediumDate(_reminderTime);
-    final planLabel = _planDateKey() == DateKeys.todayKey()
-        ? 'Today'
-        : _planDateKey();
-
-    return KeyedSubtree(
-      key: _scheduleSectionKey,
-      child: Material(
-        color: AddTaskColors.card,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          // Slimmer than the sibling cards on purpose (user call, 2026-07-15):
-          // the collapsed reminder row reads ~15% shorter.
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              AddTaskToggleRow(
-                icon: Icons.notifications_active_outlined,
-                iconColor: AddTaskColors.cyan,
-                title: 'Reminder',
-                subtitle: 'Get notified before this task starts',
-                value: _reminder,
-                onChanged: (value) async {
-                  setState(() => _reminder = value);
-                  if (!value) return;
-                  final ok = await ref
-                      .read(reminderSyncServiceProvider)
-                      .ensurePermissions();
-                  if (!ok && mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Notification permission is disabled.'),
-                      ),
-                    );
-                  }
-                },
-              ),
-              if (_reminder) ...[
-                AddTaskInsetPanel(
-                  child: Builder(
-                    builder: (context) {
-                      final sleep = isSleepCategory(_category);
-                      final datePicker = AddTaskPickerRow(
-                        icon: Icons.calendar_today_outlined,
-                        label: 'Date',
-                        value: dateLabel,
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: _reminderTime,
-                            firstDate: DateTime.now().subtract(
-                              const Duration(days: 365),
-                            ),
-                            lastDate: DateTime.now().add(
-                              const Duration(days: 365),
-                            ),
-                          );
-                          if (picked == null || !mounted) return;
-                          setState(() {
-                            _reminderTime = DateTime(
-                              picked.year,
-                              picked.month,
-                              picked.day,
-                              _reminderTime.hour,
-                              _reminderTime.minute,
-                            );
-                          });
-                        },
-                      );
-                      final timePicker = AddTaskPickerRow(
-                        icon: Icons.schedule_rounded,
-                        label: sleep ? 'Sleep start' : 'Time',
-                        value: timeLabel,
-                        onTap: () async {
-                          final picked = await showTimePicker(
-                            context: context,
-                            initialTime: TimeOfDay.fromDateTime(_reminderTime),
-                          );
-                          if (picked == null) return;
-                          setState(() {
-                            _reminderTime = DateTime(
-                              _reminderTime.year,
-                              _reminderTime.month,
-                              _reminderTime.day,
-                              picked.hour,
-                              picked.minute,
-                            );
-                          });
-                        },
-                      );
-
-                      return Column(
-                        children: [
-                          // Sleep pairs its start/end times; everything else
-                          // pairs date + time — one row either way.
-                          if (sleep) ...[
-                            datePicker,
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(child: timePicker),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: AddTaskPickerRow(
-                                    icon: Icons.bedtime_rounded,
-                                    label: 'Sleep end',
-                                    value: formatTaskTimeOfDay(
-                                      _reminderTime.add(
-                                        Duration(
-                                          minutes: _effectiveDurationMinutes,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ] else
-                            Row(
-                              children: [
-                                Expanded(child: datePicker),
-                                const SizedBox(width: 8),
-                                Expanded(child: timePicker),
-                              ],
-                            ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(4, 8, 4, 2),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.event_available_outlined,
-                                  size: 13,
-                                  color: AddTaskColors.faint,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Plan day · $planLabel',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: AddTaskColors.faint,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Collapsed power-user toggles. Sleep hides this — its schedule is
-  /// already rigid by default and its extras live in their own card.
-  Widget _buildAdvancedSection() {
-    return AddTaskCollapsibleSection(
-      key: _advancedSectionKey,
-      title: 'Advanced settings',
-      subtitle: _advancedSubtitle,
-      expanded: _advancedExpanded,
-      onToggle: () {
-        setState(() => _advancedExpanded = !_advancedExpanded);
-        if (!_advancedExpanded) return;
-        // The section sits at the bottom of the list, so the toggles it
-        // reveals land below the fold — scroll them into view.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          final ctx = _advancedSectionKey.currentContext;
-          if (ctx == null || !mounted) return;
-          Scrollable.ensureVisible(
-            ctx,
-            alignment: 0.05,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOutCubic,
-          );
-        });
-      },
-      children: [
-        AddTaskToggleRow(
-          icon: Icons.anchor_rounded,
-          iconColor: AddTaskColors.accentDim,
-          title: 'Habit anchor',
-          subtitle: 'Priority scheduling for a stable habit slot',
-          value: _isHabitAnchor,
-          onChanged: (v) => setState(() => _isHabitAnchor = v),
-        ),
-        const SizedBox(height: 8),
-        AddTaskToggleRow(
-          icon: Icons.gavel_rounded,
-          iconColor: AddTaskColors.cyan,
-          title: 'Strict for this task',
-          subtitle: 'Extra checks even when the slot is Flexible',
-          value: _strictModeRequired,
-          onChanged: (v) => setState(() => _strictModeRequired = v),
-        ),
-        const SizedBox(height: 8),
-        AddTaskToggleRow(
-          icon: Icons.lock_clock_rounded,
-          title: 'Fixed time slot',
-          subtitle: 'Treat as a hard block for conflict detection',
-          value: _isRigid,
-          onChanged: (v) => setState(() => _isRigid = v),
-        ),
-      ],
-    );
-  }
-
-  /// Sleep-only card: sync the daily sleep window / quiet mode.
-  Widget _buildSleepExtrasSection() {
-    if (!isSleepCategory(_category)) return const SizedBox.shrink();
-
-    return Material(
-      color: AddTaskColors.card,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AddTaskToggleRow(
-              icon: Icons.bedtime_rounded,
-              iconColor: AddTaskColors.accentDim,
-              title: 'Sleep window & quiet mode',
-              subtitle: Platform.isIOS
-                  ? 'Updates daily sleep window; offers in-app Sleep or DND'
-                  : 'Updates daily sleep window and in-app quiet mode',
-              value: _syncSleepWindowAndQuietMode,
-              onChanged: (v) =>
-                  setState(() => _syncSleepWindowAndQuietMode = v),
-            ),
-            if (_syncSleepWindowAndQuietMode && !Platform.isIOS) ...[
-              const SizedBox(height: 8),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'sleep', label: Text('Sleep')),
-                  ButtonSegment(value: 'dnd', label: Text('DND')),
-                ],
-                selected: {_inAppQuietMode},
-                onSelectionChanged: (s) {
-                  if (s.isEmpty) return;
-                  setState(() => _inAppQuietMode = s.first);
-                },
-              ),
-              const SizedBox(height: 12),
-            ],
-          ],
-        ),
-      ),
-    );
   }
 
   @override
@@ -2070,22 +782,87 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                           // jotting the task down. Optional — none is fine.
                           const AddTaskSectionLabel(title: 'Category'),
                           const SizedBox(height: 12),
-                          _buildCategoryPickerRow(),
+                          AddTaskCategorySection(
+                            category: _category,
+                            onCategorySelected: _selectCategory,
+                          ),
                           const SizedBox(height: 20),
                           // Reminder sits directly under the name so it can be set
                           // without scrolling — the most common add-task intent.
-                          _buildReminderSection(),
+                          AddTaskReminderSection(
+                            sectionKey: _scheduleSectionKey,
+                            reminderEnabled: _reminder,
+                            reminderTime: _reminderTime,
+                            category: _category,
+                            effectiveDurationMinutes: _effectiveDurationMinutes,
+                            planDateKey: _planDateKey(),
+                            onReminderToggled: (value) {
+                              setState(() => _reminder = value);
+                              if (!value) return;
+                              ensureReminderPermissionWithNotice(context, ref);
+                            },
+                            onReminderTimeChanged: (time) =>
+                                setState(() => _reminderTime = time),
+                          ),
                           const SizedBox(height: 12),
-                          _buildDurationSection(),
+                          AddTaskDurationSection(
+                            category: _category,
+                            duration: _duration,
+                            customDurationMinutes: _customDurationMinutes,
+                            durationEnabled: _durationEnabled,
+                            onDurationEnabledChanged: (value) =>
+                                setState(() => _durationEnabled = value),
+                            onPresetSelected: (key) => setState(() {
+                              _durationEnabled = true;
+                              _duration = key;
+                            }),
+                            onCustomTap: _editCustomDuration,
+                          ),
                           const SizedBox(height: 20),
                           if (isSleepCategory(_category)) ...[
-                            _buildAccountabilityRow(),
+                            AddTaskAccountabilityRow(
+                              subtitle: _accountabilitySubtitle(
+                                _selectedModeIndex,
+                              ),
+                              onChangeTap: _showAccountabilityPicker,
+                            ),
                             const SizedBox(height: 12),
-                            _buildSleepExtrasSection(),
+                            AddTaskSleepExtrasSection(
+                              category: _category,
+                              syncSleepWindowAndQuietMode:
+                                  _syncSleepWindowAndQuietMode,
+                              inAppQuietMode: _inAppQuietMode,
+                              onSyncChanged: (v) => setState(
+                                () => _syncSleepWindowAndQuietMode = v,
+                              ),
+                              onQuietModeChanged: (mode) =>
+                                  setState(() => _inAppQuietMode = mode),
+                            ),
                           ] else ...[
-                            _buildAccountabilityAndDeepWorkRow(),
+                            AddTaskAccountabilityDeepWorkRow(
+                              accountabilityLabel:
+                                  kAddTaskModeLabels[_selectedModeIndex]
+                                      .toUpperCase(),
+                              focusSession: _focusSession,
+                              onAccountabilityTap: _showAccountabilityPicker,
+                              onFocusSessionChanged: (v) =>
+                                  setState(() => _focusSession = v),
+                            ),
                             const SizedBox(height: 20),
-                            _buildAdvancedSection(),
+                            AddTaskAdvancedSection(
+                              sectionKey: _advancedSectionKey,
+                              expanded: _advancedExpanded,
+                              isHabitAnchor: _isHabitAnchor,
+                              strictModeRequired: _strictModeRequired,
+                              isRigid: _isRigid,
+                              onToggleExpanded: _toggleAdvancedExpanded,
+                              onHabitAnchorChanged: (v) =>
+                                  setState(() => _isHabitAnchor = v),
+                              onStrictChanged: (v) =>
+                                  setState(() => _strictModeRequired = v),
+                              onRigidChanged: (v) =>
+                                  setState(() => _isRigid = v),
+                            ),
                           ],
                         ],
                       ),
@@ -2133,52 +910,6 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                 ),
               ),
       ),
-    );
-  }
-}
-
-/// Owns its [TextEditingController] so it is disposed only after the dialog
-/// route finishes (same pattern as the goal milestone dialog).
-class _CustomCategoryDialog extends StatefulWidget {
-  const _CustomCategoryDialog();
-
-  @override
-  State<_CustomCategoryDialog> createState() => _CustomCategoryDialogState();
-}
-
-class _CustomCategoryDialogState extends State<_CustomCategoryDialog> {
-  final TextEditingController _ctrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final name = _ctrl.text.trim();
-    if (name.isEmpty) return;
-    Navigator.pop<String?>(context, name);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Custom category'),
-      content: TextField(
-        controller: _ctrl,
-        autofocus: true,
-        textCapitalization: TextCapitalization.words,
-        decoration: const InputDecoration(hintText: 'e.g. Music'),
-        onSubmitted: (_) => _submit(),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop<String?>(context, null),
-          child: const Text('Cancel'),
-        ),
-        TextButton(onPressed: _submit, child: const Text('Use')),
-      ],
     );
   }
 }
