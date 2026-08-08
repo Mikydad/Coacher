@@ -60,3 +60,12 @@ export function resolveSpeechVoice(rawConfigValue: string | undefined): string {
   const voice = (rawConfigValue ?? "").trim().toLowerCase();
   return ALLOWED_VOICES.has(voice) ? voice : SPEECH_DEFAULT_VOICE;
 }
+
+/// Extracts the ID token from an `Authorization: Bearer <token>` header.
+/// The streaming endpoint (speech_stream.ts) is an onRequest function, so
+/// unlike the callable it parses auth itself.
+export function bearerTokenFrom(header: string | undefined): string | null {
+  if (typeof header !== "string") return null;
+  const match = /^Bearer\s+(\S+)$/i.exec(header.trim());
+  return match ? match[1] : null;
+}

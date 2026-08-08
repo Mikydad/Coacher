@@ -224,11 +224,21 @@ class VoiceModeController extends ChangeNotifier {
   Future<void> _sendAndSpeak(String text) async {
     final generation = ++_generation;
     _setPhase(VoiceModePhase.thinking);
+    // T0→T1 of the turn's latency ledger; the TTS adapter logs its own
+    // T2→T4 leg. Together one spoken turn reads as two [voice-timing]
+    // lines (measure, don't estimate — latency batch 2).
+    final t0 = DateTime.now();
     String? reply;
     try {
       reply = await sendAndGetReply(text);
     } catch (_) {
       reply = null;
+    }
+    if (kDebugMode) {
+      debugPrint(
+        '[voice-timing] reply=${DateTime.now().difference(t0).inMilliseconds}ms '
+        'chars=${reply?.length ?? 0}',
+      );
     }
     if (_disposed || !_active || generation != _generation) return;
     if (reply == null || reply.trim().isEmpty) {

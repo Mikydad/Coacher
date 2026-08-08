@@ -33,6 +33,7 @@ export { stakeEvidenceArrived, stakeDisbursementReceipt } from "./stakes/trigger
 export { stakePhotoUploaded } from "./stakes/nsfw_screen";
 export { stakeAccountPurge } from "./stakes/account_purge";
 export { aiSpeech } from "./speech";
+export { aiSpeechStream } from "./speech_stream";
 
 // The model comes from the purpose routing table (ai_routing.ts) — pinned
 // server-side per purpose; clients cannot request a different one.
@@ -322,6 +323,9 @@ export const aiChat = onCall(
     timeoutSeconds: 60,
     memory: "256MiB",
     maxInstances: 10,
+    // One warm instance kills the 2-3s cold start on the conversational
+    // path (latency batch 2026-08-07) — a few $/month, felt every turn.
+    minInstances: 1,
   },
   async (request: CallableRequest<AiChatData>) => {
     if (!request.auth) {

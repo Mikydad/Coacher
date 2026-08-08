@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   SPEECH_DEFAULT_VOICE,
   SPEECH_MAX_CHARS,
+  bearerTokenFrom,
   resolveSpeechVoice,
   validateSpeechText,
 } from "./speech_rules";
@@ -43,4 +44,18 @@ test("resolveSpeechVoice degrades unknown or unset values to the default", () =>
   assert.equal(resolveSpeechVoice("siri"), SPEECH_DEFAULT_VOICE);
   assert.equal(resolveSpeechVoice(""), SPEECH_DEFAULT_VOICE);
   assert.equal(resolveSpeechVoice(undefined), SPEECH_DEFAULT_VOICE);
+});
+
+test("bearerTokenFrom extracts the token from a well-formed header", () => {
+  assert.equal(bearerTokenFrom("Bearer abc.def.ghi"), "abc.def.ghi");
+  assert.equal(bearerTokenFrom("bearer tok123"), "tok123"); // scheme is case-insensitive
+  assert.equal(bearerTokenFrom("  Bearer padded  "), "padded");
+});
+
+test("bearerTokenFrom rejects missing or malformed headers", () => {
+  assert.equal(bearerTokenFrom(undefined), null);
+  assert.equal(bearerTokenFrom(""), null);
+  assert.equal(bearerTokenFrom("Bearer"), null);
+  assert.equal(bearerTokenFrom("Basic dXNlcjpwYXNz"), null);
+  assert.equal(bearerTokenFrom("Bearer two tokens"), null);
 });

@@ -1,5 +1,7 @@
 import '../../education/presentation/first_time_feature_card.dart';
 import '../../education/presentation/help_dot.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -18,6 +20,7 @@ import '../../../core/ai/ai_proxy_client.dart';
 import '../application/voice_mode_adapters.dart';
 import '../application/voice_mode_controller.dart';
 import '../application/voice_tts_resilience.dart';
+import '../application/voice_tts_streaming.dart';
 import 'widgets/ai_input_card.dart';
 import 'widgets/chat_bubbles.dart';
 import 'widgets/voice_mode_card.dart';
@@ -443,22 +446,42 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
 
   // ─── Voice Mode (humanizing Phase 3) ──────────────────────────────────────
 
+  /// Streaming-TTS spike flag (latency batch 2, 2026-08-08): true = play
+  /// OpenAI audio as it streams from aiSpeechStream (time-to-first-audio
+  /// ≈ network + first chunks); false = the buffered aiSpeech callable
+  /// path. Kept as a flag so before/after [voice-timing] numbers come
+  /// from the same build. Remove once the spike gate passes.
+  static const bool _kStreamingTts = true;
+
   /// Swaps the composer for the Voice Mode orb and starts the
   /// listen → send → speak → relisten loop.
   void _enterVoiceMode(AiAssistantService service) {
     if (_voiceController != null) return;
     dismissKeyboard(context);
-    // Coach voice: OpenAI TTS through the aiSpeech proxy (voice pinned
-    // server-side), degrading silently to the on-device system voice when
-    // the network can't deliver — the loop itself never stalls.
+    // Coach voice: OpenAI TTS (streamed or buffered per the spike flag),
+    // degrading silently to the on-device system voice when the network
+    // can't deliver — the loop itself never stalls.
     final proxy = AiProxyClient();
+    final VoiceTtsAdapter primary;
+    if (_kStreamingTts) {
+      primary = StreamingOpenAiTtsVoiceAdapter(
+        endpoint: Uri.parse(
+          'https://us-central1-${Firebase.app().options.projectId}'
+          '.cloudfunctions.net/aiSpeechStream',
+        ),
+        idToken: () async =>
+            FirebaseAuth.instance.currentUser?.getIdToken(),
+      );
+    } else {
+      primary = OpenAiTtsVoiceAdapter(
+        synthesize: (text) =>
+            proxy.speak(text, timeout: const Duration(seconds: 8)),
+      );
+    }
     final controller = VoiceModeController(
       speech: SpeechToTextVoiceAdapter(),
       tts: ResilientVoiceTtsAdapter(
-        primary: OpenAiTtsVoiceAdapter(
-          synthesize: (text) =>
-              proxy.speak(text, timeout: const Duration(seconds: 8)),
-        ),
+        primary: primary,
         fallback: FlutterTtsVoiceAdapter(),
       ),
       sendAndGetReply: (text) => _voiceSendAndGetReply(service, text),
@@ -484,7 +507,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     AiAssistantService service,
     String text,
   ) async {
-    await service.sendMessage(text);
+    await service.sendMessage(text, voiceMode: true);
     for (final message in service.messages.reversed) {
       if (message.role != ChatRole.assistant || message.isLoading) continue;
       if (message.content.trim().isNotEmpty) return message.content;
