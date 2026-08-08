@@ -160,6 +160,13 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
               AVAudioSessionCategoryOptions.duckOthers,
         ),
       );
+      // The device gate (2026-08-08) showed bytes sitting on the phone for
+      // ~2.9s before sound: AVPlayer's stall-avoidance pre-buffers streams
+      // it can't measure (chunked, no length). Voice replies are short and
+      // synthesis outpaces playback, so start the moment audio is decodable;
+      // worst case on a bad link is a mid-sentence pause, and the full text
+      // is on screen regardless.
+      await _player.setAutomaticallyWaitsToMinimizeStalling(false);
     }
     _configured = true;
   }

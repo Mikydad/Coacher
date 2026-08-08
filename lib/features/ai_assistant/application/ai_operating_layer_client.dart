@@ -341,6 +341,7 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
 
     for (var loop = 0; loop <= kMaxLoops; loop++) {
       AiProxyChatResult result;
+      final roundSw = Stopwatch()..start();
       try {
         result = await _proxy.chatWithTools(
           messages: messages,
@@ -360,6 +361,15 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
           e.message,
           statusCode: e.statusCode,
           isNetwork: e.isNetwork,
+        );
+      }
+      if (kDebugMode) {
+        // Per-round ledger: a slow turn is usually a HIDDEN second round
+        // (read-only tool call before the answer) — name the tools so the
+        // log says which one earned its round trip.
+        debugPrint(
+          '[ai-timing] round=$loop call=${roundSw.elapsedMilliseconds}ms '
+          'tools=${result.toolCalls.isEmpty ? '-' : result.toolCalls.map((c) => c.name).join(',')}',
         );
       }
 

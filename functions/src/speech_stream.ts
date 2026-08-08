@@ -1,4 +1,4 @@
-import { onRequest } from "firebase-functions/v2/https";
+import { onRequest, HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
 import { getAuth } from "firebase-admin/auth";
 import { Readable } from "node:stream";
@@ -6,12 +6,16 @@ import { Readable } from "node:stream";
 import { openAiApiKey } from "./secrets";
 import {
   SPEECH_MODEL,
-  SPEECH_DEFAULT_VOICE,
   bearerTokenFrom,
   validateSpeechText,
 } from "./speech_rules";
+import {
+  enforceSpeechRateLimit,
+  recordSpeechUsage,
+  speechConfig,
+} from "./speech_shared";
 
-// Streaming TTS proxy for Voice Mode (latency batch 2, spike of 2026-08-08).
+// Streaming TTS proxy for Voice Mode (latency batch 2, 2026-08-08).
 //
 // Unlike the aiSpeech callable (which buffers the whole clip into a base64
 // JSON envelope), this endpoint pipes OpenAI's mp3 bytes through AS THEY
@@ -19,9 +23,10 @@ import {
 // finishes. POST with the text in the JSON body — reply text must never
 // appear in a URL (request paths land in Cloud Run logs).
 //
-// SPIKE SCOPE: auth + validation + streaming pipe + abort-on-disconnect.
-// Phase 1 adds the shared hourly quota, Remote Config voice/kill-switch,
-// and usage telemetry before this becomes the primary client path.
+// Production-hardened after the spike gate passed on device: shares the
+// hourly quota pool, Remote Config voice pin and kill switch, and usage
+// telemetry with the callable (speech_shared.ts), and carries the warm
+// instance for the spoken-turn critical path.
 
 const OPENAI_SPEECH_URL = "https://api.openai.com/v1/audio/speech";
 
@@ -32,6 +37,9 @@ export const aiSpeechStream = onRequest(
     timeoutSeconds: 60,
     memory: "256MiB",
     maxInstances: 10,
+    // The warm instance moved here from aiSpeech (Phase 1): this is the
+    // spoken-turn critical path now, and we only pay for one.
+    minInstances: 1,
   },
   async (req, res) => {
     if (req.method !== "POST") {
@@ -69,6 +77,25 @@ export const aiSpeechStream = onRequest(
     }
     const text = validated.text;
 
+    const { enabled, voice } = await speechConfig();
+    if (!enabled) {
+      // Kill switch: the client falls back to the on-device voice.
+      res.status(503).json({ error: "Speech synthesis is disabled." });
+      return;
+    }
+
+    try {
+      await enforceSpeechRateLimit(uid);
+    } catch (error) {
+      if (error instanceof HttpsError && error.code === "resource-exhausted") {
+        res.status(429).json({ error: "Speech request limit reached." });
+        return;
+      }
+      logger.error("aiSpeechStream quota check failed", { uid, error: `${error}` });
+      res.status(500).json({ error: "Quota check failed." });
+      return;
+    }
+
     // Tap-to-interrupt closes the client connection; abort the upstream
     // OpenAI request instead of synthesizing to the end for nobody.
     const upstreamAbort = new AbortController();
@@ -84,7 +111,7 @@ export const aiSpeechStream = onRequest(
         },
         body: JSON.stringify({
           model: SPEECH_MODEL,
-          voice: SPEECH_DEFAULT_VOICE,
+          voice,
           input: text,
           response_format: "mp3",
         }),
@@ -132,9 +159,11 @@ export const aiSpeechStream = onRequest(
     upstream.on("end", () => {
       logger.info("aiSpeechStream ok", {
         uid,
+        voice,
         chars: text.length,
         pipeMs: Date.now() - started,
       });
+      void recordSpeechUsage(uid, text.length);
     });
   },
 );

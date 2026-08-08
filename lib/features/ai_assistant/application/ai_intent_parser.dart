@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../domain/models/ai_action.dart';
 import '../domain/models/ai_intent_kind.dart';
 import '../domain/models/ai_planned_changes.dart';
@@ -110,6 +112,11 @@ class AiIntentParser {
     }
 
     // Step 1 — Assemble payload
+    // The turn ledger ([ai-timing], latency batch 2): assembly is every
+    // local read the payload needs (Isar slices + ContextSnapshot method
+    // channels); model is the whole agent loop (per-round detail logged
+    // by the client). Splits the reply leg so slow turns name a culprit.
+    final assembleSw = Stopwatch()..start();
     late AiOperatingLayerPayload payload;
     try {
       payload = await assembler.assemble(
@@ -128,8 +135,10 @@ class AiIntentParser {
             "I'm having trouble reading your schedule right now. Could you try again?",
       );
     }
+    assembleSw.stop();
 
     // Step 2 — Call AI client
+    final modelSw = Stopwatch()..start();
     late AiPlannedChanges result;
     try {
       result = await client.parseIntent(payload);
@@ -147,6 +156,13 @@ class AiIntentParser {
       return AiPlannedChanges(
         sessionId: sessionId,
         followUpQuestion: 'I ran into an unexpected issue. Please try again.',
+      );
+    }
+    modelSw.stop();
+    if (kDebugMode) {
+      debugPrint(
+        '[ai-timing] assemble=${assembleSw.elapsedMilliseconds}ms '
+        'model=${modelSw.elapsedMilliseconds}ms voice=$voiceMode',
       );
     }
 

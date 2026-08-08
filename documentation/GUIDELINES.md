@@ -1259,3 +1259,30 @@ not silent reversal.
   `max_tokens`; a truncated plan is worse than a slow one. *Considered:*
   streaming/realtime API (deferred — that's the Level-2/3 conversation
   work, this batch is the cheap 40-50%).
+
+- **2026-08-08 · Voice-turn latency, batch 2: streaming TTS
+  (`aiSpeechStream` + progressive playback), spike-gated.** The buffered
+  callable waited for the whole first-sentence clip before any sound.
+  Now `aiSpeechStream` (onRequest) pipes OpenAI mp3 bytes through as they
+  arrive and the client plays them from a `GrowingBufferAudioSource`
+  (just_audio custom StreamAudioSource, pure and unit-tested) while the
+  network is still appending. Device spike gate (Miky, warm turn):
+  firstChunk=1072ms — transport PASSED; the remaining audible=3961ms was
+  AVPlayer stall-avoidance pre-buffering an unmeasurable chunked stream,
+  countered with `setAutomaticallyWaitsToMinimizeStalling(false)` (worst
+  case on a bad link is a mid-sentence pause; the text is on screen).
+  Contracts that held: POST body carries the text (reply text never in a
+  URL — Cloud Run logs paths), client disconnect aborts the upstream
+  OpenAI request (tap-to-interrupt stops server spend), same
+  `VoiceTtsAdapter` interface so the system-voice floor is untouched,
+  and ONE quota pool/RC surface for both transports (`speech_shared.ts`)
+  — a voice turn costs the same on either wire. The warm instance moved
+  from `aiSpeech` to `aiSpeechStream` (only pay for the critical path);
+  the callable stays as fallback for older builds + the `_kStreamingTts`
+  A/B flag. Reply-leg instrumentation added ([ai-timing]
+  assemble/model/per-round-with-tool-names + [voice-timing]
+  reply/firstChunk/audible) because the device numbers showed the AI leg
+  (5.3s warm) now dominates — measure before cutting. *Considered:*
+  GET + AudioSource.uri (rejected: text in URL), keeping the buffered
+  adapter as a middle fallback tier (rejected: a mid-turn failure should
+  degrade instantly to the on-device voice, not retry the network).
