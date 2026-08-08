@@ -38,6 +38,10 @@ export const FALLBACK_ROUTE: PurposeRoute = {
 export const DEFAULT_ROUTES: Record<string, PurposeRoute> = {
   // User-facing (charge the 40/hr chat quota).
   coach_agent: { model: "gpt-4o-mini", maxTokens: 800, quotaClass: "user", enabled: true },
+  // Spoken turns (Voice Mode): short conversational prose generates faster
+  // and listens better. 500 (not lower) so propose_changes tool JSON is
+  // never truncated mid-plan (latency batch 2026-08-07).
+  coach_agent_voice: { model: "gpt-4o-mini", maxTokens: 500, quotaClass: "user", enabled: true },
   chat: { model: "gpt-4o-mini", maxTokens: 800, quotaClass: "user", enabled: true },
   coaching_summary: { model: "gpt-4o-mini", maxTokens: 800, quotaClass: "user", enabled: true },
   circle_pulse: { model: "gpt-4o-mini", maxTokens: 800, quotaClass: "user", enabled: true },

@@ -1241,3 +1241,21 @@ not silent reversal.
     held at the 96-issue baseline and the full suite (1,430) after every
     stage. Save path has no widget test (tier gates reach
     FirebaseAuth/static-Isar) — guarded by pure code motion + manual pass.
+
+- **2026-08-07 · Voice-turn latency, batch 1: shorter silence window +
+  `coach_agent_voice` purpose + warm function instances.** A spoken turn
+  paid ~3s silence detection, a chat-length reply generation, and
+  occasional 2-3s cold starts. Three cuts, no architecture change:
+  (1) `pauseFor` 3s → 1.7s in the speech adapter (ChatGPT-voice pacing;
+  `listenFor` 60s unchanged). (2) Spoken turns thread a `voiceMode` flag
+  (screen → service → parser → assembler → payload) and go out as purpose
+  `coach_agent_voice` with a system-prompt addendum — 1-3 spoken
+  sentences, no lists/markdown, tools untouched. Server route caps it at
+  500 tokens: the speed comes from the PROMPT (short prose = fewer
+  generated tokens), the cap only guards runaways, and 500 keeps headroom
+  so `propose_changes` tool JSON is never truncated mid-plan.
+  (3) `minInstances: 1` on `aiChat` + `aiSpeech` (few $/month, felt every
+  turn). *Why not a lower cap:* tool-call arguments count against
+  `max_tokens`; a truncated plan is worse than a slow one. *Considered:*
+  streaming/realtime API (deferred — that's the Level-2/3 conversation
+  work, this batch is the cheap 40-50%).

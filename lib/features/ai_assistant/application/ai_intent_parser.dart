@@ -44,6 +44,7 @@ class AiIntentParser {
     String sessionId, {
     AiPlannedChanges? previousPlan,
     Map<String, dynamic>? proactiveContext,
+    bool voiceMode = false,
   }) async {
     // Fast path — "what can you do?" gets a real answer, never the LLM's
     // guess or a clarify loop.
@@ -118,6 +119,7 @@ class AiIntentParser {
         intentRoute: route,
         proactiveContext: proactiveContext,
         featureGuideText: educationGuide?.toPromptBlock(),
+        voiceMode: voiceMode,
       );
     } catch (e) {
       return AiPlannedChanges(

@@ -55,6 +55,19 @@ class AiOperatingLayerException implements Exception {
 //   - get_day_schedule → read-only lookup for days beyond today/tomorrow
 // Plain text responses become informational chat messages (markdown-lite).
 //
+/// Appended to the system prompt on spoken turns (Voice Mode, latency
+/// batch 2026-08-07): the reply is read aloud, so short conversational
+/// prose is both faster to generate and better to hear. Tool use is
+/// deliberately untouched — a spoken "add a task tomorrow" still plans.
+const String _kVoiceModeAddendum = '''
+
+## VOICE MODE (this turn)
+The user is speaking by voice and your reply will be read aloud.
+- Reply in 1–3 short conversational sentences (under 60 words total).
+- No lists, no markdown, no headings — spoken prose only.
+- Tools and propose_changes work exactly as normal.
+''';
+
 const String _kSystemPrompt = '''
 You are Coach — the in-app AI coach of "SidePal", a personal productivity app.
 Talk like a sharp, warm human coach texting with someone you know well: natural,
@@ -312,7 +325,12 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
         : payload.sessionHistory;
 
     final messages = <Map<String, dynamic>>[
-      {'role': 'system', 'content': _kSystemPrompt},
+      {
+        'role': 'system',
+        'content': payload.voiceMode
+            ? '$_kSystemPrompt$_kVoiceModeAddendum'
+            : _kSystemPrompt,
+      },
       // Inject prior session turns as context
       for (final h in priorTurns) h,
       {'role': 'user', 'content': userPrompt},
@@ -330,8 +348,11 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
           turnId: turnId,
           loopIndex: loop,
           temperature: 0.45,
-          maxTokens: 800,
-          purpose: 'coach_agent',
+          // Voice turns cap lower: short spoken prose generates faster.
+          // 500 (not less) so a propose_changes tool call's JSON payload
+          // is never truncated mid-plan.
+          maxTokens: payload.voiceMode ? 500 : 800,
+          purpose: payload.voiceMode ? 'coach_agent_voice' : 'coach_agent',
           timeout: Duration(seconds: timeoutSeconds),
         );
       } on AiProxyException catch (e) {

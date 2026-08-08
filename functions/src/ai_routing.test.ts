@@ -22,6 +22,15 @@ describe('resolveRoute', () => {
     assert.equal(route.model, 'gpt-4o-mini');
   });
 
+  it('coach_agent_voice (spoken turns) is user quota with a lower cap', () => {
+    const route = resolveRoute('coach_agent_voice', {});
+    assert.equal(route.quotaClass, 'user');
+    assert.equal(route.enabled, true);
+    // Low enough for fast spoken prose, high enough that propose_changes
+    // tool JSON is never truncated mid-plan.
+    assert.equal(route.maxTokens, 500);
+  });
+
   it('extract_memory is a system purpose with temperature pinned to 0', () => {
     const route = resolveRoute('extract_memory', {});
     assert.equal(route.quotaClass, 'system');

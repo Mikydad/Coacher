@@ -28,6 +28,7 @@ class _FakeAssembler implements AiPayloadAssembler {
     intentRoute,
     proactiveContext,
     String? featureGuideText,
+    bool voiceMode = false,
   }) async =>
       AiOperatingLayerPayload(userInput: userInput);
 

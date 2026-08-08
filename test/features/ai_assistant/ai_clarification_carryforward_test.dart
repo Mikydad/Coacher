@@ -25,6 +25,7 @@ class _RecordingAssembler implements AiPayloadAssembler {
     intentRoute,
     proactiveContext,
     String? featureGuideText,
+    bool voiceMode = false,
   }) async {
     previousSummaries.add(previousPlanSummary);
     return AiOperatingLayerPayload(userInput: userInput);

@@ -126,6 +126,8 @@ export const aiSpeech = onCall(
     timeoutSeconds: 30,
     memory: "256MiB",
     maxInstances: 10,
+    // Warm instance: TTS sits on the spoken-turn critical path too.
+    minInstances: 1,
   },
   async (request: CallableRequest<AiSpeechData>) => {
     if (!request.auth) {

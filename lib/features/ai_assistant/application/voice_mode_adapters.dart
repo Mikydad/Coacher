@@ -49,9 +49,10 @@ class SpeechToTextVoiceAdapter implements VoiceSpeechAdapter {
         // End-of-speech detection — the whole loop hangs on these. Without
         // pauseFor the OS session stays open (~1 min hard cap) and neither
         // finalResult nor the 'done' status ever arrives, so the controller
-        // sits in `listening` forever. 3s of silence = the utterance is
-        // over; listenFor bounds a single turn.
-        pauseFor: const Duration(seconds: 3),
+        // sits in `listening` forever. 1.7s of silence = the utterance is
+        // over (latency batch 2026-08-07: 3s made every turn feel slow;
+        // ~1.7s matches ChatGPT-voice pacing); listenFor bounds a turn.
+        pauseFor: const Duration(milliseconds: 1700),
         listenFor: const Duration(seconds: 60),
       ),
     );

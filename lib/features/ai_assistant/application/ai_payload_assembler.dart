@@ -78,6 +78,7 @@ class AiPayloadAssembler {
     AiIntentRoute? intentRoute,
     Map<String, dynamic>? proactiveContext,
     String? featureGuideText,
+    bool voiceMode = false,
   }) async {
     final schedule = await _scheduleSliceForSession(sessionId);
 
@@ -127,6 +128,7 @@ class AiPayloadAssembler {
       episodicSummaries: dynamicResults[5] as List<String>,
       openPromises: dynamicResults[6] as List<String>,
       deviceContext: dynamicResults[7] as List<String>,
+      voiceMode: voiceMode,
     );
   }
 

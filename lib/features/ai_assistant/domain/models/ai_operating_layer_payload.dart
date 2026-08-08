@@ -34,6 +34,7 @@ class AiOperatingLayerPayload {
     this.episodicSummaries = const [],
     this.openPromises = const [],
     this.deviceContext = const [],
+    this.voiceMode = false,
   });
 
   /// The raw user input for this turn.
@@ -131,6 +132,12 @@ class AiOperatingLayerPayload {
   /// "next_calendar_event_14:00", "mode_focus", "offline". NEVER raw
   /// signals — no event contents, no locations, no identifiers.
   final List<String> deviceContext;
+
+  /// This turn arrived by voice and the reply will be spoken aloud
+  /// (latency batch 2026-08-07): the client routes it through the
+  /// `coach_agent_voice` purpose and adds the short-spoken-reply prompt
+  /// addendum. Never serialized — it shapes the call, not the context.
+  final bool voiceMode;
 
   Map<String, dynamic> toJson() => {
     'userInput': userInput,

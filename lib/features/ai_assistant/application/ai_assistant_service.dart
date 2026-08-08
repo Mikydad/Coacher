@@ -100,7 +100,10 @@ class AiAssistantService extends ChangeNotifier {
 
   // ─── Public API ───────────────────────────────────────────────────────────
 
-  Future<void> sendMessage(String userInput) async {
+  /// [voiceMode] marks a spoken turn (Voice Mode loop): the reply will be
+  /// read aloud, so the parser routes it through the `coach_agent_voice`
+  /// purpose for short conversational prose (latency batch 2026-08-07).
+  Future<void> sendMessage(String userInput, {bool voiceMode = false}) async {
     if (userInput.trim().isEmpty) return;
 
     // Memory Phase 2: keep the session's inactivity clock fresh so
@@ -197,6 +200,7 @@ class AiAssistantService extends ChangeNotifier {
         _sessionId,
         previousPlan: previousForParser,
         proactiveContext: _proactiveContextForPayload,
+        voiceMode: voiceMode,
       );
     } catch (e) {
       // Offline / AI-down: intention capture must not depend on the network
