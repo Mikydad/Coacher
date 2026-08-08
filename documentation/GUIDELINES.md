@@ -1282,7 +1282,28 @@ not silent reversal.
   A/B flag. Reply-leg instrumentation added ([ai-timing]
   assemble/model/per-round-with-tool-names + [voice-timing]
   reply/firstChunk/audible) because the device numbers showed the AI leg
-  (5.3s warm) now dominates — measure before cutting. *Considered:*
+  (5.3s warm) now dominates — measure before cutting.   *Considered:*
   GET + AudioSource.uri (rejected: text in URL), keeping the buffered
   adapter as a middle fallback tier (rejected: a mid-turn failure should
   degrade instantly to the on-device voice, not retry the network).
+
+- **2026-08-08 · Voice-turn latency, batch 3: keep-alive connection +
+  overlapped player prep + server stage ledgers.** The post-fix device
+  log had the tell: tts firstChunk tracked the reply leg almost 1:1
+  (4061 vs 4197ms, 6503 vs 6707ms) — two unrelated endpoints don't
+  coincide like that unless a shared per-request cost dominates. The
+  streaming adapter was building a NEW http.Client per speak(), i.e. a
+  full TCP+TLS handshake to us-central1 every turn. Now ONE keep-alive
+  client lives configure()→release(); interrupts cancel the response
+  subscription instead of closing the client (dart:io tears down a
+  half-read request's socket on cancel, so the server still sees the
+  disconnect and aborts its OpenAI request — the contract survives).
+  Also: player prep (setAudioSource — local proxy + AVPlayerItem) now
+  runs concurrently with the first-byte wait instead of after it; the
+  first-bytes gate stays (a pre-audio failure must throw so the
+  resilient wrapper falls back). Server side, aiChat and aiSpeechStream
+  log stage ledgers (config/quota/openai ms) — client round time minus
+  server total ≈ phone↔server network share, which is the datum for the
+  "move regions closer to the user" decision. *Rule reinforced:* measure
+  before cutting; the region question stays open until the ledgers say
+  network or OpenAI.

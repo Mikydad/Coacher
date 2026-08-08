@@ -139,9 +139,19 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
 
   bool _configured = false;
   int _generation = 0;
-  http.Client? _activeClient;
+
+  /// ONE keep-alive client for the whole session (created lazily, closed
+  /// in [release]): the 2026-08-08 device log showed firstChunk tracking
+  /// the reply leg almost 1:1 — each turn was paying a fresh TCP+TLS
+  /// handshake to us-central1 because the old code built a client per
+  /// speak(). Interrupts cancel the response subscription instead of
+  /// closing the client; dart:io tears down that request's socket on
+  /// cancel, so the server still sees the disconnect and aborts upstream.
+  http.Client? _http;
   StreamSubscription<List<int>>? _activeSub;
   Completer<void>? _speaking;
+
+  http.Client get _client => _http ??= _clientFactory();
 
   @override
   Future<void> configure() async {
@@ -182,31 +192,22 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
     }
     if (generation != _generation) return;
 
-    final client = _clientFactory();
-    _activeClient?.close();
-    _activeClient = client;
-
     final request = http.Request('POST', endpoint)
       ..headers['authorization'] = 'Bearer $token'
       ..headers['content-type'] = 'application/json'
       ..body = jsonEncode({'text': text});
 
-    final http.StreamedResponse response;
-    try {
-      response = await client.send(request).timeout(connectTimeout);
-    } catch (_) {
-      client.close();
-      rethrow;
-    }
+    final response = await _client.send(request).timeout(connectTimeout);
     if (response.statusCode != 200) {
-      client.close();
+      // Drain so the keep-alive connection returns to the pool healthy.
+      unawaited(response.stream.drain<void>().catchError((_) {}));
       throw http.ClientException(
         'aiSpeechStream HTTP ${response.statusCode}',
         endpoint,
       );
     }
     if (generation != _generation) {
-      client.close();
+      unawaited(response.stream.drain<void>().catchError((_) {}));
       return;
     }
 
@@ -234,13 +235,6 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
     _activeSub = sub;
 
     try {
-      // Gate playback on the first real bytes: a pre-audio failure must
-      // throw (so the resilient wrapper falls back) instead of handing
-      // AVPlayer an empty stream.
-      await firstChunk.future.timeout(connectTimeout);
-      if (generation != _generation) return;
-      final t3 = DateTime.now();
-
       final done = Completer<void>();
       _speaking = done;
       final stateSub = _player.processingStateStream.listen((state) {
@@ -250,7 +244,25 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
       });
 
       try {
-        await _player.setAudioSource(source);
+        // Player prep (local proxy + AVPlayerItem, ~1s cold) runs WHILE
+        // the network works on the first byte — serialized, that startup
+        // was most of the audible-after-firstChunk lag in the device log.
+        var setSourceFailed = false;
+        final setSource = _player
+            .setAudioSource(source)
+            .then<void>((_) {}, onError: (_) => setSourceFailed = true);
+
+        // Still gate audio on the first real bytes: a pre-audio failure
+        // must throw (so the resilient wrapper falls back) instead of
+        // handing AVPlayer an empty stream.
+        await firstChunk.future.timeout(connectTimeout);
+        if (generation != _generation) return;
+        final t3 = DateTime.now();
+
+        await setSource;
+        if (setSourceFailed) {
+          throw StateError('Player failed to open the speech stream');
+        }
         if (generation != _generation) return;
         final playFuture = _player.play();
         if (kDebugMode) {
@@ -276,10 +288,12 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
         } catch (_) {}
       }
     } finally {
+      // Cancelling before the body finished tears down this request's
+      // socket (dart:io never pools a half-read connection) — that is the
+      // disconnect the server watches to abort its OpenAI request. The
+      // keep-alive client itself stays open for the next turn.
       await sub.cancel();
       if (identical(_activeSub, sub)) _activeSub = null;
-      client.close();
-      if (identical(_activeClient, client)) _activeClient = null;
     }
   }
 
@@ -291,10 +305,6 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
     if (speaking != null && !speaking.isCompleted) speaking.complete();
     await _activeSub?.cancel();
     _activeSub = null;
-    // Closing the client tears down the socket — the server sees the
-    // disconnect and aborts its upstream OpenAI request.
-    _activeClient?.close();
-    _activeClient = null;
     try {
       await _player.stop();
     } catch (_) {}
@@ -303,6 +313,8 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
   @override
   Future<void> release() async {
     await stop();
+    _http?.close();
+    _http = null;
     try {
       await _player.dispose();
     } catch (_) {}

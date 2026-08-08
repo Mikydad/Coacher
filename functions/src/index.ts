@@ -358,6 +358,11 @@ export const aiChat = onCall(
       throw new HttpsError("invalid-argument", "loopIndex out of range.");
     }
 
+    // Stage ledger (latency batch 3): read next to the client's
+    // [ai-timing] round lines — round-call minus this total ≈ the
+    // phone↔server network share, which decides the region question.
+    const tStart = Date.now();
+
     // Purpose routing: model / temperature / cap / quota class per purpose.
     const { routesJson, systemDailyBudget } = await aiServerConfig();
     const route = resolveRoute(purpose, parseRouteOverrides(routesJson));
@@ -368,12 +373,14 @@ export const aiChat = onCall(
     }
     const temperature = route.temperature ?? clampTemperature(request.data?.temperature);
     const maxTokens = clampMaxTokens(request.data?.maxTokens, route.maxTokens);
+    const tConfig = Date.now();
 
     if (route.quotaClass === "system") {
       await enforceSystemBudget(uid, systemDailyBudget);
     } else {
       await enforceRateLimit(uid, turnId, loopIndex);
     }
+    const tQuota = Date.now();
 
     let response: Response;
     try {
@@ -440,6 +447,16 @@ export const aiChat = onCall(
       logger.error("OpenAI empty content", { uid, purpose });
       throw new HttpsError("internal", "AI returned an empty response.");
     }
+
+    const tOpenAi = Date.now();
+    logger.info("aiChat stages", {
+      uid,
+      purpose,
+      configMs: tConfig - tStart,
+      quotaMs: tQuota - tConfig,
+      openaiMs: tOpenAi - tQuota,
+      totalMs: tOpenAi - tStart,
+    });
 
     const totalTokens = json.usage?.total_tokens ?? -1;
     logger.info("aiChat ok", {

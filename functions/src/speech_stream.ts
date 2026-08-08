@@ -47,6 +47,8 @@ export const aiSpeechStream = onRequest(
       return;
     }
 
+    const tStart = Date.now();
+
     const token = bearerTokenFrom(req.headers.authorization);
     if (token === null) {
       res.status(401).json({ error: "Missing bearer token." });
@@ -70,6 +72,8 @@ export const aiSpeechStream = onRequest(
       return;
     }
 
+    const tAuth = Date.now();
+
     const validated = validateSpeechText(req.body?.text);
     if (!validated.ok) {
       res.status(400).json({ error: validated.reason });
@@ -83,6 +87,7 @@ export const aiSpeechStream = onRequest(
       res.status(503).json({ error: "Speech synthesis is disabled." });
       return;
     }
+    const tConfig = Date.now();
 
     try {
       await enforceSpeechRateLimit(uid);
@@ -95,6 +100,7 @@ export const aiSpeechStream = onRequest(
       res.status(500).json({ error: "Quota check failed." });
       return;
     }
+    const tQuota = Date.now();
 
     // Tap-to-interrupt closes the client connection; abort the upstream
     // OpenAI request instead of synthesizing to the end for nobody.
@@ -136,6 +142,19 @@ export const aiSpeechStream = onRequest(
         .json({ error: "Speech request failed." });
       return;
     }
+
+    // Stage ledger (latency batch 3): read next to the client's
+    // [voice-timing] firstChunk — client total minus this function's
+    // total ≈ phone↔server network, which decides the region question.
+    const tOpenAi = Date.now();
+    logger.info("aiSpeechStream stages", {
+      uid,
+      authMs: tAuth - tStart,
+      configMs: tConfig - tAuth,
+      quotaMs: tQuota - tConfig,
+      openaiHeadersMs: tOpenAi - tQuota,
+      totalToFirstPipeMs: tOpenAi - tStart,
+    });
 
     res.status(200);
     res.setHeader("Content-Type", "audio/mpeg");
