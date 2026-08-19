@@ -1304,6 +1304,32 @@ not silent reversal.
   resilient wrapper falls back). Server side, aiChat and aiSpeechStream
   log stage ledgers (config/quota/openai ms) — client round time minus
   server total ≈ phone↔server network share, which is the datum for the
-  "move regions closer to the user" decision. *Rule reinforced:* measure
+  "move regions closer to the user" decision.   *Rule reinforced:* measure
   before cutting; the region question stays open until the ledgers say
   network or OpenAI.
+
+- **2026-08-19 · Voice-turn latency, batch 4: progressive playback was a
+  lie — head/tail clips over keep-alive instead; quota runs concurrent;
+  RC failures cache.** The batch-3 ledgers convicted the streaming
+  playback: audible-minus-firstChunk tracked the server's pipeMs 1:1 on
+  every turn (2021/2001, 2135/2114, 1703/1648) — AVPlayer buffers an
+  unbounded chunked mp3 to EOF regardless of stall-avoidance, so
+  "streaming" was download-then-play with extra steps. Batch 4 stops
+  gambling on player internals: the reply splits into HEAD (first
+  sentence) and TAIL (rest), both fetched immediately as complete clips
+  over the ONE keep-alive connection through the streaming endpoint, and
+  `GrowingBufferAudioSource.completed` answers like a file server
+  (honest lengths + ranges) so playback starts instantly. Head synthesis
+  is short → audible ≈ 1.5-2s warm; the tail downloads while the head
+  plays; interrupt discards the tail via the generation counter (an
+  interrupted turn wastes one small tail synthesis — accepted). Server:
+  the ~0.5s/request quota transaction now runs CONCURRENTLY with the
+  OpenAI call on interactive paths (speech + chat user class; system
+  budget stays check-first — silent-skip semantics), and both Remote
+  Config helpers cache FAILURES with the same TTL as successes (no
+  server template is published, so every call had been re-fetching and
+  re-failing for ~100-250ms). Warm-turn budget after batch 4 ≈ reply
+  ~2.5-3s + audible ~1.5-2s. *Superseded:* batch 2's progressive-stream
+  playback claim. *Still open:* Level 2 (streaming chat + sentence
+  pipelining) is the remaining architectural cut; region move stays
+  parked (network share ~0.9-1.5s/leg, meaningful but not dominant).

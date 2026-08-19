@@ -13,29 +13,51 @@ import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
 
 import 'voice_mode_controller.dart' show VoiceTtsAdapter;
+import 'voice_speech_text.dart' show splitIntoSentences;
 
-// Streaming OpenAI TTS for Voice Mode (latency batch 2, spike 2026-08-08).
+// OpenAI TTS over the aiSpeechStream endpoint (latency batch 4, 2026-08-19).
 //
-// The buffered adapter waits for the whole first-sentence clip before any
-// sound; this one plays OpenAI's mp3 bytes AS THEY ARRIVE from the
-// aiSpeechStream endpoint, so time-to-first-audio is network + first
-// chunks instead of a full synthesis. POST body carries the text (never a
-// URL — request paths land in server logs); auth is the Firebase ID token.
+// HISTORY, because this file reversed course once: batch 2 tried true
+// progressive playback — pipe the mp3 into a growing source and let
+// AVPlayer start early. The device stage ledgers proved it never streamed:
+// audible-minus-firstChunk tracked the server's pipeMs 1:1 on every turn,
+// i.e. AVPlayer waits for EOF on an unbounded chunked mp3 no matter what
+// (stall-avoidance off included). So batch 4 stopped gambling on player
+// internals: split the reply into HEAD (first sentence) and TAIL (rest),
+// fetch both as small COMPLETE clips in parallel over one keep-alive
+// connection, and play them back-to-back. The head is short, so its full
+// synthesis+download is ~1-2s warm — that is the time-to-first-audio, and
+// the tail downloads while the head plays.
 //
 // Same VoiceTtsAdapter contract as every other voice backend — the
 // ResilientVoiceTtsAdapter wrapping and the system-voice floor are
-// untouched. Any failure here throws, and the wrapper degrades silently.
+// untouched. A head failure throws (wrapper falls back for the whole
+// reply); a tail-only failure is swallowed — the head was already heard,
+// and the full text is on screen regardless.
 
-/// A [StreamAudioSource] over bytes that are still arriving.
+/// A [StreamAudioSource] over an in-memory buffer.
 ///
-/// just_audio's local proxy reads this through a single non-range request
-/// ([rangeRequestsSupported] is false): the stream yields what is buffered,
-/// then live-follows [add] calls until [complete].
+/// Two modes:
+/// - [GrowingBufferAudioSource.completed]: all bytes known up front —
+///   reports honest lengths and range support, so AVPlayer starts
+///   immediately (this is the batch-4 playback path).
+/// - live (default ctor + [add]/[complete]): bytes still arriving —
+///   kept for tests and future use; readers block until fed.
 ///
 /// Pure Dart state machine (no platform calls) — unit-tested directly.
 class GrowingBufferAudioSource extends StreamAudioSource {
   GrowingBufferAudioSource({String contentType = 'audio/mpeg'})
     : _contentType = contentType;
+
+  /// A source whose full content is already known — honest lengths, range
+  /// requests supported, playback can start without guessing.
+  GrowingBufferAudioSource.completed(
+    Uint8List bytes, {
+    String contentType = 'audio/mpeg',
+  }) : _contentType = contentType {
+    add(bytes);
+    complete();
+  }
 
   final String _contentType;
   final List<List<int>> _chunks = [];
@@ -64,13 +86,27 @@ class GrowingBufferAudioSource extends StreamAudioSource {
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
+    final from = start ?? 0;
+    if (_done) {
+      // Everything is known: answer like a normal file server so the
+      // player trusts the media and starts at once.
+      final to = end == null ? _length : math.min(end, _length);
+      return StreamAudioResponse(
+        rangeRequestsSupported: true,
+        sourceLength: _length,
+        contentLength: to - from,
+        offset: from,
+        contentType: _contentType,
+        stream: Stream.value(_copyRange(from, to)),
+      );
+    }
     return StreamAudioResponse(
       rangeRequestsSupported: false,
       sourceLength: null,
       contentLength: null,
       offset: null,
       contentType: _contentType,
-      stream: _bytesFrom(start ?? 0, end),
+      stream: _bytesFrom(from, end),
     );
   }
 
@@ -115,13 +151,14 @@ class GrowingBufferAudioSource extends StreamAudioSource {
   }
 }
 
-/// Voice backend that streams synthesis from the aiSpeechStream endpoint
-/// and starts playback on the first buffered chunks.
+/// Voice backend that synthesizes the reply as head-sentence + tail clips
+/// through the aiSpeechStream endpoint over one keep-alive connection.
 class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
   StreamingOpenAiTtsVoiceAdapter({
     required this.endpoint,
     required this.idToken,
     this.connectTimeout = const Duration(seconds: 8),
+    this.clipTimeout = const Duration(seconds: 20),
     http.Client Function()? clientFactory,
   }) : _clientFactory = clientFactory ?? http.Client.new;
 
@@ -130,9 +167,13 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
   /// Fresh Firebase ID token per request (they expire hourly).
   final Future<String?> Function() idToken;
 
-  /// Bounds token fetch + connect + first audio byte — NOT the whole
-  /// stream; a long reply keeps trickling while earlier bytes play.
+  /// Bounds token fetch + connect + response headers for the head clip.
   final Duration connectTimeout;
+
+  /// Bounds a whole clip download — generous because the TAIL of a long
+  /// reply legitimately takes several seconds to synthesize; it has the
+  /// head's playback time to spare.
+  final Duration clipTimeout;
 
   final http.Client Function() _clientFactory;
   final AudioPlayer _player = AudioPlayer();
@@ -141,14 +182,11 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
   int _generation = 0;
 
   /// ONE keep-alive client for the whole session (created lazily, closed
-  /// in [release]): the 2026-08-08 device log showed firstChunk tracking
-  /// the reply leg almost 1:1 — each turn was paying a fresh TCP+TLS
-  /// handshake to us-central1 because the old code built a client per
-  /// speak(). Interrupts cancel the response subscription instead of
-  /// closing the client; dart:io tears down that request's socket on
-  /// cancel, so the server still sees the disconnect and aborts upstream.
+  /// in [release]): the 2026-08-08 device log showed each turn paying a
+  /// fresh TCP+TLS handshake because the old code built a client per
+  /// speak(). Requests that die mid-body close their own socket, which is
+  /// the disconnect signal the server watches to abort upstream OpenAI.
   http.Client? _http;
-  StreamSubscription<List<int>>? _activeSub;
   Completer<void>? _speaking;
 
   http.Client get _client => _http ??= _clientFactory();
@@ -170,13 +208,6 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
               AVAudioSessionCategoryOptions.duckOthers,
         ),
       );
-      // The device gate (2026-08-08) showed bytes sitting on the phone for
-      // ~2.9s before sound: AVPlayer's stall-avoidance pre-buffers streams
-      // it can't measure (chunked, no length). Voice replies are short and
-      // synthesis outpaces playback, so start the moment audio is decodable;
-      // worst case on a bad link is a mid-sentence pause, and the full text
-      // is on screen regardless.
-      await _player.setAutomaticallyWaitsToMinimizeStalling(false);
     }
     _configured = true;
   }
@@ -186,11 +217,55 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
     final generation = ++_generation;
     final t2 = DateTime.now();
 
+    final sentences = splitIntoSentences(text);
+    if (sentences.isEmpty) return;
+    final head = sentences.first;
+    final tail = sentences.skip(1).join(' ');
+
+    // Both clips start NOW: the tail synthesizes server-side while the
+    // head downloads and plays. Head failure throws (nothing spoken yet,
+    // wrapper falls back); tail failure resolves null and is swallowed.
+    final headFuture = _fetchClip(head, connectTimeout);
+    final Future<Uint8List?>? tailFuture = tail.isEmpty
+        ? null
+        : _fetchClip(
+            tail,
+            clipTimeout,
+          ).then<Uint8List?>((b) => b, onError: (_) => null);
+
+    final headBytes = await headFuture;
+    if (generation != _generation) return;
+    final t3 = DateTime.now();
+
+    if (kDebugMode) {
+      unawaited(
+        _player.playingStream.firstWhere((playing) => playing).then((_) {
+          final t4 = DateTime.now();
+          debugPrint(
+            '[voice-timing] tts headClip=${t3.difference(t2).inMilliseconds}ms '
+            'audible=${t4.difference(t2).inMilliseconds}ms '
+            'chars=${text.length}',
+          );
+        }),
+      );
+    }
+
+    await _playClip(headBytes, generation);
+    if (tailFuture == null || generation != _generation) return;
+
+    final tailBytes = await tailFuture;
+    if (tailBytes == null || generation != _generation) return;
+    await _playClip(tailBytes, generation);
+  }
+
+  /// POSTs [text] and buffers the complete mp3 clip. The endpoint streams;
+  /// we simply read to the end — for a head sentence that is ~1-2s total,
+  /// and the response begins flowing before synthesis finishes.
+  Future<Uint8List> _fetchClip(String text, Duration timeout) async {
     final token = await idToken();
     if (token == null || token.isEmpty) {
       throw StateError('No auth token for speech streaming');
     }
-    if (generation != _generation) return;
 
     final request = http.Request('POST', endpoint)
       ..headers['authorization'] = 'Bearer $token'
@@ -206,94 +281,36 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
         endpoint,
       );
     }
-    if (generation != _generation) {
-      unawaited(response.stream.drain<void>().catchError((_) {}));
-      return;
+
+    final bytes = await response.stream.toBytes().timeout(timeout);
+    if (bytes.isEmpty) {
+      throw StateError('Speech stream was empty');
     }
+    return bytes;
+  }
 
-    final source = GrowingBufferAudioSource();
-    final firstChunk = Completer<void>();
-    final sub = response.stream.listen(
-      (chunk) {
-        source.add(chunk);
-        if (!firstChunk.isCompleted) firstChunk.complete();
-      },
-      onDone: () {
-        source.complete();
-        if (!firstChunk.isCompleted) {
-          firstChunk.completeError(StateError('Speech stream was empty'));
-        }
-      },
-      onError: (Object error) {
-        // Mid-stream drop: end the clip so the player finishes what it
-        // has — the full text is on screen regardless.
-        source.complete();
-        if (!firstChunk.isCompleted) firstChunk.completeError(error);
-      },
-      cancelOnError: true,
-    );
-    _activeSub = sub;
-
-    try {
-      final done = Completer<void>();
-      _speaking = done;
-      final stateSub = _player.processingStateStream.listen((state) {
-        if (state == ProcessingState.completed && !done.isCompleted) {
-          done.complete();
-        }
-      });
-
-      try {
-        // Player prep (local proxy + AVPlayerItem, ~1s cold) runs WHILE
-        // the network works on the first byte — serialized, that startup
-        // was most of the audible-after-firstChunk lag in the device log.
-        var setSourceFailed = false;
-        final setSource = _player
-            .setAudioSource(source)
-            .then<void>((_) {}, onError: (_) => setSourceFailed = true);
-
-        // Still gate audio on the first real bytes: a pre-audio failure
-        // must throw (so the resilient wrapper falls back) instead of
-        // handing AVPlayer an empty stream.
-        await firstChunk.future.timeout(connectTimeout);
-        if (generation != _generation) return;
-        final t3 = DateTime.now();
-
-        await setSource;
-        if (setSourceFailed) {
-          throw StateError('Player failed to open the speech stream');
-        }
-        if (generation != _generation) return;
-        final playFuture = _player.play();
-        if (kDebugMode) {
-          unawaited(
-            _player.playingStream.firstWhere((playing) => playing).then((_) {
-              final t4 = DateTime.now();
-              debugPrint(
-                '[voice-timing] tts firstChunk=${t3.difference(t2).inMilliseconds}ms '
-                'audible=${t4.difference(t2).inMilliseconds}ms '
-                'chars=${text.length}',
-              );
-            }),
-          );
-        }
-        await done.future;
-        await playFuture.catchError((_) {});
-      } finally {
-        await stateSub.cancel();
-        if (identical(_speaking, done)) _speaking = null;
-        // Idle the player so the next setAudioSource starts clean.
-        try {
-          await _player.stop();
-        } catch (_) {}
+  Future<void> _playClip(Uint8List bytes, int generation) async {
+    if (generation != _generation) return;
+    final done = Completer<void>();
+    _speaking = done;
+    final stateSub = _player.processingStateStream.listen((state) {
+      if (state == ProcessingState.completed && !done.isCompleted) {
+        done.complete();
       }
+    });
+    try {
+      await _player.setAudioSource(GrowingBufferAudioSource.completed(bytes));
+      if (generation != _generation) return;
+      final playFuture = _player.play();
+      await done.future;
+      await playFuture.catchError((_) {});
     } finally {
-      // Cancelling before the body finished tears down this request's
-      // socket (dart:io never pools a half-read connection) — that is the
-      // disconnect the server watches to abort its OpenAI request. The
-      // keep-alive client itself stays open for the next turn.
-      await sub.cancel();
-      if (identical(_activeSub, sub)) _activeSub = null;
+      await stateSub.cancel();
+      if (identical(_speaking, done)) _speaking = null;
+      // Idle the player so the next setAudioSource starts clean.
+      try {
+        await _player.stop();
+      } catch (_) {}
     }
   }
 
@@ -303,8 +320,6 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
     // Wake the speak() latch first so it unwinds promptly.
     final speaking = _speaking;
     if (speaking != null && !speaking.isCompleted) speaking.complete();
-    await _activeSub?.cancel();
-    _activeSub = null;
     try {
       await _player.stop();
     } catch (_) {}

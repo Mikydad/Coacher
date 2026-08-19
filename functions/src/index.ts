@@ -172,12 +172,23 @@ const RC_TTL_MS = 5 * 60 * 1000;
 
 let rcTemplate: ServerTemplate | undefined;
 let rcLoadedAtMs = 0;
+let rcFailedAtMs = 0;
 
 async function aiServerConfig(): Promise<{
   routesJson: string;
   systemDailyBudget: number;
 }> {
   const now = Date.now();
+  const defaults = {
+    routesJson: RC_DEFAULTS.ai_purpose_routes,
+    systemDailyBudget: RC_DEFAULTS.ai_system_daily_budget,
+  };
+  // Failures are cached like successes (2026-08-19 stage ledgers): with no
+  // server template published, EVERY call was re-fetching and re-failing,
+  // ~100-250ms of pure tax on the hot path.
+  if (rcTemplate === undefined && now - rcFailedAtMs < RC_TTL_MS) {
+    return defaults;
+  }
   try {
     if (rcTemplate === undefined || now - rcLoadedAtMs > RC_TTL_MS) {
       rcTemplate = await getRemoteConfig().getServerTemplate({
@@ -192,13 +203,11 @@ async function aiServerConfig(): Promise<{
       systemDailyBudget: budget > 0 ? budget : RC_DEFAULTS.ai_system_daily_budget,
     };
   } catch (error) {
+    rcFailedAtMs = now;
     logger.warn("Remote Config unavailable; using default AI routes", {
       error: `${error}`,
     });
-    return {
-      routesJson: RC_DEFAULTS.ai_purpose_routes,
-      systemDailyBudget: RC_DEFAULTS.ai_system_daily_budget,
-    };
+    return defaults;
   }
 }
 
@@ -375,16 +384,9 @@ export const aiChat = onCall(
     const maxTokens = clampMaxTokens(request.data?.maxTokens, route.maxTokens);
     const tConfig = Date.now();
 
-    if (route.quotaClass === "system") {
-      await enforceSystemBudget(uid, systemDailyBudget);
-    } else {
-      await enforceRateLimit(uid, turnId, loopIndex);
-    }
-    const tQuota = Date.now();
-
-    let response: Response;
-    try {
-      response = await fetch(OPENAI_URL, {
+    const quotaAbort = new AbortController();
+    const doFetch = (): Promise<Response> =>
+      fetch(OPENAI_URL, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${openAiApiKey.value()}`,
@@ -401,11 +403,43 @@ export const aiChat = onCall(
             : { tools, tool_choice: "auto" }),
           messages,
         }),
-        signal: AbortSignal.timeout(45_000),
+        signal: AbortSignal.any([quotaAbort.signal, AbortSignal.timeout(45_000)]),
       });
-    } catch (error) {
-      logger.error("OpenAI request failed", { uid, purpose, error: `${error}` });
-      throw new HttpsError("unavailable", "AI service unreachable. Try again.");
+
+    let response: Response;
+    let tQuota: number;
+    if (route.quotaClass === "system") {
+      // Background callers: latency is irrelevant and the budget's
+      // silent-skip semantics must stay strict — check first, spend after.
+      await enforceSystemBudget(uid, systemDailyBudget);
+      tQuota = Date.now();
+      try {
+        response = await doFetch();
+      } catch (error) {
+        logger.error("OpenAI request failed", { uid, purpose, error: `${error}` });
+        throw new HttpsError("unavailable", "AI service unreachable. Try again.");
+      }
+    } else {
+      // Interactive path: the quota transaction (~0.5s of Firestore,
+      // 2026-08-19 ledgers) runs CONCURRENTLY with the OpenAI call. An
+      // over-quota caller pays for one aborted request — rare by
+      // construction; the latency win lands on every legitimate turn.
+      const quotaPromise = enforceRateLimit(uid, turnId, loopIndex);
+      const fetchPromise = doFetch();
+      try {
+        await quotaPromise;
+      } catch (error) {
+        quotaAbort.abort();
+        fetchPromise.catch(() => {});
+        throw error;
+      }
+      tQuota = Date.now();
+      try {
+        response = await fetchPromise;
+      } catch (error) {
+        logger.error("OpenAI request failed", { uid, purpose, error: `${error}` });
+        throw new HttpsError("unavailable", "AI service unreachable. Try again.");
+      }
     }
 
     if (response.status === 429) {
@@ -448,13 +482,15 @@ export const aiChat = onCall(
       throw new HttpsError("internal", "AI returned an empty response.");
     }
 
+    // Since batch 4 the quota and OpenAI legs OVERLAP on the user path
+    // (both measured from tConfig); totalMs stays honest wall clock.
     const tOpenAi = Date.now();
     logger.info("aiChat stages", {
       uid,
       purpose,
       configMs: tConfig - tStart,
       quotaMs: tQuota - tConfig,
-      openaiMs: tOpenAi - tQuota,
+      openaiMs: tOpenAi - tConfig,
       totalMs: tOpenAi - tStart,
     });
 

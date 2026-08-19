@@ -21,12 +21,23 @@ const RC_TTL_MS = 5 * 60 * 1000;
 
 let rcTemplate: ServerTemplate | undefined;
 let rcLoadedAtMs = 0;
+let rcFailedAtMs = 0;
 
 export async function speechConfig(): Promise<{
   enabled: boolean;
   voice: string;
 }> {
   const now = Date.now();
+  const defaults = {
+    enabled: RC_DEFAULTS.ai_speech_enabled,
+    voice: resolveSpeechVoice(RC_DEFAULTS.ai_speech_voice),
+  };
+  // Failures are cached like successes (2026-08-19 stage ledgers): with no
+  // server template published, EVERY call was re-fetching and re-failing,
+  // ~100-250ms of pure tax on the hot path.
+  if (rcTemplate === undefined && now - rcFailedAtMs < RC_TTL_MS) {
+    return defaults;
+  }
   try {
     if (rcTemplate === undefined || now - rcLoadedAtMs > RC_TTL_MS) {
       rcTemplate = await getRemoteConfig().getServerTemplate({
@@ -40,13 +51,11 @@ export async function speechConfig(): Promise<{
       voice: resolveSpeechVoice(config.getString("ai_speech_voice")),
     };
   } catch (error) {
+    rcFailedAtMs = now;
     logger.warn("Remote Config unavailable; using default speech config", {
       error: `${error}`,
     });
-    return {
-      enabled: RC_DEFAULTS.ai_speech_enabled,
-      voice: resolveSpeechVoice(RC_DEFAULTS.ai_speech_voice),
-    };
+    return defaults;
   }
 }
 

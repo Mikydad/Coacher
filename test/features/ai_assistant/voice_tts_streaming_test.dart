@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sidepal/features/ai_assistant/application/voice_tts_streaming.dart';
@@ -26,7 +27,9 @@ void main() {
 
       final response = await source.request();
       expect(await collect(response.stream), [1, 2, 3, 4, 5]);
-      expect(response.rangeRequestsSupported, isFalse);
+      // Complete at request time → honest file-server semantics (batch 4).
+      expect(response.rangeRequestsSupported, isTrue);
+      expect(response.sourceLength, 5);
       expect(response.contentType, 'audio/mpeg');
     });
 
@@ -101,6 +104,33 @@ void main() {
 
       expect(await a, [1, 2, 3]);
       expect(await b, [1, 2, 3]);
+    });
+
+    test('completed source answers like a file server (honest lengths)',
+        () async {
+      final source = GrowingBufferAudioSource.completed(
+        Uint8List.fromList([10, 20, 30, 40, 50]),
+      );
+
+      final full = await source.request();
+      expect(full.rangeRequestsSupported, isTrue);
+      expect(full.sourceLength, 5);
+      expect(full.contentLength, 5);
+      expect(full.offset, 0);
+      expect(await collect(full.stream), [10, 20, 30, 40, 50]);
+    });
+
+    test('completed source serves range requests with correct metadata',
+        () async {
+      final source = GrowingBufferAudioSource.completed(
+        Uint8List.fromList([0, 1, 2, 3, 4, 5, 6, 7]),
+      );
+
+      final range = await source.request(2, 6);
+      expect(range.sourceLength, 8);
+      expect(range.contentLength, 4);
+      expect(range.offset, 2);
+      expect(await collect(range.stream), [2, 3, 4, 5]);
     });
   });
 }

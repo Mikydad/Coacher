@@ -89,9 +89,37 @@ export const aiSpeechStream = onRequest(
     }
     const tConfig = Date.now();
 
+    // Tap-to-interrupt closes the client connection; abort the upstream
+    // OpenAI request instead of synthesizing to the end for nobody.
+    const upstreamAbort = new AbortController();
+    res.on("close", () => upstreamAbort.abort());
+
+    // The quota transaction (~0.5s of Firestore, 2026-08-19 ledgers) runs
+    // CONCURRENTLY with the OpenAI connect instead of in front of it. An
+    // over-quota caller pays OpenAI for one aborted synthesis — that only
+    // happens at the 91st request of the hour, and latency is paid by
+    // every legitimate turn.
+    const quotaPromise = enforceSpeechRateLimit(uid);
+    const fetchPromise = fetch(OPENAI_SPEECH_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${openAiApiKey.value()}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: SPEECH_MODEL,
+        voice,
+        input: text,
+        response_format: "mp3",
+      }),
+      signal: upstreamAbort.signal,
+    });
+
     try {
-      await enforceSpeechRateLimit(uid);
+      await quotaPromise;
     } catch (error) {
+      upstreamAbort.abort();
+      fetchPromise.catch(() => {});
       if (error instanceof HttpsError && error.code === "resource-exhausted") {
         res.status(429).json({ error: "Speech request limit reached." });
         return;
@@ -102,27 +130,9 @@ export const aiSpeechStream = onRequest(
     }
     const tQuota = Date.now();
 
-    // Tap-to-interrupt closes the client connection; abort the upstream
-    // OpenAI request instead of synthesizing to the end for nobody.
-    const upstreamAbort = new AbortController();
-    res.on("close", () => upstreamAbort.abort());
-
     let response: Response;
     try {
-      response = await fetch(OPENAI_SPEECH_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${openAiApiKey.value()}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: SPEECH_MODEL,
-          voice,
-          input: text,
-          response_format: "mp3",
-        }),
-        signal: upstreamAbort.signal,
-      });
+      response = await fetchPromise;
     } catch (error) {
       if (upstreamAbort.signal.aborted) return; // client hung up — not an error
       logger.error("aiSpeechStream OpenAI request failed", { uid, error: `${error}` });
@@ -144,15 +154,17 @@ export const aiSpeechStream = onRequest(
     }
 
     // Stage ledger (latency batch 3): read next to the client's
-    // [voice-timing] firstChunk — client total minus this function's
-    // total ≈ phone↔server network, which decides the region question.
+    // [voice-timing] headClip — client total minus this function's total
+    // ≈ phone↔server network, which decides the region question. Since
+    // batch 4 the quota and OpenAI legs OVERLAP (both measured from
+    // tConfig); totalToFirstPipeMs stays the honest wall-clock sum.
     const tOpenAi = Date.now();
     logger.info("aiSpeechStream stages", {
       uid,
       authMs: tAuth - tStart,
       configMs: tConfig - tAuth,
       quotaMs: tQuota - tConfig,
-      openaiHeadersMs: tOpenAi - tQuota,
+      openaiHeadersMs: tOpenAi - tConfig,
       totalToFirstPipeMs: tOpenAi - tStart,
     });
 
