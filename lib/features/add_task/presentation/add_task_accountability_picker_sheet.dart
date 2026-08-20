@@ -38,7 +38,7 @@ Future<String?> showAccountabilityPickerSheet(
             Text(
               'Accountability',
               style: TextStyle(
-                fontSize: 5,
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
                 color: AddTaskColors.onSurface,
               ),

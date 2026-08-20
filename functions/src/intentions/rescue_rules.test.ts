@@ -82,6 +82,19 @@ describe('rescueAction — the four-condition gate', () => {
     assert.deepEqual(action, { kind: 'skip', reason: 'covered' });
   });
 
+  it('a fired primary with a still-armed later slot stays covered (Tier-1 fix)', () => {
+    const action = rescueAction(
+      base({
+        projection: {
+          covered: true,
+          nextSlotMs: NOW - 3_600_000, // primary fired; mirror froze before it
+          lastSlotMs: NOW + 2 * 3_600_000, // deadline-eve safety still armed
+        },
+      }),
+    );
+    assert.deepEqual(action, { kind: 'skip', reason: 'covered' });
+  });
+
   it('a stale projection (slot already past) does NOT count as covered', () => {
     const action = rescueAction(
       base({ projection: { covered: true, nextSlotMs: NOW - 1 } }),

@@ -17,6 +17,7 @@ class IntentionProjection {
     required this.intentionId,
     required this.covered,
     required this.nextSlotMs,
+    this.lastSlotMs,
     required this.windowEndMs,
     required this.updatedAtMs,
   });
@@ -30,6 +31,14 @@ class IntentionProjection {
   /// Earliest future slot delivery time, or null when uncovered.
   final int? nextSlotMs;
 
+  /// LATEST future slot delivery time — the coverage the sweep must honor.
+  /// The mirror freezes while the app is closed, so once the earliest slot
+  /// fires, [nextSlotMs] alone makes a still-armed ladder (deadline-eve
+  /// safety slot) look uncovered and the server double-nudges (Tier-1
+  /// review fix). Null only on pre-upgrade docs; the server falls back to
+  /// [nextSlotMs] then.
+  final int? lastSlotMs;
+
   /// The intention's deadline (mirrored so the sweep's "window closing"
   /// rule needs no extra read; the intention doc carries the truth for LWW).
   final int windowEndMs;
@@ -40,12 +49,14 @@ class IntentionProjection {
   /// [windowEndMs] deliberately: a re-stamp with the same coverage must NOT
   /// trigger a mirror write. Window changes flow through the synced
   /// intention doc, which the sweep reads directly.
-  String get signature => '${covered ? 1 : 0}|${nextSlotMs ?? -1}';
+  String get signature =>
+      '${covered ? 1 : 0}|${nextSlotMs ?? -1}|${lastSlotMs ?? -1}';
 
   Map<String, dynamic> toMap() => {
     'intentionId': intentionId,
     'covered': covered,
     'nextSlotMs': nextSlotMs,
+    'lastSlotMs': lastSlotMs,
     'windowEndMs': windowEndMs,
     'updatedAtMs': updatedAtMs,
   };
@@ -68,6 +79,7 @@ class IntentionProjection {
       intentionId: intention.id,
       covered: nextSlotMs != null,
       nextSlotMs: nextSlotMs,
+      lastSlotMs: future.isEmpty ? null : future.last,
       windowEndMs: intention.windowEndMs,
       updatedAtMs: nowMs,
     );

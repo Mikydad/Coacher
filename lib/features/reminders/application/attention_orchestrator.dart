@@ -207,6 +207,10 @@ abstract final class AttentionOrchestrator {
 
     DateTime? latestConflictEnd;
     for (final delivery in recentDeliveries) {
+      // Never collide with the entity's own previous slot: a re-arm at the
+      // same time REPLACES that notification (the service cancels it), so
+      // self-spacing would just drift every re-armed reminder +gap late.
+      if (delivery.entityId == intent.entityId) continue;
       final deliveredAt = delivery.deliveredAt;
       final gapEnd = deliveredAt.add(gapDuration);
       final gapStart = deliveredAt.subtract(gapDuration);

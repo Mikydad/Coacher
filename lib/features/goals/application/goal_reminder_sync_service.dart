@@ -45,21 +45,31 @@ class GoalReminderSyncService {
   /// reroute, so upgrading users don't keep stale repeating notifications.
   Future<void> cancelForGoal(String goalId) async {
     await _n.cancel(_n.idFromGoalId(goalId));
+    await _cancelLegacySlots(goalId);
+    await _orchestrator.cancelForEntity(goalId);
+  }
+
+  /// The retired per-weekday/per-month-day slots from before the Phase 0
+  /// reroute — safe to sweep unconditionally (nothing schedules them now).
+  Future<void> _cancelLegacySlots(String goalId) async {
     for (var wd = DateTime.monday; wd <= DateTime.sunday; wd++) {
       await _n.cancel(_n.idFromGoalIdWeekday(goalId, wd));
     }
     for (var dom = 1; dom <= 31; dom++) {
       await _n.cancel(_n.idFromGoalIdMonthDay(goalId, dom));
     }
-    await _orchestrator.cancelForEntity(goalId);
   }
 
   Future<void> applyForGoal(UserGoal goal) async {
-    await cancelForGoal(goal.id);
     final now = _now();
     // Passive goals stay silent: goalShouldScheduleDailyReminder returns
     // false when repeatCadence == off (decision log 2026-07-11).
-    if (!goalShouldScheduleDailyReminder(goal, now)) return;
+    if (!goalShouldScheduleDailyReminder(goal, now)) {
+      // Not eligible (paused / passive / disabled / period ended): remove
+      // anything armed, legacy or current.
+      await cancelForGoal(goal.id);
+      return;
+    }
     final minutes = goal.reminderMinutesFromMidnight!;
     final mode = GoalIntensityMode.routineModeFromGoalIntensity(goal.intensity);
     final body = switch (mode) {
@@ -78,8 +88,15 @@ class GoalReminderSyncService {
     );
     if (first == null) {
       debugPrint('Goal reminder skipped (no slot in period): goal=${goal.id}');
+      await cancelForGoal(goal.id);
       return;
     }
+
+    // Schedule path: only sweep the retired legacy slots up front. The LIVE
+    // slot is swapped by the orchestrator itself (after the budget check),
+    // so a suppressed or budget-denied evaluation leaves the previously
+    // armed reminder intact instead of destroying it (review finding A).
+    await _cancelLegacySlots(goal.id);
 
     final intent = ReminderIntent(
       id: StableId.generate('ri_goal'),

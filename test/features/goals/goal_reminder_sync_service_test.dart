@@ -155,13 +155,24 @@ void main() {
     expect(orchestrator.cancelled, ['g1']);
   });
 
-  test('applyForGoal always re-cancels before scheduling (idempotent)',
-      () async {
+  test(
+      'schedule path never destroys the armed slot up front — the '
+      'orchestrator swaps it after the budget check (review A)', () async {
     await service.applyForGoal(marchGoal());
     await service.applyForGoal(marchGoal());
 
     expect(orchestrator.evaluated, hasLength(2));
-    expect(orchestrator.cancelled, ['g1', 'g1']);
+    // No entity-scoped cancel from the sync service on the schedule path:
+    // a suppressed/budget-denied evaluation must leave the previously
+    // armed reminder intact.
+    expect(orchestrator.cancelled, isEmpty);
+    // Only the retired legacy weekday/month-day slots are swept up front
+    // (7 + 31 = 38 per apply); the live idFromGoalId slot is untouched.
+    expect(notifications.cancelledIds, hasLength(76));
+    expect(
+      notifications.cancelledIds,
+      isNot(contains(notifications.idFromGoalId('g1'))),
+    );
   });
 
   test('rearmIfStale throttles within the min interval', () async {

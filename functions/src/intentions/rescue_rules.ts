@@ -39,6 +39,8 @@ export interface IntentionSnapshot {
 export interface ProjectionSnapshot {
   covered: boolean;
   nextSlotMs: number | null;
+  /** Latest future slot at mirror time — null on pre-upgrade docs. */
+  lastSlotMs: number | null;
 }
 
 /** Server-owned per-intention rescue bookkeeping (never client-written,
@@ -122,13 +124,17 @@ export function rescueAction(args: {
 
   // A client slot that still lies ahead and inside the window covers the
   // promise — local multi-slot alarms are the correctness floor and the
-  // server never doubles them.
-  const next = projection?.nextSlotMs ?? null;
+  // server never doubles them. Coverage is judged by the LATEST mirrored
+  // slot: the mirror freezes while the app is closed, so after the earliest
+  // slot fires, nextSlotMs alone would make a still-armed deadline-eve
+  // safety alarm look uncovered and this sweep would double-nudge (Tier-1
+  // review fix). Pre-upgrade docs lack lastSlotMs — fall back to nextSlotMs.
+  const coverageSlot = projection?.lastSlotMs ?? projection?.nextSlotMs ?? null;
   if (
     projection?.covered === true &&
-    next !== null &&
-    next > nowMs &&
-    next <= intention.windowEndMs
+    coverageSlot !== null &&
+    coverageSlot > nowMs &&
+    coverageSlot <= intention.windowEndMs
   ) {
     return { kind: 'skip', reason: 'covered' };
   }

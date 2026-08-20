@@ -15,6 +15,7 @@ import '../../features/home/presentation/home_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/reminders/application/attention_orchestrator_providers.dart';
 import '../../features/reminders/application/notification_route_resolver.dart';
+import '../../features/reminders/domain/models/attention_outcome.dart';
 import '../../features/reminders/domain/models/reminder_intent.dart';
 import '../../core/presentation/cloud_sync_global_indicator.dart';
 import '../application/main_tab_navigation.dart';
@@ -30,6 +31,11 @@ class MainTabShell extends ConsumerWidget {
   const MainTabShell({super.key});
 
   static const routeName = '/';
+
+  /// Invites already announced (or attempted) this app session — prevents
+  /// snackbar/evaluate spam on every stream emission while a suppressed
+  /// invite intentionally stays out of the persisted seen-list.
+  static final Set<String> _sessionAnnounced = <String>{};
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -84,17 +90,22 @@ class MainTabShell extends ConsumerWidget {
     final prefs = await SharedPreferences.getInstance();
     final key = 'stake_invite_notified_v1_$uid';
     final seen = (prefs.getStringList(key) ?? const []).toSet();
-    final fresh = invites.where((c) => !seen.contains(c.id)).toList();
+    final fresh = invites
+        .where((c) => !seen.contains(c.id) && !_sessionAnnounced.contains(c.id))
+        .toList();
     if (fresh.isEmpty) return;
-    await prefs.setStringList(key, {...seen, ...fresh.map((c) => c.id)}.toList());
+    // Session-level dedupe keeps the snackbar/evaluate loop from re-running
+    // on every stream emission while an invite stays suppressed.
+    _sessionAnnounced.addAll(fresh.map((c) => c.id));
 
     // Routed through the AttentionOrchestrator (Phase 0, decision log
     // 2026-07-23): invites respect overrides/collision spacing, land in the
     // notification ledger, and carry a `stake:` payload so taps navigate.
     final orchestrator = ref.read(attentionOrchestratorServiceProvider);
+    final delivered = <String>[];
     for (final c in fresh) {
       final now = DateTime.now();
-      await orchestrator.evaluate(
+      final decision = await orchestrator.evaluate(
         ReminderIntent(
           id: StableId.generate('ri_stake'),
           entityId: c.id,
@@ -110,6 +121,15 @@ class MainTabShell extends ConsumerWidget {
           createdAtMs: now.millisecondsSinceEpoch,
         ),
       );
+      if (decision.outcome != AttentionOutcome.suppressed) {
+        delivered.add(c.id);
+      }
+    }
+    // Persist only DELIVERED invites (review C): a suppressed one retries
+    // next session (or via the override-end flush), instead of being marked
+    // seen forever with no notification ever shown.
+    if (delivered.isNotEmpty) {
+      await prefs.setStringList(key, {...seen, ...delivered}.toList());
     }
 
     final text = fresh.length == 1

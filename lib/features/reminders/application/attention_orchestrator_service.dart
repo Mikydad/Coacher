@@ -69,6 +69,11 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
     /// Optional guard against iOS's 64-pending-notification cap.
     /// Null (tests, legacy wiring) means unlimited.
     NotificationBudget? budget,
+
+    /// Liveness check for non-task suppressed intents (goal/stake) before
+    /// they are re-delivered on override end — a goal deleted or completed
+    /// during an override must not nudge afterwards. Null means always live.
+    Future<bool> Function(String entityId, String entityKind)? isEntityLive,
     DateTime Function()? now,
   }) : _getCoachingStyle = getCoachingStyle ?? (() => CoachingStyle.balanced),
        _overrideRepo = contextOverrideRepository,
@@ -78,6 +83,7 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
        _ledger = ledger,
        _logEvent = logEvent,
        _budget = budget,
+       _isEntityLive = isEntityLive,
        _now = now ?? DateTime.now;
 
   final CoachingStyle Function() _getCoachingStyle;
@@ -96,6 +102,8 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
   })
   _logEvent;
   final NotificationBudget? _budget;
+  final Future<bool> Function(String entityId, String entityKind)?
+  _isEntityLive;
   final DateTime Function() _now;
 
   // ── In-memory state ────────────────────────────────────────────────────────
@@ -229,14 +237,22 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
     };
 
     for (final intent in toReEvaluate.values) {
-      // The reminder-config existence check only applies to task/habit
-      // intents; goal and stake-invite intents (Phase 0 reroute) have no
-      // ReminderConfig — their staleness is judged by age alone.
+      // Task/habit liveness = an enabled ReminderConfig still exists; other
+      // kinds (goal/stake) consult the injected liveness callback so an
+      // entity deleted or completed during the override is not re-delivered.
       final isTaskKind =
           intent.entityKind == ReminderEntityKinds.task ||
           intent.entityKind == ReminderEntityKinds.habit;
-      final isEntityStillPending =
-          !isTaskKind || enabledTaskIds.contains(intent.entityId);
+      final bool isEntityStillPending;
+      if (isTaskKind) {
+        isEntityStillPending = enabledTaskIds.contains(intent.entityId);
+      } else {
+        isEntityStillPending = await (_isEntityLive?.call(
+              intent.entityId,
+              intent.entityKind,
+            ) ??
+            Future.value(true));
+      }
       final age = now.difference(intent.proposedAt);
       final isStale = age > kSuppressedIntentStaleThreshold;
 
@@ -373,9 +389,11 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
         final deliverAt = decision.deliverAt ?? _now();
         final route = resolveNotificationRoute(intent);
         final body = _buildNotificationBody(intent, decision);
-        // Immediate announcements (stake invites) must bypass schedule():
-        // its normalize step pushes a non-future `when` forward by a day.
-        final immediate = route.immediate && !deliverAt.isAfter(_now());
+        // Anything due NOW must bypass schedule(): its normalize step pushes
+        // a non-future `when` forward by a full day — which would silently
+        // defer immediate announcements (stake invites), override-end
+        // re-deliveries, and boot-reconciliation follow-ups to tomorrow.
+        final immediate = !deliverAt.isAfter(_now());
         // Guard the iOS 64-pending cap BEFORE cancelling the entity's
         // existing notification: a denied budget must leave whatever the
         // user already has, not destroy it. (Immediate showNow goes to the
@@ -407,6 +425,7 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
               title: intent.entityTitle,
               body: body,
               payload: route.payload,
+              darwinCategoryId: route.darwinCategoryId,
             );
           } else {
             await _notifications.schedule(
@@ -440,13 +459,18 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
             // reconciliation service doesn't treat it as an undelivered ghost.
             await _ledger.markDelivered(route.notifId);
           }
-          _recentDeliveries.add(
-            RecentDelivery(
-              entityId: intent.entityId,
-              deliveredAtMs: deliverAt.millisecondsSinceEpoch,
-              interruptionLevel: intent.interruptionLevel,
-            ),
-          );
+          // Purge the entity's superseded entry first: a re-arm REPLACES
+          // the previous slot, and a stale phantom time would delay other
+          // entities' intents against a notification that no longer exists.
+          _recentDeliveries
+            ..removeWhere((d) => d.entityId == intent.entityId)
+            ..add(
+              RecentDelivery(
+                entityId: intent.entityId,
+                deliveredAtMs: deliverAt.millisecondsSinceEpoch,
+                interruptionLevel: intent.interruptionLevel,
+              ),
+            );
           await _logFatigueEvent(
             type: AnalyticsEventType.notificationDelivered,
             entityId: intent.entityId,

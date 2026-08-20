@@ -313,6 +313,28 @@ void main() {
       expect(decision.deliverAt, _now);
     });
 
+    test('re-arm never collides with the entity\'s own previous slot', () {
+      // Regression (review B): a goal re-armed at the same slot time
+      // REPLACES its previous notification — self-spacing would drift every
+      // re-armed reminder +gap late and collapse same-time goals together.
+      final slotAt = _now.add(const Duration(hours: 2));
+      final ownPrior = RecentDelivery(
+        entityId: 'task_1', // same entity as _intent()'s default
+        deliveredAtMs: slotAt.millisecondsSinceEpoch,
+        interruptionLevel: InterruptionLevel.medium,
+      );
+
+      final decision = AttentionOrchestrator.evaluate(
+        intent: _intent(proposedAt: slotAt),
+        attentionState: _attentionState(),
+        now: _now,
+        recentDeliveries: [ownPrior],
+      );
+
+      expect(decision.outcome, AttentionOutcome.approved);
+      expect(decision.deliverAt, slotAt);
+    });
+
     test('intent within gap of a future-scheduled delivery is still spaced',
         () {
       final scheduledAt = _now.add(const Duration(hours: 2));

@@ -172,7 +172,7 @@ class ThinkingLoopService {
         },
       );
 
-      await _apply(parsed, intentions, now);
+      await _apply(parsed, now);
       await prefs.setString(lastDayPrefsKey, today);
       await prefs.setString(inputsHashPrefsKey, hash);
     } catch (e) {
@@ -180,11 +180,7 @@ class ThinkingLoopService {
     }
   }
 
-  Future<void> _apply(
-    ParsedReflection parsed,
-    List<Intention> intentions,
-    DateTime now,
-  ) async {
+  Future<void> _apply(ParsedReflection parsed, DateTime now) async {
     for (final candidate in parsed.dormantIntentions) {
       final intention = buildIntention(
         IntentionDraft(
@@ -203,13 +199,18 @@ class ThinkingLoopService {
       await _intentions.upsertIntention(intention);
     }
 
-    final byId = {for (final i in intentions) i.id: i};
     for (final hint in parsed.hintUpdates) {
-      final target = byId[hint.intentionId];
-      if (target == null) continue;
+      // Re-fetch at apply time: the reflect network call took up to 30s,
+      // and the user may have acted meanwhile (Done, edit, pin). Writing
+      // the pre-call record would carry a fresher updatedAtMs and silently
+      // LWW-stomp their action on every device (Tier-1 review fix). The
+      // parser's open+unpinned gate is re-checked against the fresh record
+      // for the same reason.
+      final fresh = await _intentions.getIntention(hint.intentionId);
+      if (fresh == null || !fresh.isLive || fresh.isPinned) continue;
       await _intentions.upsertIntention(
-        target.copyWith(
-          aiHintsJson: mergeHints(target.aiHintsJson, hint),
+        fresh.copyWith(
+          aiHintsJson: mergeHints(fresh.aiHintsJson, hint),
           updatedAtMs: now.millisecondsSinceEpoch,
         ),
       );

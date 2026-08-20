@@ -102,16 +102,24 @@ class MemoryFactsRepository {
   }
 
   /// Stamps [MemoryFact.lastReferencedAtMs] after payload injection.
-  /// Local-only bump intent, but replicated so ranking agrees across
-  /// devices — cheap, and correct under LWW.
+  ///
+  /// STRICTLY LOCAL: neither bumps [MemoryFact.updatedAtMs] nor writes the
+  /// outbox. Replicating a whole fact on every chat turn would let a stale
+  /// copy from one device win LWW over an explicit user edit (✓ Correct /
+  /// ✏ Edit / 🗑 Forget) made on another. The stamp is a ranking hint —
+  /// per-device divergence is fine, and a remote pull overwriting it only
+  /// resets a hint.
   Future<void> markReferenced(List<String> factIds) async {
     final now = _now();
     for (final id in factIds) {
       final current = await getFact(id);
       if (current == null) continue;
-      await upsertFact(
-        current.copyWith(lastReferencedAtMs: now, updatedAtMs: now),
-      );
+      final stamped = current.copyWith(lastReferencedAtMs: now);
+      await _isar.writeTxn(() async {
+        await _isar.isarMemoryFacts.putByFactId(
+          IsarMemoryFact.fromDomain(stamped),
+        );
+      });
     }
   }
 

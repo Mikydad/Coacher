@@ -183,19 +183,28 @@ async function aiServerConfig(): Promise<{
     routesJson: RC_DEFAULTS.ai_purpose_routes,
     systemDailyBudget: RC_DEFAULTS.ai_system_daily_budget,
   };
-  // Failures are cached like successes (2026-08-19 stage ledgers): with no
-  // server template published, EVERY call was re-fetching and re-failing,
-  // ~100-250ms of pure tax on the hot path.
-  if (rcTemplate === undefined && now - rcFailedAtMs < RC_TTL_MS) {
-    return defaults;
-  }
-  try {
-    if (rcTemplate === undefined || now - rcLoadedAtMs > RC_TTL_MS) {
+  // Failure caching (2026-08-19 stage ledgers) applies in BOTH states: a
+  // failed refresh must not be retried on every call (~100-250ms tax), and
+  // — critically — an RC outage must serve the LAST-KNOWN template, never
+  // the compiled defaults: defaults have every purpose enabled, so falling
+  // back to them would silently revive a killed purpose mid-outage.
+  const stale = rcTemplate === undefined || now - rcLoadedAtMs > RC_TTL_MS;
+  const inFailureCooldown = now - rcFailedAtMs < RC_TTL_MS;
+  if (stale && !inFailureCooldown) {
+    try {
       rcTemplate = await getRemoteConfig().getServerTemplate({
         defaultConfig: RC_DEFAULTS,
       });
       rcLoadedAtMs = now;
+    } catch (error) {
+      rcFailedAtMs = now;
+      logger.warn("Remote Config refresh failed; serving last-known AI routes", {
+        error: `${error}`,
+      });
     }
+  }
+  if (rcTemplate === undefined) return defaults;
+  try {
     const config = rcTemplate.evaluate();
     const budget = config.getNumber("ai_system_daily_budget");
     return {
@@ -203,8 +212,7 @@ async function aiServerConfig(): Promise<{
       systemDailyBudget: budget > 0 ? budget : RC_DEFAULTS.ai_system_daily_budget,
     };
   } catch (error) {
-    rcFailedAtMs = now;
-    logger.warn("Remote Config unavailable; using default AI routes", {
+    logger.warn("Remote Config evaluate failed; using default AI routes", {
       error: `${error}`,
     });
     return defaults;
@@ -267,9 +275,35 @@ async function recordPurposeUsage(
   }
 }
 
+// Per-instance over-quota marker: the interactive path fires the OpenAI
+// call concurrently with the quota transaction (latency win), so a 429'd
+// caller has already paid for one request. Once a uid is KNOWN to be over
+// quota, subsequent calls are rejected before OpenAI fires, until the
+// sliding window can have rolled (Tier-1 review fix).
+const chatOverQuotaUntilByUid = new Map<string, number>();
+
+function chatQuotaExhausted(uid: string): boolean {
+  const until = chatOverQuotaUntilByUid.get(uid);
+  if (until !== undefined && Date.now() < until) return true;
+  chatOverQuotaUntilByUid.delete(uid);
+  return false;
+}
+
+function markChatOverQuota(uid: string, untilMs: number): void {
+  if (chatOverQuotaUntilByUid.size > 1000) {
+    const now = Date.now();
+    for (const [key, until] of chatOverQuotaUntilByUid) {
+      if (until <= now) chatOverQuotaUntilByUid.delete(key);
+    }
+  }
+  chatOverQuotaUntilByUid.set(uid, untilMs);
+}
+
 /// Sliding-hour quota counted per TURN, not per OpenAI call: follow-up calls
 /// in the same agent loop (same turnId, loopIndex > 0, within the turn
-/// window) do not consume quota but are bounded by MAX_LOOP_INDEX.
+/// window) do not consume quota — and are themselves counted and capped at
+/// MAX_LOOP_INDEX per turn, so the free window cannot be farmed for
+/// unmetered completions (Tier-1 review fix).
 async function enforceRateLimit(
   uid: string,
   turnId: string | undefined,
@@ -290,13 +324,24 @@ async function enforceRateLimit(
     const lastTurnAtMs: number =
       data?.lastTurnAt instanceof Timestamp ? data.lastTurnAt.toMillis() : 0;
 
-    // Free follow-up call inside an already-charged turn.
+    // Free follow-up call inside an already-charged turn — bounded: the
+    // agent loop legitimately makes at most MAX_LOOP_INDEX follow-ups, so
+    // anything beyond that is quota farming, not an agent loop.
     if (
       loopIndex > 0 &&
       turnId !== undefined &&
       turnId === lastTurnId &&
       now - lastTurnAtMs < TURN_WINDOW_MS
     ) {
+      const turnFollowUps: number =
+        typeof data?.turnFollowUps === "number" ? data.turnFollowUps : 0;
+      if (turnFollowUps >= MAX_LOOP_INDEX) {
+        throw new HttpsError(
+          "resource-exhausted",
+          "AI request limit reached. Try again later.",
+        );
+      }
+      tx.set(ref, { turnFollowUps: turnFollowUps + 1 }, { merge: true });
       return;
     }
 
@@ -304,6 +349,7 @@ async function enforceRateLimit(
     const turnFields = {
       lastTurnId: turnId ?? null,
       lastTurnAt: Timestamp.fromMillis(now),
+      turnFollowUps: 0,
     };
 
     if (now - windowStartMs >= RATE_WINDOW_MS) {
@@ -316,6 +362,9 @@ async function enforceRateLimit(
       return;
     }
     if (count >= RATE_LIMIT_PER_HOUR) {
+      // Remember when the window can roll so subsequent requests are
+      // rejected BEFORE the concurrent OpenAI leg fires.
+      markChatOverQuota(uid, windowStartMs + RATE_WINDOW_MS);
       throw new HttpsError(
         "resource-exhausted",
         "AI request limit reached. Try again later.",
@@ -420,10 +469,18 @@ export const aiChat = onCall(
         throw new HttpsError("unavailable", "AI service unreachable. Try again.");
       }
     } else {
+      // Known-over-quota callers are rejected before OpenAI fires at all.
+      if (chatQuotaExhausted(uid)) {
+        throw new HttpsError(
+          "resource-exhausted",
+          "AI request limit reached. Try again later.",
+        );
+      }
       // Interactive path: the quota transaction (~0.5s of Firestore,
       // 2026-08-19 ledgers) runs CONCURRENTLY with the OpenAI call. An
-      // over-quota caller pays for one aborted request — rare by
-      // construction; the latency win lands on every legitimate turn.
+      // over-quota caller pays for at most one aborted request per instance
+      // per window (the marker above short-circuits the rest); the latency
+      // win lands on every legitimate turn.
       const quotaPromise = enforceRateLimit(uid, turnId, loopIndex);
       const fetchPromise = doFetch();
       try {

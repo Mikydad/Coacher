@@ -6,15 +6,16 @@ flows and `presentation/sections/` widgets under a pure-code-motion
 discipline: behavior moves, it does not change. This file records the two
 kinds of exceptions so nobody rediscovers them as mysteries later.
 
-## Latent typo carried over on purpose (open)
+## Latent typo carried over on purpose (fixed 2026-08-08)
 
-- **Accountability picker sheet title renders at `fontSize: 5`.**
+- **Accountability picker sheet title rendered at `fontSize: 5`.**
   `lib/features/add_task/presentation/add_task_accountability_picker_sheet.dart`
   (`Text('Accountability', style: TextStyle(fontSize: 5, ...))`). This came
   verbatim from the original `_showAccountabilityPicker` in
-  `add_task_screen.dart` — almost certainly meant to be ~15, but fixing it
-  mid-refactor would have been a silent visual change, so it was preserved.
-  **TODO:** fix deliberately (one-line change + eyeball the sheet on device).
+  `add_task_screen.dart` — the title rendered smaller than its own 12px
+  subtitle. Preserved through the refactor (pure code motion), then fixed
+  deliberately right after: `fontSize: 5 → 15`. Worth an eyeball on device
+  next time the sheet is open.
 
 ## Declared micro-changes (intentional, reviewed, shipped with the split)
 

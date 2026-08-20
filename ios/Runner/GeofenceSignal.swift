@@ -1,5 +1,6 @@
 import CoreLocation
 import Foundation
+import UIKit
 import UserNotifications
 
 // Home-exit geofence (humanizing Phase 6b, PRD §9 Tier 3).
@@ -28,6 +29,21 @@ class GeofenceSignalBridge: NSObject, CLLocationManagerDelegate {
   private let manager = CLLocationManager()
   private var authCompletions: [(String) -> Void] = []
   private var locationCompletions: [([String: Any]?) -> Void] = []
+
+  // Always-upgrade watch (Tier-1 review fix). The whenInUse→always upgrade
+  // may (a) show a dialog the user reads slowly, (b) resolve silently, or
+  // (c) show nothing at all (the one-time prompt was already consumed) —
+  // and answering "Keep Only While Using" fires NO authorization callback.
+  // A blind short timer both hangs case (c)…and mis-records a slow grant
+  // as declined. Instead: a system alert makes the app resign active, so
+  // we watch for that. Dialog detected → flush on didBecomeActive (the
+  // choice is committed by then). No dialog within 2s → nothing is coming;
+  // flush with the current status.
+  private var alwaysUpgradeRequested = false
+  private var upgradePromptDetected = false
+  private var upgradeNoPromptTimer: DispatchWorkItem?
+  private var upgradeResignObserver: NSObjectProtocol?
+  private var upgradeActiveObserver: NSObjectProtocol?
 
   override private init() {
     super.init()
@@ -73,6 +89,8 @@ class GeofenceSignalBridge: NSObject, CLLocationManagerDelegate {
       manager.requestWhenInUseAuthorization()
     case "whenInUse":
       authCompletions.append(completion)
+      beginUpgradeWatch()
+      alwaysUpgradeRequested = true
       manager.requestAlwaysAuthorization()
     default:
       completion(status)
@@ -96,18 +114,73 @@ class GeofenceSignalBridge: NSObject, CLLocationManagerDelegate {
     guard status != "notDetermined" else { return }
     // Escalate whenInUse → always exactly once per request chain.
     if status == "whenInUse", !authCompletions.isEmpty {
-      manager.requestAlwaysAuthorization()
-      // The upgrade prompt may resolve silently (provisional always) or
-      // not at all; report whenInUse if no further change arrives.
-      DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-        self?.flushAuthCompletions()
+      if alwaysUpgradeRequested {
+        // The upgrade watch owns the flush — a whenInUse re-fire while the
+        // Always dialog may still be pending must not cut it short.
+        return
       }
+      beginUpgradeWatch()
+      alwaysUpgradeRequested = true
+      manager.requestAlwaysAuthorization()
       return
     }
     flushAuthCompletions()
   }
 
+  private func beginUpgradeWatch() {
+    cancelUpgradeWatch()
+    upgradeResignObserver = NotificationCenter.default.addObserver(
+      forName: UIApplication.willResignActiveNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      // A system alert presented — however long the user reads it, do NOT
+      // time out; the answer arrives via the delegate or didBecomeActive.
+      self?.upgradePromptDetected = true
+      self?.upgradeNoPromptTimer?.cancel()
+      self?.upgradeNoPromptTimer = nil
+    }
+    upgradeActiveObserver = NotificationCenter.default.addObserver(
+      forName: UIApplication.didBecomeActiveNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      guard let self, self.upgradePromptDetected else { return }
+      // Dialog dismissed. "Keep Only While Using" fires no authorization
+      // callback, so this is the only signal for that answer. Give a
+      // delegate callback (Always granted) a beat to land first — the
+      // flush reads the committed status either way.
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+        self?.flushAuthCompletions()
+      }
+    }
+    // No system alert within 2s means the one-time upgrade prompt was
+    // already consumed — nothing further will arrive; report what we have.
+    let work = DispatchWorkItem { [weak self] in
+      guard let self, !self.upgradePromptDetected else { return }
+      self.flushAuthCompletions()
+    }
+    upgradeNoPromptTimer = work
+    DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: work)
+  }
+
+  private func cancelUpgradeWatch() {
+    upgradeNoPromptTimer?.cancel()
+    upgradeNoPromptTimer = nil
+    if let observer = upgradeResignObserver {
+      NotificationCenter.default.removeObserver(observer)
+    }
+    if let observer = upgradeActiveObserver {
+      NotificationCenter.default.removeObserver(observer)
+    }
+    upgradeResignObserver = nil
+    upgradeActiveObserver = nil
+    upgradePromptDetected = false
+    alwaysUpgradeRequested = false
+  }
+
   private func flushAuthCompletions() {
+    cancelUpgradeWatch()
     guard !authCompletions.isEmpty else { return }
     let status = authorizationStatus()
     let pending = authCompletions

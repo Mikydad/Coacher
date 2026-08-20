@@ -217,6 +217,8 @@ async function projectionFor(
     covered: data.covered === true,
     nextSlotMs:
       typeof data.nextSlotMs === 'number' ? (data.nextSlotMs as number) : null,
+    lastSlotMs:
+      typeof data.lastSlotMs === 'number' ? (data.lastSlotMs as number) : null,
   };
 }
 

@@ -9,9 +9,12 @@ import '../../analytics/application/feature_builder_recompute_service.dart';
 import '../../analytics/domain/models/analytics_event.dart';
 import '../../coaching/application/coaching_style_providers.dart';
 import '../../context_override/application/context_override_providers.dart';
+import '../../goals/application/goal_reminder_schedule.dart';
+import '../../goals/application/goals_providers.dart';
 import '../domain/models/recent_delivery.dart';
 import '../domain/models/reminder_intent.dart';
 import 'attention_orchestrator_service.dart';
+import 'notification_route_resolver.dart';
 
 // ─── Suppressed intent queue ──────────────────────────────────────────────────
 
@@ -79,5 +82,17 @@ final attentionOrchestratorServiceProvider =
         // Synchronous getter — reads cached Riverpod state without suspending.
         getCoachingStyle: () => ref.read(activeCoachingStyleProvider),
         budget: ref.read(notificationBudgetProvider),
+        // Goal liveness for override-end re-delivery: a goal deleted,
+        // completed, or made passive during the override must stay silent.
+        // Other non-task kinds (stake invites, ≤2h old by construction)
+        // default to live.
+        isEntityLive: (entityId, entityKind) async {
+          if (entityKind != ReminderEntityKinds.goal) return true;
+          final goal = await ref
+              .read(goalsRepositoryProvider)
+              .getGoal(entityId);
+          return goal != null &&
+              goalShouldScheduleDailyReminder(goal, DateTime.now());
+        },
       );
     });

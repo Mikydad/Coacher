@@ -299,6 +299,13 @@ Future<void> handleNotificationResponse(
       return;
     }
     debugPrint('[NotifTap] goal tap goalId=$goalId');
+    // Record engagement so the goal's ledger entry learns opened/ignored —
+    // without this, back-off counters stay blind for goals (review F).
+    unawaited(
+      container
+          .read(attentionOrchestratorServiceProvider)
+          .onInteractionReceived(goalId, NotificationInteractionType.opened),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!_pushNowIfReady(GoalDetailScreen.routeName, arguments: goalId)) {
         _queuePendingIntent(_PendingRouteIntent.goal(goalId));

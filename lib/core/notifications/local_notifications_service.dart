@@ -218,19 +218,23 @@ class LocalNotificationsService
     required String title,
     required String body,
     String? payload,
+
+    /// iOS category (see [NotificationCategoryIds]) — due-now deliveries of
+    /// task/intention reminders keep their action buttons this way.
+    String? darwinCategoryId,
   }) async {
     await _plugin.show(
       id,
       title,
       body,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
+      NotificationDetails(
+        android: const AndroidNotificationDetails(
           'sidepal_events',
           'SidePal Events',
           importance: Importance.max,
           priority: Priority.high,
         ),
-        iOS: DarwinNotificationDetails(),
+        iOS: DarwinNotificationDetails(categoryIdentifier: darwinCategoryId),
       ),
       payload: payload,
     );
