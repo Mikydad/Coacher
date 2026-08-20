@@ -301,6 +301,16 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   VoiceModeController? _voiceController;
   bool _pendingStartVoiceMode = false;
 
+  /// True while Voice Mode presents as the full-screen stage (orb only,
+  /// no transcript). Dragging the sheet down (or the chevron) demotes to
+  /// the compact card — the voice loop keeps running either way.
+  bool _voiceImmersive = false;
+
+  /// Demotion guard: only leave immersive after the sheet actually REACHED
+  /// full — otherwise the snap-to-full animation itself (which passes
+  /// through sub-full extents) would immediately kick us out.
+  bool _voiceReachedFull = false;
+
   @override
   void initState() {
     super.initState();
@@ -486,18 +496,104 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       ),
       sendAndGetReply: (text) => _voiceSendAndGetReply(service, text),
     );
-    setState(() => _voiceController = controller);
+    setState(() {
+      _voiceController = controller;
+      _voiceImmersive = true;
+      _voiceReachedFull = false;
+    });
     controller.start();
-    // The spoken conversation needs the thread visible behind the orb.
-    _growSheetForMessages();
+    // Full-screen stage (ChatGPT-voice style): snap the sheet to full;
+    // dragging down demotes to the compact card via the extent listener.
+    widget.sheetController?.addListener(_onSheetExtentChangedForVoice);
+    // POST-frame: swapping the body detaches the thread's scroll position,
+    // which disposes any in-flight sheet animation (framework behavior) —
+    // the snap must start only after the stage's own scrollable attached.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _snapSheetToFullForVoice();
+    });
+  }
+
+  void _snapSheetToFullForVoice([int attempt = 0]) {
+    if (!_voiceImmersive) return;
+    final sheet = widget.sheetController;
+    if (sheet == null) return; // non-sheet mode: the body itself is full
+    if (!sheet.isAttached) {
+      // The stage's scrollable attaches within a frame or two; bounded
+      // retry so a pathological detach can never become a per-frame loop.
+      if (attempt >= 30) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _snapSheetToFullForVoice(attempt + 1);
+      });
+      return;
+    }
+    sheet.animateTo(
+      _CoachAiSheet.maxSize,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  /// Grabber/list drags leave immersive once the sheet visibly departs
+  /// from full — into the compact card, voice still running.
+  void _onSheetExtentChangedForVoice() {
+    if (!_voiceImmersive || !mounted) return;
+    final sheet = widget.sheetController;
+    if (sheet == null || !sheet.isAttached) return;
+    final size = sheet.size;
+    if (size >= _CoachAiSheet.maxSize - 0.05) {
+      _voiceReachedFull = true;
+      return;
+    }
+    if (_voiceReachedFull && size < _CoachAiSheet.maxSize - 0.12) {
+      _voiceReachedFull = false;
+      setState(() => _voiceImmersive = false);
+    }
+  }
+
+  /// Chevron / swipe-down on the immersive stage: compact card at 60%.
+  void _minimizeVoiceMode() {
+    if (!_voiceImmersive) return;
+    setState(() => _voiceImmersive = false);
+    _voiceReachedFull = false;
+    final sheet = widget.sheetController;
+    if (sheet != null && sheet.isAttached) {
+      sheet.animateTo(
+        _CoachAiSheet.midSize,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  /// Expand icon on the compact card: back to the full-screen stage.
+  void _expandVoiceMode() {
+    if (_voiceController == null || _voiceImmersive) return;
+    setState(() {
+      _voiceImmersive = true;
+      _voiceReachedFull = false;
+    });
+    // Post-frame for the same client-swap reason as _enterVoiceMode.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _snapSheetToFullForVoice();
+    });
   }
 
   Future<void> _exitVoiceMode() async {
     final controller = _voiceController;
     if (controller == null) return;
-    setState(() => _voiceController = null);
+    widget.sheetController?.removeListener(_onSheetExtentChangedForVoice);
+    setState(() {
+      _voiceController = null;
+      _voiceImmersive = false;
+    });
+    _voiceReachedFull = false;
     await controller.stopAndExit();
     controller.dispose();
+  }
+
+  Future<void> _exitVoiceModeToType() async {
+    await _exitVoiceMode();
+    if (mounted) _inputFocusNode.requestFocus();
   }
 
   /// Voice utterances travel the exact same path as typed messages; the
@@ -522,6 +618,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   @override
   void dispose() {
     _listenedService?.removeListener(_onServiceMessagesChanged);
+    widget.sheetController?.removeListener(_onSheetExtentChangedForVoice);
     _voiceController?.dispose();
     _inputController.dispose();
     _inputFocusNode.dispose();
@@ -678,6 +775,22 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   Widget _buildBody(AiAssistantService service) {
     _handlePendingCoachLaunch(service);
 
+    // Full-screen Voice Mode stage: the sheet's full extent shows only the
+    // orb — no thread, no composer. Swipe down / chevron → compact card.
+    final voice = _voiceController;
+    if (voice != null && _voiceImmersive) {
+      return VoiceImmersiveStage(
+        controller: voice,
+        onMinimize: _minimizeVoiceMode,
+        onExit: _exitVoiceMode,
+        onExitToType: _exitVoiceModeToType,
+        // Keeps DraggableScrollableController.isAttached true (it requires
+        // a scrollable with clients) — without this the snap-to-full froze
+        // mid-flight and every sheet call threw "not attached".
+        sheetScrollController: widget.sheetScrollController,
+      );
+    }
+
     // Listen to inputFocusRequested
     if (service.inputFocusRequested) {
       service.clearInputFocusRequest();
@@ -804,6 +917,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                         VoiceModeCard(
                           controller: _voiceController!,
                           onExit: _exitVoiceMode,
+                          onExpand: _expandVoiceMode,
                         )
                       else
                         AiInputCard(

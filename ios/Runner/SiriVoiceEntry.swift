@@ -65,6 +65,10 @@ struct SidePalAppShortcuts: AppShortcutsProvider {
         "Talk to \(.applicationName)",
         "Start a conversation with \(.applicationName)",
         "\(.applicationName) voice mode",
+        // "Open <app>" itself is OS-owned (plain launch, cannot be
+        // intercepted) — these are the closest claimable variants.
+        "Open \(.applicationName) voice",
+        "Open \(.applicationName) voice mode",
       ],
       shortTitle: "Talk to SidePal",
       systemImageName: "waveform"

@@ -1333,3 +1333,19 @@ not silent reversal.
   playback claim. *Still open:* Level 2 (streaming chat + sentence
   pipelining) is the remaining architectural cut; region move stays
   parked (network share ~0.9-1.5s/leg, meaningful but not dominant).
+
+- **2026-08-20 · Voice Mode gets a full-screen immersive stage; still one
+  Coach surface.** Entering Voice Mode snaps the Coach sheet to its full
+  stage and presents orb-only (no transcript, ChatGPT-voice style);
+  swiping down / the chevron demotes to the compact voice card at 60%
+  with the thread visible — the voice loop keeps running across both
+  presentations; X (or the keyboard button) ends Voice Mode back to the
+  typed composer. *Why:* the immersive stage is a PRESENTATION of the
+  sheet's existing full stage, so the one-surface rule (2026-07-16)
+  holds — no new chat screen, same controller, same thread.
+  *Considered:* a dedicated full-screen route (rejected: second Coach
+  surface, breaks the sheet's drag continuity and CoachRouteArgs funnel).
+  Note: Siri's "Open <app>" phrase is OS-owned and cannot launch straight
+  into Voice Mode; the claimable phrases are "Talk to SidePal" /
+  "Open SidePal voice (mode)" — phrase list lives in SiriVoiceEntry.swift
+  and, unlike notification categories, may change freely across updates.
