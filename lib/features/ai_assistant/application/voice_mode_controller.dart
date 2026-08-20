@@ -51,6 +51,16 @@ abstract class VoiceTtsAdapter {
   Future<void> release();
 }
 
+/// Optional Level-2 capability: speak a reply THAT IS STILL BEING WRITTEN.
+/// [deltas] emits raw text chunks as the model generates; the adapter
+/// sentence-splits, sanitizes, synthesizes and plays them pipelined, and
+/// completes when the full reply has been spoken or [VoiceTtsAdapter.stop]
+/// interrupted it. Adapters without this capability are buffered by the
+/// caller (full text → [VoiceTtsAdapter.speak]).
+abstract class VoiceTtsStreamCapable {
+  Future<void> speakStream(Stream<String> deltas);
+}
+
 /// The Voice Mode loop (humanizing Phase 3, PRD §6 L2):
 /// auto-listen → auto-send on end-of-speech → speak the reply
 /// sentence-chunked → auto-relisten. Tap-to-interrupt at any point.
@@ -63,6 +73,7 @@ class VoiceModeController extends ChangeNotifier {
     required this.speech,
     required this.tts,
     required this.sendAndGetReply,
+    this.tryStreamReply,
     this.maxConsecutiveSilentListens = 2,
   });
 
@@ -72,6 +83,12 @@ class VoiceModeController extends ChangeNotifier {
   /// Sends the utterance through the normal Coach path and returns the
   /// assistant's textual reply (never throws; error copy is a reply too).
   final Future<String?> Function(String userText) sendAndGetReply;
+
+  /// Level 2 seam: asked FIRST for each turn. Returning a stream means
+  /// "this turn streams" (conversational, online) and the reply is spoken
+  /// sentence-pipelined as it generates; returning null falls back to
+  /// [sendAndGetReply] (mutate-classified turns, offline, feature off).
+  final Stream<String>? Function(String userText)? tryStreamReply;
 
   /// After this many empty listens in a row the loop pauses to [idle]
   /// instead of re-opening the mic forever.
@@ -224,6 +241,12 @@ class VoiceModeController extends ChangeNotifier {
   Future<void> _sendAndSpeak(String text) async {
     final generation = ++_generation;
     _setPhase(VoiceModePhase.thinking);
+    // Level 2 fast path: stream + speak sentence-pipelined.
+    final replyStream = tryStreamReply?.call(text);
+    if (replyStream != null) {
+      await _streamAndSpeak(replyStream, generation);
+      return;
+    }
     // T0→T1 of the turn's latency ledger; the TTS adapter logs its own
     // T2→T4 leg. Together one spoken turn reads as two [voice-timing]
     // lines (measure, don't estimate — latency batch 2).
@@ -260,6 +283,59 @@ class VoiceModeController extends ChangeNotifier {
       }
     }
     if (_disposed || !_active || generation != _generation) return;
+    await _listen();
+  }
+
+  /// Level 2 turn: deltas flow into the TTS pipeline as they generate.
+  /// Phase flips to speaking on the FIRST delta; stream cancellation on
+  /// interrupt propagates upstream (the transport aborts the HTTP stream).
+  Future<void> _streamAndSpeak(
+    Stream<String> replyStream,
+    int generation,
+  ) async {
+    final t0 = DateTime.now();
+    var sawText = false;
+    final monitored = replyStream.map((delta) {
+      if (!sawText && delta.trim().isNotEmpty) {
+        sawText = true;
+        if (kDebugMode) {
+          debugPrint(
+            '[voice-timing] firstDelta='
+            '${DateTime.now().difference(t0).inMilliseconds}ms',
+          );
+        }
+        if (generation == _generation && _active) {
+          _setPhase(VoiceModePhase.speaking);
+        }
+      }
+      return delta;
+    });
+    final tts0 = tts;
+    try {
+      if (tts0 is VoiceTtsStreamCapable) {
+        await (tts0 as VoiceTtsStreamCapable).speakStream(monitored);
+      } else {
+        final full = StringBuffer();
+        await monitored.forEach(full.write);
+        if (_disposed || !_active || generation != _generation) return;
+        final text = full.toString().trim();
+        if (text.isNotEmpty) await _speak(text, generation);
+        if (text.isNotEmpty) return; // _speak relistens itself
+      }
+    } catch (_) {
+      // Speech failed — the reply text is in the thread regardless.
+    }
+    if (kDebugMode) {
+      debugPrint(
+        '[voice-timing] streamed turn=${DateTime.now().difference(t0).inMilliseconds}ms',
+      );
+    }
+    if (_disposed || !_active || generation != _generation) return;
+    if (!sawText) {
+      _statusMessage = 'No reply — tap to try again.';
+      _setPhase(VoiceModePhase.idle);
+      return;
+    }
     await _listen();
   }
 

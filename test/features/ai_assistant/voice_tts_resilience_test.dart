@@ -1,6 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sidepal/features/ai_assistant/application/voice_mode_controller.dart';
 import 'package:sidepal/features/ai_assistant/application/voice_tts_resilience.dart';
+
+/// Primary whose speak() hangs until [gate] resolves — lets a test interleave
+/// stop() between speak() starting and the primary failing.
+class HangingTts extends ScriptedTts {
+  final Completer<void> gate = Completer<void>();
+
+  @override
+  Future<void> speak(String text) async {
+    await gate.future;
+  }
+}
 
 class ScriptedTts implements VoiceTtsAdapter {
   ScriptedTts({this.failConfigure = false});
@@ -119,5 +132,32 @@ void main() {
     expect(fallback.stopCalls, 1);
     expect(primary.releaseCalls, 1);
     expect(fallback.releaseCalls, 1);
+  });
+
+  test('stop during a failing primary swallows the fallback — no ghost speech',
+      () async {
+    // Tier-1 regression: the primary tends to fail exactly when the user
+    // gives up waiting and taps to interrupt (dead network, hanging head
+    // fetch). The stale reply must NOT then speak via the fallback over
+    // the re-opened mic / after Voice Mode closed.
+    final hangingPrimary = HangingTts();
+    final silentFallback = ScriptedTts();
+    final tts = ResilientVoiceTtsAdapter(
+      primary: hangingPrimary,
+      fallback: silentFallback,
+      now: () => DateTime(2026, 8, 7, 12),
+    );
+    await tts.configure();
+
+    final speaking = tts.speak('stale reply');
+    await tts.stop(); // user interrupts while the primary hangs
+    hangingPrimary.gate.completeError(Exception('head fetch timeout'));
+    await speaking;
+
+    expect(silentFallback.spoken, isEmpty);
+
+    // A fresh turn after the interrupt still degrades normally.
+    await tts.speak('next reply'); // primary is on cooldown after failure
+    expect(silentFallback.spoken, ['next reply']);
   });
 }

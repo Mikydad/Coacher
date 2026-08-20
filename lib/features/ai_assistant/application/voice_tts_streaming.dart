@@ -12,8 +12,9 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
 
-import 'voice_mode_controller.dart' show VoiceTtsAdapter;
-import 'voice_speech_text.dart' show splitIntoSentences;
+import 'voice_mode_controller.dart'
+    show VoiceTtsAdapter, VoiceTtsStreamCapable;
+import 'voice_speech_text.dart' show sanitizeForSpeech, splitIntoSentences;
 
 // OpenAI TTS over the aiSpeechStream endpoint (latency batch 4, 2026-08-19).
 //
@@ -153,7 +154,11 @@ class GrowingBufferAudioSource extends StreamAudioSource {
 
 /// Voice backend that synthesizes the reply as head-sentence + tail clips
 /// through the aiSpeechStream endpoint over one keep-alive connection.
-class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
+/// Level 2 ([speakStream]): sentence-pipelined — each completed sentence
+/// synthesizes while the previous one plays, so speech starts before the
+/// model finishes writing.
+class StreamingOpenAiTtsVoiceAdapter
+    implements VoiceTtsAdapter, VoiceTtsStreamCapable {
   StreamingOpenAiTtsVoiceAdapter({
     required this.endpoint,
     required this.idToken,
@@ -212,10 +217,16 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
     _configured = true;
   }
 
+  /// One id per spoken reply — the server counts quota per turn, not per
+  /// clip (sentence pipelining would exhaust a per-clip pool mid-hour).
+  String _newTurnId() =>
+      'vt${DateTime.now().microsecondsSinceEpoch}_${identityHashCode(this)}';
+
   @override
   Future<void> speak(String text) async {
     final generation = ++_generation;
     final t2 = DateTime.now();
+    final turnId = _newTurnId();
 
     final sentences = splitIntoSentences(text);
     if (sentences.isEmpty) return;
@@ -225,12 +236,13 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
     // Both clips start NOW: the tail synthesizes server-side while the
     // head downloads and plays. Head failure throws (nothing spoken yet,
     // wrapper falls back); tail failure resolves null and is swallowed.
-    final headFuture = _fetchClip(head, connectTimeout);
+    final headFuture = _fetchClip(head, connectTimeout, turnId);
     final Future<Uint8List?>? tailFuture = tail.isEmpty
         ? null
         : _fetchClip(
             tail,
             clipTimeout,
+            turnId,
           ).then<Uint8List?>((b) => b, onError: (_) => null);
 
     final headBytes = await headFuture;
@@ -258,11 +270,141 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
     await _playClip(tailBytes, generation);
   }
 
+  /// Level 2: sentence-pipelined speech over a reply still being written.
+  ///
+  /// Deltas accumulate into sentences (the last fragment flushes on
+  /// stream end); each completed sentence's clip starts fetching while the
+  /// previous one plays — at most two clips in flight. The FIRST clip's
+  /// failure throws (nothing audible yet — the resilient wrapper falls
+  /// back for the whole reply); later failures skip that sentence, since
+  /// the text is on screen regardless.
+  @override
+  Future<void> speakStream(Stream<String> deltas) async {
+    final generation = ++_generation;
+    final turnId = _newTurnId();
+    final t2 = DateTime.now();
+
+    // Incremental splitter → sentence queue.
+    final queue = <String>[];
+    var closed = false;
+    var wake = Completer<void>();
+    void kick() {
+      if (!wake.isCompleted) wake.complete();
+    }
+
+    var carry = '';
+    void addCompleted(String sentence) {
+      final clean = sanitizeForSpeech(sentence).trim();
+      if (clean.isEmpty) return;
+      queue.add(clean);
+      kick();
+    }
+
+    final sub = deltas.listen(
+      (d) {
+        carry += d;
+        final parts = splitIntoSentences(carry);
+        if (parts.length > 1) {
+          for (final s in parts.take(parts.length - 1)) {
+            addCompleted(s);
+          }
+          carry = parts.last;
+        }
+      },
+      onDone: () {
+        if (carry.trim().isNotEmpty) addCompleted(carry);
+        carry = '';
+        closed = true;
+        kick();
+      },
+      onError: (_) {
+        // Speak what we have; the thread shows honest copy separately.
+        if (carry.trim().isNotEmpty) addCompleted(carry);
+        carry = '';
+        closed = true;
+        kick();
+      },
+      cancelOnError: true,
+    );
+
+    Future<String?> nextSentence() async {
+      while (true) {
+        if (generation != _generation) return null;
+        if (queue.isNotEmpty) return queue.removeAt(0);
+        if (closed) return null;
+        wake = Completer<void>();
+        await wake.future;
+      }
+    }
+
+    Future<Uint8List?> fetchSafe(String s, {required bool first}) {
+      final fut = _fetchClip(s, first ? connectTimeout : clipTimeout, turnId);
+      if (first) return fut;
+      return fut.then<Uint8List?>((b) => b, onError: (_) => null);
+    }
+
+    var audibleLogged = false;
+    void logAudibleOnce() {
+      if (!kDebugMode || audibleLogged) return;
+      audibleLogged = true;
+      unawaited(
+        _player.playingStream.firstWhere((playing) => playing).then((_) {
+          debugPrint(
+            '[voice-timing] pipelined audible='
+            '${DateTime.now().difference(t2).inMilliseconds}ms',
+          );
+        }),
+      );
+    }
+
+    try {
+      var sentence = await nextSentence();
+      Future<Uint8List?>? carriedFetch;
+      var first = true;
+      while (sentence != null && generation == _generation) {
+        final thisFetch = carriedFetch ?? fetchSafe(sentence, first: first);
+        carriedFetch = null;
+        // Prefetch the next sentence's clip while this one plays.
+        final nextPairFuture = nextSentence().then<
+            (String, Future<Uint8List?>)?>(
+          (s) => s == null ? null : (s, fetchSafe(s, first: false)),
+        );
+        Uint8List? bytes;
+        try {
+          bytes = await thisFetch;
+        } catch (_) {
+          if (first) rethrow; // wrapper falls back for the whole reply
+          bytes = null;
+        }
+        if (generation != _generation) return;
+        if (bytes != null) {
+          logAudibleOnce();
+          await _playClip(bytes, generation);
+        }
+        first = false;
+        if (generation != _generation) return;
+        final pair = await nextPairFuture;
+        if (pair == null) break;
+        sentence = pair.$1;
+        carriedFetch = pair.$2;
+      }
+    } finally {
+      await sub.cancel();
+      kick();
+    }
+  }
+
   /// POSTs [text] and buffers the complete mp3 clip. The endpoint streams;
   /// we simply read to the end — for a head sentence that is ~1-2s total,
   /// and the response begins flowing before synthesis finishes.
-  Future<Uint8List> _fetchClip(String text, Duration timeout) async {
-    final token = await idToken();
+  Future<Uint8List> _fetchClip(
+    String text,
+    Duration timeout,
+    String turnId,
+  ) async {
+    // Token fetch INSIDE the timeout: an auth refresh hanging on a dead
+    // network must not stall speak() unboundedly (Tier-2 review fix).
+    final token = await idToken().timeout(connectTimeout);
     if (token == null || token.isEmpty) {
       throw StateError('No auth token for speech streaming');
     }
@@ -270,7 +412,7 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
     final request = http.Request('POST', endpoint)
       ..headers['authorization'] = 'Bearer $token'
       ..headers['content-type'] = 'application/json'
-      ..body = jsonEncode({'text': text});
+      ..body = jsonEncode({'text': text, 'turnId': turnId});
 
     final response = await _client.send(request).timeout(connectTimeout);
     if (response.statusCode != 200) {
@@ -320,6 +462,12 @@ class StreamingOpenAiTtsVoiceAdapter implements VoiceTtsAdapter {
     // Wake the speak() latch first so it unwinds promptly.
     final speaking = _speaking;
     if (speaking != null && !speaking.isCompleted) speaking.complete();
+    // Abort in-flight clip downloads: closing the client kills the sockets,
+    // which is the disconnect signal the server watches to abort upstream
+    // OpenAI — an interrupted reply must stop billing (Tier-2 review fix).
+    // The keep-alive client is recreated lazily on the next clip.
+    _http?.close();
+    _http = null;
     try {
       await _player.stop();
     } catch (_) {}

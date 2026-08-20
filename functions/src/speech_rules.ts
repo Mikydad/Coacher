@@ -4,15 +4,22 @@
 // Pure logic, no IO — unit-tested in speech_rules.test.ts. The callable
 // shell (speech.ts) maps failures onto HttpsError codes.
 
-/// One Coach reply is ≤800 tokens (~3k chars) BEFORE speech sanitization
-/// strips markdown and [mem:…] markers, so a healthy client never comes
-/// near this. It exists to bound abuse cost, not to trim real replies.
+/// Per-CLIP cap. Since sentence-pipelined speech (voice Level 2) a clip is
+/// one sentence — far below this. It exists to bound abuse cost, not to
+/// trim real replies.
 export const SPEECH_MAX_CHARS = 2000;
 
-/// One synthesis call per Coach reply; a dense hour of conversation is
-/// ~40 replies (the chat quota), so 90 leaves comfortable headroom while
-/// still bounding a runaway client.
+/// Quota counts spoken TURNS, not clips: sentence pipelining synthesizes
+/// one clip per sentence, so per-clip counting would exhaust a real
+/// conversation mid-hour. Clips within one turn share a `turnId` and are
+/// bounded by [SPEECH_MAX_CLIPS_PER_TURN]. A dense hour is ~40 replies
+/// (the chat quota), so 90 turns leaves comfortable headroom while still
+/// bounding a runaway client.
 export const SPEECH_RATE_LIMIT_PER_HOUR = 90;
+
+/// Clip ladder bound per spoken reply — a ≤500-token voice reply splits
+/// into well under this many sentences.
+export const SPEECH_MAX_CLIPS_PER_TURN = 16;
 
 export const SPEECH_MODEL = "gpt-4o-mini-tts";
 export const SPEECH_DEFAULT_VOICE = "coral";

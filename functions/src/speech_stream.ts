@@ -13,6 +13,7 @@ import {
   enforceSpeechRateLimit,
   recordSpeechUsage,
   speechConfig,
+  speechQuotaExhaustedUntil,
 } from "./speech_shared";
 
 // Streaming TTS proxy for Voice Mode (latency batch 2, 2026-08-08).
@@ -89,6 +90,14 @@ export const aiSpeechStream = onRequest(
     }
     const tConfig = Date.now();
 
+    // Known-over-quota callers are rejected BEFORE the OpenAI leg fires:
+    // the concurrent-quota optimization below must not turn repeated 429s
+    // into unbounded upstream spend (Tier-1 review fix).
+    if (speechQuotaExhaustedUntil(uid) !== undefined) {
+      res.status(429).json({ error: "Speech request limit reached." });
+      return;
+    }
+
     // Tap-to-interrupt closes the client connection; abort the upstream
     // OpenAI request instead of synthesizing to the end for nobody.
     const upstreamAbort = new AbortController();
@@ -96,10 +105,14 @@ export const aiSpeechStream = onRequest(
 
     // The quota transaction (~0.5s of Firestore, 2026-08-19 ledgers) runs
     // CONCURRENTLY with the OpenAI connect instead of in front of it. An
-    // over-quota caller pays OpenAI for one aborted synthesis — that only
-    // happens at the 91st request of the hour, and latency is paid by
-    // every legitimate turn.
-    const quotaPromise = enforceSpeechRateLimit(uid);
+    // over-quota caller pays OpenAI for at most one aborted synthesis per
+    // instance per window (the marker above short-circuits the rest), and
+    // latency is paid by every legitimate turn.
+    const turnId =
+      typeof req.body?.turnId === "string"
+        ? String(req.body.turnId).slice(0, 64)
+        : undefined;
+    const quotaPromise = enforceSpeechRateLimit(uid, turnId);
     const fetchPromise = fetch(OPENAI_SPEECH_URL, {
       method: "POST",
       headers: {
