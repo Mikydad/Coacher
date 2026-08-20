@@ -32,6 +32,7 @@ import '../../../app/presentation/main_tab_bar_inset.dart';
 import '../application/proactive_suggestion_display.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/sync/sync_service.dart';
 
 /// Optional route arguments for pre-filling the input (e.g. from a proactive
 /// suggestion card on Home — see Phase 4).
@@ -502,6 +503,9 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       _voiceReachedFull = false;
     });
     controller.start();
+    // Background sync stays off the network while voice is live — pulls
+    // and outbox storms were competing with voice turns for bandwidth.
+    SyncService.instance.voiceModeActive = true;
     // Full-screen stage (ChatGPT-voice style): snap the sheet to full;
     // dragging down demotes to the compact card via the extent listener.
     widget.sheetController?.addListener(_onSheetExtentChangedForVoice);
@@ -582,6 +586,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     final controller = _voiceController;
     if (controller == null) return;
     widget.sheetController?.removeListener(_onSheetExtentChangedForVoice);
+    SyncService.instance.voiceModeActive = false;
     setState(() {
       _voiceController = null;
       _voiceImmersive = false;
@@ -619,6 +624,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   void dispose() {
     _listenedService?.removeListener(_onServiceMessagesChanged);
     widget.sheetController?.removeListener(_onSheetExtentChangedForVoice);
+    SyncService.instance.voiceModeActive = false;
     _voiceController?.dispose();
     _inputController.dispose();
     _inputFocusNode.dispose();
