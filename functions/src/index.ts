@@ -1,11 +1,13 @@
-import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, Timestamp, FieldValue } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
 import { getRemoteConfig, ServerTemplate } from "firebase-admin/remote-config";
 
 import { parseRouteOverrides, resolveRoute, utcDayKey } from "./ai_routing";
 import { openAiApiKey } from "./secrets";
+import { bearerTokenFrom } from "./speech_rules";
 
 initializeApp();
 
@@ -562,5 +564,173 @@ export const aiChat = onCall(
     });
     await recordPurposeUsage(uid, purpose, totalTokens);
     return { content, toolCalls };
+  },
+);
+
+// ─── aiChatStream (voice Level 2) ────────────────────────────────────────────
+// Streaming twin of aiChat for CONVERSATIONAL voice turns only: no tools,
+// purpose pinned to coach_agent_voice, text deltas as NDJSON lines
+// {"d":"..."} followed by {"done":true}. Mutate-classified turns keep the
+// full agent pipeline through the aiChat callable. onRequest because
+// callables cannot stream; auth/quota mirror aiSpeechStream/aiChat.
+export const aiChatStream = onRequest(
+  {
+    secrets: [openAiApiKey],
+    region: "us-central1",
+    timeoutSeconds: 120,
+    memory: "256MiB",
+    maxInstances: 10,
+    minInstances: 0,
+  },
+  async (req, res) => {
+    const tStart = Date.now();
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "POST only." });
+      return;
+    }
+    const token = bearerTokenFrom(req.headers.authorization);
+    if (!token) {
+      res.status(401).json({ error: "Missing bearer token." });
+      return;
+    }
+    let uid: string;
+    try {
+      const decoded = await getAuth().verifyIdToken(token);
+      // Anonymous uids are free to mint — same spend stance as aiChat.
+      if (decoded.firebase?.sign_in_provider === "anonymous") {
+        res.status(403).json({ error: "Sign in with an account to use Coach AI." });
+        return;
+      }
+      uid = decoded.uid;
+    } catch {
+      res.status(401).json({ error: "Invalid token." });
+      return;
+    }
+
+    let messages: ChatMessage[];
+    try {
+      messages = validateMessages(req.body?.messages);
+    } catch (error) {
+      res.status(400).json({
+        error: error instanceof HttpsError ? error.message : "Invalid messages.",
+      });
+      return;
+    }
+
+    const purpose = "coach_agent_voice";
+    const { routesJson } = await aiServerConfig();
+    const route = resolveRoute(purpose, parseRouteOverrides(routesJson));
+    if (!route.enabled) {
+      res.status(503).json({ error: "Purpose disabled." });
+      return;
+    }
+    const tConfig = Date.now();
+
+    // Known-over-quota callers never reach OpenAI (same marker as aiChat).
+    if (chatQuotaExhausted(uid)) {
+      res.status(429).json({ error: "AI request limit reached." });
+      return;
+    }
+
+    const upstreamAbort = new AbortController();
+    res.on("close", () => upstreamAbort.abort());
+
+    // Quota transaction concurrent with the OpenAI connect (aiChat pattern;
+    // the marker above bounds over-quota spend per instance per window).
+    const quotaPromise = enforceRateLimit(uid, undefined, 0);
+    const fetchPromise = fetch(OPENAI_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${openAiApiKey.value()}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: route.model,
+        messages,
+        max_tokens: route.maxTokens,
+        temperature: route.temperature ?? 0.6,
+        stream: true,
+      }),
+      signal: upstreamAbort.signal,
+    });
+
+    try {
+      await quotaPromise;
+    } catch (error) {
+      upstreamAbort.abort();
+      fetchPromise.catch(() => {});
+      if (error instanceof HttpsError && error.code === "resource-exhausted") {
+        res.status(429).json({ error: "AI request limit reached." });
+        return;
+      }
+      logger.error("aiChatStream quota check failed", { uid, error: `${error}` });
+      res.status(500).json({ error: "Quota check failed." });
+      return;
+    }
+    const tQuota = Date.now();
+
+    let response: Response;
+    try {
+      response = await fetchPromise;
+    } catch (error) {
+      logger.error("aiChatStream OpenAI request failed", { uid, error: `${error}` });
+      res.status(502).json({ error: "AI service unreachable." });
+      return;
+    }
+    if (response.status !== 200 || response.body == null) {
+      const body = await response.text().catch(() => "");
+      logger.error("aiChatStream OpenAI non-200", {
+        uid, status: response.status, body: body.slice(0, 300),
+      });
+      res.status(response.status === 429 ? 429 : 502).json({ error: "AI service error." });
+      return;
+    }
+
+    logger.info("aiChatStream stages", {
+      uid,
+      configMs: tConfig - tStart,
+      quotaMs: tQuota - tConfig,
+      openaiHeadersMs: Date.now() - tConfig,
+      totalToFirstPipeMs: Date.now() - tStart,
+    });
+
+    res.status(200);
+    res.setHeader("Content-Type", "application/x-ndjson");
+    res.setHeader("Cache-Control", "no-store");
+
+    // Parse OpenAI SSE → NDJSON delta lines. Chars counted for telemetry.
+    let sseCarry = "";
+    let chars = 0;
+    try {
+      for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
+        sseCarry += Buffer.from(chunk).toString("utf8");
+        const lines = sseCarry.split("\n");
+        sseCarry = lines.pop() ?? "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+          const payload = trimmed.slice(5).trim();
+          if (payload === "[DONE]") continue;
+          try {
+            const parsed = JSON.parse(payload);
+            const delta: unknown = parsed?.choices?.[0]?.delta?.content;
+            if (typeof delta === "string" && delta.length > 0) {
+              chars += delta.length;
+              res.write(`${JSON.stringify({ d: delta })}\n`);
+            }
+          } catch {
+            // Partial/keep-alive SSE line — skip.
+          }
+        }
+      }
+      res.write(`${JSON.stringify({ done: true })}\n`);
+    } catch (error) {
+      // Client hung up or upstream died mid-stream: nothing useful to send.
+      logger.warn("aiChatStream pipe ended early", { uid, error: `${error}` });
+    } finally {
+      res.end();
+    }
+    logger.info("aiChatStream ok", { uid, chars, totalMs: Date.now() - tStart });
+    await recordPurposeUsage(uid, purpose, -1);
   },
 );

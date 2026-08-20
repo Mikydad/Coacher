@@ -90,7 +90,17 @@ class SyncService {
   /// Concurrent callers await the same in-flight pull when one is running.
   ///
   /// Returns `true` when a remote pull finished successfully (not debounced/skipped).
+  /// While Voice Mode is live, background sync stays off the network:
+  /// device logs showed remote pulls + outbox storms competing with voice
+  /// requests for bandwidth mid-turn (voice Level 2 slice). Deferred work
+  /// resumes on the next trigger after voice mode ends.
+  bool voiceModeActive = false;
+
   Future<bool> syncFromRemote({bool force = false}) async {
+    if (voiceModeActive && !force) {
+      debugPrint('syncFromRemote: voice mode active, deferring');
+      return false;
+    }
     // No authenticated user → there is no user-scoped data to pull, and any
     // Firestore query would fail with permission-denied. Skip silently.
     final uid = _currentUid();
@@ -255,6 +265,10 @@ class SyncService {
   }
 
   Future<void> processQueue() async {
+    if (voiceModeActive) {
+      debugPrint('processQueue: voice mode active, deferring');
+      return;
+    }
     if (_isSyncing || _queue.isEmpty) return;
     final currentUid = _currentUid();
     if (currentUid == null && Firebase.apps.isNotEmpty) {
