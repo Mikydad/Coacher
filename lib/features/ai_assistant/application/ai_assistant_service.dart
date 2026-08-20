@@ -5,17 +5,24 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/utils/stable_id.dart';
+import '../../education/domain/feature_guides.dart';
 import '../../intentions/application/intention_capture.dart';
 import '../../memory/application/memory_extraction_service.dart';
 import '../data/ai_interaction_history_repository.dart';
 import '../domain/models/ai_action.dart';
 import '../domain/models/ai_chat_message.dart';
+import '../domain/models/ai_intent_kind.dart';
 import '../domain/models/ai_planned_changes.dart';
+import '../domain/models/ai_response_type.dart';
 import 'ai_action_executor.dart';
+import 'ai_action_param_normaliser.dart' show looksPlanShapedProse;
+import 'ai_capability_registry.dart';
 import 'ai_informational_output_guard.dart';
 import 'ai_intent_parser.dart';
+import 'ai_intent_router.dart';
 import 'proactive_chat_conversion_tracker.dart';
 import 'entity_normaliser.dart';
+import 'voice_reply_stream.dart';
 
 /// Signature for fire-and-forget analytics logging from the service layer.
 typedef AiAnalyticsLogger =
@@ -36,6 +43,7 @@ class AiAssistantService extends ChangeNotifier {
     EntityNormaliser? normaliser,
     AiScheduleCacheInvalidator? onScheduleMutated,
     MemoryExtractionService? memoryExtraction,
+    VoiceReplyStreamer? voiceReplyStreamer,
   }) : _intentParser = intentParser,
        _actionExecutor = actionExecutor,
        _historyRepository = historyRepository,
@@ -43,6 +51,7 @@ class AiAssistantService extends ChangeNotifier {
        _normaliser = normaliser ?? const EntityNormaliser(),
        _onScheduleMutated = onScheduleMutated,
        _memoryExtraction = memoryExtraction,
+       _voiceReplyStreamer = voiceReplyStreamer,
        _sessionId = StableId.generate('session');
 
   final AiIntentParser _intentParser;
@@ -55,6 +64,7 @@ class AiAssistantService extends ChangeNotifier {
   final AiAnalyticsLogger? _analyticsLogger;
   final EntityNormaliser _normaliser;
   final AiScheduleCacheInvalidator? _onScheduleMutated;
+  final VoiceReplyStreamer? _voiceReplyStreamer;
 
   String _sessionId;
   final List<AiChatMessage> _messages = [];
@@ -166,6 +176,17 @@ class AiAssistantService extends ChangeNotifier {
       ),
     );
 
+    await _parseAndRespond(userInput.trim(), voiceMode: voiceMode);
+  }
+
+  /// Steps 2–7 of a turn: loading bubble → parse → render result → persist
+  /// history → analytics. Assumes the user message is already in the thread —
+  /// [sendMessage] appends it; the streamed-voice fallback path arrives here
+  /// with it already appended by [tryStreamVoiceReply].
+  Future<void> _parseAndRespond(
+    String userInput, {
+    required bool voiceMode,
+  }) async {
     // 2. Append loading message (thinking…)
     final loadingId = StableId.generate('msg');
     _addMessage(
@@ -288,6 +309,16 @@ class AiAssistantService extends ChangeNotifier {
         ),
       );
       _pendingPlan = null;
+      // A plan that arrived as PROSE (a degraded turn the client repair
+      // rounds could not fix) must stay refinable: park it so the next
+      // "confirm"/"perfect" refines THIS plan instead of re-parsing bare
+      // (deep check 2026-08-20 — the bare re-parse restarted the
+      // "What time should I schedule it?" loop).
+      if (result.isInformational && looksPlanShapedProse(message)) {
+        _pendingClarification = result.copyWith(
+          responseType: AiResponseType.suggest,
+        );
+      }
       if (result.isInformational) {
         _logEvent('aiInformationalAnswer', {
           'sessionId': _sessionId,
@@ -316,8 +347,11 @@ class AiAssistantService extends ChangeNotifier {
       );
       _pendingPlan = null;
       // A free-text reply to a suggestion ("make it 30 minutes", "move it to
-      // 9am") must refine THIS plan, not start from scratch.
-      _pendingClarification = result.actions.isNotEmpty ? result : null;
+      // 9am") must refine THIS plan, not start from scratch. Kept even with
+      // NO actions: a narrative-only suggestion still needs "confirm"/
+      // "perfect" to refine it rather than re-parse bare — the bare re-parse
+      // was one leg of the clarify loop (deep check 2026-08-20).
+      _pendingClarification = result;
       _logEvent('aiSuggestPlanShown', {
         'sessionId': _sessionId,
         'actionCount': result.actions.length,
@@ -378,6 +412,191 @@ class AiAssistantService extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  // ─── Streamed voice turns (voice Level 2) ─────────────────────────────────
+
+  /// Weekday/relative-day references the streamed endpoint cannot answer:
+  /// context carries today, tomorrow, and week COUNTS — day detail beyond
+  /// that needs the get_day_schedule tool, which only the agent path has.
+  static final _otherDayPattern = RegExp(
+    r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|'
+    r'yesterday|next month|last week)\b',
+  );
+
+  /// Voice Level 2 routing — the [VoiceModeController.tryStreamReply] seam.
+  ///
+  /// Returns a delta stream ONLY for conversational turns the no-tools
+  /// aiChatStream endpoint can serve honestly: query-classified, no plan or
+  /// clarification pending (short answers must refine those), none of the
+  /// canned fast paths (capability/unsupported answer instantly; education
+  /// needs guide grounding), no other-day reference. Everything else — and
+  /// guests, whom the endpoint rejects — returns null so the full agent
+  /// pipeline handles the turn.
+  ///
+  /// The streamed turn owns its thread bubbles: user message + a live
+  /// assistant bubble that grows with each delta and finalizes into history.
+  /// A failure before the first delta falls back internally to the normal
+  /// parse path and emits that reply as a single chunk — the voice loop
+  /// always gets something to speak (including honest offline copy).
+  Stream<String>? tryStreamVoiceReply(String userInput) {
+    final streamer = _voiceReplyStreamer;
+    final text = userInput.trim();
+    if (streamer == null || text.isEmpty) return null;
+    if (_pendingPlan != null || _pendingClarification != null) return null;
+    final currentUser = Firebase.apps.isEmpty
+        ? null
+        : FirebaseAuth.instance.currentUser;
+    if (currentUser != null && currentUser.isAnonymous) return null;
+    if (AiCapabilityRegistry.isCapabilityQuestion(text)) return null;
+    if (FeatureGuides.isEducationQuestion(text)) return null;
+    if (AiCapabilityRegistry.detectUnsupported(text) != null) return null;
+    final route = AiIntentRouter.classify(text);
+    if (route.kind != AiIntentKind.query) return null;
+    if (_otherDayPattern.hasMatch(text.toLowerCase())) return null;
+    return _runStreamedVoiceTurn(text, route);
+  }
+
+  Stream<String> _runStreamedVoiceTurn(String text, AiIntentRoute route) {
+    unawaited(_memoryExtraction?.noteSessionActivity(_sessionId));
+    _addMessage(
+      AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.user,
+        content: text,
+        timestamp: DateTime.now(),
+      ),
+    );
+    final bubbleId = StableId.generate('msg');
+    _addMessage(
+      AiChatMessage(
+        id: bubbleId,
+        role: ChatRole.assistant,
+        content: '',
+        timestamp: DateTime.now(),
+        isLoading: true,
+      ),
+    );
+    _setLoading(true);
+    _demoteCurrentPlan();
+    _logEvent('aiCommandSubmitted', {
+      'sessionId': _sessionId,
+      'inputLength': text.length,
+    });
+
+    final buffer = StringBuffer();
+    var settled = false;
+    // The source's done/cancel events must not close [out] while the agent
+    // fallback still owes it the reply — the error arrives first, the
+    // source's trailing done right behind it.
+    var fallingBack = false;
+    StreamSubscription<String>? sub;
+    late final StreamController<String> out;
+
+    // Finalize the live bubble with whatever arrived (full reply, or the
+    // partial text on interrupt/mid-stream error — the partial IS what was
+    // spoken, so the thread stays honest about it).
+    void settle() {
+      if (settled) return;
+      settled = true;
+      final full = buffer.toString().trim();
+      if (full.isEmpty) {
+        _removeMessage(bubbleId);
+      } else {
+        final message = AiInformationalOutputGuard.sanitize(full);
+        _replaceLoadingMessage(bubbleId, message);
+        unawaited(
+          _historyRepository.save(
+            sessionId: _sessionId,
+            userInput: text,
+            parsedActions: const [],
+            assistantSummary: message,
+            responseType: AiResponseType.informational.name,
+          ),
+        );
+        _logEvent('aiInformationalAnswer', {
+          'sessionId': _sessionId,
+          'responseType': AiResponseType.informational.name,
+        });
+      }
+      _setLoading(false);
+    }
+
+    // Nothing arrived (offline, auth, server error): the agent path is the
+    // safety net — it renders its own bubbles and produces honest error copy
+    // as a reply, which we hand to the voice loop as one chunk.
+    Future<void> fallBackToAgentPath() async {
+      settled = true;
+      fallingBack = true;
+      _removeMessage(bubbleId);
+      _setLoading(false);
+      try {
+        await _parseAndRespond(text, voiceMode: true);
+      } catch (_) {}
+      final reply = latestSpokenReplyText();
+      if (!out.isClosed) {
+        if (reply != null && reply.isNotEmpty) out.add(reply);
+        await out.close();
+      }
+    }
+
+    out = StreamController<String>(
+      onListen: () {
+        sub = _voiceReplyStreamer!(
+          text,
+          _sessionId,
+          route: route,
+          proactiveContext: _proactiveContextForPayload,
+        ).listen(
+          (delta) {
+            buffer.write(delta);
+            _replaceLoadingMessage(bubbleId, buffer.toString());
+            notifyListeners();
+            if (!out.isClosed) out.add(delta);
+          },
+          onError: (Object e) {
+            if (buffer.isEmpty && !settled) {
+              unawaited(fallBackToAgentPath());
+              return;
+            }
+            settle();
+            if (!out.isClosed) {
+              out.addError(e);
+              unawaited(out.close());
+            }
+          },
+          onDone: () {
+            if (fallingBack) return;
+            settle();
+            if (!out.isClosed) unawaited(out.close());
+          },
+        );
+      },
+      onCancel: () {
+        // Interrupt: the voice pipeline dropped the stream — abort the HTTP
+        // request upstream and keep the partial text as the reply.
+        final s = sub;
+        sub = null;
+        if (s != null) unawaited(s.cancel());
+        settle();
+      },
+    );
+    return out.stream;
+  }
+
+  /// The text a voice turn should speak for the latest assistant bubble —
+  /// plan-bearing messages get the on-screen redirect line. Used by the
+  /// streamed turn's fallback and by the Voice Mode buffered path.
+  String? latestSpokenReplyText() {
+    for (final message in _messages.reversed) {
+      if (message.role != ChatRole.assistant || message.isLoading) continue;
+      if (message.content.trim().isNotEmpty) return message.content;
+      if (message.plannedChanges != null || message.draftPlan != null) {
+        return 'I put a plan together — take a look and confirm on screen.';
+      }
+      return null;
+    }
+    return null;
   }
 
   /// Executes createIntention actions immediately (no preview card) and

@@ -225,4 +225,70 @@ void main() {
     await pumpEventQueue();
     expect(sentMessages, isEmpty);
   });
+
+  group('listen stall watchdog (Siri dead-session entry)', () {
+    VoiceModeController buildWithWatchdog({int maxRestarts = 1}) {
+      speech = FakeSpeechAdapter();
+      tts = FakeTtsAdapter();
+      sentMessages = [];
+      return VoiceModeController(
+        speech: speech,
+        tts: tts,
+        sendAndGetReply: (text) async {
+          sentMessages.add(text);
+          return 'ok';
+        },
+        listenStallTimeout: const Duration(milliseconds: 30),
+        maxListenStallRestarts: maxRestarts,
+      );
+    }
+
+    test('dead listen (no callbacks at all) restarts the mic, then gives up '
+        'to idle with honest copy', () async {
+      final controller = buildWithWatchdog(maxRestarts: 1);
+      await controller.start();
+      expect(speech.listenCalls, 1);
+
+      // First stall: recovery stops the dead session and re-listens; the
+      // stop-triggered 'done' from the plugin must NOT finalize an empty
+      // utterance on top of that (no double listen).
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(speech.stopCalls, 1);
+      expect(speech.listenCalls, 2);
+      expect(controller.phase, VoiceModePhase.listening);
+
+      // Second stall exceeds maxRestarts → honest idle, mic torn down.
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(speech.listenCalls, 2);
+      expect(controller.phase, VoiceModePhase.idle);
+      expect(controller.statusMessage, contains('stalled'));
+    });
+
+    test('a result disarms the watchdog — healthy sessions never restart',
+        () async {
+      final controller = buildWithWatchdog();
+      await controller.start();
+      speech.emitPartial('hello');
+
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(speech.listenCalls, 1);
+      expect(speech.stopCalls, 0);
+      expect(controller.phase, VoiceModePhase.listening);
+    });
+
+    test('start listenDelay defers the first mic open (Siri session grace)',
+        () async {
+      final controller = buildWithWatchdog();
+      final started = controller.start(
+        listenDelay: const Duration(milliseconds: 80),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(speech.listenCalls, 0);
+      expect(controller.phase, VoiceModePhase.idle);
+
+      await started;
+      expect(speech.listenCalls, 1);
+      expect(controller.phase, VoiceModePhase.listening);
+    });
+  });
 }

@@ -5,6 +5,7 @@ import '../domain/models/ai_intent_kind.dart';
 import '../domain/models/ai_planned_changes.dart';
 import '../domain/models/ai_operating_layer_payload.dart';
 import '../domain/models/ai_response_type.dart';
+import 'ai_action_param_normaliser.dart';
 import 'ai_assumption_engine.dart';
 import 'ai_capability_registry.dart';
 import 'ai_chat_suggestion_enricher.dart';
@@ -81,6 +82,44 @@ class AiIntentParser {
     }
 
     final route = AiIntentRouter.classify(userInput);
+
+    // Deterministic clarify escape (clarify-loop fix 2026-08-20): when the
+    // previous turn asked for a specific missing field, read the answer
+    // straight out of the reply and complete the pending plan locally —
+    // no model round-trip, no chance to re-ask a question the user just
+    // answered ("What time should I schedule it?" → "2 pm" → same question
+    // forever was the failure mode).
+    if (previousPlan != null &&
+        previousPlan.requiresFollowUp &&
+        previousPlan.actions.isNotEmpty) {
+      final merged = _overlayClarificationAnswers(
+        previousPlan.actions,
+        userInput,
+        previousPlan.followUpQuestion,
+      );
+      if (!identical(merged, previousPlan.actions) &&
+          AiMissingFieldDetector.checkAll(merged).isComplete) {
+        final enriched = await _enrichWithAssumptions(merged);
+        final conflicts = <String>[];
+        final blocked = <String>[];
+        if (conflictDetector != null) {
+          try {
+            final detected = await conflictDetector!.detect(enriched);
+            conflicts.addAll(detected.softConflicts);
+            blocked.addAll(detected.hardBlocks);
+          } catch (_) {
+            // Best-effort, same stance as the model path.
+          }
+        }
+        return AiPlannedChanges(
+          sessionId: sessionId,
+          responseType: AiResponseType.mutate,
+          actions: enriched,
+          conflicts: conflicts,
+          blockedByContext: blocked,
+        );
+      }
+    }
 
     // Human-readable context for the model about the turn we're refining.
     // Must include the follow-up QUESTION (so a short answer like "9am" or
@@ -203,6 +242,21 @@ class AiIntentParser {
 
     // If the AI already asked a follow-up, propagate it
     if (result.requiresFollowUp) return result;
+
+    // The model may STILL have dropped a field the user just answered
+    // (answering a follow-up) — overlay the extracted answer before
+    // interrogating again, or the identical question loops.
+    if (previousPlan != null &&
+        previousPlan.requiresFollowUp &&
+        result.actions.isNotEmpty) {
+      result = result.copyWith(
+        actions: _overlayClarificationAnswers(
+          result.actions,
+          userInput,
+          previousPlan.followUpQuestion,
+        ),
+      );
+    }
 
     // Step 4 — Missing field check + Assumption Engine
     var enrichedActions = await _enrichWithAssumptions(result.actions);
@@ -338,6 +392,99 @@ class AiIntentParser {
   }
 
   // ─── Private helpers ──────────────────────────────────────────────────────
+
+  /// Short affirmations/rejections are never field ANSWERS — "perfect" must
+  /// not become a task title.
+  static final _nonAnswerReply = RegExp(
+    r'^(yes|yeah|yep|ok(ay)?|sure|confirm|perfect|great|good|no|nope|'
+    r'cancel|stop)\b',
+    caseSensitive: false,
+  );
+
+  /// Fills missing required fields on [actions] from the user's free-text
+  /// reply — the deterministic half of clarification handling. Returns the
+  /// SAME list instance when nothing was extracted (callers use identical()
+  /// as the no-op signal). Title-ish fields fill only when [followUpQuestion]
+  /// is literally that field's question: the user was asked for a name, so
+  /// their reply IS the name.
+  List<AiAction> _overlayClarificationAnswers(
+    List<AiAction> actions,
+    String userInput,
+    String? followUpQuestion,
+  ) {
+    final askedForDurationInMinutes =
+        followUpQuestion?.contains('in minutes') ?? false;
+    var changed = false;
+    final result = <AiAction>[];
+    for (final action in actions) {
+      final check = AiMissingFieldDetector.check(action);
+      if (check.isComplete) {
+        result.add(action);
+        continue;
+      }
+      final params = Map<String, dynamic>.from(action.parameters);
+      var actionChanged = false;
+      for (final field in check.missingFields) {
+        final answer = _extractFieldAnswer(
+          field,
+          userInput,
+          bareNumberIsMinutes: askedForDurationInMinutes,
+          // The pending question was THIS field's own question — only then
+          // may free text be taken verbatim as a title.
+          allowVerbatimTitle:
+              followUpQuestion != null &&
+              followUpQuestion == check.questionToAsk &&
+              field == check.missingFields.first,
+        );
+        if (answer != null) {
+          params[field] = answer;
+          actionChanged = true;
+        }
+      }
+      if (actionChanged) {
+        changed = true;
+        result.add(action.copyWith(parameters: params));
+      } else {
+        result.add(action);
+      }
+    }
+    return changed ? result : actions;
+  }
+
+  Object? _extractFieldAnswer(
+    String field,
+    String userInput, {
+    required bool bareNumberIsMinutes,
+    required bool allowVerbatimTitle,
+  }) {
+    switch (field) {
+      case 'time':
+      case 'reminderTime':
+        return AiActionParamNormaliser.extractTimeAnswer(userInput);
+      case 'duration':
+        return AiActionParamNormaliser.extractDurationAnswer(
+          userInput,
+          bareNumberIsMinutes: bareNumberIsMinutes,
+        );
+      case 'date':
+      case 'destinationDate':
+      case 'deadline':
+        return AiActionParamNormaliser.extractDateAnswer(userInput);
+      case 'title':
+      case 'taskTitle':
+      case 'goalTitle':
+        if (!allowVerbatimTitle) return null;
+        final text = userInput.trim();
+        if (text.isEmpty || text.split(RegExp(r'\s+')).length > 6) return null;
+        if (_nonAnswerReply.hasMatch(text)) return null;
+        if (AiActionParamNormaliser.extractTimeAnswer(text) != null) {
+          return null; // a time reply is not a name
+        }
+        return text;
+      default:
+        return null;
+    }
+  }
 
   /// For each action that is still incomplete after the first missing-field
   /// check, runs the Assumption Engine and merges any confident suggestions.

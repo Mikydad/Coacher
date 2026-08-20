@@ -1349,3 +1349,81 @@ not silent reversal.
   into Voice Mode; the claimable phrases are "Talk to SidePal" /
   "Open SidePal voice (mode)" — phrase list lives in SiriVoiceEntry.swift
   and, unlike notification categories, may change freely across updates.
+
+- **2026-08-20 · Voice Level 2 shipped: conversational turns stream
+  (aiChatStream) and speak sentence-pipelined; everything else keeps the
+  agent path.** Routing lives in `AiAssistantService.tryStreamVoiceReply`
+  (the controller's `tryStreamReply` seam, flag `_kStreamingChat` beside
+  `_kStreamingTts`): a voice turn streams ONLY when query-classified with
+  no pending plan/clarification, no capability/education/unsupported
+  fast-path match, no other-day reference (weekday names etc. — the
+  stream endpoint has no `get_day_schedule`), and the user isn't a guest.
+  The streamed system prompt swaps the tool-preserving voice addendum for
+  an ANSWER-ONLY one so a misroute degrades honestly ("say it again as a
+  direct request") instead of describing plans nothing will apply.
+  The streamed turn owns a live thread bubble (deltas grow it; final text
+  is sanitized and saved to interaction history as informational, so
+  multi-turn context includes spoken turns). Failure semantics: an error
+  BEFORE the first delta falls back internally to the buffered agent path
+  and emits that reply as one chunk — the loop always speaks something,
+  including honest offline copy; an error after deltas keeps the partial
+  text as the reply (transport contract). Interrupt stops SPEECH
+  immediately but lets the text reply finish arriving into the thread
+  (Resilient tee awaits upstream done before cancelling — accepted: one
+  reply's remaining tokens, bounded by the voice route's maxTokens, buys
+  a complete bubble, ChatGPT-style). *Known residual:* a remote pull
+  already in flight when Voice Mode starts is not aborted and can hit the
+  60s RemoteIsarMerge timeout while competing with the first turn (seen
+  on-device); the pause gate only defers NEW pulls.
+
+- **2026-08-20 · Siri voice entry hang fixed: mic-open grace delay +
+  dead-session listen watchdog.** "Hey Siri, open SidePal voice" opened
+  the stage but sat in `listening` forever: Siri foregrounds the app while
+  its OWN audio session is still releasing, and `speech_to_text` opened
+  into it — a recognizer that hears nothing and emits neither results nor
+  'done' (a HEALTHY silent listen self-closes at pauseFor ~1.7s, so
+  infinite listening always means a dead session, not a quiet user).
+  Fix, two layers: (1) externally-launched entries
+  (`CoachRouteArgs.startVoiceMode` → `_enterVoiceMode(externalLaunch:
+  true)`) delay the FIRST mic open 900ms (`VoiceModeController.start
+  (listenDelay:)`) so Siri's session releases; the stage opens instantly,
+  only the mic waits, an orb tap mid-delay listens early. (2) a per-listen
+  stall watchdog (`listenStallTimeout` 7s): no result AND no end-of-speech
+  → stop + re-listen (stop-triggered 'done' is guarded from finalizing an
+  empty utterance), `maxListenStallRestarts` 2, then honest idle ("The
+  microphone stalled — tap to try again."). 'listening'-type statuses
+  deliberately do NOT disarm the watchdog — dead sessions still emit
+  those; only real results do. Self-heals any dead-mic cause, not just
+  Siri.
+
+- **2026-08-20 · Clarify-loop + text-only-plan fix: exact param contract,
+  ingestion normalization, deterministic clarify merge, degrade repair.**
+  Deep check (multi-agent, adversarially verified) of the "What time
+  should I schedule it?" infinite loop and plans arriving as prose with no
+  Confirm card. THREE confirmed mechanisms, one contract gap underneath:
+  (1) the propose_changes schema declared action `parameters` as a bare
+  object — no key names anywhere — so the model emitted startTime/"2 pm"/
+  "14:00–15:00"-style payloads the missing-field detector (which reads
+  only `time`/`duration`/`title`) counted as missing; (2) clarify answers
+  ("2 pm") were never merged client-side — merging was delegated 100% to
+  the model via a prose block at the very END of a ~200-line prompt, so
+  the identical question looped; (3) plan-bearing turns silently degraded
+  to informational prose (no tool call / actions parsed empty / only the
+  FIRST of two propose_changes calls read), leaving ZERO confirmable state
+  — "confirm"/"Perfect" then re-parsed bare and restarted the loop.
+  Fixes: exact per-action parameter keys documented in BOTH the tool
+  schema and the system prompt; `AiActionParamNormaliser` canonicalizes at
+  ingestion (alias keys, "2 pm"→"14:00", range→time+duration, executor
+  needs colon-form 24h — "2:00 PM" used to parse as 2:00 AM); the parser
+  merges follow-up answers deterministically (local short-circuit when the
+  answer completes the plan — no model call — plus a post-model overlay so
+  an answered field can never be re-asked); the client merges ALL
+  propose_changes calls in a round, decodes double-encoded action arrays,
+  answers empty/malformed calls with a tool-error repair round (follow-up
+  question on budget exhaustion — NEVER informational plan prose), and
+  nudges prose plans on mutate/suggest turns back into the tool call once;
+  the service parks suggest-with-no-actions AND plan-shaped informational
+  prose as refine context so affirmations always refine instead of
+  re-parsing bare. *Refuted during verification:* "first propose_changes
+  wins" as the CAUSE of these transcripts (real code fact, fixed as
+  hardening, but the observed loops came from mechanisms 1–3).

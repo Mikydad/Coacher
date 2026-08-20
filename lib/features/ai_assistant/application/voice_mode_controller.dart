@@ -75,6 +75,8 @@ class VoiceModeController extends ChangeNotifier {
     required this.sendAndGetReply,
     this.tryStreamReply,
     this.maxConsecutiveSilentListens = 2,
+    this.listenStallTimeout = const Duration(seconds: 7),
+    this.maxListenStallRestarts = 2,
   });
 
   final VoiceSpeechAdapter speech;
@@ -94,6 +96,15 @@ class VoiceModeController extends ChangeNotifier {
   /// instead of re-opening the mic forever.
   final int maxConsecutiveSilentListens;
 
+  /// Dead-mic watchdog (Siri entry fix): a HEALTHY silent listen closes
+  /// itself at the plugin's pauseFor (~1.7s → 'done'), so a listen that
+  /// produces NO result and NO end-of-speech within this window has a dead
+  /// audio session (Siri still held it when the mic opened) — restart it.
+  final Duration listenStallTimeout;
+
+  /// Stall restarts before giving up to [idle] with honest retry copy.
+  final int maxListenStallRestarts;
+
   VoiceModePhase _phase = VoiceModePhase.idle;
   String _transcript = '';
   String? _statusMessage;
@@ -105,6 +116,14 @@ class VoiceModeController extends ChangeNotifier {
   /// Bumped on every interrupt/exit — in-flight async work checks it and
   /// abandons itself instead of clobbering a newer state.
   int _generation = 0;
+
+  Timer? _listenStallTimer;
+  int _stallRestarts = 0;
+
+  /// True while a stall recovery is stopping the dead session — blocks the
+  /// stop-triggered 'done' status from finalizing an empty utterance (the
+  /// recovery re-listens itself).
+  bool _recoveringListen = false;
 
   VoiceModePhase get phase => _phase;
 
@@ -118,11 +137,18 @@ class VoiceModeController extends ChangeNotifier {
   bool get micAvailable => _micAvailable;
 
   /// Enters Voice Mode and opens the mic.
-  Future<void> start() async {
+  ///
+  /// [listenDelay] postpones the FIRST mic open — externally-launched
+  /// entries (Siri) foreground the app while Siri's own audio session is
+  /// still releasing; opening the mic into that session yields a dead
+  /// recognizer (no results, no 'done', ever). An orb tap during the delay
+  /// simply listens early.
+  Future<void> start({Duration? listenDelay}) async {
     if (_active) return;
     _active = true;
     _statusMessage = null;
     _silentListens = 0;
+    _stallRestarts = 0;
     await tts.configure();
     final ok = await speech.initialize(
       onStatus: _onSpeechStatus,
@@ -137,6 +163,13 @@ class VoiceModeController extends ChangeNotifier {
       _setPhase(VoiceModePhase.idle);
       return;
     }
+    if (listenDelay != null && listenDelay > Duration.zero) {
+      await Future<void>.delayed(listenDelay);
+      if (_disposed || !_active) return;
+      // The user woke the loop themselves mid-delay (orb tap) — don't
+      // stack a second listen on top of theirs.
+      if (_phase != VoiceModePhase.idle) return;
+    }
     await _listen();
   }
 
@@ -144,6 +177,7 @@ class VoiceModeController extends ChangeNotifier {
   Future<void> stopAndExit() async {
     _active = false;
     _generation++;
+    _cancelListenStallWatchdog();
     _setPhase(VoiceModePhase.idle);
     try {
       await speech.stop();
@@ -180,10 +214,14 @@ class VoiceModeController extends ChangeNotifier {
     final generation = ++_generation;
     _transcript = '';
     _setPhase(VoiceModePhase.listening);
+    _armListenStallWatchdog(generation);
     try {
       await speech.listen(
         onResult: (text, isFinal) {
           if (_disposed || generation != _generation) return;
+          // Any result proves the audio session is alive.
+          _cancelListenStallWatchdog();
+          _stallRestarts = 0;
           _transcript = text;
           notifyListeners();
           if (isFinal) _finalizeUtterance();
@@ -191,13 +229,57 @@ class VoiceModeController extends ChangeNotifier {
       );
     } catch (_) {
       if (generation != _generation) return;
+      _cancelListenStallWatchdog();
       _statusMessage = 'Voice input failed — tap to retry.';
       _setPhase(VoiceModePhase.idle);
     }
   }
 
-  void _onSpeechStatus(String status) {
+  /// Armed per listen. Fires only when the plugin went completely silent —
+  /// no result AND no end-of-speech status — which never happens on a
+  /// healthy session (silence self-closes at pauseFor). 'listening'-type
+  /// statuses deliberately do NOT disarm it: a dead session still emits
+  /// those.
+  void _armListenStallWatchdog(int generation) {
+    _listenStallTimer?.cancel();
+    _listenStallTimer = Timer(listenStallTimeout, () {
+      if (_disposed || !_active || generation != _generation) return;
+      if (_phase != VoiceModePhase.listening) return;
+      if (_transcript.trim().isNotEmpty) return;
+      unawaited(_recoverStalledListen(generation));
+    });
+  }
+
+  void _cancelListenStallWatchdog() {
+    _listenStallTimer?.cancel();
+    _listenStallTimer = null;
+  }
+
+  Future<void> _recoverStalledListen(int generation) async {
+    _stallRestarts++;
+    if (_stallRestarts > maxListenStallRestarts) {
+      _stallRestarts = 0;
+      _statusMessage = 'The microphone stalled — tap to try again.';
+      _setPhase(VoiceModePhase.idle);
+      try {
+        await speech.stop();
+      } catch (_) {}
+      return;
+    }
+    _recoveringListen = true;
+    try {
+      await speech.stop();
+    } catch (_) {}
+    _recoveringListen = false;
     if (_disposed || !_active) return;
+    // A result/finalize slipped in while we were stopping — that turn owns
+    // the loop now.
+    if (generation != _generation) return;
+    await _listen();
+  }
+
+  void _onSpeechStatus(String status) {
+    if (_disposed || !_active || _recoveringListen) return;
     // 'done' fires on end-of-speech even when the plugin never flagged a
     // final result (short utterances, some locales) — finalize from here.
     if ((status == 'done' || status == 'notListening') &&
@@ -219,6 +301,7 @@ class VoiceModeController extends ChangeNotifier {
   Future<void> _finalizeUtterance() async {
     if (_finalizing || _phase != VoiceModePhase.listening) return;
     _finalizing = true;
+    _cancelListenStallWatchdog();
     try {
       final text = _transcript.trim();
       if (text.isEmpty) {
@@ -359,6 +442,7 @@ class VoiceModeController extends ChangeNotifier {
     _disposed = true;
     _active = false;
     _generation++;
+    _cancelListenStallWatchdog();
     unawaited(_teardown());
     super.dispose();
   }

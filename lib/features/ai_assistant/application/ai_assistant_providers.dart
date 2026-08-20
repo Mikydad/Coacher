@@ -1,3 +1,5 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/context/context_providers.dart';
@@ -34,6 +36,7 @@ import 'ai_payload_assembler.dart';
 import 'entity_normaliser.dart';
 import 'proactive_suggestion_engine.dart';
 import 'schedule_optimisation_service.dart';
+import 'voice_reply_stream.dart';
 
 // ─── AI client ────────────────────────────────────────────────────────────────
 
@@ -216,12 +219,23 @@ final aiAssistantServiceProvider =
     ) {
       final analyticsRepo = ref.read(analyticsRepositoryProvider);
       final assembler = ref.read(aiPayloadAssemblerProvider);
+      // Voice Level 2: streamed conversational replies. Endpoint/token are
+      // closures so Firebase is touched at stream time, never at build time.
+      final voiceStreamer = AiVoiceReplyStreamer(
+        assembler: assembler,
+        endpoint: () => Uri.parse(
+          'https://us-central1-${Firebase.app().options.projectId}'
+          '.cloudfunctions.net/aiChatStream',
+        ),
+        idToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
+      );
       return AiAssistantService(
         intentParser: parser,
         actionExecutor: ref.read(aiActionExecutorProvider),
         historyRepository: ref.read(aiInteractionHistoryRepositoryProvider),
         memoryExtraction: ref.read(memoryExtractionServiceProvider),
         onScheduleMutated: assembler.invalidateSessionCache,
+        voiceReplyStreamer: voiceStreamer.stream,
         analyticsLogger: (eventName, props) {
           final type = AnalyticsEventType.values.firstWhere(
             (e) => e.name == eventName,

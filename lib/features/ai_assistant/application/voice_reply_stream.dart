@@ -1,7 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+
+import '../domain/models/ai_intent_kind.dart';
+import 'ai_operating_layer_client.dart';
+import 'ai_payload_assembler.dart';
 
 /// Client transport for the aiChatStream endpoint (voice Level 2).
 ///
@@ -89,4 +94,69 @@ Stream<String> streamCoachReply({
     client.close();
   };
   return controller.stream;
+}
+
+/// The shape [AiVoiceReplyStreamer.stream] exposes — a plain function type so
+/// the service (and its tests) never touch the transport or Firebase.
+typedef VoiceReplyStreamer =
+    Stream<String> Function(
+      String userInput,
+      String sessionId, {
+      AiIntentRoute? route,
+      Map<String, dynamic>? proactiveContext,
+    });
+
+/// Payload → messages → NDJSON deltas for one streamed voice turn.
+///
+/// [endpoint] is a closure so Firebase is only touched at stream time —
+/// providers construct this in VM tests where Firebase never initialized.
+/// Cancellation propagates: `async*` forwards the listener's cancel into
+/// [streamCoachReply], which aborts the HTTP request.
+class AiVoiceReplyStreamer {
+  AiVoiceReplyStreamer({
+    required AiPayloadAssembler assembler,
+    required Uri Function() endpoint,
+    required Future<String?> Function() idToken,
+    Stream<String> Function(List<Map<String, String>> messages)? transport,
+  }) : _assembler = assembler,
+       _endpoint = endpoint,
+       _idToken = idToken,
+       _transport = transport;
+
+  final AiPayloadAssembler _assembler;
+  final Uri Function() _endpoint;
+  final Future<String?> Function() _idToken;
+  final Stream<String> Function(List<Map<String, String>> messages)?
+  _transport;
+
+  Stream<String> stream(
+    String userInput,
+    String sessionId, {
+    AiIntentRoute? route,
+    Map<String, dynamic>? proactiveContext,
+  }) async* {
+    final assembleSw = Stopwatch()..start();
+    final payload = await _assembler.assemble(
+      userInput,
+      sessionId,
+      intentRoute: route,
+      proactiveContext: proactiveContext,
+      voiceMode: true,
+    );
+    final messages = buildConversationalStreamMessages(payload);
+    if (kDebugMode) {
+      debugPrint(
+        '[ai-timing] assemble=${assembleSw.elapsedMilliseconds}ms '
+        'stream=true voice=true',
+      );
+    }
+    final transport = _transport;
+    yield* transport != null
+        ? transport(messages)
+        : streamCoachReply(
+            endpoint: _endpoint(),
+            idToken: _idToken,
+            messages: messages,
+          );
+  }
 }

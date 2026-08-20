@@ -143,25 +143,29 @@ void main() {
     expect(toolMsg['content'], contains('Nothing scheduled'));
   });
 
-  test('malformed propose_changes arguments produce a friendly follow-up',
-      () async {
-    final proxy = _ScriptedProxy([
-      const AiProxyChatResult(
-        toolCalls: [
-          AiProxyToolCall(
-            id: 'call_bad',
-            name: 'propose_changes',
-            arguments: 'not-json',
-          ),
-        ],
-      ),
-    ]);
+  test(
+      'malformed propose_changes arguments get repair rounds, then a '
+      'friendly follow-up', () async {
+    const bad = AiProxyChatResult(
+      toolCalls: [
+        AiProxyToolCall(
+          id: 'call_bad',
+          name: 'propose_changes',
+          arguments: 'not-json',
+        ),
+      ],
+    );
+    // Persistently malformed across the whole loop budget (clarify-loop
+    // hardening 2026-08-20: a bad round now retries instead of degrading).
+    final proxy = _ScriptedProxy([bad, bad, bad, bad, bad]);
     final client = ProxyAiOperatingLayerClient(proxy: proxy);
 
     final result = await client.parseIntent(_payload);
 
+    expect(proxy.calls.length, greaterThan(1),
+        reason: 'a malformed call earns at least one repair round');
     expect(result.requiresFollowUp, isTrue);
-    expect(result.followUpQuestion, contains('rephrase'));
+    expect(result.followUpQuestion, contains('once more'));
   });
 
   test('invalid tool date argument returns an error string, not a crash',

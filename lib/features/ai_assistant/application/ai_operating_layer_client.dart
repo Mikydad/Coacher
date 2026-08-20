@@ -8,6 +8,7 @@ import '../domain/models/ai_action.dart';
 import '../domain/models/ai_operating_layer_payload.dart';
 import '../domain/models/ai_planned_changes.dart';
 import '../domain/models/ai_response_type.dart';
+import 'ai_action_param_normaliser.dart';
 import 'ai_capability_registry.dart';
 
 // ─── Abstract client ──────────────────────────────────────────────────────────
@@ -67,6 +68,47 @@ The user is speaking by voice and your reply will be read aloud.
 - No lists, no markdown, no headings — spoken prose only.
 - Tools and propose_changes work exactly as normal.
 ''';
+
+/// Replaces [_kVoiceModeAddendum] on STREAMED voice turns (Level 2): the
+/// aiChatStream endpoint has no tools, so the tool language must go — and a
+/// misrouted change request must degrade honestly instead of the model
+/// claiming (or describing) changes nothing will apply.
+const String _kVoiceStreamAddendum = '''
+
+## VOICE MODE (this turn)
+The user is speaking by voice and your reply will be read aloud.
+- Reply in 1–3 short conversational sentences (under 60 words total).
+- No lists, no markdown, no headings — spoken prose only.
+- This turn is answer-only: you cannot look up other days or change anything.
+  If the user asks you to create, change, or delete something, do NOT claim
+  it is done and do NOT describe a concrete plan — say one short line asking
+  them to repeat it as a direct request (like "add workout at 6am") so you
+  can set it up properly.
+''';
+
+/// Messages for the aiChatStream endpoint (voice Level 2): same system
+/// prompt and context-grounded user prompt as the agent path, with the
+/// stream addendum instead of the tool-preserving voice addendum. Prior
+/// turns ride along so streamed replies stay conversation-aware; tool_calls
+/// entries (assistant maps without a text content) are skipped — the
+/// streaming endpoint speaks plain role/content only.
+List<Map<String, String>> buildConversationalStreamMessages(
+  AiOperatingLayerPayload payload,
+) {
+  final priorTurns = payload.conversationHistory.isNotEmpty
+      ? payload.conversationHistory
+      : payload.sessionHistory;
+  return [
+    {'role': 'system', 'content': '$_kSystemPrompt$_kVoiceStreamAddendum'},
+    for (final h in priorTurns)
+      if (h['role'] is String && h['content'] is String)
+        {'role': h['role'] as String, 'content': h['content'] as String},
+    {
+      'role': 'user',
+      'content': ProxyAiOperatingLayerClient._buildUserPrompt(payload),
+    },
+  ];
+}
 
 const String _kSystemPrompt = '''
 You are Coach — the in-app AI coach of "SidePal", a personal productivity app.
@@ -138,6 +180,14 @@ reuse them. If your earlier times are no longer visible in the conversation,
 pick sensible times from the free windows yourself instead of asking again.
 
 ## propose_changes: rules
+- Parameter keys are EXACT — the app reads only these: createTask/editTask
+  {title, time ("HH:mm", 24-hour), duration (minutes, integer), date
+  ("today" | "tomorrow" | "YYYY-MM-DD")}; moveTask {taskTitle,
+  destinationDate}; deleteTask {taskTitle}; createGoal {title, target,
+  deadline}; modifyGoal {goalTitle, field, newValue}; deleteGoal
+  {goalTitle}; addReminder/rescheduleReminder {taskTitle, reminderTime
+  ("HH:mm")}; removeReminder {taskTitle}. Never invent keys like startTime,
+  start, when, or durationMinutes — the app cannot read them.
 - Presentation "preview" → the user gave a clear command ("add workout at 6am").
   Keep your text to one short confirmation line.
 - createIntention parameters: title (short action phrase, e.g. "Call cousin
@@ -272,7 +322,20 @@ const List<Map<String, dynamic>> kCoachAgentTools = [
                     'forgetFact',
                   ],
                 },
-                'parameters': {'type': 'object'},
+                'parameters': {
+                  'type': 'object',
+                  'description':
+                      'EXACT keys per actionType — createTask/editTask: '
+                      'title, time ("HH:mm" 24-hour), duration (minutes, '
+                      'integer), date ("today" | "tomorrow" | YYYY-MM-DD); '
+                      'moveTask: taskTitle, destinationDate; deleteTask: '
+                      'taskTitle; createGoal: title, target, deadline; '
+                      'modifyGoal: goalTitle, field, newValue; deleteGoal: '
+                      'goalTitle; addReminder/rescheduleReminder: taskTitle, '
+                      'reminderTime ("HH:mm"); removeReminder: taskTitle. '
+                      'Never use startTime/start/when/durationMinutes — the '
+                      'app reads only the keys above.',
+                },
                 'confidence': {'type': 'number'},
               },
               'required': ['actionType', 'parameters'],
@@ -339,6 +402,10 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
     final turnId =
         'turn_${DateTime.now().millisecondsSinceEpoch}_${payload.userInput.hashCode.toRadixString(16)}';
 
+    // One prose-plan repair per turn — a model that ignores the nudge twice
+    // isn't going to comply on the third ask.
+    var proseRepairAttempted = false;
+
     for (var loop = 0; loop <= kMaxLoops; loop++) {
       AiProxyChatResult result;
       final roundSw = Stopwatch()..start();
@@ -373,17 +440,67 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
         );
       }
 
-      // A propose_changes call is terminal — map it to the preview pipeline.
-      for (final call in result.toolCalls) {
-        if (call.name == 'propose_changes') {
-          return _mapProposedChanges(call, result.content, payload.userInput);
+      // propose_changes is terminal — merge EVERY such call in the round
+      // (models legally split one plan across two calls; taking only the
+      // first silently dropped the rest) and map once.
+      final proposeCalls = result.toolCalls
+          .where((c) => c.name == 'propose_changes')
+          .toList();
+      if (proposeCalls.isNotEmpty) {
+        final mapped = _mapProposedChanges(
+          proposeCalls,
+          result.content,
+          payload.userInput,
+        );
+        if (mapped != null) return mapped;
+        // The tool was called but nothing usable parsed. Degrading to
+        // informational here is how plans became text-only bubbles with no
+        // Confirm card — instead answer every call with a tool error and
+        // let the model retry within the loop budget.
+        if (loop < kMaxLoops) {
+          messages.add(_assistantToolCallMessage(result));
+          for (final call in result.toolCalls) {
+            messages.add({
+              'role': 'tool',
+              'tool_call_id': call.id,
+              'content':
+                  'Error: actions was empty or malformed. Call '
+                  'propose_changes again with concrete actions, using '
+                  'EXACTLY the documented parameter keys.',
+            });
+          }
+          continue;
         }
+        return AiPlannedChanges(
+          sessionId: payload.userInput,
+          followUpQuestion:
+              'I had trouble putting that plan together — could you say '
+              'it once more?',
+        );
       }
 
-      // No tool calls → the model's text IS the reply.
+      // No tool calls → the model's text IS the reply — unless the text
+      // DESCRIBES a concrete plan (times + confirm framing). Prose plans
+      // give the user no button to press; nudge the model into the tool
+      // call it skipped instead of shipping a dead-end bubble.
       if (!result.hasToolCalls) {
         final text = result.content?.trim();
         if (text == null || text.isEmpty) break;
+        if (payload.intentKind != 'query' &&
+            !proseRepairAttempted &&
+            loop < kMaxLoops &&
+            looksPlanShapedProse(text)) {
+          proseRepairAttempted = true;
+          messages.add({'role': 'assistant', 'content': text});
+          messages.add({
+            'role': 'user',
+            'content':
+                'You described a plan without calling propose_changes — '
+                'the user has no button to apply it. Call propose_changes '
+                'now with exactly those items and times.',
+          });
+          continue;
+        }
         return AiPlannedChanges(
           sessionId: payload.userInput,
           responseType: AiResponseType.informational,
@@ -392,19 +509,7 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
       }
 
       // Read-only tool calls: execute, feed results back, continue the loop.
-      messages.add({
-        'role': 'assistant',
-        if (result.content != null && result.content!.isNotEmpty)
-          'content': result.content,
-        'tool_calls': [
-          for (final call in result.toolCalls)
-            {
-              'id': call.id,
-              'type': 'function',
-              'function': {'name': call.name, 'arguments': call.arguments},
-            },
-        ],
-      });
+      messages.add(_assistantToolCallMessage(result));
       for (final call in result.toolCalls) {
         Map<String, dynamic> args;
         try {
@@ -430,52 +535,78 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
     );
   }
 
-  /// Maps a propose_changes tool call onto the existing preview pipeline.
-  AiPlannedChanges _mapProposedChanges(
-    AiProxyToolCall call,
+  static Map<String, dynamic> _assistantToolCallMessage(
+    AiProxyChatResult result,
+  ) => {
+    'role': 'assistant',
+    if (result.content != null && result.content!.isNotEmpty)
+      'content': result.content,
+    'tool_calls': [
+      for (final call in result.toolCalls)
+        {
+          'id': call.id,
+          'type': 'function',
+          'function': {'name': call.name, 'arguments': call.arguments},
+        },
+    ],
+  };
+
+  /// Maps the round's propose_changes calls onto the preview pipeline,
+  /// unioning actions across calls. Every action is normalized at ingestion
+  /// (alias keys, "2 pm" → "14:00") so the missing-field detector and the
+  /// executor see the documented contract regardless of model drift.
+  ///
+  /// Returns null when NOTHING usable parsed — the caller repairs with a
+  /// tool-error round instead of degrading the plan to informational prose
+  /// (the old degrade is how plans became text-only bubbles with no card).
+  AiPlannedChanges? _mapProposedChanges(
+    List<AiProxyToolCall> calls,
     String? assistantText,
     String sessionId,
   ) {
-    Map<String, dynamic> args;
-    try {
-      args = Map<String, dynamic>.from(jsonDecode(call.arguments) as Map);
-    } catch (_) {
-      return AiPlannedChanges(
-        sessionId: sessionId,
-        followUpQuestion:
-            'I had trouble putting that plan together — could you rephrase it?',
-      );
-    }
-
-    final actionsRaw = args['actions'];
     final actions = <AiAction>[];
-    if (actionsRaw is List) {
+    String? presentation;
+    String? argsMessage;
+    for (final call in calls) {
+      Map<String, dynamic> args;
+      try {
+        args = Map<String, dynamic>.from(jsonDecode(call.arguments) as Map);
+      } catch (_) {
+        continue;
+      }
+      presentation ??= args['presentation']?.toString();
+      final msg = args['message']?.toString().trim();
+      if (argsMessage == null && msg != null && msg.isNotEmpty) {
+        argsMessage = msg;
+      }
+      var actionsRaw = args['actions'];
+      // Models sometimes double-encode the array as a JSON string.
+      if (actionsRaw is String) {
+        try {
+          actionsRaw = jsonDecode(actionsRaw);
+        } catch (_) {}
+      }
+      if (actionsRaw is! List) continue;
       for (final entry in actionsRaw) {
         if (entry is! Map) continue;
         try {
-          actions.add(AiAction.fromJson(Map<String, dynamic>.from(entry)));
-        } catch (_) {
-          // Skip malformed entries; keep the rest of the plan.
+          actions.add(
+            AiActionParamNormaliser.normalise(
+              AiAction.fromJson(Map<String, dynamic>.from(entry)),
+            ),
+          );
+        } catch (e) {
+          if (kDebugMode) debugPrint('[ai-map] dropped action entry: $e');
         }
       }
     }
 
+    if (actions.isEmpty) return null;
+
     final message = (assistantText?.trim().isNotEmpty ?? false)
         ? assistantText!.trim()
-        : (args['message']?.toString().trim().isNotEmpty ?? false)
-        ? args['message'].toString().trim()
-        : null;
-
-    if (actions.isEmpty) {
-      return AiPlannedChanges(
-        sessionId: sessionId,
-        responseType: AiResponseType.informational,
-        informationalMessage:
-            message ?? "I couldn't turn that into concrete changes yet.",
-      );
-    }
-
-    final isSuggestion = args['presentation'] != 'preview';
+        : argsMessage;
+    final isSuggestion = presentation != 'preview';
     return AiPlannedChanges(
       sessionId: sessionId,
       responseType: isSuggestion

@@ -450,7 +450,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       // Post-frame: _handlePendingCoachLaunch runs during build and
       // _enterVoiceMode calls setState.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _enterVoiceMode(service);
+        if (mounted) _enterVoiceMode(service, externalLaunch: true);
       });
     }
   }
@@ -464,9 +464,23 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   /// from the same build. Remove once the spike gate passes.
   static const bool _kStreamingTts = true;
 
+  /// Voice Level 2 flag: stream conversational replies through aiChatStream
+  /// and speak them sentence-pipelined as they generate. Off = every turn
+  /// takes the buffered agent path. Kept as a flag for before/after
+  /// [voice-timing] comparison, same discipline as [_kStreamingTts].
+  static const bool _kStreamingChat = true;
+
   /// Swaps the composer for the Voice Mode orb and starts the
   /// listen → send → speak → relisten loop.
-  void _enterVoiceMode(AiAssistantService service) {
+  ///
+  /// [externalLaunch] marks entries where something else foregrounded the
+  /// app (Siri "Talk to SidePal"): Siri's audio session is still releasing
+  /// when we arrive, so the first mic open waits a beat — opening into
+  /// Siri's session yields a recognizer that hears nothing forever.
+  void _enterVoiceMode(
+    AiAssistantService service, {
+    bool externalLaunch = false,
+  }) {
     if (_voiceController != null) return;
     dismissKeyboard(context);
     // Coach voice: OpenAI TTS (streamed or buffered per the spike flag),
@@ -496,13 +510,17 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         fallback: FlutterTtsVoiceAdapter(),
       ),
       sendAndGetReply: (text) => _voiceSendAndGetReply(service, text),
+      tryStreamReply: _kStreamingChat ? service.tryStreamVoiceReply : null,
     );
     setState(() {
       _voiceController = controller;
       _voiceImmersive = true;
       _voiceReachedFull = false;
     });
-    controller.start();
+    controller.start(
+      listenDelay:
+          externalLaunch ? const Duration(milliseconds: 900) : null,
+    );
     // Background sync stays off the network while voice is live — pulls
     // and outbox storms were competing with voice turns for bandwidth.
     SyncService.instance.voiceModeActive = true;
@@ -609,15 +627,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     String text,
   ) async {
     await service.sendMessage(text, voiceMode: true);
-    for (final message in service.messages.reversed) {
-      if (message.role != ChatRole.assistant || message.isLoading) continue;
-      if (message.content.trim().isNotEmpty) return message.content;
-      if (message.plannedChanges != null || message.draftPlan != null) {
-        return 'I put a plan together — take a look and confirm on screen.';
-      }
-      return null;
-    }
-    return null;
+    return service.latestSpokenReplyText();
   }
 
   @override
