@@ -1427,3 +1427,21 @@ not silent reversal.
   re-parsing bare. *Refuted during verification:* "first propose_changes
   wins" as the CAUSE of these transcripts (real code fact, fixed as
   hardening, but the observed loops came from mechanisms 1–3).
+
+- **2026-08-21 · Confirm-by-voice: the voice IS the preview card.** On the
+  orb-only voice stage the Confirm/Edit/Cancel card is invisible, so plans
+  were dead ends by voice ("take a look and confirm on screen"). Now
+  `latestSpokenReplyText` reads a pending plan aloud
+  (`voice_plan_speech.dart`: per-action prose, "14:00"→"2 PM", duration/
+  date speech, 3-item cap) and closes with "Should I go ahead? Just say
+  confirm — or no."; suggested drafts append "Want me to set it up?".
+  The existing short-reply interceptors were ALREADY the confirm path
+  (voice travels the same sendMessage as typing) — the changes are:
+  `confirmPlan()` is now AWAITED inside the interceptors (local-first, so
+  milliseconds) so the voice loop speaks the execution OUTCOME instead of
+  the stale preview, and `_affirmationPattern` gained STT-flavored
+  variants (confirmed / go for it / yes confirm). *Semantics preserved:*
+  nothing auto-executes; the spoken "confirm" is the user pressing the
+  button in the modality they're in — the confirm-gate (2026-07-23)
+  stands. No new visual confirm UI on the immersive stage by design;
+  the compact card still shows the tappable card.

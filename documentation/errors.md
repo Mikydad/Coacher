@@ -158,6 +158,27 @@ This file tracks implementation/runtime errors encountered during development of
 - **Fix applied**: Delete `libisar.dylib`, re-download resumably: `curl -L --retry 100 --retry-all-errors -C - -o libisar.dylib https://binaries.isar-community.dev/3.3.2/libisar_macos.dylib`, verify with `file` (should say "Mach-O universal binary … x86_64 … arm64", ~2.1 MB). All 1005 tests then passed.
 - **Status**: Resolved. Supersedes the environment notes in #15 for the community fork.
 
+## 22) Coach AI clarify loop — "What time should I schedule it?" forever + plans arriving as plain text
+- **Where**: Coach AI chat (typed and voice), especially around confirmation. Deep-checked 2026-08-20 with a multi-agent adversarially-verified investigation.
+- **Error / symptom**: (a) "add a workout at 2 pm" → "What time should I schedule it?" — answering "2 pm" re-asked the identical question infinitely; (b) plans rendered as plain prose ("Here's the plan — confirm below: …") with NO preview card or Confirm buttons; (c) "confirm"/"Perfect" then re-parsed as brand-new requests and restarted the loop.
+- **Root cause**: One contract gap, three mechanisms. The `propose_changes` tool schema declared action `parameters` as a bare object — no key names anywhere — so the model emitted `startTime`/"2 pm"/"14:00–15:00"-style payloads while `AiMissingFieldDetector` reads only the literal `time`/`duration`/`title` keys (and the executor needs colon-form 24h — "2:00 PM" parsed as 2:00 AM). Clarify answers were never merged client-side (delegated 100% to the model via a prose block at the END of a ~200-line prompt). Plan-bearing turns silently degraded to informational prose (no tool call / actions parsed empty / only the first of two propose_changes calls read), leaving zero confirmable state.
+- **Fix applied**: Exact per-action parameter keys documented in the tool schema AND system prompt; `AiActionParamNormaliser` canonicalizes at ingestion (alias keys, "2 pm" → "14:00", ranges → time+duration); deterministic clarify merge in `AiIntentParser` (local short-circuit + post-model overlay — an answered field can never be re-asked); degrade repair in the client (merge all propose_changes calls, tool-error retry round for empty/malformed, prose-plan nudge) and service (park action-less suggest / plan-shaped prose as refine context). Full write-up in the GUIDELINES.md decision log (2026-08-20).
+- **Status**: Resolved — verified on device; 33 regression tests pin it.
+
+## 23) Siri "open SidePal voice" stuck in listening forever
+- **Where**: Voice Mode entered via the Siri App Shortcut (`TalkToSidePalIntent`), on device.
+- **Error / symptom**: The voice stage opened and showed the listening orb but never heard anything, never finalized, never errored — pure infinite listening. Manual voice entry worked.
+- **Root cause**: Siri foregrounds the app while its OWN audio session is still releasing; `speech_to_text` opened the mic into that dying session and got a dead recognizer — no results AND no end-of-speech status, ever. Diagnostic tell: a HEALTHY silent listen always self-closes at `pauseFor` (~1.7 s → 'done'), so "listens forever" can never be a quiet user — it is always a dead session.
+- **Fix applied**: (a) 900 ms mic-open grace on externally-launched voice entries (`VoiceModeController.start(listenDelay:)`) — the stage opens instantly, only the mic waits; (b) a per-listen stall watchdog (7 s, no result AND no end-of-speech → stop + re-listen, 2 restarts, then honest idle copy "The microphone stalled — tap to try again."). Real results disarm the watchdog; 'listening'-type plugin statuses deliberately do NOT (dead sessions still emit those).
+- **Status**: Resolved — verified on device.
+
+## 24) `RemoteIsarMerge exceeded 60s` timeout when Voice Mode starts mid-pull
+- **Where**: `SyncService.syncFromRemote` (device logs during Voice Mode sessions).
+- **Error / symptom**: `syncFromRemote failed: TimeoutException after 0:01:00.000000: RemoteIsarMerge exceeded 60s`, followed later by the pull finishing with 0 rows — while voice turns on the same connection ran slow (first turn ~5.8 s vs ~2.1–2.6 s once idle).
+- **Root cause**: The Voice-Mode sync pause (`voiceModeActive`) only defers NEW pulls; a remote pull already in flight when voice starts is not aborted, competes with voice requests for bandwidth, and can hit the 60 s merge timeout. The timeout also does not cancel the underlying Firestore work — it keeps running and completes after.
+- **Fix applied**: None yet — accepted residual, documented in the GUIDELINES.md decision log (2026-08-20 voice Level 2 entry). Candidate fix if it bites harder: a cancellation flag checked between `RemoteIsarMerge` phases.
+- **Status**: Open (known residual)
+
 ---
 
 ## How to use this log

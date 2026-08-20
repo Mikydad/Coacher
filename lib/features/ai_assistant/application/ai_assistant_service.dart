@@ -22,6 +22,7 @@ import 'ai_intent_parser.dart';
 import 'ai_intent_router.dart';
 import 'proactive_chat_conversion_tracker.dart';
 import 'entity_normaliser.dart';
+import 'voice_plan_speech.dart';
 import 'voice_reply_stream.dart';
 
 /// Signature for fire-and-forget analytics logging from the service layer.
@@ -151,9 +152,11 @@ class AiAssistantService extends ChangeNotifier {
 
     // 0. While a plan is awaiting confirmation, treat a plain yes/no as the
     // answer to "confirm changes?" — never send it to the parser, which would
-    // re-propose the same plan.
+    // re-propose the same plan. Awaited so voice turns speak the OUTCOME
+    // (confirm-by-voice, 2026-08-21) — execution is local-first, so the
+    // await costs milliseconds.
     if (_pendingPlan != null &&
-        _handlePendingPlanShortReply(userInput.trim())) {
+        await _handlePendingPlanShortReply(userInput.trim())) {
       return;
     }
 
@@ -162,7 +165,7 @@ class AiAssistantService extends ChangeNotifier {
     // no pending plan, so without this the affirmation would be re-parsed as a
     // brand-new request — the "What should I call this task?" loop.
     if (_pendingPlan == null &&
-        _tryConfirmLatestDraftOnAffirmation(userInput.trim())) {
+        await _tryConfirmLatestDraftOnAffirmation(userInput.trim())) {
       return;
     }
 
@@ -584,14 +587,42 @@ class AiAssistantService extends ChangeNotifier {
     return out.stream;
   }
 
-  /// The text a voice turn should speak for the latest assistant bubble —
-  /// plan-bearing messages get the on-screen redirect line. Used by the
-  /// streamed turn's fallback and by the Voice Mode buffered path.
+  /// The text a voice turn should speak for the latest assistant bubble.
+  /// Used by the streamed turn's fallback and by the Voice Mode buffered
+  /// path.
+  ///
+  /// On the orb-only stage the preview card is invisible, so the voice IS
+  /// the preview (confirm-by-voice, 2026-08-21): a pending plan is read
+  /// aloud and closed with a confirm question — the spoken "confirm" that
+  /// follows is the user pressing the button, in the modality they're in.
   String? latestSpokenReplyText() {
     for (final message in _messages.reversed) {
       if (message.role != ChatRole.assistant || message.isLoading) continue;
-      if (message.content.trim().isNotEmpty) return message.content;
-      if (message.plannedChanges != null || message.draftPlan != null) {
+      final content = message.content.trim();
+
+      // Preview awaiting confirmation: model one-liner (when it adds
+      // something the summary doesn't), then the plan, then the ask.
+      if (message.plannedChanges != null && message.isCurrentPlan) {
+        final summary = formatPlanForSpeech(message.plannedChanges!);
+        return [
+          if (content.isNotEmpty && content != "Here's what I'll do:")
+            content,
+          if (summary.isNotEmpty) summary,
+          'Should I go ahead? Just say confirm — or no.',
+        ].join(' ');
+      }
+
+      // Suggested draft: the narrative already describes the plan; add the
+      // voice affordance the screen button provides.
+      if (message.hasDraftPlan) {
+        return [
+          if (content.isNotEmpty) content,
+          'Want me to set it up? Just say confirm.',
+        ].join(' ');
+      }
+
+      if (content.isNotEmpty) return content;
+      if (message.plannedChanges != null) {
         return 'I put a plan together — take a look and confirm on screen.';
       }
       return null;
@@ -890,8 +921,10 @@ class AiAssistantService extends ChangeNotifier {
   );
 
   static final _affirmationPattern = RegExp(
-    r'^(y+e+s+|yes please|ye[ap]h?|yep|sure|ok(ay)?|confirm|apply( it| this)?|'
-    r'do it|go ahead|sounds? good|please do|perfect|great|love it|looks good|'
+    r'^(y+e+s+|yes please|ye[ap]h?|yep|sure|ok(ay)?|'
+    r'confirm(ed)?( it| this| the plan)?|yes,? confirm|apply( it| this)?|'
+    r'do it|go ahead|go for it|sounds? good|please do|perfect|great|love it|'
+    r'looks good|'
     r"(it|that|this)('?s| is) (all )?(good|great|fine|perfect)|as it is|"
     r'(schedule|do) (it )?as (you )?suggested)[.!]*$',
   );
@@ -900,7 +933,7 @@ class AiAssistantService extends ChangeNotifier {
   /// Returns true when the reply was consumed (confirmed or cancelled).
   /// Typed affirmation while the latest assistant message carries an
   /// un-adopted draft plan → adopt it and run the normal confirm flow.
-  bool _tryConfirmLatestDraftOnAffirmation(String input) {
+  Future<bool> _tryConfirmLatestDraftOnAffirmation(String input) async {
     final normalized = input.toLowerCase().trim();
     if (normalized.split(RegExp(r'\s+')).length > 4) return false;
     if (!_affirmationPattern.hasMatch(normalized)) return false;
@@ -921,13 +954,16 @@ class AiAssistantService extends ChangeNotifier {
         ),
       );
       applySuggestedPlan(m.id);
-      unawaited(confirmPlan());
+      // Awaited: the caller (typed AND voice) reports the OUTCOME of the
+      // execution, not the moment it was kicked off. Local-first, so this
+      // is milliseconds.
+      await confirmPlan();
       return true;
     }
     return false;
   }
 
-  bool _handlePendingPlanShortReply(String input) {
+  Future<bool> _handlePendingPlanShortReply(String input) async {
     final normalized = input.toLowerCase().trim();
     // Only intercept short replies — full sentences go to the parser.
     if (normalized.split(RegExp(r'\s+')).length > 4) return false;
@@ -955,7 +991,8 @@ class AiAssistantService extends ChangeNotifier {
         ),
       );
       notifyListeners();
-      unawaited(confirmPlan());
+      // Awaited for the same outcome-reporting reason as the draft path.
+      await confirmPlan();
       return true;
     }
 
