@@ -39,8 +39,16 @@ List<OverridePreset> presetDurations(ContextOverride type) {
       ];
 
     case ContextOverride.sleep:
-      // Sleep is typically schedule-driven; manual start always indefinite.
-      return const [OverridePreset(label: 'Until I end it')];
+      // The daily sleep window (Settings) is still the schedule-driven path;
+      // manual starts gained real durations 2026-08-23 — the lone
+      // indefinite chip read as a missing picker. "Until morning" resolves
+      // to the sleep window's end (07:00 default) in the UI.
+      return const [
+        OverridePreset(label: 'Until morning'),
+        OverridePreset(label: '8 hours', duration: Duration(hours: 8)),
+        OverridePreset(label: 'Custom'), // duration resolved by UI slider
+        OverridePreset(label: 'Until I end it'),
+      ];
 
     case ContextOverride.vacation:
       return const [OverridePreset(label: 'Until I end it')];

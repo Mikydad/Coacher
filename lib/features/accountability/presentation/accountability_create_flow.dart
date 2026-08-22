@@ -1941,6 +1941,7 @@ class _AccountabilityCreateFlowState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TextField(
+                textCapitalization: TextCapitalization.sentences,
                 controller: _why,
                 maxLength: 280,
                 maxLines: 5,

@@ -148,6 +148,7 @@ Future<void> promptPlansChangedForRow(
     builder: (ctx) => AlertDialog(
       title: const Text('Short logical reason'),
       content: TextField(
+        textCapitalization: TextCapitalization.sentences,
         controller: noteCtrl,
         maxLines: 2,
         decoration: const InputDecoration(hintText: '1-2 sentences'),
@@ -250,5 +251,8 @@ Future<bool> confirmDeletePlannedTask(
     ),
     commitOverride: () async {}, // delete already done above
   );
+  // Non-stream task sources (execution day, suggestions) — the same
+  // refresh completePlannedTaskRow does.
+  if (context.mounted) invalidateTaskListProviders(ref);
   return true;
 }

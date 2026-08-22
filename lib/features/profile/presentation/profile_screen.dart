@@ -486,6 +486,7 @@ class _ProfileHero extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: TextField(
+                                  textCapitalization: TextCapitalization.words,
                                   controller: nameController,
                                   autofocus: true,
                                   style: TextStyle(
@@ -890,10 +891,8 @@ class _CoreOptimizationSection extends StatelessWidget {
               color: _kOnSurfaceVariant,
               size: 20,
             ),
-            onTap: () => Navigator.pushNamed(
-              context,
-              AnalyticsProgressScreen.routeName,
-            ),
+            onTap: () =>
+                Navigator.pushNamed(context, AnalyticsProgressScreen.routeName),
           ),
           _SettingRow(
             icon: Icons.account_circle_outlined,

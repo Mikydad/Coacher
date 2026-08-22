@@ -58,7 +58,8 @@ class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
             ),
             data: (items) {
               final blocked =
-                  ref.watch(blockedUidsProvider).valueOrNull ?? const <String>{};
+                  ref.watch(blockedUidsProvider).valueOrNull ??
+                  const <String>{};
               final visible = blocked.isEmpty
                   ? items
                   : items.where((i) => !blocked.contains(i.userId)).toList();
@@ -188,11 +189,10 @@ class _ActivityCard extends StatelessWidget {
       onTap: revealId == null
           ? null
           : () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      StakeRevealViewerScreen(challengeId: revealId),
-                ),
+              MaterialPageRoute(
+                builder: (_) => StakeRevealViewerScreen(challengeId: revealId),
               ),
+            ),
       child: _cardBody(context),
     );
   }

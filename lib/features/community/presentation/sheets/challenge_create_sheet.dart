@@ -207,6 +207,7 @@ class _ChallengeCreateSheetState extends ConsumerState<ChallengeCreateSheet> {
                     _Label('Challenge title'),
                     const SizedBox(height: 8),
                     TextFormField(
+                      textCapitalization: TextCapitalization.sentences,
                       controller: _titleController,
                       style: TextStyle(color: AppColors.textPrimary),
                       onTapOutside: (_) => dismissKeyboard(context),

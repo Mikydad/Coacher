@@ -358,6 +358,7 @@ void _showFactEditSheet(BuildContext context, WidgetRef ref, MemoryFact fact) {
           ),
           const SizedBox(height: 10),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             controller: controller,
             autofocus: true,
             maxLength: 200,
@@ -515,9 +516,7 @@ class _PersonRow extends ConsumerWidget {
 
 void _showPersonSheet(BuildContext context, WidgetRef ref, Person person) {
   final nameController = TextEditingController(text: person.displayName);
-  final relController = TextEditingController(
-    text: person.relationship ?? '',
-  );
+  final relController = TextEditingController(text: person.relationship ?? '');
   showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
@@ -600,8 +599,7 @@ void _showPersonSheet(BuildContext context, WidgetRef ref, Person person) {
                               rel.isEmpty ? null : rel,
                             ),
                             provenance: MemoryProvenance.userConfirmed,
-                            updatedAtMs:
-                                DateTime.now().millisecondsSinceEpoch,
+                            updatedAtMs: DateTime.now().millisecondsSinceEpoch,
                           ),
                         );
                   },

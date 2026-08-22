@@ -121,6 +121,7 @@ class AddTaskField extends StatelessWidget {
     this.minLines,
     this.style,
     this.autofocus = false,
+    this.textCapitalization = TextCapitalization.sentences,
   });
 
   final TextEditingController controller;
@@ -132,6 +133,7 @@ class AddTaskField extends StatelessWidget {
   final int? minLines;
   final TextStyle? style;
   final bool autofocus;
+  final TextCapitalization textCapitalization;
 
   @override
   Widget build(BuildContext context) {
@@ -142,6 +144,7 @@ class AddTaskField extends StatelessWidget {
       maxLines: maxLines,
       minLines: minLines,
       autofocus: autofocus,
+      textCapitalization: textCapitalization,
       style:
           style ??
           TextStyle(

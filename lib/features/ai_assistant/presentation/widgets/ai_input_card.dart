@@ -40,6 +40,7 @@ class AiInputCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             controller: controller,
             focusNode: focusNode,
             maxLines: 4,

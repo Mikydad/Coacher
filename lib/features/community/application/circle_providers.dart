@@ -79,9 +79,7 @@ final discoverCirclesProvider = FutureProvider.autoDispose
       return ref
           .watch(circleRepositoryProvider)
           .searchCircles(
-            category: (category == null || category == 'all')
-                ? null
-                : category,
+            category: (category == null || category == 'all') ? null : category,
           );
     });
 

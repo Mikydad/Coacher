@@ -30,10 +30,7 @@ void main() {
 
   setUp(() {
     repo = _FakeContextOverrideRepository();
-    service = ContextOverrideService(
-      repository: repo,
-      now: () => fixedNow,
-    );
+    service = ContextOverrideService(repository: repo, now: () => fixedNow);
   });
 
   group('activateOverride', () {

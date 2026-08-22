@@ -10,7 +10,9 @@ import '../domain/models/circle_member.dart';
 /// Thrown when joining would exceed the user's circle-membership limit
 /// (tier-dependent — see `tier_limits_v1`; legacy app-wide cap is 3).
 class CircleLimitException implements Exception {
-  CircleLimitException([this.limit = UserCircleMembershipService.kMaxCirclesPerUser]);
+  CircleLimitException([
+    this.limit = UserCircleMembershipService.kMaxCirclesPerUser,
+  ]);
 
   final int limit;
 

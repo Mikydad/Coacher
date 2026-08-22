@@ -140,6 +140,7 @@ class _RegisterStepState extends ConsumerState<RegisterStep> {
             AuthTextField(
               label: 'Name (optional)',
               controller: _nameCtrl,
+              textCapitalization: TextCapitalization.words,
               textInputAction: TextInputAction.next,
               onSubmitted: (_) =>
                   FocusScope.of(context).requestFocus(_emailFocus),

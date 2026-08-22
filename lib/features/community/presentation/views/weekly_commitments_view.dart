@@ -392,6 +392,7 @@ class _DraftRow extends StatelessWidget {
         children: [
           Expanded(
             child: TextField(
+              textCapitalization: TextCapitalization.sentences,
               controller: draft.titleController,
               onTapOutside: (_) => dismissKeyboard(context),
               style: TextStyle(color: AppColors.textPrimary),

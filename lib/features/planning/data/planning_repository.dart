@@ -81,10 +81,7 @@ class FirestorePlanningRepository implements PlanningRepository {
     required String entityType,
     required String path,
   }) async {
-    await outboxDelete(
-      entityType: entityType,
-      documentPath: path,
-    );
+    await outboxDelete(entityType: entityType, documentPath: path);
   }
 
   @override

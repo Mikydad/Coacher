@@ -450,6 +450,38 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
       lastDate: DateTime(2100),
       helpText: 'Goal duration',
       saveText: 'Set duration',
+      // The stock picker renders saveText as small flat app-bar text —
+      // easy to miss. Promote it to a real filled pill button and make the
+      // header help text legible (2026-08-23). The save action is the only
+      // TextButton inside the full-screen range picker, so overriding the
+      // TextButtonTheme styles exactly it — confirmButtonStyle alone is
+      // not honored by the full-screen variant.
+      builder: (ctx, child) {
+        final pillButton = TextButton.styleFrom(
+          backgroundColor: AppColors.accent,
+          foregroundColor: AppColors.onAccent,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+        );
+        return Theme(
+          data: Theme.of(ctx).copyWith(
+            textButtonTheme: TextButtonThemeData(style: pillButton),
+            datePickerTheme: DatePickerTheme.of(ctx).copyWith(
+              rangePickerHeaderHelpStyle: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+                color: AppColors.textPrimary,
+              ),
+              confirmButtonStyle: pillButton,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {
@@ -922,6 +954,23 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
     };
   }
 
+  /// Plain-language version of the label above — the "(per 10 days)"
+  /// shorthand alone confused users into thinking the interval changed the
+  /// target's meaning behind their back (2026-08-23).
+  String _targetExplainerText() {
+    final n = _repeatInterval;
+    String cycle(String unit) => n <= 1
+        ? 'Reach this amount each $unit.'
+        : 'Reach this amount within each $n-$unit cycle — progress resets '
+              'when a new cycle starts.';
+    return switch (_repeatCadence) {
+      GoalRepeatCadence.off => 'Reach this total once, over the whole goal.',
+      GoalRepeatCadence.daily => cycle('day'),
+      GoalRepeatCadence.weekly => cycle('week'),
+      GoalRepeatCadence.monthly => cycle('month'),
+    };
+  }
+
   /// Start/end dates — how long the goal lives.
   Widget _buildDurationSection() {
     return Column(
@@ -1060,14 +1109,7 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
           ),
           const SizedBox(height: 6),
           Text(
-            'Target is measured per '
-            '${_repeatInterval <= 1 ? '' : '$_repeatInterval '}'
-            '${switch (_repeatCadence) {
-              GoalRepeatCadence.daily => _repeatInterval <= 1 ? 'day' : 'days',
-              GoalRepeatCadence.weekly => _repeatInterval <= 1 ? 'week' : 'weeks',
-              GoalRepeatCadence.monthly => _repeatInterval <= 1 ? 'month' : 'months',
-              GoalRepeatCadence.off => '',
-            }}.',
+            _targetExplainerText(),
             style: TextStyle(color: AppColors.fg38, fontSize: 12),
           ),
         ],
@@ -1214,7 +1256,7 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      _targetLabelText(),
+                      '${_targetLabelText()} — ${_targetExplainerText()}',
                       style: TextStyle(color: AppColors.fg38, fontSize: 12),
                     ),
                     if (_measurement == MeasurementKind.custom) ...[

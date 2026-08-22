@@ -415,6 +415,7 @@ _promptExtensionRequest(
                       ),
                       const SizedBox(height: 10),
                       TextField(
+                        textCapitalization: TextCapitalization.sentences,
                         maxLines: 2,
                         onChanged: (v) => reasonText = v,
                         decoration: InputDecoration(
@@ -427,6 +428,7 @@ _promptExtensionRequest(
                       if (requireReflection) ...[
                         const SizedBox(height: 10),
                         TextField(
+                          textCapitalization: TextCapitalization.sentences,
                           maxLines: 2,
                           onChanged: (v) => reflectionText = v,
                           decoration: const InputDecoration(
@@ -519,6 +521,7 @@ Future<bool> _handleMoveWithReason(
                       ),
                       const SizedBox(height: 10),
                       TextField(
+                        textCapitalization: TextCapitalization.sentences,
                         maxLines: 2,
                         onChanged: (v) => noteText = v,
                         decoration: const InputDecoration(

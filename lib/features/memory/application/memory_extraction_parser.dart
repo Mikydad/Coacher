@@ -68,7 +68,10 @@ class ParsedExtraction {
   final String? summary;
 
   bool get isEmpty =>
-      facts.isEmpty && people.isEmpty && observations.isEmpty && summary == null;
+      facts.isEmpty &&
+      people.isEmpty &&
+      observations.isEmpty &&
+      summary == null;
 }
 
 /// Pure parsing + quote verification for extract_memory responses.
@@ -198,7 +201,8 @@ class MemoryExtractionParser {
           ? MemoryProvenance.userStated
           : MemoryProvenance.aiInferred,
       sourceQuote: verified ? quote.trim() : null,
-      personName: entry['personName'] is String &&
+      personName:
+          entry['personName'] is String &&
               (entry['personName'] as String).trim().isNotEmpty
           ? (entry['personName'] as String).trim()
           : null,
@@ -235,7 +239,8 @@ class MemoryExtractionParser {
 
     return ExtractedPersonCandidate(
       name: capped,
-      relationship: entry['relationship'] is String &&
+      relationship:
+          entry['relationship'] is String &&
               (entry['relationship'] as String).trim().isNotEmpty
           ? (entry['relationship'] as String).trim()
           : null,

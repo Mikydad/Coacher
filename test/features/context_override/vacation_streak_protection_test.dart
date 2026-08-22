@@ -12,8 +12,9 @@ void main() {
   }) {
     return UserAttentionState(
       id: kUserAttentionStateId,
-      activeOverride:
-          stillActive ? ContextOverride.vacation : ContextOverride.none,
+      activeOverride: stillActive
+          ? ContextOverride.vacation
+          : ContextOverride.none,
       manuallyMuted: false,
       updatedAtMs: 0,
       lastOverrideActivatedAt: startMs,

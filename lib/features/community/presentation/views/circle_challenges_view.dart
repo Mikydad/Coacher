@@ -61,7 +61,10 @@ class CircleChallengesView extends ConsumerWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _SectionHeader('Waiting for votes', helpId: 'challengeVoting'),
+                  const _SectionHeader(
+                    'Waiting for votes',
+                    helpId: 'challengeVoting',
+                  ),
                   ...list.map(
                     (c) =>
                         ChallengeVoteBanner(challenge: c, circleId: circleId),
@@ -84,7 +87,10 @@ class CircleChallengesView extends ConsumerWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _SectionHeader('Active challenges', helpId: 'challengeVoting'),
+                  const _SectionHeader(
+                    'Active challenges',
+                    helpId: 'challengeVoting',
+                  ),
                   ...list.map(
                     (c) => c.mode == ChallengeMode.competition
                         ? _CompetitionChallengeCard(
@@ -160,9 +166,7 @@ class _SectionHeader extends StatelessWidget {
     );
     return Padding(
       padding: const EdgeInsets.only(bottom: 10, top: 4),
-      child: helpId == null
-          ? label
-          : Row(children: [label, HelpDot(helpId!)]),
+      child: helpId == null ? label : Row(children: [label, HelpDot(helpId!)]),
     );
   }
 }
@@ -858,13 +862,11 @@ class _StakeEntryCard extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border:
-                Border.all(color: AppColors.coral.withValues(alpha: 0.35)),
+            border: Border.all(color: AppColors.coral.withValues(alpha: 0.35)),
           ),
           child: Row(
             children: [
-              Icon(Icons.local_fire_department_rounded,
-                  color: AppColors.coral),
+              Icon(Icons.local_fire_department_rounded, color: AppColors.coral),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

@@ -10,8 +10,12 @@ void main() {
       ProviderScope(
         overrides: [
           executionDayTasksProvider.overrideWith((ref) async => const []),
-          todayAllTasksRowsProvider.overrideWith((ref) => Stream.value(const [])),
-          openTasksOutsideTodayProvider.overrideWith((ref) async => const []),
+          todayAllTasksRowsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
+          openTasksOutsideTodayProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
         ],
         child: const CoachForLifeApp(),
       ),

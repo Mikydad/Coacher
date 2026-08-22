@@ -165,6 +165,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
 
   Widget _buildNameField() {
     return TextFormField(
+      textCapitalization: TextCapitalization.words,
       controller: _nameController,
       style: TextStyle(color: AppColors.textPrimary),
       maxLength: 40,
@@ -181,6 +182,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
 
   Widget _buildDescField() {
     return TextFormField(
+      textCapitalization: TextCapitalization.sentences,
       controller: _descController,
       style: TextStyle(color: AppColors.textPrimary),
       maxLines: 3,

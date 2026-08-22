@@ -45,11 +45,15 @@ class GoalDetailScreen extends ConsumerWidget {
             (g.customLabel?.isNotEmpty ?? false)
         ? g.customLabel!
         : g.measurementKind.displayLabel().toLowerCase();
-    final suffix = switch (g.horizon) {
-      GoalHorizon.weekly => 'this week',
-      GoalHorizon.monthly => 'this month',
-      GoalHorizon.daily => 'per day',
-      GoalHorizon.entireGoal => 'over the entire goal',
+    // Derive from the repeat schedule — the same semantics the editor's
+    // "Target (per N days)" label and the progress window use. Horizon
+    // alone said "per day" for an every-N-days goal (2026-08-23).
+    final n = g.repeatInterval;
+    final suffix = switch (g.repeatCadence) {
+      GoalRepeatCadence.off => 'over the entire goal',
+      GoalRepeatCadence.daily => n <= 1 ? 'per day' : 'per $n-day cycle',
+      GoalRepeatCadence.weekly => n <= 1 ? 'per week' : 'per $n-week cycle',
+      GoalRepeatCadence.monthly => n <= 1 ? 'per month' : 'per $n-month cycle',
     };
     return '${g.targetValue == g.targetValue.roundToDouble() ? g.targetValue.toInt() : g.targetValue} $unit ($suffix)';
   }
@@ -1090,6 +1094,7 @@ class _NewMilestoneDialogState extends State<_NewMilestoneDialog> {
     return AlertDialog(
       title: const Text('New milestone'),
       content: TextField(
+        textCapitalization: TextCapitalization.sentences,
         controller: _ctrl,
         autofocus: true,
         decoration: const InputDecoration(hintText: 'e.g. Finish lesson 1'),

@@ -2044,6 +2044,7 @@ Future<({OverrideReasonCategory reason, String note})?> _promptOverrideReason(
                 ),
                 const SizedBox(height: 10),
                 TextField(
+                  textCapitalization: TextCapitalization.sentences,
                   controller: noteCtrl,
                   maxLines: 2,
                   decoration: const InputDecoration(

@@ -125,6 +125,8 @@ class GoalEditorTextField extends StatelessWidget {
           validator: validator,
           keyboardType: keyboardType,
           autofocus: autofocus,
+          // Numeric-keyboard uses are unaffected (no letters on the pad).
+          textCapitalization: TextCapitalization.sentences,
           style: TextStyle(
             color: AppColors.fg,
             fontWeight: FontWeight.w600,
@@ -1342,6 +1344,7 @@ class GoalEditorSetupStepRow extends StatelessWidget {
                   child: TextField(
                     controller: controller,
                     onChanged: onChanged,
+                    textCapitalization: TextCapitalization.sentences,
                     style: TextStyle(
                       color: AppColors.fg,
                       fontSize: 15,

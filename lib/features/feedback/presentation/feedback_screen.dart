@@ -133,6 +133,7 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
         const SettingsSectionHeader(label: 'Tell us more'),
         const SizedBox(height: 12),
         TextField(
+          textCapitalization: TextCapitalization.sentences,
           controller: _messageController,
           onChanged: (_) => setState(() {}),
           minLines: 5,

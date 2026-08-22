@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/context_override_providers.dart';
 import '../application/context_override_service.dart';
 import '../application/override_attention_policy.dart';
+import '../application/sleep_window_util.dart';
 import '../domain/models/context_override.dart';
 import 'widgets/attention_mode_widgets.dart';
 import '../../../core/presentation/app_colors.dart';
@@ -204,6 +205,10 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
     DateTime? expiresAt;
     if (preset.label == 'Custom') {
       expiresAt = DateTime.now().add(Duration(minutes: _customMinutes));
+    } else if (preset.label == 'Until morning') {
+      // Ends at the configured sleep window's wake time (07:00 default).
+      final state = ref.read(attentionStateProvider).valueOrNull;
+      expiresAt = nextMorningAfter(DateTime.now(), state?.sleepWindowEnd);
     } else if (preset.duration != null) {
       expiresAt = DateTime.now().add(preset.duration!);
     }

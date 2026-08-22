@@ -104,7 +104,9 @@ class LocalNotificationsService
           ),
         ],
       ),
-      android: const AndroidInitializationSettings('@mipmap/ic_launcher'),
+      // White-on-transparent SidePal mark — Android status-bar icons must be
+      // monochrome; the launcher icon rendered as the stock Flutter logo.
+      android: const AndroidInitializationSettings('@drawable/ic_stat_sidepal'),
     );
     await _plugin.initialize(
       initializationSettings,
@@ -267,7 +269,8 @@ class LocalNotificationsService
   /// Notifications scheduled but not yet delivered (the queue iOS caps at 64).
   /// Distinct from [getActiveNotifications], which reads the delivered tray.
   @override
-  Future<List<PendingNotificationRequest>> getPendingNotificationRequests() async {
+  Future<List<PendingNotificationRequest>>
+  getPendingNotificationRequests() async {
     try {
       return await _plugin.pendingNotificationRequests();
     } catch (_) {

@@ -83,18 +83,21 @@ class FeedbackContextCollector {
           : Platform.operatingSystem;
     }, () => out['platform'] = 'unknown');
 
-    await _guardAsync(() async {
-      if (_deviceModel == null) {
-        final info = await _deviceInfoLoader();
-        _deviceModel = info['model'];
-        _osVersion = info['osVersion'];
-      }
-      out['deviceModel'] = _deviceModel ?? 'unknown';
-      out['osVersion'] = _osVersion ?? 'unknown';
-    }, () {
-      out['deviceModel'] = 'unknown';
-      out['osVersion'] = 'unknown';
-    });
+    await _guardAsync(
+      () async {
+        if (_deviceModel == null) {
+          final info = await _deviceInfoLoader();
+          _deviceModel = info['model'];
+          _osVersion = info['osVersion'];
+        }
+        out['deviceModel'] = _deviceModel ?? 'unknown';
+        out['osVersion'] = _osVersion ?? 'unknown';
+      },
+      () {
+        out['deviceModel'] = 'unknown';
+        out['osVersion'] = 'unknown';
+      },
+    );
 
     _guard(
       () => out['uid'] = FirestorePaths.activeUid,

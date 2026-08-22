@@ -187,12 +187,9 @@ final todayAllTasksRowsProvider = StreamProvider<List<PlannedTaskRow>>((ref) {
   return _todayRowsWatchStream(ref);
 });
 
-/// Open tasks on other plan days (bounded window around today).
-final openTasksOutsideTodayProvider = FutureProvider<List<PlannedTaskRow>>((
-  ref,
+Future<List<PlannedTaskRow>> _collectOpenTasksOutsideToday(
+  PlanningRepository repo,
 ) async {
-  // watch: re-runs when the repository re-scopes on account switch.
-  final repo = ref.watch(planningRepositoryProvider);
   final today = DateKeys.todayKey();
   final now = DateTime.now();
   final base = DateTime(now.year, now.month, now.day);
@@ -220,6 +217,55 @@ final openTasksOutsideTodayProvider = FutureProvider<List<PlannedTaskRow>>((
     return a.task.orderIndex.compareTo(b.task.orderIndex);
   });
   return rows;
+}
+
+/// Open tasks on other plan days (bounded window around today). Reactive via
+/// the same Isar watchers as the Today list — a one-shot FutureProvider here
+/// left deleted rows on screen until the next sync pull ("delete doesn't
+/// work", 2026-08-23).
+final openTasksOutsideTodayProvider = StreamProvider<List<PlannedTaskRow>>((
+  ref,
+) {
+  // watch: re-subscribes when the repository re-scopes on account switch.
+  final repo = ref.watch(planningRepositoryProvider);
+  final isar = ref.watch(offlineStoreProvider).isar;
+  if (isar == null) {
+    return Stream.value(const <PlannedTaskRow>[]);
+  }
+
+  final controller = StreamController<List<PlannedTaskRow>>.broadcast();
+
+  Future<void> emit() async {
+    try {
+      final rows = await _collectOpenTasksOutsideToday(repo);
+      if (!controller.isClosed) controller.add(rows);
+    } catch (e, st) {
+      if (!controller.isClosed) controller.addError(e, st);
+    }
+  }
+
+  unawaited(emit());
+
+  final subs = <StreamSubscription<void>>[
+    isar.isarTasks
+        .watchLazy(fireImmediately: false)
+        .listen((_) => unawaited(emit())),
+    isar.isarRoutines
+        .watchLazy(fireImmediately: false)
+        .listen((_) => unawaited(emit())),
+    isar.isarBlocks
+        .watchLazy(fireImmediately: false)
+        .listen((_) => unawaited(emit())),
+  ];
+
+  ref.onDispose(() {
+    for (final s in subs) {
+      s.cancel();
+    }
+    controller.close();
+  });
+
+  return controller.stream;
 });
 
 /// Invalidate non-stream task sources (e.g. after resume). Today/home streams update from Isar automatically.

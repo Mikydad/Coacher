@@ -19,6 +19,9 @@ class AuthTextField extends StatelessWidget {
     this.autofillHints,
     this.focusNode,
     this.enabled = true,
+    // Default none: most auth fields are email/password, where
+    // auto-capitalization breaks input. Name fields pass `.words`.
+    this.textCapitalization = TextCapitalization.none,
   });
 
   final String label;
@@ -31,12 +34,14 @@ class AuthTextField extends StatelessWidget {
   final Iterable<String>? autofillHints;
   final FocusNode? focusNode;
   final bool enabled;
+  final TextCapitalization textCapitalization;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       obscureText: obscure,
+      textCapitalization: textCapitalization,
       keyboardType: keyboardType,
       textInputAction: textInputAction,
       onSubmitted: onSubmitted,

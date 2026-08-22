@@ -257,8 +257,7 @@ class MemoryExtractionService {
       String? personId;
       if (candidate.personName != null) {
         personId = personIdByName[candidate.personName!.toLowerCase()];
-        personId ??=
-            (await _people.findByReference(candidate.personName!))?.id;
+        personId ??= (await _people.findByReference(candidate.personName!))?.id;
       }
       await _facts.upsertFact(
         MemoryFact(

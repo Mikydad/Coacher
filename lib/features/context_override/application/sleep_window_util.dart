@@ -26,6 +26,24 @@ bool isWithinSleepWindow(DateTime now, String? windowStart, String? windowEnd) {
   }
 }
 
+/// Next occurrence of the sleep window's end ("wake time") strictly after
+/// [now]. Falls back to 07:00 when no window is configured — used by the
+/// quick-activate sheet's "Until morning" preset.
+DateTime nextMorningAfter(DateTime now, String? windowEnd) {
+  final minutes = _parseHHmm(windowEnd ?? '') ?? 7 * 60;
+  var candidate = DateTime(
+    now.year,
+    now.month,
+    now.day,
+    minutes ~/ 60,
+    minutes % 60,
+  );
+  if (!candidate.isAfter(now)) {
+    candidate = candidate.add(const Duration(days: 1));
+  }
+  return candidate;
+}
+
 /// Parses a `"HH:mm"` string into total minutes since midnight.
 /// Returns null on parse failure.
 int? _parseHHmm(String raw) {

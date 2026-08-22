@@ -359,6 +359,7 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
               // keyboard's done action) to launch a focus session immediately —
               // no round-trip through the task list below.
               TextField(
+                textCapitalization: TextCapitalization.sentences,
                 controller: _quickController,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _onQuickStart(),

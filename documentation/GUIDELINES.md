@@ -1604,3 +1604,33 @@ not silent reversal.
   only the most imminent promise (soonest planned day; ties and undated →
   most recently updated) with the rest collapsed behind a 260 ms chevron,
   radar-section style.
+
+- **2026-08-23 (round 2) · Polish batch: sentence-case inputs, visible
+  picker confirm, sleep durations, live other-days list, SidePal Android
+  icons, target-cycle copy.** (1) All free-text inputs auto-capitalize:
+  `AddTaskField`/`GoalEditorTextField`/setup-step rows default to
+  `.sentences`; `AuthTextField` gained an opt-in param defaulting to
+  `.none` (email/password safety) with `.words` at name call sites; ~18
+  raw fields patched individually. Deliberately untouched: email,
+  password, typed-confirmation guards (DELETE/CONFIRM), search, numeric,
+  and the lowercase custom-unit hint. (2) The goal date-range picker's
+  "Set duration" is now a filled pill button (DatePickerTheme
+  `confirmButtonStyle` via the picker `builder`); help text enlarged.
+  (3) Sleep mode gained duration presets — Until morning (resolves to the
+  sleep window's end via `nextMorningAfter`, 07:00 fallback), 8 hours,
+  Custom slider, Until I end it. The daily sleep window remains the
+  schedule-driven path. (4) `openTasksOutsideTodayProvider` is now an
+  Isar-watch StreamProvider like the Today list — the one-shot
+  FutureProvider left deleted rows visible until the next sync pull;
+  `confirmDeletePlannedTask` also runs `invalidateTaskListProviders`.
+  (5) Android launcher icons regenerated from `assets/images/
+  sidepal_logo.png` (logo on white, matching iOS) and a white-on-
+  transparent `ic_stat_sidepal` status-bar mark added, wired into
+  `AndroidInitializationSettings` and the FCM
+  `default_notification_icon` meta-data — needs a rebuild to show.
+  (6) Target-per-cycle semantics kept (target = quota per repeat cycle,
+  matching `evaluationWindow`); the editor caption now explains it in a
+  sentence ("Reach this amount within each N-day cycle — progress resets
+  when a new cycle starts") and the goal detail target line derives from
+  repeatCadence/interval instead of horizon, which contradicted the
+  editor for every-N-day goals.

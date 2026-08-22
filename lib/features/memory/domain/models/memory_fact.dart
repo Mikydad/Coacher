@@ -42,7 +42,12 @@ MemoryFactKind memoryFactKindFromStorage(String? raw) {
 /// - [aiInferred]: auto-saved silently but always labeled "Inferred";
 ///   hedged in conversation, advisory-only in scheduling, corroborated or
 ///   decayed by suggestion responses.
-enum MemoryProvenance { userStated, userConfirmed, derivedDeterministic, aiInferred }
+enum MemoryProvenance {
+  userStated,
+  userConfirmed,
+  derivedDeterministic,
+  aiInferred,
+}
 
 MemoryProvenance memoryProvenanceFromStorage(String? raw) {
   for (final v in MemoryProvenance.values) {

@@ -20,26 +20,72 @@ PersonKind normalizeRelationship(String? freeForm) {
   if (freeForm == null) return PersonKind.other;
   final r = freeForm.toLowerCase().trim();
   const family = {
-    'mom', 'mother', 'dad', 'father', 'parent', 'sister', 'brother',
-    'sibling', 'son', 'daughter', 'child', 'kid', 'grandma', 'grandmother',
-    'grandpa', 'grandfather', 'aunt', 'uncle', 'cousin', 'nephew', 'niece',
-    'in-law', 'family',
+    'mom',
+    'mother',
+    'dad',
+    'father',
+    'parent',
+    'sister',
+    'brother',
+    'sibling',
+    'son',
+    'daughter',
+    'child',
+    'kid',
+    'grandma',
+    'grandmother',
+    'grandpa',
+    'grandfather',
+    'aunt',
+    'uncle',
+    'cousin',
+    'nephew',
+    'niece',
+    'in-law',
+    'family',
   };
   const partner = {
-    'wife', 'husband', 'spouse', 'partner', 'girlfriend', 'boyfriend',
-    'fiancée', 'fiancé', 'fiancee', 'fiance',
+    'wife',
+    'husband',
+    'spouse',
+    'partner',
+    'girlfriend',
+    'boyfriend',
+    'fiancée',
+    'fiancé',
+    'fiancee',
+    'fiance',
   };
   const work = {
-    'boss', 'manager', 'colleague', 'coworker', 'co-worker', 'cofounder',
-    'co-founder', 'client', 'mentor', 'mentee', 'teammate', 'assistant',
-    'employee', 'investor', 'business partner',
+    'boss',
+    'manager',
+    'colleague',
+    'coworker',
+    'co-worker',
+    'cofounder',
+    'co-founder',
+    'client',
+    'mentor',
+    'mentee',
+    'teammate',
+    'assistant',
+    'employee',
+    'investor',
+    'business partner',
   };
   const community = {
-    'neighbor', 'neighbour', 'coach', 'trainer', 'teacher', 'professor',
-    'classmate', 'roommate', 'flatmate', 'teammate',
+    'neighbor',
+    'neighbour',
+    'coach',
+    'trainer',
+    'teacher',
+    'professor',
+    'classmate',
+    'roommate',
+    'flatmate',
+    'teammate',
   };
-  bool matches(Set<String> kinds) =>
-      kinds.any((k) => r == k || r.contains(k));
+  bool matches(Set<String> kinds) => kinds.any((k) => r == k || r.contains(k));
   if (matches(family)) return PersonKind.family;
   if (matches(partner)) return PersonKind.partner;
   if (matches(work)) return PersonKind.work;

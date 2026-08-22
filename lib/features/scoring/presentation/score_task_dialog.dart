@@ -115,6 +115,7 @@ class _ScoreTaskDialogState extends State<ScoreTaskDialog> {
               onChanged: (v) => setState(() => _percent = v),
             ),
             TextField(
+              textCapitalization: TextCapitalization.sentences,
               controller: _reasonCtrl,
               minLines: 2,
               maxLines: 4,

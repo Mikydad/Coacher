@@ -87,9 +87,7 @@ class _TesterReportSheetState extends ConsumerState<TesterReportSheet> {
     final canSend = _messageController.text.trim().isNotEmpty && !_submitting;
     final screenshot = widget.screenshot;
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(context).bottom,
-      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.ink,
@@ -175,6 +173,7 @@ class _TesterReportSheetState extends ConsumerState<TesterReportSheet> {
               ),
               const SizedBox(height: 16),
               TextField(
+                textCapitalization: TextCapitalization.sentences,
                 controller: _messageController,
                 onChanged: (_) => setState(() {}),
                 autofocus: true,

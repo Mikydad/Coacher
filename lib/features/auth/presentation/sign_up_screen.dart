@@ -193,6 +193,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 label: 'Display name (optional)',
                 controller: _nameCtrl,
                 keyboardType: TextInputType.name,
+                textCapitalization: TextCapitalization.words,
                 textInputAction: TextInputAction.next,
                 onSubmitted: (_) =>
                     FocusScope.of(context).requestFocus(_emailFocus),
