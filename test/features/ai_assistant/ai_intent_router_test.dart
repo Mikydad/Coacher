@@ -34,6 +34,21 @@ void main() {
       (input: 'explain how to set a reminder', kind: AiIntentKind.query, focus: null),
       (input: 'Which mode should I use', kind: AiIntentKind.query, focus: null),
       (input: 'tell me about circles', kind: AiIntentKind.query, focus: null),
+      // Greetings / small talk / polite closers must never route MUTATE —
+      // the mutate hint primed the model to invent plans for "Hi"
+      // (2026-08-22 bug batch).
+      (input: 'Hi', kind: AiIntentKind.query, focus: null),
+      (input: 'hey how are you', kind: AiIntentKind.query, focus: null),
+      (input: 'Good morning!', kind: AiIntentKind.query, focus: null),
+      (input: 'thanks', kind: AiIntentKind.query, focus: null),
+      (input: 'No thank you', kind: AiIntentKind.query, focus: null),
+      (input: "what's up", kind: AiIntentKind.query, focus: null),
+      (input: 'hi how are you doing', kind: AiIntentKind.query, focus: null),
+      (input: 'How are you doing today', kind: AiIntentKind.query, focus: AiFocusDate.today),
+      // Truncated STT greeting fragments must not become plans.
+      (input: 'You doing', kind: AiIntentKind.query, focus: null),
+      // …but a greeting that carries a real command still mutates.
+      (input: 'hi add a workout at 6am', kind: AiIntentKind.mutate, focus: null),
     ];
 
     for (final c in cases) {

@@ -580,10 +580,20 @@ export const aiChatStream = onRequest(
     timeoutSeconds: 120,
     memory: "256MiB",
     maxInstances: 10,
-    minInstances: 0,
+    // Voice Level 2 made this the spoken-turn critical path — the first
+    // conversational turn after idle was paying its full cold start
+    // (first-turn latency fix 2026-08-22). Same one-warm-instance trade as
+    // aiChat and aiSpeechStream.
+    minInstances: 1,
   },
   async (req, res) => {
     const tStart = Date.now();
+    // Warmup ping from the client when Voice Mode opens: spins the
+    // instance and warms the TLS path, no work done.
+    if (req.method === "GET") {
+      res.status(204).end();
+      return;
+    }
     if (req.method !== "POST") {
       res.status(405).json({ error: "POST only." });
       return;

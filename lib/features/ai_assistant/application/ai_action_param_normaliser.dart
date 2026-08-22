@@ -97,6 +97,15 @@ abstract final class AiActionParamNormaliser {
     for (final key in _timeKeys) {
       final raw = p[key];
       if (raw is! String || raw.trim().isEmpty) continue;
+      // Model junk that cannot possibly be a clock time ("min", "morning
+      // ish") must not survive as a value — it would pass the missing-field
+      // check and reach the preview card as "at min". Dropping it lets the
+      // Assumption Engine fill it or the detector ask properly.
+      if (!RegExp(r'\d').hasMatch(raw)) {
+        p.remove(key);
+        changed = true;
+        continue;
+      }
       final range = _splitTimeRange(raw);
       final canonical = canonicaliseTime(range?.$1 ?? raw);
       if (canonical != null && canonical != raw) {

@@ -208,6 +208,12 @@ class AiIntentParser {
     // Carry the correct sessionId (client may return the user input as id)
     result = result.copyWith(sessionId: sessionId);
 
+    // Destructive-action guard: the model has answered a polite decline
+    // ("no thank you") with a delete-everything plan (2026-08-22 bug
+    // batch). Deletions only survive when the user's own words asked for
+    // one — or when they're refining a plan that already contained them.
+    result = _stripUnrequestedDeletes(result, userInput, previousPlan);
+
     // Step 3 — Router guardrails before mutation pipeline.
     result = _applyRouterGuardrails(result, route, payload);
 
@@ -312,6 +318,52 @@ class AiIntentParser {
           ? (result.informationalMessage ??
                 _defaultSuggestMessage(enrichedActions))
           : result.informationalMessage,
+    );
+  }
+
+  /// Action types that permanently destroy user data.
+  static const _deleteActionTypes = {
+    ActionType.deleteTask,
+    ActionType.deleteGoal,
+    ActionType.removeReminder,
+  };
+
+  /// Words that constitute an explicit request to destroy something.
+  static final _deleteIntentPattern = RegExp(
+    r'\b(delete|remove|clear|cancel|drop|erase|wipe|trash|scrap|'
+    r'get rid|un ?schedule|take (it|that|them|this) off)\b',
+  );
+
+  /// Drops delete-type actions the user never asked for. When nothing is
+  /// left, the turn degrades to an honest no-op answer instead of an empty
+  /// plan.
+  AiPlannedChanges _stripUnrequestedDeletes(
+    AiPlannedChanges result,
+    String userInput,
+    AiPlannedChanges? previousPlan,
+  ) {
+    if (result.actions.isEmpty) return result;
+    final hasDeletes = result.actions.any(
+      (a) => _deleteActionTypes.contains(a.actionType),
+    );
+    if (!hasDeletes) return result;
+    final allowed =
+        _deleteIntentPattern.hasMatch(userInput.toLowerCase()) ||
+        (previousPlan?.actions.any(
+              (a) => _deleteActionTypes.contains(a.actionType),
+            ) ??
+            false);
+    if (allowed) return result;
+    final kept = result.actions
+        .where((a) => !_deleteActionTypes.contains(a.actionType))
+        .toList();
+    if (kept.isNotEmpty) return result.copyWith(actions: kept);
+    return AiPlannedChanges(
+      sessionId: result.sessionId,
+      responseType: AiResponseType.informational,
+      informationalMessage:
+          "I didn't change anything. If you want something deleted, just "
+          'tell me which item.',
     );
   }
 

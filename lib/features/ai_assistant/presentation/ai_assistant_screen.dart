@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../education/presentation/first_time_feature_card.dart';
 import '../../education/presentation/help_dot.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -19,6 +21,7 @@ import '../domain/models/ai_planned_changes.dart';
 import '../../../core/ai/ai_proxy_client.dart';
 import '../application/voice_mode_adapters.dart';
 import '../application/voice_mode_controller.dart';
+import '../application/voice_warmup.dart';
 import '../application/voice_tts_resilience.dart';
 import '../application/voice_tts_streaming.dart';
 import 'widgets/ai_input_card.dart';
@@ -483,6 +486,23 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   }) {
     if (_voiceController != null) return;
     dismissKeyboard(context);
+    // First-turn latency: warm the auth cache, TLS pool, and function
+    // instances NOW, while the user is still raising the phone — the first
+    // utterance is seconds away and would otherwise pay every cold cost.
+    final projectId = Firebase.app().options.projectId;
+    unawaited(
+      warmVoiceEndpoints(
+        endpoints: [
+          Uri.parse(
+            'https://us-central1-$projectId.cloudfunctions.net/aiChatStream',
+          ),
+          Uri.parse(
+            'https://us-central1-$projectId.cloudfunctions.net/aiSpeechStream',
+          ),
+        ],
+        idToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
+      ),
+    );
     // Coach voice: OpenAI TTS (streamed or buffered per the spike flag),
     // degrading silently to the on-device system voice when the network
     // can't deliver — the loop itself never stalls.
@@ -491,11 +511,10 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     if (_kStreamingTts) {
       primary = StreamingOpenAiTtsVoiceAdapter(
         endpoint: Uri.parse(
-          'https://us-central1-${Firebase.app().options.projectId}'
+          'https://us-central1-$projectId'
           '.cloudfunctions.net/aiSpeechStream',
         ),
-        idToken: () async =>
-            FirebaseAuth.instance.currentUser?.getIdToken(),
+        idToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
       );
     } else {
       primary = OpenAiTtsVoiceAdapter(
@@ -518,8 +537,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       _voiceReachedFull = false;
     });
     controller.start(
-      listenDelay:
-          externalLaunch ? const Duration(milliseconds: 900) : null,
+      listenDelay: externalLaunch ? const Duration(milliseconds: 900) : null,
     );
     // Background sync stays off the network while voice is live — pulls
     // and outbox storms were competing with voice turns for bandwidth.
@@ -617,6 +635,22 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   Future<void> _exitVoiceModeToType() async {
     await _exitVoiceMode();
     if (mounted) _inputFocusNode.requestFocus();
+  }
+
+  /// Edit Plan on the preview card. In Voice Mode the keyboard-focus
+  /// affordance is invisible (the button appeared to do nothing) — prompt
+  /// by voice instead and let the spoken answer refine the pending plan
+  /// through the normal send path.
+  void _onEditPlanPressed(AiAssistantService service) {
+    final voice = _voiceController;
+    if (voice != null && voice.isActive) {
+      service.editPlan(focusInput: false);
+      unawaited(
+        voice.promptAndListen('Okay — what should I change about the plan?'),
+      );
+      return;
+    }
+    service.editPlan();
   }
 
   /// Voice utterances travel the exact same path as typed messages; the
@@ -892,6 +926,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                                   _inputController.text = prompt;
                                   _inputFocusNode.requestFocus();
                                 },
+                                onEditPlan: () => _onEditPlanPressed(service),
                               )
                             : _buildEmptyState(),
                       ),
@@ -1171,6 +1206,7 @@ class _MessageList extends StatelessWidget {
     required this.scrollController,
     required this.isLoading,
     required this.onSuggestedPrompt,
+    required this.onEditPlan,
   });
 
   final List<AiChatMessage> messages;
@@ -1178,6 +1214,9 @@ class _MessageList extends StatelessWidget {
   final ScrollController scrollController;
   final bool isLoading;
   final void Function(String prompt) onSuggestedPrompt;
+
+  /// Edit Plan on the preview card — voice-aware at the screen level.
+  final VoidCallback onEditPlan;
 
   @override
   Widget build(BuildContext context) {
@@ -1196,6 +1235,7 @@ class _MessageList extends StatelessWidget {
           message: msg,
           service: service,
           onSuggestedPrompt: onSuggestedPrompt,
+          onEditPlan: onEditPlan,
         );
       },
     );
@@ -1367,11 +1407,13 @@ class _MessageItem extends StatelessWidget {
     required this.message,
     required this.service,
     required this.onSuggestedPrompt,
+    required this.onEditPlan,
   });
 
   final AiChatMessage message;
   final AiAssistantService service;
   final void Function(String prompt) onSuggestedPrompt;
+  final VoidCallback onEditPlan;
 
   @override
   Widget build(BuildContext context) {
@@ -1388,9 +1430,10 @@ class _MessageItem extends StatelessWidget {
             plan: plan,
             isCurrentPlan: message.isCurrentPlan,
             isExecuted: message.isExecuted,
+            isCancelled: message.isCancelled,
             isLoading: service.isLoading,
             onConfirm: () => service.confirmPlan(plan, message.id),
-            onEdit: service.editPlan,
+            onEdit: onEditPlan,
             onCancel: service.cancelPlan,
           ),
         ],
@@ -1398,10 +1441,55 @@ class _MessageItem extends StatelessWidget {
     }
 
     if (message.hasDraftPlan) {
+      final draftActions = message.draftPlan!.actions;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           AssistantMessageBubble(content: message.content),
+          // The plan's items, always visible — the model's prose doesn't
+          // reliably describe them, and a bare "Apply this plan" button
+          // with nothing above it reads as a glitch (2026-08-22).
+          if (draftActions.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.inkDeep,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final action in draftActions)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(top: 5),
+                            child: Icon(
+                              Icons.circle,
+                              size: 5,
+                              color: AppColors.accentDim,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              describePlannedAction(action),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.grayBright,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
           if (message.suggestedPrompts.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/presentation/app_colors.dart';
@@ -27,28 +28,41 @@ class CoachAiFab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final hasBlockedPlan =
-        ref.watch(resolvedAiAssistantProvider).whenOrNull(
+        ref
+            .watch(resolvedAiAssistantProvider)
+            .whenOrNull(
               data: (svc) => svc.pendingPlan?.isBlockedByContext == true,
             ) ??
-            false;
+        false;
 
-    final fab = FloatingActionButton(
-      // Multiple instances live in the tab IndexedStack at once — opt out
-      // of Hero animation entirely so route transitions never collide.
-      heroTag: null,
-      mini: mini,
-      onPressed: () => showCoachAiSheet(context, askBar: true),
-      elevation: 0,
-      highlightElevation: 0,
-      splashColor: _accent.withValues(alpha: 0.12),
-      backgroundColor: AppColors.inkCard,
-      shape: CircleBorder(
-        side: BorderSide(color: _accent.withValues(alpha: 0.35)),
-      ),
-      child: Icon(
-        Icons.auto_awesome_rounded,
-        color: _accent,
-        size: mini ? 18 : 22,
+    // Long-press = straight into Voice Mode (2026-08-22): the same
+    // programmatic entry Siri uses; a plain tap keeps opening typed chat.
+    final fab = GestureDetector(
+      onLongPress: () {
+        HapticFeedback.mediumImpact();
+        showCoachAiSheet(
+          context,
+          args: const CoachRouteArgs(startVoiceMode: true),
+        );
+      },
+      child: FloatingActionButton(
+        // Multiple instances live in the tab IndexedStack at once — opt out
+        // of Hero animation entirely so route transitions never collide.
+        heroTag: null,
+        mini: mini,
+        onPressed: () => showCoachAiSheet(context, askBar: true),
+        elevation: 0,
+        highlightElevation: 0,
+        splashColor: _accent.withValues(alpha: 0.12),
+        backgroundColor: AppColors.inkCard,
+        shape: CircleBorder(
+          side: BorderSide(color: _accent.withValues(alpha: 0.35)),
+        ),
+        child: Icon(
+          Icons.auto_awesome_rounded,
+          color: _accent,
+          size: mini ? 18 : 22,
+        ),
       ),
     );
 

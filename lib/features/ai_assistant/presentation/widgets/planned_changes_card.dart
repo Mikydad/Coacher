@@ -11,6 +11,7 @@ class PlannedChangesCard extends StatelessWidget {
     required this.plan,
     required this.isCurrentPlan,
     this.isExecuted = false,
+    this.isCancelled = false,
     required this.onConfirm,
     required this.onEdit,
     required this.onCancel,
@@ -20,6 +21,7 @@ class PlannedChangesCard extends StatelessWidget {
   final AiPlannedChanges plan;
   final bool isCurrentPlan;
   final bool isExecuted;
+  final bool isCancelled;
   final VoidCallback onConfirm;
   final VoidCallback onEdit;
   final VoidCallback onCancel;
@@ -70,8 +72,10 @@ class PlannedChangesCard extends StatelessWidget {
             const SizedBox(height: 8),
             _HighRiskWarning(count: plan.highRiskCount),
           ],
-          // Confirm on any unexecuted card; Edit/Cancel only on the latest plan.
-          if (!isExecuted) ...[
+          // Buttons only on the LIVE plan. A cancelled, superseded, or
+          // applied card is inert — a stale Confirm was one accidental tap
+          // from executing a rejected delete-plan (2026-08-22 bug batch).
+          if (isCurrentPlan && !isExecuted && !isCancelled) ...[
             const SizedBox(height: 16),
             _ActionButtons(
               onConfirm: onConfirm,
@@ -80,11 +84,13 @@ class PlannedChangesCard extends StatelessWidget {
               isLoading: isLoading,
               hasConflicts: plan.hasConflicts,
               isBlocked: plan.isBlockedByContext,
-              showEditCancel: isCurrentPlan,
             ),
           ] else if (isExecuted) ...[
             const SizedBox(height: 12),
             const _ExecutedLabel(),
+          ] else if (isCancelled) ...[
+            const SizedBox(height: 12),
+            const _CancelledLabel(),
           ],
         ],
       ),
@@ -174,71 +180,90 @@ class _ActionRow extends StatelessWidget {
     }
   }
 
-  String _describeAction(AiAction action) {
-    final p = action.parameters;
-    switch (action.actionType) {
-      case ActionType.createTask:
-        final title = p['title'] ?? 'Task';
-        final time = p['time'] != null ? ' (${p['time']})' : '';
-        final date = p['date'] != null ? ' on ${p['date']}' : '';
-        return 'Add $title$time$date';
+  String _describeAction(AiAction action) => describePlannedAction(action);
+}
 
-      case ActionType.editTask:
-        return 'Edit "${p['title'] ?? 'task'}"';
+/// A reminder time is only worth printing when it actually looks like a
+/// clock time — model drift has produced junk like "min" here, which
+/// rendered as the nonsense preview line "… at min".
+String? _timeLabel(dynamic raw) {
+  final s = raw?.toString().trim();
+  if (s == null || s.isEmpty) return null;
+  return RegExp(r'\d').hasMatch(s) ? s : null;
+}
 
-      case ActionType.moveTask:
-        return 'Move "${p['taskTitle'] ?? 'task'}" to ${p['destinationDate'] ?? '?'}';
+/// Human-readable one-liner for a planned action. Shared by the preview
+/// card rows and the draft-plan summary under suggestion bubbles — an
+/// "Apply this plan" button must never appear with nothing describing what
+/// it applies (2026-08-22 bug batch).
+String describePlannedAction(AiAction action) {
+  final p = action.parameters;
+  switch (action.actionType) {
+    case ActionType.createTask:
+      final title = p['title'] ?? 'Task';
+      final time = p['time'] != null ? ' (${p['time']})' : '';
+      final date = p['date'] != null ? ' on ${p['date']}' : '';
+      return 'Add $title$time$date';
 
-      case ActionType.deleteTask:
-        return 'Delete "${p['taskTitle'] ?? 'task'}"';
+    case ActionType.editTask:
+      return 'Edit "${p['title'] ?? 'task'}"';
 
-      case ActionType.createGoal:
-        return 'Create goal "${p['title'] ?? 'Goal'}"';
+    case ActionType.moveTask:
+      return 'Move "${p['taskTitle'] ?? 'task'}" to ${p['destinationDate'] ?? '?'}';
 
-      case ActionType.modifyGoal:
-        return 'Update goal "${p['goalTitle'] ?? 'goal'}"';
+    case ActionType.deleteTask:
+      return 'Delete "${p['taskTitle'] ?? 'task'}"';
 
-      case ActionType.deleteGoal:
-        return 'Remove goal "${p['goalTitle'] ?? 'goal'}"';
+    case ActionType.createGoal:
+      return 'Create goal "${p['title'] ?? 'Goal'}"';
 
-      case ActionType.addReminder:
-        return 'Add reminder for "${p['taskTitle'] ?? 'task'}" at ${p['reminderTime'] ?? '?'}';
+    case ActionType.modifyGoal:
+      return 'Update goal "${p['goalTitle'] ?? 'goal'}"';
 
-      case ActionType.removeReminder:
-        return 'Remove reminder for "${p['taskTitle'] ?? 'task'}"';
+    case ActionType.deleteGoal:
+      return 'Remove goal "${p['goalTitle'] ?? 'goal'}"';
 
-      case ActionType.rescheduleReminder:
-        return 'Reschedule reminder for "${p['taskTitle'] ?? 'task'}" to ${p['reminderTime'] ?? '?'}';
+    case ActionType.addReminder:
+      final at = _timeLabel(p['reminderTime']);
+      return 'Add reminder for "${p['taskTitle'] ?? 'task'}"'
+          '${at != null ? ' at $at' : ''}';
 
-      case ActionType.activateContextOverride:
-        final type = p['overrideType'] ?? 'focus';
-        final dur = p['durationMinutes'];
-        return 'Enable ${type.toString().replaceFirst(type[0], type[0].toUpperCase())} mode'
-            '${dur != null ? ' for $dur min' : ''}';
+    case ActionType.removeReminder:
+      return 'Remove reminder for "${p['taskTitle'] ?? 'task'}"';
 
-      case ActionType.endContextOverride:
-        return 'End active mode';
+    case ActionType.rescheduleReminder:
+      final to = _timeLabel(p['reminderTime']);
+      return 'Reschedule reminder for "${p['taskTitle'] ?? 'task'}"'
+          '${to != null ? ' to $to' : ''}';
 
-      case ActionType.suggestFreeTimeBlock:
-        return 'Find free time slot (${p['durationMinutes'] ?? '?'} min)';
+    case ActionType.activateContextOverride:
+      final type = p['overrideType'] ?? 'focus';
+      final dur = p['durationMinutes'];
+      return 'Enable ${type.toString().replaceFirst(type[0], type[0].toUpperCase())} mode'
+          '${dur != null ? ' for $dur min' : ''}';
 
-      case ActionType.moveConflictingTasks:
-        return 'Resolve schedule conflicts';
+    case ActionType.endContextOverride:
+      return 'End active mode';
 
-      // Normally auto-committed and never previewed; described anyway in
-      // case an intention rides along in a mixed batch.
-      case ActionType.createIntention:
-        return 'Remember "${p['title'] ?? 'promise'}"';
+    case ActionType.suggestFreeTimeBlock:
+      return 'Find free time slot (${p['durationMinutes'] ?? '?'} min)';
 
-      case ActionType.rememberFact:
-        return 'Remember "${p['content'] ?? 'fact'}"';
+    case ActionType.moveConflictingTasks:
+      return 'Resolve schedule conflicts';
 
-      case ActionType.updateFact:
-        return 'Update memory to "${p['newContent'] ?? '?'}"';
+    // Normally auto-committed and never previewed; described anyway in
+    // case an intention rides along in a mixed batch.
+    case ActionType.createIntention:
+      return 'Remember "${p['title'] ?? 'promise'}"';
 
-      case ActionType.forgetFact:
-        return 'Forget "${p['factRef'] ?? 'memory'}"';
-    }
+    case ActionType.rememberFact:
+      return 'Remember "${p['content'] ?? 'fact'}"';
+
+    case ActionType.updateFact:
+      return 'Update memory to "${p['newContent'] ?? '?'}"';
+
+    case ActionType.forgetFact:
+      return 'Forget "${p['factRef'] ?? 'memory'}"';
   }
 }
 
@@ -335,7 +360,6 @@ class _ActionButtons extends StatelessWidget {
     required this.isLoading,
     required this.hasConflicts,
     this.isBlocked = false,
-    this.showEditCancel = true,
   });
 
   final VoidCallback onConfirm;
@@ -344,7 +368,6 @@ class _ActionButtons extends StatelessWidget {
   final bool isLoading;
   final bool hasConflicts;
   final bool isBlocked;
-  final bool showEditCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -397,50 +420,43 @@ class _ActionButtons extends StatelessWidget {
                   ),
           ),
         ),
-        if (showEditCancel) ...[
-          const SizedBox(height: 10),
-          // EDIT PLAN + CANCEL — side by side
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: isLoading ? null : onEdit,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textSoft,
-                    side: BorderSide(
-                      color: AppColors.fg.withValues(alpha: 0.15),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                  child: const Text(
-                    'EDIT PLAN',
-                    style: TextStyle(fontSize: 12),
+        const SizedBox(height: 10),
+        // EDIT PLAN + CANCEL — side by side
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: isLoading ? null : onEdit,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textSoft,
+                  side: BorderSide(color: AppColors.fg.withValues(alpha: 0.15)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
+                child: const Text('EDIT PLAN', style: TextStyle(fontSize: 12)),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: isLoading ? null : onCancel,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.redAccent,
-                    side: BorderSide(
-                      color: Colors.redAccent.withValues(alpha: 0.3),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
-                    ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: isLoading ? null : onCancel,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.redAccent,
+                  side: BorderSide(
+                    color: Colors.redAccent.withValues(alpha: 0.3),
                   ),
-                  child: const Text('CANCEL', style: TextStyle(fontSize: 12)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
+                child: const Text('CANCEL', style: TextStyle(fontSize: 12)),
               ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -484,6 +500,26 @@ class _ExecutedLabel extends StatelessWidget {
         SizedBox(width: 6),
         Text(
           'Applied',
+          style: TextStyle(fontSize: 12, color: AppColors.textSoft),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Cancelled label ──────────────────────────────────────────────────────────
+
+class _CancelledLabel extends StatelessWidget {
+  const _CancelledLabel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(Icons.cancel_outlined, size: 14, color: AppColors.textSoft),
+        SizedBox(width: 6),
+        Text(
+          'Cancelled',
           style: TextStyle(fontSize: 12, color: AppColors.textSoft),
         ),
       ],

@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../../../core/presentation/keyboard_dismiss.dart';
@@ -54,62 +57,68 @@ class AiInputCard extends StatelessWidget {
             cursorColor: AppColors.cyan,
           ),
           const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _VoiceInputButton(
-                controller: controller,
-                enabled: !isLoading,
-                onVoiceModeRequested: onVoiceModeRequested,
-              ),
-              // Send button
-              ValueListenableBuilder<TextEditingValue>(
-                valueListenable: controller,
-                builder: (context2, value, child2) {
-                  final canSend = value.text.trim().isNotEmpty && !isLoading;
-                  return GestureDetector(
-                    onTap: canSend ? onSend : null,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: canSend
-                            ? AppColors.accentBright
-                            : AppColors.gray3A,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'SEND',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
+          // TextFieldTapRegion: the TextField's onTapOutside fires on
+          // pointer-DOWN, so without this a press on the mic (or Send)
+          // collapsed the keyboard instantly and yanked the whole composer
+          // out from under the finger mid-hold (2026-08-22 bug batch).
+          TextFieldTapRegion(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _VoiceInputButton(
+                  controller: controller,
+                  enabled: !isLoading,
+                  onVoiceModeRequested: onVoiceModeRequested,
+                ),
+                // Send button
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: controller,
+                  builder: (context2, value, child2) {
+                    final canSend = value.text.trim().isNotEmpty && !isLoading;
+                    return GestureDetector(
+                      onTap: canSend ? onSend : null,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: canSend
+                              ? AppColors.accentBright
+                              : AppColors.gray3A,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'SEND',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: canSend
+                                    ? AppColors.accentDeep
+                                    : AppColors.textFaint,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.play_arrow_rounded,
+                              size: 16,
                               color: canSend
                                   ? AppColors.accentDeep
                                   : AppColors.textFaint,
-                              letterSpacing: 0.5,
                             ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.play_arrow_rounded,
-                            size: 16,
-                            color: canSend
-                                ? AppColors.accentDeep
-                                : AppColors.textFaint,
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
-            ],
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -144,6 +153,7 @@ class _VoiceInputButtonState extends State<_VoiceInputButton> {
 
   @override
   void dispose() {
+    _holdTimer?.cancel();
     if (_listening) {
       _speech.stop();
     }
@@ -209,40 +219,83 @@ class _VoiceInputButtonState extends State<_VoiceInputButton> {
     );
   }
 
+  /// Hold-to-enter-Voice-Mode, hand-rolled instead of onLongPress so the
+  /// press acknowledges INSTANTLY (glow + haptic on finger-down, stronger
+  /// haptic at trigger) and fires faster than the stock 500ms — the old
+  /// silent hold read as "nothing is happening" while the layout shifted
+  /// (2026-08-22 bug batch).
+  static const _kVoiceHold = Duration(milliseconds: 350);
+
+  Timer? _holdTimer;
+  bool _pressed = false;
+  bool _voiceHoldFired = false;
+
+  void _onPressDown() {
+    _voiceHoldFired = false;
+    setState(() => _pressed = true);
+    HapticFeedback.selectionClick();
+    if (widget.onVoiceModeRequested == null) return;
+    _holdTimer = Timer(_kVoiceHold, () async {
+      if (!mounted) return;
+      _voiceHoldFired = true;
+      setState(() => _pressed = false);
+      HapticFeedback.mediumImpact();
+      // Never enter Voice Mode with the dictation mic still open.
+      if (_listening) {
+        await _speech.stop();
+        if (mounted) setState(() => _listening = false);
+      }
+      widget.onVoiceModeRequested!();
+    });
+  }
+
+  void _onPressEnd({required bool wasTap}) {
+    _holdTimer?.cancel();
+    _holdTimer = null;
+    if (_pressed && mounted) setState(() => _pressed = false);
+    // A quick release is the dictation tap; after the hold fired, the
+    // release is just the finger leaving.
+    if (wasTap && !_voiceHoldFired) _toggle();
+  }
+
   @override
   Widget build(BuildContext context) {
     final accent = AppColors.cyan;
+    final active = _listening || _pressed;
     return GestureDetector(
-      onTap: widget.enabled ? _toggle : null,
-      onLongPress: widget.enabled && widget.onVoiceModeRequested != null
-          ? () async {
-              // Never enter Voice Mode with the dictation mic still open.
-              if (_listening) {
-                await _speech.stop();
-                if (mounted) setState(() => _listening = false);
-              }
-              widget.onVoiceModeRequested!();
-            }
-          : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: _listening
-              ? accent.withValues(alpha: 0.18)
-              : Colors.transparent,
-          border: Border.all(
-            color: _listening
-                ? accent.withValues(alpha: 0.8)
-                : AppColors.fg.withValues(alpha: 0.12),
+      onTapDown: widget.enabled ? (_) => _onPressDown() : null,
+      onTap: widget.enabled ? () => _onPressEnd(wasTap: true) : null,
+      onTapCancel: widget.enabled ? () => _onPressEnd(wasTap: false) : null,
+      child: AnimatedScale(
+        scale: _pressed ? 1.12 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: active ? accent.withValues(alpha: 0.18) : Colors.transparent,
+            border: Border.all(
+              color: active
+                  ? accent.withValues(alpha: 0.8)
+                  : AppColors.fg.withValues(alpha: 0.12),
+            ),
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: _pressed
+                ? [
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.35),
+                      blurRadius: 14,
+                      spreadRadius: 2,
+                    ),
+                  ]
+                : const [],
           ),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Icon(
-          _listening ? Icons.mic_rounded : Icons.mic_none_rounded,
-          size: 20,
-          color: _listening ? accent : AppColors.textSoft,
+          child: Icon(
+            _listening || _pressed ? Icons.mic_rounded : Icons.mic_none_rounded,
+            size: 20,
+            color: active ? accent : AppColors.textSoft,
+          ),
         ),
       ),
     );

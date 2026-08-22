@@ -169,6 +169,15 @@ class AiAssistantService extends ChangeNotifier {
       return;
     }
 
+    // 0c. A short polite decline with no plan pending ("no thank you",
+    // "that's it") closes the exchange locally. It must NEVER reach the
+    // parser: the model has misread "no thank you" as a brand-new command —
+    // including proposing deletions of the very items it just listed
+    // (2026-08-22 bug batch).
+    if (_pendingPlan == null && _handleStandaloneDecline(userInput.trim())) {
+      return;
+    }
+
     // 1. Append user message
     _addMessage(
       AiChatMessage(
@@ -850,6 +859,10 @@ class AiAssistantService extends ChangeNotifier {
     _refiningPendingPlan = false;
     _pendingClarification = null;
     _pendingPlan = null;
+    // The rejected preview must become inert — leaving its Confirm button
+    // live kept a cancelled delete-plan one accidental tap from executing
+    // (2026-08-22 bug batch).
+    _markCurrentPlanCancelled();
     _demoteCurrentPlan();
 
     _addMessage(
@@ -867,7 +880,10 @@ class AiAssistantService extends ChangeNotifier {
     notifyListeners();
   }
 
-  void editPlan() {
+  /// [focusInput] pops the keyboard for the typed refinement — Voice Mode
+  /// passes false and prompts by voice instead (the refinement arrives
+  /// through the same send path either way).
+  void editPlan({bool focusInput = true}) {
     _refiningPendingPlan = true;
     // Log rejection for any action that had an assumption-based reason label
     if (_pendingPlan != null) {
@@ -888,7 +904,7 @@ class AiAssistantService extends ChangeNotifier {
       }
     }
     // Keep plan visible (read-only card) and focus the input field
-    _inputFocusRequested = true;
+    if (focusInput) _inputFocusRequested = true;
     notifyListeners();
   }
 
@@ -916,9 +932,27 @@ class AiAssistantService extends ChangeNotifier {
   // ─── Private helpers ──────────────────────────────────────────────────────
 
   static final _rejectionPattern = RegExp(
-    r'^(n+o+(pe|o*)?|nah+|cancel( that| it)?|stop|never ?mind|no thanks?|'
+    r'^(n+o+(pe|o*)?|nah+|cancel( that| it)?|stop|never ?mind|'
+    r'no,?\s*thanks?( you)?|no,?\s*thank you|not now|'
+    r"no,?\s*(that'?s|that is) (it|all|enough)|"
     r"don'?t|forget it)[.!]*$",
   );
+
+  /// Broader than [_rejectionPattern]: closers that decline a SUGGESTION
+  /// ("that's it", "I'm good", "nothing else"). Kept separate because a
+  /// bare "that's all" while a plan awaits confirmation is ambiguous, but
+  /// as a reply to "anything else?" it clearly means "no".
+  static final _suggestionDeclinePattern = RegExp(
+    r"^((that'?s|that is) (it|all|enough)|nothing( else| more)?|"
+    r"i'?m (good|fine|ok(ay)?|set)|(we|you)'?re good|all good|"
+    r'no more|maybe later|not today)[.!]*$',
+  );
+
+  /// True when [input] is a short polite decline — of a pending plan, a
+  /// suggestion, or an "anything else?" style question.
+  static bool _isDecline(String normalized) =>
+      _rejectionPattern.hasMatch(normalized) ||
+      _suggestionDeclinePattern.hasMatch(normalized);
 
   static final _affirmationPattern = RegExp(
     r'^(y+e+s+|yes please|ye[ap]h?|yep|sure|ok(ay)?|'
@@ -961,6 +995,37 @@ class AiAssistantService extends ChangeNotifier {
       return true;
     }
     return false;
+  }
+
+  /// Consumes a standalone decline (no plan pending): appends the user turn,
+  /// drops any parked suggestion, and answers with a warm closer — all
+  /// local, no model round-trip. Returns true when consumed.
+  bool _handleStandaloneDecline(String input) {
+    final normalized = input.toLowerCase().trim();
+    if (normalized.split(RegExp(r'\s+')).length > 4) return false;
+    if (!_isDecline(normalized)) return false;
+    _pendingClarification = null;
+    _addMessage(
+      AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.user,
+        content: input,
+        timestamp: DateTime.now(),
+      ),
+    );
+    _addMessage(
+      AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.assistant,
+        content:
+            'Alright! If you change your mind or need anything later, just '
+            'let me know.',
+        timestamp: DateTime.now(),
+      ),
+    );
+    _logEvent('aiSuggestionDeclined', {'sessionId': _sessionId});
+    notifyListeners();
+    return true;
   }
 
   Future<bool> _handlePendingPlanShortReply(String input) async {
@@ -1014,6 +1079,16 @@ class AiAssistantService extends ChangeNotifier {
       content: content,
       isLoading: false,
     );
+  }
+
+  /// Stamps the live preview card(s) cancelled so they render inert.
+  void _markCurrentPlanCancelled() {
+    for (var i = 0; i < _messages.length; i++) {
+      final msg = _messages[i];
+      if (msg.plannedChanges != null && msg.isCurrentPlan && !msg.isExecuted) {
+        _messages[i] = msg.copyWith(isCurrentPlan: false, isCancelled: true);
+      }
+    }
   }
 
   void _demoteCurrentPlan() {

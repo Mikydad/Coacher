@@ -120,8 +120,7 @@ class VoiceModeCard extends StatelessWidget {
       VoiceModePhase.listening => 'Say something…',
       VoiceModePhase.thinking => ' ',
       VoiceModePhase.speaking => ' ',
-      VoiceModePhase.idle =>
-        controller.statusMessage ?? 'Tap the orb to talk.',
+      VoiceModePhase.idle => controller.statusMessage ?? 'Tap the orb to talk.',
     };
   }
 }
@@ -181,81 +180,92 @@ class VoiceImmersiveStage extends StatelessWidget {
         final idleHint = phase == VoiceModePhase.idle
             ? (controller.statusMessage ?? 'Tap the orb to talk.')
             : null;
+        // Live caption of what the mic heard — stays visible through
+        // thinking/speaking so the user can verify the AI got their words
+        // right (2026-08-22 request). Falls back to the idle hint.
+        final transcript = controller.transcript.trim();
+        final caption = transcript.isNotEmpty ? transcript : idleHint;
         final content = Column(
-            children: [
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  const SizedBox(width: 16),
-                  _RoundIconButton(
-                    icon: Icons.keyboard_arrow_down_rounded,
-                    tooltip: 'Minimize',
-                    onTap: onMinimize,
-                  ),
-                  const Spacer(),
-                ],
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: controller.onOrbTap,
-                child: _VoiceOrb(phase: phase, size: 220),
-              ),
-              const SizedBox(height: 32),
-              Text(
-                _voicePhaseLabel(phase),
-                style: TextStyle(
-                  color: AppColors.fg54,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.4,
+          children: [
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const SizedBox(width: 16),
+                _RoundIconButton(
+                  icon: Icons.keyboard_arrow_down_rounded,
+                  tooltip: 'Minimize',
+                  onTap: onMinimize,
                 ),
+                const Spacer(),
+              ],
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: controller.onOrbTap,
+              child: _VoiceOrb(phase: phase, size: 220),
+            ),
+            const SizedBox(height: 32),
+            Text(
+              _voicePhaseLabel(phase),
+              style: TextStyle(
+                color: AppColors.fg54,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.4,
               ),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: idleHint == null
-                    ? const SizedBox(height: 24)
-                    : Padding(
-                        key: ValueKey(idleHint),
-                        padding: const EdgeInsets.fromLTRB(32, 8, 32, 0),
-                        child: Text(
-                          idleHint,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: AppColors.textSoft,
-                            fontSize: 14,
-                            height: 1.35,
-                          ),
+            ),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: caption == null
+                  ? const SizedBox(height: 24)
+                  : Padding(
+                      key: ValueKey(caption),
+                      padding: const EdgeInsets.fromLTRB(32, 8, 32, 0),
+                      child: Text(
+                        caption,
+                        textAlign: TextAlign.center,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          // Live speech reads bright; hints and the
+                          // carried-over utterance read soft.
+                          color:
+                              transcript.isNotEmpty &&
+                                  phase == VoiceModePhase.listening
+                              ? AppColors.fg
+                              : AppColors.textSoft,
+                          fontSize: 14,
+                          height: 1.35,
                         ),
                       ),
-              ),
-              const Spacer(),
-              Padding(
-                padding: EdgeInsets.only(
-                  left: 32,
-                  right: 32,
-                  bottom: MediaQuery.paddingOf(context).bottom + 24,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _RoundIconButton(
-                      icon: Icons.keyboard_alt_outlined,
-                      tooltip: 'Type instead',
-                      onTap: onExitToType,
                     ),
-                    _RoundIconButton(
-                      icon: Icons.close_rounded,
-                      tooltip: 'End voice mode',
-                      onTap: onExit,
-                      prominent: true,
-                    ),
-                  ],
-                ),
+            ),
+            const Spacer(),
+            Padding(
+              padding: EdgeInsets.only(
+                left: 32,
+                right: 32,
+                bottom: MediaQuery.paddingOf(context).bottom + 24,
               ),
-            ],
-          );
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _RoundIconButton(
+                    icon: Icons.keyboard_alt_outlined,
+                    tooltip: 'Type instead',
+                    onTap: onExitToType,
+                  ),
+                  _RoundIconButton(
+                    icon: Icons.close_rounded,
+                    tooltip: 'End voice mode',
+                    onTap: onExit,
+                    prominent: true,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
         final scroll = sheetScrollController;
         if (scroll == null) return content;
         // Viewport-filling, zero-overflow scrollable: keeps the sheet

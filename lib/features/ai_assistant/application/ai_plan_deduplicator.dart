@@ -13,13 +13,31 @@ class AiPlanDeduplicator {
     String userInput, {
     bool isRefiningPreviousPlan = false,
   }) {
-    if (isRefiningPreviousPlan || actions.isEmpty || activeTasks.isEmpty) {
+    if (isRefiningPreviousPlan || actions.isEmpty) {
       return actions;
     }
 
-    return actions
-        .where((a) => !_isRedundant(a, activeTasks, userInput))
-        .toList();
+    // Within-plan dedupe first: the model has proposed the same task twice
+    // in one plan under cosmetically different titles ("Create Flutter
+    // to-do list" + "create flutter todo list").
+    final kept = <AiAction>[];
+    final seenCreateTitles = <String>[];
+    for (final a in actions) {
+      if (a.actionType == ActionType.createTask) {
+        final title = _actionTitle(a);
+        if (title != null && title.isNotEmpty) {
+          final squashed = _squash(title);
+          if (seenCreateTitles.any((s) => _fuzzyEquals(s, squashed))) {
+            continue;
+          }
+          seenCreateTitles.add(squashed);
+        }
+      }
+      kept.add(a);
+    }
+
+    if (activeTasks.isEmpty) return kept;
+    return kept.where((a) => !_isRedundant(a, activeTasks, userInput)).toList();
   }
 
   static bool _isRedundant(
@@ -65,15 +83,49 @@ class AiPlanDeduplicator {
     List<Map<String, dynamic>> activeTasks,
     String title,
   ) {
-    final needle = _normalize(title);
+    final needle = _squash(title);
     for (final t in activeTasks) {
       final taskTitle = t['title'] as String?;
-      if (taskTitle != null && _normalize(taskTitle) == needle) {
+      if (taskTitle != null && _fuzzyEquals(_squash(taskTitle), needle)) {
         return t;
       }
     }
     return null;
   }
+
+  /// Punctuation/spacing-insensitive title identity with a small typo
+  /// budget: "Create Flutter to-do list" ≡ "create flutter todo list",
+  /// "finish the app erros" ≡ "Finish the app errors". Exact matching
+  /// missed all of these and duplicates sailed through (2026-08-22).
+  static bool _fuzzyEquals(String a, String b) {
+    if (a.isEmpty || b.isEmpty) return false;
+    if (a == b) return true;
+    if (a.length < 8 || b.length < 8) return false;
+    if ((a.length - b.length).abs() > 2) return false;
+    return _editDistance(a, b) <= 2;
+  }
+
+  static int _editDistance(String a, String b) {
+    var prev = List<int>.generate(b.length + 1, (i) => i);
+    for (var i = 1; i <= a.length; i++) {
+      final current = List<int>.filled(b.length + 1, 0)..[0] = i;
+      for (var j = 1; j <= b.length; j++) {
+        final substitution = prev[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1);
+        current[j] = [
+          prev[j] + 1,
+          current[j - 1] + 1,
+          substitution,
+        ].reduce((x, y) => x < y ? x : y);
+      }
+      prev = current;
+    }
+    return prev[b.length];
+  }
+
+  /// Lowercase alphanumerics only — spacing, hyphens, and punctuation are
+  /// exactly the cosmetic differences duplicate titles arrive with.
+  static String _squash(String s) =>
+      s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
 
   static String? _actionTitle(AiAction action) {
     final p = action.parameters;

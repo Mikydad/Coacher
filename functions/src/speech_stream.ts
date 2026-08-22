@@ -43,6 +43,12 @@ export const aiSpeechStream = onRequest(
     minInstances: 1,
   },
   async (req, res) => {
+    // Warmup ping from the client when Voice Mode opens: warms the TLS
+    // path to this endpoint, no work done.
+    if (req.method === "GET") {
+      res.status(204).end();
+      return;
+    }
     if (req.method !== "POST") {
       res.status(405).json({ error: "POST only." });
       return;

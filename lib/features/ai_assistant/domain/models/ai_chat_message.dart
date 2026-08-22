@@ -24,6 +24,7 @@ class AiChatMessage {
     this.isLoading = false,
     this.isCurrentPlan = false,
     this.isExecuted = false,
+    this.isCancelled = false,
     this.autoCommittedBatchId,
   });
 
@@ -51,6 +52,10 @@ class AiChatMessage {
   /// True after the user confirmed and actions were applied.
   final bool isExecuted;
 
+  /// True after the user cancelled/rejected this plan — the card renders
+  /// inert (no Confirm), mirroring the Applied state for the other outcome.
+  final bool isCancelled;
+
   /// Batch id of an auto-committed write (createIntention — the one action
   /// type that skips the preview card, decision log 2026-07-23). Non-null
   /// renders inline [View] [Undo] affordances under the bubble.
@@ -71,6 +76,7 @@ class AiChatMessage {
     bool? isLoading,
     bool? isCurrentPlan,
     bool? isExecuted,
+    bool? isCancelled,
     String? autoCommittedBatchId,
     bool clearDraftPlan = false,
     bool clearPlannedChanges = false,
@@ -93,6 +99,7 @@ class AiChatMessage {
       isLoading: isLoading ?? this.isLoading,
       isCurrentPlan: isCurrentPlan ?? this.isCurrentPlan,
       isExecuted: isExecuted ?? this.isExecuted,
+      isCancelled: isCancelled ?? this.isCancelled,
       autoCommittedBatchId: clearAutoCommittedBatchId
           ? null
           : (autoCommittedBatchId ?? this.autoCommittedBatchId),

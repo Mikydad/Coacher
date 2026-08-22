@@ -70,6 +70,23 @@ void main() {
       expect(n.parameters['time'], '2');
     });
 
+    test('digit-less junk time values are dropped, not kept', () {
+      // Model drift produced reminderTime "min", which passed the
+      // missing-field check and rendered as "… at min" (2026-08-22).
+      final reminder = AiActionParamNormaliser.normalise(
+        const AiAction(
+          actionType: ActionType.addReminder,
+          parameters: {'taskTitle': 'Workout', 'reminderTime': 'min'},
+        ),
+      );
+      expect(reminder.parameters.containsKey('reminderTime'), isFalse);
+
+      final task = AiActionParamNormaliser.normalise(
+        _task({'title': 'A', 'time': 'morning ish'}),
+      );
+      expect(task.parameters.containsKey('time'), isFalse);
+    });
+
     test('a range yields start time AND derives duration', () {
       final n = AiActionParamNormaliser.normalise(
         _task({'title': 'A', 'time': '14:00–15:00'}),

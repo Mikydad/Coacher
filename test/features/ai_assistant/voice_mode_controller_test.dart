@@ -80,7 +80,10 @@ void main() {
   late List<String> sentMessages;
   String? nextReply;
 
-  VoiceModeController build() {
+  VoiceModeController build({
+    Duration continuationGap = Duration.zero,
+    Duration staleStatusWindow = Duration.zero,
+  }) {
     speech = FakeSpeechAdapter();
     tts = FakeTtsAdapter();
     sentMessages = [];
@@ -92,6 +95,11 @@ void main() {
         sentMessages.add(text);
         return nextReply;
       },
+      // Zero by default so the fake's instant event timing finalizes
+      // immediately — the continuation/stale-status behaviors get their
+      // own tests with real windows.
+      continuationGap: continuationGap,
+      staleStatusWindow: staleStatusWindow,
     );
   }
 
@@ -240,6 +248,8 @@ void main() {
         },
         listenStallTimeout: const Duration(milliseconds: 30),
         maxListenStallRestarts: maxRestarts,
+        continuationGap: Duration.zero,
+        staleStatusWindow: Duration.zero,
       );
     }
 
@@ -264,15 +274,32 @@ void main() {
       expect(controller.statusMessage, contains('stalled'));
     });
 
-    test('a result disarms the watchdog — healthy sessions never restart',
-        () async {
+    test(
+        'a session that dies AFTER partials arrived finalizes what it heard '
+        'instead of hanging in listening forever', () async {
       final controller = buildWithWatchdog();
       await controller.start();
       speech.emitPartial('hello');
 
+      // No further results and no end-of-speech status — a healthy session
+      // would have closed at pauseFor long before the stall timeout.
       await Future<void>.delayed(const Duration(milliseconds: 60));
-      expect(speech.listenCalls, 1);
-      expect(speech.stopCalls, 0);
+      expect(sentMessages, ['hello']);
+      expect(controller.phase, VoiceModePhase.listening); // relistening
+    });
+
+    test('each new result re-arms the watchdog (no mid-speech finalize)',
+        () async {
+      final controller = buildWithWatchdog();
+      await controller.start();
+
+      // Keep partials flowing faster than the stall timeout — the watchdog
+      // must not fire while the user is actively talking.
+      for (var i = 0; i < 4; i++) {
+        speech.emitPartial('word $i');
+        await Future<void>.delayed(const Duration(milliseconds: 15));
+      }
+      expect(sentMessages, isEmpty);
       expect(controller.phase, VoiceModePhase.listening);
     });
 
@@ -291,4 +318,139 @@ void main() {
       expect(controller.phase, VoiceModePhase.listening);
     });
   });
+
+  group('premature-endpoint continuation (mid-speech cutoff)', () {
+    test(
+        'a final hot on the heels of a partial keeps listening and stitches '
+        'the segments into one utterance', () async {
+      final controller = build(
+        continuationGap: const Duration(milliseconds: 100),
+      );
+      await controller.start();
+
+      speech.emitPartial('i wanna make');
+      speech.emitFinal('i wanna make'); // gap ≈ 0 → premature cutoff
+      await pumpEventQueue();
+
+      expect(sentMessages, isEmpty); // nothing sent — mic reopened
+      expect(controller.phase, VoiceModePhase.listening);
+      expect(speech.listenCalls, 2);
+      expect(controller.transcript, 'i wanna make');
+
+      speech.emitPartial('a call tomorrow');
+      expect(controller.transcript, 'i wanna make a call tomorrow');
+
+      // A healthy endpoint (one full silence window after the last partial)
+      // finalizes the stitched utterance.
+      await Future<void>.delayed(const Duration(milliseconds: 130));
+      speech.emitFinal('a call tomorrow');
+      await pumpEventQueue();
+
+      expect(sentMessages, ['i wanna make a call tomorrow']);
+    });
+
+    test('the dead session\'s trailing done-status cannot finalize the '
+        'continuation listen early', () async {
+      final controller = build(
+        continuationGap: const Duration(milliseconds: 100),
+        staleStatusWindow: const Duration(milliseconds: 400),
+      );
+      await controller.start();
+
+      speech.emitPartial('i wanna make');
+      speech.emitFinal('i wanna make');
+      await pumpEventQueue();
+      expect(speech.listenCalls, 2);
+
+      // The old session's close status lands right as the new listen opens.
+      speech.emitDone();
+      await pumpEventQueue();
+      expect(sentMessages, isEmpty);
+      expect(controller.phase, VoiceModePhase.listening);
+    });
+
+    test(
+        'identical re-emitted partials do not reset the endpoint clock '
+        '(iOS re-scores during silence — over-wait bug)', () async {
+      final controller = build(
+        continuationGap: const Duration(milliseconds: 200),
+      );
+      await controller.start();
+
+      speech.emitPartial('hello there');
+      // Silence: iOS re-emits the SAME text while re-scoring…
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      speech.emitPartial('hello there');
+      // …then the healthy endpoint. Gap must be measured from the last
+      // text CHANGE (250ms ago), not the re-emission (0ms ago).
+      speech.emitDone();
+      await pumpEventQueue();
+
+      expect(sentMessages, ['hello there']);
+    });
+
+    test('the old session replaying its words into the continuation listen '
+        'does not double the utterance', () async {
+      final controller = build(
+        continuationGap: const Duration(milliseconds: 100),
+        staleStatusWindow: const Duration(milliseconds: 400),
+      );
+      await controller.start();
+
+      speech.emitPartial('hi how are you doing');
+      speech.emitFinal('hi how are you doing'); // premature → continuation
+      await pumpEventQueue();
+      expect(speech.listenCalls, 2);
+
+      // The dead session's delayed events land in the NEW session's
+      // callback, replaying the same words cumulatively.
+      speech.emitPartial('hi how are');
+      speech.emitFinal('hi how are you doing');
+      await pumpEventQueue();
+
+      expect(sentMessages, isEmpty);
+      expect(controller.transcript, 'hi how are you doing'); // not doubled
+      expect(controller.phase, VoiceModePhase.listening);
+
+      // Orb tap ends the (silent) continuation — the single utterance is
+      // sent once.
+      await controller.onOrbTap();
+      await pumpEventQueue();
+      expect(sentMessages, ['hi how are you doing']);
+    });
+
+    test('orb tap while listening sends immediately — no continuation wait',
+        () async {
+      final controller = build(
+        continuationGap: const Duration(hours: 1), // would otherwise stitch
+      );
+      await controller.start();
+
+      speech.emitPartial('send this now');
+      await controller.onOrbTap(); // fake stop() emits 'done'
+      await pumpEventQueue();
+
+      expect(sentMessages, ['send this now']);
+    });
+  });
+
+  group('promptAndListen (voice-mode Edit Plan)', () {
+    test('speaks the prompt and reopens the mic for the answer', () async {
+      final controller = build();
+      await controller.start();
+      expect(speech.listenCalls, 1);
+
+      await controller.promptAndListen('What should I change?');
+      await pumpEventQueue();
+
+      expect(tts.spoken, contains('What should I change?'));
+      expect(controller.phase, VoiceModePhase.listening);
+      expect(speech.listenCalls, 2);
+
+      speech.emitFinal('move it to 9am');
+      await pumpEventQueue();
+      expect(sentMessages, ['move it to 9am']);
+    });
+  });
+
 }

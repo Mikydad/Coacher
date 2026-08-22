@@ -42,9 +42,35 @@ abstract final class AiIntentRouter {
     'what does',
   ];
 
+  /// Greetings / small talk / polite closers. Without this, "Hi" fell
+  /// through every rule to the MUTATE default — priming the model to
+  /// "return structured actions" for a hello, which is how greetings
+  /// produced re-add-everything plans (2026-08-22 bug batch).
+  static final _conversationalPattern = RegExp(
+    r"^(hi+|hey+|hello+|yo|howdy|good (morning|afternoon|evening|night)|"
+    r"(hi|hey|hello)[,!.\s]+.*|"
+    r"how (are|is) (you|it|things)( doing| going| today)?|how'?s it going|"
+    // Truncated STT greetings ("You doing") route conversation too.
+    r"((how are |are )?you|it|things) (doing|going)( good| well| ok(ay)?| today)?|"
+    r"what'?s up|sup|thanks?( you| a lot| so much)?|thank you( so much)?|"
+    r"ok(ay)?|cool|nice|great|good|bye+|good ?bye|see you( later)?|"
+    r"no,?\s*thank(s| you)?|not now|i'?m (good|fine|ok(ay)?))[\s.!?]*$",
+    caseSensitive: false,
+  );
+
   static AiIntentRoute classify(String userInput) {
     final lower = userInput.toLowerCase().trim();
     final focusDate = _detectFocusDate(lower);
+
+    // Short conversational turns route as QUERY: answer-only, no actions —
+    // and the mutate keyword check must not see them first ("hi, can you
+    // set me up" still mutates because it carries a mutate verb). Cap at 6
+    // words so "hi how are you doing" qualifies but real requests don't.
+    if (lower.split(RegExp(r'\s+')).length <= 6 &&
+        !_hasMutateKeyword(lower) &&
+        _conversationalPattern.hasMatch(lower)) {
+      return AiIntentRoute(kind: AiIntentKind.query, focusDate: focusDate);
+    }
 
     if (_educationKeywords.any(lower.contains)) {
       return AiIntentRoute(kind: AiIntentKind.query, focusDate: focusDate);

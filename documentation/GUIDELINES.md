@@ -1445,3 +1445,75 @@ not silent reversal.
   button in the modality they're in — the confirm-gate (2026-07-23)
   stands. No new visual confirm UI on the immersive stage by design;
   the compact card still shows the tappable card.
+
+- **2026-08-22 · Voice/chat trust batch: declines are local, deletes need
+  explicit words, cancelled cards go inert.** Seven field-reported bugs,
+  one root theme — the pipeline trusted the model (and the recognizer)
+  with decisions that must be deterministic. (1) *Declines*: "No thank
+  you"/"that's it" now resolve locally in `AiAssistantService`
+  (`_handleStandaloneDecline` + widened `_rejectionPattern`) — a decline
+  NEVER reaches the parser, which had answered one with a
+  delete-4-items plan. (2) *Delete guard*: `AiIntentParser` strips
+  deleteTask/deleteGoal/removeReminder from any plan whose user turn
+  lacks explicit delete wording (unless refining a plan that already had
+  deletes) — destructive intent must come from the user's own words,
+  never model inference. (3) *Cancelled = inert*: `cancelPlan()` stamps
+  the preview message `isCancelled`; `PlannedChangesCard` shows buttons
+  ONLY on the live plan (the old "Confirm on any unexecuted card" rule is
+  retired — a rejected delete-plan stayed one tap from executing).
+  (4) *Greetings route query*: `AiIntentRouter` classifies short
+  conversational turns (hi/thanks/no-thank-you, ≤4 words, no mutate verb)
+  as query — the unmatched-input default of MUTATE plus the "return
+  structured actions" hint is how "Hi" produced re-add-everything plans.
+  (5) *Fuzzy dedup*: `AiPlanDeduplicator` squashes titles to lowercase
+  alphanumerics with a ≤2 edit-distance budget (len ≥8) and also dedupes
+  within one plan — "Create Flutter to-do list" vs "create flutter todo
+  list" vs "…erros" all count as the same task. (6) *Voice endpointing*:
+  `VoiceModeController` treats a final/'done' landing sooner than
+  `continuationGap` (1.2s) after the last partial as a mid-speech cutoff —
+  it re-opens the mic and stitches segments (`_utterancePrefix`) instead
+  of sending half a sentence; `pauseFor` dropped 1.7s→1.5s (user-tuned);
+  the stall watchdog now RE-arms per result and, with a transcript,
+  finalizes instead of hanging (`listening` could previously stick
+  forever after partials if the session died); stale close-statuses
+  within 400ms of a fresh listen are ignored. Orb tap = forced endpoint.
+  (7) *Voice Edit + first-turn warmup*: Edit Plan in Voice Mode speaks
+  "what should I change?" and listens (`promptAndListen`;
+  `editPlan(focusInput: false)`) instead of invisibly focusing a hidden
+  keyboard; Voice Mode entry fires `warmVoiceEndpoints` (ID-token fetch +
+  GET pings) and `aiChatStream` gained `minInstances: 1` + a GET warmup
+  handler (it became the spoken-turn critical path but still had
+  `minInstances: 0` — the whole first-turn cold start). Reminder-time
+  junk ("at min") is dropped at normalisation (digit-less time values
+  removed) and the card omits unparseable times. **Requires a functions
+  deploy** for the warmup handlers + minInstances change.
+
+- **2026-08-22 (round 2) · Voice endpointing corrections + entry
+  affordances.** Field testing of the trust batch surfaced two regressions
+  and three UX asks. (1) *Transcript doubling* ("Hi how are you doing Hi
+  how are you doing"): after a continuation restart, the dead session's
+  delayed results are delivered into the NEW session's callback (the
+  plugin has one global handler) and replayed the whole utterance —
+  `VoiceModeController` now ignores results inside `staleStatusWindow`
+  (600ms) of a fresh listen whose squashed text merely prefixes the
+  stitched prefix, plus a combine-time backstop. The doubled text was also
+  how greetings dodged the conversational route and produced ghost "Apply
+  this plan" bubbles. (2) *Over-wait (3–5s extra)*: iOS re-emits identical
+  partials while the user is silent (re-scoring), so gap-since-last-RESULT
+  made every healthy endpoint look like a premature cutoff and each turn
+  paid extra listen cycles — the endpoint clock now ticks on text CHANGES
+  only; `pauseFor` 1.5s→1.2s, `continuationGap` 1.2s→0.9s. (3) Suggestion
+  bubbles always render their draft actions (shared
+  `describePlannedAction`) above APPLY THIS PLAN — a contextless apply
+  button is impossible regardless of model prose; greeting rule widened
+  (≤6 words, "how are you doing"/truncated "You doing" shapes).
+  (4) *Composer mic*: `TextField.onTapOutside` fires on pointer-DOWN, so
+  touching the mic collapsed the keyboard and yanked the composer out from
+  under the finger mid-hold — the mic/Send row is now a
+  `TextFieldTapRegion`; the hold is hand-rolled (350ms, glow + haptic on
+  press, medium haptic at trigger) instead of stock onLongPress.
+  (5) Long-press on `CoachAiFab` (all tabs, incl. satellites) opens Coach
+  directly in Voice Mode via `CoachRouteArgs(startVoiceMode: true)`; the
+  immersive voice stage now shows a live caption of the transcript under
+  the orb (bright while listening, soft while thinking/speaking) so users
+  can verify what was heard.
