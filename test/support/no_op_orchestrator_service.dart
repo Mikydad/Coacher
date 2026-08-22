@@ -96,6 +96,10 @@ class _NoOpFocusRepo implements FocusRepository {
 
 class _NoOpReminderRepo implements ReminderRepository {
   @override
+  Future<void> deleteRemindersForTask(String taskId) async {}
+
+
+  @override
   Future<List<ReminderConfig>> listAllReminders() async => const [];
   @override
   Future<List<ReminderConfig>> getRemindersForTasks(

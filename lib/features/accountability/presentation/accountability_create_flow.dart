@@ -24,6 +24,7 @@ import '../../goals/domain/models/goal_enums.dart';
 import '../../goals/domain/models/user_goal.dart';
 import '../../goals/presentation/widgets/goal_editor_widgets.dart';
 import '../application/points_providers.dart';
+import '../application/stake_create_replicator.dart';
 import '../application/stake_functions.dart';
 import '../application/stakes_providers.dart';
 import '../domain/models/points.dart';
@@ -47,6 +48,7 @@ Future<void> openAccountabilityCreateFlow(
   BuildContext context, {
   String? prefilledTitle,
   String? prefilledCircleId,
+  String? linkedGoalId,
 }) {
   return Navigator.of(context).push(
     MaterialPageRoute(
@@ -54,6 +56,7 @@ Future<void> openAccountabilityCreateFlow(
       builder: (_) => AccountabilityCreateFlow(
         prefilledTitle: prefilledTitle,
         prefilledCircleId: prefilledCircleId,
+        linkedGoalId: linkedGoalId,
       ),
     ),
   );
@@ -64,10 +67,15 @@ class AccountabilityCreateFlow extends ConsumerStatefulWidget {
     super.key,
     this.prefilledTitle,
     this.prefilledCircleId,
+    this.linkedGoalId,
   });
 
   final String? prefilledTitle;
   final String? prefilledCircleId;
+
+  /// When launched from an existing goal's detail page: the challenge
+  /// attaches to THIS goal instead of minting a duplicate one.
+  final String? linkedGoalId;
 
   @override
   ConsumerState<AccountabilityCreateFlow> createState() =>
@@ -2264,10 +2272,26 @@ class _AccountabilityCreateFlowState
         }
       }
     }
+    final linkedExistingGoalId = widget.linkedGoalId;
+
+    // One ACTIVE stake per goal (decision 2026-08-22): a goal that already
+    // has a non-terminal challenge can't take a second one.
+    if (linkedExistingGoalId != null &&
+        ref.read(stakedGoalIdsProvider).contains(linkedExistingGoalId)) {
+      setState(() {
+        _creating = false;
+        _createError =
+            'This goal already has an active stake — finish or cancel it '
+            'before adding another.';
+      });
+      return;
+    }
+
     // Free-tier goal cap: the commitment mints a real Goal, so the same
-    // creation gate the goal editor enforces applies here.
+    // creation gate the goal editor enforces applies here. Attaching to an
+    // existing goal mints nothing, so the gate doesn't apply.
     final goalGate = ref.read(tierGateProvider);
-    if (!goalGate.isBypassed) {
+    if (linkedExistingGoalId == null && !goalGate.isBypassed) {
       final goals = await ref.read(goalsRepositoryProvider).fetchGoalsOnce();
       final activeCount = goals
           .where((g) => g.status == GoalStatus.active)
@@ -2304,7 +2328,7 @@ class _AccountabilityCreateFlowState
     if (deadline < minDeadline) deadline = minDeadline;
 
     final id = StableId.generate('stk');
-    final goalId = StableId.generate('goal');
+    final goalId = linkedExistingGoalId ?? StableId.generate('goal');
     final type = switch (_stake) {
       _StakeChoice.photo => 'solo_photo',
       _StakeChoice.h2h => 'h2h_points',
@@ -2312,226 +2336,271 @@ class _AccountabilityCreateFlowState
       _StakeChoice.practice => 'practice',
     };
 
-    try {
-      Map<String, dynamic>? photoPayload;
-      if (_stake == _StakeChoice.photo) {
-        final storagePath = 'stake_photos/$id/$uid.jpg';
-        // Owner-only path (storage.rules); the server verifies this exact
-        // layout in stakeCreateChallenge.
-        await FirebaseStorage.instance
-            .ref(storagePath)
-            .putFile(
-              File(_photo!.path),
-              SettableMetadata(contentType: 'image/jpeg'),
-            );
-        photoPayload = {
-          'storagePath': storagePath,
-          'revealWindowMins': _revealWindowMins,
-        };
-      }
+    // ── Everything the background replication needs, captured NOW — the
+    // closures below outlive this State (the flow pops right after the
+    // local commit), so they must not touch controllers or ref.
+    final title = _title.text.trim();
+    final pledgeWhy = _why.text.trim();
+    final isPhoto = _stake == _StakeChoice.photo;
+    final photoFile = isPhoto ? File(_photo!.path) : null;
+    // Owner-only path (storage.rules); the server verifies this exact
+    // layout in stakeCreateChallenge.
+    final storagePath = 'stake_photos/$id/$uid.jpg';
+    final revealWindowMins = _revealWindowMins;
+    final mode = _mode;
+    final callableCircleId = _isPractice ? '' : (_circleId ?? '');
+    final opponentUid = _isH2h ? _opponentUid : null;
+    final h2hStake = _isH2h ? _h2hStake : null;
+    final charityId = _isH2h ? _charityId : null;
+    final bothLoseCharityId = _isH2h ? _bothLoseCharityId : null;
+    final amountCents = _isMoney ? _moneyCents : null;
+    final antiCharityId = _isMoney ? _antiCharityId : null;
+    final goalPayload = <String, dynamic>{
+      'title': title,
+      'unitKind': _unitKind,
+      'unitTarget': _unitTarget,
+      'totalUnits': _totalUnits,
+      'cadence': _cadenceStorage,
+      if (_cadence == GoalRepeatCadence.daily) 'interval': _interval,
+      if (_cadence == GoalRepeatCadence.weekly)
+        'scheduledWeekdays': (_weekdays.toList()..sort()),
+      if (_cadence == GoalRepeatCadence.monthly)
+        'repeatDaysOfMonth': (_monthDays.toList()..sort()),
+      'startDateMs': startDateMs,
+      'linkedGoalId': goalId,
+    };
 
-      await functions.createChallenge(
-        challengeId: id,
-        type: type,
-        circleId: _isPractice ? '' : (_circleId ?? ''),
-        goal: {
-          'title': _title.text.trim(),
-          'unitKind': _unitKind,
-          'unitTarget': _unitTarget,
-          'totalUnits': _totalUnits,
-          'cadence': _cadenceStorage,
-          if (_cadence == GoalRepeatCadence.daily) 'interval': _interval,
-          if (_cadence == GoalRepeatCadence.weekly)
-            'scheduledWeekdays': (_weekdays.toList()..sort()),
-          if (_cadence == GoalRepeatCadence.monthly)
-            'repeatDaysOfMonth': (_monthDays.toList()..sort()),
-          'startDateMs': startDateMs,
-          'linkedGoalId': goalId,
+    // The commitment IS a real goal (2026-07-22) when the flow wasn't
+    // launched from one: it lands in the Goals hub with the staked badge
+    // and its reminders ride the goal reminder machinery. Committed
+    // local-first BEFORE the callable (2026-08-22 — "Start the challenge"
+    // must not wait on the network); a failed create withdraws it.
+    final bounds = GoalPeriodHelpers.localDayRangeBounds(
+      _rangeStart,
+      _rangeEnd,
+    );
+    final goalNowMs = DateTime.now().millisecondsSinceEpoch;
+    final linkedGoal = UserGoal(
+      id: goalId,
+      title: title,
+      categoryId: GoalCategories.habits,
+      status: GoalStatus.active,
+      measurementKind: _measurement,
+      targetValue: _unitTarget.toDouble(),
+      // Strictness maps to intensity so analytics weighting follows it.
+      intensity: switch (_mode) {
+        'flexible' => 2,
+        'extreme' => 5,
+        _ => 3,
+      },
+      periodStartMs: bounds.startMs,
+      periodEndMs: bounds.endMs,
+      periodMode: GoalPeriodMode.calendar,
+      repeatCadence: _cadence,
+      repeatInterval: _cadence == GoalRepeatCadence.daily ? _interval : 1,
+      scheduledWeekdays: _cadence == GoalRepeatCadence.weekly
+          ? (_weekdays.toList()..sort())
+          : null,
+      repeatDaysOfMonth: _cadence == GoalRepeatCadence.monthly
+          ? (_monthDays.toList()..sort())
+          : null,
+      reminderEnabled: _reminderEnabled,
+      reminderMinutesFromMidnight: _reminderEnabled
+          ? _reminderMinutesFromMidnight
+          : null,
+      createdAtMs: goalNowMs,
+      updatedAtMs: goalNowMs,
+    );
+
+    // Optimistic local mirror so the challenge renders instantly — the
+    // background pull later LWW-overwrites it with server truth.
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    StakeChallenge buildMirror({
+      required StakeChallengeStatus status,
+      StakePhotoState? photoState,
+    }) {
+      return StakeChallenge(
+        id: id,
+        type: switch (_stake) {
+          _StakeChoice.photo => StakeChallengeType.soloPhoto,
+          _StakeChoice.h2h => StakeChallengeType.h2hPoints,
+          _StakeChoice.money => StakeChallengeType.soloMoney,
+          _StakeChoice.practice => StakeChallengeType.practice,
         },
-        mode: _mode,
-        deadlineMs: deadline,
-        photo: photoPayload,
-        opponentUid: _isH2h ? _opponentUid : null,
-        stakeAmount: _isH2h ? _h2hStake : null,
-        charityId: _isH2h ? _charityId : null,
-        bothLoseCharityId: _isH2h ? _bothLoseCharityId : null,
-        amountCents: _isMoney ? _moneyCents : null,
-        antiCharityId: _isMoney ? _antiCharityId : null,
-        pledgeWhy: _why.text.trim(),
-      );
-
-      // The commitment IS a real goal (2026-07-22): it lands in the Goals
-      // hub with the staked badge, its reminders ride the goal reminder
-      // machinery, and the challenge above froze its snapshot. Local-first
-      // write, after the callable so a failed create leaves no stray goal.
-      final bounds = GoalPeriodHelpers.localDayRangeBounds(
-        _rangeStart,
-        _rangeEnd,
-      );
-      final goalNowMs = DateTime.now().millisecondsSinceEpoch;
-      final linkedGoal = UserGoal(
-        id: goalId,
-        title: _title.text.trim(),
-        categoryId: GoalCategories.habits,
-        status: GoalStatus.active,
-        measurementKind: _measurement,
-        targetValue: _unitTarget.toDouble(),
-        // Strictness maps to intensity so analytics weighting follows it.
-        intensity: switch (_mode) {
-          'flexible' => 2,
-          'extreme' => 5,
-          _ => 3,
-        },
-        periodStartMs: bounds.startMs,
-        periodEndMs: bounds.endMs,
-        periodMode: GoalPeriodMode.calendar,
-        repeatCadence: _cadence,
-        repeatInterval: _cadence == GoalRepeatCadence.daily ? _interval : 1,
-        scheduledWeekdays: _cadence == GoalRepeatCadence.weekly
-            ? (_weekdays.toList()..sort())
-            : null,
-        repeatDaysOfMonth: _cadence == GoalRepeatCadence.monthly
-            ? (_monthDays.toList()..sort())
-            : null,
-        reminderEnabled: _reminderEnabled,
-        reminderMinutesFromMidnight: _reminderEnabled
-            ? _reminderMinutesFromMidnight
-            : null,
-        createdAtMs: goalNowMs,
-        updatedAtMs: goalNowMs,
-      );
-      await ref.read(goalsRepositoryProvider).upsertGoal(linkedGoal);
-      await ref.read(goalReminderSyncServiceProvider).applyForGoal(linkedGoal);
-
-      // Optimistic local mirror so the challenge renders before the next
-      // background pull (which LWW-overwrites with server truth).
-      final nowMs = DateTime.now().millisecondsSinceEpoch;
-      await repository.upsertLocalMirror(
-        StakeChallenge(
-          id: id,
-          type: switch (_stake) {
-            _StakeChoice.photo => StakeChallengeType.soloPhoto,
-            _StakeChoice.h2h => StakeChallengeType.h2hPoints,
-            _StakeChoice.money => StakeChallengeType.soloMoney,
-            _StakeChoice.practice => StakeChallengeType.practice,
-          },
-          status: switch (_stake) {
-            _StakeChoice.photo => StakeChallengeStatus.draft,
-            _StakeChoice.h2h => StakeChallengeStatus.pendingAccept,
-            _StakeChoice.money ||
-            _StakeChoice.practice => StakeChallengeStatus.active,
-          },
-          creatorUid: uid,
-          circleId: (_isPractice || _isMoney) ? '' : (_circleId ?? ''),
-          participants: [
-            StakeParticipant(
-              uid: uid,
-              teamId: uid,
-              stakeKind: switch (_stake) {
-                _StakeChoice.photo => 'photo',
-                _StakeChoice.money => 'money',
-                _ => 'points',
-              },
-              stakeAmount: _isH2h
-                  ? _h2hStake
-                  : _isMoney
-                  ? _moneyCents
-                  : null,
-              photoStoragePath: _stake == _StakeChoice.photo
-                  ? 'stake_photos/$id/$uid.jpg'
-                  : null,
-              revealWindowMins: _stake == _StakeChoice.photo
-                  ? _revealWindowMins
-                  : null,
-              accepted: true,
-            ),
-            if (_isH2h && _opponentUid != null)
-              StakeParticipant(
-                uid: _opponentUid!,
-                teamId: _opponentUid!,
-                stakeKind: 'points',
-                stakeAmount: _h2hStake,
-                accepted: false,
-              ),
-          ],
-          frozenGoal: StakeFrozenGoal(
-            title: _title.text.trim(),
-            unitKind: _unitKind,
-            unitTarget: _unitTarget,
-            totalUnits: _totalUnits,
-            cadence: _cadenceStorage,
-            interval: _interval,
-            scheduledWeekdays: _cadence == GoalRepeatCadence.weekly
-                ? (_weekdays.toList()..sort())
+        status: status,
+        creatorUid: uid,
+        circleId: (_isPractice || _isMoney) ? '' : (_circleId ?? ''),
+        participants: [
+          StakeParticipant(
+            uid: uid,
+            teamId: uid,
+            stakeKind: switch (_stake) {
+              _StakeChoice.photo => 'photo',
+              _StakeChoice.money => 'money',
+              _ => 'points',
+            },
+            stakeAmount: _isH2h
+                ? _h2hStake
+                : _isMoney
+                ? _moneyCents
                 : null,
-            repeatDaysOfMonth: _cadence == GoalRepeatCadence.monthly
-                ? (_monthDays.toList()..sort())
-                : null,
-            startDateMs: startDateMs,
-            linkedGoalId: goalId,
+            photoStoragePath: isPhoto ? storagePath : null,
+            revealWindowMins: isPhoto ? revealWindowMins : null,
+            accepted: true,
           ),
-          mode: _mode,
-          sideCharities: _isH2h && _charityId != null
-              ? {uid: _charityId!}
-              : const {},
-          bothLoseCharityId: _isH2h ? _bothLoseCharityId : null,
-          antiCharityId: _isMoney ? _antiCharityId : null,
-          deadlineMs: deadline,
-          photoState: _stake == _StakeChoice.photo
-              ? StakePhotoState.pendingScreen
+          if (_isH2h && _opponentUid != null)
+            StakeParticipant(
+              uid: _opponentUid!,
+              teamId: _opponentUid!,
+              stakeKind: 'points',
+              stakeAmount: _h2hStake,
+              accepted: false,
+            ),
+        ],
+        frozenGoal: StakeFrozenGoal(
+          title: title,
+          unitKind: _unitKind,
+          unitTarget: _unitTarget,
+          totalUnits: _totalUnits,
+          cadence: _cadenceStorage,
+          interval: _interval,
+          scheduledWeekdays: _cadence == GoalRepeatCadence.weekly
+              ? (_weekdays.toList()..sort())
               : null,
-          createdAtMs: nowMs,
-          // NOT the client clock: a phone running seconds ahead of the
-          // server would make this optimistic row "newer" than the real
-          // server writes, and LWW would reject every later flip (the
-          // photo-screen result only appeared after a logout wipe).
-          // 0 = "placeholder, first server echo replaces me".
-          updatedAtMs: 0,
+          repeatDaysOfMonth: _cadence == GoalRepeatCadence.monthly
+              ? (_monthDays.toList()..sort())
+              : null,
+          startDateMs: startDateMs,
+          linkedGoalId: goalId,
         ),
+        mode: _mode,
+        sideCharities: _isH2h && _charityId != null
+            ? {uid: _charityId!}
+            : const {},
+        bothLoseCharityId: _isH2h ? _bothLoseCharityId : null,
+        antiCharityId: _isMoney ? _antiCharityId : null,
+        deadlineMs: deadline,
+        photoState: photoState,
+        createdAtMs: nowMs,
+        // NOT the client clock: a phone running seconds ahead of the
+        // server would make this optimistic row "newer" than the real
+        // server writes, and LWW would reject every later flip (the
+        // photo-screen result only appeared after a logout wipe).
+        // 0 = "placeholder, first server echo replaces me".
+        updatedAtMs: 0,
       );
+    }
 
-      if (!mounted) return;
-      final nav = Navigator.of(context);
-      nav.pop();
-      if (_stake == _StakeChoice.photo && _photo != null) {
-        // Seed the owner's preview cache — the detail screen then shows
-        // the photo instantly instead of re-downloading it (slow links
-        // made the preview take minutes).
-        unawaited(StakePhotoCache.seed(id, File(_photo!.path)));
+    final optimistic = buildMirror(
+      status: switch (_stake) {
+        _StakeChoice.photo => StakeChallengeStatus.draft,
+        _StakeChoice.h2h => StakeChallengeStatus.pendingAccept,
+        _StakeChoice.money ||
+        _StakeChoice.practice => StakeChallengeStatus.active,
+      },
+      photoState: isPhoto ? StakePhotoState.pendingScreen : null,
+    );
+    // Precomputed terminal state for a screening rejection — the closure
+    // can't rebuild it after this State is disposed.
+    final rejectedMirror = isPhoto
+        ? buildMirror(
+            status: StakeChallengeStatus.cancelled,
+            photoState: StakePhotoState.rejected,
+          )
+        : null;
+
+    final goalsRepository = ref.read(goalsRepositoryProvider);
+    final goalReminderSync = ref.read(goalReminderSyncServiceProvider);
+    final replicator = ref.read(stakeCreateReplicatorProvider.notifier);
+
+    // ── Local-first commit: goal + mirror land in Isar and the flow moves
+    // on immediately (never awaits the network).
+    try {
+      if (linkedExistingGoalId == null) {
+        await goalsRepository.upsertGoal(linkedGoal);
+        await goalReminderSync.applyForGoal(linkedGoal);
       }
-      nav.push(
-        MaterialPageRoute(
-          builder: (_) => StakeChallengeDetailScreen(challengeId: id),
-        ),
-      );
-    } on StakeActionException catch (e) {
-      final photoRejected =
-          e.code == 'failed-precondition' &&
-          e.message.toLowerCase().contains('rejected');
-      setState(() {
-        _creating = false;
-        if (photoRejected) {
-          // Content screening said no. Re-pressing the button would just
-          // re-upload the same doomed photo under a new id and sit at
-          // "checking" until it gets rejected again — bounce back to the
-          // configure page (photo tile) and demand a different one.
-          _photo = null;
-          _step = _Step.configure;
-          _createError =
-              'That photo was rejected by content screening — pick a '
-              'different one.';
-        } else {
-          _createError = e.isRetryable
-              ? 'Couldn\'t reach the server. Check your connection and try again.'
-              : e.message;
-        }
-      });
+      await repository.upsertLocalMirror(optimistic);
     } catch (e) {
       setState(() {
         _creating = false;
         _createError = 'Something went wrong: $e';
       });
+      return;
     }
+
+    if (photoFile != null) {
+      // Seed the owner's preview cache — the detail screen then shows
+      // the photo instantly instead of re-downloading it (slow links
+      // made the preview take minutes).
+      unawaited(StakePhotoCache.seed(id, photoFile));
+    }
+
+    final mintedGoalId = linkedExistingGoalId == null ? goalId : null;
+    Future<void> withdrawMintedGoal() async {
+      if (mintedGoalId == null) return;
+      await goalReminderSync.cancelForGoal(mintedGoalId);
+      await goalsRepository.deleteGoal(mintedGoalId);
+    }
+
+    // Upload + callable replicate in the background; the detail screen
+    // surfaces a failure with Retry/Discard (optimistic-then-honest).
+    replicator.start(
+      id,
+      replicate: () async {
+        Map<String, dynamic>? photoPayload;
+        if (photoFile != null) {
+          await FirebaseStorage.instance
+              .ref(storagePath)
+              .putFile(photoFile, SettableMetadata(contentType: 'image/jpeg'));
+          photoPayload = {
+            'storagePath': storagePath,
+            'revealWindowMins': revealWindowMins,
+          };
+        }
+        try {
+          await functions.createChallenge(
+            challengeId: id,
+            type: type,
+            circleId: callableCircleId,
+            goal: goalPayload,
+            mode: mode,
+            deadlineMs: deadline,
+            photo: photoPayload,
+            opponentUid: opponentUid,
+            stakeAmount: h2hStake,
+            charityId: charityId,
+            bothLoseCharityId: bothLoseCharityId,
+            amountCents: amountCents,
+            antiCharityId: antiCharityId,
+            pledgeWhy: pledgeWhy,
+          );
+        } on StakeActionException catch (e) {
+          final photoRejected =
+              e.code == 'failed-precondition' &&
+              e.message.toLowerCase().contains('rejected');
+          if (!photoRejected || rejectedMirror == null) rethrow;
+          // Content screening said no — terminal, not retryable. Flip the
+          // mirror to the rejected state the detail screen already
+          // narrates and withdraw the goal this create minted.
+          await repository.upsertLocalMirror(rejectedMirror);
+          await withdrawMintedGoal();
+        }
+      },
+      discard: () async {
+        await repository.deleteLocalMirror(id);
+        await withdrawMintedGoal();
+      },
+    );
+
+    if (!mounted) return;
+    final nav = Navigator.of(context);
+    nav.pop();
+    nav.push(
+      MaterialPageRoute(
+        builder: (_) => StakeChallengeDetailScreen(challengeId: id),
+      ),
+    );
   }
 
   // ─── Small shared widgets ──────────────────────────────────────────────────

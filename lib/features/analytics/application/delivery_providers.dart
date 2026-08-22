@@ -437,7 +437,7 @@ void invalidateTodayCoachingDeliveryFromContainer(ProviderContainer container) {
 }
 
 /// Drop Layer 1 feature row, Layer 3 entity insights, and refresh Layer 4 for a goal
-/// that is no longer an active coaching subject (completed or deleted).
+/// that is no longer an active coaching subject (completed, paused, or deleted).
 Future<void> clearEntityCoachingCachesForGoal(
   WidgetRef ref,
   String goalId,
@@ -454,3 +454,9 @@ Future<void> clearEntityCoachingCachesForGoal(
       );
   invalidateTodayCoachingDelivery(ref);
 }
+
+/// Task twin of [clearEntityCoachingCachesForGoal] — wired into every task
+/// delete path so a removed task stops feeding insights the same day
+/// instead of lingering until the next full-refresh prune.
+Future<void> clearEntityCoachingCachesForTask(WidgetRef ref, String taskId) =>
+    clearEntityCoachingCachesForGoal(ref, taskId);

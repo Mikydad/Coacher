@@ -33,8 +33,10 @@ class AccountabilityHubScreen extends ConsumerWidget {
       body: challengesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
-          child: Text('Could not load challenges',
-              style: TextStyle(color: AppColors.textMuted)),
+          child: Text(
+            'Could not load challenges',
+            style: TextStyle(color: AppColors.textMuted),
+          ),
         ),
         data: (all) {
           final open = all.where((c) => !c.status.isTerminal).toList()
@@ -146,7 +148,8 @@ void _showLedger(BuildContext context, WidgetRef ref) {
     ),
     builder: (_) => Consumer(
       builder: (context, ref, _) {
-        final txns = ref.watch(pointsTxnsProvider).valueOrNull ?? const <PointsTxn>[];
+        final txns =
+            ref.watch(pointsTxnsProvider).valueOrNull ?? const <PointsTxn>[];
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -202,18 +205,18 @@ void _showLedger(BuildContext context, WidgetRef ref) {
 }
 
 String _txnLabel(String source) => switch (source) {
-      'signup_bonus' => 'Welcome bonus',
-      'earn_checkin' => 'Daily check-in',
-      'earn_task' => 'Task completed',
-      'earn_goal' => 'Goal progress',
-      'earn_streak' => 'Streak bonus',
-      'earn_challenge_win' => 'Challenge won',
-      'stake_lock' => 'Stake locked',
-      'stake_release' => 'Stake returned',
-      'stake_forfeit' => 'Stake forfeited',
-      'spend_photo_removal' => 'Photo removed early',
-      _ => source,
-    };
+  'signup_bonus' => 'Welcome bonus',
+  'earn_checkin' => 'Daily check-in',
+  'earn_task' => 'Task completed',
+  'earn_goal' => 'Goal progress',
+  'earn_streak' => 'Streak bonus',
+  'earn_challenge_win' => 'Challenge won',
+  'stake_lock' => 'Stake locked',
+  'stake_release' => 'Stake returned',
+  'stake_forfeit' => 'Stake forfeited',
+  'spend_photo_removal' => 'Photo removed early',
+  _ => source,
+};
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
@@ -327,8 +330,7 @@ class _ChallengeCard extends StatelessWidget {
             : 'Waiting for your opponent to accept';
       case StakeChallengeStatus.active:
         final left = Duration(
-          milliseconds:
-              c.deadlineMs - DateTime.now().millisecondsSinceEpoch,
+          milliseconds: c.deadlineMs - DateTime.now().millisecondsSinceEpoch,
         );
         return '$target · ${_remaining(left)} left';
       case StakeChallengeStatus.pendingVerification:
@@ -358,10 +360,14 @@ class _StakeIcon extends StatelessWidget {
       StakeChallengeType.h2hPoints ||
       StakeChallengeType.h2hMoney ||
       StakeChallengeType.teamPoints ||
-      StakeChallengeType.teamMoney =>
-        (Icons.sports_kabaddi_rounded, AppColors.amber),
-      StakeChallengeType.soloMoney =>
-        (Icons.attach_money_rounded, AppColors.statusGreen),
+      StakeChallengeType.teamMoney => (
+        Icons.sports_kabaddi_rounded,
+        AppColors.amber,
+      ),
+      StakeChallengeType.soloMoney => (
+        Icons.attach_money_rounded,
+        AppColors.statusGreen,
+      ),
       _ => (Icons.photo_camera_rounded, AppColors.coral),
     };
     return Container(
@@ -389,10 +395,7 @@ class _StatusChip extends StatelessWidget {
       StakeChallengeStatus.draft => ('checking', AppColors.amber),
       StakeChallengeStatus.pendingAccept => ('invited', AppColors.amber),
       StakeChallengeStatus.active => ('live', AppColors.statusGreen),
-      StakeChallengeStatus.pendingVerification => (
-        'deciding',
-        AppColors.amber,
-      ),
+      StakeChallengeStatus.pendingVerification => ('deciding', AppColors.amber),
       StakeChallengeStatus.completedSuccess => ('kept', AppColors.statusGreen),
       StakeChallengeStatus.completedForfeit => ('forfeited', AppColors.danger),
       StakeChallengeStatus.cancelled => ('cancelled', AppColors.textFaint),

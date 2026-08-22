@@ -10,6 +10,10 @@ import 'package:flutter_test/flutter_test.dart';
 // ─── Fakes ────────────────────────────────────────────────────────────────────
 
 class _FakeReminderRepository implements ReminderRepository {
+  @override
+  Future<void> deleteRemindersForTask(String taskId) async {}
+
+
   _FakeReminderRepository({this.reminders = const []});
   final List<ReminderConfig> reminders;
 

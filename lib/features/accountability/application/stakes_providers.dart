@@ -18,20 +18,21 @@ final stakeFunctionsProvider = Provider<StakeFunctions>(
 );
 
 /// All of this account's stake challenges (server mirror, newest first).
-final stakeChallengesStreamProvider =
-    StreamProvider<List<StakeChallenge>>((ref) {
+final stakeChallengesStreamProvider = StreamProvider<List<StakeChallenge>>((
+  ref,
+) {
   return ref.watch(stakesRepositoryProvider).watchChallenges();
 });
 
 final stakeChallengeStreamProvider =
     StreamProvider.family<StakeChallenge?, String>((ref, challengeId) {
-  return ref.watch(stakesRepositoryProvider).watchChallenge(challengeId);
-});
+      return ref.watch(stakesRepositoryProvider).watchChallenge(challengeId);
+    });
 
 final stakeEvidenceStreamProvider =
     StreamProvider.family<List<StakeEvidence>, String>((ref, challengeId) {
-  return ref.watch(stakesRepositoryProvider).watchEvidence(challengeId);
-});
+      return ref.watch(stakesRepositoryProvider).watchEvidence(challengeId);
+    });
 
 /// Every mirrored evidence row (all challenges) — the needs-action badge
 /// checks "did I log today's unit yet" without a per-challenge family.
@@ -45,10 +46,12 @@ final stakePendingInvitesProvider = Provider<List<StakeChallenge>>((ref) {
   final uid = FirestorePaths.activeUid;
   final list = ref.watch(stakeChallengesStreamProvider).value ?? const [];
   return list
-      .where((c) =>
-          c.status == StakeChallengeStatus.pendingAccept &&
-          c.creatorUid != uid &&
-          c.participant(uid) != null)
+      .where(
+        (c) =>
+            c.status == StakeChallengeStatus.pendingAccept &&
+            c.creatorUid != uid &&
+            c.participant(uid) != null,
+      )
       .toList();
 });
 
@@ -114,8 +117,9 @@ final stakedGoalIdsProvider = Provider<Set<String>>((ref) {
 
 /// Challenges that still need something from the user (not terminal),
 /// newest deadline first — the Stakes hub's "active" list.
-final openStakeChallengesProvider =
-    Provider<AsyncValue<List<StakeChallenge>>>((ref) {
+final openStakeChallengesProvider = Provider<AsyncValue<List<StakeChallenge>>>((
+  ref,
+) {
   final async = ref.watch(stakeChallengesStreamProvider);
   return async.when(
     data: (list) {

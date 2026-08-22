@@ -13,20 +13,33 @@ class GoalsStep extends ConsumerWidget {
   final VoidCallback onSkip;
 
   static const _options = [
-    (OnboardingInterests.buildBusiness, Icons.rocket_launch_outlined,
-        'Build a business'),
-    (OnboardingInterests.improveHealth, Icons.favorite_outline,
-        'Improve my health'),
-    (OnboardingInterests.learnSkills, Icons.menu_book_outlined,
-        'Learn new skills'),
-    (OnboardingInterests.getOrganized, Icons.grid_view_outlined,
-        'Get organized'),
-    (OnboardingInterests.makeMoney, Icons.payments_outlined,
-        'Make more money'),
-    (OnboardingInterests.betterHabits, Icons.refresh,
-        'Build better habits'),
-    (OnboardingInterests.moreDisciplined, Icons.shield_outlined,
-        'Become more disciplined'),
+    (
+      OnboardingInterests.buildBusiness,
+      Icons.rocket_launch_outlined,
+      'Build a business',
+    ),
+    (
+      OnboardingInterests.improveHealth,
+      Icons.favorite_outline,
+      'Improve my health',
+    ),
+    (
+      OnboardingInterests.learnSkills,
+      Icons.menu_book_outlined,
+      'Learn new skills',
+    ),
+    (
+      OnboardingInterests.getOrganized,
+      Icons.grid_view_outlined,
+      'Get organized',
+    ),
+    (OnboardingInterests.makeMoney, Icons.payments_outlined, 'Make more money'),
+    (OnboardingInterests.betterHabits, Icons.refresh, 'Build better habits'),
+    (
+      OnboardingInterests.moreDisciplined,
+      Icons.shield_outlined,
+      'Become more disciplined',
+    ),
   ];
 
   @override

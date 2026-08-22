@@ -60,7 +60,8 @@ class _StakeTimerScreenState extends ConsumerState<StakeTimerScreen> {
         builder: (dialogContext) => AlertDialog(
           title: const Text('Under a minute'),
           content: const Text(
-              'Sessions under a minute are not recorded. Leave anyway?'),
+            'Sessions under a minute are not recorded. Leave anyway?',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -78,7 +79,9 @@ class _StakeTimerScreenState extends ConsumerState<StakeTimerScreen> {
     }
 
     setState(() => _saving = true);
-    await ref.read(stakesRepositoryProvider).addEvidence(
+    await ref
+        .read(stakesRepositoryProvider)
+        .addEvidence(
           challengeId: widget.challenge.id,
           unitIndex: widget.challenge.todayUnitIndex,
           amount: minutes,
@@ -102,10 +105,7 @@ class _StakeTimerScreenState extends ConsumerState<StakeTimerScreen> {
         if (!didPop) _stopAndSave();
       },
       child: Scaffold(
-        appBar: AppBar(
-          centerTitle: true,
-          title: const PageTitle('Focus'),
-        ),
+        appBar: AppBar(centerTitle: true, title: const PageTitle('Focus')),
         body: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -122,8 +122,9 @@ class _StakeTimerScreenState extends ConsumerState<StakeTimerScreen> {
                       value: progress,
                       strokeWidth: 7,
                       backgroundColor: AppColors.fg12,
-                      color:
-                          metMercy ? AppColors.statusGreen : AppColors.accent,
+                      color: metMercy
+                          ? AppColors.statusGreen
+                          : AppColors.accent,
                     ),
                     Center(
                       child: Column(
@@ -171,26 +172,30 @@ class _StakeTimerScreenState extends ConsumerState<StakeTimerScreen> {
                       onPressed: _saving
                           ? null
                           : _running
-                              ? _pause
-                              : _start,
-                      child: Text(_running
-                          ? 'Pause'
-                          : _elapsed == Duration.zero
-                              ? 'Start'
-                              : 'Resume'),
+                          ? _pause
+                          : _start,
+                      child: Text(
+                        _running
+                            ? 'Pause'
+                            : _elapsed == Duration.zero
+                            ? 'Start'
+                            : 'Resume',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton(
-                      onPressed:
-                          _saving || _elapsed == Duration.zero ? null : _stopAndSave,
+                      onPressed: _saving || _elapsed == Duration.zero
+                          ? null
+                          : _stopAndSave,
                       child: _saving
                           ? const SizedBox(
                               width: 20,
                               height: 20,
-                              child:
-                                  CircularProgressIndicator(strokeWidth: 2.4),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.4,
+                              ),
                             )
                           : const Text('Finish & record'),
                     ),

@@ -7,6 +7,7 @@ import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../analytics/application/analytics_event_logger.dart';
+import '../../analytics/application/delivery_providers.dart';
 import '../../analytics/domain/models/analytics_event.dart';
 import '../../time_blocks/application/time_block_providers.dart';
 import '../domain/models/accountability_log.dart';
@@ -232,6 +233,10 @@ Future<bool> confirmDeletePlannedTask(
         blockId: row.blockId,
         taskId: row.task.id,
       );
+  await ref.read(reminderSyncServiceProvider).removeForDeletedTask(row.task.id);
+  // A deleted task is no longer a coaching subject — drop its cached
+  // features/insights so it can't resurface as a "today" insight.
+  await clearEntityCoachingCachesForTask(ref, row.task.id);
   // Phase A — remove the time block when the task is deleted.
   await ref
       .read(timeBlockSyncServiceProvider)

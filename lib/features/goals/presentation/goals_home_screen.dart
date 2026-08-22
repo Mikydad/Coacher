@@ -3,8 +3,11 @@ import '../../education/presentation/help_dot.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/presentation/swipe_actions.dart';
+import '../application/goal_actions.dart';
 import '../application/goals_providers.dart';
 import '../domain/models/user_goal.dart';
+import 'goal_editor_screen.dart';
 import 'goal_template_picker_screen.dart';
 import 'goals_archive_screen.dart';
 import 'widgets/category_chip_row.dart';
@@ -80,13 +83,13 @@ class GoalsHomeScreen extends ConsumerWidget {
   }
 }
 
-class _GoalList extends StatelessWidget {
+class _GoalList extends ConsumerWidget {
   const _GoalList({required this.goals});
 
   final List<UserGoal> goals;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (goals.isEmpty) {
       return Padding(
         padding: EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -100,7 +103,19 @@ class _GoalList extends StatelessWidget {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
       itemCount: goals.length,
-      itemBuilder: (_, i) => GoalCard(goal: goals[i]),
+      // Swipe right-to-left for Edit / Delete without the detail-page trip
+      // (2026-08-22).
+      itemBuilder: (_, i) => SwipeActionsRow(
+        id: goals[i].id,
+        groupTag: 'goal-cards',
+        onEdit: () => Navigator.pushNamed(
+          context,
+          GoalEditorScreen.routeName,
+          arguments: GoalEditorArgs(goalId: goals[i].id),
+        ),
+        onDelete: () => confirmDeleteGoal(context, ref, goals[i]),
+        child: GoalCard(goal: goals[i]),
+      ),
     );
   }
 }

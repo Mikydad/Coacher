@@ -18,6 +18,7 @@ import 'task_detail_screen.dart';
 
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
+import '../../../core/presentation/swipe_actions.dart';
 
 PlannedTask _hubTaskWithOrderIndex(PlannedTaskRow row, int orderIndex) {
   final t = row.task;
@@ -248,25 +249,35 @@ class TasksHubScreen extends ConsumerWidget {
                       );
                     },
                     children: [
+                      // Swipe right-to-left for Edit / Delete (2026-08-22);
+                      // reorder stays on long-press, so the two gestures
+                      // don't collide.
                       for (final row in rows)
-                        _HubTaskTile(
+                        SwipeActionsRow(
                           key: ValueKey(row.task.id),
-                          row: row,
-                          scorePercent: scores[row.task.id],
-                          onEdit: () {
-                            _openEditTask(context, ref, row);
-                          },
-                          onCompleteNow: () => completePlannedTaskRow(
-                            context,
-                            ref,
-                            row,
-                            sourceSurface: 'tasks_hub',
-                            sourceContext: 'tasks_hub.complete',
-                          ),
-                          onPlansChanged: () =>
-                              promptPlansChangedForRow(context, ref, row),
+                          id: row.task.id,
+                          groupTag: 'hub-tasks-today',
+                          onEdit: () => _openEditTask(context, ref, row),
                           onDelete: () =>
                               confirmDeletePlannedTask(context, ref, row),
+                          child: _HubTaskTile(
+                            row: row,
+                            scorePercent: scores[row.task.id],
+                            onEdit: () {
+                              _openEditTask(context, ref, row);
+                            },
+                            onCompleteNow: () => completePlannedTaskRow(
+                              context,
+                              ref,
+                              row,
+                              sourceSurface: 'tasks_hub',
+                              sourceContext: 'tasks_hub.complete',
+                            ),
+                            onPlansChanged: () =>
+                                promptPlansChangedForRow(context, ref, row),
+                            onDelete: () =>
+                                confirmDeletePlannedTask(context, ref, row),
+                          ),
                         ),
                     ],
                   );
@@ -297,25 +308,32 @@ class TasksHubScreen extends ConsumerWidget {
                   return Column(
                     children: [
                       for (final row in rows)
-                        _HubTaskTile(
+                        SwipeActionsRow(
                           key: ValueKey('other_${row.task.id}_${row.dateKey}'),
-                          row: row,
-                          scorePercent: scores[row.task.id],
-                          showDateKey: true,
-                          onEdit: () {
-                            _openEditTask(context, ref, row);
-                          },
-                          onCompleteNow: () => completePlannedTaskRow(
-                            context,
-                            ref,
-                            row,
-                            sourceSurface: 'tasks_hub',
-                            sourceContext: 'tasks_hub.complete',
-                          ),
-                          onPlansChanged: () =>
-                              promptPlansChangedForRow(context, ref, row),
+                          id: '${row.task.id}_${row.dateKey}',
+                          groupTag: 'hub-tasks-other',
+                          onEdit: () => _openEditTask(context, ref, row),
                           onDelete: () =>
                               confirmDeletePlannedTask(context, ref, row),
+                          child: _HubTaskTile(
+                            row: row,
+                            scorePercent: scores[row.task.id],
+                            showDateKey: true,
+                            onEdit: () {
+                              _openEditTask(context, ref, row);
+                            },
+                            onCompleteNow: () => completePlannedTaskRow(
+                              context,
+                              ref,
+                              row,
+                              sourceSurface: 'tasks_hub',
+                              sourceContext: 'tasks_hub.complete',
+                            ),
+                            onPlansChanged: () =>
+                                promptPlansChangedForRow(context, ref, row),
+                            onDelete: () =>
+                                confirmDeletePlannedTask(context, ref, row),
+                          ),
                         ),
                     ],
                   );
@@ -334,7 +352,6 @@ class TasksHubScreen extends ConsumerWidget {
 
 class _HubTaskTile extends StatelessWidget {
   const _HubTaskTile({
-    super.key,
     required this.row,
     required this.onEdit,
     required this.onCompleteNow,

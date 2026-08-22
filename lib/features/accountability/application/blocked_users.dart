@@ -18,10 +18,12 @@ class BlockedUsersRepository {
     return _isar.isarBlockedUsers
         .where()
         .watch(fireImmediately: true)
-        .map((rows) => {
-              for (final r in rows)
-                if (r.active) r.blockedUid,
-            });
+        .map(
+          (rows) => {
+            for (final r in rows)
+              if (r.active) r.blockedUid,
+          },
+        );
   }
 
   Future<void> setBlocked(String blockedUid, {required bool blocked}) async {
@@ -40,8 +42,7 @@ class BlockedUsersRepository {
     });
     await outboxUpsert(
       entityType: 'blockedUser',
-      documentPath:
-          '${FirestorePaths.userRoot}/blocked/$blockedUid',
+      documentPath: '${FirestorePaths.userRoot}/blocked/$blockedUid',
       payload: {
         'blockedUid': blockedUid,
         'active': blocked,

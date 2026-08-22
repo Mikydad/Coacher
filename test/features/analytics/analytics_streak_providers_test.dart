@@ -68,6 +68,10 @@ class _FakeAnalyticsRepository implements AnalyticsRepository {
 
 class _NoOpReminderRepository implements ReminderRepository {
   @override
+  Future<void> deleteRemindersForTask(String taskId) async {}
+
+
+  @override
   Future<List<ReminderConfig>> listAllReminders() async => const [];
   @override
   Future<List<ReminderConfig>> getRemindersForTasks(List<String> taskIds) async => const [];

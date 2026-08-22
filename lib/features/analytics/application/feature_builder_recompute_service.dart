@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/utils/date_keys.dart';
 import '../data/feature_cache_repository.dart';
+import '../data/insight_cache_repository.dart';
 import '../domain/models/analytics_event.dart';
+import '../domain/models/generated_insight.dart';
 import 'feature_builder_orchestrator.dart';
 import 'pattern_detection_recompute_service.dart';
 
@@ -11,14 +13,17 @@ class FeatureBuilderRecomputeService {
   FeatureBuilderRecomputeService({
     required FeatureBuilderOrchestrator orchestrator,
     required FeatureCacheRepository cacheRepository,
+    InsightCacheRepository? insightCacheRepository,
     this.onFeatureComputed,
     Duration debounce = const Duration(seconds: 2),
   }) : _orchestrator = orchestrator,
        _cacheRepository = cacheRepository,
+       _insightCacheRepository = insightCacheRepository,
        _debounce = debounce;
 
   final FeatureBuilderOrchestrator _orchestrator;
   final FeatureCacheRepository _cacheRepository;
+  final InsightCacheRepository? _insightCacheRepository;
   final OnFeatureComputedCallback? onFeatureComputed;
   final Duration _debounce;
 
@@ -79,12 +84,33 @@ class FeatureBuilderRecomputeService {
       await _cacheRepository.upsertFeatures(
         batch.assembly.featuresByEntityId.values.toList(),
       );
+      await _pruneOrphanedEntities(
+        batch.assembly.featuresByEntityId.keys.toSet(),
+      );
       await onFeatureComputed?.call(entityId: '*', now: ts, fullRefresh: true);
       _lastDailyRefreshDateKey = dateKey;
       return true;
     } catch (_) {
       // Keep experience resilient; daily refresh retries on next opportunity.
       return false;
+    }
+  }
+
+  /// Deleted/paused/expired entities vanish from the seed batch but their
+  /// cached Layer-1 rows (and the Layer-3 insights built from them) used to
+  /// live forever, re-emitting "today" coaching about things that no longer
+  /// exist. After each full refresh, anything not in [liveEntityIds] goes.
+  Future<void> _pruneOrphanedEntities(Set<String> liveEntityIds) async {
+    final cached = await _cacheRepository.listAll();
+    for (final feature in cached) {
+      final id = feature.entityId;
+      if (liveEntityIds.contains(id)) continue;
+      await _cacheRepository.deleteByEntityId(id);
+      await _insightCacheRepository?.replaceScopeInsights(
+        scopeType: InsightScopeType.entity,
+        scopeId: id,
+        insights: const <GeneratedInsight>[],
+      );
     }
   }
 }
@@ -95,6 +121,7 @@ final featureBuilderRecomputeServiceProvider =
       return FeatureBuilderRecomputeService(
         orchestrator: ref.read(featureBuilderOrchestratorProvider),
         cacheRepository: ref.read(featureCacheRepositoryProvider),
+        insightCacheRepository: ref.read(insightCacheRepositoryProvider),
         onFeatureComputed:
             ({
               required String entityId,

@@ -21,10 +21,11 @@ AuthFailure _map(String code) =>
 // Reflective helper that calls the same switch as the private method.
 AuthFailure _mapCode(FirebaseAuthException e) {
   return switch (e.code) {
-    'wrong-password' || 'user-not-found' || 'invalid-credential' =>
-      const InvalidCredentials(),
-    'email-already-in-use' || 'credential-already-in-use' =>
-      const EmailAlreadyInUse(),
+    'wrong-password' ||
+    'user-not-found' ||
+    'invalid-credential' => const InvalidCredentials(),
+    'email-already-in-use' ||
+    'credential-already-in-use' => const EmailAlreadyInUse(),
     'weak-password' => const WeakPassword(),
     'requires-recent-login' => const RequiresRecentLogin(),
     'network-request-failed' => const NetworkFailure(),
@@ -75,10 +76,7 @@ void main() {
 
   group('AuthFailureX.toUserMessage', () {
     test('InvalidCredentials has a non-empty message', () {
-      expect(
-        const InvalidCredentials().toUserMessage(),
-        isNotEmpty,
-      );
+      expect(const InvalidCredentials().toUserMessage(), isNotEmpty);
     });
 
     test('EmailAlreadyInUse has a non-empty message', () {

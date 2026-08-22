@@ -114,8 +114,8 @@ class _StakeRevealViewerScreenState
           .get();
       final data = snap.data();
       if (data == null) throw StateError('challenge missing');
-      _goalTitle = (data['frozenGoal'] as Map<String, dynamic>?)?['title']
-              as String? ??
+      _goalTitle =
+          (data['frozenGoal'] as Map<String, dynamic>?)?['title'] as String? ??
           '';
       _ownerUid = data['creatorUid'] as String?;
       _expiresAtMs = (data['revealExpiresAtMs'] as num?)?.toInt();
@@ -128,15 +128,15 @@ class _StakeRevealViewerScreenState
       String? path;
       for (final p in participants) {
         final photo = (p as Map<String, dynamic>)['photo'];
-        if (photo is Map<String, dynamic> &&
-            photo['storagePath'] is String) {
+        if (photo is Map<String, dynamic> && photo['storagePath'] is String) {
           path = photo['storagePath'] as String;
           break;
         }
       }
       if (path == null) throw StateError('no photo path');
-      final bytes =
-          await FirebaseStorage.instance.ref(path).getData(10 * 1024 * 1024);
+      final bytes = await FirebaseStorage.instance
+          .ref(path)
+          .getData(10 * 1024 * 1024);
       if (!mounted) return;
       setState(() => _imageBytes = bytes);
     } catch (e) {
@@ -203,13 +203,15 @@ class _StakeRevealViewerScreenState
       body: _gone
           ? _goneState()
           : _error != null
-              ? Center(
-                  child: Text(_error!,
-                      style: TextStyle(color: AppColors.textMuted)),
-                )
-              : _imageBytes == null
-                  ? const Center(child: CircularProgressIndicator())
-                  : _photoView(),
+          ? Center(
+              child: Text(
+                _error!,
+                style: TextStyle(color: AppColors.textMuted),
+              ),
+            )
+          : _imageBytes == null
+          ? const Center(child: CircularProgressIndicator())
+          : _photoView(),
     );
   }
 
@@ -334,8 +336,9 @@ class _StakeRevealViewerScreenState
       Navigator.of(context).pop();
     } on StakeActionException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 }

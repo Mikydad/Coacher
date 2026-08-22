@@ -49,10 +49,7 @@ class PremiumStep extends ConsumerWidget {
         children: [
           Center(
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 5,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
                 color: OnboardingColors.primary.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(999),

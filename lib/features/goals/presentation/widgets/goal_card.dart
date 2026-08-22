@@ -67,8 +67,11 @@ class GoalCard extends ConsumerWidget {
   bool get _periodEnded {
     final now = DateTime.now();
     final end = DateTime.fromMillisecondsSinceEpoch(goal.periodEndMs);
-    return DateTime(now.year, now.month, now.day)
-        .isAfter(DateTime(end.year, end.month, end.day));
+    return DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).isAfter(DateTime(end.year, end.month, end.day));
   }
 
   /// Period-aware (unlike the model's [UserGoal.allowsLoggingOn]): a goal

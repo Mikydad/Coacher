@@ -247,11 +247,9 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
       if (isTaskKind) {
         isEntityStillPending = enabledTaskIds.contains(intent.entityId);
       } else {
-        isEntityStillPending = await (_isEntityLive?.call(
-              intent.entityId,
-              intent.entityKind,
-            ) ??
-            Future.value(true));
+        isEntityStillPending =
+            await (_isEntityLive?.call(intent.entityId, intent.entityKind) ??
+                Future.value(true));
       }
       final age = now.difference(intent.proposedAt);
       final isStale = age > kSuppressedIntentStaleThreshold;

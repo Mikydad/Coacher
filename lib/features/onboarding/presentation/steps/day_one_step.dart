@@ -102,8 +102,10 @@ class _DayOneStepState extends ConsumerState<DayOneStep> {
                           color: OnboardingColors.textFaint,
                         ),
                         const SizedBox(height: 14),
-                        Text('Add your Day One photo',
-                            style: OnboardingType.cardTitle),
+                        Text(
+                          'Add your Day One photo',
+                          style: OnboardingType.cardTitle,
+                        ),
                       ],
                     ),
                   ),
@@ -153,9 +155,7 @@ class _SourceButton extends StatelessWidget {
         foregroundColor: OnboardingColors.textSecondary,
         side: BorderSide(color: OnboardingColors.border),
         padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(999),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
       ),
       icon: Icon(icon, size: 18),
       label: Text(label),

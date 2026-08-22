@@ -22,15 +22,17 @@ ReminderIntent _intent(String entityKind, {String entityId = 'e1'}) =>
 void main() {
   final notifications = LocalNotificationsService.instance;
 
-  test('task intent routes to task id namespace with task payload + category',
-      () {
-    final route = resolveNotificationRoute(_intent(ReminderEntityKinds.task));
+  test(
+    'task intent routes to task id namespace with task payload + category',
+    () {
+      final route = resolveNotificationRoute(_intent(ReminderEntityKinds.task));
 
-    expect(route.notifId, notifications.idFromTaskId('e1'));
-    expect(route.payload, 'task:e1');
-    expect(route.darwinCategoryId, NotificationCategoryIds.taskReminder);
-    expect(route.immediate, isFalse);
-  });
+      expect(route.notifId, notifications.idFromTaskId('e1'));
+      expect(route.payload, 'task:e1');
+      expect(route.darwinCategoryId, NotificationCategoryIds.taskReminder);
+      expect(route.immediate, isFalse);
+    },
+  );
 
   test('habit intent routes like a task', () {
     final route = resolveNotificationRoute(_intent(ReminderEntityKinds.habit));
@@ -39,22 +41,24 @@ void main() {
     expect(route.payload, 'task:e1');
   });
 
-  test('goal intent routes to goal id namespace with goal payload, no category',
-      () {
-    final route = resolveNotificationRoute(_intent(ReminderEntityKinds.goal));
+  test(
+    'goal intent routes to goal id namespace with goal payload, no category',
+    () {
+      final route = resolveNotificationRoute(_intent(ReminderEntityKinds.goal));
 
-    // Must stay in sync with LocalNotificationsService.idFromGoalId so
-    // cancelForGoal's sweep and tap routing keep working.
-    expect(route.notifId, notifications.idFromGoalId('e1'));
-    expect(route.payload, 'goal:e1');
-    expect(route.darwinCategoryId, isNull);
-    expect(route.immediate, isFalse);
-  });
+      // Must stay in sync with LocalNotificationsService.idFromGoalId so
+      // cancelForGoal's sweep and tap routing keep working.
+      expect(route.notifId, notifications.idFromGoalId('e1'));
+      expect(route.payload, 'goal:e1');
+      expect(route.darwinCategoryId, isNull);
+      expect(route.immediate, isFalse);
+    },
+  );
 
-  test('stake invite routes to legacy invite id, stake payload, immediate',
-      () {
-    final route =
-        resolveNotificationRoute(_intent(ReminderEntityKinds.stakeInvite));
+  test('stake invite routes to legacy invite id, stake payload, immediate', () {
+    final route = resolveNotificationRoute(
+      _intent(ReminderEntityKinds.stakeInvite),
+    );
 
     // Legacy scheme from main_tab_shell's original showNow call — keeps
     // re-emits stable and lets pre-migration invites cancel under the same id.
@@ -64,8 +68,7 @@ void main() {
     expect(route.immediate, isTrue);
   });
 
-  test(
-      'coach insight routes to the fixed COIN slot with a layer4 payload '
+  test('coach insight routes to the fixed COIN slot with a layer4 payload '
       '(V-01)', () {
     final route = resolveNotificationRoute(
       _intent(

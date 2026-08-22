@@ -93,6 +93,14 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
       if (flow.authIntent == OnboardingAuthIntent.login) {
         _finish();
       } else if (flow.step == OnboardingStep.register) {
+        // A Google/Apple tap on the register step can resolve to an account
+        // that already exists — that's a returning user logging back in, not
+        // a registration: exit the flow instead of replaying the remaining
+        // marketing steps (which would also overwrite their saved answers).
+        if (ref.read(authRepositoryProvider).lastSignInUsedExistingAccount) {
+          _finish();
+          return;
+        }
         // Dismiss any pushed auth routes before advancing the step behind.
         Navigator.of(context).popUntil((r) => r.isFirst);
         controller.markRegistered();

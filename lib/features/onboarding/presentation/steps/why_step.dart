@@ -23,8 +23,10 @@ class WhyStep extends ConsumerWidget {
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Your brain isn\'t working against you.',
-              style: OnboardingType.headline),
+          Text(
+            'Your brain isn\'t working against you.',
+            style: OnboardingType.headline,
+          ),
           const SizedBox(height: 14),
           Text(
             'We are biologically wired to seek immediate rewards — an '

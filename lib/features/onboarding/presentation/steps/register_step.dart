@@ -93,10 +93,10 @@ class _RegisterStepState extends ConsumerState<RegisterStep> {
     Navigator.of(context)
         .pushNamed(LoginScreen.routeName, arguments: _emailCtrl.text.trim())
         .then((_) {
-      ref
-          .read(onboardingFlowControllerProvider.notifier)
-          .setAuthIntent(OnboardingAuthIntent.register);
-    });
+          ref
+              .read(onboardingFlowControllerProvider.notifier)
+              .setAuthIntent(OnboardingAuthIntent.register);
+        });
   }
 
   @override

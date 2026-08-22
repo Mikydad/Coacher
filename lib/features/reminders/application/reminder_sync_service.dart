@@ -109,6 +109,15 @@ class ReminderSyncService {
   Future<void> markTaskStarted(String taskId) =>
       _resolveReminder(taskId, keepEnabled: false);
 
+  /// Task deleted: cancel the armed OS notification AND delete the config.
+  /// Deleting the config matters as much as the cancel — `scheduleFromCache`
+  /// and boot reconciliation re-arm every stored config on next launch, so a
+  /// surviving row would resurrect the notification.
+  Future<void> removeForDeletedTask(String taskId) async {
+    await _orchestrator.cancelForEntity(taskId);
+    await _repository.deleteRemindersForTask(taskId);
+  }
+
   Future<void> markLogicalReasonProvided(String taskId) =>
       _resolveReminder(taskId, keepEnabled: false);
 

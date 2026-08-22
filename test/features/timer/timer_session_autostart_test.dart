@@ -56,6 +56,10 @@ class _FakeTimerRuntimeCache extends TimerRuntimeCache {
 
 class _FakeReminderRepository implements ReminderRepository {
   @override
+  Future<void> deleteRemindersForTask(String taskId) async {}
+
+
+  @override
   Future<List<ReminderConfig>> listAllReminders() async => const [];
 
   @override

@@ -25,8 +25,8 @@ class StakeSeenKeys {
 /// state seen; the badge counts only unseen items.
 final stakeSeenProvider =
     StateNotifierProvider<StakeSeenController, Set<String>>(
-  (ref) => StakeSeenController(ref),
-);
+      (ref) => StakeSeenController(ref),
+    );
 
 class StakeSeenController extends StateNotifier<Set<String>> {
   StakeSeenController([this._ref]) : super(const {}) {

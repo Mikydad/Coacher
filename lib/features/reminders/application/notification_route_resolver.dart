@@ -78,9 +78,8 @@ NotificationRoute resolveNotificationRoute(ReminderIntent intent) {
         // Slot-aware ladder ids (0 = primary, 1 = deadline-eve, 2 =
         // fallback) so siblings can be cancelled individually. Mirrors
         // LocalNotificationsService.idFromIntentionId.
-        notifId: ('intention:${intent.entityId}:${intent.slot}')
-                .hashCode
-                .abs() %
+        notifId:
+            ('intention:${intent.entityId}:${intent.slot}').hashCode.abs() %
             2147483647,
         payload: 'intention:$encoded',
         darwinCategoryId: NotificationCategoryIds.intentionNudge,

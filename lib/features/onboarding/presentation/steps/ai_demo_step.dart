@@ -62,8 +62,10 @@ class _AiDemoStepState extends ConsumerState<AiDemoStep> {
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Just tell SidePal what you want.',
-              style: OnboardingType.headline),
+          Text(
+            'Just tell SidePal what you want.',
+            style: OnboardingType.headline,
+          ),
           const SizedBox(height: 10),
           Text(
             'Watch simple ideas become structured, actionable plans.',
@@ -74,10 +76,7 @@ class _AiDemoStepState extends ConsumerState<AiDemoStep> {
           Align(
             alignment: Alignment.centerRight,
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 10,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 gradient: OnboardingColors.aetherGradient,
                 borderRadius: BorderRadius.circular(18),

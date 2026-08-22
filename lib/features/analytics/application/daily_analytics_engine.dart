@@ -55,7 +55,8 @@ class DailyAnalyticsSnapshot {
       createdCount: (payload['createdCount'] as num?)?.toInt() ?? 0,
       completedCount: (payload['completedCount'] as num?)?.toInt() ?? 0,
       weightedCreated: (payload['weightedCreated'] as num?)?.toDouble() ?? 0,
-      weightedCompleted: (payload['weightedCompleted'] as num?)?.toDouble() ?? 0,
+      weightedCompleted:
+          (payload['weightedCompleted'] as num?)?.toDouble() ?? 0,
       completionRate: completionRate.clamp(0.0, 1.0),
       weightedCompletionRate: weightedCompletionRate.clamp(0.0, 1.0),
       schemaVersion: (payload['schemaVersion'] as num?)?.toInt() ?? 2,
@@ -192,7 +193,9 @@ GoalDayContribution? computeGoalDayContribution({
       // Progress so far in the cycle — never credit future days.
       return GoalDayContribution(
         weight: weight,
-        fraction: fractionOf(sumRange(DateKeys.yyyymmdd(window.start), dateKey)),
+        fraction: fractionOf(
+          sumRange(DateKeys.yyyymmdd(window.start), dateKey),
+        ),
       );
     case GoalRepeatCadence.weekly:
     case GoalRepeatCadence.monthly:

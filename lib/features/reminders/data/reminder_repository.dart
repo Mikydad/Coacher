@@ -32,6 +32,10 @@ abstract class ReminderRepository {
   Future<void> hydrateFromRemoteForTasks(List<String> taskIds);
 
   Future<void> upsertReminder(ReminderConfig reminder);
+
+  /// Deletes every reminder config attached to [taskId] locally and
+  /// replicates the delete via the outbox. Safe to call when none exist.
+  Future<void> deleteRemindersForTask(String taskId);
 }
 
 class FirestoreReminderRepository implements ReminderRepository {
@@ -78,5 +82,19 @@ class FirestoreReminderRepository implements ReminderRepository {
       documentPath: path,
       payload: payload,
     );
+  }
+
+  @override
+  Future<void> deleteRemindersForTask(String taskId) async {
+    final snap = await FirebaseFirestore.instance
+        .collection(FirestorePaths.reminders)
+        .where('taskId', isEqualTo: taskId)
+        .get();
+    for (final doc in snap.docs) {
+      await outboxDelete(
+        entityType: 'reminder',
+        documentPath: '${FirestorePaths.reminders}/${doc.id}',
+      );
+    }
   }
 }

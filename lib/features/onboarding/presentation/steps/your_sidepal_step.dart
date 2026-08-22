@@ -56,9 +56,7 @@ class YourSidePalStep extends ConsumerWidget {
     final flow = ref.watch(onboardingFlowControllerProvider);
     final controller = ref.read(onboardingFlowControllerProvider.notifier);
 
-    final firstInterest = flow.interests.isEmpty
-        ? null
-        : flow.interests.first;
+    final firstInterest = flow.interests.isEmpty ? null : flow.interests.first;
     final (focusTitle, firstTask) =
         _interestLabels[firstInterest] ??
         ('Your first goal', 'the easiest first step');
@@ -114,14 +112,16 @@ class YourSidePalStep extends ConsumerWidget {
                     _PreviewRow(
                       icon: Icons.flag_outlined,
                       label: 'Weekly Goals',
-                      value: '${flow.interests.length.clamp(1, 7)} focus '
+                      value:
+                          '${flow.interests.length.clamp(1, 7)} focus '
                           'area${flow.interests.length == 1 ? '' : 's'} mapped',
                     ),
                     const SizedBox(height: 10),
                     _PreviewRow(
                       icon: Icons.auto_awesome,
                       label: 'AI Recommendations',
-                      value: 'You\'ve completed 0 of 3 tasks — let\'s start '
+                      value:
+                          'You\'ve completed 0 of 3 tasks — let\'s start '
                           'with the easiest one.',
                     ),
                   ],

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -60,6 +61,26 @@ class _OnboardingGateState extends State<OnboardingGate> {
       setState(() => _showOnboarding = false);
       return;
     }
+
+    // Fresh install, but the OS restored a signed-in Firebase session (the
+    // iOS keychain survives app deletion): that's a returning user, not a
+    // first launch. The auth state comes from local storage, so this resolves
+    // fast; the timeout only guards a pathological hang.
+    try {
+      final restored = await FirebaseAuth.instance
+          .authStateChanges()
+          .first
+          .timeout(const Duration(seconds: 3));
+      if (restored != null && !restored.isAnonymous) {
+        await prefs.setBool(kOnboardingCompletedPrefsKey, true);
+        if (!mounted) return;
+        setState(() => _showOnboarding = false);
+        return;
+      }
+    } catch (_) {
+      // Fall through — worst case a returning user sees onboarding once.
+    }
+    if (!mounted) return;
 
     setState(() => _showOnboarding = true);
   }

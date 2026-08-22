@@ -107,8 +107,7 @@ class OnboardingFlowController extends StateNotifier<OnboardingFlowState> {
     var target = OnboardingStep.values[i - 1];
     // Never step back INTO registration once past it (account exists) or
     // into the transient personalizing animation.
-    if (target == OnboardingStep.register &&
-        state.registeredDuringOnboarding) {
+    if (target == OnboardingStep.register && state.registeredDuringOnboarding) {
       target = OnboardingStep.welcome;
     }
     if (target == OnboardingStep.personalizing) {
@@ -179,9 +178,7 @@ class OnboardingFlowController extends StateNotifier<OnboardingFlowState> {
       await _ref
           .read(onboardingProfileRepositoryProvider)
           .upsertProfile(
-            _buildProfile(
-              completedAtMs: DateTime.now().millisecondsSinceEpoch,
-            ),
+            _buildProfile(completedAtMs: DateTime.now().millisecondsSinceEpoch),
           );
     } catch (e, st) {
       debugPrint('OnboardingFlowController: complete write failed: $e\n$st');

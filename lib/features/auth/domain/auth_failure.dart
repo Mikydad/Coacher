@@ -35,6 +35,21 @@ class AuthSignInCanceled extends AuthFailure {
   const AuthSignInCanceled();
 }
 
+/// Linking the anonymous account failed because the chosen Google/Apple
+/// identity already belongs to an existing PathPal account (typically a
+/// previous install or another device). The credential is cached in the
+/// repository — [AuthRepositoryInterface.signInWithPendingLinkConflict]
+/// switches to that account (the recovery path this failure exists for).
+class CredentialAlreadyLinked extends AuthFailure {
+  const CredentialAlreadyLinked({this.email, this.providerLabel});
+
+  /// Email of the already-linked identity, when the provider reports it.
+  final String? email;
+
+  /// Human label for the provider ('Google' / 'Apple').
+  final String? providerLabel;
+}
+
 /// An unexpected Firebase Auth error occurred.
 class UnknownAuthFailure extends AuthFailure {
   const UnknownAuthFailure(this.message);
@@ -54,6 +69,9 @@ extension AuthFailureX on AuthFailure {
       'No internet connection. Check your network and try again.',
     RequiresRecentLogin() => 'Please sign in again before making this change.',
     AuthSignInCanceled() => '',
+    CredentialAlreadyLinked(:final providerLabel) =>
+      'This ${providerLabel ?? 'sign-in'} account is already connected to an '
+          'existing PathPal account.',
     UnknownAuthFailure(:final message) =>
       message.isEmpty ? 'Something went wrong. Please try again.' : message,
   };

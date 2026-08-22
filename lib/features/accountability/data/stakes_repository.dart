@@ -74,6 +74,18 @@ class StakesRepository {
     });
   }
 
+  /// Removes an optimistic placeholder that never reached the server (the
+  /// user discarded a failed create). Server-echoed rows come back on the
+  /// next pull, so this is only safe for `updatedAtMs == 0` placeholders.
+  Future<void> deleteLocalMirror(String challengeId) async {
+    await _isar.writeTxn(() async {
+      await _isar.isarStakeChallenges
+          .filter()
+          .challengeIdEqualTo(challengeId)
+          .deleteAll();
+    });
+  }
+
   /// Live hydration for ONE non-terminal challenge: the doc itself AND its
   /// evidence subcollection. Covers every transient state the background
   /// pull (start/resume/connectivity, 30 s throttle) is too slow for:
@@ -87,30 +99,30 @@ class StakesRepository {
         .doc('stake_challenges/$challengeId')
         .snapshots()
         .listen((snap) async {
-      final data = snap.data();
-      if (data == null) return;
-      final m = Map<String, dynamic>.from(data);
-      m['id'] = snap.id;
-      final incoming = StakeChallenge.fromMap(m);
-      // No LWW here, deliberately: this collection is SERVER-OWNED — the
-      // only client-side writes are optimistic placeholders, so a live
-      // server snapshot is authoritative by definition. (LWW here once
-      // let a clock-skewed placeholder outrank the real server flip and
-      // the screening result never showed until a logout wipe.)
-      await _isar.writeTxn(() async {
-        await _isar.isarStakeChallenges.putByChallengeId(
-          IsarStakeChallenge.fromDomain(incoming),
-        );
-      });
-    });
+          final data = snap.data();
+          if (data == null) return;
+          final m = Map<String, dynamic>.from(data);
+          m['id'] = snap.id;
+          final incoming = StakeChallenge.fromMap(m);
+          // No LWW here, deliberately: this collection is SERVER-OWNED — the
+          // only client-side writes are optimistic placeholders, so a live
+          // server snapshot is authoritative by definition. (LWW here once
+          // let a clock-skewed placeholder outrank the real server flip and
+          // the screening result never showed until a logout wipe.)
+          await _isar.writeTxn(() async {
+            await _isar.isarStakeChallenges.putByChallengeId(
+              IsarStakeChallenge.fromDomain(incoming),
+            );
+          });
+        });
     final evidenceSub = FirebaseFirestore.instance
         .collection('stake_challenges/$challengeId/evidence')
         .snapshots()
         .listen((snap) async {
-      for (final doc in snap.docs) {
-        await _mergeServerEvidence(doc.data(), doc.id, challengeId);
-      }
-    });
+          for (final doc in snap.docs) {
+            await _mergeServerEvidence(doc.data(), doc.id, challengeId);
+          }
+        });
     return StakeLiveHydration([docSub, evidenceSub]);
   }
 

@@ -42,6 +42,10 @@ class _FakePlanningRepository extends NoOpPlanningRepository {
 }
 
 class _FakeReminderRepository implements ReminderRepository {
+  @override
+  Future<void> deleteRemindersForTask(String taskId) async {}
+
+
   _FakeReminderRepository({this.reminders = const []});
 
   final List<ReminderConfig> reminders;

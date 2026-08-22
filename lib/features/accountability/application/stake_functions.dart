@@ -26,14 +26,15 @@ class StakeActionException implements Exception {
 /// genuine failure. Never block a gesture on these futures.
 class StakeFunctions {
   StakeFunctions({FirebaseFunctions? functions})
-      : _functions = functions ?? FirebaseFunctions.instance;
+    : _functions = functions ?? FirebaseFunctions.instance;
 
   final FirebaseFunctions _functions;
 
   Future<T> _call<T>(String name, Map<String, dynamic> data) async {
     try {
-      final result =
-          await _functions.httpsCallable(name).call<Map<String, dynamic>>(data);
+      final result = await _functions
+          .httpsCallable(name)
+          .call<Map<String, dynamic>>(data);
       return result.data as T;
     } on FirebaseFunctionsException catch (e) {
       throw StakeActionException(e.code, e.message ?? 'Request failed.');
@@ -86,11 +87,10 @@ class StakeFunctions {
   Future<void> acceptChallenge({
     required String challengeId,
     required String charityId,
-  }) =>
-      _call<Map<String, dynamic>>('stakeAcceptChallenge', {
-        'challengeId': challengeId,
-        'charityId': charityId,
-      });
+  }) => _call<Map<String, dynamic>>('stakeAcceptChallenge', {
+    'challengeId': challengeId,
+    'charityId': charityId,
+  });
 
   Future<void> declineChallenge(String challengeId) =>
       _call<Map<String, dynamic>>('stakeDeclineChallenge', {
@@ -98,49 +98,55 @@ class StakeFunctions {
       });
 
   /// P-5/D9 — early takedown of a live reveal (30% floor, 300 points).
-  Future<void> removePhoto(String challengeId) =>
-      _call<Map<String, dynamic>>('stakeRemovePhoto', {
-        'challengeId': challengeId,
-      });
+  Future<void> removePhoto(String challengeId) => _call<Map<String, dynamic>>(
+    'stakeRemovePhoto',
+    {'challengeId': challengeId},
+  );
 
-  Future<void> cancelDraft(String challengeId) =>
-      _call<Map<String, dynamic>>('stakeCancelDraft', {'challengeId': challengeId});
+  Future<void> cancelDraft(String challengeId) => _call<Map<String, dynamic>>(
+    'stakeCancelDraft',
+    {'challengeId': challengeId},
+  );
 
   /// M-6 — request the monthly mercy veto (photo stakes only, applied at
   /// decision time; the loss is still recorded).
-  Future<void> applyVeto(String challengeId) =>
-      _call<Map<String, dynamic>>('stakeApplyVeto', {'challengeId': challengeId});
+  Future<void> applyVeto(String challengeId) => _call<Map<String, dynamic>>(
+    'stakeApplyVeto',
+    {'challengeId': challengeId},
+  );
 
   /// V-2 — confirm or dispute another participant's completion.
   Future<void> confirmOutcome({
     required String challengeId,
     required String aboutUid,
     required bool dispute,
-  }) =>
-      _call<Map<String, dynamic>>('stakeConfirmOutcome', {
-        'challengeId': challengeId,
-        'aboutUid': aboutUid,
-        'kind': dispute ? 'dispute' : 'confirm',
-      });
+  }) => _call<Map<String, dynamic>>('stakeConfirmOutcome', {
+    'challengeId': challengeId,
+    'aboutUid': aboutUid,
+    'kind': dispute ? 'dispute' : 'confirm',
+  });
 
   /// V-3 — circle member's vote on a disputed participant.
   Future<void> castVote({
     required String challengeId,
     required String aboutUid,
     required bool pass,
-  }) =>
-      _call<Map<String, dynamic>>('stakeCastVote', {
-        'challengeId': challengeId,
-        'aboutUid': aboutUid,
-        'pass': pass,
-      });
+  }) => _call<Map<String, dynamic>>('stakeCastVote', {
+    'challengeId': challengeId,
+    'aboutUid': aboutUid,
+    'pass': pass,
+  });
 
   /// P-6/P-7 — self-report from the offending device's iOS screenshot
   /// detection. Returns nothing the offender gets to negotiate with.
   Future<void> reportScreenshot(String challengeId) =>
-      _call<Map<String, dynamic>>('stakeReportScreenshot', {'challengeId': challengeId});
+      _call<Map<String, dynamic>>('stakeReportScreenshot', {
+        'challengeId': challengeId,
+      });
 
   /// P-8 — report a revealed photo (hidden pending review).
-  Future<void> reportPhoto(String challengeId) =>
-      _call<Map<String, dynamic>>('stakeReportPhoto', {'challengeId': challengeId});
+  Future<void> reportPhoto(String challengeId) => _call<Map<String, dynamic>>(
+    'stakeReportPhoto',
+    {'challengeId': challengeId},
+  );
 }

@@ -19,10 +19,11 @@ void main() {
   AuthFailure _mapCode(String code) {
     final e = FirebaseAuthException(code: code, message: 'test-$code');
     return switch (e.code) {
-      'wrong-password' || 'user-not-found' || 'invalid-credential' =>
-        const InvalidCredentials(),
-      'email-already-in-use' || 'credential-already-in-use' =>
-        const EmailAlreadyInUse(),
+      'wrong-password' ||
+      'user-not-found' ||
+      'invalid-credential' => const InvalidCredentials(),
+      'email-already-in-use' ||
+      'credential-already-in-use' => const EmailAlreadyInUse(),
       'weak-password' => const WeakPassword(),
       'requires-recent-login' => const RequiresRecentLogin(),
       'network-request-failed' => const NetworkFailure(),
@@ -31,10 +32,8 @@ void main() {
   }
 
   group('AuthRepository — linkAnonymousWithEmail exception mapping', () {
-    test(
-        'credential-already-in-use → EmailAlreadyInUse '
-        '(triggers "Account already exists" dialog in SignUpScreen)',
-        () {
+    test('credential-already-in-use → EmailAlreadyInUse '
+        '(triggers "Account already exists" dialog in SignUpScreen)', () {
       final result = _mapCode('credential-already-in-use');
       expect(result, isA<EmailAlreadyInUse>());
     });

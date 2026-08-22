@@ -20,6 +20,11 @@ import '../../support/no_op_notification_ledger.dart';
 class _FakeReminderRepository implements ReminderRepository {
   final List<ReminderConfig> _all = [];
 
+  @override
+  Future<void> deleteRemindersForTask(String taskId) async {
+    _all.removeWhere((r) => r.taskId == taskId);
+  }
+
   void seed(Iterable<ReminderConfig> items) {
     _all
       ..clear()
@@ -145,6 +150,9 @@ class _NoOpFocusRepo implements FocusRepository {
 
 class _NoOpReminderRepo implements ReminderRepository {
   @override
+  Future<void> deleteRemindersForTask(String taskId) async {}
+
+  @override
   Future<List<ReminderConfig>> listAllReminders() async => const [];
   @override
   Future<List<ReminderConfig>> getRemindersForTasks(
@@ -170,16 +178,16 @@ ReminderConfig _reminder({
     taskId: 't1',
     taskTitle: taskTitle,
     enabled: true,
-    scheduledAtIso:
-        now.subtract(const Duration(minutes: 30)).toIso8601String(),
+    scheduledAtIso: now.subtract(const Duration(minutes: 30)).toIso8601String(),
     modeRefId: modeRefId,
     blockUrgencyScore: 90,
     pendingAction: pendingAction,
     escalationLevel: escalationLevel,
     emergencyBypass: false,
     lastTriggeredAtMs: null,
-    nextPromptAtIso:
-        now.subtract(const Duration(minutes: 10)).toIso8601String(),
+    nextPromptAtIso: now
+        .subtract(const Duration(minutes: 10))
+        .toIso8601String(),
     createdAtMs: now.millisecondsSinceEpoch,
     updatedAtMs: now.millisecondsSinceEpoch,
   );
@@ -201,18 +209,21 @@ ReminderSyncService _makeService(
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 void main() {
-  test('scheduleFromCache produces exactly one evaluated intent per enabled reminder', () async {
-    final now = DateTime(2026, 3, 24, 10, 0);
-    final repo = _FakeReminderRepository()..seed([_reminder(now: now)]);
-    final orchestrator = _FakeOrchestratorService();
-    final service = _makeService(repo, orchestrator, now);
+  test(
+    'scheduleFromCache produces exactly one evaluated intent per enabled reminder',
+    () async {
+      final now = DateTime(2026, 3, 24, 10, 0);
+      final repo = _FakeReminderRepository()..seed([_reminder(now: now)]);
+      final orchestrator = _FakeOrchestratorService();
+      final service = _makeService(repo, orchestrator, now);
 
-    await service.scheduleFromCache();
+      await service.scheduleFromCache();
 
-    expect(orchestrator.evaluated.length, 1);
-    expect(orchestrator.evaluated.first.entityId, 't1');
-    expect(orchestrator.evaluated.first.proposedAt.isAfter(now), isTrue);
-  });
+      expect(orchestrator.evaluated.length, 1);
+      expect(orchestrator.evaluated.first.entityId, 't1');
+      expect(orchestrator.evaluated.first.proposedAt.isAfter(now), isTrue);
+    },
+  );
 
   test('disabled reminder is not evaluated', () async {
     final now = DateTime(2026, 3, 24, 10, 0);
@@ -226,17 +237,40 @@ void main() {
     expect(orchestrator.evaluated, isEmpty);
   });
 
-  test('cancelForEntity is called once per reminder during applyReminders', () async {
-    final now = DateTime(2026, 3, 24, 10, 0);
-    final repo = _FakeReminderRepository()..seed([_reminder(now: now)]);
-    final orchestrator = _FakeOrchestratorService();
-    final service = _makeService(repo, orchestrator, now);
+  test(
+    'cancelForEntity is called once per reminder during applyReminders',
+    () async {
+      final now = DateTime(2026, 3, 24, 10, 0);
+      final repo = _FakeReminderRepository()..seed([_reminder(now: now)]);
+      final orchestrator = _FakeOrchestratorService();
+      final service = _makeService(repo, orchestrator, now);
 
-    await service.scheduleFromCache();
+      await service.scheduleFromCache();
 
-    // cancelForEntity called once (before evaluate) — not 64 times.
-    expect(orchestrator.cancelled.where((id) => id == 't1').length, 1);
-  });
+      // cancelForEntity called once (before evaluate) — not 64 times.
+      expect(orchestrator.cancelled.where((id) => id == 't1').length, 1);
+    },
+  );
+
+  test(
+    'removeForDeletedTask cancels the OS notification and deletes the config '
+    'so scheduleFromCache cannot re-arm it',
+    () async {
+      final now = DateTime(2026, 3, 24, 10, 0);
+      final repo = _FakeReminderRepository()..seed([_reminder(now: now)]);
+      final orchestrator = _FakeOrchestratorService();
+      final service = _makeService(repo, orchestrator, now);
+
+      await service.removeForDeletedTask('t1');
+
+      expect(orchestrator.cancelled, contains('t1'));
+      expect(await repo.listAllReminders(), isEmpty);
+
+      // The boot path must find nothing to re-arm.
+      await service.scheduleFromCache();
+      expect(orchestrator.evaluated, isEmpty);
+    },
+  );
 
   test('requestSnooze produces a followUp ReminderIntent', () async {
     final now = DateTime(2026, 3, 24, 10, 0);
@@ -247,26 +281,26 @@ void main() {
     await service.requestSnooze('t1');
 
     expect(orchestrator.evaluated.length, 1);
-    expect(
-      orchestrator.evaluated.first.reminderType,
-      ReminderType.followUp,
-    );
+    expect(orchestrator.evaluated.first.reminderType, ReminderType.followUp);
     expect(orchestrator.evaluated.first.entityId, 't1');
   });
 
-  test('markLogicalReasonProvided disables the reminder and cancels entity', () async {
-    final now = DateTime(2026, 3, 24, 10, 0);
-    final repo = _FakeReminderRepository()..seed([_reminder(now: now)]);
-    final orchestrator = _FakeOrchestratorService();
-    final service = _makeService(repo, orchestrator, now);
+  test(
+    'markLogicalReasonProvided disables the reminder and cancels entity',
+    () async {
+      final now = DateTime(2026, 3, 24, 10, 0);
+      final repo = _FakeReminderRepository()..seed([_reminder(now: now)]);
+      final orchestrator = _FakeOrchestratorService();
+      final service = _makeService(repo, orchestrator, now);
 
-    await service.markLogicalReasonProvided('t1');
+      await service.markLogicalReasonProvided('t1');
 
-    final reminders = await repo.listAllReminders();
-    expect(reminders.first.enabled, isFalse);
-    expect(reminders.first.pendingAction, isFalse);
-    expect(orchestrator.cancelled, contains('t1'));
-  });
+      final reminders = await repo.listAllReminders();
+      expect(reminders.first.enabled, isFalse);
+      expect(reminders.first.pendingAction, isFalse);
+      expect(orchestrator.cancelled, contains('t1'));
+    },
+  );
 
   test('reminder without taskTitle is skipped (no intent produced)', () async {
     final now = DateTime(2026, 3, 24, 10, 0);

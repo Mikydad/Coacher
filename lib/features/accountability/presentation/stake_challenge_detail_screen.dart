@@ -12,6 +12,7 @@ import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../../community/application/circle_providers.dart';
 import '../application/points_providers.dart';
+import '../application/stake_create_replicator.dart';
 import '../application/stake_functions.dart';
 import '../application/stake_seen_store.dart';
 import '../application/stakes_providers.dart';
@@ -34,26 +35,26 @@ class StakeChallengeDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final challengeAsync =
-        ref.watch(stakeChallengeStreamProvider(challengeId));
+    final challengeAsync = ref.watch(stakeChallengeStreamProvider(challengeId));
     final evidenceAsync = ref.watch(stakeEvidenceStreamProvider(challengeId));
 
     return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: const PageTitle('Challenge'),
-      ),
+      appBar: AppBar(centerTitle: true, title: const PageTitle('Challenge')),
       body: challengeAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
-          child: Text('Could not load',
-              style: TextStyle(color: AppColors.textMuted)),
+          child: Text(
+            'Could not load',
+            style: TextStyle(color: AppColors.textMuted),
+          ),
         ),
         data: (challenge) {
           if (challenge == null) {
             return Center(
-              child: Text('Challenge not found',
-                  style: TextStyle(color: AppColors.textMuted)),
+              child: Text(
+                'Challenge not found',
+                style: TextStyle(color: AppColors.textMuted),
+              ),
             );
           }
           final evidence = evidenceAsync.value ?? const <StakeEvidence>[];
@@ -114,8 +115,9 @@ class _BodyState extends ConsumerState<_Body> {
         return;
       }
       try {
-        final bytes =
-            await FirebaseStorage.instance.ref(path).getData(4 * 1024 * 1024);
+        final bytes = await FirebaseStorage.instance
+            .ref(path)
+            .getData(4 * 1024 * 1024);
         if (bytes != null) {
           await StakePhotoCache.write(c.id, bytes);
           if (mounted) setState(() => _stakePhotoBytes = bytes);
@@ -139,8 +141,9 @@ class _BodyState extends ConsumerState<_Body> {
   void _watchChallengeLive() {
     final wantLive = !c.status.isTerminal;
     if (wantLive && _liveWatch == null) {
-      _liveWatch =
-          ref.read(stakesRepositoryProvider).hydrateChallengeLive(c.id);
+      _liveWatch = ref
+          .read(stakesRepositoryProvider)
+          .hydrateChallengeLive(c.id);
     } else if (!wantLive && _liveWatch != null) {
       _liveWatch!.cancel();
       _liveWatch = null;
@@ -161,8 +164,7 @@ class _BodyState extends ConsumerState<_Body> {
   void _markSeen() {
     final uid = FirestorePaths.activeUid;
     final keys = <String>[];
-    if (c.status == StakeChallengeStatus.pendingAccept &&
-        c.creatorUid != uid) {
+    if (c.status == StakeChallengeStatus.pendingAccept && c.creatorUid != uid) {
       keys.add(StakeSeenKeys.invite(c.id));
     }
     if (c.status == StakeChallengeStatus.active) {
@@ -180,9 +182,7 @@ class _BodyState extends ConsumerState<_Body> {
     if (signature == _lastSeenSignature) return;
     _lastSeenSignature = signature;
     // Deferred: provider state must not change during build.
-    Future.microtask(
-      () => ref.read(stakeSeenProvider.notifier).markSeen(keys),
-    );
+    Future.microtask(() => ref.read(stakeSeenProvider.notifier).markSeen(keys));
   }
 
   /// Sum of evidence per unit for the signed-in user.
@@ -226,6 +226,7 @@ class _BodyState extends ConsumerState<_Body> {
         ),
         const SizedBox(height: 16),
         _statusBanner(),
+        ..._pendingCreateSection(),
         if (_stakePhotoBytes != null || _stakePhotoLoading) ...[
           const SizedBox(height: 12),
           _stakePhotoCard(),
@@ -238,10 +239,7 @@ class _BodyState extends ConsumerState<_Body> {
           const SizedBox(height: 12),
           _moneyStakeCard(),
         ],
-        if (_isInvitedMe) ...[
-          const SizedBox(height: 12),
-          _inviteActions(),
-        ],
+        if (_isInvitedMe) ...[const SizedBox(height: 12), _inviteActions()],
         if (c.photoState == StakePhotoState.revealed) ...[
           const SizedBox(height: 12),
           _revealCard(),
@@ -279,6 +277,102 @@ class _BodyState extends ConsumerState<_Body> {
     );
   }
 
+  /// Honest failure surface for the optimistic create (Telegram model):
+  /// while the background upload + callable are in flight nothing shows
+  /// (the status banner already narrates draft/pending), but a genuine
+  /// failure renders here with Retry/Discard. Also catches a placeholder
+  /// orphaned by an app restart mid-create (`updatedAtMs == 0`, no pending
+  /// op, older than 10 minutes).
+  List<Widget> _pendingCreateSection() {
+    final pending = ref.watch(stakeCreateReplicatorProvider)[c.id];
+    final ageMs = DateTime.now().millisecondsSinceEpoch - c.createdAtMs;
+    final orphaned =
+        pending == null &&
+        c.updatedAtMs == 0 &&
+        !c.status.isTerminal &&
+        ageMs > 10 * 60 * 1000;
+    if (pending?.error == null && !orphaned) return const [];
+    final message =
+        pending?.error ??
+        'This challenge never reached the server (the app closed while '
+            'saving). Discard it and start again.';
+    final canRetry = pending?.canRetry ?? false;
+    return [
+      const SizedBox(height: 12),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
+        decoration: BoxDecoration(
+          color: AppColors.danger.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              message,
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 13.5,
+                height: 1.45,
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (canRetry)
+                  TextButton(
+                    onPressed: () => ref
+                        .read(stakeCreateReplicatorProvider.notifier)
+                        .retry(c.id),
+                    child: const Text('Retry'),
+                  ),
+                TextButton(
+                  onPressed: _discardFailedCreate,
+                  child: Text(
+                    'Discard',
+                    style: TextStyle(color: AppColors.danger),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  Future<void> _discardFailedCreate() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Discard this challenge?'),
+        content: const Text(
+          'It never reached the server. The challenge — and the goal it '
+          'created — will be removed.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final nav = Navigator.of(context);
+    await ref.read(stakeCreateReplicatorProvider.notifier).discard(c.id);
+    // Orphaned placeholders have no registered discard op — clean the
+    // mirror row directly (a second delete is a no-op).
+    await ref.read(stakesRepositoryProvider).deleteLocalMirror(c.id);
+    nav.pop();
+  }
+
   /// What's on the line, visible ONLY to its owner while the challenge
   /// lives (the circle sees it exclusively through a forfeit reveal).
   /// Tap for full size.
@@ -288,10 +382,10 @@ class _BodyState extends ConsumerState<_Body> {
       onTap: bytes == null
           ? null
           : () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => _StakePhotoFullscreen(bytes: bytes),
-                ),
+              MaterialPageRoute(
+                builder: (_) => _StakePhotoFullscreen(bytes: bytes),
               ),
+            ),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -333,7 +427,7 @@ class _BodyState extends ConsumerState<_Body> {
                 bytes == null
                     ? 'Loading your photo…'
                     : 'This is what\'s on the line. Only you can see it — '
-                        'unless you break your word. Tap to view.',
+                          'unless you break your word. Tap to view.',
                 style: TextStyle(
                   color: AppColors.textSoft,
                   fontSize: 12.5,
@@ -393,10 +487,7 @@ class _BodyState extends ConsumerState<_Body> {
             'passes.',
         AppColors.amber,
       ),
-      StakeChallengeStatus.active => (
-        _deadlineText(),
-        AppColors.statusGreen,
-      ),
+      StakeChallengeStatus.active => (_deadlineText(), AppColors.statusGreen),
       StakeChallengeStatus.pendingVerification => (
         'Deadline passed. The server is deciding — late-synced evidence '
             'still counts for 12 hours.',
@@ -406,10 +497,7 @@ class _BodyState extends ConsumerState<_Body> {
         'You kept your word. The photo is gone — nobody ever saw it.',
         AppColors.statusGreen,
       ),
-      StakeChallengeStatus.completedForfeit => (
-        'Forfeited.',
-        AppColors.danger,
-      ),
+      StakeChallengeStatus.completedForfeit => ('Forfeited.', AppColors.danger),
       StakeChallengeStatus.vetoed => (
         'Lost, but the mercy veto held the photo back. It stays on your '
             'record.',
@@ -418,7 +506,7 @@ class _BodyState extends ConsumerState<_Body> {
       StakeChallengeStatus.cancelled => (
         c.photoState == StakePhotoState.rejected
             ? 'The photo was rejected by content screening — this stake '
-                'never armed. Try a different photo.'
+                  'never armed. Try a different photo.'
             : 'Cancelled.',
         AppColors.textFaint,
       ),
@@ -437,7 +525,11 @@ class _BodyState extends ConsumerState<_Body> {
       ),
       child: Text(
         text,
-        style: TextStyle(color: AppColors.textPrimary, fontSize: 13.5, height: 1.45),
+        style: TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 13.5,
+          height: 1.45,
+        ),
       ),
     );
   }
@@ -507,8 +599,8 @@ class _BodyState extends ConsumerState<_Body> {
             passed
                 ? Icons.check_rounded
                 : isPast
-                    ? Icons.close_rounded
-                    : Icons.circle_outlined,
+                ? Icons.close_rounded
+                : Icons.circle_outlined,
             size: 13,
             color: fgColor,
           ),
@@ -572,7 +664,9 @@ class _BodyState extends ConsumerState<_Body> {
   Future<void> _logPracticeCount(int amount) async {
     setState(() => _busy = true);
     // CC-7 — practice is self-report; the same evidence loop, zero stakes.
-    await ref.read(stakesRepositoryProvider).addEvidence(
+    await ref
+        .read(stakesRepositoryProvider)
+        .addEvidence(
           challengeId: c.id,
           unitIndex: c.todayUnitIndex,
           amount: amount,
@@ -610,10 +704,10 @@ class _BodyState extends ConsumerState<_Body> {
         .ref(path)
         .putFile(File(shot.path), SettableMetadata(contentType: 'image/jpeg'))
         .catchError((Object e) {
-      debugPrint('stake evidence photo upload failed (kept locally): $e');
-      // ignore: invalid_return_type_for_catch_error
-      return null;
-    });
+          debugPrint('stake evidence photo upload failed (kept locally): $e');
+          // ignore: invalid_return_type_for_catch_error
+          return null;
+        });
     if (mounted) setState(() => _busy = false);
   }
 
@@ -634,9 +728,13 @@ class _BodyState extends ConsumerState<_Body> {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text('$value',
-                    style: const TextStyle(
-                        fontSize: 24, fontWeight: FontWeight.w700)),
+                child: Text(
+                  '$value',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
               IconButton(
                 onPressed: () => setDialogState(() => value += 1),
@@ -696,27 +794,29 @@ class _BodyState extends ConsumerState<_Body> {
   Widget _moneyStakeCard() {
     final myUid = FirestorePaths.activeUid;
     final amountCents = c.participant(myUid)?.stakeAmount ?? 0;
-    final amount = '\$${(amountCents / 100).toStringAsFixed(amountCents % 100 == 0 ? 0 : 2)}';
+    final amount =
+        '\$${(amountCents / 100).toStringAsFixed(amountCents % 100 == 0 ? 0 : 2)}';
     final charities = ref.watch(charitiesProvider).valueOrNull ?? const [];
-    final antiName = charities
-            .where((x) => x.id == c.antiCharityId)
-            .firstOrNull
-            ?.name ??
+    final antiName =
+        charities.where((x) => x.id == c.antiCharityId).firstOrNull?.name ??
         'your chosen recipient';
     final receipt = c.receipts[myUid];
 
     final String text;
     if (c.status == StakeChallengeStatus.active ||
         c.status == StakeChallengeStatus.pendingVerification) {
-      text = '$amount held in escrow (simulated). Keep your word and it all '
+      text =
+          '$amount held in escrow (simulated). Keep your word and it all '
           'comes back; fail and it funds $antiName. No veto on money.';
     } else if (c.status == StakeChallengeStatus.completedSuccess) {
       text = '$amount refunded. Your word held.';
     } else if (receipt != null) {
-      text = '$amount donated to $antiName. '
+      text =
+          '$amount donated to $antiName. '
           '${receipt.note.isNotEmpty ? receipt.note : 'Receipt on file.'}';
     } else if (c.status == StakeChallengeStatus.completedForfeit) {
-      text = '$amount forfeited — being donated to $antiName. The receipt '
+      text =
+          '$amount forfeited — being donated to $antiName. The receipt '
           'will appear here.';
     } else {
       text = '$amount — ${c.status.storageValue}.';
@@ -728,8 +828,7 @@ class _BodyState extends ConsumerState<_Body> {
       decoration: BoxDecoration(
         color: AppColors.statusGreen.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border:
-            Border.all(color: AppColors.statusGreen.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.statusGreen.withValues(alpha: 0.3)),
       ),
       child: Text(
         text,
@@ -760,8 +859,7 @@ class _BodyState extends ConsumerState<_Body> {
           children: [
             Expanded(
               child: FilledButton(
-                onPressed:
-                    _busy || balance < stake ? null : _acceptInvite,
+                onPressed: _busy || balance < stake ? null : _acceptInvite,
                 child: const Text('Accept'),
               ),
             ),
@@ -783,7 +881,9 @@ class _BodyState extends ConsumerState<_Body> {
     final charities = ref.read(charitiesProvider).valueOrNull ?? const [];
     if (charities.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Charity list not synced yet — try again online.')),
+        const SnackBar(
+          content: Text('Charity list not synced yet — try again online.'),
+        ),
       );
       return;
     }
@@ -801,8 +901,7 @@ class _BodyState extends ConsumerState<_Body> {
                 ChoiceChip(
                   label: Text(charity.name),
                   selected: picked == charity.id,
-                  onSelected: (_) =>
-                      setDialogState(() => picked = charity.id),
+                  onSelected: (_) => setDialogState(() => picked = charity.id),
                 ),
             ],
           ),
@@ -822,18 +921,18 @@ class _BodyState extends ConsumerState<_Body> {
     if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
     try {
-      await ref.read(stakeFunctionsProvider).acceptChallenge(
-            challengeId: c.id,
-            charityId: picked!,
-          );
+      await ref
+          .read(stakeFunctionsProvider)
+          .acceptChallenge(challengeId: c.id, charityId: picked!);
       // Flip the local mirror NOW — the accept succeeded server-side and
       // the next throttled pull is up to 30 s away; without this the
       // acceptor keeps staring at "waiting for opponent".
       await ref.read(stakesRepositoryProvider).refreshChallenge(c.id);
     } on StakeActionException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -848,8 +947,9 @@ class _BodyState extends ConsumerState<_Body> {
       if (mounted) Navigator.of(context).pop();
     } on StakeActionException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -878,14 +978,18 @@ class _BodyState extends ConsumerState<_Body> {
           children: [
             Expanded(
               child: OutlinedButton(
-                onPressed: _busy ? null : () => _confirmOutcome(opponent.uid, dispute: false),
+                onPressed: _busy
+                    ? null
+                    : () => _confirmOutcome(opponent.uid, dispute: false),
                 child: const Text('Looks right'),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: OutlinedButton(
-                onPressed: _busy ? null : () => _confirmOutcome(opponent.uid, dispute: true),
+                onPressed: _busy
+                    ? null
+                    : () => _confirmOutcome(opponent.uid, dispute: true),
                 child: const Text('Dispute'),
               ),
             ),
@@ -898,7 +1002,9 @@ class _BodyState extends ConsumerState<_Body> {
   Future<void> _confirmOutcome(String aboutUid, {required bool dispute}) async {
     setState(() => _busy = true);
     try {
-      await ref.read(stakeFunctionsProvider).confirmOutcome(
+      await ref
+          .read(stakeFunctionsProvider)
+          .confirmOutcome(
             challengeId: c.id,
             aboutUid: aboutUid,
             dispute: dispute,
@@ -906,19 +1012,25 @@ class _BodyState extends ConsumerState<_Body> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(dispute
-                ? 'Disputed — the circle votes for the next 48h.'
-                : 'Confirmed.'),
+            content: Text(
+              dispute
+                  ? 'Disputed — the circle votes for the next 48h.'
+                  : 'Confirmed.',
+            ),
           ),
         );
       }
     } on StakeActionException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.code == 'already-exists'
-              ? 'You already gave your word on this.'
-              : e.message),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              e.code == 'already-exists'
+                  ? 'You already gave your word on this.'
+                  : e.message,
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -951,8 +1063,8 @@ class _BodyState extends ConsumerState<_Body> {
     final leftLabel = left == null || left.isNegative
         ? 'about to expire'
         : left.inHours >= 1
-            ? '${left.inHours}h ${left.inMinutes % 60}m'
-            : '${left.inMinutes}m';
+        ? '${left.inHours}h ${left.inMinutes % 60}m'
+        : '${left.inMinutes}m';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -979,8 +1091,7 @@ class _BodyState extends ConsumerState<_Body> {
               OutlinedButton(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) =>
-                        StakeRevealViewerScreen(challengeId: c.id),
+                    builder: (_) => StakeRevealViewerScreen(challengeId: c.id),
                   ),
                 ),
                 child: const Text('Face it'),
@@ -1001,7 +1112,8 @@ class _BodyState extends ConsumerState<_Body> {
     final me = c.participant(FirestorePaths.activeUid);
     final revealedAt = c.revealedAtMs;
     final windowMins = me?.revealWindowMins;
-    final floorPassed = revealedAt != null &&
+    final floorPassed =
+        revealedAt != null &&
         windowMins != null &&
         DateTime.now().millisecondsSinceEpoch >=
             revealedAt + (windowMins * 60000 * 30) ~/ 100;
@@ -1051,8 +1163,9 @@ class _BodyState extends ConsumerState<_Body> {
       await ref.read(stakeFunctionsProvider).removePhoto(c.id);
     } on StakeActionException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -1070,7 +1183,11 @@ class _BodyState extends ConsumerState<_Body> {
         Text(
           'If this decides against you, your one monthly veto can stop the '
           'photo from posting. The loss still goes on your record.',
-          style: TextStyle(color: AppColors.textSoft, fontSize: 13, height: 1.4),
+          style: TextStyle(
+            color: AppColors.textSoft,
+            fontSize: 13,
+            height: 1.4,
+          ),
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -1112,13 +1229,18 @@ class _BodyState extends ConsumerState<_Body> {
       await ref.read(stakeFunctionsProvider).applyVeto(c.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Veto requested — it applies when the outcome is decided.')),
+          const SnackBar(
+            content: Text(
+              'Veto requested — it applies when the outcome is decided.',
+            ),
+          ),
         );
       }
     } on StakeActionException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -1146,8 +1268,9 @@ class _BodyState extends ConsumerState<_Body> {
       if (mounted) Navigator.of(context).pop();
     } on StakeActionException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     } finally {
       if (mounted) setState(() => _busy = false);

@@ -15,15 +15,51 @@ import 'on_your_radar_section.dart';
 /// answer to "what did I say I'd do?". Each row shows the planned moment
 /// and its reason; this surface is also the delivery floor when
 /// notifications are denied or the budget is exhausted (PRD §4.5).
-class PromisesSection extends ConsumerWidget {
+///
+/// Only the most imminent promise shows by default (2026-08-22): soonest
+/// upcoming day first, ties (and undated promises) broken by most recently
+/// updated. The rest collapse behind a chevron, radar-section style.
+class PromisesSection extends ConsumerStatefulWidget {
   const PromisesSection({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final open = ref.watch(openIntentionsProvider);
+  ConsumerState<PromisesSection> createState() => _PromisesSectionState();
+}
+
+class _PromisesSectionState extends ConsumerState<PromisesSection> {
+  bool _expanded = false;
+
+  /// Day (local midnight ms) of the promise's next planned moment; undated
+  /// promises sort after every dated one.
+  static int _nextMomentDay(Intention i, OpportunityPlan? plan, int nowMs) {
+    int? momentMs = i.isPinned ? i.pinnedAtMs : null;
+    if (momentMs == null) {
+      final future =
+          (plan?.slots ?? const []).where((s) => s.deliverAtMs > nowMs).toList()
+            ..sort((a, b) => a.deliverAtMs.compareTo(b.deliverAtMs));
+      if (future.isNotEmpty) momentMs = future.first.deliverAtMs;
+    }
+    if (momentMs == null) return 1 << 62;
+    final dt = DateTime.fromMillisecondsSinceEpoch(momentMs);
+    return DateTime(dt.year, dt.month, dt.day).millisecondsSinceEpoch;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final plans =
         ref.watch(opportunityPlansProvider).valueOrNull ??
         const <String, OpportunityPlan>{};
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final open = [...ref.watch(openIntentionsProvider)]
+      ..sort((a, b) {
+        final byDay = _nextMomentDay(
+          a,
+          plans[a.id],
+          nowMs,
+        ).compareTo(_nextMomentDay(b, plans[b.id], nowMs));
+        if (byDay != 0) return byDay;
+        return b.updatedAtMs.compareTo(a.updatedAtMs);
+      });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,10 +101,64 @@ class PromisesSection extends ConsumerWidget {
             ),
             child: Column(
               children: [
-                for (var i = 0; i < open.length; i++) ...[
-                  if (i > 0)
-                    Divider(height: 1, color: AppColors.fg12, indent: 52),
-                  _PromiseRow(intention: open[i], plan: plans[open[i].id]),
+                _PromiseRow(intention: open.first, plan: plans[open.first.id]),
+                if (open.length > 1) ...[
+                  Divider(height: 1, color: AppColors.fg12, indent: 52),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(22),
+                    onTap: () => setState(() => _expanded = !_expanded),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            '${open.length - 1} MORE',
+                            style: TextStyle(
+                              color: AppColors.fg54,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          AnimatedRotation(
+                            turns: _expanded ? 0.5 : 0,
+                            duration: const Duration(milliseconds: 260),
+                            child: Icon(
+                              Icons.expand_more_rounded,
+                              size: 16,
+                              color: AppColors.fg54,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topCenter,
+                    child: !_expanded
+                        ? const SizedBox(width: double.infinity)
+                        : Column(
+                            children: [
+                              for (var i = 1; i < open.length; i++) ...[
+                                Divider(
+                                  height: 1,
+                                  color: AppColors.fg12,
+                                  indent: 52,
+                                ),
+                                _PromiseRow(
+                                  intention: open[i],
+                                  plan: plans[open[i].id],
+                                ),
+                              ],
+                            ],
+                          ),
+                  ),
                 ],
               ],
             ),
@@ -138,10 +228,7 @@ class _PromiseRow extends ConsumerWidget {
                     subline,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                   ),
                 ],
               ),

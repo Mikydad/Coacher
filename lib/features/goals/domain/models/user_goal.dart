@@ -114,24 +114,25 @@ class UserGoal {
           return false;
         }
         if (repeatInterval <= 1) return true;
-        final months =
-            (d.year - anchor.year) * 12 + (d.month - anchor.month);
+        final months = (d.year - anchor.year) * 12 + (d.month - anchor.month);
         return months >= 0 && months % repeatInterval == 0;
     }
   }
 
   bool _weekIntervalMatches(DateTime d, DateTime anchor) {
     if (repeatInterval <= 1) return true;
-    DateTime weekStart(DateTime x) =>
-        DateTime(x.year, x.month, x.day).subtract(Duration(days: x.weekday - 1));
+    DateTime weekStart(DateTime x) => DateTime(
+      x.year,
+      x.month,
+      x.day,
+    ).subtract(Duration(days: x.weekday - 1));
     final weeks = weekStart(d).difference(weekStart(anchor)).inDays ~/ 7;
     return weeks >= 0 && weeks % repeatInterval == 0;
   }
 
   /// Whether the user may log progress on [day]. Passive goals (repeat off)
   /// accept logs on any period day; repeating goals only on action days.
-  bool allowsLoggingOn(DateTime day) =>
-      !hasRepeatSchedule || isActionDay(day);
+  bool allowsLoggingOn(DateTime day) => !hasRepeatSchedule || isActionDay(day);
 
   /// Local wall time as minutes since midnight (0–1439). Meaningful when [reminderEnabled].
   final int? reminderMinutesFromMidnight;

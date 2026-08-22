@@ -61,6 +61,24 @@ class IsarReminderRepository implements ReminderRepository {
   }
 
   @override
+  Future<void> deleteRemindersForTask(String taskId) async {
+    final rows = await _isar.isarReminders
+        .filter()
+        .taskIdEqualTo(taskId)
+        .findAll();
+    if (rows.isEmpty) return;
+    await _isar.writeTxn(() async {
+      await _isar.isarReminders.deleteAll(rows.map((r) => r.id).toList());
+    });
+    for (final row in rows) {
+      await outboxDelete(
+        entityType: 'reminder',
+        documentPath: '${FirestorePaths.reminders}/${row.reminderId}',
+      );
+    }
+  }
+
+  @override
   Future<void> upsertReminder(ReminderConfig reminder) async {
     reminder.validate();
     await _isar.writeTxn(() async {

@@ -22,29 +22,25 @@ class PointsTxn {
   final int atMs;
 
   factory PointsTxn.fromMap(Map<String, dynamic> m) => PointsTxn(
-        id: (m['id'] as String?) ?? '',
-        source: (m['source'] as String?) ?? '',
-        amount: (m['amount'] as num?)?.toInt() ?? 0,
-        refId: (m['refId'] as String?) ?? '',
-        atMs: (m['atMs'] as num?)?.toInt() ?? 0,
-      );
+    id: (m['id'] as String?) ?? '',
+    source: (m['source'] as String?) ?? '',
+    amount: (m['amount'] as num?)?.toInt() ?? 0,
+    refId: (m['refId'] as String?) ?? '',
+    atMs: (m['atMs'] as num?)?.toInt() ?? 0,
+  );
 }
 
 /// D7 — one curated charity (admin-managed; clients only ever see active).
 class Charity {
-  const Charity({
-    required this.id,
-    required this.name,
-    this.category,
-  });
+  const Charity({required this.id, required this.name, this.category});
 
   final String id;
   final String name;
   final String? category;
 
   factory Charity.fromMap(Map<String, dynamic> m) => Charity(
-        id: (m['id'] as String?) ?? '',
-        name: (m['name'] as String?) ?? '',
-        category: m['category'] as String?,
-      );
+    id: (m['id'] as String?) ?? '',
+    name: (m['name'] as String?) ?? '',
+    category: m['category'] as String?,
+  );
 }

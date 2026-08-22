@@ -24,6 +24,10 @@ import '../support/no_op_orchestrator_service.dart';
 import '../support/no_op_planning_repository.dart';
 
 class _FakeReminderRepository implements ReminderRepository {
+  @override
+  Future<void> deleteRemindersForTask(String taskId) async {}
+
+
   _FakeReminderRepository(this._all);
 
   final List<ReminderConfig> _all;

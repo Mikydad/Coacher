@@ -15,7 +15,9 @@ bool layer3InsightActiveOnDateKey(GeneratedInsight insight, String dateKey) {
   if (day.isEmpty) return false;
   final start = insight.sourceWindowStartDateKey.trim();
   final end = insight.sourceWindowEndDateKey.trim();
-  if (start.isEmpty || end.isEmpty) return true;
+  // A window-less row can never expire — treating it as "always active"
+  // made legacy rows immortal on every delivery surface. Not displayable.
+  if (start.isEmpty || end.isEmpty) return false;
   return start.compareTo(day) <= 0 && end.compareTo(day) >= 0;
 }
 

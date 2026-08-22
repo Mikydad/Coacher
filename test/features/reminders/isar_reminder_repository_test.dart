@@ -11,6 +11,9 @@ import 'package:isar_community/isar.dart';
 import '../../support/isar_test_harness.dart';
 
 class _MemoryRemoteReminders implements ReminderRepository {
+  @override
+  Future<void> deleteRemindersForTask(String taskId) async {}
+
   _MemoryRemoteReminders(this.rows);
   final List<ReminderConfig> rows;
 
@@ -18,7 +21,9 @@ class _MemoryRemoteReminders implements ReminderRepository {
   Future<List<ReminderConfig>> listAllReminders() async => [];
 
   @override
-  Future<List<ReminderConfig>> getRemindersForTasks(List<String> taskIds) async {
+  Future<List<ReminderConfig>> getRemindersForTasks(
+    List<String> taskIds,
+  ) async {
     final s = taskIds.toSet();
     return rows.where((r) => s.contains(r.taskId)).toList();
   }

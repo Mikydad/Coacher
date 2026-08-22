@@ -16,6 +16,8 @@ import '../../planning/domain/models/block.dart';
 import '../../planning/domain/models/routine.dart';
 import '../../planning/domain/models/routine_mode.dart';
 import '../../planning/domain/models/task_item.dart';
+import '../../analytics/application/delivery_providers.dart';
+import '../../time_blocks/application/time_block_providers.dart';
 import '../application/plan_tomorrow_providers.dart';
 import 'widgets/plan_tomorrow_widgets.dart';
 import '../../../core/presentation/app_colors.dart';
@@ -484,12 +486,17 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
     if (confirmed != true || !mounted) return;
 
     final repo = ref.read(planningRepositoryProvider);
+    final reminderSync = ref.read(reminderSyncServiceProvider);
+    final blockSync = ref.read(timeBlockSyncServiceProvider);
     for (final row in tasks) {
       await repo.deleteTask(
         routineId: row.routineId,
         blockId: row.blockId,
         taskId: row.task.id,
       );
+      await reminderSync.removeForDeletedTask(row.task.id);
+      await blockSync.removeBlockForEntity(row.task.id);
+      await clearEntityCoachingCachesForTask(ref, row.task.id);
     }
     final blocks = await repo.getBlocks(widget.routine.id);
     for (final block in blocks) {
@@ -560,6 +567,13 @@ class _SlotSectionState extends ConsumerState<_SlotSection> {
           blockId: row.blockId,
           taskId: row.task.id,
         );
+    await ref
+        .read(reminderSyncServiceProvider)
+        .removeForDeletedTask(row.task.id);
+    await ref
+        .read(timeBlockSyncServiceProvider)
+        .removeBlockForEntity(row.task.id);
+    await clearEntityCoachingCachesForTask(ref, row.task.id);
     ref.invalidate(tomorrowTasksForRoutineProvider(widget.routine.id));
   }
 

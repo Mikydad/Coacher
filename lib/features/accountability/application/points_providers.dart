@@ -61,9 +61,9 @@ class PointsEarnService {
 
     Future<void> fire(String source, String refId) async {
       try {
-        await functions
-            .httpsCallable('grantPoints')
-            .call<Map<String, dynamic>>({'source': source, 'refId': refId});
+        await functions.httpsCallable('grantPoints').call<Map<String, dynamic>>(
+          {'source': source, 'refId': refId},
+        );
       } catch (e) {
         // Silent by design: the next sweep retries, ids dedupe server-side.
         debugPrint('grantPoints($source,$refId) deferred: $e');

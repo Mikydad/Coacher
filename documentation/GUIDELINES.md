@@ -155,6 +155,31 @@ not silent reversal.
   *Known trade-off:* snackbars raised from coach actions show on the root
   scaffold behind the sheet.
 
+- **2026-07-15 · Connect account = uid-preserving link; reinstall recovery =
+  switch, not merge.** Profile bottom gets an "Account" section for GUESTS
+  ONLY: one "Connect account" button whose tap opens a bottom sheet to pick
+  Google/Apple (Apple only where supported) — the provider decision doesn't
+  deserve permanent page space. Registered users see nothing on Profile;
+  their "Account connected · provider · email" card lives in Account
+  settings. Connecting calls the
+  existing `linkWithCredential` path — same uid, so all data is instantly
+  recoverable on any device (that's the whole feature: no data copying).
+  The reinstall/phone-change case (identity already owns another account →
+  `credential-already-in-use`) now returns a typed
+  `CredentialAlreadyLinked` failure with the credential cached in the
+  repository; the profile dialog offers "Use that account"
+  (`signInWithPendingLinkConflict` — signs into the old uid; AuthGate's
+  existing uid-change path invalidates + clears local session + re-pulls),
+  "Try another account" (Google re-shows the chooser via sign-out-first),
+  or Cancel. *Considered:* merging this device's guest data into the
+  existing account (rejected for v1: re-keying every Isar collection +
+  outbox; guest work on a fresh reinstall is typically minutes old — the
+  dialog warns it will be replaced). Guest LOG OUT is permanent data loss
+  (anonymous accounts cannot be signed back into), so guests get an honest
+  warning dialog whose primary action is "Connect account" (launches the
+  connect flow); "Delete & log out" is the destructive-styled secondary.
+  Registered users keep the old mild dialog — for them it's accurate.
+
 - **2026-07-15 · Goal template picker reads as a choice, not an info wall.**
   Header is "Pick a goal" (subtitle removed); Study is preselected on open
   (a visibly selected card is what signals "these are selectable"); the
@@ -1517,3 +1542,65 @@ not silent reversal.
   immersive voice stage now shows a live caption of the transcript under
   the orb (bright while listening, soft while thinking/speaking) so users
   can verify what was heard.
+
+- **2026-08-23 · Bug batch: deleted tasks stop notifying; reminder configs
+  are deletable.** Task deletion previously left three live remnants: the
+  armed OS notification, the immortal `ReminderConfig` (the repository had
+  no delete at all), and boot reconciliation re-arming from that config on
+  every launch. New `ReminderRepository.deleteRemindersForTask` +
+  `ReminderSyncService.removeForDeletedTask` (cancel + config delete,
+  outbox-replicated) are wired into `confirmDeletePlannedTask` and both
+  Plan-Tomorrow delete paths — which now also remove the task's time block.
+  Deleting the config is the load-bearing half: `scheduleFromCache` re-arms
+  every stored config, so a cancel alone resurrects on next launch.
+
+- **2026-08-23 · Onboarding is for new users only.** Two gates: (1) the
+  register step's Google/Apple sign-in now consults
+  `additionalUserInfo.isNewUser` (surfaced as
+  `AuthRepositoryInterface.lastSignInUsedExistingAccount`) — resolving to an
+  existing account exits the flow instead of replaying the remaining steps
+  (which also used to LWW-overwrite the user's saved onboarding answers);
+  (2) `OnboardingGate` checks for a restored Firebase session (iOS keychain
+  survives uninstall) before showing the flow. A brand-new device with no
+  session still shows onboarding until the user taps "Log in" — accepted.
+  Also merged the stranded `feat/connect-account` commit (fcaa4fe):
+  "Account connected · provider · email" card in Account settings, guest
+  connect section on Profile, and uid-preserving link-conflict recovery.
+
+- **2026-08-23 · Insights are behavioral coaching, not reminders — data
+  hygiene pass.** Per the Layer 1–4 PRDs: (1) daily full refresh now prunes
+  Layer-1 rows and entity insights for entities absent from the seed batch
+  (deleted/paused/expired things used to re-emit "today" coaching forever);
+  (2) task delete paths clear coaching caches immediately
+  (`clearEntityCoachingCachesForTask`), and pausing a goal clears like
+  complete/delete; (3) goal seeding skips non-active goals and goals whose
+  period hasn't started — a future goal used to fire `streakRisk`
+  ("missed last 2 days") on day -1; (4) window-less cached insights are no
+  longer immortal (`layer3InsightActiveOnDateKey` → false); (5) the coach
+  insight notification only banners 08:00–21:00 (Layer_four delivery
+  windows) — outside that it stays on the Home card.
+
+- **2026-08-23 · Stake create is local-first; one active stake per goal.**
+  "Start the challenge" used to await the full photo upload + the
+  `stakeCreateChallenge` callable (cold start included) before anything
+  moved. Now the linked goal + optimistic mirror commit to Isar and the
+  flow navigates immediately; upload + callable replicate in the background
+  via `StakeCreateReplicator`, and the detail screen shows Retry/Discard on
+  genuine failure (photo-screening rejection flips the mirror to the
+  existing cancelled/rejected narration and withdraws the minted goal).
+  Launching the flow from a goal now passes `linkedGoalId` — it attaches to
+  THAT goal instead of minting a duplicate (the old title-only prefill was
+  why "add another stake" never went away and the badge never showed).
+  Rule: one ACTIVE stake per goal — goal details swaps the add-card for an
+  attached-stake card, and `_create()` guards it as well.
+
+- **2026-08-23 · List ergonomics: swipe actions + one-promise Home strip.**
+  `flutter_slidable` added; shared `SwipeActionsRow`
+  (core/presentation/swipe_actions.dart) gives goal cards and tasks-hub
+  rows right-to-left Edit/Delete. Goal delete extracted to a shared
+  `confirmDeleteGoal` (goal_actions.dart) so the swipe and the detail menu
+  cannot drift; tasks reuse `confirmDeletePlannedTask`. Reorder stays on
+  long-press so the gestures don't collide. The Home Promises strip shows
+  only the most imminent promise (soonest planned day; ties and undated →
+  most recently updated) with the rest collapsed behind a 260 ms chevron,
+  radar-section style.

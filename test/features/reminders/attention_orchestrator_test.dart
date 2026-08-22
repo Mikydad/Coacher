@@ -150,8 +150,9 @@ void main() {
       for (final level in InterruptionLevel.values) {
         final decision = AttentionOrchestrator.evaluate(
           intent: _intent(level: level),
-          attentionState:
-              _attentionState(override: ContextOverride.doNotDisturb),
+          attentionState: _attentionState(
+            override: ContextOverride.doNotDisturb,
+          ),
           now: _now,
         );
         expect(
@@ -205,10 +206,7 @@ void main() {
 
     test('silences low-level non-focus intent when confidence >= 0.75', () {
       final decision = AttentionOrchestrator.evaluate(
-        intent: _intent(
-          entityId: 'other_task',
-          level: InterruptionLevel.low,
-        ),
+        intent: _intent(entityId: 'other_task', level: InterruptionLevel.low),
         attentionState: _attentionState(),
         now: _now,
         focus: _focus(primaryInsightId: 'task_1', confidence: 0.8),
@@ -220,10 +218,7 @@ void main() {
 
     test('does not silence when focus confidence < 0.75', () {
       final decision = AttentionOrchestrator.evaluate(
-        intent: _intent(
-          entityId: 'other_task',
-          level: InterruptionLevel.low,
-        ),
+        intent: _intent(entityId: 'other_task', level: InterruptionLevel.low),
         attentionState: _attentionState(),
         now: _now,
         focus: _focus(primaryInsightId: 'task_1', confidence: 0.6),
@@ -335,30 +330,32 @@ void main() {
       expect(decision.deliverAt, slotAt);
     });
 
-    test('intent within gap of a future-scheduled delivery is still spaced',
-        () {
-      final scheduledAt = _now.add(const Duration(hours: 2));
-      final futureDelivery = RecentDelivery(
-        entityId: 'goal_1',
-        deliveredAtMs: scheduledAt.millisecondsSinceEpoch,
-        interruptionLevel: InterruptionLevel.medium,
-      );
+    test(
+      'intent within gap of a future-scheduled delivery is still spaced',
+      () {
+        final scheduledAt = _now.add(const Duration(hours: 2));
+        final futureDelivery = RecentDelivery(
+          entityId: 'goal_1',
+          deliveredAtMs: scheduledAt.millisecondsSinceEpoch,
+          interruptionLevel: InterruptionLevel.medium,
+        );
 
-      final decision = AttentionOrchestrator.evaluate(
-        intent: _intent(
-          proposedAt: scheduledAt.add(const Duration(minutes: 1)),
-        ),
-        attentionState: _attentionState(),
-        now: _now,
-        recentDeliveries: [futureDelivery],
-      );
+        final decision = AttentionOrchestrator.evaluate(
+          intent: _intent(
+            proposedAt: scheduledAt.add(const Duration(minutes: 1)),
+          ),
+          attentionState: _attentionState(),
+          now: _now,
+          recentDeliveries: [futureDelivery],
+        );
 
-      expect(decision.outcome, AttentionOutcome.delayed);
-      expect(
-        decision.deliverAt,
-        scheduledAt.add(const Duration(minutes: kMinNotificationGapMinutes)),
-      );
-    });
+        expect(decision.outcome, AttentionOutcome.delayed);
+        expect(
+          decision.deliverAt,
+          scheduledAt.add(const Duration(minutes: kMinNotificationGapMinutes)),
+        );
+      },
+    );
 
     // ── Override suppression horizon ──────────────────────────────────────────
 

@@ -961,6 +961,14 @@ class _Layer4NotificationDispatchBridgeState
       return;
     }
 
+    // Delivery window (Layer_four.md): coaching may only banner during
+    // waking hours. Outside 08–21 the insight stays on the Home card and
+    // this bridge re-fires on the next in-window decision change.
+    final hour = DateTime.now().hour;
+    if (hour < 8 || hour >= 21) {
+      return;
+    }
+
     _dispatchInFlightForInsightId = primaryId;
     try {
       final insights =
@@ -2436,4 +2444,3 @@ Future<void> _uncompleteTaskFromHome(
     }
   }
 }
-

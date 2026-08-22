@@ -11,8 +11,14 @@ void main() {
       modeRefId: 'extreme',
       blockUrgencyScore: 90,
     );
-    expect(extreme.initialSnoozeMinutes, lessThan(flexible.initialSnoozeMinutes));
-    expect(extreme.maxEscalationLevel, greaterThan(flexible.maxEscalationLevel));
+    expect(
+      extreme.initialSnoozeMinutes,
+      lessThan(flexible.initialSnoozeMinutes),
+    );
+    expect(
+      extreme.maxEscalationLevel,
+      greaterThan(flexible.maxEscalationLevel),
+    );
   });
 
   test('escalation transitions shorten snooze over time', () {

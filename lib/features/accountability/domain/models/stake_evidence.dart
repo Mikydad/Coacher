@@ -37,24 +37,24 @@ class StakeEvidence {
   final int updatedAtMs;
 
   factory StakeEvidence.fromMap(Map<String, dynamic> m) => StakeEvidence(
-        id: (m['id'] as String?) ?? '',
-        challengeId: (m['challengeId'] as String?) ?? '',
-        uid: (m['uid'] as String?) ?? '',
-        unitIndex: (m['unitIndex'] as num?)?.toInt() ?? 0,
-        amount: (m['amount'] as num?)?.toInt() ?? 0,
-        source: (m['source'] as String?) ?? 'timer',
-        recordedAtMs: (m['recordedAtMs'] as num?)?.toInt() ?? 0,
-        updatedAtMs: (m['updatedAtMs'] as num?)?.toInt() ?? 0,
-      );
+    id: (m['id'] as String?) ?? '',
+    challengeId: (m['challengeId'] as String?) ?? '',
+    uid: (m['uid'] as String?) ?? '',
+    unitIndex: (m['unitIndex'] as num?)?.toInt() ?? 0,
+    amount: (m['amount'] as num?)?.toInt() ?? 0,
+    source: (m['source'] as String?) ?? 'timer',
+    recordedAtMs: (m['recordedAtMs'] as num?)?.toInt() ?? 0,
+    updatedAtMs: (m['updatedAtMs'] as num?)?.toInt() ?? 0,
+  );
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'challengeId': challengeId,
-        'uid': uid,
-        'unitIndex': unitIndex,
-        'amount': amount,
-        'source': source,
-        'recordedAtMs': recordedAtMs,
-        'updatedAtMs': updatedAtMs,
-      };
+    'id': id,
+    'challengeId': challengeId,
+    'uid': uid,
+    'unitIndex': unitIndex,
+    'amount': amount,
+    'source': source,
+    'recordedAtMs': recordedAtMs,
+    'updatedAtMs': updatedAtMs,
+  };
 }

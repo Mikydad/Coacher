@@ -8,11 +8,15 @@ import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
+import '../../accountability/application/stakes_providers.dart';
+import '../../accountability/domain/models/stake_challenge.dart';
 import '../../accountability/presentation/accountability_create_flow.dart';
+import '../../accountability/presentation/stake_challenge_detail_screen.dart';
 import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/application/daily_analytics_providers.dart';
 import '../../analytics/application/delivery_providers.dart';
 import '../../analytics/domain/models/analytics_event.dart';
+import '../application/goal_actions.dart';
 import '../application/goal_intensity_mode.dart';
 import '../application/goal_period_helpers.dart';
 import '../application/goals_providers.dart';
@@ -295,8 +299,10 @@ class GoalDetailScreen extends ConsumerWidget {
                     ).toLowerCase(),
                   ),
                 const SizedBox(height: 12),
-                // Entry point #1 into the unified accountability flow.
-                _AddAccountabilityCard(goalTitle: g.title),
+                // Entry point #1 into the unified accountability flow —
+                // or, once a stake is attached, the way back to it (one
+                // active stake per goal, decision 2026-08-22).
+                _AccountabilitySection(goal: g),
                 const SizedBox(height: 32),
               ],
               _SectionHeader(
@@ -534,6 +540,9 @@ class GoalDetailScreen extends ConsumerWidget {
         final paused = g.copyWith(status: GoalStatus.paused, updatedAtMs: now);
         await repo.upsertGoal(paused);
         await ref.read(goalReminderSyncServiceProvider).applyForGoal(paused);
+        // A deliberately shelved goal must not keep generating "at risk"
+        // coaching — same cache clear as complete/delete.
+        await clearEntityCoachingCachesForGoal(ref, paused.id);
         await ref.read(goalBlockSyncServiceProvider).removeBlockForGoal(g.id);
         invalidateGoals(ref, goalId: g.id);
         return;
@@ -555,33 +564,9 @@ class GoalDetailScreen extends ConsumerWidget {
         invalidateGoals(ref, goalId: g.id);
         return;
       case 'delete':
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Delete goal?'),
-            content: Text(
-              'Remove “${g.title}” and all its actions, milestones, and check-ins?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
-        );
-        if (ok == true && context.mounted) {
-          await ref.read(goalReminderSyncServiceProvider).cancelForGoal(g.id);
-          await repo.deleteGoal(g.id);
-          await clearEntityCoachingCachesForGoal(ref, g.id);
-          await ref.read(goalBlockSyncServiceProvider).removeBlockForGoal(g.id);
-          invalidateGoals(ref, goalId: g.id);
-          if (context.mounted) Navigator.pop(context);
-        }
+        // Shared with the goal-card swipe action — one delete path.
+        final deleted = await confirmDeleteGoal(context, ref, g);
+        if (deleted && context.mounted) Navigator.pop(context);
         return;
     }
   }
@@ -1121,12 +1106,101 @@ class _NewMilestoneDialogState extends State<_NewMilestoneDialog> {
   }
 }
 
+/// One active stake per goal: shows the attached challenge when one
+/// exists, otherwise the "Add accountability" entry point.
+class _AccountabilitySection extends ConsumerWidget {
+  const _AccountabilitySection({required this.goal});
+
+  final UserGoal goal;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final challenges =
+        ref.watch(stakeChallengesStreamProvider).value ??
+        const <StakeChallenge>[];
+    StakeChallenge? attached;
+    for (final c in challenges) {
+      if (!c.status.isTerminal && c.frozenGoal.linkedGoalId == goal.id) {
+        attached = c;
+        break;
+      }
+    }
+    if (attached == null) {
+      return _AddAccountabilityCard(goalTitle: goal.title, goalId: goal.id);
+    }
+    return _AttachedStakeCard(challenge: attached);
+  }
+}
+
+/// The goal already has a live stake: name it and link to its detail —
+/// no second stake can be added while this one is running.
+class _AttachedStakeCard extends StatelessWidget {
+  const _AttachedStakeCard({required this.challenge});
+
+  final StakeChallenge challenge;
+
+  @override
+  Widget build(BuildContext context) {
+    final typeLabel = switch (challenge.type) {
+      StakeChallengeType.soloPhoto => 'Photo stake',
+      StakeChallengeType.soloMoney => 'Money stake',
+      StakeChallengeType.h2hPoints ||
+      StakeChallengeType.h2hMoney => 'Head-to-head stake',
+      StakeChallengeType.teamPoints ||
+      StakeChallengeType.teamMoney => 'Team stake',
+      StakeChallengeType.practice => 'Practice challenge',
+    };
+    return Material(
+      color: AppColors.coral.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) =>
+                StakeChallengeDetailScreen(challengeId: challenge.id),
+          ),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.coral.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.verified_rounded, color: AppColors.coral, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '$typeLabel attached — this goal is staked',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textSoft,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Entry point #1 into the unified accountability flow: wrap this goal in
 /// a real stake ("Add Accountability" per the confirmed three-entry design).
 class _AddAccountabilityCard extends StatelessWidget {
-  const _AddAccountabilityCard({required this.goalTitle});
+  const _AddAccountabilityCard({required this.goalTitle, required this.goalId});
 
   final String goalTitle;
+  final String goalId;
 
   @override
   Widget build(BuildContext context) {
@@ -1135,8 +1209,11 @@ class _AddAccountabilityCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () =>
-            openAccountabilityCreateFlow(context, prefilledTitle: goalTitle),
+        onTap: () => openAccountabilityCreateFlow(
+          context,
+          prefilledTitle: goalTitle,
+          linkedGoalId: goalId,
+        ),
         child: Container(
           padding: const EdgeInsets.all(13),
           decoration: BoxDecoration(
@@ -1157,8 +1234,11 @@ class _AddAccountabilityCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Icon(Icons.chevron_right_rounded,
-                  color: AppColors.textSoft, size: 20),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textSoft,
+                size: 20,
+              ),
             ],
           ),
         ),

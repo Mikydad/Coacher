@@ -133,6 +133,10 @@ class _FakePlanningRepo implements PlanningRepository {
 }
 
 class _FakeReminderRepo implements ReminderRepository {
+  @override
+  Future<void> deleteRemindersForTask(String taskId) async {}
+
+
   _FakeReminderRepo({this.reminders = const []});
   final List<ReminderConfig> reminders;
 

@@ -23,12 +23,16 @@ enum StakeChallengeType {
   const StakeChallengeType(this.storageValue);
   final String storageValue;
 
-  static StakeChallengeType fromStorage(String? raw) =>
-      values.firstWhere((e) => e.storageValue == raw,
-          orElse: () => StakeChallengeType.practice);
+  static StakeChallengeType fromStorage(String? raw) => values.firstWhere(
+    (e) => e.storageValue == raw,
+    orElse: () => StakeChallengeType.practice,
+  );
 
   bool get isMultiParty =>
-      this == h2hPoints || this == h2hMoney || this == teamPoints || this == teamMoney;
+      this == h2hPoints ||
+      this == h2hMoney ||
+      this == teamPoints ||
+      this == teamMoney;
 }
 
 enum StakeChallengeStatus {
@@ -44,9 +48,10 @@ enum StakeChallengeStatus {
   const StakeChallengeStatus(this.storageValue);
   final String storageValue;
 
-  static StakeChallengeStatus fromStorage(String? raw) =>
-      values.firstWhere((e) => e.storageValue == raw,
-          orElse: () => StakeChallengeStatus.draft);
+  static StakeChallengeStatus fromStorage(String? raw) => values.firstWhere(
+    (e) => e.storageValue == raw,
+    orElse: () => StakeChallengeStatus.draft,
+  );
 
   bool get isTerminal =>
       this == completedSuccess ||
@@ -126,34 +131,34 @@ class StakeFrozenGoal {
   final String? linkedGoalId;
 
   factory StakeFrozenGoal.fromMap(Map<String, dynamic> m) => StakeFrozenGoal(
-        title: (m['title'] as String?) ?? '',
-        unitKind: (m['unitKind'] as String?) ?? 'minutes',
-        unitTarget: (m['unitTarget'] as num?)?.toInt() ?? 1,
-        totalUnits: (m['totalUnits'] as num?)?.toInt() ?? 1,
-        cadence: (m['cadence'] as String?) ?? 'daily',
-        interval: (m['interval'] as num?)?.toInt() ?? 1,
-        scheduledWeekdays: (m['scheduledWeekdays'] as List?)
-            ?.map((e) => (e as num).toInt())
-            .toList(),
-        repeatDaysOfMonth: (m['repeatDaysOfMonth'] as List?)
-            ?.map((e) => (e as num).toInt())
-            .toList(),
-        startDateMs: (m['startDateMs'] as num?)?.toInt(),
-        linkedGoalId: m['linkedGoalId'] as String?,
-      );
+    title: (m['title'] as String?) ?? '',
+    unitKind: (m['unitKind'] as String?) ?? 'minutes',
+    unitTarget: (m['unitTarget'] as num?)?.toInt() ?? 1,
+    totalUnits: (m['totalUnits'] as num?)?.toInt() ?? 1,
+    cadence: (m['cadence'] as String?) ?? 'daily',
+    interval: (m['interval'] as num?)?.toInt() ?? 1,
+    scheduledWeekdays: (m['scheduledWeekdays'] as List?)
+        ?.map((e) => (e as num).toInt())
+        .toList(),
+    repeatDaysOfMonth: (m['repeatDaysOfMonth'] as List?)
+        ?.map((e) => (e as num).toInt())
+        .toList(),
+    startDateMs: (m['startDateMs'] as num?)?.toInt(),
+    linkedGoalId: m['linkedGoalId'] as String?,
+  );
 
   Map<String, dynamic> toMap() => {
-        'title': title,
-        'unitKind': unitKind,
-        'unitTarget': unitTarget,
-        'totalUnits': totalUnits,
-        'cadence': cadence,
-        'interval': interval,
-        if (scheduledWeekdays != null) 'scheduledWeekdays': scheduledWeekdays,
-        if (repeatDaysOfMonth != null) 'repeatDaysOfMonth': repeatDaysOfMonth,
-        if (startDateMs != null) 'startDateMs': startDateMs,
-        if (linkedGoalId != null) 'linkedGoalId': linkedGoalId,
-      };
+    'title': title,
+    'unitKind': unitKind,
+    'unitTarget': unitTarget,
+    'totalUnits': totalUnits,
+    'cadence': cadence,
+    'interval': interval,
+    if (scheduledWeekdays != null) 'scheduledWeekdays': scheduledWeekdays,
+    if (repeatDaysOfMonth != null) 'repeatDaysOfMonth': repeatDaysOfMonth,
+    if (startDateMs != null) 'startDateMs': startDateMs,
+    if (linkedGoalId != null) 'linkedGoalId': linkedGoalId,
+  };
 }
 
 class StakeParticipant {
@@ -191,17 +196,17 @@ class StakeParticipant {
   }
 
   Map<String, dynamic> toMap() => {
-        'uid': uid,
-        'teamId': teamId,
-        'stakeKind': stakeKind,
-        if (stakeAmount != null) 'stakeAmount': stakeAmount,
-        if (photoStoragePath != null)
-          'photo': {
-            'storagePath': photoStoragePath,
-            'revealWindowMins': revealWindowMins,
-          },
-        'accepted': accepted,
-      };
+    'uid': uid,
+    'teamId': teamId,
+    'stakeKind': stakeKind,
+    if (stakeAmount != null) 'stakeAmount': stakeAmount,
+    if (photoStoragePath != null)
+      'photo': {
+        'storagePath': photoStoragePath,
+        'revealWindowMins': revealWindowMins,
+      },
+    'accepted': accepted,
+  };
 }
 
 /// One participant's decided result (mirror of the engine's output).
@@ -244,16 +249,16 @@ class StakeParticipantResult {
   }
 
   Map<String, dynamic> toMap() => {
-        'uid': uid,
-        'unitsPassed': unitsPassed,
-        'unitsRequired': unitsRequired,
-        'passed': passed,
-        'sideWon': sideWon,
-        'resolution': {
-          'kind': resolutionKind,
-          if (toCharityId != null) 'toCharityId': toCharityId,
-        },
-      };
+    'uid': uid,
+    'unitsPassed': unitsPassed,
+    'unitsRequired': unitsRequired,
+    'passed': passed,
+    'sideWon': sideWon,
+    'resolution': {
+      'kind': resolutionKind,
+      if (toCharityId != null) 'toCharityId': toCharityId,
+    },
+  };
 }
 
 /// $-3 — proof the forfeited money actually reached the charity.
@@ -282,12 +287,12 @@ class StakeDonationReceipt {
       );
 
   Map<String, dynamic> toMap() => {
-        'amountCents': amountCents,
-        'toCharityId': toCharityId,
-        'receiptUrl': receiptUrl,
-        'note': note,
-        'atMs': atMs,
-      };
+    'amountCents': amountCents,
+    'toCharityId': toCharityId,
+    'receiptUrl': receiptUrl,
+    'note': note,
+    'atMs': atMs,
+  };
 }
 
 // ─── The challenge ───────────────────────────────────────────────────────────
@@ -399,9 +404,11 @@ class StakeChallenge {
     if (day.isBefore(startDay)) return -1;
     if (!isActionDate(day)) return -1;
     var index = -1;
-    for (var d = startDay;
-        !d.isAfter(day);
-        d = DateTime(d.year, d.month, d.day + 1)) {
+    for (
+      var d = startDay;
+      !d.isAfter(day);
+      d = DateTime(d.year, d.month, d.day + 1)
+    ) {
       if (isActionDate(d)) index++;
     }
     return index;
@@ -426,18 +433,20 @@ class StakeChallenge {
           .map(StakeParticipant.fromMap)
           .toList(),
       frozenGoal: StakeFrozenGoal.fromMap(
-          (m['frozenGoal'] as Map<String, dynamic>?) ?? const {}),
+        (m['frozenGoal'] as Map<String, dynamic>?) ?? const {},
+      ),
       mode: m['mode'] as String?,
-      sideCharities: ((m['sideCharities'] as Map?) ?? const {})
-          .map((k, v) => MapEntry('$k', '$v')),
+      sideCharities: ((m['sideCharities'] as Map?) ?? const {}).map(
+        (k, v) => MapEntry('$k', '$v'),
+      ),
       bothLoseCharityId: m['bothLoseCharityId'] as String?,
       antiCharityId: m['antiCharityId'] as String?,
       receipts: {
-        for (final e
-            in ((outcome?['receipts'] as Map?) ?? const {}).entries)
+        for (final e in ((outcome?['receipts'] as Map?) ?? const {}).entries)
           if (e.value is Map)
             '${e.key}': StakeDonationReceipt.fromMap(
-                (e.value as Map).cast<String, dynamic>()),
+              (e.value as Map).cast<String, dynamic>(),
+            ),
       },
       deadlineMs: (m['deadlineMs'] as num?)?.toInt() ?? 0,
       photoState: StakePhotoState.fromStorage(m['photoState'] as String?),

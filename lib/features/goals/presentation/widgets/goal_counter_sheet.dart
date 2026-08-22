@@ -155,15 +155,11 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
     final repo = ref.read(goalsRepositoryProvider);
     final todayKey = DateKeys.todayKey();
     final nowDone = !action.isCompletedOn(todayKey);
-    await repo.upsertAction(
-      action.withCompletionOn(todayKey, done: nowDone),
-    );
+    await repo.upsertAction(action.withCompletionOn(todayKey, done: nowDone));
 
     // Recount locally.
     final newDone = allActions
-        .map(
-          (a) => a.id == action.id ? nowDone : a.isCompletedOn(todayKey),
-        )
+        .map((a) => a.id == action.id ? nowDone : a.isCompletedOn(todayKey))
         .where((done) => done)
         .length;
 

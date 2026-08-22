@@ -274,9 +274,16 @@ class FeatureBuilderInputAdapters {
   }) async {
     final out = <String, GoalFeatureSeed>{};
     final goals = await _goalsRepository.fetchGoalsOnce();
+    // Coaching subjects only: a paused goal was deliberately shelved, and a
+    // goal whose period hasn't started has zero behavior to pattern on —
+    // seeding it made streakRisk fire ("missed last 2 days") on day -1.
+    final windowEndExclusiveMs = DateKeys.parseLocalDateKey(
+      endDateKey,
+    ).add(const Duration(days: 1)).millisecondsSinceEpoch;
     for (final goal in goals) {
       if (goal.id.trim().isEmpty) continue;
-      if (goal.status == GoalStatus.completed) continue;
+      if (goal.status != GoalStatus.active) continue;
+      if (goal.periodStartMs >= windowEndExclusiveMs) continue;
       final checkIns = await _goalsRepository.getCheckInsForGoal(
         goal.id,
         startDateKey: startDateKey,
