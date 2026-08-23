@@ -1800,3 +1800,63 @@ not silent reversal.
   Follow-ups that live in the console, not the repo: the APNs auth key must
   be attached to the `sidepal` app before the next release, and deviceTokens
   docs minted under Coacher will go stale and re-mint on next app-open.
+
+- **2026-08-23 · Home carries one progress surface, one promise surface, and
+  no AI cards.** Home was showing the same completion numbers three times
+  (hero card, Weekly Discipline, and a "COACHING INSIGHTS" card) alongside
+  two competing AI surfaces (coaching focus card + proactive suggestion
+  cards). Four changes: (1) the COACHING INSIGHTS card is **deleted** — it
+  restated the hero card's day/week percentages with no insight in it, and
+  Progress is the analytics surface; (2) Weekly Discipline **stays** — it is
+  the only weekly number readable at a glance (the sparkline shows trend
+  shape, not a value); (3) proactive suggestions move **behind the Coach
+  FAB**: an accent dot when `activeProactiveSuggestions` is non-empty, and a
+  tap opens the sheet with `openSuggestionsPanel: true` — the same route the
+  morning-brief snackbar already used, so `ProactiveSuggestionSection` and
+  the `kHome*SuggestionLimit`/collapse constants are gone; (4) the coaching
+  focus card moves to **Progress** (the previously-unmounted
+  `ProgressCoachingFocusCard`, which is where the `layer4:` notification tap
+  already landed). *Why:* "chrome recedes, content leads" — Home answers
+  "what am I doing today", and nothing removed lost a capability; every
+  surface is one tap away. *Considered:* moving COACHING INSIGHTS to
+  Progress (rejected — Progress already computes those numbers, so the move
+  relocates the duplication); keeping the focus card on Home as its single
+  AI voice (rejected by the user in favour of the notification + dot chain
+  below, which preserves discoverability without a permanent card).
+
+- **2026-08-23 · A new coaching focus announces itself once, then waits
+  behind a dot — it never sits on Home.** When `currentCoachingFocusProvider`
+  emits a live focus whose `focusId` differs from
+  `lastNotifiedCoachingFocusId`, `_Layer4NotificationDispatchBridge` sends
+  one push through the **AttentionOrchestrator** (Phase 0 single-brain rule)
+  using the existing `ReminderEntityKinds.coachInsight` route, so the tap
+  lands on Progress. It shares the insight producer's 3/day + 08:00–21:00
+  budget rather than getting its own, so the two coaching producers can't
+  stack to six banners a day. In-app the focus shows as a badge on the
+  **Profile tab** (`hasUnseenCoachingFocusProvider`, accountability's
+  `badgeCounts` pattern) and a dot on Profile's **Progress row**; both clear
+  when `ProgressCoachingFocusCard` actually renders the focus and calls
+  `markCoachingFocusSeen` — viewing the card, not merely opening Profile.
+  Two new prefs carry this: `lastSeenCoachingFocusId` and
+  `lastNotifiedCoachingFocusId`. *Why:* the focus is worth interrupting for
+  once; after that it is reference material, and a permanent Home card is
+  the wrong price for it. *Considered:* notifying on every recompute
+  (rejected — the focus selector re-runs constantly and only `focusId`
+  changes mean a genuinely new focus); clearing the dot on Profile open
+  (rejected — the user would lose the focus without ever seeing it); a
+  separate notification budget for focus (rejected — same coaching voice,
+  same budget).
+
+- **2026-08-23 · One "Not now" snoozes a suggestion type for the rest of the
+  day.** `DismissedSuggestionRepository.typesDismissedToday()` now unions
+  into the engine's suppressed set alongside the 3-dismissals-in-7-days
+  weekly rule. The engine also dedupes by `(type, title)` before the
+  confidence sort, since priority inversion can be emitted by both
+  `_ruleOptimiseOrder` and optimisation rule A. *Why:* every regeneration
+  minted a fresh `StableId` for the same logical advice and only the weekly
+  rule suppressed anything, so a dismissed card came straight back and the
+  user had to tap "Not now" three times before it stayed gone. *Considered:*
+  giving suggestions stable content-derived ids and persisting per-id
+  dismissals (rejected for now — the type-level snooze fixes the reported
+  behaviour without a schema change; revisit if two suggestions of one type
+  ever need independent dismissal).

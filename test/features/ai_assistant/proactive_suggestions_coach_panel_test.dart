@@ -21,6 +21,9 @@ class _NoOpDismissedRepo implements DismissedSuggestionRepository {
   Future<Set<ProactiveSuggestionType>> suppressedTypes() async => {};
 
   @override
+  Future<Set<ProactiveSuggestionType>> typesDismissedToday() async => {};
+
+  @override
   Future<void> purgeOldEntries({int olderThanDays = 7}) async {}
 }
 

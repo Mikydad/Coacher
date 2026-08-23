@@ -24,6 +24,7 @@ import '../../settings/presentation/notification_settings_screen.dart';
 import '../../settings/presentation/setting_row.dart';
 import '../../settings/presentation/smart_timing_settings_screen.dart';
 import '../../analytics/application/discipline_score.dart';
+import '../../analytics/application/focus_providers.dart';
 import '../application/profile_hero_stats.dart';
 import '../application/profile_providers.dart';
 
@@ -191,7 +192,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       icon: Icons.leaderboard_rounded,
                       title: 'Progress',
                       subtitle: 'Score trends, streaks & analytics',
-                      trailing: const SettingRowChevron(),
+                      // Dot while a coaching focus is waiting unseen —
+                      // clears once the focus card renders on Progress.
+                      trailing: ref.watch(hasUnseenCoachingFocusProvider)
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.danger,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                const SettingRowChevron(),
+                              ],
+                            )
+                          : const SettingRowChevron(),
                       onTap: () => Navigator.pushNamed(
                         context,
                         AnalyticsProgressScreen.routeName,

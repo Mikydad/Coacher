@@ -42,6 +42,33 @@ class DismissedSuggestionRepository {
     return suppressed;
   }
 
+  /// Types dismissed at least once since local midnight. One "Not now"
+  /// snoozes the type for the rest of the day (2026-08-23) — before this,
+  /// regeneration resurfaced the same card until the 3-in-7-days
+  /// suppression finally kicked in, forcing three taps.
+  Future<Set<ProactiveSuggestionType>> typesDismissedToday() async {
+    final now = DateTime.now();
+    final midnight = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).millisecondsSinceEpoch;
+    final entries = await _isar.isarDismissedSuggestionLogs
+        .filter()
+        .dismissedAtMsGreaterThan(midnight - 1)
+        .findAll();
+    final types = <ProactiveSuggestionType>{};
+    for (final entry in entries) {
+      for (final type in ProactiveSuggestionType.values) {
+        if (type.name == entry.suggestionType) {
+          types.add(type);
+          break;
+        }
+      }
+    }
+    return types;
+  }
+
   /// Purges dismissal entries older than [olderThanDays] days.
   /// Called on app open (e.g. in [AppBootstrap]).
   Future<void> purgeOldEntries({int olderThanDays = 7}) async {

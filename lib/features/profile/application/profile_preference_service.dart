@@ -90,6 +90,32 @@ class ProfilePreferenceService {
     await _repository.upsertPreference(updated);
   }
 
+  /// Marks a coaching focus as viewed on the Progress screen — clears the
+  /// unseen-focus dot on the Profile tab. No-op when already seen.
+  Future<void> markCoachingFocusSeen(String focusId) async {
+    if (focusId.isEmpty) return;
+    final nowMs = _now().millisecondsSinceEpoch;
+    final existing = await _repository.getPreference();
+    final base = existing ?? _defaultPreference(nowMs);
+    if (base.lastSeenCoachingFocusId == focusId) return;
+    await _repository.upsertPreference(
+      base.copyWith(lastSeenCoachingFocusId: focusId, updatedAtMs: nowMs),
+    );
+  }
+
+  /// Records that a push was dispatched for [focusId] so recomputes that
+  /// keep the same focus never re-notify.
+  Future<void> markCoachingFocusNotified(String focusId) async {
+    if (focusId.isEmpty) return;
+    final nowMs = _now().millisecondsSinceEpoch;
+    final existing = await _repository.getPreference();
+    final base = existing ?? _defaultPreference(nowMs);
+    if (base.lastNotifiedCoachingFocusId == focusId) return;
+    await _repository.upsertPreference(
+      base.copyWith(lastNotifiedCoachingFocusId: focusId, updatedAtMs: nowMs),
+    );
+  }
+
   /// Enables or disables the morning brief notification.
   Future<void> setMorningBriefEnabled(bool enabled) async {
     final nowMs = _now().millisecondsSinceEpoch;

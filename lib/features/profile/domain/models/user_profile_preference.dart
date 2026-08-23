@@ -19,6 +19,8 @@ class UserProfilePreference {
     this.coachingInsightNotificationsEnabled = true,
     this.coachingNotificationBudgetDateKey = '',
     this.coachingNotificationSentAtMs = const <int>[],
+    this.lastSeenCoachingFocusId = '',
+    this.lastNotifiedCoachingFocusId = '',
     this.schemaVersion = kUserProfilePreferenceSchemaVersion,
   });
 
@@ -46,6 +48,14 @@ class UserProfilePreference {
   /// Milliseconds since epoch for each coaching insight push sent on [coachingNotificationBudgetDateKey].
   final List<int> coachingNotificationSentAtMs;
 
+  /// [CurrentCoachingFocus.focusId] the user has actually viewed on the
+  /// Progress screen — drives the unseen-focus dot on the Profile tab.
+  final String lastSeenCoachingFocusId;
+
+  /// [CurrentCoachingFocus.focusId] a push was last dispatched for, so a
+  /// recompute that keeps the same focus never re-notifies.
+  final String lastNotifiedCoachingFocusId;
+
   final int updatedAtMs;
   final int schemaVersion;
 
@@ -69,6 +79,8 @@ class UserProfilePreference {
     'coachingInsightNotificationsEnabled': coachingInsightNotificationsEnabled,
     'coachingNotificationBudgetDateKey': coachingNotificationBudgetDateKey,
     'coachingNotificationSentAtMs': coachingNotificationSentAtMs,
+    'lastSeenCoachingFocusId': lastSeenCoachingFocusId,
+    'lastNotifiedCoachingFocusId': lastNotifiedCoachingFocusId,
     'updatedAtMs': updatedAtMs,
     'schemaVersion': schemaVersion,
   };
@@ -88,6 +100,10 @@ class UserProfilePreference {
         coachingNotificationSentAtMs: _parseIntList(
           map['coachingNotificationSentAtMs'],
         ),
+        lastSeenCoachingFocusId:
+            map['lastSeenCoachingFocusId'] as String? ?? '',
+        lastNotifiedCoachingFocusId:
+            map['lastNotifiedCoachingFocusId'] as String? ?? '',
         updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
         schemaVersion:
             (map['schemaVersion'] as num?)?.toInt() ??
@@ -101,6 +117,8 @@ class UserProfilePreference {
     bool? coachingInsightNotificationsEnabled,
     String? coachingNotificationBudgetDateKey,
     List<int>? coachingNotificationSentAtMs,
+    String? lastSeenCoachingFocusId,
+    String? lastNotifiedCoachingFocusId,
     int? updatedAtMs,
     int? schemaVersion,
   }) => UserProfilePreference(
@@ -117,6 +135,10 @@ class UserProfilePreference {
         this.coachingNotificationBudgetDateKey,
     coachingNotificationSentAtMs:
         coachingNotificationSentAtMs ?? this.coachingNotificationSentAtMs,
+    lastSeenCoachingFocusId:
+        lastSeenCoachingFocusId ?? this.lastSeenCoachingFocusId,
+    lastNotifiedCoachingFocusId:
+        lastNotifiedCoachingFocusId ?? this.lastNotifiedCoachingFocusId,
     updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     schemaVersion: schemaVersion ?? this.schemaVersion,
   );

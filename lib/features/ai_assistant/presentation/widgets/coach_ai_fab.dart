@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/presentation/app_colors.dart';
 import '../../application/ai_assistant_providers.dart';
+import '../../application/proactive_suggestion_display.dart';
 import '../ai_assistant_screen.dart';
 
 /// The omnipresent Coach AI button — one per main tab, always bottom-right.
@@ -35,6 +36,15 @@ class CoachAiFab extends ConsumerWidget {
             ) ??
         false;
 
+    // Proactive suggestions moved off Home behind this button (2026-08-23):
+    // a quiet accent dot says "the coach has something", and a tap lands on
+    // the suggestions panel instead of the bare ask bar.
+    final hasSuggestions =
+        ref
+            .watch(proactiveSuggestionsProvider)
+            .whenOrNull(data: (s) => activeProactiveSuggestions(s).isNotEmpty) ??
+        false;
+
     // Long-press = straight into Voice Mode (2026-08-22): the same
     // programmatic entry Siri uses; a plain tap keeps opening typed chat.
     final fab = GestureDetector(
@@ -50,7 +60,13 @@ class CoachAiFab extends ConsumerWidget {
         // of Hero animation entirely so route transitions never collide.
         heroTag: null,
         mini: mini,
-        onPressed: () => showCoachAiSheet(context, askBar: true),
+        onPressed: () => showCoachAiSheet(
+          context,
+          askBar: true,
+          args: hasSuggestions
+              ? const CoachRouteArgs(openSuggestionsPanel: true)
+              : null,
+        ),
         elevation: 0,
         highlightElevation: 0,
         splashColor: _accent.withValues(alpha: 0.12),
@@ -66,7 +82,9 @@ class CoachAiFab extends ConsumerWidget {
       ),
     );
 
-    if (!hasBlockedPlan) return fab;
+    if (!hasBlockedPlan && !hasSuggestions) return fab;
+    // Red (blocked plan) outranks the accent suggestions dot.
+    final dotColor = hasBlockedPlan ? Colors.redAccent : _accent;
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -77,10 +95,7 @@ class CoachAiFab extends ConsumerWidget {
           child: Container(
             width: 9,
             height: 9,
-            decoration: const BoxDecoration(
-              color: Colors.redAccent,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
           ),
         ),
       ],

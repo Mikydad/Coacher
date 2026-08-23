@@ -7,6 +7,7 @@ import '../../core/utils/stable_id.dart';
 import '../../features/accountability/application/stakes_providers.dart';
 import '../../features/accountability/domain/models/stake_challenge.dart';
 import '../../features/accountability/presentation/accountability_hub_screen.dart';
+import '../../features/analytics/application/focus_providers.dart';
 import '../../features/auth/presentation/widgets/email_verification_banner.dart';
 import '../../features/community/presentation/community_screen.dart';
 import '../../features/context_override/domain/models/interruption_level.dart';
@@ -25,6 +26,9 @@ import 'obsidian_bottom_nav.dart';
 /// Accountability's position in the tab row (badge + "View" jumps).
 const int _kAccountabilityTabIndex = 2;
 
+/// Profile's position in the tab row (unseen coaching-focus badge).
+const int _kProfileTabIndex = 4;
+
 /// Root shell: five primary tabs (Progress lives in Profile; Coach is
 /// the omnipresent FAB + sheet) with a persistent watermark bottom nav.
 class MainTabShell extends ConsumerWidget {
@@ -41,6 +45,10 @@ class MainTabShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final index = ref.watch(mainTabIndexProvider);
     final stakeActions = ref.watch(stakeActionsNeededProvider);
+    // Unseen coaching focus (2026-08-23): the focus card lives on Progress
+    // (inside Profile), so a fresh focus shows as a badge on the Profile
+    // tab — same pattern as accountability's needs-action bubble.
+    final unseenFocus = ref.watch(hasUnseenCoachingFocusProvider);
 
     // Announce challenge invites the moment sync lands them: one local
     // notification + in-app snackbar per invite, exactly once per device
@@ -68,7 +76,10 @@ class MainTabShell extends ConsumerWidget {
             bottomNavigationBar: ObsidianBottomNav(
               selectedIndex: index,
               onTap: (i) => ref.read(mainTabIndexProvider.notifier).state = i,
-              badgeCounts: {_kAccountabilityTabIndex: stakeActions},
+              badgeCounts: {
+                _kAccountabilityTabIndex: stakeActions,
+                _kProfileTabIndex: unseenFocus ? 1 : 0,
+              },
             ),
           ),
           const CloudSyncGlobalIndicator(),

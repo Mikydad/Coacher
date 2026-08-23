@@ -49,7 +49,14 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
   /// Generates up to 3 proactive suggestions for today and
   /// updates the weekly effectiveness summary in memory.
   Future<List<ProactiveSuggestion>> generateForToday() async {
-    final suppressed = await dismissedRepo.suppressedTypes();
+    // One "Not now" hides the type for the rest of the day; 3 dismissals
+    // in 7 days suppresses it for the week (2026-08-23 — previously only
+    // the weekly rule existed, so the same card came back until the user
+    // had tapped "Not now" three times).
+    final suppressed = {
+      ...await dismissedRepo.suppressedTypes(),
+      ...await dismissedRepo.typesDismissedToday(),
+    };
     final suggestions = <ProactiveSuggestion>[];
 
     // Run rules in parallel where possible
@@ -65,9 +72,17 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
       suggestions.addAll(list);
     }
 
+    // Two rules can emit the same advice (e.g. priority inversion fires
+    // both the legacy rule and optimisation rule A) — keep the first of
+    // each (type, title) pair so identical cards never stack.
+    final seen = <String>{};
+    final deduped = suggestions
+        .where((s) => seen.add('${s.type.name}|${s.title}'))
+        .toList();
+
     // Sort by confidence descending, cap at 3
-    suggestions.sort((a, b) => b.confidence.compareTo(a.confidence));
-    final top = suggestions.take(_maxSuggestions).toList();
+    deduped.sort((a, b) => b.confidence.compareTo(a.confidence));
+    final top = deduped.take(_maxSuggestions).toList();
 
     _updateAnalyticsSummary(top);
     return top;
@@ -388,8 +403,8 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
           })
           .whereType<ProactiveSuggestion>()
           .toList();
-      // Note: scheduleOptimisationSuggested analytics is logged in the
-      // ProactiveSuggestionSection when the card renders.
+      // Note: scheduleOptimisationSuggested analytics is logged by
+      // ProactiveSuggestionCard when the card renders.
     } catch (_) {
       return [];
     }

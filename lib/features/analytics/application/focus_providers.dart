@@ -7,6 +7,7 @@ import '../../../core/local_db/isar_collections/isar_coaching_focus.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../coaching/domain/models/enforcement_mode.dart';
+import '../../profile/application/profile_providers.dart';
 import '../domain/models/current_coaching_focus.dart';
 import '../domain/models/detected_behavior_pattern.dart';
 import 'focus_candidate.dart';
@@ -53,6 +54,19 @@ final currentCoachingFocusProvider = StreamProvider<CurrentCoachingFocus?>((
   });
 
   return controller.stream;
+});
+
+// ─── Unseen focus (Profile tab dot) ──────────────────────────────────────────
+
+/// True while a live coaching focus exists that the user has not yet viewed
+/// on the Progress screen. Drives the dot on the Profile tab icon and on
+/// the Progress row inside Profile (decision 2026-08-23: coaching focus
+/// left Home — its ambient surface is now notification + this dot chain).
+final hasUnseenCoachingFocusProvider = Provider<bool>((ref) {
+  final focus = ref.watch(currentCoachingFocusProvider).valueOrNull;
+  if (focus == null || !isFocusLive(focus.lifecycleState)) return false;
+  final pref = ref.watch(userProfilePreferenceStreamProvider).valueOrNull;
+  return pref?.lastSeenCoachingFocusId != focus.focusId;
 });
 
 // ─── Focus history ────────────────────────────────────────────────────────────

@@ -183,6 +183,9 @@ class _FakeDismissedRepo implements DismissedSuggestionRepository {
   }
 
   @override
+  Future<Set<ProactiveSuggestionType>> typesDismissedToday() async => {};
+
+  @override
   Future<void> purgeOldEntries({int olderThanDays = 7}) async {}
 }
 

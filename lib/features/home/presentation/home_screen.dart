@@ -9,7 +9,6 @@ import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../ai_assistant/application/ai_assistant_providers.dart';
 import '../../ai_assistant/presentation/ai_assistant_screen.dart';
-import '../../ai_assistant/presentation/widgets/proactive_suggestion_section.dart';
 import '../../profile/application/profile_providers.dart';
 import '../../../core/sync/sync_service.dart';
 import '../../../core/utils/stable_id.dart';
@@ -27,9 +26,10 @@ import '../../analytics/application/analytics_period_bundle_notifier.dart';
 import '../../analytics/application/discipline_score.dart';
 import '../../analytics/application/coaching_insight_notification_policy.dart';
 import '../../analytics/application/delivery_providers.dart';
+import '../../analytics/application/focus_providers.dart';
 import '../../analytics/application/insight_generation_providers.dart';
-import '../../analytics/presentation/coaching_focus_card.dart';
 import '../../analytics/domain/models/analytics_event.dart';
+import '../../analytics/domain/models/current_coaching_focus.dart';
 import '../../analytics/domain/models/generated_insight.dart';
 import '../../planning/domain/models/accountability_log.dart';
 import '../../planning/domain/models/flow_transition_event.dart';
@@ -87,7 +87,6 @@ class HomeScreen extends ConsumerWidget {
     final tasksAsync = ref.watch(todayAllTasksRowsProvider);
     final todaysGoalsAsync = ref.watch(todaysActiveGoalsProvider);
     final flowSnapshotAsync = ref.watch(homeFlowSnapshotProvider);
-    final analyticsBundleAsync = ref.watch(analyticsPeriodBundleProvider);
     // No execution-state watch here: the top-level build doesn't render
     // session state ( _FlowNowStrip watches it itself), and the Focus button
     // reads it at press time — so per-second `elapsed` ticks never rebuild
@@ -203,11 +202,9 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           _FlowNowStrip(flowSnapshotAsync: flowSnapshotAsync),
           const SizedBox(height: 16),
-          const HomeCoachingFocusCard(),
-          const SizedBox(height: 8),
-          // Proactive AI suggestion cards (Phase 4) — collapse when empty
-          const ProactiveSuggestionSection(),
-          const SizedBox(height: 16),
+          // Coaching focus + proactive suggestions left Home (2026-08-23):
+          // focus lives on Progress (notification + Profile-tab dot when a
+          // new one lands); suggestions live behind the Coach FAB's dot.
           _NeonCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -426,55 +423,9 @@ class HomeScreen extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          _NeonCard(
-            child: analyticsBundleAsync.when(
-              skipLoadingOnReload: true,
-              data: (bundle) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'COACHING INSIGHTS',
-                    style: TextStyle(
-                      color: AppColors.cyan,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Goals/Habits today: ${(bundle.goalHabitDay.weightedCompletionRate * 100).round()}%',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Tasks today: ${(bundle.taskDay.weightedCompletionRate * 100).round()}%',
-                    style: TextStyle(color: AppColors.fg70),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'This week: Goals/Habits ${(bundle.goalHabitWeek.weightedCompletionRate * 100).round()}% · Tasks ${(bundle.taskWeek.weightedCompletionRate * 100).round()}%',
-                    style: TextStyle(color: AppColors.fg70, fontSize: 13),
-                  ),
-                ],
-              ),
-              loading: () => const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (e, _) => swallowedAsyncError(
-                'home_screen',
-                e,
-                Text(
-                  'Could not load analytics insights.',
-                  style: TextStyle(color: AppColors.fg54),
-                ),
-              ),
-            ),
-          ),
           const SizedBox(height: 8),
+          // COACHING INSIGHTS card removed (2026-08-23): it restated the
+          // hero card's numbers — Progress is the analytics surface.
           tasksAsync.when(
             data: (rows) {
               final completed = _completedForRows(rows, scores);
@@ -922,6 +873,7 @@ class _Layer4NotificationDispatchBridgeState
     extends ConsumerState<_Layer4NotificationDispatchBridge> {
   String? _lastScheduledPrimaryInsightId;
   String? _dispatchInFlightForInsightId;
+  String? _focusDispatchInFlightForFocusId;
 
   @override
   Widget build(BuildContext context) {
@@ -931,7 +883,89 @@ class _Layer4NotificationDispatchBridgeState
         unawaited(_onNotificationDecisionChanged(next));
       },
     );
+    // New-focus push (2026-08-23): the focus card left Home, so a freshly
+    // selected focus announces itself once — then waits on Progress behind
+    // the Profile-tab dot. Fires only when focusId changes, never on
+    // recomputes that keep the same focus.
+    ref.listen<AsyncValue<CurrentCoachingFocus?>>(currentCoachingFocusProvider, (
+      previous,
+      next,
+    ) {
+      unawaited(_onCoachingFocusChanged(next));
+    });
     return const SizedBox.shrink();
+  }
+
+  Future<void> _onCoachingFocusChanged(
+    AsyncValue<CurrentCoachingFocus?> next,
+  ) async {
+    final focus = next.valueOrNull;
+    if (focus == null || !isFocusLive(focus.lifecycleState)) return;
+    final focusId = focus.focusId;
+    if (focusId.isEmpty || _focusDispatchInFlightForFocusId == focusId) return;
+
+    final prefService = ref.read(profilePreferenceServiceProvider);
+    final pref = await prefService.getPreference();
+    if (pref.lastNotifiedCoachingFocusId == focusId) return;
+
+    // Same delivery window and shared 3/day budget as insight pushes —
+    // the two coaching producers must never stack past the budget.
+    final hour = DateTime.now().hour;
+    if (hour < 8 || hour >= 21) return;
+    final budget = await prefService.evaluateCoachingInsightNotificationSend();
+    if (!budget.allowed) return;
+
+    _focusDispatchInFlightForFocusId = focusId;
+    try {
+      final insights =
+          ref.read(layer3TodayDeliveryInsightsProvider).valueOrNull ??
+          const <GeneratedInsight>[];
+      final selected = insights
+          .where((item) => item.insightId == focus.primaryInsightId)
+          .toList();
+      final body = selected.isEmpty
+          ? 'Your coach picked a new focus — open Progress to see it.'
+          : selected.first.message;
+
+      final notifications = ref.read(localNotificationsServiceProvider);
+      final granted = await notifications.requestPermissionsIfNeeded();
+      if (!granted) return;
+
+      final budgetAfter = await prefService
+          .evaluateCoachingInsightNotificationSend();
+      if (!budgetAfter.allowed) return;
+
+      // Routed through the AttentionOrchestrator (Phase 0 single-brain
+      // rule). entityId is the primary insight so the tap lands on
+      // Progress via the existing `layer4:` route.
+      final decision = await ref
+          .read(attentionOrchestratorServiceProvider)
+          .evaluate(
+            ReminderIntent(
+              id: StableId.generate('ri_coach_focus'),
+              entityId: focus.primaryInsightId,
+              entityKind: ReminderEntityKinds.coachInsight,
+              entityTitle: 'New coaching focus',
+              proposedAt: DateTime.now().add(const Duration(minutes: 1)),
+              importance: 55,
+              interruptionLevel: InterruptionLevel.low,
+              enforcementMode: 'flexible',
+              sourceReason: 'coaching_focus_selected',
+              bodyOverride: body,
+              createdAtMs: DateTime.now().millisecondsSinceEpoch,
+            ),
+          );
+      if (decision.outcome != AttentionOutcome.suppressed) {
+        await prefService.recordCoachingInsightNotificationSent();
+      }
+      // Either way this focus is handled — a suppressed intent retries via
+      // the orchestrator's own queue, not by re-dispatching here.
+      await prefService.markCoachingFocusNotified(focusId);
+    } finally {
+      if (_focusDispatchInFlightForFocusId == focusId) {
+        _focusDispatchInFlightForFocusId = null;
+      }
+    }
   }
 
   Future<void> _onNotificationDecisionChanged(
