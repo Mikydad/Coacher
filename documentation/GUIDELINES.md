@@ -1860,3 +1860,27 @@ not silent reversal.
   dismissals (rejected for now — the type-level snooze fixes the reported
   behaviour without a schema change; revisit if two suggestions of one type
   ever need independent dismissal).
+
+- **2026-08-23 (correction) · Progress already had a Coaching Focus card —
+  the shared one added hours earlier was a duplicate and is gone.**
+  Supersedes point (4) of the "Home carries one progress surface" entry
+  above. `ProgressInsightsRow` has always rendered a `_CoachingFocusGlass`
+  watching the same `currentCoachingFocusProvider` +
+  `currentAiSummaryProvider` pair, so mounting `ProgressCoachingFocusCard`
+  above it stacked two "Coaching Focus" cards. The earlier grep that
+  concluded the shared widget was "built for this but mounted nowhere"
+  searched for the class name and missed the screen's own private inline
+  implementation — a reminder that "nothing references this widget" is not
+  the same question as "nothing renders this content". The glass card is
+  the keeper: it speaks `ProgressGlassCard`/`ProgressDesignTokens` like the
+  "Streak at risk" card it is paired with, and it carries
+  `helpId: 'coachingFocus'` wired to a real `FeatureGuide`; the shared card
+  brought its own `AppColors` styling and no help wiring.
+  **Load-bearing detail:** `markCoachingFocusSeen` moved with the removal,
+  from the deleted mount into `ProgressInsightsRow`. Deleting the mount
+  without moving it would have stranded the Profile-tab badge and the
+  Progress-row dot permanently lit, since nothing else clears them.
+  *Follow-up:* `coaching_focus_card.dart` (604 lines) is now fully
+  orphaned — `HomeCoachingFocusCard` lost its mount when the card left
+  Home, and `ProgressCoachingFocusCard` never had one. Left in the tree
+  pending a decision on deleting it.

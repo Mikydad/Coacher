@@ -7,7 +7,6 @@ import '../application/ai_summary_providers.dart';
 import '../application/delivery_providers.dart';
 import '../application/focus_providers.dart';
 import '../application/analytics_period_bundle_notifier.dart';
-import 'coaching_focus_card.dart';
 import 'progress/progress_bundle_skeleton.dart';
 import 'progress/goals_habits_section.dart';
 import 'progress/progress_design_tokens.dart';
@@ -141,17 +140,6 @@ class _AnalyticsProgressScreenState
                       bundle: bundle,
                       ringSweep: _ringSweep.value,
                     ),
-                  ),
-                ),
-                const SizedBox(height: ProgressDesignTokens.sectionSpacing),
-                // Coaching focus lives here now (2026-08-23, off Home) —
-                // rendering it live marks it seen and clears the
-                // Profile-tab dot.
-                FadeTransition(
-                  opacity: _cardsFade,
-                  child: SlideTransition(
-                    position: _cardsSlide,
-                    child: const ProgressCoachingFocusCard(),
                   ),
                 ),
                 const SizedBox(height: ProgressDesignTokens.sectionSpacing),

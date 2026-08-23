@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../profile/application/profile_providers.dart';
 import '../../application/ai_summary_providers.dart';
 import '../../application/analytics_period_bundle.dart';
 import '../../application/delivery_providers.dart';
@@ -28,6 +31,18 @@ class ProgressInsightsRow extends ConsumerWidget {
     final summaryAsync = ref.watch(currentAiSummaryProvider);
     final decisionAsync = ref.watch(layer4TodayProgressDecisionProvider);
     final insightsAsync = ref.watch(layer3TodayDeliveryInsightsProvider);
+
+    // Showing a live focus here is what "the user saw it" means — it clears
+    // the unseen-focus dot on the Profile tab and Profile's Progress row
+    // (2026-08-23). Resolve the service during build: the callback can
+    // outlive this element, and `ref` would throw.
+    final focus = focusAsync.valueOrNull;
+    if (focus != null && isFocusLive(focus.lifecycleState)) {
+      final prefService = ref.read(profilePreferenceServiceProvider);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(prefService.markCoachingFocusSeen(focus.focusId));
+      });
+    }
 
     return Column(
       children: [

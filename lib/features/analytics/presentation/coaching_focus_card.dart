@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,7 +9,6 @@ import '../domain/models/coaching_ai_payload.dart';
 import '../domain/models/current_coaching_focus.dart';
 import '../domain/models/generated_insight.dart';
 import '../../../core/utils/date_keys.dart';
-import '../../profile/application/profile_providers.dart';
 
 import '../../../core/presentation/app_colors.dart';
 
@@ -41,10 +38,6 @@ class HomeCoachingFocusCard extends ConsumerWidget {
 }
 
 /// Compact coaching focus card for the Progress / Analytics screen.
-///
-/// This is the focus's home surface (2026-08-23, off Home): rendering a
-/// live focus marks it seen, which clears the unseen-focus dot on the
-/// Profile tab and the Progress row.
 class ProgressCoachingFocusCard extends ConsumerWidget {
   const ProgressCoachingFocusCard({super.key});
 
@@ -52,16 +45,6 @@ class ProgressCoachingFocusCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final focusAsync = ref.watch(currentCoachingFocusProvider);
     final summaryAsync = ref.watch(currentAiSummaryProvider);
-
-    final focus = focusAsync.valueOrNull;
-    if (focus != null && isFocusLive(focus.lifecycleState)) {
-      // Resolve the service during build — the callback may outlive this
-      // element (navigate away in the same frame), and `ref` would throw.
-      final prefService = ref.read(profilePreferenceServiceProvider);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        unawaited(prefService.markCoachingFocusSeen(focus.focusId));
-      });
-    }
 
     return _CoachingFocusCardShell(
       focusAsync: focusAsync,
