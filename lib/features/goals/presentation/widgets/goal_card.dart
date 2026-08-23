@@ -9,23 +9,11 @@ import '../../domain/models/goal_categories.dart';
 import '../../domain/models/goal_check_in.dart';
 import '../../domain/models/goal_enums.dart';
 import '../../domain/models/user_goal.dart';
+import 'goal_category_visuals.dart';
 import 'goal_counter_sheet.dart';
 
 import '../../../../core/presentation/app_colors.dart';
 import '../../../../core/presentation/async_value_ui.dart';
-
-/// Color per category, used as the card fill color.
-Color goalCategoryColor(String categoryId) {
-  return switch (categoryId) {
-    GoalCategories.study => AppColors.categoryBlue,
-    GoalCategories.fitness => AppColors.categoryBurntOrange,
-    GoalCategories.productivity => AppColors.limeOlive,
-    GoalCategories.focus => AppColors.categoryPurple,
-    GoalCategories.habits => AppColors.categoryBrown,
-    GoalCategories.mentalClarity => AppColors.categoryTeal,
-    _ => AppColors.textDim,
-  };
-}
 
 /// A goal card with a horizontal fill bar showing today's progress.
 ///
@@ -35,17 +23,6 @@ class GoalCard extends ConsumerWidget {
   const GoalCard({super.key, required this.goal});
 
   final UserGoal goal;
-
-  Color get _baseColor {
-    if (goal.colorHex != null && goal.colorHex!.length == 6) {
-      try {
-        return Color(int.parse('FF${goal.colorHex}', radix: 16));
-      } catch (e) {
-        debugPrint('goal_card: swallowed error: $e');
-      }
-    }
-    return goalCategoryColor(goal.categoryId);
-  }
 
   /// Repeat summary when the goal has one ("Every week on Mon · Wed"),
   /// otherwise the evaluation period ("This month", "Entire goal").
@@ -136,7 +113,7 @@ class GoalCard extends ConsumerWidget {
 
     return progressAsync.when(
       loading: () => _CardShell(
-        baseColor: _baseColor,
+        tone: goalTone(goal),
         progress: 0,
         goal: goal,
         horizonLabel: _horizonLabel,
@@ -150,7 +127,7 @@ class GoalCard extends ConsumerWidget {
         'goal_card',
         e,
         _CardShell(
-          baseColor: _baseColor,
+          tone: goalTone(goal),
           progress: 0,
           goal: goal,
           horizonLabel: _horizonLabel,
@@ -161,7 +138,7 @@ class GoalCard extends ConsumerWidget {
         ),
       ),
       data: (p) => _CardShell(
-        baseColor: _baseColor,
+        tone: goalTone(goal),
         progress: p.progress,
         goal: goal,
         horizonLabel: _horizonLabel,
@@ -186,7 +163,7 @@ class GoalCard extends ConsumerWidget {
 
 class _CardShell extends StatelessWidget {
   const _CardShell({
-    required this.baseColor,
+    required this.tone,
     required this.progress,
     required this.goal,
     required this.horizonLabel,
@@ -197,7 +174,7 @@ class _CardShell extends StatelessWidget {
     this.staked = false,
   });
 
-  final Color baseColor;
+  final GoalTone tone;
   final double progress;
   final UserGoal goal;
   final String horizonLabel;
@@ -213,18 +190,22 @@ class _CardShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fillColor = baseColor;
-    final bgColor = baseColor.withValues(alpha: 0.18);
+    // The fill sits between the card and the disc so the disc keeps reading
+    // as the brightest thing on an unfinished card; completion promotes the
+    // fill to the disc's own color and lights the disc one level further.
+    final fillColor = metCommitment
+        ? tone.circle
+        : Color.alphaBlend(tone.circle.withValues(alpha: 0.62), tone.card);
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
-        height: 72,
+        height: 88,
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(18),
+          color: tone.card,
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Stack(
           fit: StackFit.expand,
@@ -238,10 +219,8 @@ class _CardShell extends StatelessWidget {
                 widthFactor: progress.clamp(0.0, 1.0),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: fillColor.withValues(
-                      alpha: metCommitment ? 1.0 : 0.55,
-                    ),
-                    borderRadius: BorderRadius.circular(18),
+                    color: fillColor,
+                    borderRadius: BorderRadius.circular(20),
                   ),
                 ),
               ),
@@ -252,6 +231,12 @@ class _CardShell extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Row(
                 children: [
+                  GoalIconDisc(
+                    tone: tone,
+                    icon: goalCategoryIcon(goal.categoryId),
+                    done: metCommitment,
+                  ),
+                  const SizedBox(width: 12),
                   // Left: title + subtitle
                   Expanded(
                     child: Column(
@@ -263,7 +248,7 @@ class _CardShell extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: metCommitment ? Colors.black : AppColors.fg,
+                            color: AppColors.fg,
                             fontWeight: FontWeight.w700,
                             fontSize: 15,
                           ),
@@ -275,9 +260,7 @@ class _CardShell extends StatelessWidget {
                               Icon(
                                 Icons.handshake_rounded,
                                 size: 12,
-                                color: metCommitment
-                                    ? Colors.black54
-                                    : AppColors.accent,
+                                color: AppColors.accent,
                               ),
                               const SizedBox(width: 3),
                             ],
@@ -288,9 +271,7 @@ class _CardShell extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: metCommitment
-                                      ? Colors.black54
-                                      : AppColors.fg70,
+                                  color: AppColors.fg70,
                                   fontSize: 12,
                                 ),
                               ),
@@ -321,7 +302,11 @@ class _CardShell extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                       ],
-                      _ActionButton(done: metCommitment, onTap: onQuickAdd),
+                      _ActionButton(
+                        tone: tone,
+                        done: metCommitment,
+                        onTap: onQuickAdd,
+                      ),
                     ],
                   ),
                 ],
@@ -335,8 +320,13 @@ class _CardShell extends StatelessWidget {
 }
 
 class _ActionButton extends StatelessWidget {
-  const _ActionButton({required this.done, required this.onTap});
+  const _ActionButton({
+    required this.tone,
+    required this.done,
+    required this.onTap,
+  });
 
+  final GoalTone tone;
   final bool done;
   final VoidCallback? onTap;
 
@@ -349,19 +339,13 @@ class _ActionButton extends StatelessWidget {
         height: 36,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: done
-              ? AppColors.fg.withValues(alpha: 0.25)
-              : AppColors.fg.withValues(alpha: 0.15),
+          color: tone.icon.withValues(alpha: done ? 0.22 : 0.10),
           border: Border.all(
-            color: AppColors.fg.withValues(alpha: done ? 0.6 : 0.4),
+            color: tone.icon.withValues(alpha: done ? 0.7 : 0.45),
             width: 1.5,
           ),
         ),
-        child: Icon(
-          done ? Icons.check : Icons.add,
-          size: 18,
-          color: done ? AppColors.fg : AppColors.fg70,
-        ),
+        child: Icon(done ? Icons.check : Icons.add, size: 18, color: tone.icon),
       ),
     );
   }

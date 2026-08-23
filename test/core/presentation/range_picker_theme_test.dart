@@ -4,11 +4,12 @@ import 'package:sidepal/core/presentation/app_colors.dart';
 import 'package:sidepal/core/presentation/range_picker_theme.dart';
 
 /// The stock range picker builds its save action with a WIDGET-level
-/// `TextButton.styleFrom(foregroundColor: headerForeground)`, which beats any
-/// TextButtonTheme — so the label color can only come from
-/// `rangePickerHeaderForegroundColor`. These tests pin that down: the label
-/// must resolve to the on-accent token (black in the dark palette), not the
-/// lime scheme color that made it unreadable on the lime pill.
+/// `TextButton.styleFrom(foregroundColor: headerForeground)`, which beats a
+/// TextButtonTheme's `foregroundColor` — the label is recolored through a
+/// theme-level `foregroundBuilder` instead. These tests pin down the fix at
+/// the render level: the visible "Set duration" text must resolve to
+/// `onAccent` (black in the dark palette) on the lime pill, while the
+/// header keeps its stock colors (the user wants ONLY the button styled).
 void main() {
   setUp(() => AppColors.palette = AppPalette.dark);
 
@@ -40,24 +41,18 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('save action label resolves to the on-accent token', (
-    tester,
-  ) async {
+  testWidgets('save label RENDERS in onAccent despite the forced '
+      'widget-level foregroundColor', (tester) async {
     await openPicker(tester);
 
-    final button = tester.widget<TextButton>(
-      find.widgetWithText(TextButton, 'Set duration'),
-    );
-    final foreground = button.style?.foregroundColor?.resolve(
-      const <WidgetState>{},
-    );
-    expect(foreground, AppColors.onAccent);
-    // The lime scheme color is what previously leaked through and made the
-    // label vanish into the pill.
-    expect(foreground, isNot(AppColors.accent));
+    // The color the Text actually inherits — innermost DefaultTextStyle.
+    final context = tester.element(find.text('Set duration'));
+    final rendered = DefaultTextStyle.of(context).style.color;
+    expect(rendered, AppColors.onAccent);
+    expect(rendered, isNot(AppColors.accent));
   });
 
-  testWidgets('save action is a filled pill, not flat text', (tester) async {
+  testWidgets('save action is a lime pill, not flat text', (tester) async {
     await openPicker(tester);
 
     final context = tester.element(
@@ -66,20 +61,19 @@ void main() {
     final style = TextButtonTheme.of(context).style;
     expect(
       style?.backgroundColor?.resolve(const <WidgetState>{}),
-      isNotNull,
-      reason: 'the save action needs a fill to read as a button',
+      AppColors.accent,
     );
     expect(style?.shape, isNotNull);
   });
 
-  testWidgets('header band pairs accent background with on-accent content', (
+  testWidgets('header keeps its stock colors — only the button is themed', (
     tester,
   ) async {
     await openPicker(tester);
 
     final context = tester.element(find.text('Goal duration'));
     final theme = DatePickerTheme.of(context);
-    expect(theme.rangePickerHeaderBackgroundColor, AppColors.accent);
-    expect(theme.rangePickerHeaderForegroundColor, AppColors.onAccent);
+    expect(theme.rangePickerHeaderBackgroundColor, isNull);
+    expect(theme.rangePickerHeaderForegroundColor, isNull);
   });
 }

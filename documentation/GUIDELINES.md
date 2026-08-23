@@ -1692,3 +1692,17 @@ not silent reversal.
   the single-date `showDatePicker`, never the range variant. Pinned by
   `test/core/presentation/range_picker_theme_test.dart`, which opens the
   real picker and asserts the resolved label color.
+
+- **2026-08-23 (round 5) · Range-picker save action, corrected: button only,
+  header untouched.** Round 4's accent header band was wrong — the user
+  wanted ONLY the "Set duration" control styled. The real escape hatch from
+  the framework's forced label color: the widget-level style sets
+  `foregroundColor` but leaves `foregroundBuilder` unset, so a theme-level
+  `foregroundBuilder` still applies (per-property resolution); and because
+  the button's forced text style lives on its outer `Material` while the
+  builder wraps the innermost child (`button_style_button.dart`), an inner
+  `DefaultTextStyle.merge(color: onAccent)` wins for the label. Result: lime
+  pill + black text, stock header. `sidePalRangePickerBuilder` no longer
+  overrides `rangePickerHeaderBackgroundColor`/`ForegroundColor`; the test
+  now asserts the RENDERED label color via `DefaultTextStyle.of` at the
+  `Text` element and that the header theme stays null.

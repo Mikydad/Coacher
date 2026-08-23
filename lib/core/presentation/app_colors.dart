@@ -1,5 +1,50 @@
 import 'package:flutter/material.dart';
 
+/// A goal category's three-level color recipe, used by the Goals list cards
+/// and the counter sheet.
+///
+/// The hierarchy is deliberate: black page → [card] (a tinted surface, dark
+/// enough to stay calm but saturated enough to read as a color) → [circle]
+/// (the same hue, brighter, behind the glyph) → [icon] (the same hue, light).
+/// Making the card a near-black version of the accent kills the color; making
+/// it the accent itself turns the list into colored rectangles. The middle
+/// band is the whole design.
+class GoalTone {
+  const GoalTone({
+    required this.card,
+    required this.circle,
+    required this.icon,
+  });
+
+  /// Derives a tone from an arbitrary seed (a goal's custom `colorHex`, which
+  /// has no hand-tuned entry) by holding the seed's hue and forcing the three
+  /// levels onto the same lightness/saturation bands the tuned tones use.
+  factory GoalTone.fromSeed(Color seed, {required bool light}) {
+    final h = HSLColor.fromColor(seed).hue;
+    HSLColor at(double s, double l) => HSLColor.fromAHSL(1, h, s, l);
+    return light
+        ? GoalTone(
+            card: at(0.42, 0.93).toColor(),
+            circle: at(0.45, 0.78).toColor(),
+            icon: at(0.55, 0.30).toColor(),
+          )
+        : GoalTone(
+            card: at(0.45, 0.155).toColor(),
+            circle: at(0.55, 0.29).toColor(),
+            icon: at(0.80, 0.78).toColor(),
+          );
+  }
+
+  /// The card surface.
+  final Color card;
+
+  /// The disc behind the category glyph — also the progress fill.
+  final Color circle;
+
+  /// The glyph itself, and any bright accent drawn on [card].
+  final Color icon;
+}
+
 /// Design tokens for "Obsidian Pulse", one value per brightness.
 ///
 /// [AppPalette.dark] is the original dark theme (values unchanged from the
@@ -82,6 +127,12 @@ class AppPalette {
     required this.categoryPurple,
     required this.categoryBrown,
     required this.categoryBurntOrange,
+    required this.toneStudy,
+    required this.toneFitness,
+    required this.toneProductivity,
+    required this.toneFocus,
+    required this.toneHabits,
+    required this.toneMentalClarity,
     required this.gold,
     required this.periwinkle,
     required this.white,
@@ -214,6 +265,14 @@ class AppPalette {
   final Color categoryPurple;
   final Color categoryBrown;
   final Color categoryBurntOrange;
+
+  /// Three-level goal-category tones (Goals list cards, counter sheet).
+  final GoalTone toneStudy;
+  final GoalTone toneFitness;
+  final GoalTone toneProductivity;
+  final GoalTone toneFocus;
+  final GoalTone toneHabits;
+  final GoalTone toneMentalClarity;
   // One-off: community accents.
   final Color gold;
   final Color periwinkle;
@@ -339,6 +398,38 @@ class AppPalette {
     categoryPurple: Color(0xFF7B4FBF),
     categoryBrown: Color(0xFF8B6B3D),
     categoryBurntOrange: Color(0xFFE07B2A),
+    // Goal tones — muted, mid-dark surfaces that still read as a color
+    // against the near-black scaffold; hue repeats at three intensities.
+    toneStudy: GoalTone(
+      card: Color(0xFF10233A),
+      circle: Color(0xFF1E4D78),
+      icon: Color(0xFFA9D5FF),
+    ),
+    toneFitness: GoalTone(
+      card: Color(0xFF3A2A18),
+      circle: Color(0xFF70501F),
+      icon: Color(0xFFFFD06A),
+    ),
+    toneProductivity: GoalTone(
+      card: Color(0xFF2F3916),
+      circle: Color(0xFF597023),
+      icon: Color(0xFFCFE798),
+    ),
+    toneFocus: GoalTone(
+      card: Color(0xFF24203A),
+      circle: Color(0xFF4B4075),
+      icon: Color(0xFFC4B2FF),
+    ),
+    toneHabits: GoalTone(
+      card: Color(0xFF382B17),
+      circle: Color(0xFF70551F),
+      icon: Color(0xFFF4CF78),
+    ),
+    toneMentalClarity: GoalTone(
+      card: Color(0xFF15383A),
+      circle: Color(0xFF226568),
+      icon: Color(0xFF9DE9E1),
+    ),
     // One-off: community accents.
     gold: Color(0xFFFFD700),
     periwinkle: Color(0xFF7B9CFF),
@@ -450,6 +541,38 @@ class AppPalette {
     categoryPurple: Color(0xFF6D28D9),
     categoryBrown: Color(0xFF92400E),
     categoryBurntOrange: Color(0xFFC2410C),
+    // Goal tones, light mode — the same hues inverted: pale tinted card,
+    // mid tint behind the glyph, deep hue for the glyph itself.
+    toneStudy: GoalTone(
+      card: Color(0xFFE6EDF5),
+      circle: Color(0xFFAEC8E0),
+      icon: Color(0xFF224E77),
+    ),
+    toneFitness: GoalTone(
+      card: Color(0xFFF5EEE6),
+      circle: Color(0xFFE0C7AE),
+      icon: Color(0xFF774A22),
+    ),
+    toneProductivity: GoalTone(
+      card: Color(0xFFF0F5E6),
+      circle: Color(0xFFD1E0AE),
+      icon: Color(0xFF5D7722),
+    ),
+    toneFocus: GoalTone(
+      card: Color(0xFFE9E6F5),
+      circle: Color(0xFFB9AEE0),
+      icon: Color(0xFF362277),
+    ),
+    toneHabits: GoalTone(
+      card: Color(0xFFF5F1E6),
+      circle: Color(0xFFE0D5AE),
+      icon: Color(0xFF776522),
+    ),
+    toneMentalClarity: GoalTone(
+      card: Color(0xFFE6F5F3),
+      circle: Color(0xFFAEE0DB),
+      icon: Color(0xFF22776E),
+    ),
     gold: Color(0xFFCA8A04),
     periwinkle: Color(0xFF4F6BD8),
     white: Color(0xFF1A1C1C),
@@ -575,6 +698,18 @@ abstract final class AppColors {
   static Color get categoryPurple => palette.categoryPurple;
   static Color get categoryBrown => palette.categoryBrown;
   static Color get categoryBurntOrange => palette.categoryBurntOrange;
+
+  // Goal-category tones.
+  static GoalTone get toneStudy => palette.toneStudy;
+  static GoalTone get toneFitness => palette.toneFitness;
+  static GoalTone get toneProductivity => palette.toneProductivity;
+  static GoalTone get toneFocus => palette.toneFocus;
+  static GoalTone get toneHabits => palette.toneHabits;
+  static GoalTone get toneMentalClarity => palette.toneMentalClarity;
+
+  /// Which palette is live — goal tones derived from a custom color need to
+  /// know which direction to build (pale card + deep glyph, or the reverse).
+  static bool get isLight => identical(palette, AppPalette.light);
   // One-off: community accents.
   static Color get gold => palette.gold;
   static Color get periwinkle => palette.periwinkle;
