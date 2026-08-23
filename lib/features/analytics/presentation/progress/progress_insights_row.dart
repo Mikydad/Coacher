@@ -84,9 +84,14 @@ class _CoachingFocusGlass extends StatelessWidget {
           );
         }
         final summary = summaryAsync.valueOrNull;
+        // Full summary, not `_firstSentence` (2026-08-23): this card is the
+        // only place the coach's daily summary is shown now that Home's
+        // focus card is gone, so a second sentence would exist nowhere.
+        // The streak card below still truncates — its source is a long
+        // generated insight, not prose written to be read whole.
         final headline =
             summary != null && summary.dailySummary.trim().isNotEmpty
-            ? _firstSentence(summary.dailySummary)
+            ? summary.dailySummary.trim()
             : 'Stay aligned with what matters today.';
         final body =
             summary != null && summary.mainRecommendation.trim().isNotEmpty
