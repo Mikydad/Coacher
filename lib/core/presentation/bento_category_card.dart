@@ -2,12 +2,68 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// Bento card palette for the category-first pickers (Add Task, New Goal).
+/// One card's three-part color recipe: a near-black tinted [surface], a
+/// muted [accent] that the glyph (and the selection comet) carries, and a
+/// dim [border] for the resting hairline / selection track.
+///
+/// The premium look depends on the surface staying almost black: saturated
+/// fills read as cheap against the app's black scaffold, so the color lives
+/// in the icon and the ring, never in the fill.
+class BentoTone {
+  const BentoTone({
+    required this.surface,
+    required this.accent,
+    required this.border,
+  });
+
+  final Color surface;
+  final Color accent;
+  final Color border;
+}
+
+/// Bento palette for the category-first pickers (Add Task, New Goal).
 /// Deliberately fixed raw colors (NOT AppColors tokens): per the design
-/// reference these bright cards look identical in dark and light themes —
-/// only the page background behind them adapts. [ink] is the dark text
-/// drawn on top of every card.
+/// reference these cards look identical in dark and light themes — only the
+/// page background behind them adapts.
+///
+/// Two families live here:
+/// - [BentoTone]s — the dark charcoal mosaic cards of the New Goal picker
+///   ([BentoCategoryCard]): black surface, colored icon, colored ring.
+/// - The bright flat colors below — the Add Task mini chips, which invert
+///   to [ink] on select and so need a saturated fill.
 abstract final class BentoPalette {
+  // Charcoal tones — warm/brown/green/purple/blue tinted blacks.
+  static const study = BentoTone(
+    surface: Color(0xFF2A2622),
+    accent: Color(0xFFF2D9A5),
+    border: Color(0xFFBFA77A),
+  );
+  static const fitness = BentoTone(
+    surface: Color(0xFF292521),
+    accent: Color(0xFFD99A68),
+    border: Color(0xFF5F4A3A),
+  );
+  static const learn = BentoTone(
+    surface: Color(0xFF242C29),
+    accent: Color(0xFF9ACFC2),
+    border: Color(0xFF465C55),
+  );
+  static const read = BentoTone(
+    surface: Color(0xFF252329),
+    accent: Color(0xFFA98BCE),
+    border: Color(0xFF554965),
+  );
+  static const focus = BentoTone(
+    surface: Color(0xFF20262C),
+    accent: Color(0xFF8FB8DD),
+    border: Color(0xFF45586B),
+  );
+
+  /// Text drawn on a charcoal card.
+  static const cardText = Color(0xFFF5F5F5);
+  static const cardTextMuted = Color(0xFFA8A8A8);
+
+  // Bright flat colors — Add Task mini chips only.
   static const yellow = Color(0xFFF6D14E);
   static const orange = Color(0xFFEF8D43);
   static const green = Color(0xFF92E3A9);
@@ -17,19 +73,19 @@ abstract final class BentoPalette {
   static const ink = Color(0xFF17191C);
 }
 
-/// One colored mosaic card: uppercase label top-left, a check chip top-right
-/// when selected, a hero glyph, one soft supporting line below. Sizes itself
-/// to whatever height its mosaic slot gives it — short slots drop the
-/// subtitle and shrink the glyph instead of overflowing.
+/// One charcoal mosaic card: uppercase label top-left, a check chip
+/// top-right when selected, a colored hero glyph, one soft supporting line
+/// below. Sizes itself to whatever height its mosaic slot gives it — short
+/// slots drop the subtitle and shrink the glyph instead of overflowing.
 ///
-/// Selection keeps the card's color untouched and draws an inner accent ring
-/// (inset from the edge) with a soft glow that gently pulses — lights and
-/// dims — plus a check chip centered on the right edge; [dimmed] softly
-/// recedes the non-chosen siblings.
+/// Resting state carries a hairline of the tone's border; selection lights
+/// that hairline up and sends an accent-colored comet around it, plus a
+/// check chip in the top-right corner. [dimmed] softly recedes the
+/// non-chosen siblings.
 class BentoCategoryCard extends StatefulWidget {
   const BentoCategoryCard({
     super.key,
-    required this.color,
+    required this.tone,
     required this.icon,
     required this.label,
     this.subtitle,
@@ -39,7 +95,7 @@ class BentoCategoryCard extends StatefulWidget {
     this.hero = false,
   });
 
-  final Color color;
+  final BentoTone tone;
   final IconData icon;
   final String label;
   final String? subtitle;
@@ -92,12 +148,18 @@ class _BentoCategoryCardState extends State<BentoCategoryCard>
 
   @override
   Widget build(BuildContext context) {
-    const fg = BentoPalette.ink;
+    final tone = widget.tone;
+    // Chip ground: the accent barely mixed into the surface, so each card's
+    // check sits in its own family instead of a foreign gray.
+    final chipBg = Color.alphaBlend(
+      tone.accent.withValues(alpha: 0.18),
+      tone.surface,
+    );
     return AnimatedOpacity(
       opacity: widget.dimmed ? 0.82 : 1,
       duration: const Duration(milliseconds: 200),
       child: Material(
-        color: widget.color,
+        color: tone.surface,
         borderRadius: BorderRadius.circular(24),
         child: InkWell(
           onTap: widget.onTap,
@@ -120,7 +182,7 @@ class _BentoCategoryCardState extends State<BentoCategoryCard>
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: fg,
+                            color: BentoPalette.cardText,
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 1.2,
@@ -129,7 +191,7 @@ class _BentoCategoryCardState extends State<BentoCategoryCard>
                         const Spacer(),
                         Icon(
                           widget.icon,
-                          color: fg,
+                          color: tone.accent,
                           size: widget.hero
                               ? 38
                               : compact
@@ -142,8 +204,8 @@ class _BentoCategoryCardState extends State<BentoCategoryCard>
                             widget.subtitle!,
                             maxLines: widget.hero ? 1 : 2,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: fg.withValues(alpha: 0.72),
+                            style: const TextStyle(
+                              color: BentoPalette.cardTextMuted,
                               fontSize: 11,
                               height: 1.3,
                               fontWeight: FontWeight.w600,
@@ -155,19 +217,38 @@ class _BentoCategoryCardState extends State<BentoCategoryCard>
                   );
                 },
               ),
+              // Resting hairline — just enough edge to separate the charcoal
+              // card from the black page without competing with selection.
+              if (!widget.selected)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: tone.border.withValues(alpha: 0.35),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               if (widget.selected) ...[
-                // Inner white ring with a comet sweep: a bright highlight
-                // (with fading tail) travels the border; the rest of the
-                // ring stays a dim steady white. Painter, not BoxShadow —
-                // the glow must hug the stroke, never haze the card face.
+                // Accent ring with a comet sweep: a bright highlight (with
+                // fading tail) travels the border; the rest of the ring
+                // stays a dim steady accent. Painter, not BoxShadow — the
+                // glow must hug the stroke, never haze the card face.
                 Positioned.fill(
                   child: IgnorePointer(
                     child: Padding(
-                      padding: const EdgeInsets.all(5),
+                      padding: const EdgeInsets.all(1),
                       child: AnimatedBuilder(
                         animation: _pulse,
                         builder: (context, _) => CustomPaint(
-                          painter: _CometRingPainter(t: _pulse.value),
+                          painter: _CometRingPainter(
+                            t: _pulse.value,
+                            track: tone.border,
+                            comet: tone.accent,
+                          ),
                         ),
                       ),
                     ),
@@ -178,12 +259,16 @@ class _BentoCategoryCardState extends State<BentoCategoryCard>
                   top: 12,
                   right: 12,
                   child: Container(
-                    padding: const EdgeInsets.all(5),
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: fg.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(10),
+                      color: chipBg,
+                      shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.check_rounded, size: 14, color: fg),
+                    child: const Icon(
+                      Icons.check_rounded,
+                      size: 15,
+                      color: BentoPalette.cardText,
+                    ),
                   ),
                 ),
               ],
@@ -195,36 +280,42 @@ class _BentoCategoryCardState extends State<BentoCategoryCard>
   }
 }
 
-/// White selection ring with a traveling comet: a dim steady base ring, and
-/// a bright highlight with a fading tail that laps the border once per [t]
-/// cycle (sweep-gradient stroke rotated by t). The comet also carries a
-/// blurred halo so the moving light glows along the stroke only.
+/// Accent selection ring with a traveling comet: a dim steady [track] ring,
+/// and a bright [comet] highlight with a fading tail that laps the border
+/// once per [t] cycle (sweep-gradient stroke rotated by t). The comet also
+/// carries a blurred halo so the moving light glows along the stroke only.
 class _CometRingPainter extends CustomPainter {
-  const _CometRingPainter({required this.t});
+  const _CometRingPainter({
+    required this.t,
+    required this.track,
+    required this.comet,
+  });
 
   /// Lap progress, 0..1 → one full trip around the border.
   final double t;
+  final Color track;
+  final Color comet;
 
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
-    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(19));
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(23));
 
     // Dim steady track.
     final base = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..color = Colors.white.withValues(alpha: 0.38);
+      ..strokeWidth = 1.5
+      ..color = track;
     canvas.drawRRect(rrect, base);
 
     // Comet: tail brightens toward the head, then cuts off.
-    final comet = SweepGradient(
+    final sweep = SweepGradient(
       colors: [
-        Colors.white.withValues(alpha: 0),
-        Colors.white.withValues(alpha: 0),
-        Colors.white.withValues(alpha: 0.55),
-        Colors.white,
-        Colors.white.withValues(alpha: 0),
+        comet.withValues(alpha: 0),
+        comet.withValues(alpha: 0),
+        comet.withValues(alpha: 0.45),
+        comet,
+        comet.withValues(alpha: 0),
       ],
       stops: const [0.0, 0.62, 0.86, 0.97, 0.98],
       transform: GradientRotation(2 * math.pi * t),
@@ -232,20 +323,23 @@ class _CometRingPainter extends CustomPainter {
 
     final halo = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 5
-      ..shader = comet
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+      ..strokeWidth = 4
+      ..shader = sweep
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
     canvas.drawRRect(rrect, halo);
 
     final head = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..shader = comet;
+      ..strokeWidth = 1.5
+      ..shader = sweep;
     canvas.drawRRect(rrect, head);
   }
 
   @override
-  bool shouldRepaint(_CometRingPainter oldDelegate) => oldDelegate.t != t;
+  bool shouldRepaint(_CometRingPainter oldDelegate) =>
+      oldDelegate.t != t ||
+      oldDelegate.track != track ||
+      oldDelegate.comet != comet;
 }
 
 /// The dark "pill" action button that sits under a bento mosaic (Custom

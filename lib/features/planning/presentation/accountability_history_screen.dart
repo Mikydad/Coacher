@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/presentation/page_headers.dart';
+import '../../../core/presentation/range_picker_theme.dart';
 import '../domain/models/accountability_log.dart';
 import '../domain/models/flow_transition_event.dart';
 
@@ -56,6 +57,7 @@ class _AccountabilityHistoryScreenState
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 1),
       initialDateRange: _range,
+      builder: sidePalRangePickerBuilder,
     );
     if (selected == null) return;
     setState(() => _range = selected);

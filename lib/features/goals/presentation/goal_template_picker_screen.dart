@@ -72,10 +72,10 @@ class _GoalTemplatePickerScreenState extends State<GoalTemplatePickerScreen> {
   Widget build(BuildContext context) {
     final byId = {for (final t in goalTemplates) t.id: t};
 
-    BentoCategoryCard card(String id, Color color, {bool hero = false}) {
+    BentoCategoryCard card(String id, BentoTone tone, {bool hero = false}) {
       final t = byId[id]!;
       return BentoCategoryCard(
-        color: color,
+        tone: tone,
         icon: _iconFor(id),
         label: t.label,
         subtitle: _subtitle(t),
@@ -112,17 +112,17 @@ class _GoalTemplatePickerScreenState extends State<GoalTemplatePickerScreen> {
                 children: [
                   Expanded(
                     flex: 6,
-                    child: card('study', BentoPalette.yellow, hero: true),
+                    child: card('study', BentoPalette.study, hero: true),
                   ),
                   const SizedBox(height: 12),
                   Expanded(
                     flex: 5,
                     child: Row(
                       children: [
-                        Expanded(child: card('fitness', BentoPalette.orange)),
+                        Expanded(child: card('fitness', BentoPalette.fitness)),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: card('learn_skill', BentoPalette.green),
+                          child: card('learn_skill', BentoPalette.learn),
                         ),
                       ],
                     ),
@@ -132,11 +132,9 @@ class _GoalTemplatePickerScreenState extends State<GoalTemplatePickerScreen> {
                     flex: 5,
                     child: Row(
                       children: [
-                        Expanded(
-                          child: card('read_books', BentoPalette.purple),
-                        ),
+                        Expanded(child: card('read_books', BentoPalette.read)),
                         const SizedBox(width: 12),
-                        Expanded(child: card('focus', BentoPalette.blue)),
+                        Expanded(child: card('focus', BentoPalette.focus)),
                       ],
                     ),
                   ),

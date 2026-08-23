@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/presentation/keyboard_dismiss.dart';
+import '../../../core/presentation/range_picker_theme.dart';
 import '../../../core/tier/tier_providers.dart';
 import '../../../core/tier/upgrade_prompt.dart';
 import '../../../core/runtime/mutation_request.dart';
@@ -450,38 +451,7 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
       lastDate: DateTime(2100),
       helpText: 'Goal duration',
       saveText: 'Set duration',
-      // The stock picker renders saveText as small flat app-bar text —
-      // easy to miss. Promote it to a real filled pill button and make the
-      // header help text legible (2026-08-23). The save action is the only
-      // TextButton inside the full-screen range picker, so overriding the
-      // TextButtonTheme styles exactly it — confirmButtonStyle alone is
-      // not honored by the full-screen variant.
-      builder: (ctx, child) {
-        final pillButton = TextButton.styleFrom(
-          backgroundColor: AppColors.accent,
-          foregroundColor: AppColors.onAccent,
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(999),
-          ),
-        );
-        return Theme(
-          data: Theme.of(ctx).copyWith(
-            textButtonTheme: TextButtonThemeData(style: pillButton),
-            datePickerTheme: DatePickerTheme.of(ctx).copyWith(
-              rangePickerHeaderHelpStyle: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6,
-                color: AppColors.textPrimary,
-              ),
-              confirmButtonStyle: pillButton,
-            ),
-          ),
-          child: child!,
-        );
-      },
+      builder: sidePalRangePickerBuilder,
     );
     if (picked != null) {
       setState(() {

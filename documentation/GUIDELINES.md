@@ -1654,3 +1654,41 @@ not silent reversal.
   shared `SettingRow`/`SettingRowChevron`
   (settings/presentation/setting_row.dart) — profile and sub-pages share
   one row implementation.
+
+- **2026-08-23 (round 4) · Goal picker cards went charcoal.** The New Goal
+  mosaic's five saturated bento fills (yellow/orange/green/purple/blue with
+  dark ink text) read as cheap against the black scaffold, so the cards
+  are now near-black tinted surfaces that let the icon and the ring carry
+  the color: `BentoTone {surface, accent, border}` in
+  `core/presentation/bento_category_card.dart` — Study #2A2622/#F2D9A5/
+  #BFA77A, Fitness #292521/#D99A68/#5F4A3A, Learn Skill #242C29/#9ACFC2/
+  #465C55, Read Books #252329/#A98BCE/#554965, Deep Work #20262C/#8FB8DD/
+  #45586B. Card text is fixed #F5F5F5 / #A8A8A8 (the surfaces are
+  theme-invariant, as the bright cards were). Resting cards carry a 35%
+  border hairline; selection lights the ring and runs the comet in the
+  tone's accent instead of white, and the check chip became a circle on
+  accent-over-surface. `BentoPalette`'s bright flat colors stay — the Add
+  Task mini chips invert to `ink` on select and still need a saturated
+  fill; they were deliberately left on the old palette.
+
+- **2026-08-23 (round 4) · Range-picker save action: why the header had to
+  move with it.** The lime pill from round 2 rendered with unreadable
+  lime-on-lime text. Cause, from `date_picker.dart`: the full-screen range
+  picker builds its save action as
+  `TextButton(style: TextButton.styleFrom(foregroundColor: headerForeground))`
+  — a WIDGET-level style, which always beats a `TextButtonTheme`, so the
+  label color is reachable only through
+  `DatePickerThemeData.rangePickerHeaderForegroundColor`. That same color
+  also paints the help text, the date headline, and the close icon, so it
+  can only change together with the header background. Settled on the
+  `accent`/`onAccent` pair (guaranteed contrast in both palettes): a lime
+  header band with black content in dark mode, deep olive with white in
+  light. The save action keeps a `white`-filled pill — `white` is the
+  contrast partner of `onAccent` in both palettes — so the forced label
+  color stays legible. Extracted as `sidePalRangePickerBuilder`
+  (`core/presentation/range_picker_theme.dart`) and applied to all three
+  range pickers (goal editor, stake create, accountability history).
+  `confirmButtonStyle` was dropped from the override: it is honored only by
+  the single-date `showDatePicker`, never the range variant. Pinned by
+  `test/core/presentation/range_picker_theme_test.dart`, which opens the
+  real picker and asserts the resolved label color.

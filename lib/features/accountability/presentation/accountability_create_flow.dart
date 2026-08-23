@@ -13,6 +13,7 @@ import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/keyboard_dismiss.dart';
 import '../../../core/presentation/page_headers.dart';
+import '../../../core/presentation/range_picker_theme.dart';
 import '../../../core/tier/tier_providers.dart';
 import '../../../core/tier/upgrade_prompt.dart';
 import '../../../core/utils/stable_id.dart';
@@ -895,6 +896,7 @@ class _AccountabilityCreateFlowState
       firstDate: today,
       lastDate: today.add(const Duration(days: 150)),
       initialDateRange: DateTimeRange(start: _rangeStart, end: _rangeEnd),
+      builder: sidePalRangePickerBuilder,
     );
     if (picked == null || !mounted) return;
     setState(() {
