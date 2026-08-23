@@ -19,10 +19,7 @@ void main() {
 
   group('toMap / fromMap round-trip', () {
     test('preserves all fields across serialize → deserialize', () {
-      final original = _pref(
-        displayName: 'Bob',
-        mode: EnforcementMode.extreme,
-      );
+      final original = _pref(displayName: 'Bob', mode: EnforcementMode.extreme);
       final restored = UserProfilePreference.fromMap(original.toMap());
 
       expect(restored.id, original.id);
@@ -42,10 +39,7 @@ void main() {
 
     test('round-trips empty display name', () {
       final p = _pref(displayName: '');
-      expect(
-        UserProfilePreference.fromMap(p.toMap()).displayName,
-        '',
-      );
+      expect(UserProfilePreference.fromMap(p.toMap()).displayName, '');
     });
   });
 
@@ -54,10 +48,7 @@ void main() {
   group('fromMap defaults for missing keys', () {
     test('missing id → kUserProfilePreferenceId', () {
       final m = _pref().toMap()..remove('id');
-      expect(
-        UserProfilePreference.fromMap(m).id,
-        kUserProfilePreferenceId,
-      );
+      expect(UserProfilePreference.fromMap(m).id, kUserProfilePreferenceId);
     });
 
     test('missing displayName → empty string', () {
@@ -87,7 +78,10 @@ void main() {
 
   group('copyWith', () {
     test('overrides only displayName', () {
-      final original = _pref(displayName: 'Alice', mode: EnforcementMode.flexible);
+      final original = _pref(
+        displayName: 'Alice',
+        mode: EnforcementMode.flexible,
+      );
       final copy = original.copyWith(displayName: 'Bob');
       expect(copy.displayName, 'Bob');
       expect(copy.defaultEnforcementMode, EnforcementMode.flexible);
@@ -110,7 +104,10 @@ void main() {
     });
 
     test('no-arg copyWith returns identical values', () {
-      final original = _pref(displayName: 'Alice', mode: EnforcementMode.extreme);
+      final original = _pref(
+        displayName: 'Alice',
+        mode: EnforcementMode.extreme,
+      );
       final copy = original.copyWith();
       expect(copy.displayName, original.displayName);
       expect(copy.defaultEnforcementMode, original.defaultEnforcementMode);

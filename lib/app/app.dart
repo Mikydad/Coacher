@@ -31,7 +31,11 @@ import '../features/feedback/presentation/tester_bug_bubble.dart';
 import '../features/memory/presentation/memory_knowledge_screen.dart';
 import '../features/profile/presentation/default_enforcement_mode_selection_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
+import '../features/settings/presentation/about_support_screen.dart';
 import '../features/settings/presentation/account_settings_screen.dart';
+import '../features/settings/presentation/coach_ai_settings_screen.dart';
+import '../features/settings/presentation/coaching_settings_screen.dart';
+import '../features/settings/presentation/smart_timing_settings_screen.dart';
 import '../features/settings/presentation/notification_settings_screen.dart';
 import '../features/settings/presentation/reminder_settings_screen.dart';
 import '../features/tasks_hub/presentation/task_detail_screen.dart';
@@ -183,6 +187,11 @@ class CoachForLifeApp extends ConsumerWidget {
           );
         },
         AccountSettingsScreen.routeName: (_) => const AccountSettingsScreen(),
+        CoachingSettingsScreen.routeName: (_) => const CoachingSettingsScreen(),
+        SmartTimingSettingsScreen.routeName: (_) =>
+            const SmartTimingSettingsScreen(),
+        CoachAiSettingsScreen.routeName: (_) => const CoachAiSettingsScreen(),
+        AboutSupportScreen.routeName: (_) => const AboutSupportScreen(),
         NotificationSettingsScreen.routeName: (_) =>
             const NotificationSettingsScreen(),
         ReminderSettingsScreen.routeName: (_) => const ReminderSettingsScreen(),

@@ -1634,3 +1634,23 @@ not silent reversal.
   when a new cycle starts") and the goal detail target line derives from
   repeatCadence/interval instead of horizon, which contradicted the
   editor for every-N-day goals.
+
+- **2026-08-23 (round 3) · Profile reorganized into a grouped hub.** The
+  Profile tab's flat "Core Optimization" list + inline selectors became a
+  hero + eight door rows: Progress, Coaching (subtitle = current mode ·
+  tone), Smart Timing, Coach & AI, Notifications & Reminders, Account &
+  Privacy, Appearance (bottom sheet), About & Support. Guest connect card
+  and Log Out stay on the hub. New pages under `/settings/*`:
+  `CoachingSettingsScreen` (Discipline Mode + Coach Tone collapsed to the
+  ACTIVE value, chevron expands the other options, selecting collapses —
+  radar-section pattern), `SmartTimingSettingsScreen` (calendar/motion/
+  head-out rows moved verbatim), `CoachAiSettingsScreen` (Coach AI sheet +
+  What SidePal knows), `AboutSupportScreen` (Send Feedback + version
+  footer with its 7-tap tester-mode toggle). NotificationSettingsScreen
+  became "Notifications & Reminders" (coach-insight prefs + sleep window/
+  attention modes on one page; ReminderSettingsScreen kept for deep
+  links). Appearance is a Dark/Light sheet (`showAppearanceSheet`)
+  replacing the blind row-tap toggle. `_SettingRow` was extracted to the
+  shared `SettingRow`/`SettingRowChevron`
+  (settings/presentation/setting_row.dart) — profile and sub-pages share
+  one row implementation.

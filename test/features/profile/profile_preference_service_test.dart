@@ -23,10 +23,7 @@ class _FakeRepo implements ProfilePreferenceRepository {
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
-ProfilePreferenceService _makeService(
-  _FakeRepo repo, {
-  DateTime? fixedNow,
-}) {
+ProfilePreferenceService _makeService(_FakeRepo repo, {DateTime? fixedNow}) {
   final nowFn = fixedNow != null ? () => fixedNow : DateTime.now;
   return ProfilePreferenceService(repository: repo, now: nowFn);
 }
@@ -90,22 +87,28 @@ void main() {
   group('setDefaultEnforcementMode', () {
     test('persists flexible mode', () async {
       final repo = _FakeRepo();
-      await _makeService(repo, fixedNow: fixedNow)
-          .setDefaultEnforcementMode(EnforcementMode.flexible);
+      await _makeService(
+        repo,
+        fixedNow: fixedNow,
+      ).setDefaultEnforcementMode(EnforcementMode.flexible);
       expect(repo._stored?.defaultEnforcementMode, EnforcementMode.flexible);
     });
 
     test('persists extreme mode', () async {
       final repo = _FakeRepo();
-      await _makeService(repo, fixedNow: fixedNow)
-          .setDefaultEnforcementMode(EnforcementMode.extreme);
+      await _makeService(
+        repo,
+        fixedNow: fixedNow,
+      ).setDefaultEnforcementMode(EnforcementMode.extreme);
       expect(repo._stored?.defaultEnforcementMode, EnforcementMode.extreme);
     });
 
     test('sets updatedAtMs to now', () async {
       final repo = _FakeRepo();
-      await _makeService(repo, fixedNow: fixedNow)
-          .setDefaultEnforcementMode(EnforcementMode.disciplined);
+      await _makeService(
+        repo,
+        fixedNow: fixedNow,
+      ).setDefaultEnforcementMode(EnforcementMode.disciplined);
       expect(repo._stored?.updatedAtMs, fixedMs);
     });
 
@@ -117,8 +120,10 @@ void main() {
         defaultEnforcementMode: EnforcementMode.disciplined,
         updatedAtMs: 0,
       );
-      await _makeService(repo, fixedNow: fixedNow)
-          .setDefaultEnforcementMode(EnforcementMode.flexible);
+      await _makeService(
+        repo,
+        fixedNow: fixedNow,
+      ).setDefaultEnforcementMode(EnforcementMode.flexible);
       expect(repo._stored?.displayName, 'Miko');
     });
   });

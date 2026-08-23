@@ -423,9 +423,9 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
           child: _ActionRow(
             title: 'Contact support',
             subtitle: 'Questions, problems, or reports — we answer',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const FeedbackScreen()),
-            ),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const FeedbackScreen())),
             isLast: true,
           ),
         ),

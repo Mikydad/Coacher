@@ -12,6 +12,8 @@ import 'package:sidepal/features/feedback/application/tester_mode_controller.dar
 import 'package:sidepal/features/profile/application/profile_providers.dart';
 import 'package:sidepal/features/profile/domain/models/user_profile_preference.dart';
 import 'package:sidepal/features/profile/presentation/profile_screen.dart';
+import 'package:sidepal/features/settings/presentation/about_support_screen.dart';
+import 'package:sidepal/features/settings/presentation/coaching_settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -77,6 +79,34 @@ Widget _buildScreen({
   );
 }
 
+Widget _buildCoachingScreen() {
+  return ProviderScope(
+    overrides: [
+      coachingProfileStreamProvider.overrideWith(
+        (ref) => Stream.value(_stubProfile),
+      ),
+      activeCoachingStyleProvider.overrideWithValue(CoachingStyle.balanced),
+      userProfilePreferenceStreamProvider.overrideWith(
+        (ref) => Stream.value(_stubPreference),
+      ),
+      defaultEnforcementModeProvider.overrideWithValue(
+        EnforcementMode.disciplined,
+      ),
+    ],
+    child: const MaterialApp(home: CoachingSettingsScreen()),
+  );
+}
+
+Widget _buildAboutScreen() {
+  return ProviderScope(
+    overrides: [
+      authUidProvider.overrideWithValue('test-uid'),
+      isRegisteredProvider.overrideWithValue(true),
+    ],
+    child: const MaterialApp(home: AboutSupportScreen()),
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 void main() {
@@ -94,23 +124,34 @@ void main() {
       expect(find.text('Miko'), findsOneWidget);
     });
 
-    testWidgets('falls back to "You" when display name is empty', (tester) async {
+    testWidgets('falls back to "You" when display name is empty', (
+      tester,
+    ) async {
       await tester.pumpWidget(_buildScreen(displayName: ''));
       await tester.pump();
       expect(find.text('You'), findsOneWidget);
     });
 
-    testWidgets('renders Discipline Modes section header', (tester) async {
+    testWidgets('renders the grouped settings hub', (tester) async {
       await tester.pumpWidget(_buildScreen());
       await tester.pump();
-      expect(find.text('DISCIPLINE MODES'), findsOneWidget);
+      expect(find.text('SETTINGS'), findsOneWidget);
+      expect(find.text('Progress'), findsOneWidget);
+      expect(find.text('Coaching'), findsOneWidget);
+      // The Coaching row summarizes the current mode and tone.
+      expect(
+        find.text(
+          '${EnforcementMode.disciplined.displayName} · '
+          '${CoachingStyle.balanced.displayName}',
+        ),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('shows the active coaching style in the hero badge',
-        (tester) async {
-      await tester.pumpWidget(
-        _buildScreen(style: CoachingStyle.supportive),
-      );
+    testWidgets('shows the active coaching style in the hero badge', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_buildScreen(style: CoachingStyle.supportive));
       await tester.pump();
       expect(
         find.text(CoachingStyle.supportive.displayName.toUpperCase()),
@@ -118,15 +159,27 @@ void main() {
       );
     });
 
-    testWidgets('shows all enforcement mode tiles', (tester) async {
-      await tester.pumpWidget(_buildScreen());
-      await tester.pump();
-      for (final mode in EnforcementMode.values) {
-        expect(find.text(mode.displayName), findsWidgets);
-      }
-      // The active mode carries the ACTIVE badge.
-      expect(find.text('ACTIVE'), findsOneWidget);
-    });
+    testWidgets(
+      'Coaching page collapses to the active mode and expands to the rest',
+      (tester) async {
+        await tester.pumpWidget(_buildCoachingScreen());
+        await tester.pumpAndSettle();
+        // Collapsed: only the active mode and active tone show.
+        expect(
+          find.text(EnforcementMode.disciplined.displayName),
+          findsOneWidget,
+        );
+        expect(find.text(EnforcementMode.extreme.displayName), findsNothing);
+        expect(find.text('ACTIVE'), findsNWidgets(2));
+
+        // Expand discipline: the other modes appear.
+        await tester.tap(find.text(EnforcementMode.disciplined.displayName));
+        await tester.pumpAndSettle();
+        for (final mode in EnforcementMode.values) {
+          expect(find.text(mode.displayName), findsOneWidget);
+        }
+      },
+    );
 
     testWidgets('renders streak card', (tester) async {
       await tester.pumpWidget(_buildScreen());
@@ -135,58 +188,52 @@ void main() {
       expect(find.text('12'), findsOneWidget);
     });
 
-    testWidgets('renders Coach Tone section with all styles', (tester) async {
-      await tester.pumpWidget(_buildScreen());
-      await tester.pump();
-      await tester.scrollUntilVisible(
-        find.text('COACH TONE'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      expect(find.text('COACH TONE'), findsOneWidget);
+    testWidgets('Coaching page shows the active tone collapsed', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_buildCoachingScreen());
+      await tester.pumpAndSettle();
+      expect(find.text(CoachingStyle.balanced.displayName), findsOneWidget);
+      expect(find.text(CoachingStyle.intense.displayName), findsNothing);
     });
 
-    testWidgets('shows Core Optimization settings rows', (tester) async {
+    testWidgets('shows the hub navigation rows', (tester) async {
       await tester.pumpWidget(_buildScreen());
       await tester.pump();
       await tester.scrollUntilVisible(
-        find.text('Account Settings'),
+        find.text('Account & Privacy'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text('Account Settings'), findsOneWidget);
-      expect(find.text('Notifications'), findsOneWidget);
-      expect(find.text('Reminder Settings'), findsOneWidget);
+      expect(find.text('Account & Privacy'), findsOneWidget);
+      expect(find.text('Notifications & Reminders'), findsOneWidget);
+      expect(find.text('Smart Timing'), findsOneWidget);
+      expect(find.text('Coach & AI'), findsOneWidget);
+      expect(find.text('Appearance'), findsOneWidget);
+      expect(find.text('About & Support'), findsOneWidget);
     });
 
-    testWidgets('shows the Send Feedback row', (tester) async {
-      await tester.pumpWidget(_buildScreen());
+    testWidgets('About & Support page shows the Send Feedback row', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_buildAboutScreen());
       await tester.pump();
-      await tester.scrollUntilVisible(
-        find.text('Send Feedback'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
       expect(find.text('Send Feedback'), findsOneWidget);
       expect(find.text('Report a bug or suggest an idea'), findsOneWidget);
     });
 
-    testWidgets('7 taps on the version footer toggle tester mode',
-        (tester) async {
+    testWidgets('7 taps on the version footer toggle tester mode', (
+      tester,
+    ) async {
       SharedPreferences.setMockInitialValues({});
-      await tester.pumpWidget(_buildScreen());
+      await tester.pumpWidget(_buildAboutScreen());
       await tester.pump();
       final footer = find.textContaining('SIDEPAL');
-      await tester.scrollUntilVisible(
-        footer,
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
       await tester.ensureVisible(footer);
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(
-        tester.element(find.byType(ProfileScreen)),
+        tester.element(find.byType(AboutSupportScreen)),
       );
       expect(container.read(testerModeProvider), isFalse);
 
@@ -232,8 +279,9 @@ void main() {
       expect(find.text('Cancel'), findsOneWidget);
     });
 
-    testWidgets('avatar initial uses first letter of display name',
-        (tester) async {
+    testWidgets('avatar initial uses first letter of display name', (
+      tester,
+    ) async {
       await tester.pumpWidget(_buildScreen(displayName: 'Alice'));
       await tester.pump();
       expect(find.text('A'), findsOneWidget);

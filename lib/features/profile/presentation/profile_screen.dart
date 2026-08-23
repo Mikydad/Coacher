@@ -1,19 +1,10 @@
-import '../../education/presentation/first_time_feature_card.dart';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/context/activity_signal.dart';
-import '../../../core/context/calendar_signal.dart';
-import '../../../core/context/context_providers.dart';
-import '../../../core/context/geofence_signal.dart';
-import '../../intentions/application/intentions_providers.dart';
-import '../../intentions/presentation/geofence_opt_in_flow.dart';
 import '../../../core/presentation/theme_brightness_controller.dart';
 import '../../../core/presentation/page_headers.dart';
-import '../../../core/runtime/recompute_scope.dart';
-import '../../../core/runtime/unified_recompute_graph.dart';
 
 import '../../../app/application/main_tab_navigation.dart';
 import '../../auth/application/auth_providers.dart';
@@ -22,19 +13,17 @@ import '../../auth/application/user_scoped_invalidation.dart';
 import '../../auth/presentation/widgets/connect_account_section.dart';
 import '../../../features/coaching/application/coaching_style_providers.dart';
 import '../../../features/coaching/domain/models/coaching_style.dart';
-import '../../../features/coaching/domain/models/enforcement_mode.dart';
 import '../../../features/context_override/application/context_override_providers.dart';
 import '../../analytics/presentation/analytics_progress_screen.dart';
-import '../../ai_assistant/presentation/ai_assistant_screen.dart';
-import '../../memory/presentation/memory_knowledge_screen.dart';
+import '../../settings/presentation/about_support_screen.dart';
 import '../../settings/presentation/account_settings_screen.dart';
+import '../../settings/presentation/appearance_sheet.dart';
+import '../../settings/presentation/coach_ai_settings_screen.dart';
+import '../../settings/presentation/coaching_settings_screen.dart';
 import '../../settings/presentation/notification_settings_screen.dart';
-import '../../settings/presentation/reminder_settings_screen.dart';
+import '../../settings/presentation/setting_row.dart';
+import '../../settings/presentation/smart_timing_settings_screen.dart';
 import '../../analytics/application/discipline_score.dart';
-import '../../feedback/application/feedback_context_collector.dart';
-import '../../feedback/application/tester_mode_controller.dart';
-import '../../education/presentation/help_dot.dart';
-import '../../feedback/presentation/feedback_screen.dart';
 import '../application/profile_providers.dart';
 
 import '../../../core/presentation/app_colors.dart';
@@ -43,9 +32,7 @@ import '../../../core/presentation/app_colors.dart';
 
 Color get _kPrimary => AppColors.limeCream;
 Color get _kPrimaryDim => AppColors.accentDim;
-Color get _kSecondary => AppColors.cyan;
 Color get _kSurface => AppColors.ink;
-Color get _kSurfaceLow => AppColors.inkDeep;
 Color get _kSurfaceHigh => AppColors.inkWarm;
 Color get _kSurfaceHighest => AppColors.inkElevated;
 Color get _kOnSurface => AppColors.white;
@@ -189,86 +176,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 32)),
 
-              // ── Discipline Modes ──────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _SectionLabel(
-                      label: 'Discipline Modes',
-                      helpId: 'disciplineModes',
-                    ),
-                    const SizedBox(height: 4),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Text(
-                        'How strict the app is overall. New tasks inherit '
-                        'this based on how important they are — you can '
-                        'still change it per task.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: _kOnSurfaceVariant.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              // ── Grouped hub (Profile reorg 2026-08-23): every knob lives
+              // on a focused sub-page; this list is just the doors in.
+              const SliverToBoxAdapter(child: _SectionLabel(label: 'Settings')),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const FirstTimeFeatureCard(guideId: 'disciplineModes'),
-                      _DisciplineModesSection(activeMode: defaultMode),
-                    ],
+                  child: _ProfileHubList(
+                    modeLabel: defaultMode.displayName,
+                    toneLabel: coachingStyle.displayName,
+                    quietLabel: quietLabel,
                   ),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
-
-              // ── Coach Tone ────────────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _SectionLabel(label: 'Coach Tone', helpId: 'coachTone'),
-                    const SizedBox(height: 4),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Text(
-                        'Adjust how your AI coach communicates with you.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: _kOnSurfaceVariant.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: _CoachToneSection(activeStyle: coachingStyle),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
-
-              // ── Core Optimization (settings) ──────────────────────────────
-              SliverToBoxAdapter(
-                child: _SectionLabel(
-                  label: 'Core Optimization',
-                  helpId: 'coreOptimization',
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: _CoreOptimizationSection(quietLabel: quietLabel),
                 ),
               ),
 
@@ -310,8 +228,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ),
 
-              // ── Version footer (7 taps toggles tester mode) ───────────────
-              const SliverToBoxAdapter(child: _VersionFooter()),
+              // Version footer + tester-mode taps moved to About & Support.
+              const SliverToBoxAdapter(child: SizedBox(height: 48)),
             ],
           ),
 
@@ -614,240 +532,17 @@ class _ProfileHero extends StatelessWidget {
   }
 }
 
-// ─── Discipline Modes section ─────────────────────────────────────────────────
+// ─── Grouped settings hub (Profile reorg 2026-08-23) ─────────────────────────
 
-class _DisciplineModesSection extends ConsumerWidget {
-  const _DisciplineModesSection({required this.activeMode});
-
-  final EnforcementMode activeMode;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Column(
-      children: EnforcementMode.values.map((mode) {
-        final isActive = mode == activeMode;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: _DisciplineTile(
-            mode: mode,
-            isActive: isActive,
-            onTap: () async {
-              final service = ref.read(profilePreferenceServiceProvider);
-              await service.setDefaultEnforcementMode(mode);
-            },
-          ),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _DisciplineTile extends StatelessWidget {
-  const _DisciplineTile({
-    required this.mode,
-    required this.isActive,
-    required this.onTap,
+class _ProfileHubList extends StatelessWidget {
+  const _ProfileHubList({
+    required this.modeLabel,
+    required this.toneLabel,
+    required this.quietLabel,
   });
 
-  final EnforcementMode mode;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    IconData icon;
-    Color iconColor;
-    switch (mode) {
-      case EnforcementMode.flexible:
-        icon = Icons.waves_rounded;
-        iconColor = _kSecondary;
-      case EnforcementMode.disciplined:
-        icon = Icons.bolt_rounded;
-        iconColor = isActive ? _kOnPrimaryFixed : _kPrimaryDim;
-      case EnforcementMode.extreme:
-        icon = Icons.shield_rounded;
-        iconColor = _kError;
-    }
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isActive
-              ? _kPrimaryContainer.withValues(alpha: 0.05)
-              : _kSurfaceLow,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isActive
-                ? _kPrimaryDim.withValues(alpha: 0.5)
-                : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isActive ? _kPrimaryDim : _kSurfaceHighest,
-              ),
-              child: Icon(icon, color: iconColor, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        mode.displayName,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: isActive ? _kPrimary : _kOnSurface,
-                        ),
-                      ),
-                      if (isActive) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _kPrimary,
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                          child: Text(
-                            'ACTIVE',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.onAccent,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    mode.description,
-                    style: TextStyle(fontSize: 12, color: _kOnSurfaceVariant),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Coach Tone section ───────────────────────────────────────────────────────
-
-class _CoachToneSection extends ConsumerWidget {
-  const _CoachToneSection({required this.activeStyle});
-
-  final CoachingStyle activeStyle;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-      childAspectRatio: 2.2,
-      children: CoachingStyle.values.map((style) {
-        final isActive = style == activeStyle;
-        return GestureDetector(
-          onTap: () async {
-            final service = ref.read(coachingStyleServiceProvider);
-            await service.setStyle(style);
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: isActive
-                  ? _kPrimaryContainer.withValues(alpha: 0.08)
-                  : _kSurfaceLow,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isActive
-                    ? _kPrimaryDim.withValues(alpha: 0.4)
-                    : Colors.transparent,
-                width: 2,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  style.displayName,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: _styleTextColor(style, isActive),
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  _styleCopy(style),
-                  style: TextStyle(fontSize: 10, color: _kOnSurfaceVariant),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Color _styleTextColor(CoachingStyle style, bool isActive) {
-    if (isActive) return _kPrimary;
-    switch (style) {
-      case CoachingStyle.supportive:
-        return _kSecondary;
-      case CoachingStyle.balanced:
-        return _kOnSurface;
-      case CoachingStyle.disciplined:
-        return _kOnSurface;
-      case CoachingStyle.intense:
-        return _kError;
-    }
-  }
-
-  String _styleCopy(CoachingStyle style) {
-    switch (style) {
-      case CoachingStyle.supportive:
-        return 'Encouraging and light';
-      case CoachingStyle.balanced:
-        return 'Empathetic and steady';
-      case CoachingStyle.disciplined:
-        return 'Direct and focused';
-      case CoachingStyle.intense:
-        return 'Radical honesty only';
-    }
-  }
-}
-
-// ─── Core Optimization (settings list) ───────────────────────────────────────
-
-class _CoreOptimizationSection extends StatelessWidget {
-  const _CoreOptimizationSection({required this.quietLabel});
-
+  final String modeLabel;
+  final String toneLabel;
   final String quietLabel;
 
   @override
@@ -856,75 +551,70 @@ class _CoreOptimizationSection extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: Column(
         children: [
-          _SettingRow(
-            icon: Icons.auto_awesome_rounded,
-            title: 'Coach AI',
-            subtitle: 'Your coach, from anywhere',
-            trailing: Icon(
-              Icons.chevron_right_rounded,
-              color: _kOnSurfaceVariant,
-              size: 20,
-            ),
-            onTap: () => showCoachAiSheet(context),
-          ),
-          _SettingRow(
-            icon: Icons.psychology_outlined,
-            title: 'What SidePal knows',
-            subtitle: 'Remembered facts, people & summaries',
-            trailing: Icon(
-              Icons.chevron_right_rounded,
-              color: _kOnSurfaceVariant,
-              size: 20,
-            ),
-            onTap: () =>
-                Navigator.pushNamed(context, MemoryKnowledgeScreen.routeName),
-          ),
-          const _CalendarSignalRow(),
-          const _ActivitySignalRow(),
-          const _GeofenceSignalRow(),
-          _SettingRow(
+          SettingRow(
             icon: Icons.leaderboard_rounded,
             title: 'Progress',
             subtitle: 'Score trends, streaks & analytics',
-            trailing: Icon(
-              Icons.chevron_right_rounded,
-              color: _kOnSurfaceVariant,
-              size: 20,
-            ),
+            trailing: const SettingRowChevron(),
             onTap: () =>
                 Navigator.pushNamed(context, AnalyticsProgressScreen.routeName),
           ),
-          _SettingRow(
-            icon: Icons.account_circle_outlined,
-            title: 'Account Settings',
-            subtitle: 'Security, Privacy & Data',
-            trailing: Icon(
-              Icons.chevron_right_rounded,
-              color: _kOnSurfaceVariant,
-              size: 20,
-            ),
+          SettingRow(
+            icon: Icons.bolt_rounded,
+            title: 'Coaching',
+            subtitle: '$modeLabel · $toneLabel',
+            trailing: const SettingRowChevron(),
             onTap: () =>
-                Navigator.pushNamed(context, AccountSettingsScreen.routeName),
+                Navigator.pushNamed(context, CoachingSettingsScreen.routeName),
           ),
-          _SettingRow(
+          SettingRow(
+            icon: Icons.schedule_rounded,
+            title: 'Smart Timing',
+            subtitle: 'Calendar, motion & head-out nudges',
+            trailing: const SettingRowChevron(),
+            onTap: () => Navigator.pushNamed(
+              context,
+              SmartTimingSettingsScreen.routeName,
+            ),
+          ),
+          SettingRow(
+            icon: Icons.auto_awesome_rounded,
+            title: 'Coach & AI',
+            subtitle: 'Coach AI & what SidePal knows',
+            trailing: const SettingRowChevron(),
+            onTap: () =>
+                Navigator.pushNamed(context, CoachAiSettingsScreen.routeName),
+          ),
+          SettingRow(
             icon: Icons.notifications_active_outlined,
-            title: 'Notifications',
-            subtitle: 'Coaching insights & push alerts',
-            trailing: Icon(
-              Icons.chevron_right_rounded,
-              color: _kOnSurfaceVariant,
-              size: 20,
+            title: 'Notifications & Reminders',
+            subtitle: 'Coaching insights, sleep window & modes',
+            trailing: Text(
+              quietLabel,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: _kPrimary,
+              ),
             ),
             onTap: () => Navigator.pushNamed(
               context,
               NotificationSettingsScreen.routeName,
             ),
           ),
+          SettingRow(
+            icon: Icons.account_circle_outlined,
+            title: 'Account & Privacy',
+            subtitle: 'Connected account, security & data',
+            trailing: const SettingRowChevron(),
+            onTap: () =>
+                Navigator.pushNamed(context, AccountSettingsScreen.routeName),
+          ),
           Consumer(
             builder: (context, ref, _) {
               final isDark =
                   ref.watch(themeBrightnessProvider) == Brightness.dark;
-              return _SettingRow(
+              return SettingRow(
                 icon: isDark
                     ? Icons.dark_mode_outlined
                     : Icons.light_mode_outlined,
@@ -939,231 +629,19 @@ class _CoreOptimizationSection extends StatelessWidget {
                     color: _kPrimary,
                   ),
                 ),
-                onTap: () =>
-                    ref.read(themeBrightnessProvider.notifier).toggle(),
+                onTap: () => showAppearanceSheet(context),
               );
             },
           ),
-          _SettingRow(
-            icon: Icons.alarm_on_rounded,
-            title: 'Reminder Settings',
-            subtitle: 'Sleep window & attention modes',
-            trailing: Text(
-              quietLabel,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: _kPrimary,
-              ),
-            ),
+          SettingRow(
+            icon: Icons.info_outline_rounded,
+            title: 'About & Support',
+            subtitle: 'Feedback, version & tester mode',
+            trailing: const SettingRowChevron(),
             onTap: () =>
-                Navigator.pushNamed(context, ReminderSettingsScreen.routeName),
-          ),
-          _SettingRow(
-            icon: Icons.feedback_outlined,
-            title: 'Send Feedback',
-            subtitle: 'Report a bug or suggest an idea',
-            trailing: Icon(
-              Icons.chevron_right_rounded,
-              color: _kOnSurfaceVariant,
-              size: 20,
-            ),
-            onTap: () => Navigator.pushNamed(context, FeedbackScreen.routeName),
-            isLast: true,
+                Navigator.pushNamed(context, AboutSupportScreen.routeName),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Calendar-aware timing toggle (humanizing Phase 4b): the persistent
-/// switch behind the one-time ask card. On → OS grant is requested if
-/// needed; the signal stays ephemeral (busy intervals only, never stored).
-/// Off → remembered decline, the ask card never returns.
-class _CalendarSignalRow extends ConsumerWidget {
-  const _CalendarSignalRow();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final choice = ref.watch(calendarSignalChoiceProvider).valueOrNull;
-    final enabled = choice == CalendarSignalChoice.enabled;
-    return _SettingRow(
-      icon: Icons.calendar_month_rounded,
-      title: 'Calendar-aware timing',
-      subtitle: 'Plan promises around your real meetings — read-only',
-      trailing: Switch.adaptive(
-        value: enabled,
-        onChanged: (v) => _toggle(context, ref, v),
-      ),
-      onTap: () => _toggle(context, ref, !enabled),
-    );
-  }
-
-  Future<void> _toggle(BuildContext context, WidgetRef ref, bool on) async {
-    final service = ref.read(calendarSignalServiceProvider);
-    if (on) {
-      final granted = await service.enable();
-      if (granted) {
-        UnifiedRecomputeGraph.instance.schedule(
-          RecomputeScope.forReminderChange(),
-        );
-      } else if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Calendar access is off at the system level — allow it in '
-              'iOS Settings > SidePal, then try again.',
-            ),
-          ),
-        );
-      }
-    } else {
-      await service.decline();
-    }
-    ref.invalidate(calendarSignalChoiceProvider);
-  }
-}
-
-/// Motion-aware timing toggle (humanizing Phase 6a): the persistent
-/// switch behind the one-time ask card. On → OS grant is requested if
-/// needed (the first Core Motion query IS the prompt); readings stay
-/// decision-time snapshots, never stored. Off → remembered decline.
-class _ActivitySignalRow extends ConsumerWidget {
-  const _ActivitySignalRow();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final choice = ref.watch(activitySignalChoiceProvider).valueOrNull;
-    final enabled = choice == ActivitySignalChoice.enabled;
-    return _SettingRow(
-      icon: Icons.directions_walk_rounded,
-      title: 'Motion-aware timing',
-      subtitle: "Suggest calls when you're walking — checked in the moment",
-      trailing: Switch.adaptive(
-        value: enabled,
-        onChanged: (v) => _toggle(context, ref, v),
-      ),
-      onTap: () => _toggle(context, ref, !enabled),
-    );
-  }
-
-  Future<void> _toggle(BuildContext context, WidgetRef ref, bool on) async {
-    final service = ref.read(activitySignalServiceProvider);
-    if (on) {
-      final granted = await service.enable();
-      if (!granted && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Motion access is off at the system level — allow it in '
-              'iOS Settings > SidePal > Motion & Fitness, then try again.',
-            ),
-          ),
-        );
-      }
-    } else {
-      await service.decline();
-    }
-    ref.invalidate(activitySignalChoiceProvider);
-  }
-}
-
-/// Head-out nudges toggle (humanizing Phase 6b): the persistent switch
-/// behind the per-intention capture ask. On → runs the enable + explicit
-/// set-home ladder (one home area, device-local, exit-only). Off →
-/// remembered decline; the native region and armed list are cleared —
-/// off means off. Tapping the row when enabled re-opens home setup, so
-/// a "Later" at capture time or a move can be fixed here.
-class _GeofenceSignalRow extends ConsumerWidget {
-  const _GeofenceSignalRow();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(geofenceStateProvider).valueOrNull;
-    final enabled = state?.choice == GeofenceSignalChoice.enabled;
-    final subtitle = enabled && state?.hasHome != true
-        ? 'Home not set yet — tap to set it while you\u2019re there'
-        : 'Nudge chosen promises when you leave home — one area, '
-              'on-device only';
-    return _SettingRow(
-      icon: Icons.near_me_outlined,
-      title: 'Head-out nudges',
-      subtitle: subtitle,
-      trailing: Switch.adaptive(
-        value: enabled,
-        onChanged: (v) => _toggle(context, ref, v),
-      ),
-      onTap: () => _toggle(context, ref, !enabled || state?.hasHome != true),
-    );
-  }
-
-  Future<void> _toggle(BuildContext context, WidgetRef ref, bool on) async {
-    if (on) {
-      await ensureGeofenceReady(context, ref);
-    } else {
-      await ref.read(geofenceArmingServiceProvider).decline();
-    }
-    ref.invalidate(geofenceStateProvider);
-  }
-}
-
-class _SettingRow extends StatelessWidget {
-  const _SettingRow({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.trailing,
-    required this.onTap,
-    this.isLast = false,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Widget trailing;
-  final VoidCallback onTap;
-  final bool isLast;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: _kSurfaceLow,
-      child: InkWell(
-        onTap: onTap,
-        highlightColor: _kPrimary.withValues(alpha: 0.05),
-        splashColor: _kPrimary.withValues(alpha: 0.08),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Row(
-            children: [
-              Icon(icon, color: _kOnSurfaceVariant, size: 22),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: _kOnSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      subtitle,
-                      style: TextStyle(fontSize: 11, color: _kOnSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              trailing,
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1212,33 +690,22 @@ class _LogOutButton extends StatelessWidget {
 // ─── Shared section label ─────────────────────────────────────────────────────
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.label, this.helpId});
+  const _SectionLabel({required this.label});
   final String label;
-
-  /// Feature-guide id — renders a `?` that opens the help sheet.
-  final String? helpId;
 
   @override
   Widget build(BuildContext context) {
-    final text = Text(
-      label.toUpperCase(),
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 2,
-        color: _kOnSurfaceVariant,
-      ),
-    );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: helpId == null
-          ? text
-          : Row(
-              children: [
-                Flexible(child: text),
-                HelpDot(helpId!),
-              ],
-            ),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 2,
+          color: _kOnSurfaceVariant,
+        ),
+      ),
     );
   }
 }
@@ -1461,78 +928,6 @@ class _ObsidianDialog extends StatelessWidget {
               ],
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Version footer + tester-mode toggle ─────────────────────────────────────
-
-/// Shows the real app version and hides the tester-mode switch: 7 quick taps
-/// flip the floating bug-report bubble on/off for this device.
-class _VersionFooter extends ConsumerStatefulWidget {
-  const _VersionFooter();
-
-  @override
-  ConsumerState<_VersionFooter> createState() => _VersionFooterState();
-}
-
-class _VersionFooterState extends ConsumerState<_VersionFooter> {
-  final SevenTapDetector _taps = SevenTapDetector();
-
-  Future<void> _onTap() async {
-    final remaining = _taps.registerTap(DateTime.now());
-    final messenger = ScaffoldMessenger.of(context);
-    if (remaining == 0) {
-      final outcome = await ref.read(testerModeProvider.notifier).toggle();
-      if (!mounted) return;
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(switch (outcome) {
-            TesterToggleOutcome.enabled =>
-              'Tester mode enabled — bug bubble is on',
-            TesterToggleOutcome.disabled => 'Tester mode disabled',
-            TesterToggleOutcome.accountRequired =>
-              'Sign in with an account to use tester mode',
-          }),
-        ),
-      );
-    } else if (remaining <= 3) {
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 1),
-          content: Text(
-            '$remaining more tap${remaining == 1 ? '' : 's'} to toggle '
-            'tester mode',
-          ),
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final info = ref.watch(packageInfoProvider).valueOrNull;
-    final label = info == null
-        ? 'SIDEPAL'
-        : 'SIDEPAL V${info.version} BUILD ${info.buildNumber}';
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: _onTap,
-      child: Padding(
-        padding: const EdgeInsets.only(top: 24, bottom: 40),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 2.5,
-            color: _kOnSurfaceVariant.withValues(alpha: 0.4),
-          ),
         ),
       ),
     );
