@@ -92,10 +92,16 @@ service firebase.storage {
 
     // Feedback screenshots — uid-scoped, create-only, images only, 5MB cap.
     // Tester captures are PNG; gallery attachments from the feedback form
-    // are JPEG/HEIC. No client read: reports are reviewed in the Firebase
-    // console. Path is written by FeedbackScreenshotStorage.
+    // are JPEG/HEIC. Read is owner-only — enough for getDownloadURL(), and
+    // no tester can browse another's captures. Reports are reviewed in the
+    // Firebase console. Path is written by FeedbackScreenshotStorage.
     match /feedback/{uid}/{fileName} {
-      allow read: if false;
+      // MUST allow the uploader to read: getDownloadURL() is a READ, so
+      // `read: if false` let putData succeed and then threw
+      // [firebase_storage/unauthorized] on the URL fetch — the report
+      // silently degraded to text-only and screenshotUrl never reached
+      // Firestore. Only the owner; other users still get nothing.
+      allow read: if isSignedIn() && request.auth.uid == uid;
       allow create: if isSignedIn()
         && request.auth.uid == uid
         && fileName.matches(request.auth.uid + '_.*')

@@ -29,8 +29,14 @@ family/friend phone right after installing.
 - Firestore: top-level **`feedback/{feedbackId}`** collection
   (`userId`, `type`, `message`, `context` map, optional `screenshotUrl`,
   `status: 'new'`, `createdAtMs`, `schemaVersion`).
-- Screenshots: Storage at **`feedback/{uid}/{uid}_{reportId}.png`**.
-- **Review in the Firebase console** (Firestore → Data → `feedback`).
+- Screenshots: Storage at **`feedback/{uid}/{uid}_{reportId}.{ext}`** (`png`
+  for tester captures, `jpg`/`heic` for gallery picks). Storage read is
+  **owner-only** — required, because `getDownloadURL()` is a read and the
+  original `read: if false` silently broke every URL (see decision log
+  2026-08-23).
+- **Review in the Firebase console** (Firestore → Data → `feedback`). The
+  `screenshotUrl` field on the doc is the clickable image — no need to hunt
+  through the Storage browser.
   Clients cannot read/update/delete — create-only. If volume ever justifies
   it, the planned upgrade is an admin-only inbox screen inside the app gated
   to the owner uid.
@@ -52,7 +58,10 @@ because a plugin does.
   if they drift. Change both together.
 - **Screenshot uploads happen BEFORE the Firestore create** — rules are
   create-only, so there is no second chance to attach the URL. Upload failure
-  degrades to a text-only report with `context.screenshotUploadFailed='true'`.
+  degrades to a text-only report with `context.screenshotUploadFailed='true'`
+  plus `context.screenshotUploadError` carrying the plugin's error code
+  (`unauthorized` = rules rejection, `retry-limit-exceeded` = bad connection).
+  Grep those two keys first when screenshots go missing.
 - **Offline**: a failed Firestore write is queued via
   `SyncService.enqueueUpsert` (entityType `feedbackReport`) and replays on
   reconnect. Screenshot bytes are never queued (JSON-only queue).

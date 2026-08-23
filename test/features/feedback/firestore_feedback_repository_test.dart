@@ -4,6 +4,7 @@ import 'package:sidepal/core/sync/sync_service.dart';
 import 'package:sidepal/features/feedback/data/firestore_feedback_repository.dart';
 import 'package:sidepal/features/feedback/domain/models/feedback_report.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 FeedbackReport _report() => FeedbackReport(
@@ -91,11 +92,29 @@ void main() {
 
     final data = (await fs.doc('feedback/feedback_1').get()).data()!;
     expect(data.containsKey('screenshotUrl'), isFalse);
-    expect(
-      (data['context'] as Map)['screenshotUploadFailed'],
-      'true',
-    );
+    expect((data['context'] as Map)['screenshotUploadFailed'], 'true');
   });
+
+  test(
+    'records the plugin error code so a rules rejection is triageable',
+    () async {
+      // Regression: `read: if false` on the Storage path made getDownloadURL
+      // throw [firebase_storage/unauthorized] AFTER a successful putData, and
+      // a bare 'true' flag hid that for a month.
+      final r = repo(
+        uploader: (_, _, _, {contentType = 'image/png'}) async =>
+            throw FirebaseException(
+              plugin: 'firebase_storage',
+              code: 'unauthorized',
+            ),
+      );
+
+      await r.submit(_report(), screenshotBytes: Uint8List.fromList([1]));
+
+      final data = (await fs.doc('feedback/feedback_1').get()).data()!;
+      expect((data['context'] as Map)['screenshotUploadError'], 'unauthorized');
+    },
+  );
 
   test('queues the payload for offline replay when the write fails', () async {
     await repo(failingWriter: true).submit(_report());

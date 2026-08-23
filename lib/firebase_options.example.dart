@@ -26,6 +26,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: 'REPLACE_WITH_FIREBASE_MESSAGING_SENDER_ID',
     projectId: 'REPLACE_WITH_FIREBASE_PROJECT_ID',
     storageBucket: 'REPLACE_WITH_FIREBASE_STORAGE_BUCKET',
-    iosBundleId: 'com.example.coachForLife',
+    iosBundleId: 'io.sidepal.app',
   );
 }

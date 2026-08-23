@@ -1758,3 +1758,45 @@ not silent reversal.
   failure. Monday anchor matches `GoalPeriodHelpers`. Profile order:
   hero+streak → Progress → Discipline Mode → Coach Tone → SETTINGS →
   guest connect → Log Out.
+
+- **2026-08-23 · Feedback screenshots are owner-readable in Storage, because
+  `getDownloadURL()` is a read.** The `/feedback/{uid}/{fileName}` rule shipped
+  with `allow read: if false` (2026-07-09), reasoning that reports are triaged
+  in the Firebase console so no client ever needs to read them. That was wrong
+  about the mechanics: `putData` succeeded, then `getDownloadURL()` — a READ —
+  was rejected with `[firebase_storage/unauthorized]`, the repository's
+  `catch` degraded the report to text-only, and `screenshotUrl` never reached
+  Firestore. Every screenshot since the pipeline shipped landed in the bucket
+  orphaned, with no doc pointing at it. Now `allow read: if isSignedIn() &&
+  request.auth.uid == uid` — the narrowest grant that lets the uploader fetch
+  its own URL; no tester can browse another's captures. Alternatives: a Cloud
+  Function minting the URL server-side (rejected — a function, a cold start and
+  a failure mode to buy back what one rule line gives); or storing the raw
+  `gs://` path instead of a download URL (rejected — not clickable in the
+  console, which is the whole point of the field). Companion change: the
+  degrade path now also stamps `context.screenshotUploadError` with the
+  plugin's error code, since a bare `screenshotUploadFailed: 'true'` is what
+  let this hide for a month.
+
+- **2026-08-23 · The iOS binary is the `sidepal` Firebase app — and
+  `firebase_options.dart`, not the plist, is what decides.**
+  `AppDelegate.swift` has no `FirebaseApp.configure()`; Firebase boots from
+  Dart via `DefaultFirebaseOptions.currentPlatform`
+  (`lib/core/firebase/firebase_initializer.dart`). The 2026-07-22 rebrand
+  registered a new `sidepal` iOS app (`…ios:a52900e663250d169553fe`,
+  `io.sidepal.app`) and updated `ios/Runner/GoogleService-Info.plist`, but
+  left `firebase_options.dart` on the legacy `Coacher` app
+  (`…ios:a09bd6e079e5b33e9553fe`, `com.example.coachForLife`) — so every
+  build since kept registering, and landing FCM/APNs tokens, under Coacher
+  with a placeholder bundle id. Now reconciled: `firebase_options.dart`
+  mirrors the plist exactly (appId, bundle id, iOS client id); the stale
+  root-level `GoogleService-Info.plist` (an untracked Coacher copy referenced
+  by nothing) was removed; `firebase_options.example.dart` templates the
+  sidepal bundle id. Alternatives: `flutterfire configure` regeneration
+  (rejected this round — interactive + network-bound on a slow connection,
+  and the plist already carries the authoritative values); deleting the
+  Coacher registration in the console (deferred — irreversible, and any
+  older TestFlight build still on Coacher would lose its backend).
+  Follow-ups that live in the console, not the repo: the APNs auth key must
+  be attached to the `sidepal` app before the next release, and deviceTokens
+  docs minted under Coacher will go stale and re-mint on next app-open.

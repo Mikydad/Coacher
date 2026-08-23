@@ -17,6 +17,15 @@ typedef ScreenshotUploader =
 typedef FeedbackDocWriter =
     Future<void> Function(String path, Map<String, dynamic> payload);
 
+/// Short, bounded reason for a failed screenshot upload — the plugin code
+/// (`unauthorized`, `retry-limit-exceeded`, …) when there is one, so triage
+/// can tell a rules rejection from a dropped connection.
+String _describeUploadError(Object error) {
+  final code = error is FirebaseException ? error.code : null;
+  final text = code ?? error.runtimeType.toString();
+  return text.length <= 60 ? text : text.substring(0, 60);
+}
+
 /// Writes feedback reports to the top-level `feedback` Firestore collection.
 ///
 /// Firestore rules only allow *creates* on `feedback/{id}`, so the screenshot
@@ -54,11 +63,17 @@ class FirestoreFeedbackRepository implements FeedbackRepository {
           contentType: screenshotContentType,
         );
         effective = report.copyWith(screenshotUrl: url);
-      } catch (_) {
+      } catch (e) {
         // Screenshot bytes are never queued for replay (the offline queue
         // carries Firestore JSON only) — degrade to a text-only report.
+        // Record WHY too: a bare 'true' flag hid a storage-rules
+        // misconfiguration (getDownloadURL denied) for a month.
         effective = report.copyWith(
-          context: {...report.context, 'screenshotUploadFailed': 'true'},
+          context: {
+            ...report.context,
+            'screenshotUploadFailed': 'true',
+            'screenshotUploadError': _describeUploadError(e),
+          },
         );
       }
     }
