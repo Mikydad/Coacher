@@ -13,17 +13,18 @@ import '../../auth/application/user_scoped_invalidation.dart';
 import '../../auth/presentation/widgets/connect_account_section.dart';
 import '../../../features/coaching/application/coaching_style_providers.dart';
 import '../../../features/coaching/domain/models/coaching_style.dart';
+import '../../../features/coaching/presentation/widgets/coaching_preference_sections.dart';
 import '../../../features/context_override/application/context_override_providers.dart';
 import '../../analytics/presentation/analytics_progress_screen.dart';
 import '../../settings/presentation/about_support_screen.dart';
 import '../../settings/presentation/account_settings_screen.dart';
 import '../../settings/presentation/appearance_sheet.dart';
 import '../../settings/presentation/coach_ai_settings_screen.dart';
-import '../../settings/presentation/coaching_settings_screen.dart';
 import '../../settings/presentation/notification_settings_screen.dart';
 import '../../settings/presentation/setting_row.dart';
 import '../../settings/presentation/smart_timing_settings_screen.dart';
 import '../../analytics/application/discipline_score.dart';
+import '../application/profile_hero_stats.dart';
 import '../application/profile_providers.dart';
 
 import '../../../core/presentation/app_colors.dart';
@@ -127,9 +128,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final displayName = ref.watch(displayNameProvider);
     final coachingStyle = ref.watch(activeCoachingStyleProvider);
-    final defaultMode = ref.watch(defaultEnforcementModeProvider);
     final attentionAsync = ref.watch(attentionStateProvider);
     final streakDays = ref.watch(homeDisplayStreakDaysProvider);
+    final heroStats = ref.watch(profileHeroStatsProvider);
 
     if (!_editingName && _nameController.text != displayName) {
       _nameController.text = displayName;
@@ -168,9 +169,54 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     nameController: _nameController,
                     coachingStyle: coachingStyle,
                     streakCount: streakDays,
+                    tasksLabel: heroStats.tasksLabel,
+                    goalsLabel: heroStats.goalsLabel,
                     onEditTap: () => setState(() => _editingName = true),
                     onSaveName: _saveName,
                   ),
+                ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
+              // ── Progress (2026-08-23): sits directly under the streak
+              // card so checking progress is the first thing available,
+              // not a row buried in the settings list.
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: SettingRow(
+                      icon: Icons.leaderboard_rounded,
+                      title: 'Progress',
+                      subtitle: 'Score trends, streaks & analytics',
+                      trailing: const SettingRowChevron(),
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        AnalyticsProgressScreen.routeName,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 28)),
+
+              // ── Discipline Mode + Coach Tone (2026-08-23): the two knobs
+              // reached for most often sit out in the open, above the
+              // settings doors — each collapsed to its active value.
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: DisciplineModeSection(),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 18)),
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: CoachToneSection(),
                 ),
               ),
 
@@ -182,11 +228,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: _ProfileHubList(
-                    modeLabel: defaultMode.displayName,
-                    toneLabel: coachingStyle.displayName,
-                    quietLabel: quietLabel,
-                  ),
+                  child: _ProfileHubList(quietLabel: quietLabel),
                 ),
               ),
 
@@ -282,6 +324,8 @@ class _ProfileHero extends StatelessWidget {
     required this.nameController,
     required this.coachingStyle,
     required this.streakCount,
+    required this.tasksLabel,
+    required this.goalsLabel,
     required this.onEditTap,
     required this.onSaveName,
   });
@@ -292,6 +336,10 @@ class _ProfileHero extends StatelessWidget {
   final TextEditingController nameController;
   final CoachingStyle coachingStyle;
   final int streakCount;
+
+  /// Preformatted so the card stays a dumb view: "3/5" or an em dash.
+  final String tasksLabel;
+  final String goalsLabel;
   final VoidCallback onEditTap;
   final VoidCallback onSaveName;
 
@@ -504,27 +552,90 @@ class _ProfileHero extends StatelessWidget {
                 size: 28,
               ),
               const SizedBox(height: 10),
-              Text(
-                streakCount.toString(),
-                style: TextStyle(
-                  fontSize: 42,
-                  fontWeight: FontWeight.w800,
-                  color: _kOnPrimaryContainer,
-                  height: 1,
-                  letterSpacing: -1,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'DAY STREAK',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 2,
-                  color: _kOnPrimaryContainer,
-                ),
+              // Streak stays the hero; today's tasks and this week's goals
+              // sit beside it so progress is readable without a tap
+              // (2026-08-23).
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: _HeroStat(
+                      value: streakCount.toString(),
+                      label: 'DAY STREAK',
+                      valueSize: 34,
+                    ),
+                  ),
+                  Expanded(
+                    child: _HeroStat(
+                      value: tasksLabel,
+                      label: 'TODAY',
+                      valueSize: 26,
+                    ),
+                  ),
+                  Expanded(
+                    child: _HeroStat(
+                      value: goalsLabel,
+                      label: 'THIS WEEK',
+                      valueSize: 26,
+                    ),
+                  ),
+                ],
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// One number + caption inside the lime hero card. FittedBox keeps a long
+/// value ("12/14") from overflowing its third of the row on narrow phones.
+class _HeroStat extends StatelessWidget {
+  const _HeroStat({
+    required this.value,
+    required this.label,
+    required this.valueSize,
+  });
+
+  final String value;
+  final String label;
+  final double valueSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: valueSize,
+              fontWeight: FontWeight.w800,
+              color: _kOnPrimaryContainer,
+              height: 1,
+              letterSpacing: -1,
+            ),
+          ),
+        ),
+        const SizedBox(height: 3),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            label,
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.4,
+              color: _kOnPrimaryContainer,
+            ),
           ),
         ),
       ],
@@ -535,14 +646,8 @@ class _ProfileHero extends StatelessWidget {
 // ─── Grouped settings hub (Profile reorg 2026-08-23) ─────────────────────────
 
 class _ProfileHubList extends StatelessWidget {
-  const _ProfileHubList({
-    required this.modeLabel,
-    required this.toneLabel,
-    required this.quietLabel,
-  });
+  const _ProfileHubList({required this.quietLabel});
 
-  final String modeLabel;
-  final String toneLabel;
   final String quietLabel;
 
   @override
@@ -551,22 +656,6 @@ class _ProfileHubList extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: Column(
         children: [
-          SettingRow(
-            icon: Icons.leaderboard_rounded,
-            title: 'Progress',
-            subtitle: 'Score trends, streaks & analytics',
-            trailing: const SettingRowChevron(),
-            onTap: () =>
-                Navigator.pushNamed(context, AnalyticsProgressScreen.routeName),
-          ),
-          SettingRow(
-            icon: Icons.bolt_rounded,
-            title: 'Coaching',
-            subtitle: '$modeLabel · $toneLabel',
-            trailing: const SettingRowChevron(),
-            onTap: () =>
-                Navigator.pushNamed(context, CoachingSettingsScreen.routeName),
-          ),
           SettingRow(
             icon: Icons.schedule_rounded,
             title: 'Smart Timing',

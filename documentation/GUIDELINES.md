@@ -1732,3 +1732,29 @@ not silent reversal.
     the same disc, so tapping a card no longer jumps to a brighter, more
     saturated blue. `goalCategoryColor` was retired; goal detail keeps its
     lime "Obsidian Pulse" language and is untouched.
+
+- **2026-08-23 · Profile: the two coaching knobs and Progress come out of
+  the settings list.** Discipline Mode and Coach Tone were pulled out of the
+  (now deleted) `CoachingSettingsScreen` and sit directly on Profile — they
+  are reached for most often, so they are open on the page rather than
+  behind a door, keeping the collapsed-to-ACTIVE tile with a chevron that
+  expands the alternatives in place. Extracted as `DisciplineModeSection` /
+  `CoachToneSection`
+  (`coaching/presentation/widgets/coaching_preference_sections.dart`), which
+  carry no outer padding so the host supplies it; their explainer paragraphs
+  were dropped as noise. The Coaching row and `/settings/coaching` route are
+  gone — with both sections moved the page had nothing left. Progress also
+  left the list and became a card directly under the streak, so checking
+  progress is the first thing available.
+
+  The streak card now carries three stats — DAY STREAK · TODAY (tasks
+  done/planned) · THIS WEEK (goal-days met ÷ scheduled since Monday) — via
+  `profileHeroStatsProvider`. Deliberate choices: it reads
+  `goalsStreamProvider`, NOT `activeGoalsProvider`, because that one applies
+  the Goals tab's category filter and would silently change the Profile
+  number; a goal counts only on days it was actually due, so an
+  every-other-day goal isn't punished for off-days; and an em dash (not
+  "0/0"/"0%") shows when nothing was scheduled — a quiet day is not a
+  failure. Monday anchor matches `GoalPeriodHelpers`. Profile order:
+  hero+streak → Progress → Discipline Mode → Coach Tone → SETTINGS →
+  guest connect → Log Out.

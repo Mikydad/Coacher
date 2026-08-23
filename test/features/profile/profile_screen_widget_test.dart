@@ -13,7 +13,6 @@ import 'package:sidepal/features/profile/application/profile_providers.dart';
 import 'package:sidepal/features/profile/domain/models/user_profile_preference.dart';
 import 'package:sidepal/features/profile/presentation/profile_screen.dart';
 import 'package:sidepal/features/settings/presentation/about_support_screen.dart';
-import 'package:sidepal/features/settings/presentation/coaching_settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -79,22 +78,14 @@ Widget _buildScreen({
   );
 }
 
-Widget _buildCoachingScreen() {
-  return ProviderScope(
-    overrides: [
-      coachingProfileStreamProvider.overrideWith(
-        (ref) => Stream.value(_stubProfile),
-      ),
-      activeCoachingStyleProvider.overrideWithValue(CoachingStyle.balanced),
-      userProfilePreferenceStreamProvider.overrideWith(
-        (ref) => Stream.value(_stubPreference),
-      ),
-      defaultEnforcementModeProvider.overrideWithValue(
-        EnforcementMode.disciplined,
-      ),
-    ],
-    child: const MaterialApp(home: CoachingSettingsScreen()),
-  );
+/// The default 800x600 test surface is shorter than any real phone, so the
+/// Coach Tone section falls outside it once Progress sits above the knobs —
+/// and unbuilt slivers can't be asserted on. Give those tests a phone-shaped
+/// viewport instead of scrolling past the frosted top bar.
+void _useTallViewport(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1200, 3000);
+  tester.view.devicePixelRatio = 3.0;
+  addTearDown(tester.view.reset);
 }
 
 Widget _buildAboutScreen() {
@@ -133,19 +124,21 @@ void main() {
     });
 
     testWidgets('renders the grouped settings hub', (tester) async {
+      _useTallViewport(tester);
       await tester.pumpWidget(_buildScreen());
       await tester.pump();
-      expect(find.text('SETTINGS'), findsOneWidget);
+      // Discipline Mode and Coach Tone sit above the list, not inside it.
+      expect(find.text('DISCIPLINE MODE'), findsOneWidget);
+      expect(find.text('COACH TONE'), findsOneWidget);
+      // Progress sits above the knobs, not inside the settings list.
       expect(find.text('Progress'), findsOneWidget);
-      expect(find.text('Coaching'), findsOneWidget);
-      // The Coaching row summarizes the current mode and tone.
-      expect(
-        find.text(
-          '${EnforcementMode.disciplined.displayName} · '
-          '${CoachingStyle.balanced.displayName}',
-        ),
-        findsOneWidget,
+      await tester.scrollUntilVisible(
+        find.text('SETTINGS'),
+        200,
+        scrollable: find.byType(Scrollable).first,
       );
+      expect(find.text('SETTINGS'), findsOneWidget);
+      expect(find.text('Coaching'), findsNothing);
     });
 
     testWidgets('shows the active coaching style in the hero badge', (
@@ -160,9 +153,10 @@ void main() {
     });
 
     testWidgets(
-      'Coaching page collapses to the active mode and expands to the rest',
+      'Discipline Mode collapses to the active value and expands in place',
       (tester) async {
-        await tester.pumpWidget(_buildCoachingScreen());
+        _useTallViewport(tester);
+        await tester.pumpWidget(_buildScreen());
         await tester.pumpAndSettle();
         // Collapsed: only the active mode and active tone show.
         expect(
@@ -188,10 +182,11 @@ void main() {
       expect(find.text('12'), findsOneWidget);
     });
 
-    testWidgets('Coaching page shows the active tone collapsed', (
+    testWidgets('Coach Tone shows only the active style until expanded', (
       tester,
     ) async {
-      await tester.pumpWidget(_buildCoachingScreen());
+      _useTallViewport(tester);
+      await tester.pumpWidget(_buildScreen());
       await tester.pumpAndSettle();
       expect(find.text(CoachingStyle.balanced.displayName), findsOneWidget);
       expect(find.text(CoachingStyle.intense.displayName), findsNothing);

@@ -1,64 +1,58 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/presentation/app_colors.dart';
-import '../../coaching/application/coaching_style_providers.dart';
-import '../../coaching/domain/models/coaching_style.dart';
-import '../../coaching/domain/models/enforcement_mode.dart';
-import '../../education/presentation/first_time_feature_card.dart';
-import '../../education/presentation/help_dot.dart';
-import '../../profile/application/profile_providers.dart';
-import 'settings_page_scaffold.dart';
+import '../../../../core/presentation/app_colors.dart';
+import '../../../education/presentation/first_time_feature_card.dart';
+import '../../../education/presentation/help_dot.dart';
+import '../../../profile/application/profile_providers.dart';
+import '../../../settings/presentation/settings_page_scaffold.dart';
+import '../../application/coaching_style_providers.dart';
+import '../../domain/models/coaching_style.dart';
+import '../../domain/models/enforcement_mode.dart';
 
-/// Coaching page (Profile reorg 2026-08-23): Discipline Mode + Coach Tone,
-/// each collapsed to the currently selected value — tap the value (or the
-/// chevron) to reveal the other options; picking one collapses again.
-class CoachingSettingsScreen extends ConsumerStatefulWidget {
-  const CoachingSettingsScreen({super.key});
+/// Discipline Mode and Coach Tone, each collapsed to the currently selected
+/// value — tap it (or the chevron) to reveal the other options; picking one
+/// collapses again.
+///
+/// These live directly on the Profile page, above the settings list
+/// (2026-08-23): they are the two knobs the user actually reaches for, so
+/// they sit out in the open rather than behind a settings door. The widgets
+/// carry no outer padding — the host supplies it.
 
-  static const routeName = '/settings/coaching';
+class DisciplineModeSection extends ConsumerStatefulWidget {
+  const DisciplineModeSection({super.key});
 
   @override
-  ConsumerState<CoachingSettingsScreen> createState() =>
-      _CoachingSettingsScreenState();
+  ConsumerState<DisciplineModeSection> createState() =>
+      _DisciplineModeSectionState();
 }
 
-class _CoachingSettingsScreenState
-    extends ConsumerState<CoachingSettingsScreen> {
-  bool _modesExpanded = false;
-  bool _toneExpanded = false;
+class _DisciplineModeSectionState extends ConsumerState<DisciplineModeSection> {
+  bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
     final activeMode = ref.watch(defaultEnforcementModeProvider);
-    final activeStyle = ref.watch(activeCoachingStyleProvider);
-
-    return SettingsPageScaffold(
-      title: 'Coaching',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _headerWithHelp('Discipline Mode', 'disciplineModes'),
-        const SizedBox(height: 4),
-        Text(
-          'How strict the app is overall. New tasks inherit this based on '
-          'how important they are — you can still change it per task.',
-          style: TextStyle(
-            fontSize: 11,
-            color: AppColors.textSoft.withValues(alpha: 0.7),
-          ),
+        const _SectionHeaderWithHelp(
+          label: 'Discipline Mode',
+          helpId: 'disciplineModes',
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         const FirstTimeFeatureCard(guideId: 'disciplineModes'),
         _DisciplineTile(
           mode: activeMode,
           isActive: true,
-          expandChevron: _modesExpanded,
-          onTap: () => setState(() => _modesExpanded = !_modesExpanded),
+          expandChevron: _expanded,
+          onTap: () => setState(() => _expanded = !_expanded),
         ),
         AnimatedSize(
           duration: const Duration(milliseconds: 260),
           curve: Curves.easeOutCubic,
           alignment: Alignment.topCenter,
-          child: !_modesExpanded
+          child: !_expanded
               ? const SizedBox(width: double.infinity)
               : Padding(
                   padding: const EdgeInsets.only(top: 10),
@@ -71,35 +65,54 @@ class _CoachingSettingsScreenState
                             child: _DisciplineTile(
                               mode: mode,
                               isActive: false,
-                              onTap: () => _selectMode(mode),
+                              onTap: () => _select(mode),
                             ),
                           ),
                     ],
                   ),
                 ),
         ),
-        const SizedBox(height: 32),
-        _headerWithHelp('Coach Tone', 'coachTone'),
-        const SizedBox(height: 4),
-        Text(
-          'Adjust how your AI coach communicates with you.',
-          style: TextStyle(
-            fontSize: 11,
-            color: AppColors.textSoft.withValues(alpha: 0.7),
-          ),
-        ),
-        const SizedBox(height: 12),
+      ],
+    );
+  }
+
+  Future<void> _select(EnforcementMode mode) async {
+    setState(() => _expanded = false);
+    await ref
+        .read(profilePreferenceServiceProvider)
+        .setDefaultEnforcementMode(mode);
+  }
+}
+
+class CoachToneSection extends ConsumerStatefulWidget {
+  const CoachToneSection({super.key});
+
+  @override
+  ConsumerState<CoachToneSection> createState() => _CoachToneSectionState();
+}
+
+class _CoachToneSectionState extends ConsumerState<CoachToneSection> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeStyle = ref.watch(activeCoachingStyleProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _SectionHeaderWithHelp(label: 'Coach Tone', helpId: 'coachTone'),
+        const SizedBox(height: 10),
         _ToneTile(
           style: activeStyle,
           isActive: true,
-          expandChevron: _toneExpanded,
-          onTap: () => setState(() => _toneExpanded = !_toneExpanded),
+          expandChevron: _expanded,
+          onTap: () => setState(() => _expanded = !_expanded),
         ),
         AnimatedSize(
           duration: const Duration(milliseconds: 260),
           curve: Curves.easeOutCubic,
           alignment: Alignment.topCenter,
-          child: !_toneExpanded
+          child: !_expanded
               ? const SizedBox(width: double.infinity)
               : Padding(
                   padding: const EdgeInsets.only(top: 10),
@@ -112,7 +125,7 @@ class _CoachingSettingsScreenState
                             child: _ToneTile(
                               style: style,
                               isActive: false,
-                              onTap: () => _selectTone(style),
+                              onTap: () => _select(style),
                             ),
                           ),
                     ],
@@ -123,19 +136,20 @@ class _CoachingSettingsScreenState
     );
   }
 
-  Future<void> _selectMode(EnforcementMode mode) async {
-    setState(() => _modesExpanded = false);
-    final service = ref.read(profilePreferenceServiceProvider);
-    await service.setDefaultEnforcementMode(mode);
+  Future<void> _select(CoachingStyle style) async {
+    setState(() => _expanded = false);
+    await ref.read(coachingStyleServiceProvider).setStyle(style);
   }
+}
 
-  Future<void> _selectTone(CoachingStyle style) async {
-    setState(() => _toneExpanded = false);
-    final service = ref.read(coachingStyleServiceProvider);
-    await service.setStyle(style);
-  }
+class _SectionHeaderWithHelp extends StatelessWidget {
+  const _SectionHeaderWithHelp({required this.label, required this.helpId});
 
-  Widget _headerWithHelp(String label, String helpId) {
+  final String label;
+  final String helpId;
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
       children: [
         Flexible(child: SettingsSectionHeader(label: label)),
@@ -145,7 +159,7 @@ class _CoachingSettingsScreenState
   }
 }
 
-// ─── Tiles (moved from profile_screen's private widgets, 2026-08-23) ─────────
+// ─── Tiles ───────────────────────────────────────────────────────────────────
 
 class _DisciplineTile extends StatelessWidget {
   const _DisciplineTile({
@@ -214,14 +228,18 @@ class _DisciplineTile extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        mode.displayName,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: isActive
-                              ? AppColors.limeCream
-                              : AppColors.white,
+                      Flexible(
+                        child: Text(
+                          mode.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isActive
+                                ? AppColors.limeCream
+                                : AppColors.white,
+                          ),
                         ),
                       ),
                       if (isActive) ...[
@@ -306,12 +324,16 @@ class _ToneTile extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        style.displayName,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: _textColor(),
+                      Flexible(
+                        child: Text(
+                          style.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _textColor(),
+                          ),
                         ),
                       ),
                       if (isActive) ...[

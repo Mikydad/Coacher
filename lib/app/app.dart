@@ -34,7 +34,6 @@ import '../features/profile/presentation/profile_screen.dart';
 import '../features/settings/presentation/about_support_screen.dart';
 import '../features/settings/presentation/account_settings_screen.dart';
 import '../features/settings/presentation/coach_ai_settings_screen.dart';
-import '../features/settings/presentation/coaching_settings_screen.dart';
 import '../features/settings/presentation/smart_timing_settings_screen.dart';
 import '../features/settings/presentation/notification_settings_screen.dart';
 import '../features/settings/presentation/reminder_settings_screen.dart';
@@ -187,7 +186,6 @@ class CoachForLifeApp extends ConsumerWidget {
           );
         },
         AccountSettingsScreen.routeName: (_) => const AccountSettingsScreen(),
-        CoachingSettingsScreen.routeName: (_) => const CoachingSettingsScreen(),
         SmartTimingSettingsScreen.routeName: (_) =>
             const SmartTimingSettingsScreen(),
         CoachAiSettingsScreen.routeName: (_) => const CoachAiSettingsScreen(),
