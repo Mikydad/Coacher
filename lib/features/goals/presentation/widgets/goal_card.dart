@@ -5,7 +5,6 @@ import '../../../../core/utils/date_keys.dart';
 import '../../../accountability/application/stakes_providers.dart';
 import '../../application/goal_period_helpers.dart';
 import '../../application/goals_providers.dart';
-import '../../domain/models/goal_categories.dart';
 import '../../domain/models/goal_check_in.dart';
 import '../../domain/models/goal_enums.dart';
 import '../../domain/models/user_goal.dart';

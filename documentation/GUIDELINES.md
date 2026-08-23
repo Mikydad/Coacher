@@ -1706,3 +1706,29 @@ not silent reversal.
   overrides `rangePickerHeaderBackgroundColor`/`ForegroundColor`; the test
   now asserts the RENDERED label color via `DefaultTextStyle.of` at the
   `Text` element and that the header theme stays null.
+
+- **2026-08-23 (round 5) · Goal cards became three-level tinted surfaces.**
+  The Goals list read as "black → blue rectangle → black": each card was
+  one category color at 18% with a full-strength fill bar. Now every
+  category carries a `GoalTone {card, circle, icon}` (app_colors.dart) —
+  a mid-dark tinted surface, a brighter disc of the same hue, and a light
+  glyph — so color presence comes from hierarchy inside the card, not from
+  saturation of the whole rectangle. Dark values: Study #10233A/#1E4D78/
+  #A9D5FF, Focus #24203A/#4B4075/#C4B2FF, Mental Clarity #15383A/#226568/
+  #9DE9E1, Fitness #3A2A18/#70501F/#FFD06A, Habits #382B17/#70551F/
+  #F4CF78, Productivity #2F3916/#597023/#CFE798 (derived — the reference
+  didn't cover it); light mode inverts the bands (pale card, mid disc,
+  deep glyph). Goals with a custom `colorHex` get `GoalTone.fromSeed`,
+  which holds the hue and forces the same three bands.
+  - Cards grew 72 → 88px for a 44px category disc (`GoalIconDisc`) —
+    goals carry no icon of their own, so the glyph is per category
+    (`goalCategoryIcon`, goal_category_visuals.dart).
+  - The fill bar is now `circle` blended 62% over `card` (a band between
+    the two) so the disc stays the brightest thing on an unfinished card;
+    completion promotes the fill to full `circle` and lights the disc to
+    `icon` with a card-colored glyph. The old "title flips to black when
+    met" is gone — muted fills can't carry black text.
+  - The counter sheet reads the same tone (accent = `tone.icon`) and shows
+    the same disc, so tapping a card no longer jumps to a brighter, more
+    saturated blue. `goalCategoryColor` was retired; goal detail keeps its
+    lime "Obsidian Pulse" language and is untouched.

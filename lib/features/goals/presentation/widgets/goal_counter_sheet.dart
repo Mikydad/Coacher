@@ -8,7 +8,7 @@ import '../../domain/models/goal_action.dart';
 import '../../domain/models/goal_check_in.dart';
 import '../../domain/models/goal_enums.dart';
 import '../../domain/models/user_goal.dart';
-import 'goal_card.dart';
+import 'goal_category_visuals.dart';
 import '../goal_detail_screen.dart';
 
 import '../../../../core/presentation/app_colors.dart';
@@ -108,7 +108,10 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
   bool get _loggableToday =>
       GoalPeriodHelpers.allowsLoggingOnDateKey(_goal, DateKeys.todayKey());
 
-  Color get _accentColor => goalCategoryColor(_goal.categoryId);
+  /// The goal's tone — the sheet borrows the card's own three levels so
+  /// tapping a card doesn't jump to a brighter, different blue.
+  GoalTone get _tone => goalTone(_goal);
+  Color get _accentColor => _tone.icon;
 
   // ── Persistence ─────────────────────────────────────────────────────────────
 
@@ -320,6 +323,12 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
     padding: const EdgeInsets.symmetric(horizontal: 24),
     child: Column(
       children: [
+        GoalIconDisc(
+          tone: _tone,
+          icon: goalCategoryIcon(_goal.categoryId),
+          size: 56,
+        ),
+        const SizedBox(height: 12),
         Text(
           _goal.title,
           style: TextStyle(
