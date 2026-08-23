@@ -1733,6 +1733,31 @@ not silent reversal.
     saturated blue. `goalCategoryColor` was retired; goal detail keeps its
     lime "Obsidian Pulse" language and is untouched.
 
+- **2026-08-23 (round 6) · Tasks hub rows became real cards.** The hub's
+  `Card` + `ListTile` (plain panel, no leading, raw `t.status.name` in the
+  subtitle) is now a rounded panel with a 4px colored left stripe, a
+  tap-to-complete circle, a two-line-capable title, and the kebab kept on
+  the right. Only `tasks_hub_screen.dart` changed — the Add Task screen and
+  its bento category row are deliberately untouched.
+  - **Stripe/circle color** (`_taskAccent`): the six built-in categories
+    hold fixed hues (Study→categoryBlue, Fitness→coral, Work→orange,
+    Personal→violetSoft, Plan→success, Sleep→periwinkle); a custom category
+    derives a stable hue from its name (s .45), and an uncategorized task
+    derives one from its title at s .20 — enough rhythm for the list without
+    claiming the meaning a categorized row's color has. Decided this way
+    because most existing tasks carry no category, so a category-only rule
+    would have made nearly every stripe gray.
+  - **Tap-to-complete** is new: the circle is the primary action, filling
+    with the accent on completion (title strikes through). "Complete now"
+    stays in the kebab; an already-done circle is inert — nothing on this
+    screen un-completes a task.
+  - **Meta line** dropped `notStarted` (the empty circle says it), the bare
+    `—` score placeholder, and `0 min`; status shows only when notable
+    (In progress / Done / Partial), and "Reminder on" carries a bell in the
+    row's accent.
+  - Section titles moved off a raw 22px bold `Text` onto `SectionHeader.style`
+    with a lime calendar glyph.
+
 - **2026-08-23 · Profile: the two coaching knobs and Progress come out of
   the settings list.** Discipline Mode and Coach Tone were pulled out of the
   (now deleted) `CoachingSettingsScreen` and sit directly on Profile — they

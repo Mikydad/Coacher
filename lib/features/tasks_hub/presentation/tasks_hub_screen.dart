@@ -12,6 +12,7 @@ import '../../planning/application/planned_task_actions.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
 import '../../planning/domain/models/task_item.dart';
+import '../../planning/domain/sleep_task.dart';
 import '../../scoring/application/scoring_controller.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 import 'task_detail_screen.dart';
@@ -182,10 +183,7 @@ class TasksHubScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'Today',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
+              const _HubSectionHeader('Today'),
               const SizedBox(height: 8),
               todayAsync.when(
                 data: (rows) {
@@ -292,10 +290,7 @@ class TasksHubScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 28),
-              const Text(
-                'Open on other days',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
+              const _HubSectionHeader('Open on other days'),
               const SizedBox(height: 8),
               otherAsync.when(
                 data: (rows) {
@@ -350,6 +345,60 @@ class TasksHubScreen extends ConsumerWidget {
   }
 }
 
+/// Section heading for the hub — the shared [SectionHeader] type scale with
+/// a lime calendar glyph in front, so "Today" and "Open on other days" read
+/// as dated buckets rather than plain labels.
+class _HubSectionHeader extends StatelessWidget {
+  const _HubSectionHeader(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.accent),
+        const SizedBox(width: 8),
+        Text(title, style: SectionHeader.style),
+      ],
+    );
+  }
+}
+
+/// Stripe + checkbox color for one row.
+///
+/// The six built-in categories hold a fixed hue so the list reads by kind.
+/// A custom category derives a stable hue from its own name; an
+/// uncategorized task derives one from its title and wears it desaturated —
+/// enough to give the list rhythm without pretending to mean something a
+/// categorized row's color does.
+Color _taskAccent(PlannedTask t) {
+  final category = t.category?.trim();
+  if (category == null || category.isEmpty) {
+    return _derivedAccent(t.title, saturation: 0.20, lightness: 0.52);
+  }
+  return switch (category) {
+    'Study' => AppColors.categoryBlue,
+    'Fitness' => AppColors.coral,
+    'Work' => AppColors.orange,
+    'Personal' => AppColors.violetSoft,
+    'Plan' || 'Planning' => AppColors.success,
+    kSleepTaskCategory => AppColors.periwinkle,
+    _ => _derivedAccent(category, saturation: 0.45, lightness: 0.60),
+  };
+}
+
+/// Same text → same hue, every launch: [String.hashCode] is stable within a
+/// run and the value only ever drives decoration.
+Color _derivedAccent(
+  String seed, {
+  required double saturation,
+  required double lightness,
+}) {
+  final hue = (seed.hashCode.abs() % 360).toDouble();
+  return HSLColor.fromAHSL(1, hue, saturation, lightness).toColor();
+}
+
 class _HubTaskTile extends StatelessWidget {
   const _HubTaskTile({
     required this.row,
@@ -377,47 +426,203 @@ class _HubTaskTile extends StatelessWidget {
     );
   }
 
+  /// Status only when it says something the row doesn't already show — the
+  /// empty checkbox is what "notStarted" means, so spelling it out was noise.
+  String? get _statusLabel => switch (row.task.status) {
+    TaskStatus.notStarted => null,
+    TaskStatus.inProgress => 'In progress',
+    TaskStatus.completed => 'Done',
+    TaskStatus.partial => 'Partial',
+  };
+
   @override
   Widget build(BuildContext context) {
     final t = row.task;
-    final pctLabel = scorePercent != null ? '$scorePercent%' : '—';
-    final subtitle = StringBuffer()
-      ..write('${t.durationMinutes} min')
-      ..write(t.category != null ? ' · ${t.category}' : '')
-      ..write(t.reminderEnabled ? ' · Reminder on' : '')
-      ..write(' · $pctLabel')
-      ..write(showDateKey ? ' · ${row.dateKey}' : '')
-      ..write(' · ${t.status.name}');
+    final accent = _taskAccent(t);
+    final done = t.status == TaskStatus.completed;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      color: AppColors.surfacePanel,
-      child: ListTile(
-        onTap: () => _openDetails(context),
-        title: Text(t.title),
-        subtitle: Text(
-          subtitle.toString(),
-          style: TextStyle(color: AppColors.fg54, fontSize: 12),
-        ),
-        trailing: PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert),
-          onSelected: (value) {
-            if (value == 'details') _openDetails(context);
-            if (value == 'edit') onEdit();
-            if (value == 'complete') onCompleteNow();
-            if (value == 'plans_changed') onPlansChanged();
-            if (value == 'delete') onDelete();
-          },
-          itemBuilder: (ctx) => const [
-            PopupMenuItem(value: 'details', child: Text('Details')),
-            PopupMenuItem(value: 'edit', child: Text('Edit')),
-            PopupMenuItem(value: 'complete', child: Text('Complete now')),
-            PopupMenuItem(
-              value: 'plans_changed',
-              child: Text('Plans Changed?'),
+    // Meta chunks, each rendered as its own span so the reminder can carry
+    // a bell in the accent color mid-line.
+    final chunks = <(String, bool)>[
+      if (t.durationMinutes > 0) ('${t.durationMinutes} min', false),
+      if (t.category != null && t.category!.trim().isNotEmpty)
+        (t.category!, false),
+      if (t.reminderEnabled) ('Reminder on', true),
+      if (showDateKey) (row.dateKey, false),
+      if (scorePercent != null) ('$scorePercent%', false),
+      if (_statusLabel != null) (_statusLabel!, false),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      // Floor, not a fixed height: a row whose meta chunks all filtered out
+      // (0 min, no category, no reminder) would otherwise collapse to its
+      // title and break the list's rhythm; wrapped titles still grow past it.
+      constraints: const BoxConstraints(minHeight: 76),
+      clipBehavior: Clip.hardEdge,
+      decoration: BoxDecoration(
+        color: AppColors.surfacePanel,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openDetails(context),
+          // IntrinsicHeight gives the stretch a bounded height — the list
+          // items are shrink-wrapped, so without it the stripe (and every
+          // stretched child) has no height to lay out against.
+          child: IntrinsicHeight(
+            child: Row(
+              // Stretch so the stripe runs the full height of a wrapped title.
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(width: 4, color: accent),
+                _CompleteCircle(
+                  accent: accent,
+                  done: done,
+                  onTap: done ? null : onCompleteNow,
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          t.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: done ? AppColors.fg54 : AppColors.fg,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            decoration: done
+                                ? TextDecoration.lineThrough
+                                : null,
+                            decorationColor: AppColors.fg54,
+                          ),
+                        ),
+                        if (chunks.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          _MetaLine(chunks: chunks, accent: accent),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: AppColors.fg54),
+                  onSelected: (value) {
+                    if (value == 'details') _openDetails(context);
+                    if (value == 'edit') onEdit();
+                    if (value == 'complete') onCompleteNow();
+                    if (value == 'plans_changed') onPlansChanged();
+                    if (value == 'delete') onDelete();
+                  },
+                  itemBuilder: (ctx) => const [
+                    PopupMenuItem(value: 'details', child: Text('Details')),
+                    PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    PopupMenuItem(
+                      value: 'complete',
+                      child: Text('Complete now'),
+                    ),
+                    PopupMenuItem(
+                      value: 'plans_changed',
+                      child: Text('Plans Changed?'),
+                    ),
+                    PopupMenuItem(value: 'delete', child: Text('Delete')),
+                  ],
+                ),
+              ],
             ),
-            PopupMenuItem(value: 'delete', child: Text('Delete')),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The one-line meta under the title. Chunks join with " · "; the reminder
+/// chunk gets a bell and the row's accent so "Reminder on" is spottable
+/// without reading the line.
+class _MetaLine extends StatelessWidget {
+  const _MetaLine({required this.chunks, required this.accent});
+
+  final List<(String, bool)> chunks;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final spans = <InlineSpan>[];
+    for (var i = 0; i < chunks.length; i++) {
+      if (i > 0) spans.add(const TextSpan(text: ' · '));
+      final (text, isReminder) = chunks[i];
+      if (isReminder) {
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Icon(
+                Icons.notifications_active_rounded,
+                size: 13,
+                color: accent,
+              ),
+            ),
+          ),
+        );
+      }
+      spans.add(
+        TextSpan(
+          text: text,
+          style: isReminder ? TextStyle(color: accent) : null,
+        ),
+      );
+    }
+    return Text.rich(
+      TextSpan(children: spans),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(color: AppColors.fg54, fontSize: 12),
+    );
+  }
+}
+
+/// Tap-to-complete circle — the row's primary action now (it was buried in
+/// the kebab menu). Completing fills the ring with the row's accent; an
+/// already-done row's circle is inert, since nothing here un-completes.
+class _CompleteCircle extends StatelessWidget {
+  const _CompleteCircle({
+    required this.accent,
+    required this.done,
+    required this.onTap,
+  });
+
+  final Color accent;
+  final bool done;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkResponse(
+      onTap: onTap,
+      radius: 26,
+      child: SizedBox(
+        width: 52,
+        child: Center(
+          child: Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: done ? accent : Colors.transparent,
+              border: Border.all(color: accent, width: 2),
+            ),
+            child: done
+                ? Icon(Icons.check_rounded, size: 16, color: AppColors.scaffold)
+                : null,
+          ),
         ),
       ),
     );
