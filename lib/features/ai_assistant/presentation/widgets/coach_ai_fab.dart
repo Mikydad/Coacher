@@ -13,16 +13,14 @@ import '../ai_assistant_screen.dart';
 /// (decision log 2026-07-16). Tapping opens the ask-bar peek of the coach
 /// sheet: type → send → the sheet grows to show the answer.
 ///
-/// [mini] is the satellite form for tabs that already own a primary FAB
-/// (Goals / Community / Accountability): the coach button stacks above the
-/// page's own action, same spot on every tab.
+/// Full-size on every tab (2026-08-25 — the mini satellite form was too
+/// quiet to find); on tabs that own a primary FAB it stacks above the
+/// page's own action, same spot everywhere.
 ///
 /// Carries the red "blocked plan" dot that used to sit on the Coach nav
 /// icon — now visible from every working tab instead of one nav slot.
 class CoachAiFab extends ConsumerWidget {
-  const CoachAiFab({super.key, this.mini = false});
-
-  final bool mini;
+  const CoachAiFab({super.key});
 
   static Color get _accent => AppColors.cyan;
 
@@ -55,36 +53,48 @@ class CoachAiFab extends ConsumerWidget {
           args: const CoachRouteArgs(startVoiceMode: true),
         );
       },
-      child: FloatingActionButton(
-        // Multiple instances live in the tab IndexedStack at once — opt out
-        // of Hero animation entirely so route transitions never collide.
-        heroTag: null,
-        mini: mini,
-        onPressed: () => showCoachAiSheet(
-          context,
-          askBar: true,
-          args: hasSuggestions
-              ? const CoachRouteArgs(openSuggestionsPanel: true)
-              : null,
+      // Solid accent + a soft glow: the coach is the app's one primary
+      // action, and the old ink-on-ink outline disappeared into the page.
+      child: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: _accent.withValues(alpha: 0.30),
+              blurRadius: 14,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
-        elevation: 0,
-        highlightElevation: 0,
-        splashColor: _accent.withValues(alpha: 0.12),
-        backgroundColor: AppColors.inkCard,
-        shape: CircleBorder(
-          side: BorderSide(color: _accent.withValues(alpha: 0.35)),
-        ),
-        child: Icon(
-          Icons.auto_awesome_rounded,
-          color: _accent,
-          size: mini ? 18 : 22,
+        child: FloatingActionButton(
+          // Multiple instances live in the tab IndexedStack at once — opt out
+          // of Hero animation entirely so route transitions never collide.
+          heroTag: null,
+          onPressed: () => showCoachAiSheet(
+            context,
+            askBar: true,
+            args: hasSuggestions
+                ? const CoachRouteArgs(openSuggestionsPanel: true)
+                : null,
+          ),
+          elevation: 0,
+          highlightElevation: 0,
+          splashColor: AppColors.onAccent.withValues(alpha: 0.12),
+          backgroundColor: _accent,
+          shape: const CircleBorder(),
+          child: Icon(
+            Icons.auto_awesome_rounded,
+            color: AppColors.onAccent,
+            size: 26,
+          ),
         ),
       ),
     );
 
     if (!hasBlockedPlan && !hasSuggestions) return fab;
-    // Red (blocked plan) outranks the accent suggestions dot.
-    final dotColor = hasBlockedPlan ? Colors.redAccent : _accent;
+    // Red (blocked plan) outranks the suggestions dot; on the solid accent
+    // disc the suggestions dot flips to the on-accent tone to stay visible.
+    final dotColor = hasBlockedPlan ? Colors.redAccent : AppColors.onAccent;
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -103,8 +113,8 @@ class CoachAiFab extends ConsumerWidget {
   }
 }
 
-/// Satellite arrangement for tabs that own a primary FAB: mini coach
-/// button above, the page's own action below.
+/// Satellite arrangement for tabs that own a primary FAB: coach button
+/// above, the page's own action below.
 class CoachSatelliteFabs extends StatelessWidget {
   const CoachSatelliteFabs({super.key, required this.pageFab});
 
@@ -116,7 +126,7 @@ class CoachSatelliteFabs extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        const CoachAiFab(mini: true),
+        const CoachAiFab(),
         const SizedBox(height: 10),
         pageFab,
       ],

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -23,8 +21,11 @@ class AiInputCard extends StatelessWidget {
   final VoidCallback onSend;
   final bool isLoading;
 
-  /// Long-press on the mic enters Voice Mode (humanizing Phase 3);
-  /// plain tap stays one-shot dictation. Null hides the affordance.
+  /// Opens conversational Voice Mode (humanizing Phase 3). Shown as its
+  /// own labeled waveform button — dictation and conversation are two
+  /// different acts and get two different buttons (2026-08-25; the old
+  /// hidden long-press-on-the-mic entry was undiscoverable). Null hides
+  /// the affordance.
   final VoidCallback? onVoiceModeRequested;
 
   @override
@@ -64,13 +65,16 @@ class AiInputCard extends StatelessWidget {
           // out from under the finger mid-hold (2026-08-22 bug batch).
           TextFieldTapRegion(
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _VoiceInputButton(
-                  controller: controller,
-                  enabled: !isLoading,
-                  onVoiceModeRequested: onVoiceModeRequested,
-                ),
+                _DictationButton(controller: controller, enabled: !isLoading),
+                if (onVoiceModeRequested != null) ...[
+                  const SizedBox(width: 8),
+                  _VoiceModeButton(
+                    enabled: !isLoading,
+                    onPressed: onVoiceModeRequested!,
+                  ),
+                ],
+                const Spacer(),
                 // Send button
                 ValueListenableBuilder<TextEditingValue>(
                   valueListenable: controller,
@@ -127,25 +131,55 @@ class AiInputCard extends StatelessWidget {
   }
 }
 
+/// Enters conversational Voice Mode with one tap. A waveform, not a mic —
+/// the mic next door types for you; this one talks with you.
+class _VoiceModeButton extends StatelessWidget {
+  const _VoiceModeButton({required this.enabled, required this.onPressed});
+
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = AppColors.cyan;
+    return Tooltip(
+      message: 'Voice conversation',
+      child: GestureDetector(
+        onTap: enabled
+            ? () {
+                HapticFeedback.mediumImpact();
+                onPressed();
+              }
+            : null,
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.14),
+            border: Border.all(color: accent.withValues(alpha: 0.45)),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Icon(Icons.graphic_eq_rounded, size: 20, color: accent),
+        ),
+      ),
+    );
+  }
+}
+
 /// Tap-to-dictate mic button. Streams recognised words into [controller] so
-/// the user can review the text before sending. Long-press enters Voice
-/// Mode when [onVoiceModeRequested] is provided.
-class _VoiceInputButton extends StatefulWidget {
-  const _VoiceInputButton({
-    required this.controller,
-    required this.enabled,
-    this.onVoiceModeRequested,
-  });
+/// the user can review the text before sending. Dictation ONLY — Voice Mode
+/// lives on the waveform button beside it.
+class _DictationButton extends StatefulWidget {
+  const _DictationButton({required this.controller, required this.enabled});
 
   final TextEditingController controller;
   final bool enabled;
-  final VoidCallback? onVoiceModeRequested;
 
   @override
-  State<_VoiceInputButton> createState() => _VoiceInputButtonState();
+  State<_DictationButton> createState() => _DictationButtonState();
 }
 
-class _VoiceInputButtonState extends State<_VoiceInputButton> {
+class _DictationButtonState extends State<_DictationButton> {
   final SpeechToText _speech = SpeechToText();
   bool _initialised = false;
   bool _available = false;
@@ -154,7 +188,6 @@ class _VoiceInputButtonState extends State<_VoiceInputButton> {
 
   @override
   void dispose() {
-    _holdTimer?.cancel();
     if (_listening) {
       _speech.stop();
     }
@@ -162,6 +195,7 @@ class _VoiceInputButtonState extends State<_VoiceInputButton> {
   }
 
   Future<void> _toggle() async {
+    HapticFeedback.selectionClick();
     if (_listening) {
       await _speech.stop();
       if (mounted) setState(() => _listening = false);
@@ -220,82 +254,32 @@ class _VoiceInputButtonState extends State<_VoiceInputButton> {
     );
   }
 
-  /// Hold-to-enter-Voice-Mode, hand-rolled instead of onLongPress so the
-  /// press acknowledges INSTANTLY (glow + haptic on finger-down, stronger
-  /// haptic at trigger) and fires faster than the stock 500ms — the old
-  /// silent hold read as "nothing is happening" while the layout shifted
-  /// (2026-08-22 bug batch).
-  static const _kVoiceHold = Duration(milliseconds: 350);
-
-  Timer? _holdTimer;
-  bool _pressed = false;
-  bool _voiceHoldFired = false;
-
-  void _onPressDown() {
-    _voiceHoldFired = false;
-    setState(() => _pressed = true);
-    HapticFeedback.selectionClick();
-    if (widget.onVoiceModeRequested == null) return;
-    _holdTimer = Timer(_kVoiceHold, () async {
-      if (!mounted) return;
-      _voiceHoldFired = true;
-      setState(() => _pressed = false);
-      HapticFeedback.mediumImpact();
-      // Never enter Voice Mode with the dictation mic still open.
-      if (_listening) {
-        await _speech.stop();
-        if (mounted) setState(() => _listening = false);
-      }
-      widget.onVoiceModeRequested!();
-    });
-  }
-
-  void _onPressEnd({required bool wasTap}) {
-    _holdTimer?.cancel();
-    _holdTimer = null;
-    if (_pressed && mounted) setState(() => _pressed = false);
-    // A quick release is the dictation tap; after the hold fired, the
-    // release is just the finger leaving.
-    if (wasTap && !_voiceHoldFired) _toggle();
-  }
-
   @override
   Widget build(BuildContext context) {
     final accent = AppColors.cyan;
-    final active = _listening || _pressed;
-    return GestureDetector(
-      onTapDown: widget.enabled ? (_) => _onPressDown() : null,
-      onTap: widget.enabled ? () => _onPressEnd(wasTap: true) : null,
-      onTapCancel: widget.enabled ? () => _onPressEnd(wasTap: false) : null,
-      child: AnimatedScale(
-        scale: _pressed ? 1.12 : 1.0,
-        duration: const Duration(milliseconds: 120),
+    return Tooltip(
+      message: 'Dictate into the text box',
+      child: GestureDetector(
+        onTap: widget.enabled ? _toggle : null,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: active ? accent.withValues(alpha: 0.18) : Colors.transparent,
+            color: _listening
+                ? accent.withValues(alpha: 0.18)
+                : Colors.transparent,
             border: Border.all(
-              color: active
+              color: _listening
                   ? accent.withValues(alpha: 0.8)
                   : AppColors.fg.withValues(alpha: 0.12),
             ),
             borderRadius: BorderRadius.circular(999),
-            boxShadow: _pressed
-                ? [
-                    BoxShadow(
-                      color: accent.withValues(alpha: 0.35),
-                      blurRadius: 14,
-                      spreadRadius: 2,
-                    ),
-                  ]
-                : const [],
           ),
           child: Icon(
-            _listening || _pressed ? Icons.mic_rounded : Icons.mic_none_rounded,
+            _listening ? Icons.mic_rounded : Icons.mic_none_rounded,
             size: 20,
-            color: active ? accent : AppColors.textSoft,
+            color: _listening ? accent : AppColors.textSoft,
           ),
         ),
       ),

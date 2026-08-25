@@ -96,12 +96,12 @@ class HomeScreen extends ConsumerWidget {
     _maybeTriggerMorningBrief(context, ref);
 
     return Scaffold(
-      // Mini + lifted to match the satellite position on tabs that stack
-      // it above their own FAB — the coach button must not change size or
-      // hop vertically as you switch tabs.
+      // Lifted to match the satellite position on tabs that stack it above
+      // their own FAB — the coach button must not change size or hop
+      // vertically as you switch tabs (full-size everywhere since 2026-08-25).
       floatingActionButton: const Padding(
-        padding: EdgeInsets.only(bottom: 58),
-        child: CoachAiFab(mini: true),
+        padding: EdgeInsets.only(bottom: 66),
+        child: CoachAiFab(),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       appBar: AppBar(
