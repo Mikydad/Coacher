@@ -1979,3 +1979,48 @@ not silent reversal.
   editing) is now a labeled "Details ›" pill. The keyboard promise
   sheet's confirm button says "Find me a good time" — the coach finds the
   slot, the user isn't promising to.
+
+- **2026-08-25 · The focus session's completion rate is computed, not
+  asked — and finishing the planned time skips the rating entirely.**
+  `_handleStopFlow` derives elapsed ÷ `targetDurationMinutes`; at ≥100%
+  it saves a 100% score silently (all modes — user decision: "if we did
+  the thing we said we'd do, just complete it"; extreme's
+  always-a-reason contract survives only INSIDE the dialog "for now"),
+  otherwise `ScoreTaskDialog` opens pre-filled with the computed percent
+  (`initialPercent`), freely adjustable. The reason field now exists
+  only below the mode's bar (`reasonThresholdForMode`: flexible 80 /
+  disciplined 90 / extreme 100 — deliberately the same numbers as
+  `EnforcementModePolicy.streakDayThreshold`, so the rating card and the
+  streak engine never disagree about "good enough"); sliding to a
+  passing score animates it away, and a typed reason that slid out of
+  relevance doesn't ship. Tasks with no planned duration keep the
+  manual slider at 100. *Why:* the dialog opened at a hardcoded 100
+  and demanded a reason below 100 in every mode — someone who worked
+  12.5 of 25 minutes was interrogated about a number the app already
+  knew.
+
+- **2026-08-25 · "Stop" is "End", Cancel never strands, and the focus
+  stack never duplicates.** Cancelling the (flexible-mode) rating keeps
+  the persisted worked time, records no score, and returns to the Focus
+  selection screen — previously it left the user on a dead timer whose
+  "Start" was inert and whose second "Stop" wrote a duplicate
+  TimerSession row (now guarded: a finished session never re-persists).
+  At 100% the auto-next-task flow still runs (user decision).
+  `returnToFocusList` now clears to `route.isFirst` before pushing —
+  the old predicate stopped at an EXISTING /focus route, stacking
+  [shell, /focus, /focus] after every session, and stripped the shell
+  entirely when no /focus existed.
+
+- **2026-08-25 · A task must have a name.** The Add/Edit Task save
+  button disables on a blank title and reads "Name the task first";
+  `_onSave` hard-guards too. The silent `'Untitled Task'` fallback is
+  gone from the save path (the deserialization default in
+  `PlannedTask.fromMap` stays — it protects against corrupt stored
+  data, not user input).
+
+- **2026-08-25 · Category selection is additive, never an inversion.**
+  The add-task category chip used to flip to `BentoPalette.ink`
+  (#17191C) when selected — on the dark sheet (#0E0E0E) the PICKED chip
+  vanished while every unselected sibling glowed. Selected now keeps
+  its vivid category color and gains three redundant cues: check icon,
+  ink ring, own-color glow. Tap-to-clear behavior unchanged.
