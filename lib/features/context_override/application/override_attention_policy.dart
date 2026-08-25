@@ -73,20 +73,27 @@ abstract final class OverrideAttentionPolicy {
 
   /// Human-readable one-liner shown beneath each option in the quick-activate
   /// bottom sheet.
+  // Every summary names SidePal explicitly (2026-08-25): "Do Not Disturb /
+  // Holds everything" read as phone-wide DND, which no app can do — the
+  // copy must never promise more than the app controls.
   static String suppressionSummary(ContextOverride override) {
     switch (override) {
       case ContextOverride.none:
-        return 'All notifications active.';
+        return 'All SidePal notifications active.';
       case ContextOverride.meeting:
-        return 'Holds standard reminders. Urgent alerts still get through.';
+        return 'Holds standard SidePal reminders. Urgent alerts still get '
+            'through.';
       case ContextOverride.focus:
-        return 'Holds low and medium reminders. Urgent alerts still get through.';
+        return 'Holds low and medium SidePal reminders. Urgent alerts still '
+            'get through.';
       case ContextOverride.sleep:
-        return 'Holds all reminders. Only critical emergency alerts bypass.';
+        return 'Holds all SidePal reminders. Only critical emergency alerts '
+            'bypass.';
       case ContextOverride.vacation:
-        return 'Holds all reminders and protects your streaks.';
+        return 'Holds all SidePal reminders and protects your streaks.';
       case ContextOverride.doNotDisturb:
-        return 'Holds everything. No notifications will be delivered.';
+        return 'Holds every SidePal notification. Your phone\'s own '
+            'Do Not Disturb is untouched.';
     }
   }
 }

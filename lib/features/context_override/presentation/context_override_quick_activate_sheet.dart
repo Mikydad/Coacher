@@ -81,7 +81,9 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
         const AttentionModeSheetHandle(),
         const AttentionModeSheetHeader(
           subtitle:
-              'Tell the app what you\'re doing so it knows when to hold reminders.',
+              'Tell the app what you\'re doing so it knows when to hold '
+              'reminders. These modes quiet SidePal only — your phone\'s own '
+              'notifications are untouched.',
         ),
         const SizedBox(height: 20),
         for (final type in _overrideTypes) ...[

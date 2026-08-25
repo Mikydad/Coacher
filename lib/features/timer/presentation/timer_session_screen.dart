@@ -416,14 +416,16 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
               child: Column(
                 children: [
                   const SizedBox(height: 24),
-                  Text(
-                    'PHASE',
-                    style: TextStyle(letterSpacing: 3, color: AppColors.fg70),
+                  // "PHASE / Deep Focus" named a concept nobody introduced —
+                  // first-time testers asked what the screen was (2026-08-25).
+                  const Text(
+                    'Focus timer',
+                    style: TextStyle(fontSize: 54, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Deep Focus',
-                    style: TextStyle(fontSize: 54, fontWeight: FontWeight.bold),
+                  Text(
+                    'Timing your work on this task',
+                    style: TextStyle(color: AppColors.fg70),
                   ),
                   const SizedBox(height: 30),
                   Container(

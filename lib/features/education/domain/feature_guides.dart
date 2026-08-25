@@ -783,7 +783,8 @@ abstract final class FeatureGuides {
     what:
         'Deep Work marks a task as a no-interruption block: while you work '
         'on it, the app holds its own notifications so nothing pulls you '
-        'away mid-task.',
+        'away mid-task. It quiets SidePal only — your phone\'s other apps '
+        'and its system Do Not Disturb are untouched.',
     why:
         'One ping can cost twenty minutes of focus. Blocking alerts on your '
         'hardest tasks protects the time you already decided to protect.',

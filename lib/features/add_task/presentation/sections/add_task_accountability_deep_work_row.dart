@@ -51,7 +51,9 @@ class AddTaskAccountabilityDeepWorkRow extends StatelessWidget {
             child: AddTaskSplitSettingCard(
               icon: Icons.bolt_rounded,
               title: 'Deep Work',
-              subtitle: 'BLOCKS ALERTS',
+              // "BLOCKS ALERTS" read as phone-wide DND; only SidePal's own
+              // notifications are held (2026-08-25).
+              subtitle: 'MUTES SIDEPAL ALERTS',
               onTap: () => onFocusSessionChanged(!focusSession),
               trailing: Switch.adaptive(
                 value: focusSession,
