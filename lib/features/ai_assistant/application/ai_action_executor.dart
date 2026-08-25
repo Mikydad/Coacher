@@ -5,6 +5,7 @@ import '../../../core/local_db/isar_collections/isar_ai_action_batch.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
+import '../../../core/utils/friendly_date.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../context_override/application/context_override_service.dart';
 import '../../context_override/domain/models/context_override.dart';
@@ -1293,15 +1294,9 @@ class AiActionExecutor {
     return raw;
   }
 
-  String _friendlyDate(String dateKey) {
-    final today = DateKeys.todayKey();
-    final tomorrow = DateKeys.todayKey(
-      DateTime.now().add(const Duration(days: 1)),
-    );
-    if (dateKey == today) return 'today';
-    if (dateKey == tomorrow) return 'tomorrow';
-    return dateKey;
-  }
+  // Full humanizer since 2026-08-25 — weekday names for the coming week,
+  // "Mon, Sep 1" beyond, never a raw date key.
+  String _friendlyDate(String dateKey) => friendlyDateKey(dateKey);
 
   String _overrideLabel(ContextOverride type) {
     switch (type) {

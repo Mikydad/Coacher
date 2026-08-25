@@ -1,3 +1,4 @@
+import '../../../core/utils/friendly_date.dart';
 import '../domain/models/ai_action.dart';
 import '../domain/models/ai_planned_changes.dart';
 
@@ -106,8 +107,12 @@ String _speakableDate(String raw, {bool bare = false}) {
   final s = raw.trim().toLowerCase();
   if (s.isEmpty) return '';
   if (s == 'today' || s == 'tomorrow') return s;
-  // YYYY-MM-DD and friends read badly — say nothing rather than spell it.
+  // YYYY-MM-DD reads badly aloud. Within the coming week it humanizes to
+  // a bare weekday ("Sunday") — speak that; beyond, say nothing rather
+  // than spell digits (2026-08-25).
   if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(s)) {
+    final friendly = friendlyDateKey(s);
+    if (!RegExp(r'\d').hasMatch(friendly)) return friendly.toLowerCase();
     return bare ? s : '';
   }
   return s;

@@ -626,9 +626,25 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
   static String _buildUserPrompt(AiOperatingLayerPayload payload) {
     final buffer = StringBuffer();
     final now = DateTime.now();
+    // Weekday named + phrasing rule (2026-08-25): without it the model
+    // resolved "Sunday" to a date key and echoed the number back at the
+    // user ("created for 2026-08-30" instead of "on Sunday").
+    const weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
     buffer.writeln(
-      'Today is ${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
-      '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} (local).',
+      'Today is ${weekdays[now.weekday - 1]}, '
+      '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
+      '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} (local). '
+      'When speaking to the user, refer to dates the way people do — '
+      '"today", "tomorrow", or the weekday name ("on Sunday") — never a '
+      'raw YYYY-MM-DD; keep the numeric form only inside tool parameters.',
     );
     buffer.writeln();
     buffer.writeln('User request: "${payload.userInput}"');

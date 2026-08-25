@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/utils/friendly_date.dart';
 import '../../domain/models/ai_action.dart';
 import '../../domain/models/ai_planned_changes.dart';
 
@@ -202,20 +203,28 @@ String describePlannedAction(AiAction action) {
     case ActionType.createTask:
       final title = p['title'] ?? 'Task';
       final time = p['time'] != null ? ' (${p['time']})' : '';
-      final date = p['date'] != null ? ' on ${p['date']}' : '';
+      // "on Sunday", never "on 2026-08-30" (2026-08-25).
+      final date = p['date'] != null
+          ? ' on ${friendlyDateKey('${p['date']}')}'
+          : '';
       return 'Add $title$time$date';
 
     case ActionType.editTask:
       return 'Edit "${p['title'] ?? 'task'}"';
 
     case ActionType.moveTask:
-      return 'Move "${p['taskTitle'] ?? 'task'}" to ${p['destinationDate'] ?? '?'}';
+      final dest = p['destinationDate'];
+      return 'Move "${p['taskTitle'] ?? 'task'}" to '
+          '${dest != null ? friendlyDateKey('$dest') : '?'}';
 
     case ActionType.deleteTask:
       return 'Delete "${p['taskTitle'] ?? 'task'}"';
 
     case ActionType.createGoal:
-      return 'Create goal "${p['title'] ?? 'Goal'}"';
+      // The deadline used to be silently dropped from the preview.
+      final deadline = p['deadline'];
+      return 'Create goal "${p['title'] ?? 'Goal'}"'
+          '${deadline != null ? ' — by ${friendlyDateKey('$deadline')}' : ''}';
 
     case ActionType.modifyGoal:
       return 'Update goal "${p['goalTitle'] ?? 'goal'}"';

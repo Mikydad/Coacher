@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/context/context_providers.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/utils/date_keys.dart';
+import '../../../core/utils/friendly_date.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../analytics/domain/models/analytics_event.dart';
 import '../../auth/application/auth_providers.dart';
@@ -49,8 +50,11 @@ final aiOperatingLayerClientProvider = FutureProvider<AiOperatingLayerClient>((
     toolRunner: AiCoachToolRunner(
       dayScheduleLookup: (dateKey) async {
         final rows = await collectTasksForDateKey(planning, dateKey);
-        if (rows.isEmpty) return 'Nothing scheduled on $dateKey.';
-        final buffer = StringBuffer('Tasks on $dateKey:\n');
+        // Tool output feeds the model's prose — hand it the human word so
+        // the reply says "Sunday", not the date key (2026-08-25).
+        final dayLabel = friendlyDateKey(dateKey);
+        if (rows.isEmpty) return 'Nothing scheduled on $dayLabel ($dateKey).';
+        final buffer = StringBuffer('Tasks on $dayLabel ($dateKey):\n');
         for (final row in rows) {
           final t = row.task;
           var time = 'no time set';
