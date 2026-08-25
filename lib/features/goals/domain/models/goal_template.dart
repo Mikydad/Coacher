@@ -36,5 +36,9 @@ class GoalTemplate {
   final List<String> setupSteps;
   final String? customLabel;
 
-  bool get isBlank => id == 'custom';
+  /// A truly empty starting point. The custom-CATEGORY flow (2026-08-26)
+  /// reuses the 'custom' id but carries a categoryId — that must still be
+  /// applied, or the goal silently lands in Study (the exact bug the flow
+  /// exists to fix).
+  bool get isBlank => id == 'custom' && categoryId == null;
 }
