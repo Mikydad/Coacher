@@ -17,6 +17,7 @@ import '../../../core/presentation/range_picker_theme.dart';
 import '../../../core/tier/tier_providers.dart';
 import '../../../core/tier/upgrade_prompt.dart';
 import '../../../core/utils/stable_id.dart';
+import '../../../app/application/main_tab_navigation.dart';
 import '../../community/application/circle_providers.dart';
 import '../../goals/application/goal_period_helpers.dart';
 import '../../goals/application/goals_providers.dart';
@@ -132,22 +133,24 @@ class _AccountabilityCreateFlowState
       _Step.configure =>
         !_stakeChosen
             ? <(GlobalKey, bool)>[]
+            // Commitment first — it sits above the stake config since the
+            // 2026-08-25 reorder (title directly under the stake cards).
             : switch (_stake) {
                 _StakeChoice.photo => [
-                  (_keyPhotoCircle, _circleId != null),
                   ...commitment,
+                  (_keyPhotoCircle, _circleId != null),
                   (_keyPhotoUpload, _photo != null),
                 ],
                 _StakeChoice.h2h => [
+                  ...commitment,
                   (_keyH2hCircle, _circleId != null),
                   (_keyOpponent, _opponentUid != null),
                   (_keyYourCause, _charityId != null),
                   (_keyBothLose, _bothLoseCharityId != null),
-                  ...commitment,
                 ],
                 _StakeChoice.money => [
-                  (_keyAntiCharity, _antiCharityId != null),
                   ...commitment,
+                  (_keyAntiCharity, _antiCharityId != null),
                 ],
                 _StakeChoice.practice => commitment,
               },
@@ -167,14 +170,8 @@ class _AccountabilityCreateFlowState
   void _revealMissing() {
     setState(() => _showChecklist = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final ctx = _firstMissingKey()?.currentContext;
-      if (ctx == null) return;
-      Scrollable.ensureVisible(
-        ctx,
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeOutCubic,
-        alignment: 0.08,
-      );
+      final key = _firstMissingKey();
+      if (key != null) _scrollToKey(key);
     });
   }
 
@@ -324,45 +321,52 @@ class _AccountabilityCreateFlowState
   }
 
   /// (label, satisfied) rows for the requirements checklist.
-  List<(String, bool)> get _requirementItems => switch (_step) {
+  /// (label, satisfied, scroll target). Chip order mirrors page order
+  /// (commitment first since the 2026-08-25 reorder); the key makes each
+  /// chip tappable — tap → glide to that field.
+  List<(String, bool, GlobalKey?)> get _requirementItems => switch (_step) {
     _Step.configure => [
       if (!_stakeChosen)
-        ('What\'s on the line', false)
+        ('What\'s on the line', false, null)
       else ...[
-        ...switch (_stake) {
-          _StakeChoice.photo => [
-            ('Circle', _circleId != null),
-            ('The photo', _photo != null),
-          ],
-          _StakeChoice.h2h => [
-            ('Circle', _circleId != null),
-            ('Opponent', _opponentUid != null),
-            ('Your cause', _charityId != null),
-            ('Both-lose cause', _bothLoseCharityId != null),
-          ],
-          _StakeChoice.money => [('Anti-charity', _antiCharityId != null)],
-          _StakeChoice.practice => <(String, bool)>[],
-        },
-        ('Title', _title.text.trim().isNotEmpty),
-        ('Target', _unitTarget > 0),
+        ('Title', _title.text.trim().isNotEmpty, _keyTitle),
+        ('Target', _unitTarget > 0, _keyTarget),
         (
           'Action days',
           _totalUnits > 0 &&
               _totalUnits <= 90 &&
               (_cadence != GoalRepeatCadence.weekly || _weekdays.isNotEmpty) &&
               (_cadence != GoalRepeatCadence.monthly || _monthDays.isNotEmpty),
+          _keySchedule,
         ),
+        ...switch (_stake) {
+          _StakeChoice.photo => [
+            ('Circle', _circleId != null, _keyPhotoCircle),
+            ('The photo', _photo != null, _keyPhotoUpload),
+          ],
+          _StakeChoice.h2h => [
+            ('Circle', _circleId != null, _keyH2hCircle),
+            ('Opponent', _opponentUid != null, _keyOpponent),
+            ('Your cause', _charityId != null, _keyYourCause),
+            ('Both-lose cause', _bothLoseCharityId != null, _keyBothLose),
+          ],
+          _StakeChoice.money => [
+            ('Anti-charity', _antiCharityId != null, _keyAntiCharity),
+          ],
+          _StakeChoice.practice => <(String, bool, GlobalKey?)>[],
+        },
       ],
     ],
     _Step.promise => [
-      ('Your why', _why.text.trim().isNotEmpty),
-      if (_needsConsent) ('Consent boxes', _consentValid),
+      ('Your why', _why.text.trim().isNotEmpty, _keyWhy),
+      if (_needsConsent) ('Consent boxes', _consentValid, _keyConsent),
     ],
     _Step.review => const [],
   };
 
   /// Red-only (2026-07-22): satisfied items say nothing; only what still
-  /// blocks Continue shows.
+  /// blocks Continue shows. Each chip is tappable (2026-08-25) and glides
+  /// to its own field.
   Widget _requirementChecklist() {
     final missing = _requirementItems.where((item) => !item.$2).toList();
     if (missing.isEmpty) return const SizedBox.shrink();
@@ -372,34 +376,55 @@ class _AccountabilityCreateFlowState
         spacing: 8,
         runSpacing: 6,
         children: [
-          for (final (label, _) in missing)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.coral.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: AppColors.coral.withValues(alpha: 0.45),
+          for (final (label, _, key) in missing)
+            InkWell(
+              onTap: key == null ? null : () => _scrollToKey(key),
+              borderRadius: BorderRadius.circular(999),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
                 ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _reqBadge(),
-                  const SizedBox(width: 5),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: AppColors.coral,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                    ),
+                decoration: BoxDecoration(
+                  color: AppColors.coral.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: AppColors.coral.withValues(alpha: 0.45),
                   ),
-                ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _reqBadge(),
+                    const SizedBox(width: 5),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: AppColors.coral,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
         ],
       ),
+    );
+  }
+
+  /// Glide the page to a requirement's field. No-op when the target isn't
+  /// mounted (defensive — every chip now has a mounted anchor, including
+  /// the no-circles notice).
+  void _scrollToKey(GlobalKey key) {
+    final ctx = key.currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      alignment: 0.08,
     );
   }
 
@@ -1043,6 +1068,27 @@ class _AccountabilityCreateFlowState
               );
             },
           ),
+        // Commitment block first (2026-08-25): picking a stake auto-focuses
+        // the title, so the title must be the next thing down — the old
+        // order put the circle picker above it and the focus-scroll skipped
+        // right past it. Appears once (stable subtree — GlobalKeys inside
+        // must never be duplicated by a switcher).
+        AnimatedSize(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: !_stakeChosen
+              ? const SizedBox(width: double.infinity)
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 22),
+                    const SectionHeader('The commitment'),
+                    const SizedBox(height: 12),
+                    ..._commitmentFields(),
+                  ],
+                ),
+        ),
         // Stake-specific config cross-fades per stake (per-stake keys only).
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 320),
@@ -1065,24 +1111,6 @@ class _AccountabilityCreateFlowState
                   children: [
                     const SizedBox(height: 22),
                     ..._stakeConfigFields(),
-                  ],
-                ),
-        ),
-        // Commitment block appears once (stable subtree — GlobalKeys
-        // inside must never be duplicated by a switcher).
-        AnimatedSize(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
-          alignment: Alignment.topCenter,
-          child: !_stakeChosen
-              ? const SizedBox(width: double.infinity)
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 22),
-                    const SectionHeader('The commitment'),
-                    const SizedBox(height: 12),
-                    ..._commitmentFields(),
                   ],
                 ),
         ),
@@ -1152,17 +1180,9 @@ class _AccountabilityCreateFlowState
     }
     if (circles.isEmpty) {
       return [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppColors.amber.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            'A photo stake needs a circle to post to. Join one in '
-            'Community first — or start with a practice run.',
-            style: TextStyle(color: AppColors.textSoft, fontSize: 12.5),
-          ),
+        _noCirclesNotice(
+          scrollKey: _keyPhotoCircle,
+          needLine: 'a photo stake posts its proof there.',
         ),
         const SizedBox(height: 16),
         _microLabel('REVEAL WINDOW'),
@@ -1213,6 +1233,60 @@ class _AccountabilityCreateFlowState
       const SizedBox(height: 6),
       autoDeleteTag,
     ];
+  }
+
+  /// Loud, actionable no-circles state (2026-08-25): the old quiet
+  /// paragraph left photo/h2h unfinishable with no way forward — and the
+  /// Continue jump targeted a field that wasn't even mounted. This card
+  /// carries the requirement's scroll key so the jump lands here, and a
+  /// button that actually goes to Community.
+  Widget _noCirclesNotice({
+    required GlobalKey scrollKey,
+    required String needLine,
+  }) {
+    return Container(
+      key: scrollKey,
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.amber.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.amber.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'No circles yet',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Join or create one and invite others — $needLine',
+            style: TextStyle(
+              color: AppColors.textSoft,
+              fontSize: 12.5,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton(
+            onPressed: () =>
+                navigateToMainTab(context, ref, index: MainTabIndex.community),
+            style: OutlinedButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              foregroundColor: AppColors.amber,
+              side: BorderSide(color: AppColors.amber.withValues(alpha: 0.6)),
+            ),
+            child: const Text('Go to Community'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Goal-editor-styled dropdown, shared by every picker on the
@@ -1401,9 +1475,9 @@ class _AccountabilityCreateFlowState
       if (circlesAsync.isLoading)
         const LinearProgressIndicator()
       else if (circles.isEmpty)
-        Text(
-          'Join a circle first — challenges live inside one.',
-          style: TextStyle(color: AppColors.textSoft, fontSize: 12.5),
+        _noCirclesNotice(
+          scrollKey: _keyH2hCircle,
+          needLine: 'challenges live inside one.',
         )
       else
         // CIRCLE and POINTS side by side, ~65/35 (2026-07-22).
