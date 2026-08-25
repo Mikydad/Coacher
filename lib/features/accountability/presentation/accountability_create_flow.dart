@@ -19,6 +19,7 @@ import '../../../core/tier/upgrade_prompt.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../../app/application/main_tab_navigation.dart';
 import '../../community/application/circle_providers.dart';
+import '../../community/domain/models/accountability_circle.dart';
 import '../../goals/application/goal_period_helpers.dart';
 import '../../goals/application/goals_providers.dart';
 import '../../goals/domain/models/goal_categories.dart';
@@ -1178,6 +1179,7 @@ class _AccountabilityCreateFlowState
     if (circlesAsync.isLoading) {
       return [const LinearProgressIndicator()];
     }
+    _dropStaleCircleId(circles);
     if (circles.isEmpty) {
       return [
         _noCirclesNotice(
@@ -1233,6 +1235,19 @@ class _AccountabilityCreateFlowState
       const SizedBox(height: 6),
       autoDeleteTag,
     ];
+  }
+
+  /// Drops a circle id the user no longer belongs to (2026-08-25): Rematch
+  /// prefills the old challenge's circle with no validation, so after
+  /// leaving that circle the id sailed past every `!= null` gate — the
+  /// server even accepted the create — and a stale id trips the circle
+  /// dropdown's "value must be among items" assert.
+  void _dropStaleCircleId(List<AccountabilityCircle> circles) {
+    final id = _circleId;
+    if (id == null || circles.any((c) => c.id == id)) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _circleId == id) setState(() => _circleId = null);
+    });
   }
 
   /// Loud, actionable no-circles state (2026-08-25): the old quiet
@@ -1470,6 +1485,7 @@ class _AccountabilityCreateFlowState
     final charitiesAsync = ref.watch(charitiesProvider);
     final balance = ref.watch(pointsBalanceProvider).valueOrNull ?? 0;
     final myUid = FirestorePaths.activeUid;
+    if (!circlesAsync.isLoading) _dropStaleCircleId(circles);
 
     return [
       if (circlesAsync.isLoading)

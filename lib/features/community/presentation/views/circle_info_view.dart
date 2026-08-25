@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/di/providers.dart';
+import '../../../accountability/application/stakes_providers.dart';
 import '../../application/circle_providers.dart';
 import '../../domain/models/accountability_circle.dart';
 import '../../domain/models/circle_enums.dart';
@@ -278,6 +279,39 @@ class CircleInfoView extends ConsumerWidget {
     WidgetRef ref,
     String _,
   ) async {
+    // A live stake in this circle blocks leaving (2026-08-25): the stake
+    // would keep running — and a photo stake would still reveal here —
+    // after the user thought they'd walked away. Settle it first.
+    final liveStakes = (ref.read(stakeChallengesStreamProvider).value ??
+            const [])
+        .where((c) => !c.status.isTerminal && c.circleId == circleId)
+        .toList();
+    if (liveStakes.isNotEmpty) {
+      final title = liveStakes.first.frozenGoal.title;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.surfaceDark,
+          title: Text(
+            'You can\'t leave yet',
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
+          content: Text(
+            'You have a live stake in this circle ("$title"). Finish it or '
+            'surrender it in Accountability first — leaving wouldn\'t stop '
+            'it, and its consequence would still land here.',
+            style: TextStyle(color: AppColors.textMuted),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(

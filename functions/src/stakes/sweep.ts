@@ -156,9 +156,19 @@ async function decideDue(now: number): Promise<number> {
     const decision = decideChallenge(ch, inputs, action.atMs);
 
     // Display names for reveal feed posts, read before the transaction.
+    // The feed post is skipped when the circle no longer exists
+    // (2026-08-25): a bare tx.create into a deleted circle would abort the
+    // whole settlement transaction every 15-minute pass — a poison pill
+    // that also starves reveals and refunds behind it.
     const revealNames = new Map<string, string>();
+    let circleExists = false;
+    if (ch.circleId) {
+      circleExists = (await db.doc(`circles/${ch.circleId}`).get()).exists;
+    }
     for (const r of decision.perParticipant) {
-      if (r.resolution.kind !== 'reveal_photo' || !ch.circleId) continue;
+      if (r.resolution.kind !== 'reveal_photo' || !ch.circleId || !circleExists) {
+        continue;
+      }
       const member = await db
         .doc(`circles/${ch.circleId}/members/${r.uid}`)
         .get();
@@ -220,8 +230,9 @@ async function decideDue(now: number): Promise<number> {
           update.revealExpiresAtMs = revealExpiresAtMs(now, photo.revealWindowMins);
           tx.create(doc.ref.collection('events').doc(), eventDoc({ type: 'photo_revealed', uid: r.uid, atMs: now }));
           // Circle feed post (the announcement) — the client feed renders
-          // it natively and opens the secure reveal viewer.
-          if (ch.circleId) {
+          // it natively and opens the secure reveal viewer. Skipped when
+          // the circle is gone (see circleExists above).
+          if (ch.circleId && circleExists) {
             const feedRef = db
               .collection(`circles/${ch.circleId}/activityFeed`)
               .doc();
@@ -378,10 +389,18 @@ async function loadDecisionInputs(ch: StakeChallenge): Promise<DecisionInputs> {
   const votes = votesSnap.docs.map((d) => d.data() as unknown as Vote);
   const vetoRequests = vetoSnap.docs.map((d) => d.data() as unknown as VetoRequest);
 
-  // V-3 — eligible voters: circle members who are not participants.
+  // V-3 — eligible voters: ACTIVE circle members who are not participants.
+  // Status-filtered (2026-08-25): leaving soft-deletes to status 'removed'
+  // and joining starts at 'pending' — counting those ghosts set the quorum
+  // bar against members who can never vote, quietly defaulting every
+  // dispute to the evidence verdict.
   let eligibleVoterCount = 0;
   if (ch.circleId) {
-    const members = await db.collection(`circles/${ch.circleId}/members`).count().get();
+    const members = await db
+      .collection(`circles/${ch.circleId}/members`)
+      .where('status', '==', 'active')
+      .count()
+      .get();
     eligibleVoterCount = Math.max(0, members.data().count - ch.participants.length);
   }
 
