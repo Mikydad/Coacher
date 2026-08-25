@@ -210,7 +210,7 @@ class _IntentionQuickAddSheetState
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              child: const Text('I\'ll find a good time'),
+              child: const Text('Find me a good time'),
             ),
           ),
         ],
