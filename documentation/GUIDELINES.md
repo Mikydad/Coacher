@@ -1909,3 +1909,73 @@ not silent reversal.
   orphaned — `HomeCoachingFocusCard` lost its mount when the card left
   Home, and `ProgressCoachingFocusCard` never had one. Left in the tree
   pending a decision on deleting it.
+
+- **2026-08-25 · Deleting a goal with a live stake is honest, and solo
+  stakes get a priced early exit ("surrender").** The delete dialog now
+  detects a non-terminal challenge whose `frozenGoal.linkedGoalId` is the
+  goal and says plainly that deleting the goal does NOT end the stake; it
+  offers "Delete, keep stake" (default) and — for solo, still-active,
+  non-points stakes — "Delete & surrender stake". Surrender is the new
+  `stakeSurrender` callable: server-owned, `active →
+  completed_surrendered` (a NEW distinct terminal status, so history never
+  dresses a surrender up as a fought-and-lost forfeit), money escrow →
+  disbursement_pending to the anti-charity, photo requires and consumes
+  the monthly mercy veto (no veto → the callable refuses and the client
+  warns the photo reveals at the deadline — per user decision, surrender
+  is simply unavailable then), points locks burn final. Multi-party
+  challenges can never be surrendered (other people are in them). The
+  client fires surrender AFTER the local-first goal delete, background,
+  optimistic-then-honest: success and failure each get one snackbar, and
+  a failed surrender leaves the stake live in Accountability. *Why:* the
+  old flow warned about nothing and orphaned the stake — users deleted a
+  goal believing it killed the commitment, then forfeited money/photos at
+  a deadline they thought was gone. A FREE cancel-on-delete was rejected
+  outright: anyone about to lose would delete the goal, gutting the
+  commitment device — the stake's own consequence is the price of leaving.
+
+- **2026-08-25 · The seize-the-moment card obeys taps the frame they
+  happen.** `SeizeTheMomentCard` now guards synchronously against
+  `dismissedSeizeCandidatesProvider` and `openIntentionsProvider` before
+  rendering the provider's value, because a `FutureProvider` in reload
+  carries its previous value and `valueOrNull` kept showing the
+  just-dismissed promise through a recompute that could hang on unbounded
+  CoreMotion/EventKit channel calls (both now `.timeout()` and degrade to
+  no-signal). Remove tombstones the intention BEFORE notification
+  cleanup, which is best-effort in a try/catch. Extraction and reflection
+  dedupe new promises against ALL titles including tombstones
+  (`fetchAllIncludingTombstones`) so a removed promise can't be re-minted
+  under a fresh id from an old chat observation. *Why:* the reported "you
+  must tap Not now 3 times on the last promise" — each tap restarted the
+  slow recompute while the stale value stayed on screen.
+
+- **2026-08-25 · The coaching banner's copy is frozen at dispatch and
+  Progress honors it.** `AnnouncedInsightStore` (SharedPreferences, one
+  slot mirroring the one OS coaching-banner slot, expires at day
+  rollover) snapshots the insight message+caption when the notification
+  dispatches; `_StreakAtRiskGlass` renders the snapshot whenever the
+  decision's live insight id no longer resolves, and the slot clears when
+  the banner is cancelled. *Why:* delivery is deferred (minutes→hours)
+  while recomputes wholesale-replace the day's insights under date-keyed
+  ids, so tapping the notification routinely landed on the generic
+  fallback — "insight not available yet". *Considered:* carrying the
+  insight id through the tap route (rejected: the pending-intent queue
+  would need new plumbing and the id is already stale by then — the
+  frozen copy is the only thing that can honor the promise).
+
+- **2026-08-25 · Voice gets two visible doors; the coach FAB earns its
+  accent.** The composer mic is dictation-only; a labeled waveform button
+  beside it opens conversational Voice Mode in one tap (the 350 ms
+  hold-to-talk entry was undiscoverable — both in-app Voice Mode entries
+  were hidden long-presses). The FAB long-press → Voice Mode stays. The
+  FAB itself is full-size on every tab (the `mini` variant is gone) with
+  a solid accent disc, on-accent glyph, and soft glow; Home's lift
+  padding moved 58→66 to keep it from hopping between tabs; the
+  suggestions dot flips to the on-accent tone. *Why:* "the AI FAB is not
+  visible enough" + "differentiate voice input from conversation like
+  ChatGPT" — one unlabeled mic carried two unrelated behaviors.
+
+- **2026-08-25 · Small clarity fixes.** The goal quick-log sheet's
+  trending-arrow icon (read as a stats glyph; testers couldn't find goal
+  editing) is now a labeled "Details ›" pill. The keyboard promise
+  sheet's confirm button says "Find me a good time" — the coach finds the
+  slot, the user isn't promising to.
