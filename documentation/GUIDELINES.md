@@ -2108,3 +2108,30 @@ not silent reversal.
   (throttled 350ms), and the overflow check re-measures across up to 5
   frames because the lazy ListView's first-frame extent under-reported
   long replies.
+
+- **2026-08-26 · Circle invites: a server-held key is the door.** The
+  first circle Cloud Functions: `circleInvite` (any ACTIVE member fetches
+  the circle's key, minted on demand; regenerate is moderator-only and
+  revokes the old key) and `circleJoinWithInvite` (validates the key,
+  the 8-member cap, and writes member + `users/{uid}/circleIds` index
+  atomically with the Admin SDK). Keys live in the client-unreadable
+  `circle_invites/{code}` collection — circle docs are readable by every
+  signed-in user, so a key stored there would be public. **The key IS
+  the approval** (user decision): it bypasses request-approval and is
+  the only door into private circles, which discovery never lists.
+  Format XXXX-XXXX from a no-0/O/1/I alphabet; `normalizeCode` accepts
+  sloppy input. Client: "Invite members" tile on circle info (key +
+  copy + share via share_plus, moderator regenerate), "Join with a key"
+  sheet reachable from the Community FAB sheet and the Discover AppBar.
+  Deep link: the `sidepal://` custom URL scheme now exists
+  (Info.plist + a DeepLinkBridge inside AppDelegate.swift — the
+  SiriVoiceEntry pending-flag pattern, kept in the same file so no
+  pbxproj edit was needed); `sidepal://join/KEY` opens the join sheet
+  prefilled (`lib/app/deep_links.dart`, init + consume hooked into
+  AppLifecycleTaskRefresh beside Siri). *Deferred, deliberately:*
+  invite-by-username (needs a public handle registry — no usernames or
+  cross-user profile reads exist), universal https links (needs a
+  hosted domain for AASA), notifying moderators of join requests, and
+  the standing rules debt that any signed-in user can still self-write
+  an active member doc (the callable path doesn't widen that hole; a
+  rules pass should close it).
