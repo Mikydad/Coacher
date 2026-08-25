@@ -18,6 +18,18 @@ class SeizeTheMomentCard extends ConsumerWidget {
     if (candidate == null) return const SizedBox.shrink();
     final intention = candidate.intention;
 
+    // Synchronous guards: while the provider recomputes (motion + calendar,
+    // seconds in the worst case) `valueOrNull` keeps returning the PREVIOUS
+    // candidate — so a dismissed or removed promise would sit on screen
+    // shrugging off taps. Dismissal and removal must land this frame.
+    final dismissed = ref.watch(dismissedSeizeCandidatesProvider);
+    final stillOpen = ref
+        .watch(openIntentionsProvider)
+        .any((i) => i.id == intention.id);
+    if (dismissed.contains(intention.id) || !stillOpen) {
+      return const SizedBox.shrink();
+    }
+
     // Provenance-honest motion phrasing (Phase 6a): "you're walking" is
     // said only when a fresh reading exists — no signal, no claim.
     final motion = activityMomentPhrase(candidate.activity);

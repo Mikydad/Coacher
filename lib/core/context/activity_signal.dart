@@ -109,10 +109,14 @@ class ActivitySignalChannel {
     Duration lookback = const Duration(minutes: 10),
   }) async {
     try {
-      final raw = await _channel.invokeMapMethod<Object?, Object?>(
-        'getCurrentActivity',
-        {'lookbackMs': lookback.inMilliseconds},
-      );
+      // CoreMotion can stall indefinitely on a wedged pedometer daemon;
+      // a signal that late is useless, so degrade to "no signal" instead
+      // of holding every downstream decision hostage.
+      final raw = await _channel
+          .invokeMapMethod<Object?, Object?>('getCurrentActivity', {
+            'lookbackMs': lookback.inMilliseconds,
+          })
+          .timeout(const Duration(seconds: 2));
       if (raw == null) return null;
       return ActivityReading.fromMap(raw);
     } catch (e) {

@@ -40,6 +40,17 @@ class IntentionsRepository {
         .toList(growable: false);
   }
 
+  /// Every row, tombstones included. Dedupe callers (extraction/reflection)
+  /// must see removed promises too — a promise the user deleted must stay
+  /// deleted, not be re-minted under a fresh id.
+  Future<List<Intention>> fetchAllIncludingTombstones() async {
+    final rows = await _isar.isarIntentions
+        .where()
+        .sortByUpdatedAtMsDesc()
+        .findAll();
+    return rows.map((e) => e.toDomain()).toList(growable: false);
+  }
+
   Future<Intention?> getIntention(String intentionId) async {
     final row = await _isar.isarIntentions
         .filter()

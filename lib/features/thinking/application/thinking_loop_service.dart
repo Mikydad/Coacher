@@ -168,7 +168,10 @@ class ThinkingLoopService {
             if (i.isLive && !i.isPinned) i.id,
         },
         existingTitleKeys: {
-          for (final i in live) ReflectionParser.titleKey(i.title),
+          // Tombstones included: a promise the user removed must not come
+          // back from a reflection pass under a fresh id.
+          for (final i in await _intentions.fetchAllIncludingTombstones())
+            ReflectionParser.titleKey(i.title),
         },
       );
 

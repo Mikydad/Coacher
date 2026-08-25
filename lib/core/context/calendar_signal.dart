@@ -97,13 +97,15 @@ class CalendarSignalChannel {
     DateTime end,
   ) async {
     try {
-      final raw = await _channel.invokeListMethod<Map<Object?, Object?>>(
-        'getBusyIntervals',
-        {
-          'startMs': start.millisecondsSinceEpoch,
-          'endMs': end.millisecondsSinceEpoch,
-        },
-      );
+      // EventKit can stall on a wedged calendar daemon; a busy map that
+      // late is useless, so degrade to "no events" instead of blocking
+      // every downstream free-window decision.
+      final raw = await _channel
+          .invokeListMethod<Map<Object?, Object?>>('getBusyIntervals', {
+            'startMs': start.millisecondsSinceEpoch,
+            'endMs': end.millisecondsSinceEpoch,
+          })
+          .timeout(const Duration(seconds: 3));
       if (raw == null) return const [];
       return [for (final map in raw) ?CalendarBusyInterval.fromMap(map)];
     } catch (e) {

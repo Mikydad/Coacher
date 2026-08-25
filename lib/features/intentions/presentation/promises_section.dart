@@ -307,12 +307,18 @@ class _PromiseRow extends ConsumerWidget {
                   child: OutlinedButton(
                     onPressed: () async {
                       Navigator.of(sheetContext).pop();
-                      await ref
-                          .read(intentionNudgeSyncServiceProvider)
-                          .cancelForIntention(intention.id);
+                      // Tombstone first — a throw inside notification
+                      // cleanup must never leave the promise alive.
                       await ref
                           .read(intentionsRepositoryProvider)
                           .deleteIntention(intention.id);
+                      try {
+                        await ref
+                            .read(intentionNudgeSyncServiceProvider)
+                            .cancelForIntention(intention.id);
+                      } catch (_) {
+                        // Best-effort; rearmIfStale reconciles slots later.
+                      }
                     },
                     child: const Text('Remove'),
                   ),

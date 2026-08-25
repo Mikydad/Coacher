@@ -12,6 +12,7 @@ import '../data/memory_session_state_repository.dart';
 import '../data/people_repository.dart';
 import '../domain/models/memory_fact.dart';
 import '../domain/models/person.dart';
+import '../../thinking/application/reflection_parser.dart';
 import 'memory_extraction_parser.dart';
 
 /// Post-conversation memory extraction + summarize-then-purge (PRD §5.2).
@@ -277,8 +278,19 @@ class MemoryExtractionService {
     }
 
     // Dormant observations → dormant intentions ("on your radar"; zero
-    // notifications until the user or an opportunity wakes them).
+    // notifications until the user or an opportunity wakes them). Deduped
+    // against every existing title — tombstones included, so a promise the
+    // user removed can't be resurrected from an old chat observation.
+    final existingTitleKeys = {
+      for (final i in await _intentions.fetchAllIncludingTombstones())
+        ReflectionParser.titleKey(i.title),
+    };
     for (final observation in parsed.observations) {
+      if (existingTitleKeys.contains(
+        ReflectionParser.titleKey(observation.title),
+      )) {
+        continue;
+      }
       final now = DateTime.now();
       final intention = buildIntention(
         IntentionDraft(
