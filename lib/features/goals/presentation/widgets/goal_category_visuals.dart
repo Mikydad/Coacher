@@ -30,8 +30,23 @@ GoalTone goalCategoryTone(String categoryId) => switch (categoryId) {
   GoalCategories.focus => AppColors.toneFocus,
   GoalCategories.habits => AppColors.toneHabits,
   GoalCategories.mentalClarity => AppColors.toneMentalClarity,
-  _ => AppColors.toneStudy,
+  _ => _derivedCategoryTone(categoryId),
 };
+
+/// Custom categories hash their own name to a stable hue (2026-08-25) —
+/// they all used to wear the Study tone, indistinguishable at a glance.
+/// Same recipe as the tasks hub's derived accents.
+GoalTone _derivedCategoryTone(String categoryId) {
+  final hue = categoryId.trim().toLowerCase().codeUnits.fold<int>(
+        0,
+        (acc, c) => (acc * 31 + c) & 0x7fffffff,
+      ) %
+      360;
+  return GoalTone.fromSeed(
+    HSLColor.fromAHSL(1, hue.toDouble(), 0.45, 0.60).toColor(),
+    light: AppColors.isLight,
+  );
+}
 
 /// One glyph per category — goals carry no icon of their own, so the
 /// category is what the disc can show.

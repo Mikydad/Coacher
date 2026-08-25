@@ -17,11 +17,13 @@ class CategoryChipRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final filter = ref.watch(selectedGoalCategoryFilterProvider);
 
+    // Built-ins + live custom categories (2026-08-25) — a custom-category
+    // goal must be filterable, not stranded behind a hardcoded list.
     final categories = [
       (id: null, label: 'All'),
-      ...GoalCategories.all.map(
-        (id) => (id: id as String?, label: GoalCategories.label(id)),
-      ),
+      ...ref
+          .watch(goalCategoryFilterOptionsProvider)
+          .map((id) => (id: id as String?, label: GoalCategories.label(id))),
     ];
 
     return SizedBox(

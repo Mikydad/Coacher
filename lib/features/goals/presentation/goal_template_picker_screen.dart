@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
+import '../../add_task/presentation/add_task_custom_category_dialog.dart';
 import '../application/goal_templates.dart';
 import '../domain/models/goal_categories.dart';
 import '../domain/models/goal_enums.dart';
@@ -142,9 +143,27 @@ class _GoalTemplatePickerScreenState extends State<GoalTemplatePickerScreen> {
               ),
             ),
             const SizedBox(height: 16),
+            // Custom = name your own CATEGORY first (2026-08-25): the old
+            // "Custom Goal" silently filed the goal under Study, making it
+            // unfindable behind the category filter. The named category
+            // rides into the editor and joins the Goals-page filter chips.
             BentoPillButton(
-              label: custom.label,
-              onTap: () => _openEditor(context, custom),
+              label: 'Custom category',
+              onTap: () async {
+                final name = await showCustomCategoryDialog(context);
+                if (name == null || name.trim().isEmpty || !context.mounted) {
+                  return;
+                }
+                await _openEditor(
+                  context,
+                  GoalTemplate(
+                    id: custom.id,
+                    label: custom.label,
+                    emoji: custom.emoji,
+                    categoryId: name.trim(),
+                  ),
+                );
+              },
               color: AppColors.surfaceCard,
               textColor: AppColors.fg,
               ringColor: AppColors.accentDim,

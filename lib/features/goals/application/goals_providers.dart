@@ -7,6 +7,7 @@ import 'goal_period_helpers.dart';
 import '../data/goals_repository.dart';
 import '../data/isar_goals_repository.dart';
 import '../domain/models/goal_action.dart';
+import '../domain/models/goal_categories.dart';
 import '../domain/models/goal_check_in.dart';
 import '../domain/models/goal_enums.dart';
 import '../domain/models/goal_milestone.dart';
@@ -27,6 +28,25 @@ final goalsStreamProvider = StreamProvider<List<UserGoal>>((ref) {
 final selectedGoalCategoryFilterProvider = StateProvider<String?>(
   (ref) => null,
 );
+
+/// Category ids for the Goals-page filter chips (2026-08-25): the built-ins
+/// plus every custom category carried by an active goal — a custom-category
+/// goal used to be invisible behind every chip except All. Derived from the
+/// UNFILTERED stream (the filtered one would collapse the row to the
+/// selected chip), and the active filter is kept in the list so deleting
+/// the last goal of a category can't strand an invisible filter.
+final goalCategoryFilterOptionsProvider = Provider<List<String>>((ref) {
+  final goals = ref.watch(goalsStreamProvider).valueOrNull ?? const [];
+  final filter = ref.watch(selectedGoalCategoryFilterProvider);
+  final builtIn = GoalCategories.all.toSet();
+  final custom = <String>{
+    for (final g in goals)
+      if (g.status == GoalStatus.active && !builtIn.contains(g.categoryId))
+        g.categoryId,
+    if (filter != null && !builtIn.contains(filter)) filter,
+  }..remove('');
+  return [...GoalCategories.all, ...custom.toList()..sort()];
+});
 
 final activeGoalsProvider = Provider<AsyncValue<List<UserGoal>>>((ref) {
   final async = ref.watch(goalsStreamProvider);
