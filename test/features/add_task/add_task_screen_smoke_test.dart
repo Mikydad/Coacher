@@ -132,9 +132,18 @@ void main() {
     expect(find.text('Accountability'), findsOneWidget);
     expect(find.text('Deep Work'), findsOneWidget);
     expect(find.text('ADVANCED SETTINGS'), findsOneWidget);
-    // Twice: the small-caps AppBar PageTitle and the save button.
-    expect(find.text('ADD TASK'), findsNWidgets(2));
+    // With a blank title the save button disables and says why, so only
+    // the small-caps AppBar PageTitle reads ADD TASK (2026-08-25).
+    expect(find.text('ADD TASK'), findsOneWidget);
+    expect(find.text('NAME THE TASK FIRST'), findsOneWidget);
     expect(find.text('Sleep window & quiet mode'), findsNothing);
+
+    // Typing a title arms the save button (the title field is the first
+    // TextField on the sheet).
+    await tester.enterText(find.byType(TextField).first, 'Write the report');
+    await tester.pumpAndSettle();
+    expect(find.text('ADD TASK'), findsNWidgets(2));
+    expect(find.text('NAME THE TASK FIRST'), findsNothing);
   });
 
   testWidgets('selecting Sleep swaps to the sleep layout', (tester) async {
