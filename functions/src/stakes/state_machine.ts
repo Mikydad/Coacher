@@ -9,7 +9,9 @@ import { ChallengeStatus } from './types';
 const LEGAL: Record<ChallengeStatus, readonly ChallengeStatus[]> = {
   draft: ['pending_accept', 'active', 'cancelled'],
   pending_accept: ['active', 'cancelled'],
-  active: ['pending_verification', 'cancelled'],
+  // 'completed_surrendered' is the solo early exit (stakeSurrender):
+  // pre-deadline only — past the deadline the decision engine owns it.
+  active: ['pending_verification', 'completed_surrendered', 'cancelled'],
   // 'cancelled' from pending_verification covers account deletion mid-decision.
   pending_verification: [
     'completed_success',
@@ -19,6 +21,7 @@ const LEGAL: Record<ChallengeStatus, readonly ChallengeStatus[]> = {
   ],
   completed_success: [],
   completed_forfeit: [],
+  completed_surrendered: [],
   cancelled: [],
   vetoed: [],
 };

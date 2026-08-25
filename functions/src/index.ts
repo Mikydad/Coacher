@@ -20,6 +20,7 @@ export {
   stakeAcceptChallenge,
   stakeDeclineChallenge,
   stakeApplyVeto,
+  stakeSurrender,
   stakeConfirmOutcome,
   stakeCastVote,
   stakeReportScreenshot,

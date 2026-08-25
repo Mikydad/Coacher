@@ -398,6 +398,10 @@ class _StatusChip extends StatelessWidget {
       StakeChallengeStatus.pendingVerification => ('deciding', AppColors.amber),
       StakeChallengeStatus.completedSuccess => ('kept', AppColors.statusGreen),
       StakeChallengeStatus.completedForfeit => ('forfeited', AppColors.danger),
+      StakeChallengeStatus.completedSurrendered => (
+        'surrendered',
+        AppColors.textFaint,
+      ),
       StakeChallengeStatus.cancelled => ('cancelled', AppColors.textFaint),
       StakeChallengeStatus.vetoed => ('vetoed', AppColors.textFaint),
     };

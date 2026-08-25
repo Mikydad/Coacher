@@ -27,6 +27,11 @@ export type ChallengeType =
  * `completed_forfeit` when at least one forfeited (split 1v1 outcomes land
  * here — per-participant results live in outcome.perParticipant).
  * `vetoed` is solo-photo only (M-6): a recorded loss with no reveal.
+ * `completed_surrendered` (2026-08-25) is the solo early exit: the user
+ * gives up before the deadline and the stake's own consequence applies
+ * immediately (money donates, photo needs the mercy veto and dies
+ * unseen) — a distinct status so history never dresses a surrender up
+ * as a fought-and-lost forfeit.
  */
 export type ChallengeStatus =
   | 'draft'
@@ -35,6 +40,7 @@ export type ChallengeStatus =
   | 'pending_verification'
   | 'completed_success'
   | 'completed_forfeit'
+  | 'completed_surrendered'
   | 'cancelled'
   | 'vetoed';
 

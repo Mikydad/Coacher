@@ -120,7 +120,8 @@ export interface AuditEvent {
     | 'photo_expired'
     | 'photo_reported'
     | 'photo_deleted'
-    | 'screenshot_strike';
+    | 'screenshot_strike'
+    | 'surrendered';
   uid?: string;
   atMs: number;
   data?: Record<string, string | number | boolean>;

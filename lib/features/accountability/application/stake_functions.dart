@@ -115,6 +115,15 @@ class StakeFunctions {
     {'challengeId': challengeId},
   );
 
+  /// Solo early exit (goal-delete flow): the stake's own consequence
+  /// applies now — money donates, a photo consumes the mercy veto (the
+  /// server rejects when none is available), the loss is recorded as
+  /// `completed_surrendered`.
+  Future<void> surrender(String challengeId) => _call<Map<String, dynamic>>(
+    'stakeSurrender',
+    {'challengeId': challengeId},
+  );
+
   /// V-2 — confirm or dispute another participant's completion.
   Future<void> confirmOutcome({
     required String challengeId,

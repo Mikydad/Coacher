@@ -16,6 +16,7 @@ const ALL: ChallengeStatus[] = [
   'pending_verification',
   'completed_success',
   'completed_forfeit',
+  'completed_surrendered',
   'cancelled',
   'vetoed',
 ];
@@ -24,7 +25,7 @@ const ALL: ChallengeStatus[] = [
 const EXPECTED: Record<ChallengeStatus, ChallengeStatus[]> = {
   draft: ['pending_accept', 'active', 'cancelled'],
   pending_accept: ['active', 'cancelled'],
-  active: ['pending_verification', 'cancelled'],
+  active: ['pending_verification', 'completed_surrendered', 'cancelled'],
   pending_verification: [
     'completed_success',
     'completed_forfeit',
@@ -33,6 +34,7 @@ const EXPECTED: Record<ChallengeStatus, ChallengeStatus[]> = {
   ],
   completed_success: [],
   completed_forfeit: [],
+  completed_surrendered: [],
   cancelled: [],
   vetoed: [],
 };

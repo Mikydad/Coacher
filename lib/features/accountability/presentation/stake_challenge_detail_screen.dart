@@ -498,6 +498,11 @@ class _BodyState extends ConsumerState<_Body> {
         AppColors.statusGreen,
       ),
       StakeChallengeStatus.completedForfeit => ('Forfeited.', AppColors.danger),
+      StakeChallengeStatus.completedSurrendered => (
+        'Surrendered before the deadline — the stake\'s consequence applied. '
+            'It stays on your record.',
+        AppColors.textSoft,
+      ),
       StakeChallengeStatus.vetoed => (
         'Lost, but the mercy veto held the photo back. It stays on your '
             'record.',

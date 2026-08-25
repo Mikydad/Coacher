@@ -18,7 +18,8 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 
 import { canRemoveRevealedPhoto, vetoEligible } from './decisions';
-import { escrowRef, newEscrowDoc } from './escrows';
+import { escrowRef, markEscrow, newEscrowDoc } from './escrows';
+import { measureParticipant } from './measurement';
 import { balanceRef, txnRef, writeLedgerTxn } from './ledger';
 import { EscrowDoc, getPaymentProvider, validMoneyAmount } from './payments';
 import {
@@ -41,6 +42,7 @@ import {
   challengeFromSnap,
   ENFORCEMENT,
   eventDoc,
+  evidenceFromSnap,
 } from './firestore_layout';
 import { assertTransition } from './state_machine';
 import {
@@ -48,11 +50,14 @@ import {
   ChallengeType,
   CONFIRM_WINDOW_MS,
   FrozenGoal,
+  isMultiParty,
   Participant,
+  ParticipantResult,
   REVEAL_WINDOW_MAX_MINS,
   REVEAL_WINDOW_MIN_MINS,
   SoloMode,
   StakeChallenge,
+  StakeResolution,
 } from './types';
 import { voteClosesAtMs } from './decisions';
 
@@ -753,6 +758,190 @@ export const stakeApplyVeto = onCall(
       appendEvent(tx, id, { type: 'veto_requested', uid, atMs: now });
     });
     // The sweep applies it at decision time and stamps enforcement.lastVetoAtMs.
+    return { ok: true };
+  },
+);
+
+// ─── stakeSurrender ──────────────────────────────────────────────────────────
+// The solo early exit (2026-08-25, goal-delete flow): give up before the
+// deadline and take the stake's own consequence NOW. Never an escape
+// hatch — money donates to the anti-charity, a photo dies unseen only by
+// consuming the monthly mercy veto (no veto → no surrender), points burn
+// final. Multi-party challenges can't be surrendered: other people are
+// in them. Terminal status is 'completed_surrendered', distinct from a
+// fought-and-lost forfeit, so history stays truthful.
+
+export const stakeSurrender = onCall(
+  CALL_OPTS,
+  async (request: CallableRequest<{ challengeId?: unknown }>) => {
+    const uid = requireAuth(request);
+    requireRegistered(request);
+    const id = str(request.data?.challengeId, 'challengeId', 1, 64);
+    const now = Date.now();
+    const db = getFirestore();
+
+    // Pre-checks outside the transaction (same pattern as stakeApplyVeto);
+    // everything is re-validated on the fresh snap inside it.
+    const ch = await loadChallenge(id);
+    const me = participantOf(ch, uid);
+    if (isMultiParty(ch.type)) {
+      throw new HttpsError(
+        'failed-precondition',
+        'Only solo challenges can be surrendered — other people are in this one.',
+      );
+    }
+    if (ch.status !== 'active') {
+      throw new HttpsError(
+        'failed-precondition',
+        'Only an active challenge can be surrendered.',
+      );
+    }
+    if (me.stakeKind === 'photo') {
+      const enforcement = (
+        await db.collection(ENFORCEMENT).doc(uid).get()
+      ).data() as EnforcementDoc | undefined;
+      if (!vetoEligible(ch, enforcement?.lastVetoAtMs ?? null, now)) {
+        throw new HttpsError(
+          'failed-precondition',
+          'No mercy veto available — a photo stake can only be surrendered by ' +
+            'consuming it (one per 30 days). Finish the challenge or the photo ' +
+            'reveals at the deadline.',
+        );
+      }
+    }
+
+    // Honest units for the record: what was actually logged before giving up.
+    const evidence = (
+      await db.collection(CHALLENGES).doc(id).collection('evidence').get()
+    ).docs
+      .map(evidenceFromSnap)
+      .filter((e): e is NonNullable<typeof e> => e !== null);
+
+    let photoPath: string | undefined;
+    await db.runTransaction(async (tx) => {
+      const ref = db.collection(CHALLENGES).doc(id);
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new HttpsError('not-found', 'Challenge not found.');
+      const fresh = challengeFromSnap(snap);
+      if (fresh.status !== 'active') {
+        throw new HttpsError(
+          'failed-precondition',
+          'Only an active challenge can be surrendered.',
+        );
+      }
+      assertTransition('active', 'completed_surrendered');
+
+      // Reads before writes: points balance / money escrow.
+      const stake = me.stakeAmount ?? 0;
+      let bal: BalanceDoc | undefined;
+      if (me.stakeKind === 'points' && stake > 0) {
+        bal = (await tx.get(balanceRef(uid))).data() as BalanceDoc | undefined;
+      }
+      let escrow: EscrowDoc | undefined;
+      if (me.stakeKind === 'money' && stake > 0) {
+        escrow = (await tx.get(escrowRef(id, uid))).data() as
+          | EscrowDoc
+          | undefined;
+      }
+
+      const measured = measureParticipant(
+        fresh.frozenGoal,
+        fresh.mode,
+        evidence,
+        uid,
+        now,
+      );
+      const resolution: StakeResolution =
+        fresh.type === 'practice' || stake === 0
+          ? { kind: 'none' }
+          : me.stakeKind === 'photo'
+            ? { kind: 'veto_blocked' }
+            : { kind: 'forfeit', toCharityId: fresh.antiCharityId ?? '' };
+      const result: ParticipantResult = {
+        uid,
+        teamId: me.teamId,
+        unitsPassed: measured.unitsPassed,
+        unitsRequired: measured.unitsRequired,
+        evidencePassed: false,
+        passed: false,
+        sideWon: false,
+        disputed: false,
+        backfillFlagged: false,
+        resolution,
+      };
+
+      const update: Record<string, unknown> = {
+        status: 'completed_surrendered',
+        updatedAtMs: now,
+        outcome: { decidedAtMs: now, perParticipant: [result] },
+      };
+
+      if (me.stakeKind === 'photo') {
+        // M-6 semantics applied early: the veto burns, the photo dies
+        // unseen, the loss stays on the record.
+        update.photoState = 'deleted';
+        tx.set(
+          db.collection(ENFORCEMENT).doc(uid),
+          { lastVetoAtMs: now, updatedAtMs: now },
+          { merge: true },
+        );
+        photoPath = me.photo?.storagePath;
+      }
+
+      // PT-4 — the lock burns final (zero-amount audit row, same shape as
+      // the sweep's forfeit path).
+      if (me.stakeKind === 'points' && stake > 0) {
+        writeLedgerTxn(tx, uid, bal, {
+          source: 'stake_forfeit',
+          amount: 0,
+          refId: id,
+          atMs: now,
+          data: {
+            burnedAmount: stake,
+            toCharityId:
+              resolution.kind === 'forfeit' ? resolution.toCharityId : '',
+          },
+        });
+      }
+
+      // $-2 — record the disbursement intent atomically; the provider call
+      // stays in the sweep's queue driver, never inside this transaction.
+      if (me.stakeKind === 'money' && escrow && escrow.status === 'held') {
+        markEscrow(tx, escrowRef(id, uid), escrow, 'disbursement_pending', now, {
+          toCharityId:
+            resolution.kind === 'forfeit' ? resolution.toCharityId : '',
+        });
+      }
+
+      tx.update(ref, update);
+      appendEvent(tx, id, { type: 'surrendered', uid, atMs: now });
+      tx.create(
+        ref.collection('events').doc(),
+        eventDoc({
+          type: 'participant_forfeited',
+          uid,
+          atMs: now,
+          data: {
+            unitsPassed: measured.unitsPassed,
+            unitsRequired: measured.unitsRequired,
+            disputed: false,
+          },
+        }),
+      );
+      if (me.stakeKind === 'photo') {
+        tx.create(
+          ref.collection('events').doc(),
+          eventDoc({ type: 'veto_applied', uid, atMs: now }),
+        );
+      }
+    });
+
+    // Storage delete after commit (best-effort; photoState already
+    // 'deleted', so nothing can reveal it if this crashes).
+    if (photoPath) {
+      await getStorage().bucket().file(photoPath).delete({ ignoreNotFound: true });
+    }
+    logger.info('stakeSurrender ok', { uid, id });
     return { ok: true };
   },
 );

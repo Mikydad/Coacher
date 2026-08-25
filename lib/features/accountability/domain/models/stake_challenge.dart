@@ -42,6 +42,11 @@ enum StakeChallengeStatus {
   pendingVerification('pending_verification'),
   completedSuccess('completed_success'),
   completedForfeit('completed_forfeit'),
+
+  /// The solo early exit (2026-08-25): gave up before the deadline and the
+  /// stake's own consequence applied immediately — distinct from a
+  /// fought-and-lost forfeit so history stays truthful.
+  completedSurrendered('completed_surrendered'),
   cancelled('cancelled'),
   vetoed('vetoed');
 
@@ -56,6 +61,7 @@ enum StakeChallengeStatus {
   bool get isTerminal =>
       this == completedSuccess ||
       this == completedForfeit ||
+      this == completedSurrendered ||
       this == cancelled ||
       this == vetoed;
 }
