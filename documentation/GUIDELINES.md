@@ -2049,3 +2049,34 @@ not silent reversal.
   2026-08-30 and echo the number. The goal preview also shows its
   deadline (was silently dropped). (7) Home's Today's Tasks card has a
   "+ Create a task" link (goals-card pattern; tasks only, per user).
+
+- **2026-08-25 · Batch 4 (circles-and-navigation round).** (1) **Leaving a
+  circle is BLOCKED while the user has a live stake in it** (user
+  decision) — `_confirmLeave` checks `stakeChallengesStreamProvider` for
+  a non-terminal challenge with this `circleId` and explains why,
+  because leaving guards nothing: membership soft-deletes to
+  `status: 'removed'`, every membership check is existence-only, and the
+  sweep would still reveal the photo into the departed circle under the
+  user's real name. Known remaining debt, deliberately deferred:
+  existence-only checks mean a departed member retains rules-level
+  access (chat, feed, votes, new stakes) — making checks status-aware
+  touches firestore.rules/storage.rules and needs its own pass.
+  (2) Rematch's prefilled `circleId` is validated against `myCircles`
+  and dropped when stale (`_dropStaleCircleId`) — it used to sail past
+  every `!= null` gate, get ACCEPTED server-side into the departed
+  circle, and trip the dropdown's value assert. (3) Sweep:
+  `eligibleVoterCount` now counts only `status == 'active'` members
+  (removed/pending ghosts silently made dispute quorum unreachable);
+  the reveal feed post is skipped when the circle document is gone (a
+  bare tx.create into a deleted circle aborted the whole settlement
+  every 15-minute pass). (4) Home "Today's goals" tap opens the
+  GoalCounterSheet quick-log (the section's own subtitle already
+  promised "tap a goal to log progress"); goal detail stays reachable
+  via the sheet's Details pill; falls back to the detail push while
+  progress is loading. "+ Create a goal" is always visible (was
+  empty-state-only). (5) Ending a focus session ALWAYS lands on the
+  Focus list: `_autoReturnToFocusIfStillCurrent` routes there instead
+  of popping to the launch site, and a throw in auto-next can no longer
+  strand the user on the dead timer. (6) Task detail "Mark done" pops
+  back to the previous screen, snackbar on the surviving app-level
+  messenger. Composer voice-button layout left as-is (user decision).
