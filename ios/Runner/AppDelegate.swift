@@ -2,12 +2,48 @@ import Flutter
 import UIKit
 import UserNotifications
 
+/// sidepal:// custom-scheme links (2026-08-26; first use: circle invite
+/// keys, sidepal://join/XXXX-XXXX). Same shape as SiriVoiceEntryBridge:
+/// cold-start links wait as a pending value Dart consumes idempotently on
+/// launch/resume; warm links post an in-process event forwarded over the
+/// method channel. Lives in this file so no pbxproj surgery is needed.
+final class DeepLinkBridge {
+  static let notificationName = Notification.Name("SidePalDeepLink")
+  private static var pending: String?
+
+  static func handle(_ url: URL) -> Bool {
+    guard url.scheme?.lowercased() == "sidepal" else { return false }
+    pending = url.absoluteString
+    NotificationCenter.default.post(
+      name: notificationName, object: url.absoluteString)
+    return true
+  }
+
+  static func consumePending() -> String? {
+    let value = pending
+    pending = nil
+    return value
+  }
+}
+
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+  override func application(
+    _ app: UIApplication,
+    open url: URL,
+    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+  ) -> Bool {
+    if DeepLinkBridge.handle(url) { return true }
+    return super.application(app, open: url, options: options)
+  }
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    if let url = launchOptions?[.url] as? URL {
+      _ = DeepLinkBridge.handle(url)
+    }
     // Ensure iOS notification tap callbacks are routed through AppDelegate.
     UNUserNotificationCenter.current().delegate = self
     // Home-exit geofence (humanizing Phase 6b): recreate the location
@@ -54,6 +90,27 @@ import UserNotifications
       object: nil, queue: .main
     ) { _ in
       siriChannel.invokeMethod("voiceEntryRequested", arguments: nil)
+    }
+
+    // sidepal:// deep links (2026-08-26) — pending flag + warm event, the
+    // Siri-bridge pattern.
+    let deepLinkRegistrar = engineBridge.pluginRegistry.registrar(forPlugin: "SidePalDeepLinks")
+    let deepLinkChannel = FlutterMethodChannel(
+      name: "sidepal/deep_links",
+      binaryMessenger: deepLinkRegistrar!.messenger())
+    deepLinkChannel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "consumePendingLink":
+        result(DeepLinkBridge.consumePending())
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    NotificationCenter.default.addObserver(
+      forName: DeepLinkBridge.notificationName,
+      object: nil, queue: .main
+    ) { note in
+      deepLinkChannel.invokeMethod("linkReceived", arguments: note.object as? String)
     }
 
     // Ephemeral calendar signal (humanizing Phase 4b): busy intervals only,

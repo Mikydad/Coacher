@@ -27,6 +27,9 @@ export {
   stakeReportPhoto,
   stakeRemovePhoto,
 } from "./stakes/callables";
+// Circle invites (2026-08-26) — the first circle callables: server-held
+// invite keys, the only door into private circles.
+export { circleInvite, circleJoinWithInvite } from "./circles/callables";
 export { grantPoints, pointsSignupBonus } from "./stakes/ledger";
 export { stakeSweep } from "./stakes/sweep";
 export { intentionSweep } from "./intentions/sweep";

@@ -7,6 +7,7 @@ import '../../../accountability/application/stakes_providers.dart';
 import '../../application/circle_providers.dart';
 import '../../domain/models/accountability_circle.dart';
 import '../../domain/models/circle_enums.dart';
+import '../sheets/circle_invite_sheet.dart';
 import '../sheets/circle_notif_prefs_sheet.dart';
 
 import '../../../../core/presentation/app_colors.dart';
@@ -147,6 +148,21 @@ class CircleInfoView extends ConsumerWidget {
                 title: m.userId == uid
                     ? '${m.displayName} (you)'
                     : m.displayName,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // ── Invite ───────────────────────────────────────────────────────
+            _SectionLabel('Invite'),
+            const SizedBox(height: 8),
+            _SettingsTile(
+              icon: Icons.person_add_alt_1_outlined,
+              title: 'Invite members',
+              onTap: () => showCircleInviteSheet(
+                context,
+                circleId: circleId,
+                circleName: circle.name,
+                isModerator: isModerator,
               ),
             ),
             const SizedBox(height: 16),

@@ -15,6 +15,7 @@ import '../domain/models/accountability_circle.dart';
 import '../domain/models/circle_enums.dart';
 import 'circle_auth_guard.dart';
 import 'circle_detail_screen.dart';
+import 'sheets/circle_join_code_sheet.dart';
 
 import '../../../core/presentation/app_colors.dart';
 
@@ -285,6 +286,13 @@ class _CircleDiscoveryScreenState extends ConsumerState<CircleDiscoveryScreen>
         title: const PageTitle('Discover circles'),
         centerTitle: true,
         elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Join with a key',
+            icon: const Icon(Icons.key_rounded),
+            onPressed: () => showJoinWithCodeSheet(context, ref),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.accent,

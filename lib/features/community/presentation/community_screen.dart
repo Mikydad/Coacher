@@ -10,6 +10,7 @@ import 'circle_auth_guard.dart';
 import 'circle_create_screen.dart';
 import 'circle_detail_screen.dart';
 import 'circle_discovery_screen.dart';
+import 'sheets/circle_join_code_sheet.dart';
 
 import '../../../core/presentation/app_colors.dart';
 import '../../ai_assistant/presentation/widgets/coach_ai_fab.dart';
@@ -177,6 +178,27 @@ class CommunityScreen extends ConsumerWidget {
               onTap: () {
                 Navigator.pop(ctx);
                 Navigator.pushNamed(context, CircleDiscoveryScreen.routeName);
+              },
+            ),
+            ListTile(
+              leading: CircleAvatar(
+                backgroundColor: AppColors.surfaceCard,
+                child: Icon(Icons.key_rounded, color: AppColors.gold),
+              ),
+              title: Text(
+                'Join with a key',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: Text(
+                'Got an invite key from a friend? Enter it here',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                showJoinWithCodeSheet(context, ref);
               },
             ),
             const SizedBox(height: 8),
