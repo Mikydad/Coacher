@@ -101,8 +101,11 @@ class AddTaskCategorySection extends StatelessWidget {
 
 /// One fixed-size mini bento chip for the inline category row: icon +
 /// uppercase label on a single centered line (the row is too short for the
-/// stacked bento layout). Selection inverts the chip — dark-ink background
-/// with the category color as ink — so the pick is unmissable at a glance.
+/// stacked bento layout). Selection is ADDITIVE, never an inversion
+/// (2026-08-25): the old dark-ink flip vanished into the dark sheet, so a
+/// picked category read as an empty gap. The chip keeps its vivid color
+/// and gains three redundant cues — the icon becomes a check, an ink ring
+/// draws inside the edge, and the chip glows in its own color.
 class _CategoryMiniCard extends StatelessWidget {
   const _CategoryMiniCard(
     this.label, {
@@ -120,35 +123,56 @@ class _CategoryMiniCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = selected ? BentoPalette.ink : color;
-    final fg = selected ? color : BentoPalette.ink;
+    const fg = BentoPalette.ink;
     return SizedBox(
       width: 73,
-      child: Material(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          color: color,
           borderRadius: BorderRadius.circular(12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 13, color: fg),
-              const SizedBox(width: 5),
-              Flexible(
-                child: Text(
-                  label.toUpperCase(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: fg,
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
+          border: Border.all(
+            color: selected ? fg : Colors.transparent,
+            width: 1.5,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.5),
+                    blurRadius: 10,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : const [],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(selected ? Icons.check_rounded : icon,
+                    size: selected ? 14 : 13, color: fg),
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    label.toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: fg,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

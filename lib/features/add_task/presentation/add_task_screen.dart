@@ -444,11 +444,10 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
 
   Future<void> _onSave() async {
     if (_saving || (_isEdit && !_loaded)) return;
+    // Belt to the button's braces: nothing saves without a name.
+    final title = _controller.text.trim();
+    if (title.isEmpty) return;
     setState(() => _saving = true);
-
-    final title = _controller.text.trim().isEmpty
-        ? 'Untitled Task'
-        : _controller.text.trim();
     final planning = ref.read(planningRepositoryProvider);
     final planKey = _planDateKey();
     final nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -880,30 +879,41 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                           ],
                         ),
                       ),
-                      child: FilledButton(
-                        // Guided-tour target: "now save it".
-                        key: TourTargets.addTaskSaveButton,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(56),
-                          backgroundColor: AddTaskColors.accentContainer,
-                          foregroundColor: AppColors.accentDeep,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(28),
-                          ),
-                        ),
-                        onPressed: _saving ? null : _onSave,
-                        child: Text(
-                          _saving
-                              ? 'Saving…'
-                              : (_isEdit ? 'Save changes' : 'Add task')
-                                    .toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
+                      // A task must have a name (2026-08-25) — blank titles
+                      // used to save silently as "Untitled Task". The button
+                      // disables and says why, live with every keystroke.
+                      child: ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _controller,
+                        builder: (context, titleValue, _) {
+                          final titleBlank = titleValue.text.trim().isEmpty;
+                          return FilledButton(
+                            // Guided-tour target: "now save it".
+                            key: TourTargets.addTaskSaveButton,
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(56),
+                              backgroundColor: AddTaskColors.accentContainer,
+                              foregroundColor: AppColors.accentDeep,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(28),
+                              ),
+                            ),
+                            onPressed: _saving || titleBlank ? null : _onSave,
+                            child: Text(
+                              (_saving
+                                      ? 'Saving…'
+                                      : titleBlank
+                                      ? 'Name the task first'
+                                      : (_isEdit ? 'Save changes' : 'Add task'))
+                                  .toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],
