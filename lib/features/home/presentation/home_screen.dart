@@ -46,6 +46,7 @@ import '../../tasks_hub/presentation/task_detail_screen.dart';
 import '../../tasks_hub/presentation/tasks_hub_screen.dart';
 import '../../focus/presentation/focus_selection_screen.dart';
 import '../../goals/application/goals_providers.dart';
+import '../../goals/presentation/widgets/goal_counter_sheet.dart';
 import '../../goals/domain/models/goal_categories.dart';
 import '../../goals/domain/models/goal_enums.dart';
 import '../../goals/domain/models/user_goal.dart';
@@ -370,21 +371,7 @@ class HomeScreen extends ConsumerWidget {
                             style: TextStyle(color: AppColors.fg54),
                           ),
                           const SizedBox(height: 8),
-                          TextButton.icon(
-                            onPressed: () => Navigator.pushNamed(
-                              context,
-                              GoalTemplatePickerScreen.routeName,
-                            ),
-                            icon: Icon(
-                              Icons.add,
-                              size: 20,
-                              color: AppColors.accent,
-                            ),
-                            label: const Text('Create a goal'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.accent,
-                            ),
-                          ),
+                          _createGoalLink(context),
                         ],
                       );
                     }
@@ -392,15 +379,46 @@ class HomeScreen extends ConsumerWidget {
                     final remaining = goals.length - visible.length;
                     return Column(
                       children: [
+                        // Tap = log progress (2026-08-25) — the same
+                        // quick-log sheet as the Goals page, honoring the
+                        // section's own "tap a goal to log progress" line.
+                        // Goal detail stays reachable via the sheet's
+                        // Details pill; while progress is still loading
+                        // the tap falls back to the detail push.
                         for (final g in visible)
-                          _TodayGoalTile(
-                            title: g.title,
-                            subtitle: _homeGoalSubtitle(g),
-                            onTap: () => Navigator.pushNamed(
-                              context,
-                              GoalDetailScreen.routeName,
-                              arguments: g.id,
-                            ),
+                          Consumer(
+                            builder: (context, tileRef, _) {
+                              final progress = tileRef
+                                  .watch(goalTodayProgressProvider(g.id))
+                                  .valueOrNull;
+                              return _TodayGoalTile(
+                                title: g.title,
+                                subtitle: _homeGoalSubtitle(g),
+                                onTap: () {
+                                  if (progress == null) {
+                                    Navigator.pushNamed(
+                                      context,
+                                      GoalDetailScreen.routeName,
+                                      arguments: g.id,
+                                    );
+                                    return;
+                                  }
+                                  showModalBottomSheet<void>(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (_) => GoalCounterSheet(
+                                      goal: g,
+                                      initialProgress: progress,
+                                    ),
+                                  ).then(
+                                    (_) => tileRef.invalidate(
+                                      goalTodayProgressProvider(g.id),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
                           ),
                         if (remaining > 0)
                           _HomeSectionSeeMoreLink(
@@ -413,6 +431,13 @@ class HomeScreen extends ConsumerWidget {
                               index: MainTabIndex.goals,
                             ),
                           ),
+                        // Direct goal creation stays visible even with
+                        // goals listed (2026-08-25) — it used to appear
+                        // only in the empty state.
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: _createGoalLink(context),
+                        ),
                       ],
                     );
                   },
@@ -1643,6 +1668,18 @@ Widget _createTaskLink(BuildContext context) {
     onPressed: () => showAddTaskSheet(context),
     icon: Icon(Icons.add, size: 20, color: AppColors.accent),
     label: const Text('Create a task'),
+    style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+  );
+}
+
+/// "+ Create a goal" — always visible at the bottom of the Today's goals
+/// card (2026-08-25; it used to exist only in the empty state).
+Widget _createGoalLink(BuildContext context) {
+  return TextButton.icon(
+    onPressed: () =>
+        Navigator.pushNamed(context, GoalTemplatePickerScreen.routeName),
+    icon: Icon(Icons.add, size: 20, color: AppColors.accent),
+    label: const Text('Create a goal'),
     style: TextButton.styleFrom(foregroundColor: AppColors.accent),
   );
 }
