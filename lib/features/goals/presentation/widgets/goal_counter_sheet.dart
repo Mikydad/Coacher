@@ -303,9 +303,17 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         const Spacer(),
-        IconButton(
-          tooltip: 'View full detail',
-          icon: Icon(Icons.trending_up_outlined, color: AppColors.fg54),
+        // A labeled pill instead of a bare glyph — "edit this goal" starts
+        // here, so the way in has to be spelled out in words.
+        TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.textPrimary,
+            backgroundColor: AppColors.fg12,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
           onPressed: () {
             Navigator.of(context).pop();
             Navigator.pushNamed(
@@ -314,6 +322,14 @@ class _GoalCounterSheetState extends ConsumerState<GoalCounterSheet> {
               arguments: _goal.id,
             );
           },
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Details', style: TextStyle(fontSize: 13)),
+              const SizedBox(width: 2),
+              Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.fg54),
+            ],
+          ),
         ),
       ],
     ),
