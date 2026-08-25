@@ -696,7 +696,12 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
       );
       return;
     }
-    final repeatInterval = _repeatCadence == GoalRepeatCadence.off
+    // Daily always saves interval 1 (2026-08-25): its wheel is commented
+    // out, and a stale >1 restored from a draft or an old goal would
+    // silently skip days with no visible control.
+    final repeatInterval =
+        _repeatCadence == GoalRepeatCadence.off ||
+            _repeatCadence == GoalRepeatCadence.daily
         ? 1
         : _repeatInterval.clamp(1, 999);
     final repo = ref.read(goalsRepositoryProvider);
@@ -833,6 +838,16 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
       await ref.read(formDraftRepositoryProvider).delete(_draftKey);
 
       if (!mounted) return;
+      // The list must show what was just saved (2026-08-25): with a
+      // specific category filter active that doesn't match, the fresh goal
+      // was silently filtered out of view. Switch the filter to the goal's
+      // category; "All" stays "All" — narrowing it would be its own
+      // surprise.
+      final filter = ref.read(selectedGoalCategoryFilterProvider);
+      if (filter != null && filter != _categoryId) {
+        ref.read(selectedGoalCategoryFilterProvider.notifier).state =
+            _categoryId;
+      }
       // `true` = saved: the template picker beneath pops itself as well, so
       // back after saving doesn't land on a stale picker.
       Navigator.pop(context, true);
@@ -989,7 +1004,13 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
         ),
         GoalEditorRepeatToggle(
           selected: _repeatCadence,
-          onChanged: (c) => setState(() => _repeatCadence = c),
+          onChanged: (c) => setState(() {
+            _repeatCadence = c;
+            // Daily has no interval wheel (2026-08-25, commented out
+            // below) — a stale "every 3" carried over from weekly would
+            // silently skip days with no visible control to fix it.
+            if (c == GoalRepeatCadence.daily) _repeatInterval = 1;
+          }),
         ),
         const SizedBox(height: 8),
         if (_repeatCadence == GoalRepeatCadence.off)
@@ -1023,28 +1044,37 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
             ),
             const SizedBox(height: 12),
           ],
-          // "Every X days" wheel and the reminder control share one row.
+          // The interval wheel and the reminder control share one row.
+          // DAILY no longer shows the "every X days" wheel (2026-08-25,
+          // user decision — commented, not removed, in case it returns);
+          // weekly/monthly keep theirs, and the cadence toggle above
+          // forces the interval back to 1 when daily is picked.
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              GoalEditorIntervalWheel(
-                value: _repeatInterval,
-                maxValue: _repeatCadence == GoalRepeatCadence.daily ? 30 : 12,
-                onChanged: (v) => setState(() => _repeatInterval = v),
-                unitSingular: switch (_repeatCadence) {
-                  GoalRepeatCadence.daily => 'day',
-                  GoalRepeatCadence.weekly => 'week',
-                  GoalRepeatCadence.monthly => 'month',
-                  GoalRepeatCadence.off => '',
-                },
-                unitPlural: switch (_repeatCadence) {
-                  GoalRepeatCadence.daily => 'days',
-                  GoalRepeatCadence.weekly => 'weeks',
-                  GoalRepeatCadence.monthly => 'months',
-                  GoalRepeatCadence.off => '',
-                },
-              ),
-              const SizedBox(width: 12),
+              if (_repeatCadence != GoalRepeatCadence.daily) ...[
+                GoalEditorIntervalWheel(
+                  value: _repeatInterval,
+                  // maxValue: _repeatCadence == GoalRepeatCadence.daily
+                  //     ? 30
+                  //     : 12,
+                  maxValue: 12,
+                  onChanged: (v) => setState(() => _repeatInterval = v),
+                  unitSingular: switch (_repeatCadence) {
+                    // GoalRepeatCadence.daily => 'day',
+                    GoalRepeatCadence.weekly => 'week',
+                    GoalRepeatCadence.monthly => 'month',
+                    _ => '',
+                  },
+                  unitPlural: switch (_repeatCadence) {
+                    // GoalRepeatCadence.daily => 'days',
+                    GoalRepeatCadence.weekly => 'weeks',
+                    GoalRepeatCadence.monthly => 'months',
+                    _ => '',
+                  },
+                ),
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: KeyedSubtree(
                   key: _reminderSectionKey,

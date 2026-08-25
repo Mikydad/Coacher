@@ -202,6 +202,9 @@ class _AccountabilityCreateFlowState
   late DateTime _rangeStart = _todayDate();
   late DateTime _rangeEnd = _todayDate().add(const Duration(days: 6));
   GoalRepeatCadence _cadence = GoalRepeatCadence.daily;
+  // Not final: the (currently commented-out) daily interval wheel is the
+  // writer — see the schedule row.
+  // ignore: prefer_final_fields
   int _interval = 1;
   final Set<int> _weekdays = <int>{};
   final Set<int> _monthDays = <int>{};
@@ -766,16 +769,19 @@ class _AccountabilityCreateFlowState
       Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          if (_cadence == GoalRepeatCadence.daily) ...[
-            GoalEditorIntervalWheel(
-              value: _interval,
-              maxValue: 30,
-              onChanged: (v) => setState(() => _interval = v),
-              unitSingular: 'day',
-              unitPlural: 'days',
-            ),
-            const SizedBox(width: 12),
-          ],
+          // Daily "every X days" wheel removed 2026-08-25 (user decision —
+          // commented, not deleted, in case it returns). `_interval` stays
+          // at its default of 1, so daily means every day.
+          // if (_cadence == GoalRepeatCadence.daily) ...[
+          //   GoalEditorIntervalWheel(
+          //     value: _interval,
+          //     maxValue: 30,
+          //     onChanged: (v) => setState(() => _interval = v),
+          //     unitSingular: 'day',
+          //     unitPlural: 'days',
+          //   ),
+          //   const SizedBox(width: 12),
+          // ],
           Expanded(
             child: GoalEditorReminderCard(
               compact: true,
