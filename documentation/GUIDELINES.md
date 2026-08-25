@@ -2080,3 +2080,31 @@ not silent reversal.
   strand the user on the dead timer. (6) Task detail "Mark done" pops
   back to the previous screen, snackbar on the surviving app-level
   messenger. Composer voice-button layout left as-is (user decision).
+
+- **2026-08-25 · Batch 5 (custom categories, interval, sheet growth).**
+  (1) The New-goal picker's bottom pill is now **"Custom category"**:
+  name a category (reusing the Add-Task dialog — UI-generic) → the goal
+  editor opens seeded with it. Previously "Custom Goal" silently filed
+  the goal under Study; goals have NO other category picker (the sector
+  chips were removed in f9aab66 and `GoalEditorSectorChips` is dead
+  code). The category stays a plain string on the goal — no new synced
+  entity. (2) The Goals filter chips derive from data:
+  `goalCategoryFilterOptionsProvider` = built-ins + every custom
+  category on an active goal + the currently-selected filter (so
+  deleting the last goal of a category can't strand an invisible
+  filter); derived from the UNFILTERED stream. Custom categories hash
+  their name to a stable hue in `goalCategoryTone` (they all wore the
+  Study tone). (3) Saving a goal switches an active category filter to
+  the saved goal's category ("All" stays "All") — filter-on-Study +
+  save-a-Sleep-goal used to hide the fresh goal. (4) The daily
+  "every X days" wheel is COMMENTED OUT (user decision — restorable) in
+  both the goal editor (cadence-guarded; weekly/monthly keep theirs)
+  and the stake flow; daily force-saves interval 1 and the cadence
+  toggle resets it, because a stale 3 restored from a draft would
+  silently skip days with no visible control. (5) Coach sheet growth
+  regression: growth keyed ONLY on message count, but a reply replaces
+  its loading bubble in place (same count) and streamed replies rewrite
+  one bubble per token — now a last-message signature change also grows
+  (throttled 350ms), and the overflow check re-measures across up to 5
+  frames because the lazy ListView's first-frame extent under-reported
+  long replies.
