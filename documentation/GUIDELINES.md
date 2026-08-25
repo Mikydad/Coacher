@@ -2024,3 +2024,28 @@ not silent reversal.
   vanished while every unselected sibling glowed. Selected now keeps
   its vivid category color and gains three redundant cues: check icon,
   ink ring, own-color glow. Tap-to-clear behavior unchanged.
+
+- **2026-08-25 · Batch 3 (sister-testing round).** (1) The timer hero
+  "PHASE / Deep Focus" is now "Focus timer / Timing your work on this
+  task" — testers asked what the screen was. (2) Every DND-ish surface
+  names SidePal explicitly: override summaries
+  (`OverrideAttentionPolicy.suppressionSummary`), the quick-activate
+  sheet subtitle, the Deep Work card ("MUTES SIDEPAL ALERTS"), and the
+  Deep Work guide — no copy may promise phone-wide silence an app
+  cannot deliver. (3) Stake create: the commitment block (title first)
+  now sits ABOVE the stake config — picking a stake auto-focuses the
+  title and the old order scroll-jumped past the circle picker; jump
+  order and chip order follow. (4) Zero circles is a loud, actionable
+  card ("No circles yet — join or create one and invite others" + Go to
+  Community via `navigateToMainTab`), keyed so the Continue jump lands
+  on it (previously the jump targeted an unmounted field and did
+  NOTHING). (5) Requirement chips are tappable — each glides to its own
+  field (`_requirementItems` now carries the scroll key). (6) New
+  `lib/core/utils/friendly_date.dart` (today/tomorrow/yesterday,
+  weekday within 6 days, "Mon, Sep 1" beyond) feeds the AI plan card,
+  executor confirmations, voice speech, and the schedule tool output;
+  the operating-layer prompt now names the weekday and instructs
+  human date phrasing — the model used to resolve "Sunday" →
+  2026-08-30 and echo the number. The goal preview also shows its
+  deadline (was silently dropped). (7) Home's Today's Tasks card has a
+  "+ Create a task" link (goals-card pattern; tasks only, per user).
