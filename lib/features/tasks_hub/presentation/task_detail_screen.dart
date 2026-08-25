@@ -148,6 +148,9 @@ class TaskDetailScreen extends ConsumerWidget {
     WidgetRef ref,
     PlannedTask task,
   ) async {
+    // Capture the app-level messenger before popping — it outlives this
+    // route, so the confirmation lands on the screen the user returns to.
+    final messenger = ScaffoldMessenger.of(context);
     await completePlannedTaskRow(
       context,
       ref,
@@ -156,12 +159,12 @@ class TaskDetailScreen extends ConsumerWidget {
       sourceContext: 'task_detail.complete',
       runAutoNext: false,
     );
-    ref.invalidate(taskDetailProvider(args));
+    // Done means done (2026-08-25): return to wherever the task was opened
+    // from instead of lingering on a page whose buttons just went grey.
     if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Task completed.')));
+      Navigator.of(context).pop();
     }
+    messenger.showSnackBar(const SnackBar(content: Text('Task completed.')));
   }
 
   Future<void> _delete(

@@ -213,23 +213,28 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
       }
       if (!mounted) return;
       if (result.completionPercent >= 100) {
-        await runAutoNextTaskFlow(
-          context,
-          ref,
-          completedTaskId: execState.taskId,
-          completionPercent: result.completionPercent,
-        );
+        // A throw in the next-task lookup must never strand the user on
+        // the dead timer — the terminal navigation below still runs.
+        try {
+          await runAutoNextTaskFlow(
+            context,
+            ref,
+            completedTaskId: execState.taskId,
+            completionPercent: result.completionPercent,
+          );
+        } catch (e) {
+          debugPrint('[TimerSession] auto-next failed: $e');
+        }
       } else {
         await returnToFocusList(context, ref);
       }
-      // The rating is saved at this point, so the user should never be left
-      // stranded on the finished timer. Most paths above already navigate
-      // away (returnToFocusList, or "Start now" pushing the next task's
-      // timer on top) — but some leave this screen as the current route,
-      // e.g. no next task was available, or a next-task sub-dialog (extra
-      // time / move with reason) was cancelled. Only pop when we're still
-      // the active route so we never pop a screen that was pushed on top of
-      // us in the meantime, and never double-pop an already-removed route.
+      // The rating is saved at this point — ending a session ALWAYS lands
+      // on the Focus list where tasks are chosen (2026-08-25), no matter
+      // where the timer was launched from. Most paths above already
+      // navigated (returnToFocusList, or "Start now" pushing the next
+      // task's timer on top); this catches the rest — no next task
+      // available, a next-task sub-dialog cancelled, or auto-next threw.
+      // Guarded on isCurrent so a route pushed on top is never yanked.
       _autoReturnToFocusIfStillCurrent();
     } finally {
       if (mounted) {
@@ -240,15 +245,18 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
     }
   }
 
-  /// Pops this screen once the post-session rating flow has fully settled,
-  /// but only if nothing else already navigated away. `route.isCurrent` is
-  /// false when another screen (e.g. Focus, or a freshly-pushed timer for
-  /// the auto-next task) is now on top, so this is a no-op in that case.
+  /// Routes to the Focus list once the post-session rating flow has fully
+  /// settled, but only if nothing else already navigated away.
+  /// `route.isCurrent` is false when another screen (e.g. Focus, or a
+  /// freshly-pushed timer for the auto-next task) is now on top, so this
+  /// is a no-op in that case. A plain pop used to land wherever the timer
+  /// was launched from (Home, task detail) — ending a session should
+  /// always return to where tasks are chosen (2026-08-25).
   void _autoReturnToFocusIfStillCurrent() {
     if (!mounted) return;
     final route = ModalRoute.of(context);
     if (route == null || !route.isCurrent) return;
-    Navigator.of(context).maybePop();
+    unawaited(returnToFocusList(context, ref));
   }
 
   Future<void> _checkReclaimedTime(String taskId) async {
