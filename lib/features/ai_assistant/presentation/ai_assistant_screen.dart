@@ -356,7 +356,16 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     }
     // Measure AFTER the 60% stage has laid out: does the thread overflow
     // its viewport? Then 60% would just mean cramped scrolling — continue
-    // to full in the same motion.
+    // to full in the same motion. Re-measured over a few frames
+    // (2026-08-25): the thread is a lazy ListView, so the very first
+    // post-frame extent is an estimate that under-reported long replies
+    // and the sheet never grew past 60%.
+    _expandToFullIfOverflowing();
+  }
+
+  void _expandToFullIfOverflowing([int attempt = 0]) {
+    final sheet = widget.sheetController;
+    if (sheet == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !sheet.isAttached) return;
       if (sheet.size >= _CoachAiSheet.maxSize - 0.05) return; // already full
@@ -364,20 +373,31 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       // until the next message event.
       if (sheet.size < _CoachAiSheet.midSize - 0.06) return;
       final scroll = _activeScrollController;
-      if (!scroll.hasClients) return;
-      // Small tolerance: a few overflowing pixels aren't "a long chat".
-      if (scroll.position.maxScrollExtent > 32) {
+      if (scroll.hasClients &&
+          // Small tolerance: a few overflowing pixels aren't "a long chat".
+          scroll.position.maxScrollExtent > 32) {
         sheet.animateTo(
           _CoachAiSheet.maxSize,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOutCubic,
         );
+        return;
       }
+      if (attempt < 4) _expandToFullIfOverflowing(attempt + 1);
     });
   }
 
   AiAssistantService? _listenedService;
   int _seenMessageCount = 0;
+  String _seenLastMessageSignature = '';
+  DateTime _lastContentGrowAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  String _lastMessageSignature(AiAssistantService service) {
+    final messages = service.messages;
+    if (messages.isEmpty) return '';
+    final last = messages.last;
+    return '${last.id}:${last.content.length}';
+  }
 
   /// One growth mechanism for every message source: watch the service and
   /// grow when the thread gains a message (user send, auto-send, AI reply).
@@ -388,6 +408,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     _listenedService?.removeListener(_onServiceMessagesChanged);
     _listenedService = service;
     _seenMessageCount = service.messages.length;
+    _seenLastMessageSignature = _lastMessageSignature(service);
     service.addListener(_onServiceMessagesChanged);
     if (widget.sheetMode && service.messages.isNotEmpty) {
       _growSheetForMessages();
@@ -398,9 +419,29 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     final service = _listenedService;
     if (service == null || !mounted) return;
     final count = service.messages.length;
+    final signature = _lastMessageSignature(service);
     final grew = count > _seenMessageCount;
+    // The count is NOT the whole story (2026-08-25 regression): a reply
+    // replaces its loading bubble in place (remove + add, same count), and
+    // streamed replies rewrite one bubble token by token — the sheet never
+    // re-measured and stayed cramped at 60% for long answers.
+    final contentChanged = !grew && signature != _seenLastMessageSignature;
     _seenMessageCount = count;
-    if (grew) _growSheetForMessages();
+    _seenLastMessageSignature = signature;
+    if (grew) {
+      _growSheetForMessages();
+      return;
+    }
+    if (contentChanged) {
+      // Throttled: streaming fires this per token batch.
+      final now = DateTime.now();
+      if (now.difference(_lastContentGrowAt) <
+          const Duration(milliseconds: 350)) {
+        return;
+      }
+      _lastContentGrowAt = now;
+      _growSheetForMessages();
+    }
   }
 
   void _applyCoachLaunchArgs(Object? args) {
