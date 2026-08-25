@@ -24,8 +24,10 @@ import '../../planning/application/task_schedule_display.dart';
 import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/application/analytics_period_bundle_notifier.dart';
 import '../../analytics/application/discipline_score.dart';
+import '../../analytics/application/announced_insight_store.dart';
 import '../../analytics/application/coaching_insight_notification_policy.dart';
 import '../../analytics/application/delivery_providers.dart';
+import '../../analytics/presentation/coaching_insight_copy.dart';
 import '../../analytics/application/focus_providers.dart';
 import '../../analytics/application/insight_generation_providers.dart';
 import '../../analytics/domain/models/analytics_event.dart';
@@ -957,6 +959,20 @@ class _Layer4NotificationDispatchBridgeState
           );
       if (decision.outcome != AttentionOutcome.suppressed) {
         await prefService.recordCoachingInsightNotificationSent();
+        // Same frozen-copy rule as insight pushes: the tap must be
+        // honorable after a recompute replaces the advertised insight.
+        if (selected.isNotEmpty) {
+          await ref
+              .read(announcedInsightStoreProvider)
+              .save(
+                AnnouncedInsight(
+                  insightId: focus.primaryInsightId,
+                  message: selected.first.message,
+                  caption: coachingDetailCaption(selected.first) ?? '',
+                  dateKey: DateKeys.todayKey(),
+                ),
+              );
+        }
       }
       // Either way this focus is handled — a suppressed intent retries via
       // the orchestrator's own queue, not by re-dispatching here.
@@ -980,6 +996,8 @@ class _Layer4NotificationDispatchBridgeState
 
     if (!vm.isEligible || primaryId == null || primaryId.isEmpty) {
       await notifications.cancel(kCoachingInsightNotificationId);
+      // No banner, no promise — drop the frozen copy too.
+      await ref.read(announcedInsightStoreProvider).clear();
       _lastScheduledPrimaryInsightId = null;
       _dispatchInFlightForInsightId = null;
       return;
@@ -1050,6 +1068,21 @@ class _Layer4NotificationDispatchBridgeState
         // actually scheduled; a suppressed intent retries via the
         // orchestrator's own queue.
         await prefService.recordCoachingInsightNotificationSent();
+        // Freeze the bannered copy: recomputes wholesale-replace today's
+        // insights, so the tap must be honored from this snapshot when
+        // the live id no longer resolves.
+        if (selected.isNotEmpty) {
+          await ref
+              .read(announcedInsightStoreProvider)
+              .save(
+                AnnouncedInsight(
+                  insightId: primaryId,
+                  message: selected.first.message,
+                  caption: coachingDetailCaption(selected.first) ?? '',
+                  dateKey: DateKeys.todayKey(),
+                ),
+              );
+        }
       }
       _lastScheduledPrimaryInsightId = primaryId;
     } finally {

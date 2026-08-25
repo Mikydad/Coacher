@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../profile/application/profile_providers.dart';
 import '../../application/ai_summary_providers.dart';
+import '../../application/announced_insight_store.dart';
 import '../../application/analytics_period_bundle.dart';
 import '../../application/delivery_providers.dart';
 import '../../application/discipline_score.dart';
@@ -52,6 +53,7 @@ class ProgressInsightsRow extends ConsumerWidget {
           decisionAsync: decisionAsync,
           insightsAsync: insightsAsync,
           bundle: bundle,
+          announced: ref.watch(announcedInsightTodayProvider).valueOrNull,
         ),
       ],
     );
@@ -129,11 +131,16 @@ class _StreakAtRiskGlass extends StatelessWidget {
     required this.decisionAsync,
     required this.insightsAsync,
     required this.bundle,
+    required this.announced,
   });
 
   final AsyncValue<DeliveryDecision?> decisionAsync;
   final AsyncValue<List<GeneratedInsight>> insightsAsync;
   final AnalyticsPeriodBundle? bundle;
+
+  /// Today's frozen banner copy — the insight the OS notification
+  /// advertised, kept renderable even after a recompute replaced it.
+  final AnnouncedInsight? announced;
 
   @override
   Widget build(BuildContext context) {
@@ -156,6 +163,22 @@ class _StreakAtRiskGlass extends StatelessWidget {
           helpId: 'streakAtRisk',
             headline: _firstSentence(primary.message),
             body: caption ?? _streakFallbackBody(bundle),
+          );
+        }
+
+        // The banner's promise outlives recomputes: when the advertised
+        // insight no longer resolves live, honor the tap from the frozen
+        // copy instead of shrugging with the generic fallback.
+        if (announced != null) {
+          return ProgressGlassCard(
+            accentColor: ProgressDesignTokens.primaryDim,
+            icon: Icons.warning_amber_rounded,
+            title: 'Coaching insight',
+            helpId: 'streakAtRisk',
+            headline: _firstSentence(announced!.message),
+            body: announced!.caption.isNotEmpty
+                ? announced!.caption
+                : _streakFallbackBody(bundle),
           );
         }
 
