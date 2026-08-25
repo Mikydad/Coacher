@@ -2352,6 +2352,7 @@ Future<void> _completeTaskFromHome(
         taskTitle: t.title,
         requireSubmit: mode == 'disciplined' || mode == 'extreme',
         requireReasonAlways: mode == 'extreme',
+        reasonThresholdPercent: ScoreTaskDialog.reasonThresholdForMode(mode),
       ) ??
       const ScoreTaskDialogResult(completionPercent: 100, reason: null);
   if (!context.mounted) return;

@@ -111,7 +111,11 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
       _isHandlingStopFlow = true;
     }
     try {
-      await ctrl.stopAndPersist();
+      // Already-finished sessions were persisted by the first stop — never
+      // write a duplicate TimerSession row for a second press.
+      if (execState.phase != ExecutionPhase.finished) {
+        await ctrl.stopAndPersist();
+      }
       if (!mounted) return;
       if (execState.targetType == TimerSessionTargetType.block) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -119,19 +123,46 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
         );
         return;
       }
+      // The completion rate is computed, not asked (2026-08-25): worked
+      // elapsed vs the planned duration. Working the full planned time IS
+      // completion — no rating card, no reason, in every mode.
+      final targetMinutes = execState.targetDurationMinutes;
+      final int? computedPercent = (targetMinutes != null && targetMinutes > 0)
+          ? ((execState.elapsed.inSeconds / (targetMinutes * 60)) * 100)
+                .clamp(0.0, 100.0)
+                .round()
+          : null;
       // Discipline-mode contract for the post-session rating:
-      // flexible → dismissible, walking away saves nothing;
-      // disciplined → must submit a score (reason below 100%);
+      // flexible → dismissible; dismissing keeps the worked time, records
+      //   no score, and returns to the Focus page;
+      // disciplined → must submit a score (reason below its 90% bar);
       // extreme → must submit a score AND a reason at any percentage.
       final mode = await effectiveModeRefIdForTaskId(ref, execState.taskId);
       if (!mounted) return;
-      final result = await ScoreTaskDialog.show(
-        context,
-        taskTitle: activeLabel,
-        requireSubmit: mode == 'disciplined' || mode == 'extreme',
-        requireReasonAlways: mode == 'extreme',
-      );
-      if (!mounted || result == null) return;
+      final ScoreTaskDialogResult? result;
+      if (computedPercent != null && computedPercent >= 100) {
+        result = const ScoreTaskDialogResult(
+          completionPercent: 100,
+          reason: null,
+        );
+      } else {
+        result = await ScoreTaskDialog.show(
+          context,
+          taskTitle: activeLabel,
+          requireSubmit: mode == 'disciplined' || mode == 'extreme',
+          requireReasonAlways: mode == 'extreme',
+          initialPercent: computedPercent ?? 100,
+          reasonThresholdPercent: ScoreTaskDialog.reasonThresholdForMode(mode),
+        );
+      }
+      if (!mounted) return;
+      if (result == null) {
+        // Cancel: the worked time is already saved; no score is recorded,
+        // and the user lands back where tasks are chosen — never stranded
+        // on a dead timer.
+        await returnToFocusList(context, ref);
+        return;
+      }
       await ref
           .read(scoringControllerProvider)
           .submit(
@@ -549,7 +580,7 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                                 ),
                           icon: const Icon(Icons.stop_circle_outlined),
                           label: Text(
-                            _isHandlingStopFlow ? 'Saving...' : 'Stop',
+                            _isHandlingStopFlow ? 'Saving...' : 'End',
                           ),
                         ),
                       ),

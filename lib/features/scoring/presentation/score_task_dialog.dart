@@ -16,6 +16,8 @@ class ScoreTaskDialog extends StatefulWidget {
     required this.taskTitle,
     this.requireSubmit = false,
     this.requireReasonAlways = false,
+    this.initialPercent = 100,
+    this.reasonThresholdPercent = 100,
   });
 
   final String taskTitle;
@@ -25,8 +27,30 @@ class ScoreTaskDialog extends StatefulWidget {
   final bool requireSubmit;
 
   /// When true (extreme mode) a reason is required at any score, not only
-  /// below 100%.
+  /// below the threshold.
   final bool requireReasonAlways;
+
+  /// Where the slider starts. The timer flow passes the computed
+  /// elapsed-vs-planned percent (2026-08-25) so the user adjusts a
+  /// pre-filled honest number instead of rating from scratch; checkbox
+  /// flows keep the old default of 100.
+  final int initialPercent;
+
+  /// The mode's "good enough" bar: at or above it the reason field never
+  /// appears; below it a reason is shown and required. Mirrors
+  /// [reasonThresholdForMode] / `EnforcementModePolicy.streakDayThreshold`.
+  final int reasonThresholdPercent;
+
+  /// The per-mode bar for "good enough" — the same numbers the streak
+  /// engine judges days by (`EnforcementModePolicy.streakDayThreshold`),
+  /// so the rating card and the analytics never disagree about what
+  /// counts.
+  static int reasonThresholdForMode(String modeRefId) =>
+      switch (modeRefId.trim().toLowerCase()) {
+        'extreme' => 100,
+        'disciplined' => 90,
+        _ => 80,
+      };
 
   /// Dismissability is the task's discipline-mode contract:
   ///
@@ -42,6 +66,8 @@ class ScoreTaskDialog extends StatefulWidget {
     required String taskTitle,
     bool requireSubmit = false,
     bool requireReasonAlways = false,
+    int initialPercent = 100,
+    int reasonThresholdPercent = 100,
   }) {
     return showDialog<ScoreTaskDialogResult>(
       context: context,
@@ -52,6 +78,8 @@ class ScoreTaskDialog extends StatefulWidget {
           taskTitle: taskTitle,
           requireSubmit: requireSubmit,
           requireReasonAlways: requireReasonAlways,
+          initialPercent: initialPercent,
+          reasonThresholdPercent: reasonThresholdPercent,
         ),
       ),
     );
@@ -62,7 +90,7 @@ class ScoreTaskDialog extends StatefulWidget {
 }
 
 class _ScoreTaskDialogState extends State<ScoreTaskDialog> {
-  double _percent = 100;
+  late double _percent = widget.initialPercent.clamp(0, 100).toDouble();
   final _reasonCtrl = TextEditingController();
   String? _error;
 
@@ -72,14 +100,21 @@ class _ScoreTaskDialogState extends State<ScoreTaskDialog> {
     super.dispose();
   }
 
+  /// The reason field exists only below the mode's bar (or always, in
+  /// extreme): a good-enough session needs no explanation.
+  bool get _reasonNeeded =>
+      widget.requireReasonAlways ||
+      _percent.round() < widget.reasonThresholdPercent;
+
   void _submit() {
     final value = _percent.round();
     final reason = _reasonCtrl.text.trim();
-    if ((value < 100 || widget.requireReasonAlways) && reason.isEmpty) {
+    if (_reasonNeeded && reason.isEmpty) {
       setState(
         () => _error = widget.requireReasonAlways
             ? 'A reason is required in extreme mode.'
-            : 'Reason is required when completion is below 100%.',
+            : 'Reason is required below '
+                  '${widget.reasonThresholdPercent}%.',
       );
       return;
     }
@@ -87,7 +122,8 @@ class _ScoreTaskDialogState extends State<ScoreTaskDialog> {
       context,
       ScoreTaskDialogResult(
         completionPercent: value,
-        reason: reason.isEmpty ? null : reason,
+        // A reason typed and then slid out of relevance doesn't ship.
+        reason: _reasonNeeded && reason.isNotEmpty ? reason : null,
       ),
     );
   }
@@ -112,21 +148,31 @@ class _ScoreTaskDialogState extends State<ScoreTaskDialog> {
               max: 100,
               divisions: 20,
               value: _percent,
-              onChanged: (v) => setState(() => _percent = v),
+              onChanged: (v) => setState(() {
+                _percent = v;
+                if (!_reasonNeeded) _error = null;
+              }),
             ),
-            TextField(
-              textCapitalization: TextCapitalization.sentences,
-              controller: _reasonCtrl,
-              minLines: 2,
-              maxLines: 4,
-              decoration: InputDecoration(
-                labelText: widget.requireReasonAlways
-                    ? 'Reason (required)'
-                    : 'Reason (required if < 100%)',
-                hintText: widget.requireReasonAlways
-                    ? 'How did this session go?'
-                    : 'Add context for partial completion',
-              ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 180),
+              alignment: Alignment.topCenter,
+              child: _reasonNeeded
+                  ? TextField(
+                      textCapitalization: TextCapitalization.sentences,
+                      controller: _reasonCtrl,
+                      minLines: 2,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        labelText: widget.requireReasonAlways
+                            ? 'Reason (required)'
+                            : 'Reason (required below '
+                                  '${widget.reasonThresholdPercent}%)',
+                        hintText: widget.requireReasonAlways
+                            ? 'How did this session go?'
+                            : 'Add context for partial completion',
+                      ),
+                    )
+                  : const SizedBox(width: double.infinity),
             ),
             if (_error != null) ...[
               const SizedBox(height: 8),

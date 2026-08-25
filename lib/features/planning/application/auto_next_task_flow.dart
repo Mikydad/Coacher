@@ -659,10 +659,14 @@ String _appendExtraTimeNote({
 
 Future<void> returnToFocusList(BuildContext context, WidgetRef ref) async {
   invalidateTaskListProviders(ref);
+  // Clear down to the root shell before pushing: stopping the removal at
+  // an EXISTING /focus route left the stack [shell, /focus, /focus] — a
+  // duplicated Focus screen after every session — and when no /focus
+  // existed at all it stripped the shell out from under the new route.
   await Navigator.pushNamedAndRemoveUntil(
     context,
     FocusSelectionScreen.routeName,
-    (route) => route.settings.name == FocusSelectionScreen.routeName,
+    (route) => route.isFirst,
   );
 }
 
