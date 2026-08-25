@@ -241,9 +241,16 @@ class HomeScreen extends ConsumerWidget {
                 tasksAsync.when(
                   data: (rows) {
                     if (rows.isEmpty) {
-                      return Text(
-                        'No tasks yet. Tap ADD TASK to create one.',
-                        style: TextStyle(color: AppColors.fg54),
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'No tasks yet.',
+                            style: TextStyle(color: AppColors.fg54),
+                          ),
+                          const SizedBox(height: 8),
+                          _createTaskLink(context),
+                        ],
                       );
                     }
                     final visible = rows.take(kHomePreviewItemLimit).toList();
@@ -290,6 +297,12 @@ class HomeScreen extends ConsumerWidget {
                               TasksHubScreen.routeName,
                             ),
                           ),
+                        // Direct add from Home (2026-08-25) — mirrors the
+                        // goals card's "Create a goal" link.
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: _createTaskLink(context),
+                        ),
                       ],
                     );
                   },
@@ -1621,6 +1634,17 @@ class _FlowNowTimerControl extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "+ Create a task" link at the bottom of the Today's Tasks card
+/// (2026-08-25) — same shape as the goals card's "Create a goal".
+Widget _createTaskLink(BuildContext context) {
+  return TextButton.icon(
+    onPressed: () => showAddTaskSheet(context),
+    icon: Icon(Icons.add, size: 20, color: AppColors.accent),
+    label: const Text('Create a task'),
+    style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+  );
 }
 
 class _HomeSectionSeeMoreLink extends StatelessWidget {
