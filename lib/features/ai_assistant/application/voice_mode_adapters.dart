@@ -49,13 +49,16 @@ class SpeechToTextVoiceAdapter implements VoiceSpeechAdapter {
         // End-of-speech detection — the whole loop hangs on these. Without
         // pauseFor the OS session stays open (~1 min hard cap) and neither
         // finalResult nor the 'done' status ever arrives, so the controller
-        // sits in `listening` forever. 1.2s of silence = the utterance is
-        // over (latency batch 2026-08-07: 3s made every turn feel slow;
-        // user-tuned to ~1.2s 2026-08-22 — premature mid-speech cutoffs
-        // are caught by the controller's continuation stitching, so the
-        // window no longer has to over-provision for them); listenFor
-        // bounds a turn.
-        pauseFor: const Duration(milliseconds: 1200),
+        // sits in `listening` forever. 1.8s of silence = the utterance is
+        // over. History: 3s felt slow (2026-08-07), user-tuned to 1.2s
+        // (2026-08-22), raised back to 1.8s (2026-08-26) — 1.2s sat INSIDE
+        // the controller's old 900ms continuation gap's dead zone, so
+        // endpoints landing at 0.9–1.2s counted as healthy and sent half
+        // sentences ("hey how are you do"). INVARIANT: pauseFor must stay
+        // ABOVE the controller's continuationGap (1.5s) — the gap of a
+        // healthy endpoint ≈ pauseFor, and anything under continuationGap
+        // is treated as a mid-speech cutoff and stitched.
+        pauseFor: const Duration(milliseconds: 1800),
         listenFor: const Duration(seconds: 60),
       ),
     );

@@ -117,6 +117,7 @@ class VoiceModeCard extends StatelessWidget {
     final transcript = controller.transcript.trim();
     if (transcript.isNotEmpty) return transcript;
     return switch (controller.phase) {
+      VoiceModePhase.connecting => 'One moment…',
       VoiceModePhase.listening => 'Say something…',
       VoiceModePhase.thinking => ' ',
       VoiceModePhase.speaking => ' ',
@@ -126,6 +127,9 @@ class VoiceModeCard extends StatelessWidget {
 }
 
 String _voicePhaseLabel(VoiceModePhase phase) => switch (phase) {
+  // Honest spin-up copy (2026-08-26): the mic takes 1–3s to go live on the
+  // first entry after launch — saying LISTENING there lost opening words.
+  VoiceModePhase.connecting => 'GETTING READY…',
   VoiceModePhase.listening => 'LISTENING',
   VoiceModePhase.thinking => 'THINKING…',
   VoiceModePhase.speaking => 'SPEAKING — TAP TO INTERRUPT',
@@ -384,6 +388,8 @@ class _VoiceOrbState extends State<_VoiceOrb>
   }
 
   Color get _color => switch (widget.phase) {
+    // Muted mic-off look while spinning up — not the live cyan.
+    VoiceModePhase.connecting => AppColors.fg54,
     VoiceModePhase.listening => AppColors.cyan,
     VoiceModePhase.thinking => AppColors.amber,
     VoiceModePhase.speaking => AppColors.accentBright,
@@ -391,6 +397,7 @@ class _VoiceOrbState extends State<_VoiceOrb>
   };
 
   IconData get _icon => switch (widget.phase) {
+    VoiceModePhase.connecting => Icons.mic_none_rounded,
     VoiceModePhase.listening => Icons.mic_rounded,
     VoiceModePhase.thinking => Icons.more_horiz_rounded,
     VoiceModePhase.speaking => Icons.graphic_eq_rounded,

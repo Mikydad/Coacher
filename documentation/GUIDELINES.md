@@ -2135,3 +2135,26 @@ not silent reversal.
   the standing rules debt that any signed-in user can still self-write
   an active member doc (the callable path doesn't widen that hole; a
   rules pass should close it).
+
+- **2026-08-26 · Voice Mode: the endpoint dead zone is closed and the orb
+  stops lying about listening.** (1) Mid-sentence cutoffs ("hey how are
+  you do"): the continuation guard stitched only endpoints arriving
+  < 900ms after the last text change, while the recognizer's own silence
+  window was 1200ms — endpoints landing at 0.9–1.2s (exactly iOS's
+  aggressive semantic endpointer) counted as healthy and half sentences
+  shipped. Now `pauseFor` 1.8s / `continuationGap` 1.5s, with the
+  INVARIANT documented on both constants: continuationGap must stay
+  below pauseFor, and the pair moves together. Cost: turns end after
+  1.8s of silence instead of 1.2s — the price of not being cut off.
+  (The user's account-switch correlation was investigated and is
+  coincidental: nothing in the STT leg touches the account; at most a
+  reinstall let iOS re-choose slower server-side recognition, which
+  widens this exact hole.) (2) New `VoiceModePhase.connecting`
+  ("GETTING READY…", muted orb): entering Voice Mode used to claim
+  LISTENING before `speech.listen()` was even awaited, losing opening
+  words during the 1–3s first-launch native spin-up. The phase flips to
+  `listening` only on the plugin's own 'listening' status (previously
+  ignored) or a first result; continuation restarts stay `listening`
+  (warm engine, and a mid-sentence "getting ready" flash would read as
+  a glitch). Deferred: hoisting the per-entry STT adapter to app
+  lifetime so the native init cost is paid once per run.

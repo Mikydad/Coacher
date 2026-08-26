@@ -10,6 +10,12 @@ enum VoiceModePhase {
   /// Not in the loop (paused after repeated silence, or before start).
   idle,
 
+  /// Mic spinning up (2026-08-26): permissions + native audio session,
+  /// 1–3s on the first entry after launch. The orb must not claim
+  /// "listening" while words would be lost — it flips to [listening] only
+  /// when the recognizer reports it's actually live.
+  connecting,
+
   /// Mic open, streaming a live transcript.
   listening,
 
@@ -77,7 +83,7 @@ class VoiceModeController extends ChangeNotifier {
     this.maxConsecutiveSilentListens = 2,
     this.listenStallTimeout = const Duration(seconds: 7),
     this.maxListenStallRestarts = 2,
-    this.continuationGap = const Duration(milliseconds: 900),
+    this.continuationGap = const Duration(milliseconds: 1500),
     this.maxContinuations = 8,
     this.staleStatusWindow = const Duration(milliseconds: 600),
   });
@@ -108,12 +114,16 @@ class VoiceModeController extends ChangeNotifier {
   /// Stall restarts before giving up to [idle] with honest retry copy.
   final int maxListenStallRestarts;
 
-  /// Premature-endpoint detection (mid-speech cutoff fix 2026-08-22): a
-  /// HEALTHY end-of-speech arrives one silence window (~pauseFor) after the
-  /// last partial. A final/'done' that lands sooner than this gap means the
-  /// recognizer cut the user off mid-sentence — the loop re-opens the mic
-  /// and stitches the next segment onto what it already heard instead of
-  /// sending half an utterance.
+  /// Premature-endpoint detection (mid-speech cutoff fix 2026-08-22,
+  /// re-tuned 2026-08-26): a HEALTHY end-of-speech arrives one silence
+  /// window (~pauseFor, 1.8s) after the last partial. A final/'done' that
+  /// lands sooner than this gap means the recognizer cut the user off
+  /// mid-sentence — the loop re-opens the mic and stitches the next
+  /// segment onto what it already heard instead of sending half an
+  /// utterance. INVARIANT: must stay BELOW the adapter's pauseFor — the
+  /// old 900ms gap under a 1.2s pauseFor left a 0.9–1.2s dead zone where
+  /// iOS's aggressive endpoints counted as healthy and half sentences
+  /// shipped.
   final Duration continuationGap;
 
   /// Upper bound on stitched segments per utterance — a safety net, since
@@ -193,6 +203,9 @@ class VoiceModeController extends ChangeNotifier {
     _statusMessage = null;
     _silentListens = 0;
     _stallRestarts = 0;
+    // Honest from the first frame: TTS configure + STT initialize take
+    // real time (worst on the first entry after launch).
+    _setPhase(VoiceModePhase.connecting);
     await tts.configure();
     final ok = await speech.initialize(
       onStatus: _onSpeechStatus,
@@ -211,8 +224,9 @@ class VoiceModeController extends ChangeNotifier {
       await Future<void>.delayed(listenDelay);
       if (_disposed || !_active) return;
       // The user woke the loop themselves mid-delay (orb tap) — don't
-      // stack a second listen on top of theirs.
-      if (_phase != VoiceModePhase.idle) return;
+      // stack a second listen on top of theirs. (The resting phase here is
+      // `connecting` since 2026-08-26, so test for an actual listen.)
+      if (_phase == VoiceModePhase.listening) return;
     }
     await _listen();
   }
@@ -248,6 +262,8 @@ class VoiceModeController extends ChangeNotifier {
           _statusMessage = null;
           await _listen();
         }
+      case VoiceModePhase.connecting:
+        break; // Mic not live yet — nothing heard, nothing to finalize.
       case VoiceModePhase.thinking:
         break; // Nothing sensible to interrupt mid-request.
     }
@@ -298,12 +314,23 @@ class VoiceModeController extends ChangeNotifier {
       _utterancePrefix = '';
       _continuations = 0;
     }
-    _setPhase(VoiceModePhase.listening);
+    // A fresh listen shows `connecting` until the recognizer confirms it's
+    // live (plugin 'listening' status or a first result) — the first entry
+    // after launch spends 1–3s in native spin-up, and claiming "listening"
+    // there lost the user's opening words (2026-08-26). Mid-utterance
+    // continuation restarts stay `listening`: the engine is warm and a
+    // "getting ready" flash mid-sentence would read as a glitch.
+    _setPhase(
+      continuation ? VoiceModePhase.listening : VoiceModePhase.connecting,
+    );
     _armListenStallWatchdog(generation);
     try {
       await speech.listen(
         onResult: (text, isFinal) {
           if (_disposed || generation != _generation) return;
+          if (_phase == VoiceModePhase.connecting) {
+            _setPhase(VoiceModePhase.listening);
+          }
           // The previous segment's late results land in THIS session's
           // callback after a continuation restart (the plugin has one
           // global handler) — text that merely repeats the stitched prefix
@@ -370,7 +397,10 @@ class VoiceModeController extends ChangeNotifier {
     _listenStallTimer?.cancel();
     _listenStallTimer = Timer(listenStallTimeout, () {
       if (_disposed || !_active || generation != _generation) return;
-      if (_phase != VoiceModePhase.listening) return;
+      if (_phase != VoiceModePhase.listening &&
+          _phase != VoiceModePhase.connecting) {
+        return;
+      }
       if (transcript.trim().isNotEmpty) {
         _forceFinalize = true;
         unawaited(_finalizeUtterance());
@@ -410,10 +440,17 @@ class VoiceModeController extends ChangeNotifier {
 
   void _onSpeechStatus(String status) {
     if (_disposed || !_active || _recoveringListen) return;
+    // The recognizer's own "I'm live" signal ends the `connecting` phase —
+    // the one honest moment to start saying "Listening" (2026-08-26).
+    if (status == 'listening' && _phase == VoiceModePhase.connecting) {
+      _setPhase(VoiceModePhase.listening);
+      return;
+    }
     // 'done' fires on end-of-speech even when the plugin never flagged a
     // final result (short utterances, some locales) — finalize from here.
     if ((status == 'done' || status == 'notListening') &&
-        _phase == VoiceModePhase.listening) {
+        (_phase == VoiceModePhase.listening ||
+            _phase == VoiceModePhase.connecting)) {
       // A close-status arriving right as a fresh listen opens belongs to
       // the PREVIOUS session (continuation restarts) — never finalize a
       // listen that hasn't produced anything yet off a stale status.
@@ -430,7 +467,8 @@ class VoiceModeController extends ChangeNotifier {
 
   void _onSpeechError() {
     if (_disposed || !_active) return;
-    if (_phase == VoiceModePhase.listening) {
+    if (_phase == VoiceModePhase.listening ||
+        _phase == VoiceModePhase.connecting) {
       _statusMessage = 'I didn\'t catch that — tap to retry.';
       _setPhase(VoiceModePhase.idle);
     }
@@ -443,7 +481,11 @@ class VoiceModeController extends ChangeNotifier {
   /// window, so a smaller gap means the recognizer cut the user off
   /// mid-sentence and the loop keeps listening instead of sending.
   Future<void> _finalizeUtterance({DateTime? lastPartialAt}) async {
-    if (_finalizing || _phase != VoiceModePhase.listening) return;
+    if (_finalizing ||
+        (_phase != VoiceModePhase.listening &&
+            _phase != VoiceModePhase.connecting)) {
+      return;
+    }
     _finalizing = true;
     _cancelListenStallWatchdog();
     try {

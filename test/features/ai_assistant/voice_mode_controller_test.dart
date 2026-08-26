@@ -21,12 +21,19 @@ class FakeSpeechAdapter implements VoiceSpeechAdapter {
     return available;
   }
 
+  /// Set false to simulate the slow native spin-up (Bug B, 2026-08-26):
+  /// listen() opens but the recognizer never confirms it's live.
+  bool confirmListening = true;
+
   @override
   Future<void> listen({
     required void Function(String text, bool isFinal) onResult,
   }) async {
     listenCalls++;
     _onResult = onResult;
+    // The real plugin reports 'listening' once the native session is live —
+    // the controller's connecting → listening flip rides on it.
+    if (confirmListening) _onStatus?.call('listening');
   }
 
   @override
@@ -38,6 +45,7 @@ class FakeSpeechAdapter implements VoiceSpeechAdapter {
   void emitPartial(String text) => _onResult!(text, false);
   void emitFinal(String text) => _onResult!(text, true);
   void emitDone() => _onStatus!('done');
+  void emitStatus(String status) => _onStatus!(status);
 }
 
 /// TTS fake — records replies (one speak per reply); can hold playback
@@ -311,10 +319,37 @@ void main() {
       );
       await Future<void>.delayed(const Duration(milliseconds: 20));
       expect(speech.listenCalls, 0);
-      expect(controller.phase, VoiceModePhase.idle);
+      // The grace delay now reads as spin-up, not "paused" (2026-08-26).
+      expect(controller.phase, VoiceModePhase.connecting);
 
       await started;
       expect(speech.listenCalls, 1);
+      expect(controller.phase, VoiceModePhase.listening);
+    });
+  });
+
+  group('connecting phase (honest spin-up, 2026-08-26)', () {
+    test('stays in connecting until the recognizer confirms it is live',
+        () async {
+      final controller = build();
+      speech.confirmListening = false;
+      await controller.start();
+      expect(speech.listenCalls, 1);
+      // Mic open but never confirmed — the orb must not claim LISTENING.
+      expect(controller.phase, VoiceModePhase.connecting);
+
+      speech.emitStatus('listening');
+      expect(controller.phase, VoiceModePhase.listening);
+    });
+
+    test('a first result also ends connecting (belt to the status braces)',
+        () async {
+      final controller = build();
+      speech.confirmListening = false;
+      await controller.start();
+      expect(controller.phase, VoiceModePhase.connecting);
+
+      speech.emitPartial('hey');
       expect(controller.phase, VoiceModePhase.listening);
     });
   });
