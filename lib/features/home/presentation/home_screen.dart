@@ -944,7 +944,16 @@ class _Layer4NotificationDispatchBridgeState
     final focusId = focus.focusId;
     if (focusId.isEmpty || _focusDispatchInFlightForFocusId == focusId) return;
 
+    // EVERY ref.read happens before the first await (2026-08-26): this
+    // bridge outlives its awaits only sometimes — `ref` after the widget's
+    // disposal threw an uncaught "Cannot use ref" at boot.
     final prefService = ref.read(profilePreferenceServiceProvider);
+    final notifications = ref.read(localNotificationsServiceProvider);
+    final orchestrator = ref.read(attentionOrchestratorServiceProvider);
+    final announcedStore = ref.read(announcedInsightStoreProvider);
+    final insights =
+        ref.read(layer3TodayDeliveryInsightsProvider).valueOrNull ??
+        const <GeneratedInsight>[];
     final pref = await prefService.getPreference();
     if (pref.lastNotifiedCoachingFocusId == focusId) return;
 
@@ -957,9 +966,6 @@ class _Layer4NotificationDispatchBridgeState
 
     _focusDispatchInFlightForFocusId = focusId;
     try {
-      final insights =
-          ref.read(layer3TodayDeliveryInsightsProvider).valueOrNull ??
-          const <GeneratedInsight>[];
       final selected = insights
           .where((item) => item.insightId == focus.primaryInsightId)
           .toList();
@@ -967,7 +973,6 @@ class _Layer4NotificationDispatchBridgeState
           ? 'Your coach picked a new focus — open Progress to see it.'
           : selected.first.message;
 
-      final notifications = ref.read(localNotificationsServiceProvider);
       final granted = await notifications.requestPermissionsIfNeeded();
       if (!granted) return;
 
@@ -978,9 +983,7 @@ class _Layer4NotificationDispatchBridgeState
       // Routed through the AttentionOrchestrator (Phase 0 single-brain
       // rule). entityId is the primary insight so the tap lands on
       // Progress via the existing `layer4:` route.
-      final decision = await ref
-          .read(attentionOrchestratorServiceProvider)
-          .evaluate(
+      final decision = await orchestrator.evaluate(
             ReminderIntent(
               id: StableId.generate('ri_coach_focus'),
               entityId: focus.primaryInsightId,
@@ -1000,9 +1003,7 @@ class _Layer4NotificationDispatchBridgeState
         // Same frozen-copy rule as insight pushes: the tap must be
         // honorable after a recompute replaces the advertised insight.
         if (selected.isNotEmpty) {
-          await ref
-              .read(announcedInsightStoreProvider)
-              .save(
+          await announcedStore.save(
                 AnnouncedInsight(
                   insightId: focus.primaryInsightId,
                   message: selected.first.message,
@@ -1028,14 +1029,22 @@ class _Layer4NotificationDispatchBridgeState
     final vm = next.valueOrNull;
     if (vm == null) return;
 
+    // EVERY ref.read happens before the first await (2026-08-26): the
+    // store read after `notifications.cancel` threw an uncaught
+    // "Cannot use ref after the widget was disposed" at boot.
     final notifications = ref.read(localNotificationsServiceProvider);
     final prefService = ref.read(profilePreferenceServiceProvider);
+    final orchestrator = ref.read(attentionOrchestratorServiceProvider);
+    final announcedStore = ref.read(announcedInsightStoreProvider);
+    final insights =
+        ref.read(layer3TodayDeliveryInsightsProvider).valueOrNull ??
+        const <GeneratedInsight>[];
     final primaryId = vm.primaryInsightId?.trim();
 
     if (!vm.isEligible || primaryId == null || primaryId.isEmpty) {
       await notifications.cancel(kCoachingInsightNotificationId);
       // No banner, no promise — drop the frozen copy too.
-      await ref.read(announcedInsightStoreProvider).clear();
+      await announcedStore.clear();
       _lastScheduledPrimaryInsightId = null;
       _dispatchInFlightForInsightId = null;
       return;
@@ -1061,9 +1070,6 @@ class _Layer4NotificationDispatchBridgeState
 
     _dispatchInFlightForInsightId = primaryId;
     try {
-      final insights =
-          ref.read(layer3TodayDeliveryInsightsProvider).valueOrNull ??
-          const <GeneratedInsight>[];
       final selected = insights
           .where((item) => item.insightId == primaryId)
           .toList();
@@ -1084,9 +1090,7 @@ class _Layer4NotificationDispatchBridgeState
       // must never banner into a context override, a coaching-focus
       // silence, or a collision window, and it must land in the ledger
       // like every other surface (Phase 0 single-brain rule).
-      final decision = await ref
-          .read(attentionOrchestratorServiceProvider)
-          .evaluate(
+      final decision = await orchestrator.evaluate(
             ReminderIntent(
               id: StableId.generate('ri_coach_insight'),
               entityId: primaryId,
@@ -1110,9 +1114,7 @@ class _Layer4NotificationDispatchBridgeState
         // insights, so the tap must be honored from this snapshot when
         // the live id no longer resolves.
         if (selected.isNotEmpty) {
-          await ref
-              .read(announcedInsightStoreProvider)
-              .save(
+          await announcedStore.save(
                 AnnouncedInsight(
                   insightId: primaryId,
                   message: selected.first.message,
