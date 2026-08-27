@@ -2316,3 +2316,26 @@ not silent reversal.
   needs client attestation setup first; the onRequest stream verifies
   the header manually). Functions 239 green, Flutter 1608 green.
   Remaining wave: Phases 6-7 (memory quality, chat-surface warmth).
+
+- **2026-08-27 · AI fix wave, Phase 6 shipped: memory truth + context
+  quality + pulse hardening.** One commit (3ca6bb6). Memory: rememberFact
+  verifies the paraphrase against the utterance (unsupported → aiInferred)
+  and always echoes the stored content beside Undo; forget/update prefer
+  [mem:id] refs, refuse ambiguity with a candidates question, and name
+  deletions; mere mentions stop counting as interactions (M4).
+  Extraction: undecodable responses throw and stay pending — never
+  "nothing durable" — with fence-tolerant decode (M3); the truncation
+  fallback summarizes assistant summaries, not raw user openers (M5);
+  observation titles cap at 80. Context: SCORED memory recall replaces
+  newest-20 (confirmed/stated + input-match + lastReferencedAtMs);
+  route-conditioned payload trimming drops week/tomorrow/patterns from
+  non-planning turns; dead capabilities section deleted; session cache
+  evicts on end; DST-safe day math; summary TTL derivation style-aware.
+  Pulse: injected-title guard (clip+quote+preamble), memberLines
+  validated against REAL members, honest outcome enum per banner copy.
+  Tripwire regex learned injected-field writes → surfaced two
+  pre-existing violations (votes allowlisted as server-truth; notif
+  prefs allowlisted as tracked FOLLOW-UP DEBT + task chip filed).
+  DEFERRED from Phase 6, deliberately: IsarAiPulseCache wiring +
+  superseded-pulse-doc deletion (product polish, not safety). Suite
+  1607 green. Remaining: Phase 7 (chat-surface warmth).
