@@ -572,7 +572,12 @@ class AiAssistantService extends ChangeNotifier {
   /// that needs the get_day_schedule tool, which only the agent path has.
   static final _otherDayPattern = RegExp(
     r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|'
-    r'yesterday|next month|last week)\b',
+    r'yesterday|next month|last week|next week|weekends?|'
+    r'day after tomorrow|\d{1,2}(st|nd|rd|th)|'
+    r'january|february|march|april|june|july|august|september|'
+    r'october|november|december)\b',
+    // "may" is deliberately absent — as a modal verb it appears in normal
+    // questions ("what may I…") far more often than as the month.
   );
 
   /// Voice Level 2 routing — the [VoiceModeController.tryStreamReply] seam.
@@ -774,12 +779,18 @@ class AiAssistantService extends ChangeNotifier {
       // Preview awaiting confirmation: model one-liner (when it adds
       // something the summary doesn't), then the plan, then the ask.
       if (message.plannedChanges != null && message.isCurrentPlan) {
-        final summary = formatPlanForSpeech(message.plannedChanges!);
+        final plan = message.plannedChanges!;
+        final summary = formatPlanForSpeech(plan);
         return [
           if (content.isNotEmpty && content != "Here's what I'll do:")
             content,
           if (summary.isNotEmpty) summary,
-          'Should I go ahead? Just say confirm — or no.',
+          // Hard blocks require the stronger phrase (settled Q3): spoken
+          // "confirm" is informed consent only when the warning tier was
+          // actually disclosed and deliberately overridden.
+          plan.isBlockedByContext
+              ? "Still want it? Say 'yes, do it anyway' — or no."
+              : 'Should I go ahead? Just say confirm — or no.',
         ].join(' ');
       }
 
@@ -1299,6 +1310,29 @@ class AiAssistantService extends ChangeNotifier {
           timestamp: DateTime.now(),
         ),
       );
+      // Hard context blocks demand the stronger phrase (fix-wave Phase 4,
+      // §8 E12 / settled Q3): on the orb-only stage the card's red rows
+      // are invisible, so a plain "confirm" of a sleep/DND-crossing plan
+      // was uninformed consent. The warning was spoken with the plan; the
+      // override phrase proves the user heard it.
+      final plan = _pendingPlan;
+      if (plan != null &&
+          plan.isBlockedByContext &&
+          !_hardBlockOverridePattern.hasMatch(normalized)) {
+        _addMessage(
+          AiChatMessage(
+            id: StableId.generate('msg'),
+            role: ChatRole.assistant,
+            content:
+                'That plan overlaps a protected window (sleep or '
+                "do-not-disturb). If you're sure, say \"yes, do it "
+                'anyway" — or "no" to drop it.',
+            timestamp: DateTime.now(),
+          ),
+        );
+        notifyListeners();
+        return true;
+      }
       notifyListeners();
       // Awaited for the same outcome-reporting reason as the draft path.
       await confirmPlan();
@@ -1307,6 +1341,13 @@ class AiAssistantService extends ChangeNotifier {
 
     return false;
   }
+
+  /// Deliberate override of a hard context block — must carry an explicit
+  /// "anyway/override"-shaped commitment, never a bare "confirm".
+  static final _hardBlockOverridePattern = RegExp(
+    r'\b(anyway|override|ignore (it|that|the warning)|'
+    r'do it (anyway|regardless)|still (want|do) it)\b',
+  );
 
   void _addMessage(AiChatMessage msg) {
     _messages.add(msg);

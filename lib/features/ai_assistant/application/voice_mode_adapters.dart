@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import 'shared_speech_callbacks.dart';
 import 'voice_mode_controller.dart';
 import 'voice_selection.dart';
 import 'voice_speech_text.dart';
@@ -12,23 +13,56 @@ import 'voice_speech_text.dart';
 /// Real STT adapter over the `speech_to_text` plugin (same plugin the
 /// one-shot dictation mic uses — Voice Mode adds the loop, not a new
 /// speech stack).
+///
+/// Status/error callbacks route through [SharedSpeechCallbacks] and are
+/// re-claimed before every listen (fix-wave Phase 4, §8 V1): the plugin is
+/// a process singleton whose initialize() refuses to re-register
+/// listeners, so a per-entry adapter used to run DEAF from the second
+/// voice session per launch — silently undoing the 2026-08-26
+/// connecting-phase fix and turning quiet pauses into false
+/// "microphone stalled" errors.
 class SpeechToTextVoiceAdapter implements VoiceSpeechAdapter {
   SpeechToTextVoiceAdapter();
 
   final SpeechToText _speech = SpeechToText();
   bool _initialized = false;
   bool _available = false;
+  void Function(String status)? _onStatus;
+  void Function()? _onError;
+
+  /// Public so the invariant test can pin it against the controller's
+  /// continuationGap — this exact pair drifting apart was the 2026-08-26
+  /// endpoint dead zone.
+  static const Duration pauseFor = Duration(milliseconds: 1800);
+
+  void _claim() {
+    final onStatus = _onStatus;
+    final onError = _onError;
+    if (onStatus == null || onError == null) return;
+    SharedSpeechCallbacks.claim(
+      this,
+      speech: _speech,
+      onStatus: onStatus,
+      onError: onError,
+    );
+  }
 
   @override
   Future<bool> initialize({
     required void Function(String status) onStatus,
     required void Function() onError,
   }) async {
+    _onStatus = onStatus;
+    _onError = onError;
+    _claim();
     if (_initialized) return _available;
     try {
+      // The dispatchers, not the raw callbacks: initialize() assigns its
+      // params to the plugin's listener fields, and the registry must stay
+      // the single indirection every later claim can re-point.
       _available = await _speech.initialize(
-        onStatus: onStatus,
-        onError: (_) => onError(),
+        onStatus: SharedSpeechCallbacks.dispatchStatus,
+        onError: SharedSpeechCallbacks.dispatchError,
       );
     } catch (_) {
       _available = false;
@@ -41,6 +75,9 @@ class SpeechToTextVoiceAdapter implements VoiceSpeechAdapter {
   Future<void> listen({
     required void Function(String text, bool isFinal) onResult,
   }) {
+    // Re-claim per listen: the dictation mic (or a newer Voice Mode entry)
+    // may have taken the callbacks since — the active listener always wins.
+    _claim();
     return _speech.listen(
       onResult: (result) => onResult(result.recognizedWords, result.finalResult),
       listenOptions: SpeechListenOptions(
@@ -58,7 +95,7 @@ class SpeechToTextVoiceAdapter implements VoiceSpeechAdapter {
         // ABOVE the controller's continuationGap (1.5s) — the gap of a
         // healthy endpoint ≈ pauseFor, and anything under continuationGap
         // is treated as a mid-speech cutoff and stitched.
-        pauseFor: const Duration(milliseconds: 1800),
+        pauseFor: pauseFor,
         listenFor: const Duration(seconds: 60),
       ),
     );
@@ -66,6 +103,11 @@ class SpeechToTextVoiceAdapter implements VoiceSpeechAdapter {
 
   @override
   Future<void> stop() => _speech.stop();
+
+  /// Voice Mode exited — stop routing events to this adapter's (about to
+  /// be disposed) controller. A later claimer takes over anyway; this just
+  /// closes the window where stale events reach a dead controller.
+  void release() => SharedSpeechCallbacks.release(this);
 }
 
 /// Real TTS adapter over `flutter_tts` — on-device platform voices, so

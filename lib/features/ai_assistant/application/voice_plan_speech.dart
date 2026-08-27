@@ -23,7 +23,25 @@ String formatPlanForSpeech(AiPlannedChanges plan) {
         '${parts.take(cap).join(', ')}, and ${parts.length - cap} more '
         '${parts.length - cap == 1 ? 'step' : 'steps'}';
   }
-  return "I'll $listing.";
+  // The voice IS the preview — it must speak the same risk surface the
+  // card shows (fix-wave Phase 4, §8 E12): a plan inside the sleep/DND
+  // window used to read aloud with no mention of the red hard-block the
+  // sighted user would see.
+  return "I'll $listing.${_warningSentence(plan)}";
+}
+
+String _warningSentence(AiPlannedChanges plan) {
+  if (plan.isBlockedByContext) {
+    return ' Heads-up — that overlaps a protected window like sleep or '
+        'do-not-disturb.';
+  }
+  if (plan.hasConflicts) {
+    final n = plan.conflicts.length;
+    return n == 1
+        ? ' One heads-up: it clashes with something already scheduled.'
+        : ' $n heads-ups: it clashes with things already scheduled.';
+  }
+  return '';
 }
 
 String _describeAction(AiAction action) {

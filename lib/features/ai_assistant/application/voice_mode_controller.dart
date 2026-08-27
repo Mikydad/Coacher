@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import 'voice_speech_text.dart';
 
@@ -74,7 +75,7 @@ abstract class VoiceTtsStreamCapable {
 /// Airplane-honest: TTS is on-device, so the loop speaks whatever the
 /// Coach pipeline returns — including the deterministic mock reply and
 /// honest network-error copy when AI is unreachable.
-class VoiceModeController extends ChangeNotifier {
+class VoiceModeController extends ChangeNotifier with WidgetsBindingObserver {
   VoiceModeController({
     required this.speech,
     required this.tts,
@@ -203,6 +204,14 @@ class VoiceModeController extends ChangeNotifier {
     _statusMessage = null;
     _silentListens = 0;
     _stallRestarts = 0;
+    // Lifecycle honesty (fix-wave Phase 4, §8 V3): backgrounding, a phone
+    // call, or Siri mid-turn used to strand the loop — just_audio pauses
+    // and 'completed' never fires, so the orb claimed SPEAKING into a
+    // silent room; backgrounded listens kept cycling the stall watchdog.
+    // Best-effort: VM tests run without a widgets binding.
+    try {
+      WidgetsBinding.instance.addObserver(this);
+    } catch (_) {}
     // Honest from the first frame: TTS configure + STT initialize take
     // real time (worst on the first entry after launch).
     _setPhase(VoiceModePhase.connecting);
@@ -229,6 +238,31 @@ class VoiceModeController extends ChangeNotifier {
       if (_phase == VoiceModePhase.listening) return;
     }
     await _listen();
+  }
+
+  /// The app left the foreground mid-loop: park honestly at idle instead
+  /// of stranding `speaking`/`listening` against a paused audio session.
+  /// One orb tap resumes — never an auto-relisten (settled Q7: a hot mic
+  /// after a phone call is a privacy surprise).
+  Future<void> pauseToIdle() async {
+    if (_disposed || !_active) return;
+    if (_phase == VoiceModePhase.idle) return;
+    _generation++;
+    _cancelListenStallWatchdog();
+    try {
+      await speech.stop();
+    } catch (_) {}
+    try {
+      await tts.stop();
+    } catch (_) {}
+    if (_disposed || !_active) return;
+    _statusMessage = 'Paused — tap when you\'re back.';
+    _setPhase(VoiceModePhase.idle);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) unawaited(pauseToIdle());
   }
 
   /// Leaves Voice Mode entirely (X button / sheet closed).
@@ -309,7 +343,11 @@ class VoiceModeController extends ChangeNotifier {
     _transcript = '';
     _lastResultAt = null;
     _forceFinalize = false;
-    _listenStartedAt = DateTime.now();
+    // Stamped AFTER speech.listen() resolves (fix-wave Phase 4, §8 V6):
+    // stamping before it let a previous session's trailing 'done' age past
+    // the stale window during a slow native spin-up and finalize an empty
+    // listen. Null = still starting — every close-status is stale then.
+    _listenStartedAt = null;
     if (!continuation) {
       _utterancePrefix = '';
       _continuations = 0;
@@ -325,7 +363,7 @@ class VoiceModeController extends ChangeNotifier {
     );
     _armListenStallWatchdog(generation);
     try {
-      await speech.listen(
+      final listenStarted = speech.listen(
         onResult: (text, isFinal) {
           if (_disposed || generation != _generation) return;
           if (_phase == VoiceModePhase.connecting) {
@@ -359,6 +397,8 @@ class VoiceModeController extends ChangeNotifier {
           }
         },
       );
+      await listenStarted;
+      if (generation == _generation) _listenStartedAt = DateTime.now();
     } catch (_) {
       if (generation != _generation) return;
       _cancelListenStallWatchdog();
@@ -373,7 +413,9 @@ class VoiceModeController extends ChangeNotifier {
   bool _isStaleReplay(String text) {
     if (_utterancePrefix.isEmpty) return false;
     final startedAt = _listenStartedAt;
-    if (startedAt == null ||
+    // Null = the fresh listen hasn't even opened — anything arriving now
+    // that echoes the prefix is the dead session replaying.
+    if (startedAt != null &&
         DateTime.now().difference(startedAt) >= staleStatusWindow) {
       return false;
     }
@@ -457,8 +499,8 @@ class VoiceModeController extends ChangeNotifier {
       final startedAt = _listenStartedAt;
       if (_lastResultAt == null &&
           !_forceFinalize &&
-          startedAt != null &&
-          DateTime.now().difference(startedAt) < staleStatusWindow) {
+          (startedAt == null ||
+              DateTime.now().difference(startedAt) < staleStatusWindow)) {
         return;
       }
       _finalizeUtterance(lastPartialAt: _lastResultAt);
@@ -658,6 +700,9 @@ class VoiceModeController extends ChangeNotifier {
     _active = false;
     _generation++;
     _cancelListenStallWatchdog();
+    try {
+      WidgetsBinding.instance.removeObserver(this);
+    } catch (_) {}
     unawaited(_teardown());
     super.dispose();
   }

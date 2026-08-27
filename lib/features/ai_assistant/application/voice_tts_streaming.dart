@@ -199,9 +199,20 @@ class StreamingOpenAiTtsVoiceAdapter
   @override
   Future<void> configure() async {
     if (_configured) return;
-    if (defaultTargetPlatform == TargetPlatform.iOS) {
-      // The exact session contract every other voice actor uses (the
-      // earpiece lesson): share with the mic, force the main speaker.
+    await _applySpeakerRoute();
+    _configured = true;
+  }
+
+  /// The exact session contract every other voice actor uses (the
+  /// earpiece lesson): share with the mic, force the main speaker.
+  /// Re-asserted before EVERY spoken reply, not trusted from configure()
+  /// (fix-wave Phase 4, §8 V8): speech_to_text rewrites the session around
+  /// each listen, and the fallback adapter documents this re-assertion as
+  /// mandatory — the two adapters encoded contradictory beliefs about the
+  /// same session.
+  Future<void> _applySpeakerRoute() async {
+    if (defaultTargetPlatform != TargetPlatform.iOS) return;
+    try {
       final session = await AudioSession.instance;
       await session.configure(
         AudioSessionConfiguration(
@@ -213,8 +224,9 @@ class StreamingOpenAiTtsVoiceAdapter
               AVAudioSessionCategoryOptions.duckOthers,
         ),
       );
+    } catch (e) {
+      debugPrint('[VoiceMode] speaker route re-assert skipped: $e');
     }
-    _configured = true;
   }
 
   /// One id per spoken reply — the server counts quota per turn, not per
@@ -225,25 +237,32 @@ class StreamingOpenAiTtsVoiceAdapter
   @override
   Future<void> speak(String text) async {
     final generation = ++_generation;
+    await _applySpeakerRoute();
+    if (generation != _generation) return;
     final t2 = DateTime.now();
     final turnId = _newTurnId();
 
     final sentences = splitIntoSentences(text);
     if (sentences.isEmpty) return;
     final head = sentences.first;
-    final tail = sentences.skip(1).join(' ');
+    // The tail chunks at the server's per-clip character cap (fix-wave
+    // Phase 4, §8 V5): one oversized tail used to 400 and be swallowed by
+    // design, so long agent replies spoke ONE sentence and went silent
+    // with no signal that the rest existed only on screen.
+    final tailChunks = _chunkSentences(sentences.skip(1));
 
-    // Both clips start NOW: the tail synthesizes server-side while the
+    // Clips start NOW: the tail synthesizes server-side while the
     // head downloads and plays. Head failure throws (nothing spoken yet,
     // wrapper falls back); tail failure resolves null and is swallowed.
     final headFuture = _fetchClip(head, connectTimeout, turnId);
-    final Future<Uint8List?>? tailFuture = tail.isEmpty
-        ? null
-        : _fetchClip(
-            tail,
-            clipTimeout,
-            turnId,
-          ).then<Uint8List?>((b) => b, onError: (_) => null);
+    final tailFutures = [
+      for (final chunk in tailChunks)
+        _fetchClip(
+          chunk,
+          clipTimeout,
+          turnId,
+        ).then<Uint8List?>((b) => b, onError: (_) => null),
+    ];
 
     final headBytes = await headFuture;
     if (generation != _generation) return;
@@ -263,11 +282,47 @@ class StreamingOpenAiTtsVoiceAdapter
     }
 
     await _playClip(headBytes, generation);
-    if (tailFuture == null || generation != _generation) return;
+    for (final tailFuture in tailFutures) {
+      if (generation != _generation) return;
+      final tailBytes = await tailFuture;
+      if (tailBytes == null || generation != _generation) return;
+      await _playClip(tailBytes, generation);
+    }
+  }
 
-    final tailBytes = await tailFuture;
-    if (tailBytes == null || generation != _generation) return;
-    await _playClip(tailBytes, generation);
+  /// Greedily packs [sentences] into chunks under the server's 2000-char
+  /// per-clip cap (speech_rules.ts SPEECH_MAX_CHARS). A single sentence
+  /// over the cap is hard-split — better an awkward seam than silence.
+  static List<String> _chunkSentences(Iterable<String> sentences) {
+    const maxChars = 2000;
+    final chunks = <String>[];
+    final current = StringBuffer();
+    void flush() {
+      final s = current.toString().trim();
+      if (s.isNotEmpty) chunks.add(s);
+      current.clear();
+    }
+
+    for (final sentence in sentences) {
+      if (sentence.length > maxChars) {
+        flush();
+        for (var i = 0; i < sentence.length; i += maxChars) {
+          chunks.add(
+            sentence.substring(
+              i,
+              (i + maxChars) > sentence.length ? sentence.length : i + maxChars,
+            ),
+          );
+        }
+        continue;
+      }
+      if (current.length + sentence.length + 1 > maxChars) flush();
+      current
+        ..write(sentence)
+        ..write(' ');
+    }
+    flush();
+    return chunks;
   }
 
   /// Level 2: sentence-pipelined speech over a reply still being written.
@@ -281,6 +336,8 @@ class StreamingOpenAiTtsVoiceAdapter
   @override
   Future<void> speakStream(Stream<String> deltas) async {
     final generation = ++_generation;
+    await _applySpeakerRoute();
+    if (generation != _generation) return;
     final turnId = _newTurnId();
     final t2 = DateTime.now();
 

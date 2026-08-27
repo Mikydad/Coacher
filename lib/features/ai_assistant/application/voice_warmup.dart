@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import 'voice_reply_stream.dart' show sharedVoiceHttpClient;
+
 /// Pre-warms the first spoken turn's network path the moment Voice Mode
 /// opens (first-turn latency fix 2026-08-22).
 ///
@@ -24,13 +26,18 @@ Future<void> warmVoiceEndpoints({
     idToken().timeout(timeout).then<void>((_) {}, onError: (_) {}),
     for (final endpoint in endpoints)
       Future(() async {
-        final client = (clientFactory ?? http.Client.new)();
+        // The SHARED keep-alive client (fix-wave Phase 4, §8 V4): the old
+        // per-warmup client closed immediately, discarding the very socket
+        // this GET existed to warm — the first turn paid the TCP+TLS
+        // handshake anyway. Test factories own (and close) their client.
+        final owns = clientFactory != null;
+        final client = owns ? clientFactory() : sharedVoiceHttpClient();
         try {
           await client.get(endpoint).timeout(timeout);
         } catch (_) {
           // Offline / server hiccup — the real turn reports honestly.
         } finally {
-          client.close();
+          if (owns) client.close();
         }
       }),
   ]);

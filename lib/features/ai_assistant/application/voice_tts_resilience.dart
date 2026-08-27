@@ -32,6 +32,9 @@ class ResilientVoiceTtsAdapter
   bool _primaryConfigured = false;
   DateTime? _lastPrimaryFailureAt;
 
+  /// Cancels the degraded-mode delta buffering; set only while buffering.
+  void Function()? _cancelBuffered;
+
   /// Bumped by [stop]/[release]. A speak() whose generation went stale
   /// mid-flight was cancelled by the user — it must NOT proceed to the
   /// fallback, or the full stale reply speaks over the re-opened mic (or
@@ -66,7 +69,12 @@ class ResilientVoiceTtsAdapter
         _lastPrimaryFailureAt = null;
         return;
       } catch (_) {
-        _lastPrimaryFailureAt = _now();
+        // A stale generation means OUR OWN stop() killed the in-flight
+        // clip fetch — the class doc's "the primary tends to throw exactly
+        // when the user taps" case. Recording that as a primary failure
+        // put the good voice on a 60s cooldown every time an interactive
+        // user interrupted (fix-wave Phase 4, §8 V2 / GPT-5.6 G20).
+        if (generation == _generation) _lastPrimaryFailureAt = _now();
       }
     }
     // Cancelled while the primary was failing — swallow, don't ghost-speak.
@@ -88,8 +96,28 @@ class ResilientVoiceTtsAdapter
         !_primaryOnCooldown &&
         primaryAdapter is VoiceTtsStreamCapable;
     if (!canPipeline) {
+      // Cancellable buffering (§8 V2's second half): `deltas.forEach` had
+      // no way to stop, so during a cooldown an interrupt left the model
+      // stream generating to completion while the orb claimed SPEAKING
+      // into silence — and later interrupts stopped nothing.
       final full = StringBuffer();
-      await deltas.forEach(full.write).catchError((_) {});
+      final done = Completer<void>();
+      final sub = deltas.listen(
+        full.write,
+        onError: (Object _) {
+          if (!done.isCompleted) done.complete();
+        },
+        onDone: () {
+          if (!done.isCompleted) done.complete();
+        },
+      );
+      _cancelBuffered = () {
+        if (!done.isCompleted) done.complete();
+        unawaited(sub.cancel());
+      };
+      await done.future;
+      _cancelBuffered = null;
+      await sub.cancel();
       if (generation != _generation) return;
       final text = sanitizeForSpeech(full.toString());
       if (text.isEmpty) return;
@@ -117,7 +145,7 @@ class ResilientVoiceTtsAdapter
       await (primaryAdapter as VoiceTtsStreamCapable).speakStream(tee.stream);
       _lastPrimaryFailureAt = null;
     } catch (_) {
-      _lastPrimaryFailureAt = _now();
+      if (generation == _generation) _lastPrimaryFailureAt = _now();
       // Let the reply finish arriving, then speak it via the floor voice.
       await sub.asFuture<void>().catchError((_) {});
       if (generation != _generation) return;
@@ -132,6 +160,8 @@ class ResilientVoiceTtsAdapter
   @override
   Future<void> stop() async {
     _generation++;
+    _cancelBuffered?.call();
+    _cancelBuffered = null;
     try {
       await primary.stop();
     } catch (_) {}

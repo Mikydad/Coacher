@@ -670,6 +670,10 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     });
     _voiceReachedFull = false;
     await controller.stopAndExit();
+    // Stop routing singleton speech events at this session's (now dead)
+    // callbacks — the dictation mic may claim them next (§8 V1).
+    final speechAdapter = controller.speech;
+    if (speechAdapter is SpeechToTextVoiceAdapter) speechAdapter.release();
     controller.dispose();
   }
 

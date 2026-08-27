@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import '../../application/shared_speech_callbacks.dart';
+
 import '../../../../core/presentation/keyboard_dismiss.dart';
 
 import '../../../../core/presentation/app_colors.dart';
@@ -191,7 +193,12 @@ class _DictationButtonState extends State<_DictationButton> {
     if (_listening) {
       _speech.stop();
     }
+    SharedSpeechCallbacks.release(this);
     super.dispose();
+  }
+
+  void _onError() {
+    if (mounted) setState(() => _listening = false);
   }
 
   Future<void> _toggle() async {
@@ -202,12 +209,19 @@ class _DictationButtonState extends State<_DictationButton> {
       return;
     }
 
+    // Claim the singleton's callbacks (fix-wave Phase 4, §8 V1): after a
+    // Voice Mode session the plugin's initialize() refused to re-register
+    // them, so this button's lit state never reset on 'done'.
+    SharedSpeechCallbacks.claim(
+      this,
+      speech: _speech,
+      onStatus: _onStatus,
+      onError: _onError,
+    );
     if (!_initialised) {
       _available = await _speech.initialize(
-        onStatus: _onStatus,
-        onError: (_) {
-          if (mounted) setState(() => _listening = false);
-        },
+        onStatus: SharedSpeechCallbacks.dispatchStatus,
+        onError: SharedSpeechCallbacks.dispatchError,
       );
       _initialised = true;
     }

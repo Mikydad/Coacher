@@ -8,6 +8,25 @@ import '../domain/models/ai_intent_kind.dart';
 import 'ai_operating_layer_client.dart';
 import 'ai_payload_assembler.dart';
 
+/// One process-lifetime keep-alive HTTP client for the voice streaming
+/// endpoints (fix-wave Phase 4, §8 V4). Dart's keep-alive sockets belong
+/// to their Client and die with close() — the old per-stream client paid a
+/// fresh TCP+TLS handshake before EVERY first token, and the warmup's
+/// "leaves the connection warm" claim was void because its client closed
+/// immediately (the TTS adapter measured exactly this on device and moved
+/// to a session-lifetime client; the chat transport never followed).
+/// Interrupts abort the REQUEST (subscription cancel), not the client.
+http.Client? _sharedVoiceClient;
+
+http.Client sharedVoiceHttpClient() => _sharedVoiceClient ??= http.Client();
+
+/// Test hook / recovery: drop the shared client so the next stream builds
+/// a fresh one.
+void resetSharedVoiceHttpClient() {
+  _sharedVoiceClient?.close();
+  _sharedVoiceClient = null;
+}
+
 /// The reply stream ended without a clean finish: an upstream error, a
 /// token-cap truncation, or a dead pipe. Deltas received before it are
 /// real; the reply as a whole is INCOMPLETE (fix-wave Phase 3, §8 H5).
@@ -22,9 +41,11 @@ class AiVoiceStreamTruncated implements Exception {
 /// Client transport for the aiChatStream endpoint (voice Level 2).
 ///
 /// POSTs the conversation and yields text deltas as the model writes them.
-/// The response is NDJSON: {"d":"delta"} lines then {"done":true}.
-/// Cancelling the returned stream closes the HTTP client, which aborts the
-/// server's upstream OpenAI request (interrupts stop billing).
+/// The response is NDJSON: {"d":"delta"} lines then a {"done":true,
+/// "finish": …} terminator (or an {"e": …} error line).
+/// Cancelling the returned stream aborts the in-flight REQUEST, which
+/// aborts the server's upstream OpenAI request (interrupts stop billing) —
+/// the shared keep-alive client itself survives.
 ///
 /// Errors surface as stream errors AFTER any received deltas — callers
 /// (the voice pipeline, the live thread bubble) treat partial text as the
@@ -38,8 +59,12 @@ Stream<String> streamCoachReply({
   http.Client Function()? clientFactory,
 }) {
   final controller = StreamController<String>();
-  final client = (clientFactory ?? http.Client.new)();
+  // The shared keep-alive client by default (§8 V4); a test-provided
+  // factory gets a private client that closes with the stream.
+  final ownsClient = clientFactory != null;
+  final client = ownsClient ? clientFactory() : sharedVoiceHttpClient();
   var closed = false;
+  StreamSubscription<String>? bodySub;
 
   Future<void> run() async {
     try {
@@ -60,48 +85,78 @@ Stream<String> streamCoachReply({
         );
       }
       var carry = '';
-      await for (final chunk in response.stream
+      // A broadcast-free single subscription we can cancel from onCancel:
+      // cancelling aborts THIS response (and its socket) without killing
+      // the shared client's keep-alive pool.
+      final bodyStream = response.stream
           .timeout(idleTimeout)
-          .transform(utf8.decoder)) {
-        carry += chunk;
-        final lines = carry.split('\n');
-        carry = lines.removeLast();
-        for (final line in lines) {
-          final trimmed = line.trim();
-          if (trimmed.isEmpty) continue;
-          try {
-            final parsed = jsonDecode(trimmed);
-            if (parsed is Map<String, dynamic>) {
-              final delta = parsed['d'];
-              if (delta is String && delta.isNotEmpty && !closed) {
-                controller.add(delta);
-              }
-              // Honest ending contract (fix-wave Phase 3, §8 H5): the
-              // server names how the reply ended. An explicit upstream
-              // error — or a token-cap truncation — surfaces as a stream
-              // error after the received deltas, never as a clean finish.
-              if (parsed['e'] != null) {
-                throw const AiVoiceStreamTruncated('upstream error');
-              }
-              if (parsed['done'] == true) {
-                if (parsed['finish'] == 'length') {
-                  throw const AiVoiceStreamTruncated('token cap');
-                }
-                return;
-              }
+          .transform(utf8.decoder);
+      final done = Completer<void>();
+      late final StreamSubscription<String> sub;
+      var finished = false;
+      void finish([Object? error]) {
+        if (finished) return;
+        finished = true;
+        if (error != null && !closed) controller.addError(error);
+        if (!done.isCompleted) done.complete();
+      }
+
+      void handleLine(String line) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty) return;
+        try {
+          final parsed = jsonDecode(trimmed);
+          if (parsed is Map<String, dynamic>) {
+            final delta = parsed['d'];
+            if (delta is String && delta.isNotEmpty && !closed) {
+              controller.add(delta);
             }
-          } on AiVoiceStreamTruncated {
-            rethrow;
-          } catch (_) {
-            // Torn line mid-flush — the carry buffer handles real splits;
-            // anything else is skipped.
+            // Honest ending contract (fix-wave Phase 3, §8 H5): the
+            // server names how the reply ended. An explicit upstream
+            // error — or a token-cap truncation — surfaces as a stream
+            // error after the received deltas, never as a clean finish.
+            if (parsed['e'] != null) {
+              finish(const AiVoiceStreamTruncated('upstream error'));
+              unawaited(sub.cancel());
+              return;
+            }
+            if (parsed['done'] == true) {
+              if (parsed['finish'] == 'length') {
+                finish(const AiVoiceStreamTruncated('token cap'));
+              } else {
+                finish();
+              }
+              unawaited(sub.cancel());
+              return;
+            }
           }
+        } catch (_) {
+          // Torn line mid-flush — the carry buffer handles real splits;
+          // anything else is skipped.
         }
       }
-      // Stream ended WITHOUT the done marker: the pipe died mid-reply.
-      // Treating this as success is how half-sentence replies were spoken
-      // and persisted as complete (§8 H5/G18).
-      throw const AiVoiceStreamTruncated('stream ended without done');
+
+      sub = bodyStream.listen(
+        (chunk) {
+          carry += chunk;
+          final lines = carry.split('\n');
+          carry = lines.removeLast();
+          for (final line in lines) {
+            handleLine(line);
+            if (finished) return;
+          }
+        },
+        onError: (Object e) => finish(e),
+        onDone: () {
+          // Stream ended WITHOUT the done marker: the pipe died mid-reply.
+          // Treating this as success is how half-sentence replies were
+          // spoken and persisted as complete (§8 H5/G18).
+          finish(const AiVoiceStreamTruncated('stream ended without done'));
+        },
+        cancelOnError: true,
+      );
+      bodySub = sub;
+      await done.future;
     } catch (e) {
       if (!closed) controller.addError(e);
     }
@@ -111,16 +166,25 @@ Stream<String> streamCoachReply({
     unawaited(
       run().whenComplete(() {
         closed = true;
-        client.close();
+        if (ownsClient) client.close();
         if (!controller.isClosed) controller.close();
       }),
     );
   };
   controller.onCancel = () {
-    // Listener gone (interrupt): kill the socket so the server aborts
-    // upstream OpenAI.
+    // Listener gone (interrupt): abort THIS request so the server aborts
+    // upstream OpenAI — the shared client (and its keep-alive pool) lives.
     closed = true;
-    client.close();
+    final sub = bodySub;
+    if (sub != null) {
+      unawaited(sub.cancel());
+    } else if (ownsClient) {
+      client.close();
+    } else {
+      // No response yet on the shared client: recycle it so the pending
+      // request cannot outlive the interrupt.
+      resetSharedVoiceHttpClient();
+    }
   };
   return controller.stream;
 }
