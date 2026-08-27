@@ -2256,3 +2256,21 @@ not silent reversal.
   invalidations deleted. Legacy snapshots (30-min window across the
   update) still roll back via the old path. Suite 1592 green. Next:
   Phase 3 (honest failure + races).
+
+- **2026-08-27 · AI fix wave, Phase 3 shipped: honest failure + race
+  guards.** One commit (21d2859). Failed turns are ERROR bubbles with a
+  Retry chip; the retry reuses the failed turnId (loopIndex ≥ 1) so it is
+  QUOTA-FREE; errors stopped masquerading as followUpQuestions (H10).
+  'deadline-exceeded' = timeout copy, not "you're offline" (H3). The
+  offline promise heuristic is reachable again (error results try local
+  capture first). Session-generation guard: sheet-close mid-turn abandons
+  the late reply entirely — thread, pending state, and history (R1, both
+  typed and streamed paths). confirmPlan: re-entrancy guard (R2) +
+  try/catch/finally. Typing during a turn queues Telegram-style (Q6,
+  FIFO cap 3). 4k-char input cap, persisted capped (R5). Server (deploys
+  with Phase 5): refundChatTurn on upstream failure keeps turn fields so
+  the retry window works (H4); aiChatStream ends honestly —
+  finish_reason on done, {"e"} on upstream error/mid-pipe death — and
+  the client surfaces AiVoiceStreamTruncated after partials, with the
+  bubble marked "cut off" (H5/G18). Suite 1602 green. Next: Phase 4
+  (voice reliability — the shared STT adapter is the headline).
