@@ -2274,3 +2274,23 @@ not silent reversal.
   the client surfaces AiVoiceStreamTruncated after partials, with the
   bubble marked "cut off" (H5/G18). Suite 1602 green. Next: Phase 4
   (voice reliability — the shared STT adapter is the headline).
+
+- **2026-08-27 · AI fix wave, Phase 4 shipped: voice reliability.** One
+  commit (b2de5ea). `SharedSpeechCallbacks` pins the speech_to_text
+  singleton's PUBLIC listener fields to one dispatcher pair and routes to
+  the last claimer — voice sessions after the first (and the dictation
+  mic after Voice Mode) stop running deaf; both consumers claim on
+  initialize AND per listen, release on exit (V1/G11, the bug that
+  silently undid the 08-26 fix from session #2). Lifecycle observer parks
+  the loop at honest idle on backgrounding/calls — never auto-relistens
+  (Q7). Interrupts no longer stamp the 60s TTS cooldown (own-stop
+  generation check) and the degraded buffered branch is cancellable
+  (V2/G20). One keep-alive client for aiChatStream shared with warmup —
+  interrupts abort the request, not the pool (V4). _listenStartedAt
+  stamps at native open; pre-open statuses/replays are stale (V6). Tails
+  chunk at the 2000-char clip cap (V5); speaker route re-asserts per
+  reply (V8); confirm-by-voice speaks conflicts/hard blocks and hard
+  blocks demand "yes, do it anyway" (E12/Q3); day gate widened (V7).
+  pauseFor>continuationGap is now a tested invariant. Suite 1608 green.
+  Next: Phase 5 (server hardening — ONE functions deploy, bundled with
+  the pending surrender/invite deploy).
