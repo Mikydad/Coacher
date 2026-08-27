@@ -2339,3 +2339,38 @@ not silent reversal.
   DEFERRED from Phase 6, deliberately: IsarAiPulseCache wiring +
   superseded-pulse-doc deletion (product polish, not safety). Suite
   1607 green. Remaining: Phase 7 (chat-surface warmth).
+
+- **2026-08-27 · AI fix wave, Phase 7 shipped: chat-surface warmth — the
+  wave's final phase.** Typed query turns now STREAM (server `mode:
+  "typed"` on aiChatStream → purpose coach_agent, prompt key
+  coach_agent_stream without voice's 60-word cap; client reuses the
+  voice Level-2 streamer with `typed: true`); the answer assembles live
+  in one bubble, dies-before-first-delta falls back to the agent path
+  AFTER the stream settles (sendMessage awaits the whole turn), and
+  truncation appends honest "cut off" copy. Stop chip on in-flight
+  turns (cancelCurrentTurn: generation bump + stream cancel — U1's
+  ~80s dead composer). Session end is DEFERRED (settled Q7): closing
+  the sheet stashes the thread for a 10-min restore window — the
+  Restore banner brings it back under the SAME sessionId, so extraction
+  fires only when the window lapses, a new-session message lands, or
+  the service disposes. Launch rehydrates the last same-day session as
+  dimmed `isHistorical` rows under an EARLIER TODAY divider (U10 —
+  display-only; extraction integrity untouched). Sheet UX: own
+  ScaffoldMessenger so snackbars stop rendering behind the barrier
+  (U5, history sheet routes through a captured messenger); suggestions
+  panel + first-time card + help button re-homed into the sheet (U2)
+  with the guest auto-send made post-frame first (R7's latent
+  notifyListeners-in-build); auto-scroll moved off the build path and
+  streaming only follows the tail when the reader is already there
+  (U3); a manual drag mid-stream parks the sheet until the next real
+  message (U9); the trailing double ThinkingIndicator is gone (U4).
+  Boot: client build reads the RC kill switch synchronously
+  (lastKnownAiEnabled) + background refresh — no more 10s
+  "Initialising Coach AI…" on slow networks (R4) — and the error body
+  gained Retry. Detail pass: SelectionArea (copyable bubbles),
+  timestamps on executed cards (the 30-min undo window is
+  decision-relevant), AppColors.danger replaces raw reds, SectionHeader
+  in the history sheet, Semantics on the orb (phase-aware labels) and
+  SEND. Suite 1618 green. THE WAVE IS COMPLETE (Phases 0–7); deploy
+  `firebase deploy --only functions` ships Phases 3+5+7 server changes
+  together, then delete the client's vestigial prompt constants.

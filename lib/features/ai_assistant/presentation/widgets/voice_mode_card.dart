@@ -82,9 +82,13 @@ class VoiceModeCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
-              GestureDetector(
-                onTap: controller.onOrbTap,
-                child: _VoiceOrb(phase: phase),
+              Semantics(
+                button: true,
+                label: _orbSemanticsLabel(phase),
+                child: GestureDetector(
+                  onTap: controller.onOrbTap,
+                  child: _VoiceOrb(phase: phase),
+                ),
               ),
               const SizedBox(height: 10),
               AnimatedSwitcher(
@@ -204,9 +208,13 @@ class VoiceImmersiveStage extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            GestureDetector(
-              onTap: controller.onOrbTap,
-              child: _VoiceOrb(phase: phase, size: 220),
+            Semantics(
+              button: true,
+              label: _orbSemanticsLabel(phase),
+              child: GestureDetector(
+                onTap: controller.onOrbTap,
+                child: _VoiceOrb(phase: phase, size: 220),
+              ),
             ),
             const SizedBox(height: 32),
             Text(
@@ -443,4 +451,16 @@ class _VoiceOrbState extends State<_VoiceOrb>
       },
     );
   }
+}
+
+/// Screen-reader label for the orb — its tap action changes by phase
+/// (fix-wave Phase 7, §8 U8), so the label must say what a tap DOES now.
+String _orbSemanticsLabel(VoiceModePhase phase) {
+  return switch (phase) {
+    VoiceModePhase.idle => 'Voice orb. Tap to start talking.',
+    VoiceModePhase.connecting => 'Voice orb. Microphone starting.',
+    VoiceModePhase.listening => 'Voice orb. Listening — tap to finish.',
+    VoiceModePhase.thinking => 'Voice orb. Thinking.',
+    VoiceModePhase.speaking => 'Voice orb. Speaking — tap to interrupt.',
+  };
 }

@@ -82,43 +82,48 @@ class AiInputCard extends StatelessWidget {
                   valueListenable: controller,
                   builder: (context2, value, child2) {
                     final canSend = value.text.trim().isNotEmpty && !isLoading;
-                    return GestureDetector(
-                      onTap: canSend ? onSend : null,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: canSend
-                              ? AppColors.accentBright
-                              : AppColors.gray3A,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'SEND',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
+                    return Semantics(
+                      button: true,
+                      enabled: canSend,
+                      label: 'Send message',
+                      child: GestureDetector(
+                        onTap: canSend ? onSend : null,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: canSend
+                                ? AppColors.accentBright
+                                : AppColors.gray3A,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'SEND',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: canSend
+                                      ? AppColors.accentDeep
+                                      : AppColors.textFaint,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.play_arrow_rounded,
+                                size: 16,
                                 color: canSend
                                     ? AppColors.accentDeep
                                     : AppColors.textFaint,
-                                letterSpacing: 0.5,
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.play_arrow_rounded,
-                              size: 16,
-                              color: canSend
-                                  ? AppColors.accentDeep
-                                  : AppColors.textFaint,
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     );

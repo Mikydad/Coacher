@@ -54,6 +54,7 @@ Stream<String> streamCoachReply({
   required Uri endpoint,
   required Future<String?> Function() idToken,
   required List<Map<String, String>> messages,
+  bool typed = false,
   Duration connectTimeout = const Duration(seconds: 10),
   Duration idleTimeout = const Duration(seconds: 30),
   http.Client Function()? clientFactory,
@@ -75,7 +76,12 @@ Stream<String> streamCoachReply({
       final request = http.Request('POST', endpoint)
         ..headers['authorization'] = 'Bearer $token'
         ..headers['content-type'] = 'application/json'
-        ..body = jsonEncode({'messages': messages});
+        ..body = jsonEncode({
+          'messages': messages,
+          // Typed turns get the coach_agent route + typed stream prompt
+          // server-side (fix-wave Phase 7) — no spoken-prose word cap.
+          if (typed) 'mode': 'typed',
+        });
       final response = await client.send(request).timeout(connectTimeout);
       if (response.statusCode != 200) {
         unawaited(response.stream.drain<void>().catchError((_) {}));
@@ -197,6 +203,7 @@ typedef VoiceReplyStreamer =
       String sessionId, {
       AiIntentRoute? route,
       Map<String, dynamic>? proactiveContext,
+      bool typed,
     });
 
 /// Payload → messages → NDJSON deltas for one streamed voice turn.
@@ -227,6 +234,7 @@ class AiVoiceReplyStreamer {
     String sessionId, {
     AiIntentRoute? route,
     Map<String, dynamic>? proactiveContext,
+    bool typed = false,
   }) async* {
     final assembleSw = Stopwatch()..start();
     final payload = await _assembler.assemble(
@@ -234,13 +242,13 @@ class AiVoiceReplyStreamer {
       sessionId,
       intentRoute: route,
       proactiveContext: proactiveContext,
-      voiceMode: true,
+      voiceMode: !typed,
     );
     final messages = buildConversationalStreamMessages(payload);
     if (kDebugMode) {
       debugPrint(
         '[ai-timing] assemble=${assembleSw.elapsedMilliseconds}ms '
-        'stream=true voice=true',
+        'stream=true typed=$typed',
       );
     }
     final transport = _transport;
@@ -250,6 +258,7 @@ class AiVoiceReplyStreamer {
             endpoint: _endpoint(),
             idToken: _idToken,
             messages: messages,
+            typed: typed,
           );
   }
 }

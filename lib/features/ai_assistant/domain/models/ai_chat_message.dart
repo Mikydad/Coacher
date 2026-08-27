@@ -29,6 +29,7 @@ class AiChatMessage {
     this.isError = false,
     this.retryInput,
     this.retryTurnId,
+    this.isHistorical = false,
   });
 
   final String id;
@@ -75,6 +76,10 @@ class AiChatMessage {
   /// re-run as a free same-turn follow-up instead of double-charging.
   final String? retryTurnId;
 
+  /// Rehydrated from a previous session's history on launch (fix-wave
+  /// Phase 7, §8 U10) — rendered dimmed under an "earlier" divider.
+  final bool isHistorical;
+
   bool get hasPreviewCard => plannedChanges != null && !isLoading;
   bool get hasDraftPlan =>
       draftPlan != null && plannedChanges == null && !isLoading;
@@ -95,6 +100,7 @@ class AiChatMessage {
     bool? isError,
     String? retryInput,
     String? retryTurnId,
+    bool? isHistorical,
     bool clearDraftPlan = false,
     bool clearPlannedChanges = false,
     bool clearAutoCommittedBatchId = false,
@@ -123,6 +129,7 @@ class AiChatMessage {
       isError: isError ?? this.isError,
       retryInput: retryInput ?? this.retryInput,
       retryTurnId: retryTurnId ?? this.retryTurnId,
+      isHistorical: isHistorical ?? this.isHistorical,
     );
   }
 

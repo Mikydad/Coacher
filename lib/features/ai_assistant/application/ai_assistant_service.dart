@@ -127,6 +127,68 @@ class AiAssistantService extends ChangeNotifier {
     };
   }
 
+  bool _hydrated = false;
+
+  /// Rehydrates the last SAME-DAY session's turns as marked history so a
+  /// relaunch doesn't present an empty thread seconds after a rich
+  /// conversation (fix-wave Phase 7, §8 U10 / settled Q7). Display-only
+  /// continuity: the rows keep their old sessionId in storage (extraction
+  /// integrity untouched) and the live session stays fresh — deep
+  /// continuity is the extracted memory's job.
+  Future<void> hydrateFromHistory() async {
+    if (_hydrated || _messages.isNotEmpty) return;
+    _hydrated = true;
+    try {
+      final recent = await _historyRepository.getRecent(limit: 20);
+      if (recent.isEmpty) return;
+      final todayStart = DateTime.now();
+      final dayFloorMs = DateTime(
+        todayStart.year,
+        todayStart.month,
+        todayStart.day,
+      ).millisecondsSinceEpoch;
+      final latestSession = recent.first.sessionId;
+      final rows = recent
+          .where(
+            (r) =>
+                r.sessionId == latestSession && r.timestampMs >= dayFloorMs,
+          )
+          .toList()
+          .reversed
+          .take(10)
+          .toList();
+      if (rows.isEmpty || _messages.isNotEmpty) return;
+      for (final row in rows) {
+        if (row.userInput.trim().isNotEmpty) {
+          _addMessage(
+            AiChatMessage(
+              id: StableId.generate('msg'),
+              role: ChatRole.user,
+              content: row.userInput.trim(),
+              timestamp: DateTime.fromMillisecondsSinceEpoch(row.timestampMs),
+              isHistorical: true,
+            ),
+          );
+        }
+        final summary = row.assistantSummary?.trim();
+        if (summary != null && summary.isNotEmpty) {
+          _addMessage(
+            AiChatMessage(
+              id: StableId.generate('msg'),
+              role: ChatRole.assistant,
+              content: summary,
+              timestamp: DateTime.fromMillisecondsSinceEpoch(row.timestampMs),
+              isHistorical: true,
+            ),
+          );
+        }
+      }
+      if (_messages.isNotEmpty) notifyListeners();
+    } catch (e) {
+      debugPrint('[AiAssistantService] hydrate failed: $e');
+    }
+  }
+
   // ─── Public API ───────────────────────────────────────────────────────────
 
   /// [voiceMode] marks a spoken turn (Voice Mode loop): the reply will be
@@ -158,6 +220,13 @@ class AiAssistantService extends ChangeNotifier {
       );
       notifyListeners();
       return;
+    }
+
+    // A message in THIS session means the previous one won't be restored —
+    // its deferred extraction fires now (fix-wave Phase 7).
+    if (_restorableThread != null &&
+        _restorableThread!.sessionId != _sessionId) {
+      _finalizeStashedSession();
     }
 
     // Memory Phase 2: keep the session's inactivity clock fresh so
@@ -266,7 +335,155 @@ class AiAssistantService extends ChangeNotifier {
       ),
     );
 
+    // Typed query turns STREAM (fix-wave Phase 7, the voice Level-2
+    // infrastructure reused): progressive text replaces the multi-second
+    // dots wait for the most common turn shape. Same honest gating as the
+    // voice fast path; anything it can't serve falls to the agent loop.
+    if (!voiceMode && await _tryStreamTypedTurn(text)) return;
+
     await _parseAndRespond(userInput.trim(), voiceMode: voiceMode);
+  }
+
+  /// True when the turn was handled by the typed streaming path.
+  Future<bool> _tryStreamTypedTurn(String text) async {
+    final streamer = _voiceReplyStreamer;
+    if (streamer == null) return false;
+    if (!AiRemoteConfigService.instance.lastKnownAiEnabled) return false;
+    if (_pendingPlan != null || _pendingClarification != null) return false;
+    if (AiCapabilityRegistry.isCapabilityQuestion(text)) return false;
+    if (FeatureGuides.isEducationQuestion(text)) return false;
+    if (AiCapabilityRegistry.detectUnsupported(text) != null) return false;
+    final route = AiIntentRouter.classify(text);
+    if (route.kind != AiIntentKind.query) return false;
+    if (_otherDayPattern.hasMatch(text.toLowerCase())) return false;
+    await _runStreamedTypedTurn(text, route);
+    return true;
+  }
+
+  /// One streamed TYPED turn: a live bubble grows with each delta and
+  /// settles into history. Failure before the first delta falls back to
+  /// the agent path; failure after keeps the honest partial with the
+  /// cut-off marker. Mirrors the voice streamed turn minus the audio leg.
+  Future<void> _runStreamedTypedTurn(String text, AiIntentRoute route) async {
+    final generation = _turnGeneration;
+    unawaited(_memoryExtraction?.noteSessionActivity(_sessionId));
+    final bubbleId = StableId.generate('msg');
+    _addMessage(
+      AiChatMessage(
+        id: bubbleId,
+        role: ChatRole.assistant,
+        content: '',
+        timestamp: DateTime.now(),
+        isLoading: true,
+      ),
+    );
+    _setLoading(true);
+    _demoteCurrentPlan();
+    _logEvent('aiCommandSubmitted', {
+      'sessionId': _sessionId,
+      'inputLength': text.length,
+    });
+
+    final buffer = StringBuffer();
+    var truncated = false;
+    final done = Completer<void>();
+
+    void settle() {
+      if (done.isCompleted) return;
+      done.complete();
+      if (generation != _turnGeneration) return;
+      final full = buffer.toString().trim();
+      if (full.isEmpty) {
+        _removeMessage(bubbleId);
+      } else {
+        var message = AiInformationalOutputGuard.sanitize(full);
+        if (truncated) {
+          message = '$message …\n\n(That reply got cut off — ask again '
+              'for the rest.)';
+        }
+        _replaceLoadingMessage(bubbleId, message);
+        unawaited(
+          _historyRepository.save(
+            sessionId: _sessionId,
+            userInput: text,
+            parsedActions: const [],
+            assistantSummary: message,
+            responseType: AiResponseType.informational.name,
+          ),
+        );
+        _logEvent('aiInformationalAnswer', {
+          'sessionId': _sessionId,
+          'responseType': AiResponseType.informational.name,
+        });
+      }
+      _setLoading(false);
+    }
+
+    var fallbackToAgent = false;
+    late final StreamSubscription<String> sub;
+    sub = streamerForTypedTurn(text, route).listen(
+      (delta) {
+        if (generation != _turnGeneration) return;
+        buffer.write(delta);
+        _replaceLoadingMessage(bubbleId, buffer.toString());
+        notifyListeners();
+      },
+      onError: (Object e) {
+        if (buffer.isEmpty && !done.isCompleted) {
+          // Nothing arrived — the agent path is the safety net. The
+          // fallback itself runs AFTER [done] below, so a caller awaiting
+          // sendMessage gets the whole turn, not a stranded loading bubble.
+          fallbackToAgent = true;
+          done.complete();
+          if (generation != _turnGeneration) return;
+          _removeMessage(bubbleId);
+          _setLoading(false);
+          return;
+        }
+        if (e is AiVoiceStreamTruncated) truncated = true;
+        settle();
+        unawaited(sub.cancel());
+      },
+      onDone: settle,
+      cancelOnError: true,
+    );
+    _cancelStreamedTurn = () {
+      unawaited(sub.cancel());
+      settle();
+    };
+    await done.future;
+    _cancelStreamedTurn = null;
+    if (fallbackToAgent && generation == _turnGeneration) {
+      await _parseAndRespond(text, voiceMode: false);
+    }
+  }
+
+  /// Seam for tests; production routes through the shared streamer.
+  @visibleForTesting
+  Stream<String> streamerForTypedTurn(String text, AiIntentRoute route) =>
+      _voiceReplyStreamer!(
+        text,
+        _sessionId,
+        route: route,
+        proactiveContext: _proactiveContextForPayload,
+        typed: true,
+      );
+
+  /// Set while a typed streamed turn is live — [cancelCurrentTurn] uses it.
+  void Function()? _cancelStreamedTurn;
+
+  /// Stop button on the thinking indicator (fix-wave Phase 7, §8 U1): the
+  /// composer used to be dead for up to ~80s with no way out. Abandons the
+  /// in-flight turn via the generation guard (an agent reply arriving
+  /// later is discarded); queued turns still drain.
+  void cancelCurrentTurn() {
+    if (!_isLoading) return;
+    _turnGeneration++;
+    _cancelStreamedTurn?.call();
+    _cancelStreamedTurn = null;
+    _messages.removeWhere((m) => m.isLoading);
+    _setLoading(false);
+    _logEvent('aiTurnCancelled', {'sessionId': _sessionId});
   }
 
   /// Steps 2–7 of a turn: loading bubble → parse → render result → persist
@@ -1169,11 +1386,71 @@ class AiAssistantService extends ChangeNotifier {
     // No notifyListeners needed — UI calls this after acting on it
   }
 
+  /// The just-closed thread, kept for the restore window (settled Q7:
+  /// 10 minutes). An accidental downward fling used to destroy the visible
+  /// conversation irreversibly (§8 U6).
+  ({List<AiChatMessage> messages, String sessionId, DateTime at})?
+  _restorableThread;
+  Timer? _sessionEndTimer;
+  static const _kRestoreWindow = Duration(minutes: 10);
+
+  bool get canRestoreConversation {
+    final stash = _restorableThread;
+    return stash != null &&
+        DateTime.now().difference(stash.at) < _kRestoreWindow;
+  }
+
+  /// Puts the just-closed thread back — same sessionId, so the session
+  /// boundary and memory extraction are untouched (the deferred end below
+  /// simply never fires).
+  void restoreConversation() {
+    final stash = _restorableThread;
+    if (stash == null) return;
+    _restorableThread = null;
+    _sessionEndTimer?.cancel();
+    _turnGeneration++;
+    _queuedTurns.clear();
+    _sessionId = stash.sessionId;
+    _messages
+      ..clear()
+      ..addAll(stash.messages);
+    _pendingPlan = null;
+    _pendingClarification = null;
+    _isLoading = false;
+    unawaited(_memoryExtraction?.noteSessionActivity(_sessionId));
+    _logEvent('aiConversationRestored', {'sessionId': _sessionId});
+    notifyListeners();
+  }
+
+  /// Extraction for a stashed session fires when the user has moved on —
+  /// the restore window lapsed, a message was sent in the NEW session, or
+  /// the service is going away. (onSessionEnded extracts IMMEDIATELY, so
+  /// firing it at close would strand a restored conversation's later turns
+  /// outside memory; the bootstrap idle-sweep remains the floor if the
+  /// app dies before any of these.)
+  void _finalizeStashedSession() {
+    final stash = _restorableThread;
+    if (stash == null) return;
+    _restorableThread = null;
+    _sessionEndTimer?.cancel();
+    unawaited(_memoryExtraction?.onSessionEnded(stash.sessionId));
+  }
+
   void startNewSession() {
-    // The old session visibly ended — extract its memory now (best-effort;
-    // failures stay pending and the bootstrap sweep retries).
     final endedSessionId = _sessionId;
-    unawaited(_memoryExtraction?.onSessionEnded(endedSessionId));
+    // Deferred end (fix-wave Phase 7, §8 U6): stash the thread for the
+    // restore window instead of extracting immediately.
+    _finalizeStashedSession(); // at most one stash at a time
+    if (_messages.any((m) => !m.isLoading)) {
+      _restorableThread = (
+        messages: List.of(_messages.where((m) => !m.isLoading)),
+        sessionId: endedSessionId,
+        at: DateTime.now(),
+      );
+      _sessionEndTimer = Timer(_kRestoreWindow, _finalizeStashedSession);
+    } else {
+      unawaited(_memoryExtraction?.onSessionEnded(endedSessionId));
+    }
     // Any turn still awaiting the model belongs to the DEAD session —
     // bumping the generation makes it abandon all mutation on arrival
     // (fix-wave Phase 3, §8 R1). Queued turns die with their session.
@@ -1410,6 +1687,13 @@ class AiAssistantService extends ChangeNotifier {
         _messages[i] = msg.copyWith(isCurrentPlan: false, isExecuted: true);
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _finalizeStashedSession();
+    _sessionEndTimer?.cancel();
+    super.dispose();
   }
 
   void _setLoading(bool value) {

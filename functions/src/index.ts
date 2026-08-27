@@ -834,7 +834,11 @@ export const aiChatStream = onRequest(
       return;
     }
 
-    const purpose = "coach_agent_voice";
+    // Typed streaming (fix-wave Phase 7): the same endpoint serves typed
+    // query turns — coach_agent route (800 tokens) and the typed stream
+    // prompt, instead of the voice route's spoken-prose constraints.
+    const typed = req.body?.mode === "typed";
+    const purpose = typed ? "coach_agent" : "coach_agent_voice";
     const cfg = await aiServerConfig();
     const route = resolveRoute(purpose, parseRouteOverrides(cfg.routesJson));
     if (!route.enabled) {
@@ -861,7 +865,7 @@ export const aiChatStream = onRequest(
     // here, so its addendum forbids claiming or describing changes.
     const finalMessages = applyServerSystemPrompt(
       messages,
-      "coach_agent_voice_stream",
+      typed ? "coach_agent_stream" : "coach_agent_voice_stream",
       cfg.systemPromptsJson,
     );
     const tConfig = Date.now();

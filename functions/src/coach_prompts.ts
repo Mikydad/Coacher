@@ -157,6 +157,16 @@ The user is speaking by voice and your reply will be read aloud.
 - Tools and propose_changes work exactly as normal.
 `;
 
+const TYPED_STREAM_ADDENDUM = `
+
+## THIS TURN (typed, streaming)
+- This turn is answer-only: you cannot look up other days or change anything.
+  If the user asks you to create, change, or delete something, do NOT claim
+  it is done and do NOT describe a concrete plan — ask them in one short
+  line to repeat it as a direct request (like "add workout at 6am") so you
+  can set it up properly.
+`;
+
 const STREAM_ADDENDUM = `
 ## VOICE MODE (this turn)
 The user is speaking by voice and your reply will be read aloud.
@@ -174,10 +184,13 @@ export const DEFAULT_SYSTEM_PROMPTS: Record<string, string> = {
   coach_agent: BASE_PROMPT,
   chat: BASE_PROMPT,
   coach_agent_voice: BASE_PROMPT + VOICE_ADDENDUM,
-  // The streaming endpoint has no tools — its addendum forbids claiming
-  // or describing changes (registered under its own key so RC can tune it
-  // independently of the tool-preserving voice prompt).
+  // The streaming endpoint has no tools — its addenda forbid claiming or
+  // describing changes (own keys so RC can tune them independently).
+  // voice_stream keeps the spoken-prose constraints; agent_stream is the
+  // TYPED variant (fix-wave Phase 7: typed query turns stream too, and a
+  // 60-word spoken-prose cap would be wrong for them).
   coach_agent_voice_stream: BASE_PROMPT + STREAM_ADDENDUM,
+  coach_agent_stream: BASE_PROMPT + TYPED_STREAM_ADDENDUM,
 };
 
 /** Purposes whose system prompt the SERVER owns: client `system` messages

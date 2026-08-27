@@ -410,8 +410,9 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     _seenMessageCount = service.messages.length;
     _seenLastMessageSignature = _lastMessageSignature(service);
     service.addListener(_onServiceMessagesChanged);
-    if (widget.sheetMode && service.messages.isNotEmpty) {
-      _growSheetForMessages();
+    if (service.messages.isNotEmpty) {
+      if (widget.sheetMode) _growSheetForMessages();
+      _scrollToBottom();
     }
   }
 
@@ -429,10 +430,19 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     _seenMessageCount = count;
     _seenLastMessageSignature = signature;
     if (grew) {
+      // A new message resets any deliberate park — the user asked for more.
+      _userParkedSheet = false;
       _growSheetForMessages();
+      _scrollToBottom();
       return;
     }
     if (contentChanged) {
+      // Streaming follows the tail only if the reader is already there
+      // (§8 U3) — never yank someone who scrolled up to reread.
+      _scrollToBottom(onlyIfNearBottom: true);
+      // A manual drag mid-stream is a deliberate park (§8 U9): content
+      // ticks stop resizing the sheet until the next real message.
+      if (_userParkedSheet) return;
       // Throttled: streaming fires this per token batch.
       final now = DateTime.now();
       if (now.difference(_lastContentGrowAt) <
@@ -443,6 +453,10 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       _growSheetForMessages();
     }
   }
+
+  /// True after a manual header drag while a reply is in flight — content
+  /// growth stops fighting the chosen extent until the next message (§8 U9).
+  bool _userParkedSheet = false;
 
   void _applyCoachLaunchArgs(Object? args) {
     ref.read(coachLastOpenedDateKeyProvider.notifier).state =
@@ -486,7 +500,13 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     if (!_autoSendHandled && autoMessage != null) {
       _autoSendHandled = true;
       _pendingAutoSendMessage = null;
-      service.sendMessage(autoMessage);
+      // Post-frame (fix-wave Phase 7, §8 R7): this method runs during
+      // build, and sendMessage reaches notifyListeners synchronously on
+      // the guest branch — a setState-during-build crash armed the moment
+      // the suggestions panel came back (U2).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) service.sendMessage(autoMessage);
+      });
     }
 
     if (_pendingStartVoiceMode) {
@@ -726,16 +746,24 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   ScrollController get _activeScrollController =>
       widget.sheetScrollController ?? _scrollController;
 
-  void _scrollToBottom() {
+  /// Scrolls the thread to its end. [onlyIfNearBottom] is the streaming
+  /// case (fix-wave Phase 7, §8 U3): content ticks must not yank a reader
+  /// who deliberately scrolled up — only follow the tail when they are
+  /// already at it.
+  void _scrollToBottom({bool onlyIfNearBottom = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final controller = _activeScrollController;
-      if (controller.hasClients) {
-        controller.animateTo(
-          controller.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+      if (!controller.hasClients) return;
+      final position = controller.position;
+      if (onlyIfNearBottom &&
+          position.maxScrollExtent - position.pixels > 220) {
+        return;
       }
+      controller.animateTo(
+        position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     });
   }
 
@@ -759,13 +787,22 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     );
 
     if (widget.sheetMode) {
-      return Material(
-        color: AppColors.ink,
-        child: Column(
-          children: [
-            _buildSheetHeader(serviceAsync),
-            Expanded(child: body),
-          ],
+      // The sheet owns its feedback (fix-wave Phase 7, §8 U5): snackbars
+      // used to land on the ROOT messenger under the modal barrier — undo
+      // confirmations and the mic-permission error were invisible, so a
+      // denied mic tap looked like nothing happened. The keyboard inset is
+      // already applied by the sheet wrapper, so the Scaffold must not
+      // re-apply it.
+      return ScaffoldMessenger(
+        child: Scaffold(
+          backgroundColor: AppColors.ink,
+          resizeToAvoidBottomInset: false,
+          body: Column(
+            children: [
+              _buildSheetHeader(serviceAsync),
+              Expanded(child: body),
+            ],
+          ),
         ),
       );
     }
@@ -787,6 +824,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       onVerticalDragUpdate: sheet == null
           ? null
           : (details) {
+              _userParkedSheet = true;
               final height = MediaQuery.sizeOf(context).height;
               sheet.jumpTo(
                 (sheet.size - details.delta.dy / height).clamp(
@@ -838,9 +876,16 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Balances the trailing help button so the title stays centred.
+              const SizedBox(width: 40),
+              const Spacer(),
               const PageTitle('Coach AI'),
               const SizedBox(width: 8),
               _StatusPill(isReady: serviceAsync.hasValue),
+              const Spacer(),
+              // The sheet is the only Coach presentation — the help entry
+              // lived on the retired tab's AppBar and was unreachable (§8 U2).
+              const HelpAppBarButton('coachAi'),
             ],
           ),
           const SizedBox(height: 4),
@@ -896,16 +941,23 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
 
     final messages = service.messages;
     final hasMessages = messages.isNotEmpty;
-
-    // Auto-scroll on new messages
-    if (hasMessages) _scrollToBottom();
+    // Auto-scroll moved off the build path (§8 U3): the service listener
+    // scrolls on real message events; a rebuild alone never yanks the list.
 
     final showSuggestionsPanel = _shouldShowSuggestionsPanel();
 
-    // Discoverability chrome above the thread. The sheet skips it entirely
-    // (quick chat, no cards); the tab keeps it.
+    // Discoverability chrome above the thread. Rendered in the sheet too
+    // (fix-wave Phase 7, §8 U2): the old `!sheetMode` gate left the
+    // suggestions panel and first-time card unreachable once the Coach tab
+    // retired — four live entry points (FAB dot, morning brief, push tap)
+    // promised a panel that no longer existed anywhere. The ask-bar peek
+    // stays clean: the chrome appears once the sheet is tall enough.
+    final hasFreshMessages = messages.any((m) => !m.isHistorical);
+    final showRestoreBanner =
+        !hasFreshMessages && service.canRestoreConversation;
+    final showChrome = !widget.sheetMode || _showComposerExtras;
     final topExtras = <Widget>[
-      if (!widget.sheetMode) ...[
+      if (showChrome) ...[
         const Padding(
           padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: FirstTimeFeatureCard(guideId: 'coachAi'),
@@ -918,9 +970,14 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
             initiallyExpanded: _openSuggestionsPanel || !hasMessages,
           ),
       ],
+      // Accidental-close recovery (fix-wave Phase 7, §8 U1/U10): within
+      // 10 minutes of the sheet closing, the stashed thread can come back
+      // exactly as it was — same session, plans and all.
+      if (showRestoreBanner)
+        _RestoreConversationBanner(onRestore: service.restoreConversation)
       // "Pick up where you left off" banner — shown when no active messages
       // and there is a recent unconfirmed plan
-      if (!hasMessages)
+      else if (!hasMessages)
         _PickUpBanner(
           historyRepository: service.historyRepository,
           onResume: (input) {
@@ -972,6 +1029,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                                   _inputFocusNode.requestFocus();
                                 },
                                 onEditPlan: () => _onEditPlanPressed(service),
+                                onStop: service.cancelCurrentTurn,
                               )
                             : _buildEmptyState(),
                       ),
@@ -1110,10 +1168,44 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(32),
-        child: Text(
-          'Could not load Coach AI.\n$e',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.textSoft, fontSize: 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Could not load Coach AI.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSoft, fontSize: 14),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '$e',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textFaint, fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            // A failed boot (offline first open, RC fetch death) used to be
+            // a dead end — the only recovery was closing and reopening the
+            // sheet (§8 R4's error half).
+            OutlinedButton.icon(
+              onPressed: () {
+                ref.invalidate(aiOperatingLayerClientProvider);
+                ref.invalidate(aiIntentParserProvider);
+                ref.invalidate(resolvedAiAssistantProvider);
+              },
+              icon: Icon(
+                Icons.refresh_rounded,
+                size: 16,
+                color: AppColors.cyan,
+              ),
+              label: Text(
+                'Try again',
+                style: TextStyle(color: AppColors.cyan, fontSize: 13),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: AppColors.cyan.withValues(alpha: 0.4)),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1252,6 +1344,7 @@ class _MessageList extends StatelessWidget {
     required this.isLoading,
     required this.onSuggestedPrompt,
     required this.onEditPlan,
+    required this.onStop,
   });
 
   final List<AiChatMessage> messages;
@@ -1263,26 +1356,159 @@ class _MessageList extends StatelessWidget {
   /// Edit Plan on the preview card — voice-aware at the screen level.
   final VoidCallback onEditPlan;
 
+  /// Cancels the in-flight turn (fix-wave Phase 7, §8 U1).
+  final VoidCallback onStop;
+
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      controller: scrollController,
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: messages.length + (isLoading ? 1 : 0),
-      itemBuilder: (context, i) {
-        if (i == messages.length) {
-          // Extra loading indicator at bottom while processing
-          return const ThinkingIndicator();
-        }
-        final msg = messages[i];
-        return _MessageItem(
-          message: msg,
-          service: service,
-          onSuggestedPrompt: onSuggestedPrompt,
-          onEditPlan: onEditPlan,
-        );
-      },
+    // SelectionArea: bubbles are copyable (§8 U8) — long-press selects.
+    return SelectionArea(
+      child: ListView.builder(
+        controller: scrollController,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: messages.length + (isLoading ? 1 : 0),
+        itemBuilder: (context, i) {
+          if (i == messages.length) {
+            // While a turn is in flight the thread ends with a Stop chip —
+            // NOT a second ThinkingIndicator: the loading bubble already
+            // draws the dots, and the trailing copy was the §8 U4
+            // double-indicator.
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: ActionChip(
+                  avatar: Icon(
+                    Icons.stop_rounded,
+                    size: 14,
+                    color: AppColors.textSoft,
+                  ),
+                  label: const Text('Stop', style: TextStyle(fontSize: 12)),
+                  backgroundColor: AppColors.inkCard,
+                  side: BorderSide(
+                    color: AppColors.textSoft.withValues(alpha: 0.25),
+                  ),
+                  onPressed: onStop,
+                ),
+              ),
+            );
+          }
+          final msg = messages[i];
+          Widget item = _MessageItem(
+            message: msg,
+            service: service,
+            onSuggestedPrompt: onSuggestedPrompt,
+            onEditPlan: onEditPlan,
+          );
+          // Rehydrated turns read as context, not conversation (§8 U10):
+          // dimmed, with a labelled divider before the block and a plain
+          // rule where the live conversation resumes.
+          if (msg.isHistorical) {
+            item = Opacity(opacity: 0.7, child: item);
+          }
+          final earlierDivider = i == 0 && msg.isHistorical;
+          final freshDivider =
+              i > 0 && messages[i - 1].isHistorical && !msg.isHistorical;
+          if (!earlierDivider && !freshDivider) return item;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (earlierDivider) const _ThreadDivider(label: 'EARLIER TODAY'),
+              if (freshDivider) const _ThreadDivider(),
+              item,
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Thin labelled rule between the rehydrated block and the live thread.
+class _ThreadDivider extends StatelessWidget {
+  const _ThreadDivider({this.label});
+
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    final line = Divider(
+      height: 1,
+      color: AppColors.textFaint.withValues(alpha: 0.25),
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: label == null
+          ? line
+          : Row(
+              children: [
+                Expanded(child: line),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    label!,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.8,
+                      color: AppColors.textFaint,
+                    ),
+                  ),
+                ),
+                Expanded(child: line),
+              ],
+            ),
+    );
+  }
+}
+
+/// "Restore conversation" banner (fix-wave Phase 7, §8 U1/U10): shown when
+/// the previous thread was stashed by an accidental close and the restore
+/// window is still open.
+class _RestoreConversationBanner extends StatelessWidget {
+  const _RestoreConversationBanner({required this.onRestore});
+
+  final VoidCallback onRestore;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.cyan.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.cyan.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.restore_rounded, size: 14, color: AppColors.cyan),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Your last conversation is still here.',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.cyan,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onRestore,
+            child: Text(
+              'Restore',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.cyan,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1406,12 +1632,12 @@ class _ConflictSummaryBanner extends StatelessWidget {
         : '⚠ $totalWarnings conflict${totalWarnings > 1 ? 's' : ''} detected — review below before confirming.';
 
     final bg = isHard
-        ? Colors.red.withValues(alpha: 0.12)
+        ? AppColors.danger.withValues(alpha: 0.12)
         : AppColors.amber.withValues(alpha: 0.12);
     final borderColor = isHard
-        ? Colors.redAccent.withValues(alpha: 0.4)
+        ? AppColors.danger.withValues(alpha: 0.4)
         : AppColors.amber.withValues(alpha: 0.4);
-    final textColor = isHard ? Colors.redAccent : AppColors.amber;
+    final textColor = isHard ? AppColors.danger : AppColors.amber;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -1481,6 +1707,18 @@ class _MessageItem extends StatelessWidget {
             onEdit: onEditPlan,
             onCancel: service.cancelPlan,
           ),
+          // Timestamp on executed cards (§8 U8): the undo window is
+          // 30 minutes, so WHEN it ran is decision-relevant.
+          if (message.isExecuted)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 2, 20, 8),
+              child: Text(
+                'Applied '
+                '${message.timestamp.hour.toString().padLeft(2, '0')}:'
+                '${message.timestamp.minute.toString().padLeft(2, '0')}',
+                style: TextStyle(fontSize: 11, color: AppColors.textFaint),
+              ),
+            ),
         ],
       );
     }
@@ -1601,10 +1839,7 @@ class _MessageItem extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 48, 0),
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 10,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: AppColors.inkCard,
                 borderRadius: BorderRadius.circular(14),
@@ -1646,9 +1881,7 @@ class _MessageItem extends StatelessWidget {
                 ),
                 label: const Text('Retry', style: TextStyle(fontSize: 12)),
                 backgroundColor: AppColors.inkCard,
-                side: BorderSide(
-                  color: AppColors.cyan.withValues(alpha: 0.25),
-                ),
+                side: BorderSide(color: AppColors.cyan.withValues(alpha: 0.25)),
                 onPressed: service.isLoading
                     ? null
                     : () => service.retryTurn(message.id),
@@ -1763,14 +1996,19 @@ class _AiActionBar extends ConsumerWidget {
   }
 
   void _showHistorySheet(BuildContext context, WidgetRef ref) {
+    // Captured HERE, inside the coach sheet's ScaffoldMessenger — the
+    // history sheet itself mounts on the root navigator, above it.
+    final messenger = ScaffoldMessenger.of(context);
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.inkCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) =>
-          _AiHistorySheet(executor: ref.read(aiActionExecutorProvider)),
+      builder: (_) => _AiHistorySheet(
+        executor: ref.read(aiActionExecutorProvider),
+        messenger: messenger,
+      ),
     );
   }
 }
@@ -1785,13 +2023,17 @@ class _AiActionBar extends ConsumerWidget {
 Future<void> handleAiUndo(
   BuildContext context,
   WidgetRef ref,
-  AiActionExecutor executor,
-) async {
+  AiActionExecutor executor, {
+  ScaffoldMessengerState? messenger,
+}) async {
   // Chip/count refresh needs no manual invalidation since fix-wave
   // Phase 2: the batch providers are Isar watch streams and emit on every
   // batch write — including the rollback's own state transition.
+  // [messenger] lets the history sheet (its own modal route, OUTSIDE the
+  // coach sheet's ScaffoldMessenger) still land feedback inside the coach
+  // sheet instead of behind the barrier (§8 U5).
   void showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    (messenger ?? ScaffoldMessenger.of(context)).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: AppColors.inkCard),
     );
   }
@@ -1853,8 +2095,8 @@ Future<void> handleAiUndo(
           UndoNeedsConfirmation() => 'AI changes undone.', // unreachable
         });
       }
-      // Cancel keeps the batch untouched and undoable — the watch stream
-      // keeps the chip accurate either way.
+    // Cancel keeps the batch untouched and undoable — the watch stream
+    // keeps the chip accurate either way.
 
     case UndoNotAvailable(:final reason):
       showSnack(reason);
@@ -1899,8 +2141,11 @@ class _UndoChip extends StatelessWidget {
 // ── AI history bottom sheet ───────────────────────────────────────────────────
 
 class _AiHistorySheet extends ConsumerWidget {
-  const _AiHistorySheet({required this.executor});
+  const _AiHistorySheet({required this.executor, this.messenger});
   final AiActionExecutor executor;
+
+  /// The coach sheet's messenger — undo feedback lands there (§8 U5).
+  final ScaffoldMessengerState? messenger;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1920,18 +2165,11 @@ class _AiHistorySheet extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
-        Padding(
+        const Padding(
           padding: EdgeInsets.symmetric(horizontal: 20),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: Text(
-              'Recent AI changes',
-              style: TextStyle(
-                color: AppColors.fg,
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            child: SectionHeader('Recent AI changes'),
           ),
         ),
         const SizedBox(height: 12),
@@ -1953,7 +2191,12 @@ class _AiHistorySheet extends ConsumerWidget {
                         // the pre-rollback completed-tasks confirmation.
                         // Runs BEFORE the sheet closes: popping first would
                         // unmount this context and kill the dialog.
-                        await handleAiUndo(context, ref, executor);
+                        await handleAiUndo(
+                          context,
+                          ref,
+                          executor,
+                          messenger: messenger,
+                        );
                         if (context.mounted) Navigator.pop(context);
                       }
                     : null,

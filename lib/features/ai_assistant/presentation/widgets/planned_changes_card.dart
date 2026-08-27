@@ -158,12 +158,12 @@ class _ActionRow extends StatelessWidget {
         return (icon: Icons.edit_rounded, color: AppColors.textSoft);
 
       case ActionType.forgetFact:
-        return (icon: Icons.remove_rounded, color: Colors.redAccent);
+        return (icon: Icons.remove_rounded, color: AppColors.danger);
 
       case ActionType.deleteTask:
       case ActionType.deleteGoal:
       case ActionType.removeReminder:
-        return (icon: Icons.remove_rounded, color: Colors.redAccent);
+        return (icon: Icons.remove_rounded, color: AppColors.danger);
 
       case ActionType.editTask:
       case ActionType.moveTask:
@@ -298,9 +298,9 @@ class _ConflictRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = isBlocking
-        ? Colors.red.withValues(alpha: 0.15)
+        ? AppColors.danger.withValues(alpha: 0.15)
         : AppColors.amber.withValues(alpha: 0.15);
-    final textColor = isBlocking ? Colors.redAccent : AppColors.amber;
+    final textColor = isBlocking ? AppColors.danger : AppColors.amber;
     final icon = isBlocking ? Icons.block_rounded : Icons.warning_amber_rounded;
 
     return Container(
@@ -342,24 +342,20 @@ class _HighRiskWarning extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.red.withValues(alpha: 0.12),
+        color: AppColors.danger.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.delete_forever_rounded,
-            size: 14,
-            color: Colors.redAccent,
-          ),
+          Icon(Icons.delete_forever_rounded, size: 14, color: AppColors.danger),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               'This will permanently delete $count item${count > 1 ? 's' : ''}.',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: Colors.redAccent,
+                color: AppColors.danger,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -401,7 +397,7 @@ class _ActionButtons extends StatelessWidget {
     }
 
     final confirmBg = isBlocked
-        ? Colors.red.withValues(alpha: 0.85)
+        ? AppColors.danger.withValues(alpha: 0.85)
         : AppColors.accentBright;
     final confirmFg = isBlocked ? AppColors.fg : AppColors.accentDeep;
 
@@ -463,9 +459,9 @@ class _ActionButtons extends StatelessWidget {
               child: OutlinedButton(
                 onPressed: isLoading ? null : onCancel,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.redAccent,
+                  foregroundColor: AppColors.danger,
                   side: BorderSide(
-                    color: Colors.redAccent.withValues(alpha: 0.3),
+                    color: AppColors.danger.withValues(alpha: 0.3),
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
@@ -496,7 +492,7 @@ class _BlockedDisclaimer extends StatelessWidget {
         style: TextStyle(
           fontSize: 11,
           fontStyle: FontStyle.italic,
-          color: Colors.redAccent.withValues(alpha: 0.8),
+          color: AppColors.danger.withValues(alpha: 0.8),
         ),
       ),
     );

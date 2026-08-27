@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -428,7 +429,8 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
     // loopIndex >= 1, which is what the server's free-follow-up branch
     // keys on.
     final retryTurnId = payload.retryTurnId;
-    final turnId = retryTurnId ??
+    final turnId =
+        retryTurnId ??
         'turn_${DateTime.now().millisecondsSinceEpoch}_${payload.userInput.hashCode.toRadixString(16)}';
     final loopIndexOffset = retryTurnId != null ? 1 : 0;
 
@@ -851,9 +853,7 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
     }
 
     if (payload.openPromises.isNotEmpty) {
-      buffer.writeln(
-        'Promises already captured (do NOT create these again):',
-      );
+      buffer.writeln('Promises already captured (do NOT create these again):');
       for (final line in payload.openPromises) {
         buffer.writeln('  - $line');
       }
@@ -905,7 +905,16 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
 Future<AiOperatingLayerClient> buildAiOperatingLayerClient({
   AiCoachToolRunner? toolRunner,
 }) async {
-  final aiEnabled = await AiRemoteConfigService.instance.isAiEnabled();
+  // Synchronous last-known read + background refresh (fix-wave Phase 7,
+  // §8 R4): awaiting the Remote Config fetch here held the ENTIRE Coach
+  // provider chain — cold start on a slow connection showed
+  // 'Initialising Coach AI…' with no composer for up to the 10s fetch
+  // timeout, a user gesture waiting on the network. lastKnown defaults to
+  // enabled (the Cloud Function is the real gate) and the refreshed value
+  // applies on the next provider resolution — the same once-per-build
+  // semantics the awaited read had.
+  final aiEnabled = AiRemoteConfigService.instance.lastKnownAiEnabled;
+  unawaited(AiRemoteConfigService.instance.isAiEnabled());
 
   if (!aiEnabled) {
     if (kDebugMode) {

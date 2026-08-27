@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -300,7 +302,11 @@ final resolvedAiAssistantProvider = FutureProvider<AiAssistantService>((
   ref,
 ) async {
   final parser = await ref.watch(aiIntentParserProvider.future);
-  return ref.watch(aiAssistantServiceProvider(parser));
+  final service = ref.watch(aiAssistantServiceProvider(parser));
+  // Launch continuity (fix-wave Phase 7, §8 U10): the last same-day
+  // session rehydrates as marked history — idempotent, no-op once done.
+  unawaited(service.hydrateFromHistory());
+  return service;
 });
 
 // ─── Dismissed suggestion repository ─────────────────────────────────────────

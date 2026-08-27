@@ -113,6 +113,7 @@ AiAssistantService _makeService({
             String sessionId, {
             AiIntentRoute? route,
             Map<String, dynamic>? proactiveContext,
+            bool typed = false,
           }) => streamedReply(),
   );
 }
