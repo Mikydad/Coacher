@@ -167,32 +167,52 @@ final aiActionBatchRepositoryProvider = Provider<AiActionBatchRepository>((
 
 /// The most recent [IsarAiActionBatch] — used by the UI to decide whether
 /// to show the "Undo AI changes" button.
-final lastAiBatchProvider = FutureProvider<IsarAiActionBatch?>((ref) async {
-  // Rebuild on account switch so cached values never leak across users.
+// Isar watch streams (fix-wave Phase 2, §8 E5): the old cached
+// FutureProviders were only ever invalidated from inside the undo handlers
+// — circular, so the Undo chip stayed at its stale pre-confirm value for
+// the rest of the app session. A watch emits the moment any batch write
+// lands; no manual invalidation exists anymore.
+Stream<T> _watchBatches<T>(
+  Ref ref,
+  Future<T> Function(AiActionBatchRepository repo) read,
+) async* {
+  // Rebuild on account switch so values never leak across users.
   ref.watch(authUidProvider);
   final repo = ref.read(aiActionBatchRepositoryProvider);
-  return repo.findMostRecent();
-});
+  final isar = OfflineStore.instance.isar;
+  yield await read(repo);
+  if (isar == null) return;
+  await for (final _ in isar.isarAiActionBatchs.watchLazy()) {
+    yield await read(repo);
+  }
+}
 
-/// Whether the undo button should be visible: most recent batch is `completed`
-/// and was created within the last 30 minutes.
-final canUndoLastAiBatchProvider = FutureProvider<bool>((ref) async {
-  final batch = await ref.watch(lastAiBatchProvider.future);
-  if (batch == null) return false;
-  final isUndoable = batch.state == AiActionBatchState.completed.name;
-  if (!isUndoable) return false;
-  final ageMs = DateTime.now().millisecondsSinceEpoch - batch.createdAtMs;
-  return ageMs <= const Duration(minutes: 30).inMilliseconds;
-});
+final lastAiBatchProvider = StreamProvider<IsarAiActionBatch?>(
+  (ref) => _watchBatches(ref, (repo) => repo.findMostRecent()),
+);
+
+/// Whether the undo button should be visible: most recent batch is
+/// undoable (`completed` or `partialFailure` — matching the executor's own
+/// rule) and was created within the last 30 minutes. Re-evaluated on every
+/// batch write; a chip lingering past the window resolves honestly to
+/// UndoNotAvailable on tap.
+final canUndoLastAiBatchProvider = StreamProvider<bool>(
+  (ref) => _watchBatches(ref, (repo) async {
+    final batch = await repo.findMostRecent();
+    if (batch == null) return false;
+    final isUndoable =
+        batch.state == AiActionBatchState.completed.name ||
+        batch.state == AiActionBatchState.partialFailure.name;
+    if (!isUndoable) return false;
+    final ageMs = DateTime.now().millisecondsSinceEpoch - batch.createdAtMs;
+    return ageMs <= const Duration(minutes: 30).inMilliseconds;
+  }),
+);
 
 /// Recent AI batch history — last 5 batches, newest first.
-final recentAiBatchesProvider = FutureProvider<List<IsarAiActionBatch>>((
-  ref,
-) async {
-  // Rebuild on account switch so cached values never leak across users.
-  ref.watch(authUidProvider);
-  return ref.read(aiActionBatchRepositoryProvider).listRecent();
-});
+final recentAiBatchesProvider = StreamProvider<List<IsarAiActionBatch>>(
+  (ref) => _watchBatches(ref, (repo) => repo.listRecent()),
+);
 
 // ─── Action executor ─────────────────────────────────────────────────────────
 

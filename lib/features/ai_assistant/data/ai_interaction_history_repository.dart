@@ -88,31 +88,31 @@ class AiInteractionHistoryRepository {
     });
   }
 
-  Future<void> markConfirmed(String sessionId) async {
-    final entries = await _isar.isarAiInteractionHistorys
-        .filter()
-        .sessionIdEqualTo(sessionId)
-        .findAll();
-    if (entries.isEmpty) return;
-    await _isar.writeTxn(() async {
-      for (final e in entries) {
-        e.confirmed = true;
-        await _isar.isarAiInteractionHistorys.put(e);
-      }
-    });
-  }
+  /// Marks the NEWEST entry of [sessionId] confirmed — the entry whose
+  /// plan the user just confirmed. Marking the whole session (the old
+  /// behavior) flagged declined suggestions and informational turns too,
+  /// which then fed the model "Already applied this session (do NOT
+  /// repeat)" for things that never happened (§8 M1 / GPT-5.6 G8).
+  Future<void> markConfirmed(String sessionId) =>
+      _markLatest(sessionId, (e) => e.confirmed = true);
 
-  Future<void> markExecuted(String sessionId) async {
-    final entries = await _isar.isarAiInteractionHistorys
+  /// Marks the NEWEST entry of [sessionId] executed — see [markConfirmed].
+  Future<void> markExecuted(String sessionId) =>
+      _markLatest(sessionId, (e) => e.executed = true);
+
+  Future<void> _markLatest(
+    String sessionId,
+    void Function(IsarAiInteractionHistory) mutate,
+  ) async {
+    final latest = await _isar.isarAiInteractionHistorys
         .filter()
         .sessionIdEqualTo(sessionId)
-        .findAll();
-    if (entries.isEmpty) return;
+        .sortByTimestampMsDesc()
+        .findFirst();
+    if (latest == null) return;
     await _isar.writeTxn(() async {
-      for (final e in entries) {
-        e.executed = true;
-        await _isar.isarAiInteractionHistorys.put(e);
-      }
+      mutate(latest);
+      await _isar.isarAiInteractionHistorys.put(latest);
     });
   }
 

@@ -99,6 +99,18 @@ class AppBootstrap {
       container.read(dismissedSuggestionRepositoryProvider).purgeOldEntries(),
     );
 
+    // AI batch hygiene (fix-wave Phase 2): roll back batches a crash left
+    // stranded mid-execution (their per-action inverse logs are the repair
+    // record — §8 E8), then prune batch records older than 7 days / beyond
+    // the newest 20 (pruneOld had shipped with zero callers, so snapshots
+    // of personal data accumulated forever).
+    unawaited(
+      container.read(aiActionExecutorProvider).sweepStrandedBatches().then(
+            (_) =>
+                container.read(aiActionBatchRepositoryProvider).pruneOld(),
+          ),
+    );
+
     // Community bridges (activity feed + challenge progress) — read-only
     // observers restarted by AuthGate on account switch so their per-user
     // dedupe state never leaks across sessions.

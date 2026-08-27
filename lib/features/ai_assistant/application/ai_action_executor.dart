@@ -212,19 +212,13 @@ class AiActionExecutor {
       }
     }
 
-    // Idempotency guard: if this batchId somehow already exists as completed, skip.
-    final existing = await batchRepository.findByBatchId(batchId);
-    if (existing?.state == AiActionBatchState.completed.name) {
-      return ExecutionResult(
-        batchId: batchId,
-        successes: const ['(already completed)'],
-      );
-    }
-
-    // Capture pre-mutation snapshot of affected tasks.
-    final snapshotJson = await _captureSnapshot(actions);
-
-    // Persist the batch as pending, then transition to executing.
+    // Persist the batch as pending, then transition to executing. The
+    // snapshot is an inverse-operation log (fix-wave Phase 2): each handler
+    // records the EXACT inverse of what it did, so undo can never touch
+    // unrelated data — the old date-wide task snapshot restored every task
+    // on the affected days (GPT-5.6 G3: undoing a "remember this" could
+    // revert today's completions and LWW-push that to other devices).
+    final inverseOps = <Map<String, dynamic>>[];
     final batch = IsarAiActionBatch()
       ..batchId = batchId
       ..state = AiActionBatchState.pending.name
@@ -233,7 +227,7 @@ class AiActionExecutor {
             .map((a) => {'type': a.actionType.name, 'params': a.parameters})
             .toList(),
       )
-      ..snapshotJson = snapshotJson
+      ..snapshotJson = jsonEncode({'inverseOps': inverseOps})
       ..succeededActionIds = []
       ..failedActionIds = []
       ..createdAtMs = now
@@ -251,7 +245,7 @@ class AiActionExecutor {
           action.parameters['_actionId'] as String? ??
           '${action.actionType.name}_${actions.indexOf(action)}';
       try {
-        final message = await _dispatch(action);
+        final message = await _dispatch(action, inverseOps);
         if (message != null) successes.add(message);
         await _notifyCoordinator(action);
         succeededIds.add(actionId);
@@ -259,38 +253,33 @@ class AiActionExecutor {
         failures.add('${_humanLabel(action)}: ${e.toString()}');
         failedIds.add(actionId);
       }
+      // Persist the log after EVERY action — a crash mid-batch leaves a
+      // rollback-able record for the boot sweep (§8 E8).
+      await batchRepository.updateSnapshot(
+        batchId,
+        jsonEncode({'inverseOps': inverseOps}),
+      );
     }
 
-    if (failures.isEmpty) {
-      await batchRepository.updateState(
-        batchId,
-        AiActionBatchState.completed,
-        succeeded: succeededIds,
-        failed: [],
-      );
-      return ExecutionResult(
-        successes: successes,
-        failures: failures,
-        batchId: batchId,
-      );
-    } else {
-      // Partial failure — record it, then roll back all completed steps.
-      await batchRepository.updateState(
-        batchId,
-        AiActionBatchState.partialFailure,
-        succeeded: succeededIds,
-        failed: failedIds,
-      );
-      await _rollbackBatch(batchId, snapshotJson);
-      return ExecutionResult(
-        successes: const [],
-        failures: const [
-          "I couldn't complete all steps — I've restored your schedule to its previous state.",
-        ],
-        batchId: batchId,
-        wasRolledBack: true,
-      );
-    }
+    // Per-item outcomes (settled Q4): independent actions succeed and fail
+    // independently — the old all-or-nothing rollback destroyed the user's
+    // confirmed work over one failed step, and couldn't even revert creates
+    // while claiming it had (§8 E3/E6). Undo of a partialFailure batch
+    // reverts exactly the succeeded actions: their ops are the only ones in
+    // the log.
+    await batchRepository.updateState(
+      batchId,
+      failures.isEmpty
+          ? AiActionBatchState.completed
+          : AiActionBatchState.partialFailure,
+      succeeded: succeededIds,
+      failed: failedIds,
+    );
+    return ExecutionResult(
+      successes: successes,
+      failures: failures,
+      batchId: batchId,
+    );
   }
 
   // ─── Undo last batch ───────────────────────────────────────────────────────
@@ -352,97 +341,197 @@ class AiActionExecutor {
     return ok ? const UndoSuccess() : const UndoFailed();
   }
 
-  // ─── Snapshot ─────────────────────────────────────────────────────────────
+  // ─── Inverse-op log (fix-wave Phase 2) ─────────────────────────────────────
 
-  /// Capture a minimal JSON snapshot of entities that will be mutated.
-  /// Uses the affected date keys from the actions to fetch all tasks for
-  /// those dates, then filters to only the relevant taskIds.
-  /// Used as the rollback payload for [_rollbackBatch].
-  Future<String> _captureSnapshot(List<AiAction> actions) async {
-    final tasks = <Map<String, dynamic>>[];
-    final seenTaskIds = <String>{};
+  /// Full serialization of a task row for a `restoreTask` inverse op.
+  static Map<String, dynamic> _taskRowMap(PlannedTask t) => {
+    'id': t.id,
+    'routineId': t.routineId,
+    'blockId': t.blockId,
+    'title': t.title,
+    'durationMinutes': t.durationMinutes,
+    'priority': t.priority,
+    'orderIndex': t.orderIndex,
+    'reminderEnabled': t.reminderEnabled,
+    'reminderTimeIso': t.reminderTimeIso,
+    'status': t.status.name,
+    'planDateKey': t.planDateKey,
+    'modeRefId': t.modeRefId,
+    'notes': t.notes,
+    'category': t.category,
+    'sequenceIndex': t.sequenceIndex,
+    'isHabitAnchor': t.isHabitAnchor,
+    'strictModeRequired': t.strictModeRequired,
+    'createdAtMs': t.createdAtMs,
+    'updatedAtMs': t.updatedAtMs,
+  };
 
-    // Collect all affected date keys and explicit task IDs.
-    final dateKeys = <String>{};
-    for (final action in actions) {
-      final dateStr = _resolveDate(action.parameters['date'] as String?);
-      dateKeys.add(dateStr);
-      final destDate = _resolveDate(
-        action.parameters['destinationDate'] as String?,
-      );
-      dateKeys.add(destDate);
+  PlannedTask _taskFromRowMap(Map<String, dynamic> m) => PlannedTask(
+    id: m['id'] as String,
+    routineId: m['routineId'] as String,
+    blockId: m['blockId'] as String,
+    title: m['title'] as String,
+    durationMinutes: (m['durationMinutes'] as num).toInt(),
+    priority: (m['priority'] as num).toInt(),
+    orderIndex: (m['orderIndex'] as num).toInt(),
+    reminderEnabled: m['reminderEnabled'] as bool,
+    reminderTimeIso: m['reminderTimeIso'] as String?,
+    status: _taskStatusFromName(m['status'] as String?),
+    planDateKey: m['planDateKey'] as String?,
+    modeRefId: m['modeRefId'] as String?,
+    notes: m['notes'] as String?,
+    category: m['category'] as String?,
+    sequenceIndex: (m['sequenceIndex'] as num?)?.toInt(),
+    isHabitAnchor: m['isHabitAnchor'] as bool? ?? false,
+    strictModeRequired: m['strictModeRequired'] as bool? ?? false,
+    createdAtMs: (m['createdAtMs'] as num).toInt(),
+    // Bump updatedAtMs so LWW wins over any stale remote state.
+    updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+  );
+
+  /// Captures the pre-mutation reminder configs for [taskId] as a
+  /// `restoreReminderConfigs` op — appended by every handler that changes
+  /// or removes a task's reminder state, so undo restores the config rows
+  /// AND re-schedules the OS notifications (§8 E7: undo used to leave
+  /// armed notifications and stale configs behind).
+  Future<Map<String, dynamic>> _reminderConfigsOp(String taskId) async {
+    List<Map<String, dynamic>> configs = const [];
+    try {
+      final existing = await reminderRepository.getRemindersForTasks([taskId]);
+      configs = [for (final c in existing) c.toMap()];
+    } catch (e) {
+      debugPrint('ai_action_executor: config capture failed: $e');
     }
-
-    // Fetch all tasks for each affected date and snapshot them.
-    for (final dateKey in dateKeys) {
-      try {
-        final rows = await collectTasksForDateKey(planningRepository, dateKey);
-        for (final row in rows) {
-          final t = row.task;
-          if (seenTaskIds.contains(t.id)) continue;
-          seenTaskIds.add(t.id);
-          tasks.add({
-            'id': t.id,
-            'routineId': t.routineId,
-            'blockId': t.blockId,
-            'title': t.title,
-            'durationMinutes': t.durationMinutes,
-            'priority': t.priority,
-            'orderIndex': t.orderIndex,
-            'reminderEnabled': t.reminderEnabled,
-            'reminderTimeIso': t.reminderTimeIso,
-            'status': t.status.name,
-            'planDateKey': t.planDateKey,
-            'modeRefId': t.modeRefId,
-            'notes': t.notes,
-            'category': t.category,
-            'createdAtMs': t.createdAtMs,
-            'updatedAtMs': t.updatedAtMs,
-          });
-        }
-      } catch (e) {
-        debugPrint('ai_action_executor: swallowed error: $e');
-      }
-    }
-
-    return jsonEncode({'tasks': tasks});
+    return {'op': 'restoreReminderConfigs', 'taskId': taskId,
+        'configs': configs};
   }
 
   // ─── Rollback ─────────────────────────────────────────────────────────────
 
-  /// Restore all snapshotted entities from [snapshotJson] and trigger
-  /// recompute through the coordinator. Returns false when the task-restore
-  /// leg failed — callers must not report success on false (§8 G4; the
-  /// full typed-inverse-log rollback lands in fix-wave Phase 2).
+  /// Applies the batch's inverse-operation log in reverse order — each op
+  /// individually guarded, nothing swallowed into a false success. Legacy
+  /// batches (pre-Phase-2 `{"tasks": …}` snapshots, still inside the 30-min
+  /// undo window across an app update) take the old restore path. Returns
+  /// false when any op failed — the batch state is then left untouched so
+  /// undo stays available for a retry.
   Future<bool> _rollbackBatch(String batchId, String snapshotJson) async {
+    Map<String, dynamic>? snapshot;
+    try {
+      snapshot = jsonDecode(snapshotJson) as Map<String, dynamic>?;
+    } catch (e) {
+      debugPrint('ai_action_executor: unreadable snapshot: $e');
+      return false;
+    }
+
+    final bool allOk;
+    if (snapshot != null && snapshot['inverseOps'] is List) {
+      final ops = (snapshot['inverseOps'] as List)
+          .cast<Map<String, dynamic>>();
+      allOk = await _applyInverseOps(ops);
+    } else {
+      allOk = await _legacyRollback(batchId, snapshot);
+    }
+
+    if (allOk) {
+      await batchRepository.updateState(
+        batchId,
+        AiActionBatchState.rolledBack,
+        undoneAtMs: DateTime.now().millisecondsSinceEpoch,
+      );
+    }
+    return allOk;
+  }
+
+  Future<bool> _applyInverseOps(List<Map<String, dynamic>> ops) async {
+    var allOk = true;
+    for (final op in ops.reversed) {
+      try {
+        switch (op['op'] as String?) {
+          case 'deleteTask':
+            final taskId = op['taskId'] as String;
+            await planningRepository.deleteTask(
+              routineId: op['routineId'] as String,
+              blockId: op['blockId'] as String,
+              taskId: taskId,
+            );
+            await reminderSyncService.removeForDeletedTask(taskId);
+            await timeBlockSyncService.removeBlockForEntity(taskId);
+          case 'restoreTask':
+            final restored = _taskFromRowMap(
+              (op['row'] as Map).cast<String, dynamic>(),
+            );
+            await planningRepository.upsertTask(restored);
+            await ScheduleMutationCoordinator.instance.run(
+              TaskUpdatedMutation(
+                entityId: restored.id,
+                sourceContext: 'ai_rollback',
+                dateStr: restored.planDateKey ?? DateKeys.todayKey(),
+              ),
+              commitOverride: () async {},
+            );
+          case 'restoreReminderConfigs':
+            final taskId = op['taskId'] as String;
+            final configs = (op['configs'] as List? ?? const [])
+                .cast<Map>()
+                .map((m) => ReminderConfig.fromMap(m.cast<String, dynamic>()))
+                .toList();
+            if (configs.isEmpty) {
+              // The action ADDED reminder state where none existed.
+              await reminderSyncService.removeForDeletedTask(taskId);
+            } else {
+              for (final c in configs) {
+                await reminderRepository.upsertReminder(
+                  c.copyWith(
+                    updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+                  ),
+                );
+              }
+              await reminderSyncService.syncForTaskIds([taskId]);
+            }
+          case 'deleteGoal':
+            await goalsRepository.deleteGoal(op['goalId'] as String);
+          case 'restoreGoal':
+            final restored = UserGoal.fromMap(
+              (op['goal'] as Map).cast<String, dynamic>(),
+            ).copyWith(updatedAtMs: DateTime.now().millisecondsSinceEpoch);
+            await goalsRepository.upsertGoal(restored);
+          case 'deleteIntention':
+            final id = op['intentionId'] as String;
+            await intentionNudgeSyncService?.cancelForIntention(id);
+            await intentionsRepository?.deleteIntention(id);
+          case 'deleteFact':
+            await memoryFactsRepository?.deleteFact(op['factId'] as String);
+          case 'restoreFact':
+            final restored = MemoryFact.fromMap(
+              (op['fact'] as Map).cast<String, dynamic>(),
+            ).copyWith(updatedAtMs: DateTime.now().millisecondsSinceEpoch);
+            await memoryFactsRepository?.upsertFact(restored);
+          default:
+            debugPrint('ai_action_executor: unknown inverse op ${op['op']}');
+            allOk = false;
+        }
+      } catch (e) {
+        debugPrint('ai_action_executor: inverse op ${op['op']} failed: $e');
+        allOk = false;
+      }
+    }
+    return allOk;
+  }
+
+  /// Pre-Phase-2 rollback: the date-wide task snapshot plus the actionsJson
+  /// sub-rollbacks. Kept only for batches persisted before the update.
+  Future<bool> _legacyRollback(
+    String batchId,
+    Map<String, dynamic>? snapshot,
+  ) async {
     await _rollbackCreatedIntentions(batchId);
     await _rollbackMemoryActions(batchId);
     await _rollbackGoalActions(batchId);
     try {
-      final snapshot = jsonDecode(snapshotJson) as Map<String, dynamic>?;
       final taskList = (snapshot?['tasks'] as List<dynamic>? ?? [])
           .cast<Map<String, dynamic>>();
-
       for (final taskMap in taskList) {
-        final restored = PlannedTask(
-          id: taskMap['id'] as String,
-          routineId: taskMap['routineId'] as String,
-          blockId: taskMap['blockId'] as String,
-          title: taskMap['title'] as String,
-          durationMinutes: (taskMap['durationMinutes'] as num).toInt(),
-          priority: (taskMap['priority'] as num).toInt(),
-          orderIndex: (taskMap['orderIndex'] as num).toInt(),
-          reminderEnabled: taskMap['reminderEnabled'] as bool,
-          reminderTimeIso: taskMap['reminderTimeIso'] as String?,
-          status: _taskStatusFromName(taskMap['status'] as String?),
-          planDateKey: taskMap['planDateKey'] as String?,
-          modeRefId: taskMap['modeRefId'] as String?,
-          notes: taskMap['notes'] as String?,
-          category: taskMap['category'] as String?,
-          createdAtMs: (taskMap['createdAtMs'] as num).toInt(),
-          // Bump updatedAtMs so LWW wins over any stale remote state.
-          updatedAtMs: DateTime.now().millisecondsSinceEpoch,
-        );
+        final restored = _taskFromRowMap(taskMap);
         await planningRepository.upsertTask(restored);
         await ScheduleMutationCoordinator.instance.run(
           TaskUpdatedMutation(
@@ -453,16 +542,28 @@ class AiActionExecutor {
           commitOverride: () async {},
         );
       }
-
-      await batchRepository.updateState(
-        batchId,
-        AiActionBatchState.rolledBack,
-        undoneAtMs: DateTime.now().millisecondsSinceEpoch,
-      );
       return true;
     } catch (e) {
-      debugPrint('ai_action_executor: rollback failed: $e');
+      debugPrint('ai_action_executor: legacy rollback failed: $e');
       return false;
+    }
+  }
+
+  /// Rolls back batches a crash left stranded in pending/executing (§8 E8)
+  /// — their per-action-persisted inverse logs are exactly the repair
+  /// record. Called from the bootstrap maintenance block.
+  Future<void> sweepStrandedBatches() async {
+    try {
+      final stranded = await batchRepository.findStranded();
+      for (final batch in stranded) {
+        debugPrint(
+          'ai_action_executor: sweeping stranded batch ${batch.batchId} '
+          '(${batch.state})',
+        );
+        await _rollbackBatch(batch.batchId, batch.snapshotJson);
+      }
+    } catch (e) {
+      debugPrint('ai_action_executor: stranded sweep failed: $e');
     }
   }
 
@@ -552,35 +653,62 @@ class AiActionExecutor {
     }
   }
 
-  /// Check if any tasks in the snapshot have since been completed by the user.
+  /// Tasks this batch touched that the user has COMPLETED since — undoing
+  /// would revert (restoreTask) or delete (created-task deleteTask op)
+  /// those completions, so the caller asks first. Reads the inverse-op log;
+  /// the legacy `{"tasks": …}` snapshot format is still understood for
+  /// batches persisted before Phase 2.
   Future<List<String>> _findCompletedSnapshotTasks(String snapshotJson) async {
     final titles = <String>[];
     try {
       final snapshot = jsonDecode(snapshotJson) as Map<String, dynamic>?;
-      final taskList = (snapshot?['tasks'] as List<dynamic>? ?? [])
-          .cast<Map<String, dynamic>>();
 
-      // Collect unique date keys from snapshot to query current tasks.
-      final dateKeys = <String>{};
-      for (final t in taskList) {
-        final dk = t['planDateKey'] as String?;
-        if (dk != null) dateKeys.add(dk);
+      // (taskId, dateKey, wasCompleted) triples the batch touched.
+      final touched = <String, ({String? dateKey, bool wasCompleted})>{};
+      final ops = snapshot?['inverseOps'] as List<dynamic>?;
+      if (ops != null) {
+        for (final raw in ops.cast<Map>()) {
+          final op = raw.cast<String, dynamic>();
+          switch (op['op']) {
+            case 'restoreTask':
+              final row = (op['row'] as Map).cast<String, dynamic>();
+              touched[row['id'] as String] = (
+                dateKey: row['planDateKey'] as String?,
+                wasCompleted:
+                    row['status'] == TaskStatus.completed.name,
+              );
+            case 'deleteTask':
+              // A task this batch CREATED — it did not exist before, so
+              // any completion since is the user's work.
+              touched[op['taskId'] as String] = (
+                dateKey: op['dateKey'] as String?,
+                wasCompleted: false,
+              );
+          }
+        }
+      } else {
+        final taskList = (snapshot?['tasks'] as List<dynamic>? ?? [])
+            .cast<Map<String, dynamic>>();
+        for (final t in taskList) {
+          if (t['id'] == null) continue;
+          touched[t['id'] as String] = (
+            dateKey: t['planDateKey'] as String?,
+            wasCompleted: t['status'] == TaskStatus.completed.name,
+          );
+        }
       }
-      final taskIdToSnapshotStatus = {
-        for (final t in taskList)
-          if (t['id'] != null) t['id'] as String: t['status'] as String?,
-      };
 
+      final dateKeys = <String>{
+        for (final v in touched.values)
+          if (v.dateKey != null) v.dateKey!,
+      };
       for (final dateKey in dateKeys) {
         final rows = await collectTasksForDateKey(planningRepository, dateKey);
         for (final row in rows) {
-          final taskId = row.task.id;
-          if (!taskIdToSnapshotStatus.containsKey(taskId)) continue;
-          final wasCompleted =
-              taskIdToSnapshotStatus[taskId] == TaskStatus.completed.name;
-          final isNowCompleted = row.task.status == TaskStatus.completed;
-          // Warn if the task went from not-completed to completed since the AI batch.
-          if (!wasCompleted && isNowCompleted) {
+          final entry = touched[row.task.id];
+          if (entry == null) continue;
+          if (!entry.wasCompleted &&
+              row.task.status == TaskStatus.completed) {
             titles.add(row.task.title);
           }
         }
@@ -695,28 +823,31 @@ class AiActionExecutor {
 
   // ─── Dispatcher ───────────────────────────────────────────────────────────
 
-  Future<String?> _dispatch(AiAction action) async {
+  Future<String?> _dispatch(
+    AiAction action,
+    List<Map<String, dynamic>> ops,
+  ) async {
     switch (action.actionType) {
       case ActionType.createTask:
-        return _createTask(action.parameters);
+        return _createTask(action.parameters, ops);
       case ActionType.editTask:
-        return _editTask(action.parameters);
+        return _editTask(action.parameters, ops);
       case ActionType.moveTask:
-        return _moveTask(action.parameters);
+        return _moveTask(action.parameters, ops);
       case ActionType.deleteTask:
-        return _deleteTask(action.parameters);
+        return _deleteTask(action.parameters, ops);
       case ActionType.createGoal:
-        return _createGoal(action.parameters);
+        return _createGoal(action.parameters, ops);
       case ActionType.modifyGoal:
-        return _modifyGoal(action.parameters);
+        return _modifyGoal(action.parameters, ops);
       case ActionType.deleteGoal:
-        return _deleteGoal(action.parameters);
+        return _deleteGoal(action.parameters, ops);
       case ActionType.addReminder:
-        return _addReminder(action.parameters);
+        return _addReminder(action.parameters, ops);
       case ActionType.removeReminder:
-        return _removeReminder(action.parameters);
+        return _removeReminder(action.parameters, ops);
       case ActionType.rescheduleReminder:
-        return _rescheduleReminder(action.parameters);
+        return _rescheduleReminder(action.parameters, ops);
       case ActionType.activateContextOverride:
         return _activateContextOverride(action.parameters);
       case ActionType.endContextOverride:
@@ -728,13 +859,13 @@ class AiActionExecutor {
           '${action.actionType.name} requires manual follow-up in chat',
         );
       case ActionType.createIntention:
-        return _createIntention(action.parameters);
+        return _createIntention(action.parameters, ops);
       case ActionType.rememberFact:
-        return _rememberFact(action.parameters);
+        return _rememberFact(action.parameters, ops);
       case ActionType.updateFact:
-        return _updateFact(action.parameters);
+        return _updateFact(action.parameters, ops);
       case ActionType.forgetFact:
-        return _forgetFact(action.parameters);
+        return _forgetFact(action.parameters, ops);
     }
   }
 
@@ -743,7 +874,10 @@ class AiActionExecutor {
   /// Auto-committed with undo: stating an intention is permission
   /// (settled: Q1). SidePal picks the delivery moment; the confirmation
   /// happens at delivery, where the suggestion is phrased as a question.
-  Future<String> _createIntention(Map<String, dynamic> p) async {
+  Future<String> _createIntention(
+    Map<String, dynamic> p,
+    List<Map<String, dynamic>> ops,
+  ) async {
     final repo = intentionsRepository;
     if (repo == null) {
       throw StateError('Intentions are not available in this build.');
@@ -795,6 +929,7 @@ class AiActionExecutor {
     intention.validate();
 
     await repo.upsertIntention(intention);
+    ops.add({'op': 'deleteIntention', 'intentionId': intention.id});
     // Plan the ladder right away (unthrottled) so the Promises strip shows
     // "planned for …" the moment the chat bubble appears. Airplane-safe.
     try {
@@ -816,7 +951,10 @@ class AiActionExecutor {
 
   /// "Remember this" — auto-committed with undo. Explicit remembering is
   /// userStated by definition: the utterance IS the statement.
-  Future<String> _rememberFact(Map<String, dynamic> p) async {
+  Future<String> _rememberFact(
+    Map<String, dynamic> p,
+    List<Map<String, dynamic>> ops,
+  ) async {
     final repo = memoryFactsRepository;
     if (repo == null) {
       throw StateError('Memory is not available in this build.');
@@ -856,12 +994,16 @@ class AiActionExecutor {
     );
     fact.validate();
     await repo.upsertFact(fact);
+    ops.add({'op': 'deleteFact', 'factId': fact.id});
     return 'Noted — I\'ll remember that.';
   }
 
   /// Edit an existing fact. The user correcting the record is confirmation
   /// (provenance promotes to userConfirmed, PRD §5.3).
-  Future<String> _updateFact(Map<String, dynamic> p) async {
+  Future<String> _updateFact(
+    Map<String, dynamic> p,
+    List<Map<String, dynamic>> ops,
+  ) async {
     final repo = memoryFactsRepository;
     if (repo == null) {
       throw StateError('Memory is not available in this build.');
@@ -880,6 +1022,7 @@ class AiActionExecutor {
     final capped = newContent.length > 200
         ? newContent.substring(0, 200)
         : newContent;
+    ops.add({'op': 'restoreFact', 'fact': target.toMap()});
     await repo.upsertFact(
       target.copyWith(
         content: capped,
@@ -892,7 +1035,10 @@ class AiActionExecutor {
   }
 
   /// Forget a fact — soft tombstone (kept for LWW, gone from every surface).
-  Future<String> _forgetFact(Map<String, dynamic> p) async {
+  Future<String> _forgetFact(
+    Map<String, dynamic> p,
+    List<Map<String, dynamic>> ops,
+  ) async {
     final repo = memoryFactsRepository;
     if (repo == null) {
       throw StateError('Memory is not available in this build.');
@@ -904,6 +1050,7 @@ class AiActionExecutor {
         'I couldn\'t find that memory — check "What SidePal knows".',
       );
     }
+    ops.add({'op': 'restoreFact', 'fact': target.toMap()});
     await repo.deleteFact(target.id);
     return 'Forgotten.';
   }
@@ -933,7 +1080,10 @@ class AiActionExecutor {
 
   // ─── Task handlers ────────────────────────────────────────────────────────
 
-  Future<String> _createTask(Map<String, dynamic> p) async {
+  Future<String> _createTask(
+    Map<String, dynamic> p,
+    List<Map<String, dynamic>> ops,
+  ) async {
     final title = p['title'] as String? ?? 'New Task';
     final dateStr = _resolveDate(p['date'] as String?);
     final timeStr = p['time'] as String?;
@@ -969,6 +1119,15 @@ class AiActionExecutor {
     );
 
     await planningRepository.upsertTask(task);
+    p['_resolvedTaskId'] = task.id;
+    ops.add({
+      'op': 'deleteTask',
+      'taskId': task.id,
+      'routineId': routineId,
+      'blockId': blockId,
+      'dateKey': dateStr,
+      'title': title,
+    });
 
     if (reminderTime != null) {
       await _upsertReminderForTask(
@@ -1022,9 +1181,14 @@ class AiActionExecutor {
   /// time, duration, and/or day — preserving id, status, notes, category,
   /// priority, order, and enforcement mode. The old handler upserted a
   /// brand-new task, duplicating the schedule.
-  Future<String> _editTask(Map<String, dynamic> p) async {
+  Future<String> _editTask(
+    Map<String, dynamic> p,
+    List<Map<String, dynamic>> ops,
+  ) async {
     final row = await _requireResolvedTaskRow(p);
     final task = row.task;
+    ops.add({'op': 'restoreTask', 'row': _taskRowMap(task)});
+    ops.add(await _reminderConfigsOp(task.id));
     final timeStr = p['time'] as String?;
     final durationMinutes = (p['duration'] as num?)?.toInt();
     final dateParam = p['date'] as String?;
@@ -1120,7 +1284,10 @@ class AiActionExecutor {
   /// Real move (fix-wave Phase 1, §8 E1): same task id lands on the
   /// destination day; an existing reminder keeps its clock time on the new
   /// day; the derived time block follows.
-  Future<String> _moveTask(Map<String, dynamic> p) async {
+  Future<String> _moveTask(
+    Map<String, dynamic> p,
+    List<Map<String, dynamic>> ops,
+  ) async {
     final destRaw = p['destinationDate'] as String?;
     if (destRaw == null || destRaw.trim().isEmpty) {
       throw ArgumentError('Where should I move it to — today, tomorrow, '
@@ -1136,7 +1303,7 @@ class AiActionExecutor {
       ...p,
       'title': row.task.title,
       'date': destKey,
-    }).then((_) =>
+    }, ops).then((_) =>
         'Moved "${row.task.title}" to ${_friendlyDate(destKey)}.');
   }
 
@@ -1144,8 +1311,13 @@ class AiActionExecutor {
   /// task row, reminder configs + armed OS notifications, derived time
   /// block. (Entity coaching caches self-heal on the next daily refresh —
   /// the clear helper is WidgetRef-bound and unreachable from here.)
-  Future<String> _deleteTask(Map<String, dynamic> p) async {
+  Future<String> _deleteTask(
+    Map<String, dynamic> p,
+    List<Map<String, dynamic>> ops,
+  ) async {
     final row = await _requireResolvedTaskRow(p);
+    ops.add({'op': 'restoreTask', 'row': _taskRowMap(row.task)});
+    ops.add(await _reminderConfigsOp(row.task.id));
     await planningRepository.deleteTask(
       routineId: row.routineId,
       blockId: row.blockId,
@@ -1158,7 +1330,10 @@ class AiActionExecutor {
 
   // ─── Goal handlers ────────────────────────────────────────────────────────
 
-  Future<String> _createGoal(Map<String, dynamic> p) async {
+  Future<String> _createGoal(
+    Map<String, dynamic> p,
+    List<Map<String, dynamic>> ops,
+  ) async {
     await tierGuard?.ensureCanCreateGoal();
     final title = p['title'] as String? ?? 'New Goal';
     final target = p['target'] as String? ?? '';
@@ -1211,6 +1386,7 @@ class AiActionExecutor {
     );
 
     await goalsRepository.upsertGoal(goal);
+    ops.add({'op': 'deleteGoal', 'goalId': goal.id});
     return 'Created goal "$title".';
   }
 
@@ -1233,7 +1409,10 @@ class AiActionExecutor {
   /// Real goal edit (fix-wave Phase 1, §8 E1): title, target, deadline, or
   /// intensity on the SAME goal id. Anything else fails loudly instead of
   /// pretending.
-  Future<String> _modifyGoal(Map<String, dynamic> p) async {
+  Future<String> _modifyGoal(
+    Map<String, dynamic> p,
+    List<Map<String, dynamic>> ops,
+  ) async {
     final goal = await _requireResolvedGoal(p);
     final field = (p['field'] as String? ?? '').trim().toLowerCase();
     final newValue = p['newValue'];
@@ -1286,6 +1465,7 @@ class AiActionExecutor {
           'not "$field".',
         );
     }
+    ops.add({'op': 'restoreGoal', 'goal': goal.toMap()});
     await goalsRepository.upsertGoal(updated);
     return 'Updated goal "${goal.title}" ($describe).';
   }
@@ -1294,8 +1474,12 @@ class AiActionExecutor {
   /// stashed as `_prevGoalJson` in [execute] so rollback/undo can restore
   /// the goal itself (check-in history is deleted by the repository and is
   /// NOT restored — the Phase 2 inverse-op log will cover it).
-  Future<String> _deleteGoal(Map<String, dynamic> p) async {
+  Future<String> _deleteGoal(
+    Map<String, dynamic> p,
+    List<Map<String, dynamic>> ops,
+  ) async {
     final goal = await _requireResolvedGoal(p);
+    ops.add({'op': 'restoreGoal', 'goal': goal.toMap()});
     await goalsRepository.deleteGoal(goal.id);
     return 'Removed goal "${goal.title}".';
   }
@@ -1312,7 +1496,10 @@ class AiActionExecutor {
 
   /// Adds or updates a reminder. If no matching task exists for [dateStr], creates
   /// a new task first (AI often returns addReminder instead of createTask).
-  Future<String> _addReminder(Map<String, dynamic> p) async {
+  Future<String> _addReminder(
+    Map<String, dynamic> p,
+    List<Map<String, dynamic>> ops,
+  ) async {
     final taskTitle = (p['taskTitle'] as String?)?.trim().isNotEmpty == true
         ? (p['taskTitle'] as String).trim()
         : (p['title'] as String?)?.trim().isNotEmpty == true
@@ -1323,6 +1510,8 @@ class AiActionExecutor {
 
     final existing = await _findTaskRowByTitle(taskTitle, dateStr);
     if (existing != null) {
+      ops.add({'op': 'restoreTask', 'row': _taskRowMap(existing.task)});
+      ops.add(await _reminderConfigsOp(existing.task.id));
       return _attachReminderToExistingTask(
         existing,
         dateStr: dateStr,
@@ -1337,16 +1526,21 @@ class AiActionExecutor {
       if (timeStr != null) 'time': timeStr,
       'duration': p['duration'] ?? 30,
       if (p['modeRefId'] != null) 'modeRefId': p['modeRefId'],
-    });
+    }, ops);
   }
 
   /// Real reminder removal (fix-wave Phase 1, §8 E1): cancels the armed OS
   /// notification, deletes the ReminderConfig (the load-bearing half —
   /// boot reconciliation re-arms from surviving configs), clears the
   /// task row's reminder fields, and removes the derived time block.
-  Future<String> _removeReminder(Map<String, dynamic> p) async {
+  Future<String> _removeReminder(
+    Map<String, dynamic> p,
+    List<Map<String, dynamic>> ops,
+  ) async {
     final row = await _requireResolvedTaskRow(p);
     final task = row.task;
+    ops.add({'op': 'restoreTask', 'row': _taskRowMap(task)});
+    ops.add(await _reminderConfigsOp(task.id));
     await reminderSyncService.removeForDeletedTask(task.id);
     if (task.reminderEnabled || task.reminderTimeIso != null) {
       await planningRepository.upsertTask(
@@ -1377,7 +1571,10 @@ class AiActionExecutor {
     return 'Removed the reminder for "${task.title}".';
   }
 
-  Future<String> _rescheduleReminder(Map<String, dynamic> p) async {
+  Future<String> _rescheduleReminder(
+    Map<String, dynamic> p,
+    List<Map<String, dynamic>> ops,
+  ) async {
     final taskTitle = (p['taskTitle'] as String?)?.trim().isNotEmpty == true
         ? (p['taskTitle'] as String).trim()
         : (p['title'] as String?)?.trim().isNotEmpty == true
@@ -1397,9 +1594,11 @@ class AiActionExecutor {
         'date': dateStr,
         if (timeStr != null) 'time': timeStr,
         'duration': p['duration'] ?? 30,
-      });
+      }, ops);
     }
 
+    ops.add({'op': 'restoreTask', 'row': _taskRowMap(existing.task)});
+    ops.add(await _reminderConfigsOp(existing.task.id));
     return _attachReminderToExistingTask(
       existing,
       dateStr: dateStr,

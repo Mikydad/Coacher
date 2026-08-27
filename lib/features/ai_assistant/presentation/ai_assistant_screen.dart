@@ -1715,12 +1715,9 @@ Future<void> handleAiUndo(
   WidgetRef ref,
   AiActionExecutor executor,
 ) async {
-  void invalidateBatchProviders() {
-    ref.invalidate(lastAiBatchProvider);
-    ref.invalidate(canUndoLastAiBatchProvider);
-    ref.invalidate(recentAiBatchesProvider);
-  }
-
+  // Chip/count refresh needs no manual invalidation since fix-wave
+  // Phase 2: the batch providers are Isar watch streams and emit on every
+  // batch write — including the rollback's own state transition.
   void showSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: AppColors.inkCard),
@@ -1733,14 +1730,12 @@ Future<void> handleAiUndo(
   switch (result) {
     case UndoSuccess():
       showSnack('AI changes have been undone.');
-      invalidateBatchProviders();
 
     case UndoFailed():
       showSnack(
         "Couldn't undo — some changes may not have been restored. "
         'Try again.',
       );
-      invalidateBatchProviders();
 
     case UndoNeedsConfirmation(:final batchId, :final completedTitles):
       final proceed = await showDialog<bool>(
@@ -1786,13 +1781,11 @@ Future<void> handleAiUndo(
           UndoNeedsConfirmation() => 'AI changes undone.', // unreachable
         });
       }
-      // Cancel keeps the batch untouched and undoable; refresh either way
-      // so the chip state stays accurate.
-      invalidateBatchProviders();
+      // Cancel keeps the batch untouched and undoable — the watch stream
+      // keeps the chip accurate either way.
 
     case UndoNotAvailable(:final reason):
       showSnack(reason);
-      invalidateBatchProviders();
   }
 }
 

@@ -780,15 +780,22 @@ class AiAssistantService extends ChangeNotifier {
 
     final result = await _actionExecutor.execute(plan.actions);
 
-    await _historyRepository.markConfirmed(_sessionId);
-    await _historyRepository.markExecuted(_sessionId);
+    // History marking is truthful (fix-wave Phase 2, §8 M1/G8): only the
+    // latest entry — the confirmed plan's own — and only when something
+    // actually applied. A fully-failed confirm marks nothing, so the next
+    // turn's prompt never claims "already applied" for work that never
+    // happened.
+    if (result.successes.isNotEmpty) {
+      await _historyRepository.markConfirmed(_sessionId);
+      await _historyRepository.markExecuted(_sessionId);
+    }
 
     // Store assistant summary for multi-turn conversationHistory (Phase 3)
-    final executionSummary = result.hasFailures
+    final executionSummary = result.successes.isEmpty
+        ? 'Nothing was applied. Issues: ${result.failures.take(2).join("; ")}'
+        : result.hasFailures
         ? 'Already applied (do not repeat): ${result.successes.join("; ")}. Issues: ${result.failures.take(2).join("; ")}'
-        : result.successes.isNotEmpty
-        ? 'Already applied (do not repeat): ${result.successes.join("; ")}'
-        : 'Already applied (do not repeat): Done';
+        : 'Already applied (do not repeat): ${result.successes.join("; ")}';
     unawaited(
       _historyRepository.saveAssistantSummary(_sessionId, executionSummary),
     );
@@ -813,7 +820,12 @@ class AiAssistantService extends ChangeNotifier {
     _demoteCurrentPlan();
     _setLoading(false);
 
-    final summary = result.hasFailures
+    // Per-item outcomes (fix-wave Phase 2, settled Q4): successes stay
+    // applied, failures are named individually — never the old
+    // all-or-nothing "I've restored your schedule" (which wasn't true).
+    final summary = result.successes.isEmpty && result.hasFailures
+        ? "I couldn't apply that:\n${result.toSummaryMessage()}"
+        : result.hasFailures
         ? 'Done with some issues:\n${result.toSummaryMessage()}'
         : result.successes.isNotEmpty
         ? result.toSummaryMessage()
