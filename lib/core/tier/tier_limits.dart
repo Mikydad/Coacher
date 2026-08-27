@@ -49,8 +49,13 @@ class TierLimits {
   /// Active (enabled) reminder configurations; a recurring reminder is 1.
   final int freeReminders;
 
-  /// Server-classified actionable AI messages per day (enforced by the
-  /// aiChat Cloud Function; the client value is for UI messaging only).
+  /// Charged AI turns per UTC day (enforced by the aiChat Cloud Function
+  /// since fix-wave Phase 5, reading `freeAiInstructionsPerDay` out of the
+  /// tier_limits_v1 RC blob; the client value is for UI messaging only).
+  /// V1 counts charged turns rather than server-classified actionable
+  /// messages — set generous until the paywall flips (settled Q8: the
+  /// mechanism ships first; per-message classification comes with
+  /// entitlements).
   final int freeAiInstructionsPerDay;
 
   /// Activated photo-stake challenges per calendar month.

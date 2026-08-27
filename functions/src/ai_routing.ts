@@ -36,15 +36,30 @@ export const FALLBACK_ROUTE: PurposeRoute = {
  *  per-field. Chat stays gpt-4o-mini — upgradeable per-purpose by config
  *  flip, no client release. */
 export const DEFAULT_ROUTES: Record<string, PurposeRoute> = {
-  // User-facing (charge the 40/hr chat quota).
-  coach_agent: { model: "gpt-4o-mini", maxTokens: 800, quotaClass: "user", enabled: true },
+  // User-facing (charge the 40/hr chat quota). Temperatures pinned
+  // server-side since fix-wave Phase 5 (settled Q9) — the client's value
+  // no longer decides: 0.6 keeps coaching prose warm with disciplined
+  // tool JSON; voice runs slightly warmer (spoken repetition grates);
+  // summaries/pulse are consistency surfaces validated against tone
+  // rules, so lower variance means fewer rejected (paid) responses.
+  coach_agent: {
+    model: "gpt-4o-mini", maxTokens: 800, quotaClass: "user", enabled: true, temperature: 0.6,
+  },
   // Spoken turns (Voice Mode): short conversational prose generates faster
   // and listens better. 500 (not lower) so propose_changes tool JSON is
   // never truncated mid-plan (latency batch 2026-08-07).
-  coach_agent_voice: { model: "gpt-4o-mini", maxTokens: 500, quotaClass: "user", enabled: true },
-  chat: { model: "gpt-4o-mini", maxTokens: 800, quotaClass: "user", enabled: true },
-  coaching_summary: { model: "gpt-4o-mini", maxTokens: 800, quotaClass: "user", enabled: true },
-  circle_pulse: { model: "gpt-4o-mini", maxTokens: 800, quotaClass: "user", enabled: true },
+  coach_agent_voice: {
+    model: "gpt-4o-mini", maxTokens: 500, quotaClass: "user", enabled: true, temperature: 0.7,
+  },
+  chat: {
+    model: "gpt-4o-mini", maxTokens: 800, quotaClass: "user", enabled: true, temperature: 0.6,
+  },
+  coaching_summary: {
+    model: "gpt-4o-mini", maxTokens: 800, quotaClass: "user", enabled: true, temperature: 0.4,
+  },
+  circle_pulse: {
+    model: "gpt-4o-mini", maxTokens: 800, quotaClass: "user", enabled: true, temperature: 0.4,
+  },
   // System purposes (separate daily budget, silent-skip on exhaustion).
   parse_intention: {
     model: "gpt-4o-mini", maxTokens: 300, quotaClass: "system", enabled: true, temperature: 0,
