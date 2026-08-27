@@ -156,7 +156,110 @@ void main() {
       expect(AiActionParamNormaliser.extractDateAnswer('tomorrow please'),
           'tomorrow');
       expect(AiActionParamNormaliser.extractDateAnswer('today'), 'today');
-      expect(AiActionParamNormaliser.extractDateAnswer('on friday'), isNull);
+      // Weekday replies resolve locally since fix-wave Phase 1 (they used
+      // to be left to the model, costing a round-trip on a clarify answer).
+      expect(
+        AiActionParamNormaliser.extractDateAnswer('on friday'),
+        matches(RegExp(r'^(today|\d{4}-\d{2}-\d{2})$')),
+      );
+    });
+  });
+
+  group('canonicaliseDate (fix-wave Phase 1: no more phantom planDateKeys)',
+      () {
+    // Wednesday 2026-08-26 as the fixed reference.
+    final ref = DateTime(2026, 8, 26);
+
+    test('today/tonight/tomorrow variants keep the relative contract', () {
+      expect(AiActionParamNormaliser.canonicaliseDate('Today'), 'today');
+      expect(AiActionParamNormaliser.canonicaliseDate('tonight'), 'today');
+      expect(AiActionParamNormaliser.canonicaliseDate('Tomorrow'), 'tomorrow');
+      expect(AiActionParamNormaliser.canonicaliseDate('tmrw'), 'tomorrow');
+    });
+
+    test('weekday names resolve to the next occurrence as a date key', () {
+      expect(
+        AiActionParamNormaliser.canonicaliseDate('Saturday', now: ref),
+        '2026-08-29',
+      );
+      expect(
+        AiActionParamNormaliser.canonicaliseDate('on friday', now: ref),
+        '2026-08-28',
+      );
+      expect(
+        AiActionParamNormaliser.canonicaliseDate('next mon', now: ref),
+        '2026-08-31',
+      );
+      // The reference day itself means today.
+      expect(
+        AiActionParamNormaliser.canonicaliseDate('wednesday', now: ref),
+        'today',
+      );
+    });
+
+    test('day after tomorrow resolves to a concrete key', () {
+      expect(
+        AiActionParamNormaliser.canonicaliseDate('day after tomorrow',
+            now: ref),
+        '2026-08-28',
+      );
+    });
+
+    test('loose ISO forms are padded; impossible dates are rejected', () {
+      expect(
+        AiActionParamNormaliser.canonicaliseDate('2026-9-3'),
+        '2026-09-03',
+      );
+      expect(
+        AiActionParamNormaliser.canonicaliseDate('2026-08-30'),
+        '2026-08-30',
+      );
+      expect(AiActionParamNormaliser.canonicaliseDate('2026-02-31'), isNull);
+      expect(AiActionParamNormaliser.canonicaliseDate('2026-13-01'), isNull);
+    });
+
+    test('junk is null so the caller drops the key', () {
+      expect(AiActionParamNormaliser.canonicaliseDate('someday'), isNull);
+      expect(AiActionParamNormaliser.canonicaliseDate('next week'), isNull);
+      expect(AiActionParamNormaliser.canonicaliseDate(''), isNull);
+    });
+
+    test('normalise() canonicalises date params and drops junk', () {
+      final action = AiActionParamNormaliser.normalise(
+        const AiAction(
+          actionType: ActionType.createTask,
+          parameters: {
+            'title': 'Deep work',
+            'time': '14:00',
+            'duration': 60,
+            'date': '2026-9-3',
+          },
+        ),
+      );
+      expect(action.parameters['date'], '2026-09-03');
+
+      final junk = AiActionParamNormaliser.normalise(
+        const AiAction(
+          actionType: ActionType.createTask,
+          parameters: {
+            'title': 'Deep work',
+            'time': '14:00',
+            'duration': 60,
+            'date': 'whenever works',
+          },
+        ),
+      );
+      expect(junk.parameters.containsKey('date'), isFalse);
+    });
+
+    test('extractDateAnswer resolves weekday replies locally', () {
+      final answer = AiActionParamNormaliser.extractDateAnswer('on saturday');
+      expect(answer, isNotNull);
+      expect(RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(answer!), isTrue);
+      expect(
+        AiActionParamNormaliser.extractDateAnswer('tomorrow works'),
+        'tomorrow',
+      );
     });
   });
 

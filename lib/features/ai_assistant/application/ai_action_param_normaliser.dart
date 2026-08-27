@@ -1,3 +1,4 @@
+import '../../../core/utils/date_keys.dart';
 import '../domain/models/ai_action.dart';
 
 /// Canonicalizes model-emitted action parameters at ingestion.
@@ -72,6 +73,10 @@ abstract final class AiActionParamNormaliser {
   /// Keys whose values are clock times and get canonicalized to "HH:mm".
   static const _timeKeys = {'time', 'reminderTime'};
 
+  /// Keys whose values are calendar dates and get canonicalized to
+  /// "today" | "tomorrow" | "YYYY-MM-DD".
+  static const _dateKeys = {'date', 'destinationDate', 'deadline'};
+
   /// Returns [action] with parameters canonicalized. Original alias keys
   /// are left in place (harmless extras); only missing canonical keys are
   /// filled and time/duration values reformatted.
@@ -127,6 +132,25 @@ abstract final class AiActionParamNormaliser {
       }
     }
 
+    // Dates: the model drifts to weekday names ("Saturday") and loose
+    // numerics ("2026-9-3"). Before this pass, a garbage value flowed into
+    // planDateKey verbatim — a phantom day no screen ever queries — while
+    // its reminder silently fired TODAY (§8 E9). Canonicalise what we can;
+    // drop what we can't so the executor's date validation fails loudly
+    // instead of writing to a day that doesn't exist.
+    for (final key in _dateKeys) {
+      final raw = p[key];
+      if (raw is! String || raw.trim().isEmpty) continue;
+      final canonical = canonicaliseDate(raw);
+      if (canonical == null) {
+        p.remove(key);
+        changed = true;
+      } else if (canonical != raw) {
+        p[key] = canonical;
+        changed = true;
+      }
+    }
+
     final duration = p['duration'];
     if (duration is String) {
       final parsed = parseDurationMinutes(duration);
@@ -167,6 +191,70 @@ abstract final class AiActionParamNormaliser {
     if (hour > 23 || minute > 59) return null;
     return '${hour.toString().padLeft(2, '0')}:'
         '${minute.toString().padLeft(2, '0')}';
+  }
+
+  // ─── Date parsing ───────────────────────────────────────────────────────────
+
+  static const _weekdays = {
+    'monday': DateTime.monday,
+    'mon': DateTime.monday,
+    'tuesday': DateTime.tuesday,
+    'tue': DateTime.tuesday,
+    'tues': DateTime.tuesday,
+    'wednesday': DateTime.wednesday,
+    'wed': DateTime.wednesday,
+    'thursday': DateTime.thursday,
+    'thu': DateTime.thursday,
+    'thur': DateTime.thursday,
+    'thurs': DateTime.thursday,
+    'friday': DateTime.friday,
+    'fri': DateTime.friday,
+    'saturday': DateTime.saturday,
+    'sat': DateTime.saturday,
+    'sunday': DateTime.sunday,
+    'sun': DateTime.sunday,
+  };
+
+  static final _isoDate = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})$');
+
+  /// Canonicalizes a model-emitted date value to the executor contract:
+  /// "today" | "tomorrow" | "YYYY-MM-DD". Weekday names resolve to the
+  /// NEXT occurrence (today counts — "on Saturday" said on a Saturday
+  /// means today); loose ISO forms ("2026-9-3") are zero-padded and
+  /// validated. Null = unparseable; the caller drops the key so the value
+  /// can never reach `planDateKey`.
+  static String? canonicaliseDate(String raw, {DateTime? now}) {
+    final s = raw.trim().toLowerCase();
+    if (s.isEmpty) return null;
+    if (s == 'today' || s == 'tonight') return 'today';
+    if (s == 'tomorrow' || s == 'tmrw' || s == 'tmr') return 'tomorrow';
+    final ref = now ?? DateTime.now();
+    if (s == 'day after tomorrow' || s == 'the day after tomorrow') {
+      return DateKeys.yyyymmdd(ref.add(const Duration(days: 2)));
+    }
+    // "saturday" / "on saturday" / "next saturday" — "next X" resolves to
+    // the same next occurrence (the model rarely means the week after).
+    final word = s
+        .replaceFirst(RegExp(r'^(on|this|next)\s+'), '')
+        .trim();
+    final weekday = _weekdays[word];
+    if (weekday != null) {
+      final daysAhead = (weekday - ref.weekday) % 7;
+      final target = DateTime(ref.year, ref.month, ref.day + daysAhead);
+      return daysAhead == 0 ? 'today' : DateKeys.yyyymmdd(target);
+    }
+    final iso = _isoDate.firstMatch(s);
+    if (iso != null) {
+      final year = int.parse(iso.group(1)!);
+      final month = int.parse(iso.group(2)!);
+      final day = int.parse(iso.group(3)!);
+      if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+      final parsed = DateTime(year, month, day);
+      // Reject rollovers like 2026-02-31 → March 3.
+      if (parsed.month != month || parsed.day != day) return null;
+      return DateKeys.yyyymmdd(parsed);
+    }
+    return null;
   }
 
   static final _rangeSeparator = RegExp(r'\s*(?:–|—|-|\bto\b)\s*');
@@ -249,12 +337,19 @@ abstract final class AiActionParamNormaliser {
     return null;
   }
 
-  /// "today"/"tonight"/"tomorrow" from a free-text reply. Weekday names are
-  /// deliberately NOT resolved here — the model path handles those.
+  /// "today"/"tonight"/"tomorrow"/"day after tomorrow"/weekday names from
+  /// a free-text reply, resolved to the executor contract via
+  /// [canonicaliseDate].
   static String? extractDateAnswer(String input) {
     final s = input.toLowerCase();
+    if (s.contains('day after tomorrow')) {
+      return canonicaliseDate('day after tomorrow');
+    }
     if (s.contains('tomorrow')) return 'tomorrow';
     if (s.contains('today') || s.contains('tonight')) return 'today';
+    for (final token in s.split(RegExp(r'[^a-z]+'))) {
+      if (_weekdays.containsKey(token)) return canonicaliseDate(token);
+    }
     return null;
   }
 }

@@ -1263,6 +1263,16 @@ class AiActionExecutor {
     if (raw == 'tomorrow') {
       return DateKeys.todayKey(DateTime.now().add(const Duration(days: 1)));
     }
+    // The normaliser canonicalises dates at ingestion; anything else must
+    // be a valid YYYY-MM-DD key. An unparseable value used to flow into
+    // planDateKey verbatim — a task on a day no screen queries, invisible
+    // everywhere, while its reminder fired today (§8 E9). Fail loudly as a
+    // per-action failure instead of writing to a phantom day.
+    try {
+      DateKeys.parseLocalDateKey(raw);
+    } catch (_) {
+      throw ArgumentError('Unrecognized date "$raw"');
+    }
     return raw;
   }
 
