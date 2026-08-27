@@ -2158,3 +2158,41 @@ not silent reversal.
   (warm engine, and a mid-sentence "getting ready" flash would read as
   a glitch). Deferred: hoisting the per-entry STT adapter to app
   lifetime so the native init cost is paid once per run.
+
+- **2026-08-27 · AI chat fix wave: design settled (audit §8 + GPT-5.6
+  cross-audit).** Two same-day audits (AUDIT.md §8, adversarially verified;
+  PRD/AI_assitance/Ai_converstaion_gpt5.6.md) agree: the AI pipeline's
+  scaffolding is strong but the execution layer lies — five confirmed verbs
+  (moveTask/deleteTask/modifyGoal/deleteGoal/removeReminder) are no-op
+  success stubs, editTask duplicates, undo snapshots WHOLE DAYS (not touched
+  entities) and swallows rollback failures. Full design + phases:
+  `PRD/AI_assitance/AI_chat_fix_design.md`. Settled semantics (Miko approved
+  all ten recommendations): (Q1) while a verb is unimplemented the coach
+  refuses honestly with a deep link — no pre-filled-editor cards; (Q2)
+  entity resolution runs at PREVIEW time: unique ≥0.8 fuzzy match resolves
+  silently (card shows what matched), zero/multiple matches ask a LOCAL
+  question (no model call, no quota); undated delete/move searches
+  today→tomorrow→this week, asks only when ambiguous across days; (Q3)
+  voice hard-blocks (sleep/DND) speak the warning and require an explicit
+  second "yes, do it anyway" — plain "confirm" deliberately does not match;
+  (Q4) per-item outcomes replace all-or-nothing rollback: successes stay,
+  failures show ✓/✗ with per-row retry; NO per-item checkboxes this wave;
+  (Q5) system prompts move SERVER-side per purpose (compile-time default +
+  RC override slot, ai_purpose_routes pattern) — client `system` messages
+  rejected for chat purposes; enables OpenAI prompt-prefix caching; (Q6)
+  send-during-turn queues one-deep, Telegram-style; (Q7) restore-conversation
+  banner 10 min (same sessionId), last same-day session rehydrates on launch
+  (~10 turns, marked as earlier), voice returns to idle after
+  call/backgrounding — never auto-relisten (hot-mic privacy); (Q8) the
+  decision-logged 5/day free-tier actionable-instruction cap gets
+  implemented server-side NOW behind tier_limits_v1 (set generous until the
+  paywall flips — the mechanism is the point); (Q9) temperatures pinned
+  server-side: 0.6 coach_agent/chat, 0.7 coach_agent_voice, 0.4
+  coaching_summary/circle_pulse; (Q10) barge-in, per-item checkboxes, and
+  prompt-persona work are OUT of this wave. Batch order: Phase 0 "stop the
+  lying" ships first (de-advertise stubs + undo dry-run + kill-switch
+  honesty + real behind-pace progress + Home refresh fix), then real verbs
+  (resolver), undo v2 (inverse-op log), honest failure/races, voice, server
+  (ONE functions deploy, batched with the pending surrender/invite deploy),
+  memory/UX. Goal, in Miko's words: an assistant that understands, talks
+  well, and does the things it's supposed to do.

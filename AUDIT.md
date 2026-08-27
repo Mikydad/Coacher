@@ -409,3 +409,292 @@ no fixes applied. Every finding was verified against the code, not assumed._
 1. **Before any public/beta exposure:** S1, S2 (rules + cost abuse), H1 (one-liner).
 2. **Next sprint:** P1 (sync cursors — cost grows every day it waits), S3, S5, S6/R7 (circle integrity + broken reactions), R2.
 3. **Scheduled debt:** R1 error-surfacing sweep, P2, P3, R5 major upgrades, H3 a11y pass, R6 integration tests.
+
+## 8) AI chat & live conversation — deep audit (2026-08-27)
+
+_Audited on branch `feat/ux-fixes-and-stake-surrender`. Scope: everything AI —
+the chat pipeline (send → parse → agent loop → render/store), the Cloud
+Functions backend (`aiChat`, `aiChatStream`, `aiSpeech*`, `ai_routing`),
+context/payload assembly + memory extraction/injection, the action executor
+(confirm gate, batches, undo), Voice Mode end-to-end (STT → LLM → TTS), the
+Coach sheet UI, conversation persistence/tiering, and the secondary AI
+surfaces (coaching summary, circle pulse, proactive engine, thinking loop).
+~18k lines read in full by seven parallel deep-readers; all 15 distinct
+CRITICAL/HIGH claims were then each handed to an independent adversarial
+verifier instructed to refute them against the live code. **None were
+refuted**; three were downgraded to MEDIUM where verification narrowed their
+reach. Findings marked **✓ verified** went through that pass; the rest are
+single-reader findings with exact citations. Report-only; no fixes applied.
+Yardstick, per Miko: "a ChatGPT-level assistant that does what it's supposed
+to do."_
+
+**The one-paragraph verdict:** the scaffolding around the model is genuinely
+excellent — server-pinned models and quotas, a bounded agent loop, a
+deterministic clarify-loop, quote-verified memory extraction, an airtight
+confirm-gate topology, honest offline capture — but the core promise breaks
+at the last step: **five of the confirmed mutation verbs are no-op stubs that
+report success** (move/delete task, modify/delete goal, remove reminder),
+**edit duplicates instead of editing**, and **undo cannot revert creations**.
+The coach says "Done — moved it to tomorrow" and nothing moved. Everything
+else in this section is secondary to that: a coach that confirms actions it
+did not perform is not a trust problem to polish later, it is the product
+gap. The second systemic theme: the project's own "optimistic-then-honest /
+Telegram model" rule is not implemented on its flagship AI surface — failed
+turns have no retry, several failure modes are silently presented as success,
+and two kill-switch paths actively fabricate content.
+
+### 8.0 How it works today (orientation)
+
+- **Client pipeline** — `AiAssistantService.sendMessage` runs local guards
+  (guest nudge, yes/no plan interception, decline regexes), then
+  `AiIntentParser.parse` assembles an all-Isar payload and drives a bounded
+  tool-calling agent loop (≤4 rounds, 20s each) against the `aiChat`
+  callable; `propose_changes` becomes the confirm card, `get_day_schedule`
+  executes locally between rounds. Results pass through the unrequested-
+  delete guard, param normaliser, missing-field detector, assumption engine,
+  deduplicator, and conflict detector before rendering. The thread is
+  in-memory per sheet-open; turns persist to device-local Isar history
+  (last 10 feed the next prompt; summarize-then-purge distills them into
+  synced memory at 48h).
+- **Server** — two Cloud Functions in us-central1 (Node 22, raw `fetch`, no
+  SDK/retries): `aiChat` (agent turns) and `aiChatStream` (NDJSON deltas for
+  conversational voice). Per-purpose routing pins model (gpt-4o-mini
+  everywhere), temperature, and token caps, RC-overridable behind a model
+  allow-list. Quota: 40 charged turns/uid/hour in a Firestore transaction run
+  concurrently with the OpenAI call; agent follow-ups sharing a `turnId` are
+  free (≤3); system purposes draw a separate silent-skip daily budget.
+  Anonymous uids are rejected; App Check is still a TODO.
+- **Voice** — a per-entry phase machine (connecting/listening/thinking/
+  speaking) over three seams: `speech_to_text` (pauseFor 1.8s, continuation
+  stitching, stall watchdog), a resilient TTS stack (OpenAI head+tail clips
+  over one keep-alive client, falling back to on-device with a 60s cooldown),
+  and two reply paths — query turns stream `aiChatStream` sentence-pipelined,
+  everything else takes the agent path and is spoken from the settled bubble.
+  Confirm-by-voice reads the plan aloud; spoken "confirm" is intercepted
+  locally.
+- **Secondary surfaces** — coaching summary (analytics), circle AI pulse,
+  proactive suggestion engine, thinking loop, memory extraction — all share
+  `AiProxyClient` but each duplicates its own prompt builder, parser, and
+  fallback semantics.
+
+### 8.1 Execution integrity — the coach says "done" when nothing happened
+
+| # | Sev | Finding |
+|---|-----|---------|
+| E1 | **CRITICAL** ✓ verified | **Five confirmed mutation kinds are no-op stubs that report success.** `_moveTask` returns `'Moved "…"'`, `_deleteTask` returns `'Deleted "…"'`, `_modifyGoal`/`_deleteGoal` return success strings, `_removeReminder` writes nothing (`ai_action_executor.dart:965-977, 1021-1031, 1065-1068`) — all with `// Full implementation: …` comments. The model is offered all of them in the tool enum (`ai_operating_layer_client.dart:304-323`) and `AiCapabilityRegistry.supportedMutate` advertises them. User says "delete my 3pm meeting", reviews the card, taps CONFIRM — chat says done, batch marked completed, `markExecuted` stamps the session, and the task still sits on the schedule firing reminders. The executor's own standard elsewhere (`suggestFreeTimeBlock` **throws** UnsupportedError "so confirm does not look successful", `:641-646`) proves fake success is a recognized anti-pattern; these handlers violate it. Worse, `quickDirectivesProvider` pins "Move schedule" / "Remove task" / "Edit task" as top chips by usage frequency — the UI actively advertises the broken verbs. **Fix:** implement the five handlers against the existing repositories (title→id resolution via `_findTaskRowByTitle`, `planningRepository.deleteTask`/`upsertTask` with new `planDateKey`, `goalsRepository`, `reminderSyncService.removeForDeletedTask`); until each is real, remove it from `kCoachAgentTools`, the capability prompt, and the directive chips so the model routes around it. |
+| E2 | **HIGH** ✓ verified | **editTask creates a duplicate task instead of editing.** `_editTask` builds a `PlannedTask` with a fresh `StableId`, priority 3, orderIndex 0, status notStarted, no modeRefId/notes/category and upserts it (`ai_action_executor.dart:912-963`; the comment admits "Simplified: upsert a new task"). "Change my 9am workout to 10am" → a second workout at 10:00 while the 9:00 original stays; the clone loses enforcement mode and completion state and skips `tierGuard.ensureCanCreateTask`. **Fix:** resolve the existing row and upsert the same id with changed fields (`_attachReminderToExistingTask` at `:1174-1204` already shows the correct copy-all-fields pattern). |
+| E3 | **HIGH** ✓ verified | **Undo/rollback cannot revert creations — the most common batch kind.** `_captureSnapshot` snapshots only pre-existing *task* rows (`:312-360`); `_rollbackBatch` only re-upserts them (`:366-413`). A created task (plus its ReminderConfig, armed OS notification, derived time block, or a created goal) is not in the snapshot, so "Undo AI changes" returns UndoSuccess — "AI changes have been undone." — while everything created survives. The same gap makes the partial-failure message "I've restored your schedule to its previous state" false whenever the failed batch contained creates. **Fix:** pre-assign client ids for createTask/createGoal exactly like `_intentionId` already does, persist in actionsJson, and have rollback delete those ids before restoring the snapshot — or better, record an inverse-operation log per dispatched action (see 8.9). |
+| E4 | **HIGH** ✓ verified | **The undo-warning dialog's Cancel is fake — rollback already ran.** `_undoBatch` unconditionally calls `_rollbackBatch` *then* returns `UndoWarningTasksCompleted` (`ai_action_executor.dart:293-303`); the screen then shows "Undoing will revert those completions" with Cancel / "Undo anyway" (`ai_assistant_screen.dart:1706-1747`; the comment at `:1737` admits it). Whatever the user presses, their completions were already reverted — and LWW propagates the reversion to other devices. Cancel also skips the provider invalidations, leaving the stale Undo chip pointing at a rolled-back batch. **Fix:** split into dry-run check → dialog → rollback-on-confirm. |
+| E5 | **HIGH** ✓ verified | **The undo entry point never appears when it matters.** `lastAiBatchProvider` / `canUndoLastAiBatchProvider` / `recentAiBatchesProvider` are cached non-autoDispose FutureProviders watching only `authUidProvider` (`ai_assistant_providers.dart:159-184`); the only invalidations live *inside the undo handlers themselves* — circular: refreshing the undo affordance requires performing an undo. After the user confirms a plan, the "Undo AI changes" chip stays at its stale pre-confirm value for the rest of the app session; the gap hides a feature the executor correctly persists. (Verification refinements: a sheet-mode first mount after the session's first confirm can show the chip correctly once; auto-committed intention messages have their own working inline Undo — the missing affordance specifically hits confirmed preview-card plans. Staleness also runs the other way: a cached `true` never re-checks the 30-min window, leaving a dead chip.) Also violates the house rule that UI reads Isar watch streams. **Fix:** StreamProviders over `isarAiActionBatchs` watches (`fireImmediately: true`) — which deletes every manual invalidate. |
+| E6 | **HIGH** ✓ verified | **A decorative action in a confirmed plan poisons the whole batch.** `suggestFreeTimeBlock`/`moveConflictingTasks` throw UnsupportedError inside `_dispatch` (`:641-645`) but are still offered in the tool enum and rendered on the preview card. 4 creates + 1 suggest → the 4 succeed, the 5th throws, the batch rolls back "everything" (except, per E3, the created tasks survive), the message claims full restoration, and the batch lands `rolledBack` where undo is refused. `ExecutionResult` discards the successes list, so there is no per-item outcome — the exact opposite of the mandated per-item-error-with-retry model. **Fix:** strip non-executable kinds at parse time; report per-action outcomes instead of all-or-nothing rollback for independent actions. |
+| E7 | MED | **Rollback/undo leaves armed OS notifications and ReminderConfig rows behind.** `_upsertReminderForTask` schedules notifications; `_rollbackBatch` never cancels or deletes configs (`:366-413, 1230-1276`) — and `reminder_sync_service.dart:112-119`'s own comment warns boot reconciliation re-arms every stored config. Undo a "remind me to stretch at 7pm" and the phone still rings at 19:00, forever. **Fix:** cancel + delete configs for batch-created tasks and re-sync restored ones during rollback. |
+| E8 | MED | **Crash mid-batch strands it in `executing` — half-applied, no rollback, no undo, ever.** Nothing reconciles executing-state batches on boot; `_undoBatch` refuses them (`:277-284`). The persisted snapshot needed for repair sits unused. The adjacent "idempotency guard" (`:175-182`) is dead code — batchId is freshly generated per call and can never pre-exist. **Fix:** boot sweep rolling back stale pending/executing batches from their stored snapshot. |
+| E9 | MED | **Unvalidated model dates write to phantom days and fire reminders today.** `_resolveDate` passes any non-today/tomorrow string through verbatim; `'Saturday'` becomes a `planDateKey` no screen queries (invisible task) while `_parseReminderDateTime`'s failure fallback is `DateTime.now()` — a mystery notification today (`:1287-1295, 1156-1172`). The normaliser canonicalises time but never date. **Fix:** canonicalise dates in `AiActionParamNormaliser` (weekday → next date key, validate `YYYY-MM-DD`), throw on unparseable. |
+| E10 | MED | **Plan deduplicator is date-blind.** "Set up the same deep-work block for tomorrow" is silently dropped because a same-titled task exists *today*, and the coach answers "That already appears on today's list" (`ai_plan_deduplicator.dart:43-79`; dedupe set is today-only). **Fix:** skip the redundancy check when the action's resolved date differs from today. |
+| E11 | MED | **The preview card doesn't say what an edit will change.** `describePlannedAction` renders `'Edit "Gym"'` / `'Update goal "x"'` with no old→new values even though the parameters carry them (`planned_changes_card.dart:212-230`; reminders inconsistently *do* show the time). The confirm gate is only as good as what it discloses; for edits it discloses nothing. **Fix:** render changed params ("Edit "Gym" — time → 19:00, duration → 45 min"). |
+| E12 | MED | **Voice confirm never speaks conflicts or hard context blocks.** On the orb-only stage "the voice IS the preview", but `formatPlanForSpeech` renders actions only — a plan inside the sleep/DND window is read aloud with no mention of the red hard-block the sighted user sees, and spoken "confirm" executes it; `confirmPlan` doesn't gate on `isBlockedByContext` (`voice_plan_speech.dart:11-27`, `ai_assistant_service.dart:607-640, 719-754`). **Fix:** speak a warning sentence when `hasAnyWarnings`; require a second affirmation for hard blocks. |
+| E13 | MED | **Assumption engine copies time/duration/enforcement mode off a single shared word.** One common >2-char word = similarity 0.7; the completed-task boost lifts it to exactly the 0.80 copy threshold — "add a call with mom" inherits the investor call's 07:30, 60 min, and strict enforcement mode (`ai_assumption_engine.dart:110-125`). The card's reasonLabel doesn't say which fields were guessed. **Fix:** require ≥0.9 similarity for the boost to reach the threshold, or exclude `modeRefId`; mark assumed values on the card. |
+| E14 | MED | **Auto-committed forget/update resolves ambiguous memory refs by first containment match.** "Forget what I said about work" with two work-related facts tombstones whichever is newest, announced only as "Forgotten." (`ai_action_executor.dart:831-849`). **Fix:** on multiple matches, ask; always echo the affected fact's content; prefer `[mem:<id>]` refs the model already receives. |
+| E15 | LOW | Reminder collision detector ignores dates and exempts exact-time collisions (`diffMinutes.abs() > 0` — two 09:00 reminders never warn; a months-old 09:02 does) (`ai_conflict_detector.dart:114-133`). Conflict detector's override-window math also breaks across midnight (`:221-233`). |
+| E16 | LOW | `addReminder` onto an existing task bypasses the free-tier reminder cap (`:1174-1228` — no `ensureCanAddReminder`); `_editTask`'s create path bypasses the task cap. Latent until `TierLimits.enforced` flips true, then chat becomes the paywall sidestep. Related: `tier_limits.dart:53-55` claims a server-side per-day AI-instruction cap that **does not exist** — `functions/src/index.ts` has only the flat 40/hr with no tier lookup, so the free/pro AI differentiation the monetization PRD counts on is documented but unimplemented. |
+| E17 | LOW | Unknown model actionType silently coerces to `createTask` (`ai_action.dart:96-104`) — a mis-emitted "completeTask" becomes a plausible-looking create card. Return null/throw and let the existing per-entry catch drop it into the repair round. Also: `pruneOld()` on the batch repo is dead code (snapshots of personal data retained forever), and coordinator notifications always carry placeholder entity ids (`'ai-task'`) because nothing writes `_resolvedTaskId` back. |
+
+### 8.2 Honesty & the failure story — the Telegram model is not implemented here
+
+| # | Sev | Finding |
+|---|-----|---------|
+| H1 | MED ✓ verified (downgraded from HIGH) | **Failed turns have no error state and no retry; the composer already cleared.** `AiChatMessage` has no error field; no error styling or per-message retry exists anywhere in the surface; the input was cleared before send (`ai_assistant_screen.dart:1019-1023`); the auto-commit failure path has the same gap despite its own doc comment claiming "errors surface honestly, per-item, Telegram-style" (`ai_assistant_service.dart:645, 664-679`). Verification corrected the mechanism: offline/rate-limit/server failures don't reach the service's outer catch — the parser catches them and returns *network-honest copy* as a followUpQuestion (`ai_intent_parser.dart:170-199`), so the words are honest but render as an ordinary bubble. Recovery = retype by reading your own bubble. CLAUDE.md principle 3 mandates per-item error with retry for exactly this surface; chat implements the optimistic half only. **Fix:** `isError` + originating input on the message, error styling, a Retry chip re-invoking the parse — and reuse the same `turnId` with `loopIndex>0` so the retry is quota-free (the server already supports this; today a retry double-charges). |
+| H2 | MED ✓ verified (downgraded from HIGH) | **confirmPlan has no error guard — a throw leaves the chat dead.** `_setLoading(true); await execute(); await markConfirmed/markExecuted` with no try/catch/finally (`ai_assistant_service.dart:752-757, :787`) — the same call is wrapped in try/catch on the auto-commit path precisely because it throws. An escaping throw = `_isLoading` stuck true, SEND/dictation/card buttons all disabled, thinking dots forever; only closing the sheet (which wipes the conversation) recovers. A throw in markConfirmed/markExecuted lands *after* actions applied — user told nothing. Verification narrowed the trigger set: `_captureSnapshot` and `_rollbackBatch` swallow their own errors, and the "DB closed on logout" trigger doesn't exist (no `Isar.close()` in lib/); what remains is the unguarded Isar transactions (`findByBatchId`/`createBatch`/`updateState`/`markConfirmed`/`markExecuted`) on genuine DB faults — latent robustness gap on the most sensitive path, violating the project's own "failure story named" rule. **Fix:** try/catch/finally with an honest failure bubble; leave the card confirmable. Cheap. |
+| H3 | MED | **Slow turns are blamed on the user being offline, and the abandoned turn still bills.** `deadline-exceeded` is classified as a network error (`ai_proxy_client.dart:33-35`) → "You're offline — I need a connection…" on a live connection (the developer's own slow-network norm); the server charged the turn at start, and the retype charges a second unit. **Fix:** split the copy ("That took too long…"); reuse turnId for retries. |
+| H4 | MED | **Quota is charged with no refund when OpenAI fails.** The transaction deliberately runs concurrently with the fetch, but there is no compensating decrement on fetch failure / non-200 / empty content (`functions/src/index.ts:490-546`, same on the stream). During an OpenAI outage every retry burns one of 40 hourly turns delivering nothing, then the user is told they hit *their* limit. **Fix:** best-effort `increment(-1)` + clear lastTurnId on upstream failure. |
+| H5 | MED | **Truncated streamed replies are presented — and persisted — as complete.** The server's SSE pipe loop ignores error events and `finish_reason` and emits `{"done":true}` on any clean upstream end (`index.ts:727-746`); on a mid-pipe throw it ends with *no* error line; and the Dart client treats stream-end-without-done as success anyway (`voice_reply_stream.dart:52-75`). A half-sentence coach reply is spoken and saved as a normal answer. The 500-token voice cap makes `finish_reason: length` cuts routine, silently. **Fix:** surface finish_reason and an error line server-side; make the client require the done marker. |
+| H6 | MED ✓ verified (summary half downgraded from HIGH) | **The AI kill switch fabricates.** Flipping `ai_enabled` off routes production to test mocks. Chat: `MockAiOperatingLayerClient` answers *any* command with a confident "Morning Workout tomorrow 06:00" plan that really executes on confirm (`ai_operating_layer_client.dart:866-932`). Analytics: the card renders "[mock] Coaching summary for focus: streak_risk." cached as a genuine (isFallback:false) summary for up to 18h, bypassing the `DeterministicCoachingRenderer` that exists precisely for this situation (`ai_summary_providers.dart:27-33`, `coaching_ai_client.dart:226-242`). Verification narrowed the summary's reach: the only trigger of `recomputeAiSummaryProvider` is the **ungated "Test AI coaching summary" AppBar button on the production Progress screen** (`analytics_progress_screen.dart:98-102`) — the default kill-switch path falls back to the deterministic trace line once the cache expires; mock text reaches whoever taps that test button, then persists 18h. During exactly the incidents where trust matters most, the coach lies. **Fix:** honest unavailable copy in release for chat; make the disabled path throw so the deterministic renderer takes over; gate or remove the test button; reserve mocks for tests. |
+| H7 | **HIGH** ✓ verified | **The "goal behind pace" card fabricates a specific accusation.** `_estimateGoalProgress` hardcodes 0 (`proactive_suggestion_engine.dart:431-438` — the comment admits it), so `behindPct` equals the *elapsed* percentage: a fully-on-track goal at day 27/30 reads "~90% behind the expected pace", at confidence 0.80 (second of five rules under the top-3 cap — it nearly always shows), daily, from ~20% of any goal's period. Meanwhile the goals surface computes real progress from the same synced GoalCheckIns (`goals_providers.dart`) and can show the goal *ahead* of pace simultaneously — cross-surface incoherence a coach cannot afford. **Fix:** feed real GoalCheckIn progress, or drop the number and downgrade the copy. |
+| H8 | MED | **"You had a pending plan" banner false-positives after purely informational chats.** Every turn saves `confirmed=false` including informational answers; `getMostRecentUnconfirmed` filters only on confirmed+timestamp — asking "what's on my plan today?", closing, and reopening shows "You had a pending plan — want to continue?" whose Resume re-sends the question and burns a quota turn (`ai_interaction_history_repository.dart:47,147-159`). **Fix:** filter to entries with non-empty parsedActions. |
+| H9 | MED | **Circle pulse collapses four different outcomes into "Nothing new yet".** Cooldown, empty feed, AI failure, and save failure all return null → the same copy (`circle_ai_pulse_service.dart:38-71`); a paid AI result whose save throws is silently discarded. The awaited raw Firestore write also evades the architecture tripwire (it matches only `await FirebaseFirestore.instance`). **Fix:** outcome enum with honest copy + retry; extend the guard regex. |
+| H10 | LOW | **Error copy is recycled as a follow-up question**, so the next turn's prompt claims the model asked the user about being offline, clarify-rate analytics count error events, and the next voice turn is forced off the fast path (`ai_intent_parser.dart:184-198`, `ai_assistant_service.dart:292-308`). **Fix:** dedicated error responseType. |
+
+### 8.3 Races & state lifecycle
+
+| # | Sev | Finding |
+|---|-----|---------|
+| R1 | **HIGH** ✓ verified | **Closing the sheet mid-turn races startNewSession.** The sheet's `whenComplete` unconditionally rotates the session and clears the thread while `_parseAndRespond` is still awaiting (turns run up to ~80s); the late reply then lands as the first message of the *next* empty session, can arm a pending plan whose context is gone, and is persisted under the wrong sessionId — escaping its own session's memory extraction and pre-polluting the next conversation's history (`ai_assistant_screen.dart:105-113`, `ai_assistant_service.dart:386-412, 916-930`). **Fix:** generation counter captured at turn start; bail out of all state mutation + history save on mismatch (same guard for the streamed-voice settle path). |
+| R2 | MED | **Double-tap on Confirm executes the plan twice.** The button disables only via build-time isLoading; `confirmPlan` has no reentrancy check; the executor's idempotency guard can never fire (fresh batchId per call) — two taps inside one frame window = duplicate tasks/reminders (`ai_assistant_screen.dart:1476`, `ai_assistant_service.dart:719-754`, `ai_action_executor.dart:144,176-182`). **Fix:** `if (_isLoading) return` at entry, or derive batchId from plan identity so the guard is real. |
+| R3 | MED | **Concurrent turns via proactive-card auto-send.** `sendMessage` has no in-flight guard and loading is a bool: two auto-sends interleave, replies append in completion order, pending-plan state is clobbered by whichever finishes last, and in voice mode the wrong turn's reply can be spoken (`ai_assistant_screen.dart:466-490`, `ai_assistant_service.dart:117, 1121-1124`). **Fix:** guard/queue sends. |
+| R4 | MED | **Opening Coach can wait up to 10s on a Remote Config fetch** before the composer exists (cold start, >1h since last fetch, slow network — `ai_remote_config_service.dart:26-49`): a user gesture waiting on the network, against principle 1. Related: if the provider chain ever errors, the raw exception renders with no retry and caches for the app session (`ai_assistant_screen.dart:1105-1116`). **Fix:** serve the last-activated value synchronously, fetch in background; retry button that invalidates the chain. |
+| R5 | MED | **One oversized paste poisons the session.** userInput is persisted uncapped and replayed verbatim in the last-10-turn history; above the server's 120k-char cap every subsequent turn can fail until the sheet closes (`ai_interaction_history_repository.dart:36-43`, `index.ts:50,129`), with the generic "Something went wrong". **Fix:** cap at send time + truncate at persist; name the too-long failure. |
+| R6 | MED | **Every notifyListeners rebuilds the whole screen — and the FAB on every tab.** `resolvedAiAssistantProvider` watches the ChangeNotifier family, so each notify refreshes the FutureProvider chain (the comment at `ai_assistant_providers.dart:216-218` claims the opposite); zero `select()` in the feature; during voice streaming this fires per delta batch (`:268-273`, `coach_ai_fab.dart:29-35`). **Fix:** narrow providers (messages/isLoading/pendingPlan) + a scoped ListenableBuilder. |
+| R7 | MED | **Latent notifyListeners-during-build crash on the guest auto-send path** — armed the moment the suggestions panel (U2) is fixed: `_handlePendingCoachLaunch` runs in build and the anonymous branch reaches notifyListeners synchronously (`ai_assistant_screen.dart:485-489,866-867`, `ai_assistant_service.dart:127-150`). **Fix:** dispatch auto-send post-frame like the startVoiceMode branch already does. |
+| R8 | LOW | **Single `lastTurnId` slot server-side double-charges interleaved turns.** A voice stream turn (which always clobbers the slot with `undefined`) or a second device mid-agent-loop makes the in-flight loop's follow-up charge as a fresh turn and clobber back (`index.ts:328-359, 654`); each interleaving can burn 2-4 extra units of the 40/hr. Related LOW: the per-instance over-quota marker rejects the *free* follow-ups of an already-charged 40th turn (`:479-484`). **Fix:** small map of recent turnIds; gate the marker to `loopIndex == 0`. |
+| R9 | LOW | Assembler session cache grows unboundedly (evicted only on mutation, never on session end); schedule slice can be 30s stale after out-of-chat edits; `Duration`-based day arithmetic breaks on DST-change days (`ai_payload_assembler.dart:67-72, 396-407`). Thinking-loop day/hash prefs aren't uid-scoped (`thinking_loop_service.dart:75-76`). Maintenance that exists but is never wired: `pruneOldSummaries`, batch `pruneOld`, history `purgeBefore` (dead), and `IsarAiPulseCache` is registered but never read or written — no offline pulse despite the collection existing for exactly that. |
+
+### 8.4 Voice / live conversation
+
+| # | Sev | Finding |
+|---|-----|---------|
+| V1 | **HIGH** ✓ verified | **STT status/error callbacks freeze to the first initializer — every later voice session runs without them.** `SpeechToText` is a process singleton whose `initialize()` early-returns once `_initWorked` without re-registering listeners (`speech_to_text-7.4.0/speech_to_text.dart:313-319`); the app creates a fresh adapter per voice-mode entry (`voice_mode_adapters.dart:15-38`, `ai_assistant_screen.dart:566-567`) and the dictation mic registers its own handlers on the same singleton. From the second session per launch (or the first, if dictation ran earlier): the `'listening'` status never arrives so the new connecting phase never ends (the 2026-08-26 fix only works in session #1); silent listens never self-finalize on `'done'` and fall to the 7s stall watchdog, ending in the false "The microphone stalled" after ~21s instead of the gentle pause at ~4s; plugin errors never surface. Reverse direction: after voice mode, the dictation button's lit state never resets. Invisible to the suite (fake adapters). **Fix:** assign the plugin's public `statusListener`/`errorListener` fields before each listen, or hold one process-wide adapter that multiplexes to the active controller. |
+| V2 | MED | **Tap-to-interrupt during a TTS fetch records a false failure and puts the good voice on a 60s cooldown.** `stop()` closes the keep-alive client → in-flight clip fetch throws → the catch stamps `_lastPrimaryFailureAt` without checking generation (`voice_tts_resilience.dart:61-75,117-129`) — an interrupt-happy user is semi-permanently stuck on the robotic fallback. And in degraded mode, `await deltas.forEach(...)` is uncancellable: interrupts stop nothing while the orb claims SPEAKING silently (`:90-97`). **Fix:** check generation before recording failure; cancellable subscription in the buffered branch. |
+| V3 | MED | **No lifecycle/audio-interruption handling.** No WidgetsBindingObserver, no interruption/becomingNoisy listeners anywhere in the voice path: backgrounding, a phone call, or an AirPods disconnect mid-clip strands `speaking` (just_audio pauses; `completed` never fires) until an orb tap; backgrounded-while-listening keeps cycling the watchdog; `SyncService.voiceModeActive` stays true suppressing sync throughout. **Fix:** observer → `pauseToIdle()` with honest copy. |
+| V4 | MED | **Every streamed chat turn pays a fresh TCP+TLS handshake, and the warmup's warm socket is discarded.** `new http.Client()` per stream, closed after (`voice_reply_stream.dart:30,81-95`); Dart keep-alive sockets die with their client — the TTS adapter measured exactly this on-device and moved to a session-lifetime client; the chat transport never adopted it, and `voice_warmup.dart`'s "leaves the connection warm" claim is void for the same reason (~100-300ms avoidable on every first token). **Fix:** one lazily-created keep-alive client for the voice session, shared with the warmup GET. |
+| V5 | LOW | Buffered replies whose tail exceeds 2000 chars speak only the first sentence — the tail clip 400s and is swallowed by design (`voice_tts_streaming.dart:231-246`, `speech_rules.ts:10`). Chunk the tail. |
+| V6 | LOW | Two residual endpointing races post-08-26 fix: `_listenStartedAt` is stamped before `listen()` resolves (slow native spin-up lets a stale `done` pass the 600ms guard and finalize an empty listen), and a stale `done` after a genuine first partial forces an extra stitch-restart (`voice_mode_controller.dart:132-138, 457-517`). Bounded; noted so a future "orb restarted mid-word" report has a known cause. |
+| V7 | LOW | The streamed-voice day-reference gate misses "weekend", "next week", "day after tomorrow", and explicit dates — those turns stream to the tool-less endpoint whose addendum makes the model decline and ask to rephrase, when the agent path could have answered (`ai_assistant_service.dart:431-437`). Gate on the router's focusDate instead of a parallel regex. |
+| V8 | LOW | The streaming TTS adapter configures the audio session once and never re-asserts the speaker route the fallback adapter documents as mandatory to re-assert per turn (`voice_tts_streaming.dart:199-218` vs `voice_mode_adapters.dart:121-149`) — the two adapters encode contradictory beliefs about the same session; latent earpiece regression. |
+| V9 | INFO | Aborted voice turns still bill one chat + one speech unit (deliberate spend-control trade; upstream OpenAI billing *is* aborted — recorded so it isn't re-litigated). On interrupt the thread keeps all received deltas, a superset of what was spoken; `[mem:]` markers are visible in the live bubble until settle sanitizes. |
+
+### 8.5 Server, cost & abuse surface
+
+| # | Sev | Finding |
+|---|-----|---------|
+| S1 | **HIGH** ✓ verified | **The proxy is a general-purpose OpenAI API per account: no server-owned system prompt, request-count quota, 120k-char payloads.** The server never constructs or verifies the system prompt — `validateMessages` accepts a client `system` role verbatim and forwards it (`index.ts:82-133, 450-459`); quota counts requests, not tokens: 40 turns/hr × up to 3 free follow-ups × ~30k input tokens ≈ millions of tokens/hr per free-to-create account (≈$15-20/day of gpt-4o-mini), multiplied by farmed accounts while App Check remains unenforced — plus arbitrary content generated under the app's key (OpenAI ToS liability). Distinct from the fixed anonymous-uid half of §7 S2. **Fix:** server-owned per-purpose system prompts (reject/replace client `system` messages); a token-based daily budget (the code already receives `usage.total_tokens`); finish the App Check TODO — noting `aiChatStream`/`aiSpeechStream` are onRequest and need *manual* header verification, so flipping `enforceAppCheck` on the callables alone leaves them open. |
+| S2 | MED | Purpose strings are client-invented free text; each distinct value becomes a permanent `byPurpose` field on the shared aiUsage doc — cycling random purposes bloats it toward the 1MiB doc limit, at which point the quota transaction on the same doc starts failing: self-DoS (`index.ts:414-415, 258-277`). Allow-list purposes; bucket the rest. |
+| S3 | LOW | Error taxonomy conflates user quota, system budget, and upstream OpenAI 429 into one `resource-exhausted` (`index.ts:370-377, 243-247, 508-510`) — the client cannot offer a countdown vs an immediate retry. Attach a machine-readable `details` payload. |
+| S4 | LOW | `aiChatStream` telemetry runs after `res.end()` — CPU-throttled on Cloud Run, so the voice purpose's usage counts are systematically unreliable (`index.ts:744-748`); pair fixing it with `stream_options: {include_usage: true}` for token-accurate voice accounting. Also INFO: purpose kill switches can revive on cold start during an RC outage (fresh instances have no last-known template, `:192-212`); no upstream inactivity timeout on the stream (platform 120s cap mitigates). |
+| S5 | MED | **Circle pulse is a cross-user prompt-injection surface with no confirm gate on output.** Member-authored task titles flow verbatim into the shared prompt (`circle_ai_pulse_service.dart:188-231`), the parsed `memberLines` are never validated against real members, and the result renders to every member attributed by name — user-to-user content spoofing on a trust-sensitive surface, with a hostile `suggestedChallenge` getting a Start button. **Fix:** quote/cap/strip event titles, instruct data-not-instructions, validate userIds against the member list. |
+| S6 | LOW | **The auto-commit relaxation quietly retracted §7 S8's injection mitigation for memory/intentions.** Text reaching the model can now cause a persistent write (`rememberFact`) whose content re-feeds every future prompt — a self-sustaining channel — or a deletion (`forgetFact`), with no gate. Low today (payload text is the user's own); becomes HIGH the day any shared/circle content enters the payload. **Fix:** decision-log the invariant ("no non-user-authored text in the Coach payload while these auto-commit"), keep the auto-commit set frozen. |
+| S7 | INFO | `coaching_summary` and `circle_pulse` charge the user's 40/hr chat quota — a heavy chatter silently degrades their own analytics card to the deterministic fallback (and vice versa), sitting awkwardly against ai_routing's own "never a quota error for a call they didn't make" philosophy. Consider system-class for the summary (it already silent-skips to a fallback). |
+
+### 8.6 Memory & context quality — what the model is told
+
+| # | Sev | Finding |
+|---|-----|---------|
+| M1 | **HIGH** ✓ verified | **`markExecuted` stamps the whole session — "Already applied this session" then lies to the model.** One confirm flips `executed=true` on *every* prior entry, including declined suggestions and follow-up questions (`ai_interaction_history_repository.dart:105-117`); from the next turn all their summaries inject under "Already applied this session (do NOT repeat)" (`ai_payload_assembler.dart:718-736`). Decline a study plan, confirm a workout, then say "actually let's do that study plan" — the payload claims it was already applied, so the model refuses or pretends it exists. Poisoning compounds per confirm, session-long. **Fix:** mark only the entry whose plan executed. |
+| M2 | MED | **Chat-path `rememberFact` stores the model's paraphrase as userStated truth at confidence 1.0, unverified** — bypassing the extraction pipeline's own quote-verify-or-demote safety idea; the ack bubble may be just "Noted — I'll remember that." without echoing what was stored, so a misheard "prefers evening workouts" is asserted plainly in every future conversation and the user never sees it to undo it (`ai_action_executor.dart:736-777`). **Fix:** run the quote check and demote on mismatch, and/or always echo the stored content next to Undo — the missing verification UI at zero cost. |
+| M3 | MED | **A malformed or token-truncated `extract_memory` response marks the session extracted — memory silently lost, then raw turns purge.** Any jsonDecode failure yields an empty ParsedExtraction indistinguishable from "nothing durable"; the 900-token cap makes truncation plausible; the server strips `finish_reason` so it's undetectable (`memory_extraction_service.dart:208-211`, `memory_extraction_parser.dart:104-111`) — against the module's own "continuity is never silently lost" contract. **Fix:** invalid response = failure (stay pending); pass finish_reason; add the reflection parser's fence-stripping. |
+| M4 | MED | **Merely mentioning a person resets their interaction clock** — "I miss Sarah, I haven't seen her in months" suppresses the relationship-gap nudge for another 21 days and tells the next prompt "Sarah — interacted today", inviting exactly the wrong coaching (`memory_extraction_service.dart:225-229` vs `relationship_care_service.dart:153-165`). **Fix:** separate `lastMentionedAtMs` from real interactions (completed intentions). |
+| M5 | MED | **The 7-day truncation fallback copies the first three raw user turns verbatim into a permanent, synced MemoryFact** — raw utterances (possibly health/relationship disclosures) escape the 48h privacy boundary indefinitely and keep flowing to OpenAI, while also being the lowest-quality summary possible (openers are greetings) (`memory_extraction_service.dart:329-352`). **Fix:** build from assistantSummary lines / last substantive turns; give truncation summaries their own TTL. |
+| M6 | MED | **Memory injection is strictly newest-20 — foundational facts fall out of the prompt.** After ~3 chatty sessions, "has type-1 diabetes" is evicted by newer trivia; the coach's amnesia looks like a model failure while the fact still shows in "What SidePal knows". The carefully-engineered `lastReferencedAtMs` "ranking hint" is read by nothing (`ai_payload_assembler.dart:179-210`). **Fix:** score selection (kind/provenance floor + recency + reference stamps + person-mention match). |
+| M7 | INFO | **A bare "hi" ships the user's entire memory, people list, week, goals, and ~28 Isar reads to OpenAI** (~2.5-3k tokens): §7 P3 confirmed unfixed and wider than described — `assemble()` builds every section unconditionally; the router's classification gates nothing (`ai_payload_assembler.dart:74-133`). Cost, latency, and unnecessary sensitive-data egress on the most common turn shape. (Device context is exemplary — coarse labels only; memory/people have no equivalent minimization.) |
+| M8 | LOW | Keyword router misroutes: "What should I add tomorrow?" contains " add " → MUTATE with a return-structured-actions hint; "add a task to explain X to Sam" contains "explain" → QUERY told *not* to return actions; "when's my next task" matches nothing → MUTATE default (`ai_intent_router.dart:31-135`). Downstream guardrails soften impact to degraded steering. Check question-shape before mutate verbs. |
+| M9 | LOW | The `capabilities` payload section is assembled every turn and never rendered — the model never sees the capability table; the prompt's hand-written Boundaries prose is the only (drifting) source of truth (`ai_payload_assembler.dart:115`, dead `formatForPrompt`). Extraction observation titles are uncapped (reflection caps the identical field at 80 chars) and become unbounded intention titles in every future prompt. The `direct` coaching-style branch in the schedule-answer formatter is dead — the enum says disciplined/intense (`ai_schedule_answer_formatter.dart:54-58`). |
+| M10 | MED | **The coaching summary ignores the user's coaching style when deriving framing** — `deriveCoachingFraming` is called without the style argument, so the prompt then demands assertive protection framing *and* "be warm, avoid guilt" simultaneously, and the tone validator enforces the wrong tone (`ai_summary_providers.dart:127-131` vs the documented FR-D-12 matrix in `coaching_ai_payload.dart:43-57`). Chat honors style; the two coach surfaces speak with different personas. One-line fix. |
+
+### 8.7 Chat surface UX vs the "ChatGPT-level" bar
+
+| # | Sev | Finding |
+|---|-----|---------|
+| U1 | **HIGH** | **No cancellation, no queueing: the composer locks for up to ~80s.** SEND is dead while a turn is in flight (20s/round × 4 rounds); voice's orb tap during `thinking` is explicitly a no-op. Only the streamed voice path is cancellable. The opposite of "act instantly, never lock input". **Fix:** Stop affordance on the loading bubble via a turn generation; let typed input queue. |
+| U2 | **HIGH** ✓ verified | **The proactive suggestions panel, first-time card, and Coach help button are unreachable in production.** They live behind `if (!widget.sheetMode)` and the sheet is the only presentation since the Coach tab retired (`ai_assistant_screen.dart:243, 903-916`) — yet four live entry points still promise them: the FAB's accent dot ("a tap lands on the suggestions panel"), the Home morning-brief snackbar Open, and the push tap all pass `openSuggestionsPanel: true` and land on a sheet with no suggestions anywhere. The engine still runs and recomputes on every task mutation — pure waste feeding a dot that points at nothing; the entire ProactiveSuggestionCard UX ("Let's do it"/"Not now", dismissal capping) is dead code. Verification frames it precisely: the FAB advertising (2026-08-23) post-dates the tab retirement (2026-07-16) — an incomplete migration, not a retired feature; the morning-brief paths at least prefill the composer via `preDraftedText`. **Fix:** move the panel + help into the sheet body (empty-state and `_openSuggestionsPanel`), re-home the first-time card — and fix R7 first. |
+| U3 | MED | **Forced scroll-to-bottom on every rebuild** — `_scrollToBottom` fires on every body build with messages (not on new-message), so during streaming/thinking the user is yanked back within 350ms of scrolling up to reread (`ai_assistant_screen.dart:893-897`). Gate on message-count growth + near-bottom heuristic. |
+| U4 | MED | **Two ThinkingIndicators stack on every typed turn** — the loading bubble renders dots *and* `isLoading` appends a trailing dots row (`:1268-1272` + `:1461`). |
+| U5 | MED | **Undo/dictation snackbars render behind the modal sheet.** All feedback goes to the root ScaffoldMessenger under the barrier: "AI changes have been undone", "cannot be undone", and the mic-permission error are invisible at 60%/full — for the mic case the user taps and *nothing* visibly happens (`:1696-1752, 1867-1872`, `ai_input_card.dart:251-255`). Wrap the sheet in its own ScaffoldMessenger or use inline banners. |
+| U6 | MED | **An accidental downward fling destroys the visible conversation, irreversibly.** Session-boundary-on-close is intentional (P1-04), but one fast fling anywhere on the header wipes thread + pending plan; the only recovery re-*sends* the last unconfirmed input (fresh AI round-trip, everything else lost). **Fix:** keep boundary semantics, soften the loss — retain the last thread and offer "Restore conversation" on reopen within minutes. |
+| U7 | LOW | The safety-critical color coding (blocked/conflict/high-risk) uses raw `Colors.red/redAccent` throughout the coach surface instead of the palette-switched `AppColors.danger` — materially worse contrast in light mode; CLAUDE.md mandates AppColors-only (`planned_changes_card.dart` ×8, `_ConflictSummaryBanner`, FAB dot). The history sheet also hand-rolls a 17px header where `SectionHeader` is the rule. |
+| U8 | LOW | No message timestamps anywhere (relevant because of the 30-min undo window); chat bubbles are not selectable/copyable (and copying your own failed message is currently the only cheap resend); no insertion animation ("nothing snaps" is the house motion rule); a11y: unlabeled orb whose action changes by phase, no liveRegion announcements for thinking/speaking, sub-44pt bare-GestureDetector targets, directives row clips at large text scales. |
+| U9 | LOW | Sheet auto-grow fights a deliberate 60% park while a reply streams (content ticks count as message events, and 0.6 is above the 0.54 respect-threshold — `:366-388, 428-444`). Suppress growth after a user drag until the next count increase. |
+| U10 | INFO | **The visible thread does not survive relaunch** — by design cross-device continuity rides extracted memory, a defensible privacy lean; but every launch presents an empty thread seconds after a rich conversation, and the data to rehydrate the last session (userInput + assistantSummary per turn) already sits in Isar. See 8.9. |
+
+### 8.8 Verified OK — what is genuinely strong
+
+- **Server discipline:** model pinning with an allow-list (config typos cannot
+  select expensive models); temperature/token caps only lower; quota in
+  Firestore transactions with the aiUsage collection unreadable by clients;
+  anonymous uids rejected on all endpoints; free-follow-up farming closed
+  (turnId + 3-min window + cap mirrored client/server); interrupts genuinely
+  abort upstream OpenAI billing; system-vs-user budget separation with
+  silent-skip semantics; RC outage serves last-known template; no message
+  content in logs; the OpenAI key via Secret Manager, never near a client.
+- **Pipeline robustness:** the malformed-model-output ladder (double-encoded
+  arrays, per-entry drops, tool-error repair rounds, prose-plan nudge) is
+  real engineering; the agent loop is bounded both ends; no awaited Firestore
+  on any chat interaction path (tripwire-tested); the clarify-loop defenses
+  (deterministic local merge, carry-forward, verbatim-title gating) hold
+  together as a system with dedicated tests.
+- **Safety topology:** the confirm-gate is structurally airtight for schedule
+  mutations in both modalities (voice rides the same sendMessage; streamed
+  voice is tool-less with a no-claiming addendum; stale/cancelled cards are
+  inert); the unrequested-delete guard genuinely closes the "no thank you →
+  delete plan" class; auto-commit undo is precise per batch with pre-assigned
+  ids and exact fact restore.
+- **Memory architecture:** summarize-then-purge is well built (extraction-
+  gated purge, 7-day deferral, retry-not-skip on transport failure, legacy
+  adoption); quote-verification demotes unverified claims to inferred; the
+  reflection pipeline (grounding-or-drop, caps, re-fetch-before-write LWW
+  protection, inputs-hash gating) is the strongest LLM surface in the app;
+  tombstone-aware dedupe stops deleted promises resurrecting; "What SidePal
+  knows" gives full user control; `markReferenced` is deliberately local-only
+  so reference stamps can never LWW-stomp user edits.
+- **Voice engineering:** the endpointing invariant now holds with margin and
+  its failure history is documented on both constants; generation-counter
+  discipline is consistent across controller and TTS adapters (491-line test
+  suite); transcript fidelity is exact; the streamed-turn fallback ladder
+  always leaves the loop something honest to speak; speech quota's clip
+  ladder converges head+tail on one charge.
+- **Offline honesty:** airplane-mode promise capture works through the same
+  executor path with per-item failure copy; guests get a local sign-in nudge
+  instead of a server error; the sheet's keyboard engineering (pixel-anchored
+  peek, TextFieldTapRegion mic fix) is careful and correct.
+
+### 8.9 The road to "a ChatGPT-level assistant that does what it's supposed to do"
+
+Ordered; each tier is shippable alone.
+
+1. **Make every advertised verb real (E1, E2).** Implement move/delete task,
+   modify/delete goal, remove reminder, and true edit — the single highest-
+   leverage change in the entire AI surface. The right shape: resolve entity
+   references to concrete ids at *preview* time (EntityNormaliser similarity
+   already exists), stash `_resolvedTaskId`/`_resolvedGoalId` on the action,
+   render what was matched on the card ("Move "Gym" — today 9:00 →
+   tomorrow"), and ask when zero/multiple candidates match. That one change
+   makes the stubs implementable by id, kills hallucinated-title execution,
+   fixes the coordinator's placeholder ids, and makes the preview honest.
+   Until each verb is real: remove it from the tools, the capability prompt,
+   and the quick-directive chips.
+2. **Make failure honest (H1-H5, E6).** `isError` + retry chip on the bubble
+   (reusing the turnId so retries are quota-free — the server already
+   supports it); try/catch/finally around confirmPlan; per-action outcomes in
+   the confirm summary instead of all-or-nothing rollback; the done/finish
+   contract on the stream; split "slow" from "offline" copy; refund quota on
+   upstream failure. This is the Telegram model the project already mandates.
+3. **Make undo real (E3, E4, E5, E7, E8).** Inverse-operation log per
+   dispatched action (deletes creations by construction, covers goals/
+   reminders/time blocks); dry-run before the warning dialog; watch-stream
+   providers so the Undo chip appears the instant a batch completes; boot
+   sweep for stranded `executing` batches.
+4. **Stop the two kill-switch fabrications (H6)** and the behind-pace
+   fabrication (H7) — cheap, and they are the moments users decide whether
+   the coach lies.
+5. **Fix the context poisoners (M1-M6, R1).** Per-entry markExecuted; the
+   sheet-close generation guard; echo remembered content next to Undo;
+   disambiguate forgets; extraction failure ≠ empty extraction; scored memory
+   selection so foundational facts never fall out of the prompt.
+6. **Voice reliability (V1-V4).** One process-wide STT adapter multiplexing
+   callbacks (V1 silently undoes the 08-26 connecting-phase fix from session
+   #2 onward — it is the top voice bug); generation-checked cooldown stamps;
+   a lifecycle observer; a session-lifetime keep-alive client shared with
+   warmup.
+7. **Latency & cost.** Stream typed query turns through the existing
+   aiChatStream seam (the single biggest perceived-speed win — the
+   infrastructure is already built); route-conditioned payload trimming (a
+   greeting needs none of the 28-read context block); order messages for
+   OpenAI automatic prompt caching (stable prefix ≥1024 tokens ≈ half input
+   cost); pre-assemble the payload while the user is still speaking;
+   parallelize voice start(); speak canned prompts on-device.
+8. **Server hardening (S1, S2, R8).** Server-owned system prompts per
+   purpose; token-based daily budget; App Check on callables *and* manual
+   header verification on the onRequest streams; turnId registry; purpose
+   allow-list. Implement (or honestly un-document) the tier-aware AI
+   instruction cap (E16).
+9. **Product warmth.** Restore-conversation on reopen (U6) and rehydrate the
+   last session's turns on launch (U10) — the thread data already sits in
+   Isar; per-item accept/reject on the plan card; personalized empty-state
+   chips seeded from real goals; timestamps, copyable bubbles, insertion
+   animation; suggestions panel re-homed into the sheet (U2) with R7 fixed
+   first; snackbars inside the sheet (U5); real GoalCheckIn progress feeding
+   the behind-pace rule, the coaching payload, and chat alike — the single
+   best cross-surface coherence fix.
+
+### 8.10 Priority order
+
+1. **Now (trust-critical):** E1+E2 (or at minimum de-advertise the broken
+   verbs — a one-hour change that stops the lying), E4 (fake Cancel), H7
+   (the false accusation every goal-holder sees daily).
+2. **This sprint:** H1 retry surface + H2 guard (cheap), E3+E5+E6 (undo that
+   undoes), R1+R2 (mid-turn races), V1 (undoes the 08-26 voice fix from
+   session #2), M1 (session poisoning), U2+R7, H6.
+3. **Next:** tier 5-7 above (context poisoners, voice reliability,
+   latency/cost), S1 server hardening before any public beta, S5 before
+   circles scale.
+4. **Scheduled debt:** the LOW tables above, a11y pass (U8, extends §7 H3),
+   dead-code deletions (parseOperatingLayerJsonMap, weekly pulse, capability
+   payload section, batch pruning wiring).
