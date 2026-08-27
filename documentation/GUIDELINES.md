@@ -2215,3 +2215,26 @@ not silent reversal.
   `evaluationWindow` — silence over fabrication. (5) Home coaching
   refresh invalidates AND reads. Suite 1564 green, analyzer at the
   97-issue baseline. Next: Phase 1 (entity resolver + real verbs).
+
+- **2026-08-27 · AI fix wave, Phase 1 shipped: the verbs are real.**
+  Two commits (bf147ed, 4ea4df0). (1) Dates canonicalise at ingestion —
+  weekday names → next-occurrence date keys, loose ISO validated, junk
+  dropped; the executor rejects unparseable dates loudly (no more
+  phantom `planDateKey` tasks with reminders firing today). Weekday
+  clarify-replies resolve locally. (2) `AiEntityResolver` — the
+  keystone: targeting actions resolve taskTitle/goalTitle → concrete
+  Isar ids at PREVIEW time (Q2 semantics: unique ≥0.8 silently with the
+  card showing the real matched title; zero/multiple → LOCAL question;
+  undated → today→week nearest-day-wins; targeting-grade matching, no
+  category tier). Executor: true editTask (same row, fields preserved),
+  moveTask (reminder keeps clock time on the new day), deleteTask (the
+  2026-08-23 deletion set), removeReminder (config delete — the
+  boot-re-arm half), modifyGoal (title/target/deadline/intensity) and
+  deleteGoal with `_prevGoalJson` stashes so undo restores goals,
+  createGoal honors numeric targets. execute() copies parameter maps
+  (bookkeeping keys stop leaking into live plans). Tool enum/prompt/
+  registry/chips re-advertise; only suggestFreeTimeBlock/
+  moveConflictingTasks stay retired (silently stripped). Deduplicator
+  is date-aware; the card discloses edit/modify field changes (E11).
+  Suite 1587 green, analyzer 97 baseline. Next: Phase 2 (undo v2
+  inverse-op log), per the batch order.
