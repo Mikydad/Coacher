@@ -2196,3 +2196,22 @@ not silent reversal.
   (ONE functions deploy, batched with the pending surrender/invite deploy),
   memory/UX. Goal, in Miko's words: an assistant that understands, talks
   well, and does the things it's supposed to do.
+
+- **2026-08-27 · AI fix wave, Phase 0 shipped: the coach stops lying.**
+  Five commits (eb293ca..ee9d0db): (1) the eight retired verbs
+  (edit/move/delete task, modify/delete goal, remove reminder, both
+  read-only kinds) are gone from the tool enum, capability registry, and
+  directive chips; stubs throw; a new parser strip guarantees no retired
+  verb ever reaches a preview card — plans degrade to the Q1 honest
+  refusal or keep their real work with a note. (2) Undo warns BEFORE
+  rolling back (`UndoNeedsConfirmation` + force re-invoke); rollback
+  failures surface as `UndoFailed`, never fake success; one shared
+  `handleAiUndo` for bar + history sheet. (3) Kill switch degrades
+  honestly: `DisabledAiOperatingLayerClient` (release) and
+  `DisabledCoachingAiClient` → deterministic renderer; mocks are
+  debug/test-only; streamed voice respects the switch via
+  `lastKnownAiEnabled`; the Progress test button is tester-only.
+  (4) Behind-pace reads real check-in progress inside
+  `evaluationWindow` — silence over fabrication. (5) Home coaching
+  refresh invalidates AND reads. Suite 1564 green, analyzer at the
+  97-issue baseline. Next: Phase 1 (entity resolver + real verbs).
