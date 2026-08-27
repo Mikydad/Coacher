@@ -11,11 +11,14 @@ import 'package:sidepal/features/ai_assistant/domain/models/ai_response_type.dar
 import 'package:sidepal/features/planning/data/planning_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Retired-verb guard (fix-wave Phase 0, AUDIT.md §8 E1/E2/E6): verbs whose
-/// executors are stubs must never reach a preview card. A confirmed "Done"
-/// for a write that never happened is the worst failure the coach has —
-/// these tests pin the honest degradation until Phase 1 makes each verb
-/// real and removes it from [AiIntentParser.kRetiredActionTypes].
+/// Retired-verb guard (fix-wave Phases 0-1, AUDIT.md §8 E1/E6).
+///
+/// Phase 0 retired every verb whose executor was a fake-success stub;
+/// Phase 1 restored the six mutation verbs with real handlers. What remains
+/// retired: the two decorative read-only kinds with no executor — they used
+/// to throw during dispatch and poison a confirmed batch into rollback.
+/// These tests pin (a) the retired set matches the tool enum, and (b) the
+/// strip drops decorative kinds silently without touching real work.
 
 class _ScriptedClient implements AiOperatingLayerClient {
   _ScriptedClient(this.result);
@@ -74,7 +77,7 @@ AiPlannedChanges _plan(List<AiAction> actions) => AiPlannedChanges(
 );
 
 void main() {
-  test('the tool enum offers no retired verbs to the model', () {
+  test('the tool enum and the retired set are exact complements', () {
     final enumValues =
         // ignore: avoid_dynamic_calls
         (((kCoachAgentTools.first['function']
@@ -86,16 +89,25 @@ void main() {
       expect(
         enumValues,
         isNot(contains(retired.name)),
-        reason: '${retired.name} has no working executor and must not be '
-            'offered to the model',
+        reason: '${retired.name} has no executor and must not be offered',
       );
     }
-    expect(enumValues, contains('createTask'));
-    expect(enumValues, contains('rescheduleReminder'));
+    // Every re-enabled Phase 1 verb IS offered — its handler is real.
+    for (final live in [
+      ActionType.createTask,
+      ActionType.editTask,
+      ActionType.moveTask,
+      ActionType.deleteTask,
+      ActionType.modifyGoal,
+      ActionType.deleteGoal,
+      ActionType.removeReminder,
+      ActionType.rescheduleReminder,
+    ]) {
+      expect(enumValues, contains(live.name));
+    }
   });
 
-  test('a move-only plan degrades to an honest refusal, not a card',
-      () async {
+  test('mutation verbs flow through the strip untouched', () async {
     final result = await _parser(
       _plan(const [
         AiAction(
@@ -105,55 +117,8 @@ void main() {
       ]),
     ).parse('move my workout to tomorrow', 's1');
 
-    expect(result.actions, isEmpty);
-    expect(result.isInformational, isTrue);
-    expect(
-      result.informationalMessage,
-      contains("can't move or edit existing tasks yet"),
-    );
-    expect(result.informationalMessage, contains("didn't change anything"));
-  });
-
-  test('an edit-only plan degrades to an honest refusal', () async {
-    final result = await _parser(
-      _plan(const [
-        AiAction(
-          actionType: ActionType.editTask,
-          parameters: {'title': 'Gym', 'time': '19:00'},
-        ),
-      ]),
-    ).parse('change my gym to 7pm', 's1');
-
-    expect(result.actions, isEmpty);
-    expect(result.isInformational, isTrue);
-  });
-
-  test('a mixed plan keeps the real work and notes the retired part',
-      () async {
-    final result = await _parser(
-      _plan(const [
-        AiAction(
-          actionType: ActionType.createTask,
-          parameters: {
-            'title': 'Study',
-            'time': '14:00',
-            'duration': 30,
-            'date': 'today',
-          },
-        ),
-        AiAction(
-          actionType: ActionType.moveTask,
-          parameters: {'taskTitle': 'Workout', 'destinationDate': 'tomorrow'},
-        ),
-      ]),
-    ).parse('add study at 2pm and move my workout to tomorrow', 's1');
-
     expect(result.actions, hasLength(1));
-    expect(result.actions.single.actionType, ActionType.createTask);
-    expect(
-      result.informationalMessage,
-      contains("can't move or edit existing tasks yet"),
-    );
+    expect(result.actions.single.actionType, ActionType.moveTask);
   });
 
   test('decorative suggestFreeTimeBlock is silently dropped from a plan',
@@ -182,5 +147,17 @@ void main() {
     expect(result.actions, hasLength(1));
     expect(result.actions.single.actionType, ActionType.createTask);
     expect(result.informationalMessage ?? '', isNot(contains("can't")));
+  });
+
+  test('a decorative-only plan degrades honestly instead of a dead card',
+      () async {
+    final result = await _parser(
+      _plan(const [
+        AiAction(actionType: ActionType.moveConflictingTasks, parameters: {}),
+      ]),
+    ).parse('sort out my conflicts', 's1');
+
+    expect(result.actions, isEmpty);
+    expect(result.isInformational, isTrue);
   });
 }

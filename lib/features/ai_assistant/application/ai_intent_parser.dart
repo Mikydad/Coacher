@@ -10,6 +10,7 @@ import 'ai_assumption_engine.dart';
 import 'ai_capability_registry.dart';
 import 'ai_chat_suggestion_enricher.dart';
 import 'ai_conflict_detector.dart';
+import 'ai_entity_resolver.dart';
 import 'ai_intent_router.dart';
 import '../../education/domain/feature_guides.dart';
 import 'ai_missing_field_detector.dart';
@@ -34,6 +35,7 @@ class AiIntentParser {
     required this.assumptionEngine,
     this.conflictDetector,
     this.chatSuggestionEnricher,
+    this.entityResolver,
   });
 
   final AiOperatingLayerClient client;
@@ -41,6 +43,11 @@ class AiIntentParser {
   final AiAssumptionEngine assumptionEngine;
   final AiConflictDetector? conflictDetector;
   final AiChatSuggestionEnricher? chatSuggestionEnricher;
+
+  /// Resolves entity-targeting actions to concrete ids before the preview
+  /// card (fix-wave Phase 1). Null in legacy tests — targeting actions then
+  /// reach the executor unresolved and fail loudly there.
+  final AiEntityResolver? entityResolver;
 
   Future<AiPlannedChanges> parse(
     String userInput,
@@ -291,6 +298,24 @@ class AiIntentParser {
       );
     }
 
+    // Entity resolution BEFORE the card: targeting actions map to concrete
+    // ids here, so the preview shows the real matched entity and execution
+    // can never guess. Zero/multiple matches become a LOCAL question — no
+    // model call, no quota (fix-wave Phase 1, settled Q2).
+    if (entityResolver != null) {
+      final resolution = await entityResolver!.resolve(enrichedActions);
+      switch (resolution) {
+        case EntityResolutionQuestion(:final question):
+          return AiPlannedChanges(
+            sessionId: sessionId,
+            followUpQuestion: question,
+            actions: enrichedActions,
+          );
+        case EntityResolutionOk(:final actions):
+          enrichedActions = actions;
+      }
+    }
+
     final missingCheck = AiMissingFieldDetector.checkAll(enrichedActions);
     if (!missingCheck.isComplete) {
       return AiPlannedChanges(
@@ -328,16 +353,14 @@ class AiIntentParser {
     );
   }
 
-  /// Verbs the executor cannot perform yet (fix-wave Phase 0,
-  /// PRD/AI_assitance/AI_chat_fix_design.md). Phase 1 removes entries from
-  /// this set as each verb's handler becomes real.
+  /// Verbs the executor cannot perform (fix-wave Phase 0/1,
+  /// PRD/AI_assitance/AI_chat_fix_design.md). The six mutation verbs were
+  /// retired in Phase 0 and re-enabled in Phase 1 once their handlers
+  /// became real (resolver-stamped ids, true edits, full deletion set).
+  /// The two remaining kinds are decorative read-only actions with no
+  /// executor — they used to throw mid-batch and poison confirmed plans
+  /// into rollback (§8 E6).
   static const kRetiredActionTypes = {
-    ActionType.editTask,
-    ActionType.moveTask,
-    ActionType.deleteTask,
-    ActionType.modifyGoal,
-    ActionType.deleteGoal,
-    ActionType.removeReminder,
     ActionType.suggestFreeTimeBlock,
     ActionType.moveConflictingTasks,
   };

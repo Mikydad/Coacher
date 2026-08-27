@@ -180,12 +180,18 @@ reuse them. If your earlier times are no longer visible in the conversation,
 pick sensible times from the free windows yourself instead of asking again.
 
 ## propose_changes: rules
-- Parameter keys are EXACT — the app reads only these: createTask
+- Parameter keys are EXACT — the app reads only these: createTask/editTask
   {title, time ("HH:mm", 24-hour), duration (minutes, integer), date
-  ("today" | "tomorrow" | "YYYY-MM-DD")}; createGoal {title, target,
-  deadline}; addReminder/rescheduleReminder {taskTitle, reminderTime
-  ("HH:mm")}. Never invent keys like startTime, start, when, or
-  durationMinutes — the app cannot read them.
+  ("today" | "tomorrow" | "YYYY-MM-DD")}; moveTask {taskTitle,
+  destinationDate}; deleteTask {taskTitle}; createGoal {title, target,
+  deadline}; modifyGoal {goalTitle, field ("title" | "target" |
+  "deadline" | "intensity"), newValue}; deleteGoal {goalTitle};
+  addReminder/rescheduleReminder {taskTitle, reminderTime ("HH:mm")};
+  removeReminder {taskTitle}. Never invent keys like startTime, start,
+  when, or durationMinutes — the app cannot read them.
+- For edit/move/delete, pass the task or goal title as the user said it —
+  the app matches it to the real item and shows the user exactly what
+  will change before anything is applied.
 - Presentation "preview" → the user gave a clear command ("add workout at 6am").
   Keep your text to one short confirmation line.
 - createIntention parameters: title (short action phrase, e.g. "Call cousin
@@ -223,11 +229,8 @@ pick sensible times from the free windows yourself instead of asking again.
 - Circles/community, billing, and account settings are managed in the app's own
   screens, not by you. Say so honestly in one clause, then offer the nearest
   thing you CAN do.
-- You cannot yet move, edit, or delete existing tasks, change or delete
-  existing goals, or remove reminders. When asked, NEVER claim you did it and
-  never propose it as an action — say honestly in one clause that this is done
-  by tapping the item in the app, then offer the nearest thing you CAN do
-  (create a task or goal, set or reschedule a reminder, answer a question).
+- Never claim a change happened before the user confirmed the plan card —
+  propose_changes only PROPOSES; the app applies nothing until Confirm.
 - One question at a time. Never repeat a sentence you already sent this
   conversation — if the user seems stuck, change approach and offer choices.
 
@@ -304,16 +307,23 @@ const List<Map<String, dynamic>> kCoachAgentTools = [
               'properties': {
                 'actionType': {
                   'type': 'string',
-                  // Retired verbs (editTask/moveTask/deleteTask/modifyGoal/
-                  // deleteGoal/removeReminder/suggestFreeTimeBlock/
-                  // moveConflictingTasks) are deliberately NOT offered: the
-                  // executor cannot perform them yet, and a confirm card
-                  // must never promise work the app cannot do (fix-wave
-                  // Phase 0). Phase 1 re-adds each verb as it becomes real.
+                  // suggestFreeTimeBlock/moveConflictingTasks are
+                  // deliberately NOT offered: decorative read-only kinds
+                  // with no executor — they used to throw mid-batch and
+                  // poison confirmed plans into rollback (§8 E6). The six
+                  // mutation verbs returned in fix-wave Phase 1 with real
+                  // handlers (resolver-stamped ids, true edits, the full
+                  // deletion set).
                   'enum': [
                     'createTask',
+                    'editTask',
+                    'moveTask',
+                    'deleteTask',
                     'createGoal',
+                    'modifyGoal',
+                    'deleteGoal',
                     'addReminder',
+                    'removeReminder',
                     'rescheduleReminder',
                     'activateContextOverride',
                     'endContextOverride',
@@ -326,12 +336,15 @@ const List<Map<String, dynamic>> kCoachAgentTools = [
                 'parameters': {
                   'type': 'object',
                   'description':
-                      'EXACT keys per actionType — createTask: '
+                      'EXACT keys per actionType — createTask/editTask: '
                       'title, time ("HH:mm" 24-hour), duration (minutes, '
                       'integer), date ("today" | "tomorrow" | YYYY-MM-DD); '
-                      'createGoal: title, target, deadline; '
-                      'addReminder/rescheduleReminder: taskTitle, '
-                      'reminderTime ("HH:mm"). '
+                      'moveTask: taskTitle, destinationDate; deleteTask: '
+                      'taskTitle; createGoal: title, target, deadline; '
+                      'modifyGoal: goalTitle, field ("title" | "target" | '
+                      '"deadline" | "intensity"), newValue; deleteGoal: '
+                      'goalTitle; addReminder/rescheduleReminder: taskTitle, '
+                      'reminderTime ("HH:mm"); removeReminder: taskTitle. '
                       'Never use startTime/start/when/durationMinutes — the '
                       'app reads only the keys above.',
                 },

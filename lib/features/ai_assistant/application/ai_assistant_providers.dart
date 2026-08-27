@@ -29,6 +29,7 @@ import 'ai_action_executor.dart';
 import 'ai_tier_guard.dart';
 import 'ai_assistant_service.dart';
 import 'ai_assumption_engine.dart';
+import 'ai_entity_resolver.dart';
 import 'ai_chat_suggestion_enricher.dart';
 import 'ai_conflict_detector.dart';
 import 'ai_intent_parser.dart';
@@ -129,6 +130,15 @@ final aiChatSuggestionEnricherProvider = Provider<AiChatSuggestionEnricher>((
   );
 });
 
+// ─── Entity resolver ──────────────────────────────────────────────────────────
+
+final aiEntityResolverProvider = Provider<AiEntityResolver>((ref) {
+  return AiEntityResolver(
+    planningRepository: ref.read(planningRepositoryProvider),
+    goalsRepository: ref.read(goalsRepositoryProvider),
+  );
+});
+
 // ─── Intent parser ────────────────────────────────────────────────────────────
 
 final aiIntentParserProvider = FutureProvider<AiIntentParser>((ref) async {
@@ -143,6 +153,7 @@ final aiIntentParserProvider = FutureProvider<AiIntentParser>((ref) async {
     assumptionEngine: assumptionEngine,
     conflictDetector: conflictDetector,
     chatSuggestionEnricher: enricher,
+    entityResolver: ref.read(aiEntityResolverProvider),
   );
 });
 

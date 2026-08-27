@@ -210,7 +210,15 @@ String describePlannedAction(AiAction action) {
       return 'Add $title$time$date';
 
     case ActionType.editTask:
-      return 'Edit "${p['title'] ?? 'task'}"';
+      // The confirm gate is only as good as what it discloses — an edit
+      // must list the changed fields, never a bare title (§8 E11).
+      final changes = <String>[
+        if (_timeLabel(p['time']) != null) 'time → ${p['time']}',
+        if (p['duration'] != null) 'duration → ${p['duration']} min',
+        if (p['date'] != null) 'day → ${friendlyDateKey('${p['date']}')}',
+      ];
+      return 'Edit "${p['title'] ?? 'task'}"'
+          '${changes.isNotEmpty ? ' — ${changes.join(', ')}' : ''}';
 
     case ActionType.moveTask:
       final dest = p['destinationDate'];
@@ -227,7 +235,10 @@ String describePlannedAction(AiAction action) {
           '${deadline != null ? ' — by ${friendlyDateKey('$deadline')}' : ''}';
 
     case ActionType.modifyGoal:
-      return 'Update goal "${p['goalTitle'] ?? 'goal'}"';
+      final field = p['field'];
+      final newValue = p['newValue'];
+      return 'Update goal "${p['goalTitle'] ?? 'goal'}"'
+          '${field != null && newValue != null ? ' — $field → $newValue' : ''}';
 
     case ActionType.deleteGoal:
       return 'Remove goal "${p['goalTitle'] ?? 'goal'}"';

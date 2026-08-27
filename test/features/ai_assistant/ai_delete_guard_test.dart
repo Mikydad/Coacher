@@ -90,20 +90,15 @@ void main() {
     expect(result.informationalMessage, contains("didn't change anything"));
   });
 
-  test(
-      'an explicit delete request degrades to an honest refusal while '
-      'deleteTask is retired (fix-wave Phase 0; Phase 1 restores the plan)',
-      () async {
+  test('an explicit delete request keeps its delete actions', () async {
+    // deleteTask is a real verb again since fix-wave Phase 1 (the Phase-0
+    // retirement ended when the executor's handler became real).
     final result = await _parser(
       _deletePlan,
     ).parse('delete the wake up task and the flutter list', 's1');
 
-    // The unrequested-delete guard lets an explicit request through, but the
-    // retired-verb strip must still catch it: the executor cannot delete yet,
-    // so a preview card would be a confirmed no-op.
-    expect(result.actions, isEmpty);
-    expect(result.isInformational, isTrue);
-    expect(result.informationalMessage, contains("can't delete tasks yet"));
+    expect(result.actions, hasLength(2));
+    expect(result.actions.first.actionType, ActionType.deleteTask);
   });
 
   test('mixed plan keeps non-delete actions when deletes were unrequested',
@@ -135,16 +130,13 @@ void main() {
     expect(result.actions.single.actionType, ActionType.createTask);
   });
 
-  test(
-      'refining a plan that already had deletes still cannot revive a '
-      'retired verb (fix-wave Phase 0)', () async {
+  test('refining a plan that already had deletes keeps them', () async {
     final result = await _parser(_deletePlan).parse(
       'yes those two',
       's1',
       previousPlan: _deletePlan,
     );
 
-    expect(result.actions, isEmpty);
-    expect(result.isInformational, isTrue);
+    expect(result.actions, hasLength(2));
   });
 }

@@ -1,3 +1,4 @@
+import '../../../core/utils/date_keys.dart';
 import '../domain/models/ai_action.dart';
 
 /// Removes actions that duplicate tasks already on today's schedule.
@@ -52,6 +53,18 @@ class AiPlanDeduplicator {
         break;
       default:
         return false;
+    }
+
+    // [activeTasks] covers TODAY only — a same-titled task on another day
+    // is a new task, not a duplicate. Without this, "set up the same
+    // deep-work block for tomorrow" was silently dropped as already on
+    // today's list (§8 E10).
+    final date = action.parameters['date'] as String?;
+    if (date != null &&
+        date.isNotEmpty &&
+        date != 'today' &&
+        date != DateKeys.todayKey()) {
+      return false;
     }
 
     final title = _actionTitle(action);

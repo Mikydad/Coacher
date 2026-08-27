@@ -150,9 +150,19 @@ class AiActionExecutor {
 
   // ─── Public execute ────────────────────────────────────────────────────────
 
-  Future<ExecutionResult> execute(List<AiAction> actions) async {
+  Future<ExecutionResult> execute(List<AiAction> requested) async {
     final batchId = StableId.generate('ai_batch');
     final now = DateTime.now().millisecondsSinceEpoch;
+
+    // Work on copies: the pre-pass below annotates parameters with
+    // bookkeeping keys (_intentionId/_factId/_prevGoalJson/…), and mutating
+    // the caller's live maps leaked those keys into the preview card
+    // message and history — and broke outright on unmodifiable maps
+    // (§8 E17-adjacent INFO, verified by test).
+    final actions = [
+      for (final a in requested)
+        a.copyWith(parameters: Map<String, dynamic>.from(a.parameters)),
+    ];
 
     // Pre-assign client ids to createIntention actions so the persisted
     // actionsJson carries them — rollback/undo can then tombstone exactly
@@ -178,6 +188,26 @@ class AiActionExecutor {
         if (target != null) {
           action.parameters['_targetFactId'] = target.id;
           action.parameters['_prevFactJson'] = jsonEncode(target.toMap());
+        }
+      }
+      // modify/delete goal: same pattern — stash the pre-mutation goal so
+      // rollback/undo can restore it (the task snapshot cannot cover
+      // goals; fix-wave Phase 1).
+      if (action.actionType == ActionType.modifyGoal ||
+          action.actionType == ActionType.deleteGoal) {
+        final goalId = action.parameters['_resolvedGoalId'] as String?;
+        if (goalId != null) {
+          try {
+            final goals = await goalsRepository.fetchGoalsOnce();
+            for (final g in goals) {
+              if (g.id == goalId) {
+                action.parameters['_prevGoalJson'] = jsonEncode(g.toMap());
+                break;
+              }
+            }
+          } catch (e) {
+            debugPrint('ai_action_executor: goal stash failed: $e');
+          }
         }
       }
     }
@@ -387,6 +417,7 @@ class AiActionExecutor {
   Future<bool> _rollbackBatch(String batchId, String snapshotJson) async {
     await _rollbackCreatedIntentions(batchId);
     await _rollbackMemoryActions(batchId);
+    await _rollbackGoalActions(batchId);
     try {
       final snapshot = jsonDecode(snapshotJson) as Map<String, dynamic>?;
       final taskList = (snapshot?['tasks'] as List<dynamic>? ?? [])
@@ -489,6 +520,35 @@ class AiActionExecutor {
       }
     } catch (e) {
       debugPrint('ai_action_executor: swallowed error: $e');
+    }
+  }
+
+  /// Undo of goal actions: modified or deleted goals are restored from the
+  /// pre-mutation state stashed in the persisted actionsJson
+  /// (`_prevGoalJson`, fix-wave Phase 1 — mirrors [_rollbackMemoryActions]).
+  /// A deleted goal's check-in history is not restorable here (the
+  /// repository purges it); the Phase 2 inverse-op log will cover it.
+  Future<void> _rollbackGoalActions(String batchId) async {
+    try {
+      final batch = await batchRepository.findByBatchId(batchId);
+      if (batch == null) return;
+      final actionList = (jsonDecode(batch.actionsJson) as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+      for (final entry in actionList) {
+        if (entry['type'] != ActionType.modifyGoal.name &&
+            entry['type'] != ActionType.deleteGoal.name) {
+          continue;
+        }
+        final params = (entry['params'] as Map?)?.cast<String, dynamic>();
+        final prevJson = params?['_prevGoalJson'] as String?;
+        if (prevJson == null) continue;
+        final restored = UserGoal.fromMap(
+          (jsonDecode(prevJson) as Map).cast<String, dynamic>(),
+        ).copyWith(updatedAtMs: DateTime.now().millisecondsSinceEpoch);
+        await goalsRepository.upsertGoal(restored);
+      }
+    } catch (e) {
+      debugPrint('ai_action_executor: goal rollback failed: $e');
     }
   }
 
@@ -932,23 +992,168 @@ class AiActionExecutor {
     return 'Added "$title" on ${_friendlyDate(dateStr)}${timeStr != null ? " at $timeStr" : ""}.';
   }
 
-  // Retired verbs (fix-wave Phase 0): these handlers used to fake success —
-  // _editTask created a DUPLICATE task, _moveTask/_deleteTask returned
-  // "Moved"/"Deleted" strings with no write at all. Until Phase 1 implements
-  // them for real, they throw so a confirm can never look successful
-  // (the same standard suggestFreeTimeBlock already applies). They are
-  // unreachable in normal flow: the tool enum no longer offers them and
-  // AiIntentParser strips them from any plan before the preview card.
+  /// Loads the task row a resolver-stamped action targets. The resolver
+  /// (AiEntityResolver, fix-wave Phase 1) matched the entity BEFORE the
+  /// preview card; execution never guesses by title. Throws loudly when
+  /// the stamp is missing (legacy plan, resolver disabled) or the row is
+  /// gone (deleted between preview and confirm).
+  Future<PlannedTaskRow> _requireResolvedTaskRow(
+    Map<String, dynamic> p,
+  ) async {
+    final id = p['_resolvedTaskId'] as String?;
+    final dateKey = p['_resolvedDateKey'] as String?;
+    if (id == null || dateKey == null) {
+      throw ArgumentError(
+        "I couldn't match that task to your plan — ask me again with its "
+        'name.',
+      );
+    }
+    final rows = await collectTasksForDateKey(planningRepository, dateKey);
+    for (final row in rows) {
+      if (row.task.id == id) return row;
+    }
+    throw ArgumentError(
+      'That task is no longer on ${_friendlyDate(dateKey)} — it may have '
+      'been changed since I suggested this.',
+    );
+  }
+
+  /// True edit (fix-wave Phase 1, §8 E2): updates the SAME task row —
+  /// time, duration, and/or day — preserving id, status, notes, category,
+  /// priority, order, and enforcement mode. The old handler upserted a
+  /// brand-new task, duplicating the schedule.
   Future<String> _editTask(Map<String, dynamic> p) async {
-    throw UnsupportedError('Editing existing tasks is not supported yet.');
+    final row = await _requireResolvedTaskRow(p);
+    final task = row.task;
+    final timeStr = p['time'] as String?;
+    final durationMinutes = (p['duration'] as num?)?.toInt();
+    final dateParam = p['date'] as String?;
+    final newDateKey = dateParam != null && dateParam.trim().isNotEmpty
+        ? _resolveDate(dateParam)
+        : (task.planDateKey ?? row.dateKey);
+
+    if (timeStr == null && durationMinutes == null &&
+        newDateKey == (task.planDateKey ?? row.dateKey)) {
+      throw ArgumentError(
+        'Tell me what to change about "${task.title}" — its time, '
+        'duration, or day.',
+      );
+    }
+
+    var routineId = task.routineId;
+    var blockId = task.blockId;
+    if (newDateKey != (task.planDateKey ?? row.dateKey)) {
+      final ids = await planningRepository.ensureDefaultDayPlan(newDateKey);
+      routineId = ids.routineId;
+      blockId = ids.blockId;
+    }
+
+    // New time wins; otherwise an existing reminder follows the (possibly
+    // new) day at its old clock time.
+    DateTime? reminderTime;
+    if (timeStr != null) {
+      reminderTime = _parseReminderDateTime(newDateKey, timeStr);
+    } else if (task.reminderTimeIso != null) {
+      final old = DateTime.tryParse(task.reminderTimeIso!)?.toLocal();
+      if (old != null) {
+        final day = DateKeys.parseLocalDateKey(newDateKey);
+        reminderTime = DateTime(
+          day.year, day.month, day.day, old.hour, old.minute,
+        );
+      }
+    }
+
+    final updated = PlannedTask(
+      id: task.id,
+      routineId: routineId,
+      blockId: blockId,
+      title: task.title,
+      durationMinutes: durationMinutes ?? task.durationMinutes,
+      priority: task.priority,
+      orderIndex: task.orderIndex,
+      reminderEnabled: reminderTime != null && task.reminderEnabled ||
+          (timeStr != null),
+      reminderTimeIso: reminderTime?.toIso8601String(),
+      status: task.status,
+      createdAtMs: task.createdAtMs,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+      category: task.category,
+      planDateKey: newDateKey,
+      notes: task.notes,
+      sequenceIndex: task.sequenceIndex,
+      isHabitAnchor: task.isHabitAnchor,
+      strictModeRequired: task.strictModeRequired,
+      modeRefId: task.modeRefId,
+    );
+    await planningRepository.upsertTask(updated);
+
+    if (updated.reminderEnabled && reminderTime != null) {
+      await _upsertReminderForTask(
+        taskId: task.id,
+        taskTitle: task.title,
+        routineId: routineId,
+        blockId: blockId,
+        reminderTime: reminderTime,
+        modeRefId: task.modeRefId,
+        existingCreatedAtMs: task.createdAtMs,
+      );
+      final block = timeBlockSyncService.deriveBlock(
+        entityId: task.id,
+        entityKind: 'task',
+        startAt: reminderTime,
+        durationMinutes: updated.durationMinutes,
+        modeRefId: updated.modeRefId,
+      );
+      if (block != null) await timeBlockSyncService.syncBlock(block);
+    } else {
+      await reminderSyncService.syncForTaskIds([task.id]);
+    }
+
+    final changes = <String>[
+      if (timeStr != null) 'time → $timeStr',
+      if (durationMinutes != null) 'duration → $durationMinutes min',
+      if (newDateKey != row.dateKey) 'day → ${_friendlyDate(newDateKey)}',
+    ];
+    return 'Updated "${task.title}" (${changes.join(', ')}).';
   }
 
+  /// Real move (fix-wave Phase 1, §8 E1): same task id lands on the
+  /// destination day; an existing reminder keeps its clock time on the new
+  /// day; the derived time block follows.
   Future<String> _moveTask(Map<String, dynamic> p) async {
-    throw UnsupportedError('Moving existing tasks is not supported yet.');
+    final destRaw = p['destinationDate'] as String?;
+    if (destRaw == null || destRaw.trim().isEmpty) {
+      throw ArgumentError('Where should I move it to — today, tomorrow, '
+          'or a date?');
+    }
+    final row = await _requireResolvedTaskRow(p);
+    final destKey = _resolveDate(destRaw);
+    final sourceKey = row.task.planDateKey ?? row.dateKey;
+    if (destKey == sourceKey) {
+      return '"${row.task.title}" is already on ${_friendlyDate(destKey)}.';
+    }
+    return _editTask({
+      ...p,
+      'title': row.task.title,
+      'date': destKey,
+    }).then((_) =>
+        'Moved "${row.task.title}" to ${_friendlyDate(destKey)}.');
   }
 
+  /// Real delete (fix-wave Phase 1, §8 E1): the 2026-08-23 deletion set —
+  /// task row, reminder configs + armed OS notifications, derived time
+  /// block. (Entity coaching caches self-heal on the next daily refresh —
+  /// the clear helper is WidgetRef-bound and unreachable from here.)
   Future<String> _deleteTask(Map<String, dynamic> p) async {
-    throw UnsupportedError('Deleting tasks is not supported yet.');
+    final row = await _requireResolvedTaskRow(p);
+    await planningRepository.deleteTask(
+      routineId: row.routineId,
+      blockId: row.blockId,
+      taskId: row.task.id,
+    );
+    await reminderSyncService.removeForDeletedTask(row.task.id);
+    await timeBlockSyncService.removeBlockForEntity(row.task.id);
+    return 'Deleted "${row.task.title}".';
   }
 
   // ─── Goal handlers ────────────────────────────────────────────────────────
@@ -972,6 +1177,20 @@ class AiActionExecutor {
           }())
         : now + const Duration(days: 30).inMilliseconds;
 
+    // Honor the model's target when it carries a number: "20 km" →
+    // targetValue 20, customLabel "km" (fix-wave Phase 1 — every AI goal
+    // used to be hard-coded to count-of-1, so "run 20km a week" became a
+    // count-of-1 goal regardless of what the user asked).
+    final parsedTarget = target.isNotEmpty
+        ? _parseLeadingNumber(target)
+        : null;
+    final targetLabel = parsedTarget != null
+        ? target
+              .replaceFirst(RegExp(r'\d+(?:\.\d+)?'), '')
+              .replaceAll(RegExp(r'\s+'), ' ')
+              .trim()
+        : target;
+
     // Repeat off: an AI-created goal with a deadline is a one-time outcome
     // goal — progress accumulates until the deadline.
     final goal = UserGoal(
@@ -980,8 +1199,10 @@ class AiActionExecutor {
       categoryId: GoalCategories.productivity,
       status: GoalStatus.active,
       measurementKind: MeasurementKind.count,
-      targetValue: 1,
-      customLabel: target.isNotEmpty ? target : null,
+      targetValue: parsedTarget != null && parsedTarget > 0
+          ? parsedTarget
+          : 1,
+      customLabel: targetLabel.isNotEmpty ? targetLabel : null,
       intensity: 3,
       periodStartMs: now,
       periodEndMs: periodEnd,
@@ -993,14 +1214,99 @@ class AiActionExecutor {
     return 'Created goal "$title".';
   }
 
-  // Retired verbs (fix-wave Phase 0) — see the note above _editTask.
-  Future<String> _modifyGoal(Map<String, dynamic> p) async {
-    throw UnsupportedError('Changing existing goals is not supported yet.');
+  /// Loads the goal a resolver-stamped action targets — same contract as
+  /// [_requireResolvedTaskRow].
+  Future<UserGoal> _requireResolvedGoal(Map<String, dynamic> p) async {
+    final id = p['_resolvedGoalId'] as String?;
+    if (id == null) {
+      throw ArgumentError(
+        "I couldn't match that goal — ask me again with its name.",
+      );
+    }
+    final goals = await goalsRepository.fetchGoalsOnce();
+    for (final g in goals) {
+      if (g.id == id) return g;
+    }
+    throw ArgumentError('That goal no longer exists.');
   }
 
-  Future<String> _deleteGoal(Map<String, dynamic> p) async {
-    throw UnsupportedError('Deleting goals is not supported yet.');
+  /// Real goal edit (fix-wave Phase 1, §8 E1): title, target, deadline, or
+  /// intensity on the SAME goal id. Anything else fails loudly instead of
+  /// pretending.
+  Future<String> _modifyGoal(Map<String, dynamic> p) async {
+    final goal = await _requireResolvedGoal(p);
+    final field = (p['field'] as String? ?? '').trim().toLowerCase();
+    final newValue = p['newValue'];
+    if (field.isEmpty || newValue == null) {
+      throw ArgumentError(
+        'Tell me what to change about "${goal.title}" — its title, '
+        'target, deadline, or intensity.',
+      );
+    }
+    final now = DateTime.now().millisecondsSinceEpoch;
+    UserGoal updated;
+    String describe;
+    switch (field) {
+      case 'title':
+      case 'name':
+        final title = newValue.toString().trim();
+        if (title.isEmpty) throw ArgumentError('The new title is empty.');
+        updated = goal.copyWith(title: title, updatedAtMs: now);
+        describe = 'renamed to "$title"';
+      case 'target':
+      case 'targetvalue':
+        final target = _parseLeadingNumber(newValue.toString());
+        if (target == null || target <= 0) {
+          throw ArgumentError(
+            'I couldn\'t read "$newValue" as a target number.',
+          );
+        }
+        updated = goal.copyWith(targetValue: target, updatedAtMs: now);
+        describe = 'target → ${_trimNum(target)}';
+      case 'deadline':
+      case 'enddate':
+        final key = _resolveDate(newValue.toString());
+        updated = goal.copyWith(
+          periodEndMs: DateKeys.parseLocalDateKey(key)
+              .add(const Duration(hours: 23, minutes: 59))
+              .millisecondsSinceEpoch,
+          updatedAtMs: now,
+        );
+        describe = 'deadline → ${_friendlyDate(key)}';
+      case 'intensity':
+        final intensity = (num.tryParse(newValue.toString()))?.round();
+        if (intensity == null || intensity < 1 || intensity > 5) {
+          throw ArgumentError('Intensity is a number from 1 to 5.');
+        }
+        updated = goal.copyWith(intensity: intensity, updatedAtMs: now);
+        describe = 'intensity → $intensity';
+      default:
+        throw ArgumentError(
+          'I can change a goal\'s title, target, deadline, or intensity — '
+          'not "$field".',
+        );
+    }
+    await goalsRepository.upsertGoal(updated);
+    return 'Updated goal "${goal.title}" ($describe).';
   }
+
+  /// Real goal delete (fix-wave Phase 1, §8 E1). The pre-mutation state is
+  /// stashed as `_prevGoalJson` in [execute] so rollback/undo can restore
+  /// the goal itself (check-in history is deleted by the repository and is
+  /// NOT restored — the Phase 2 inverse-op log will cover it).
+  Future<String> _deleteGoal(Map<String, dynamic> p) async {
+    final goal = await _requireResolvedGoal(p);
+    await goalsRepository.deleteGoal(goal.id);
+    return 'Removed goal "${goal.title}".';
+  }
+
+  static double? _parseLeadingNumber(String raw) {
+    final m = RegExp(r'\d+(?:\.\d+)?').firstMatch(raw);
+    return m == null ? null : double.tryParse(m.group(0)!);
+  }
+
+  static String _trimNum(double v) =>
+      v == v.roundToDouble() ? v.round().toString() : v.toString();
 
   // ─── Reminder handlers ────────────────────────────────────────────────────
 
@@ -1034,9 +1340,41 @@ class AiActionExecutor {
     });
   }
 
-  // Retired verb (fix-wave Phase 0) — see the note above _editTask.
+  /// Real reminder removal (fix-wave Phase 1, §8 E1): cancels the armed OS
+  /// notification, deletes the ReminderConfig (the load-bearing half —
+  /// boot reconciliation re-arms from surviving configs), clears the
+  /// task row's reminder fields, and removes the derived time block.
   Future<String> _removeReminder(Map<String, dynamic> p) async {
-    throw UnsupportedError('Removing reminders is not supported yet.');
+    final row = await _requireResolvedTaskRow(p);
+    final task = row.task;
+    await reminderSyncService.removeForDeletedTask(task.id);
+    if (task.reminderEnabled || task.reminderTimeIso != null) {
+      await planningRepository.upsertTask(
+        PlannedTask(
+          id: task.id,
+          routineId: task.routineId,
+          blockId: task.blockId,
+          title: task.title,
+          durationMinutes: task.durationMinutes,
+          priority: task.priority,
+          orderIndex: task.orderIndex,
+          reminderEnabled: false,
+          reminderTimeIso: null,
+          status: task.status,
+          createdAtMs: task.createdAtMs,
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+          category: task.category,
+          planDateKey: task.planDateKey ?? row.dateKey,
+          notes: task.notes,
+          sequenceIndex: task.sequenceIndex,
+          isHabitAnchor: task.isHabitAnchor,
+          strictModeRequired: task.strictModeRequired,
+          modeRefId: task.modeRefId,
+        ),
+      );
+    }
+    await timeBlockSyncService.removeBlockForEntity(task.id);
+    return 'Removed the reminder for "${task.title}".';
   }
 
   Future<String> _rescheduleReminder(Map<String, dynamic> p) async {

@@ -8,10 +8,8 @@ import '../presentation/widgets/quick_directives_row.dart';
 
 // ─── Label map ────────────────────────────────────────────────────────────────
 
-// Retired verbs (moveTask/deleteTask/editTask) are deliberately absent:
-// the chips were steering users into actions the executor cannot perform
-// yet (fix-wave Phase 0). History entries with those types simply don't
-// map to a chip. Phase 1 restores each entry as its verb becomes real.
+// Every mapped verb has a real executor (fix-wave Phase 1) — never map a
+// chip to a verb before its handler exists.
 const Map<ActionType, QuickDirective> _kActionDirectiveMap = {
   ActionType.createTask: QuickDirective(
     label: 'Add task',
@@ -21,13 +19,25 @@ const Map<ActionType, QuickDirective> _kActionDirectiveMap = {
     label: 'Create goal',
     startingText: 'Create a goal ',
   ),
+  ActionType.moveTask: QuickDirective(
+    label: 'Move schedule',
+    startingText: 'Move my ',
+  ),
   ActionType.activateContextOverride: QuickDirective(
     label: 'Focus mode',
     startingText: 'Enable focus mode ',
   ),
+  ActionType.deleteTask: QuickDirective(
+    label: 'Remove task',
+    startingText: 'Delete my ',
+  ),
   ActionType.addReminder: QuickDirective(
     label: 'Add reminder',
     startingText: 'Remind me to ',
+  ),
+  ActionType.editTask: QuickDirective(
+    label: 'Edit task',
+    startingText: 'Edit my ',
   ),
   ActionType.rescheduleReminder: QuickDirective(
     label: 'Change reminder',
