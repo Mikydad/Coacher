@@ -10,10 +10,13 @@ abstract final class AiCapabilityRegistry {
     'activity_patterns',
   ];
 
+  // Move/edit/delete of existing tasks, goal modify/delete, and reminder
+  // removal are retired until their executors are real (fix-wave Phase 0/1)
+  // — advertising a verb the app cannot perform produced confirmed no-ops.
   static const supportedMutate = [
-    'tasks_create_edit_move_delete',
-    'goals_create_modify_delete',
-    'reminders_add_remove_reschedule',
+    'tasks_create',
+    'goals_create',
+    'reminders_add_reschedule',
     'context_overrides_focus_sleep_dnd',
   ];
 
@@ -127,8 +130,10 @@ abstract final class AiCapabilityRegistry {
       "📋 Plan with you — \"Help me plan tomorrow\" and I'll look at your "
       "goals, tasks, and free time, then propose a schedule you can apply "
       "with one tap.\n"
-      "➕ Manage tasks — add, move, edit, or delete tasks and set reminders.\n"
-      "🎯 Work on goals — create or adjust goals and tell you how you're "
+      "➕ Add tasks — create new tasks and set or reschedule reminders. "
+      "(Moving, editing, or deleting existing ones is coming soon — for now, "
+      "tap the item in the app.)\n"
+      "🎯 Work on goals — create goals and tell you how you're "
       "tracking against them.\n"
       "🔎 Answer questions — what's on today, tomorrow, or this week.\n"
       "🧘 Protect your focus — start focus, sleep, or do-not-disturb windows.\n\n"

@@ -909,71 +909,23 @@ class AiActionExecutor {
     return 'Added "$title" on ${_friendlyDate(dateStr)}${timeStr != null ? " at $timeStr" : ""}.';
   }
 
+  // Retired verbs (fix-wave Phase 0): these handlers used to fake success —
+  // _editTask created a DUPLICATE task, _moveTask/_deleteTask returned
+  // "Moved"/"Deleted" strings with no write at all. Until Phase 1 implements
+  // them for real, they throw so a confirm can never look successful
+  // (the same standard suggestFreeTimeBlock already applies). They are
+  // unreachable in normal flow: the tool enum no longer offers them and
+  // AiIntentParser strips them from any plan before the preview card.
   Future<String> _editTask(Map<String, dynamic> p) async {
-    final title = p['title'] as String? ?? '';
-    final dateStr = _resolveDate(p['date'] as String?);
-    final timeStr = p['time'] as String?;
-    final durationMinutes = (p['duration'] as num?)?.toInt();
-
-    // For edit: find the task by title in today's plan and update it.
-    // Simplified: upsert a new task with updated fields.
-    // A full implementation would fetch the existing task by ID from Isar.
-    final (:routineId, :blockId) = await planningRepository
-        .ensureDefaultDayPlan(dateStr);
-
-    DateTime? reminderTime;
-    if (timeStr != null && timeStr.contains(':')) {
-      final parts = timeStr.split(':');
-      DateTime date;
-      try {
-        date = DateKeys.parseLocalDateKey(dateStr);
-      } catch (_) {
-        date = DateTime.now();
-      }
-      reminderTime = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        int.tryParse(parts[0]) ?? 9,
-        int.tryParse(parts[1]) ?? 0,
-      );
-    }
-
-    final task = PlannedTask(
-      id: StableId.generate('task'),
-      routineId: routineId,
-      blockId: blockId,
-      title: title,
-      durationMinutes: durationMinutes ?? 30,
-      priority: 3,
-      orderIndex: 0,
-      reminderEnabled: reminderTime != null,
-      reminderTimeIso: reminderTime?.toIso8601String(),
-      status: TaskStatus.notStarted,
-      createdAtMs: DateTime.now().millisecondsSinceEpoch,
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch,
-      planDateKey: dateStr,
-    );
-
-    await planningRepository.upsertTask(task);
-    if (reminderTime != null) {
-      await reminderSyncService.syncForTaskIds([task.id]);
-    }
-    return 'Updated "$title".';
+    throw UnsupportedError('Editing existing tasks is not supported yet.');
   }
 
   Future<String> _moveTask(Map<String, dynamic> p) async {
-    final taskTitle = p['taskTitle'] as String? ?? '';
-    final destinationDate = _resolveDate(p['destinationDate'] as String?);
-    return 'Moved "$taskTitle" to ${_friendlyDate(destinationDate)}.';
-    // Full implementation: query task by title, update planDateKey, upsert.
+    throw UnsupportedError('Moving existing tasks is not supported yet.');
   }
 
   Future<String> _deleteTask(Map<String, dynamic> p) async {
-    final taskTitle = p['taskTitle'] as String? ?? '';
-    // Full implementation: query task by title, call deleteTask.
-    // For V1: log the intent and return confirmation.
-    return 'Deleted "$taskTitle".';
+    throw UnsupportedError('Deleting tasks is not supported yet.');
   }
 
   // ─── Goal handlers ────────────────────────────────────────────────────────
@@ -1018,16 +970,13 @@ class AiActionExecutor {
     return 'Created goal "$title".';
   }
 
+  // Retired verbs (fix-wave Phase 0) — see the note above _editTask.
   Future<String> _modifyGoal(Map<String, dynamic> p) async {
-    final goalTitle = p['goalTitle'] as String? ?? '';
-    return 'Updated goal "$goalTitle".';
-    // Full implementation: fetch goal by title, apply field change, upsert.
+    throw UnsupportedError('Changing existing goals is not supported yet.');
   }
 
   Future<String> _deleteGoal(Map<String, dynamic> p) async {
-    final goalTitle = p['goalTitle'] as String? ?? '';
-    return 'Removed goal "$goalTitle".';
-    // Full implementation: fetch goal by title, call deleteGoal.
+    throw UnsupportedError('Deleting goals is not supported yet.');
   }
 
   // ─── Reminder handlers ────────────────────────────────────────────────────
@@ -1062,9 +1011,9 @@ class AiActionExecutor {
     });
   }
 
+  // Retired verb (fix-wave Phase 0) — see the note above _editTask.
   Future<String> _removeReminder(Map<String, dynamic> p) async {
-    final taskTitle = p['taskTitle'] as String? ?? '';
-    return 'Removed reminder for "$taskTitle".';
+    throw UnsupportedError('Removing reminders is not supported yet.');
   }
 
   Future<String> _rescheduleReminder(Map<String, dynamic> p) async {

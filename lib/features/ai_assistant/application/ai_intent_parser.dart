@@ -214,6 +214,13 @@ class AiIntentParser {
     // one — or when they're refining a plan that already contained them.
     result = _stripUnrequestedDeletes(result, userInput, previousPlan);
 
+    // Retired-verb guard (fix-wave Phase 0): verbs the executor cannot
+    // perform yet must never reach a preview card — a confirmed no-op that
+    // says "Done" is worse than an honest refusal. The tool enum no longer
+    // offers them, but the model can still emit one from conversation
+    // history or drift; strip here so the card only ever promises real work.
+    result = _stripRetiredActions(result);
+
     // Step 3 — Router guardrails before mutation pipeline.
     result = _applyRouterGuardrails(result, route, payload);
 
@@ -319,6 +326,81 @@ class AiIntentParser {
                 _defaultSuggestMessage(enrichedActions))
           : result.informationalMessage,
     );
+  }
+
+  /// Verbs the executor cannot perform yet (fix-wave Phase 0,
+  /// PRD/AI_assitance/AI_chat_fix_design.md). Phase 1 removes entries from
+  /// this set as each verb's handler becomes real.
+  static const kRetiredActionTypes = {
+    ActionType.editTask,
+    ActionType.moveTask,
+    ActionType.deleteTask,
+    ActionType.modifyGoal,
+    ActionType.deleteGoal,
+    ActionType.removeReminder,
+    ActionType.suggestFreeTimeBlock,
+    ActionType.moveConflictingTasks,
+  };
+
+  /// Drops actions whose verb is retired. When some actions survive, the
+  /// plan proceeds with an honest note about the part that can't be done;
+  /// when nothing survives, the turn degrades to an honest refusal with a
+  /// pointer to the manual surface (settled Q1: no pre-filled-editor cards).
+  AiPlannedChanges _stripRetiredActions(AiPlannedChanges result) {
+    if (result.actions.isEmpty) return result;
+    final dropped = result.actions
+        .where((a) => kRetiredActionTypes.contains(a.actionType))
+        .toList();
+    if (dropped.isEmpty) return result;
+    final kept = result.actions
+        .where((a) => !kRetiredActionTypes.contains(a.actionType))
+        .toList();
+    final note = _retiredExplanation(dropped);
+    if (kept.isNotEmpty) {
+      if (note.isEmpty) return result.copyWith(actions: kept);
+      final message = result.informationalMessage;
+      return result.copyWith(
+        actions: kept,
+        informationalMessage: message == null || message.trim().isEmpty
+            ? note
+            : '$message\n\n$note',
+      );
+    }
+    final lead = note.isEmpty
+        ? "I couldn't turn that into a change I can apply."
+        : note;
+    return AiPlannedChanges(
+      sessionId: result.sessionId,
+      responseType: AiResponseType.informational,
+      informationalMessage:
+          "$lead I didn't change anything.\n\nWhat I can do from here: add "
+          'new tasks or goals, set or reschedule reminders, start focus or '
+          'sleep windows, and answer questions about your schedule.',
+    );
+  }
+
+  /// One honest clause naming what was asked for and where to do it instead.
+  String _retiredExplanation(List<AiAction> dropped) {
+    final phrases = <String>{};
+    for (final action in dropped) {
+      switch (action.actionType) {
+        case ActionType.editTask:
+        case ActionType.moveTask:
+          phrases.add('move or edit existing tasks');
+        case ActionType.deleteTask:
+          phrases.add('delete tasks');
+        case ActionType.modifyGoal:
+        case ActionType.deleteGoal:
+          phrases.add('change or delete goals');
+        case ActionType.removeReminder:
+          phrases.add('remove reminders');
+        default:
+          break; // suggestFreeTimeBlock / moveConflictingTasks: silent drop
+      }
+    }
+    if (phrases.isEmpty) return '';
+    return "I can't ${phrases.join(' or ')} yet — tap the item in the app "
+        'to do that.';
   }
 
   /// Action types that permanently destroy user data.

@@ -47,7 +47,10 @@ void main() {
       final prompt = AiCapabilityRegistry.formatForPrompt();
 
       expect(prompt, contains('today_schedule'));
-      expect(prompt, contains('tasks_create_edit_move_delete'));
+      expect(prompt, contains('tasks_create'));
+      // Retired until their executors are real (fix-wave Phase 0): the
+      // registry must not advertise edit/move/delete anywhere.
+      expect(prompt, isNot(contains('edit_move_delete')));
       expect(prompt, contains('unsupported'));
     });
   });

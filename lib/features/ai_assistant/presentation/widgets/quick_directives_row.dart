@@ -15,7 +15,7 @@ class QuickDirective {
 const List<QuickDirective> kDefaultDirectives = [
   QuickDirective(label: 'Add task', startingText: 'Add a task '),
   QuickDirective(label: 'Create goal', startingText: 'Create a goal '),
-  QuickDirective(label: 'Move schedule', startingText: 'Move my '),
+  QuickDirective(label: 'Add reminder', startingText: 'Remind me to '),
   QuickDirective(label: 'Focus mode', startingText: 'Enable focus mode '),
 ];
 
