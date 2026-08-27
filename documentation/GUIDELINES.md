@@ -2294,3 +2294,25 @@ not silent reversal.
   pauseFor>continuationGap is now a tested invariant. Suite 1608 green.
   Next: Phase 5 (server hardening — ONE functions deploy, bundled with
   the pending surrender/invite deploy).
+
+- **2026-08-27 · AI fix wave, Phase 5 shipped: server hardening (deploy
+  pending).** One commit (47a2398), functions-only — bundles into the ONE
+  pending deploy with surrender/invite. (1) System prompts are
+  SERVER-owned for chat-class purposes: client `system` messages are
+  dropped and replaced (old clients keep working — identical text,
+  generated verbatim into `coach_prompts.ts`); per-purpose RC overrides
+  via `ai_system_prompts` (Q5); the stable prefix enables OpenAI prompt
+  caching. The client's prompt constants become vestigial — delete after
+  the deploy is confirmed live. (2) Per-uid daily TOKEN budget
+  (`ai_daily_token_budget`, default 300k) + the tier instruction cap
+  reading `freeAiInstructionsPerDay` from tier_limits_v1 (Q8 — v1 counts
+  charged turns, generous default). (3) Turn REGISTRY (recentTurns map,
+  cap 4) replaces lastTurnId — interleaving stops double-charging;
+  aiChatStream registers its own turn; over-quota marker spares free
+  follow-ups. (4) Quota errors carry {reason, retryAfterMs} details.
+  (5) Telemetry purpose allow-list ('other' bucket); stream telemetry +
+  include_usage lands BEFORE res.end. (6) Temperatures pinned: 0.6/0.7/
+  0.4 (Q9). (7) App Check behind `ai_enforce_app_check` (default OFF —
+  needs client attestation setup first; the onRequest stream verifies
+  the header manually). Functions 239 green, Flutter 1608 green.
+  Remaining wave: Phases 6-7 (memory quality, chat-surface warmth).
