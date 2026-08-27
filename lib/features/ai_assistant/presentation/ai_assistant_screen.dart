@@ -1687,70 +1687,7 @@ class _AiActionBar extends ConsumerWidget {
   }
 
   Future<void> _handleUndo(BuildContext context, WidgetRef ref) async {
-    final executor = ref.read(aiActionExecutorProvider);
-    final result = await executor.undoLastAiBatch();
-    if (!context.mounted) return;
-
-    switch (result) {
-      case UndoSuccess():
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('AI changes have been undone.'),
-            backgroundColor: AppColors.inkCard,
-          ),
-        );
-        ref.invalidate(lastAiBatchProvider);
-        ref.invalidate(canUndoLastAiBatchProvider);
-        ref.invalidate(recentAiBatchesProvider);
-
-      case UndoWarningTasksCompleted(:final completedTitles):
-        final proceed = await showDialog<bool>(
-          context: context,
-          builder: (_) => AlertDialog(
-            backgroundColor: AppColors.inkCard,
-            title: Text(
-              'Some tasks were completed',
-              style: TextStyle(color: AppColors.fg),
-            ),
-            content: Text(
-              'The following tasks added by the AI have since been completed. '
-              'Undoing will revert those completions:\n\n'
-              '${completedTitles.map((t) => '• $t').join('\n')}',
-              style: TextStyle(color: AppColors.grayLight),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(
-                  'Undo anyway',
-                  style: TextStyle(color: AppColors.cyan),
-                ),
-              ),
-            ],
-          ),
-        );
-        if (proceed == true && context.mounted) {
-          // Rollback already happened in undoLastAiBatch for warning case.
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('AI changes undone (including completed tasks).'),
-              backgroundColor: AppColors.inkCard,
-            ),
-          );
-          ref.invalidate(lastAiBatchProvider);
-          ref.invalidate(canUndoLastAiBatchProvider);
-          ref.invalidate(recentAiBatchesProvider);
-        }
-
-      case UndoNotAvailable(:final reason):
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(reason), backgroundColor: AppColors.inkCard),
-        );
-    }
+    await handleAiUndo(context, ref, ref.read(aiActionExecutorProvider));
   }
 
   void _showHistorySheet(BuildContext context, WidgetRef ref) {
@@ -1763,6 +1700,99 @@ class _AiActionBar extends ConsumerWidget {
       builder: (_) =>
           _AiHistorySheet(executor: ref.read(aiActionExecutorProvider)),
     );
+  }
+}
+
+/// Shared undo flow for the action bar and the history sheet — one
+/// implementation so the two entry points cannot drift.
+///
+/// Honest ordering (fix-wave Phase 0, §8 E4): when tasks the batch touched
+/// were completed since, the executor returns [UndoNeedsConfirmation]
+/// WITHOUT rolling back; the dialog's Cancel genuinely cancels, and only
+/// "Undo anyway" performs the rollback (forced, targeting that exact batch).
+Future<void> handleAiUndo(
+  BuildContext context,
+  WidgetRef ref,
+  AiActionExecutor executor,
+) async {
+  void invalidateBatchProviders() {
+    ref.invalidate(lastAiBatchProvider);
+    ref.invalidate(canUndoLastAiBatchProvider);
+    ref.invalidate(recentAiBatchesProvider);
+  }
+
+  void showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppColors.inkCard),
+    );
+  }
+
+  final result = await executor.undoLastAiBatch();
+  if (!context.mounted) return;
+
+  switch (result) {
+    case UndoSuccess():
+      showSnack('AI changes have been undone.');
+      invalidateBatchProviders();
+
+    case UndoFailed():
+      showSnack(
+        "Couldn't undo — some changes may not have been restored. "
+        'Try again.',
+      );
+      invalidateBatchProviders();
+
+    case UndoNeedsConfirmation(:final batchId, :final completedTitles):
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: AppColors.inkCard,
+          title: Text(
+            'Some tasks were completed',
+            style: TextStyle(color: AppColors.fg),
+          ),
+          content: Text(
+            'The following tasks added by the AI have since been completed. '
+            'Undoing will revert those completions:\n\n'
+            '${completedTitles.map((t) => '• $t').join('\n')}',
+            style: TextStyle(color: AppColors.grayLight),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(
+                'Undo anyway',
+                style: TextStyle(color: AppColors.cyan),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (!context.mounted) return;
+      if (proceed == true) {
+        // Force the SAME batch the user was warned about — never whatever
+        // happens to be most recent by the time they answered.
+        final forced = await executor.undoBatchById(batchId, force: true);
+        if (!context.mounted) return;
+        showSnack(switch (forced) {
+          UndoSuccess() => 'AI changes undone (including completed tasks).',
+          UndoFailed() =>
+            "Couldn't undo — some changes may not have been restored.",
+          UndoNotAvailable(:final reason) => reason,
+          UndoNeedsConfirmation() => 'AI changes undone.', // unreachable
+        });
+      }
+      // Cancel keeps the batch untouched and undoable; refresh either way
+      // so the chip state stays accurate.
+      invalidateBatchProviders();
+
+    case UndoNotAvailable(:final reason):
+      showSnack(reason);
+      invalidateBatchProviders();
   }
 }
 
@@ -1854,25 +1884,12 @@ class _AiHistorySheet extends ConsumerWidget {
                 canUndo: canUndo,
                 onUndo: canUndo
                     ? () async {
-                        Navigator.pop(context);
-                        // Trigger undo through the outer bar's handler (invalidate is handled there)
-                        final result = await executor.undoLastAiBatch();
-                        if (!context.mounted) return;
-                        final msg = switch (result) {
-                          UndoSuccess() => 'AI changes undone.',
-                          UndoWarningTasksCompleted() =>
-                            'AI changes undone (some completed tasks reverted).',
-                          UndoNotAvailable(:final reason) => reason,
-                        };
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(msg),
-                            backgroundColor: AppColors.inkCard,
-                          ),
-                        );
-                        ref.invalidate(lastAiBatchProvider);
-                        ref.invalidate(canUndoLastAiBatchProvider);
-                        ref.invalidate(recentAiBatchesProvider);
+                        // One shared flow with the action bar — including
+                        // the pre-rollback completed-tasks confirmation.
+                        // Runs BEFORE the sheet closes: popping first would
+                        // unmount this context and kill the dialog.
+                        await handleAiUndo(context, ref, executor);
+                        if (context.mounted) Navigator.pop(context);
                       }
                     : null,
               );

@@ -82,11 +82,21 @@ class UndoNotAvailable extends UndoResult {
   final String reason;
 }
 
-/// Undo succeeded but some tasks that were created/edited by the AI
-/// have since been completed by the user. Undo reverts those completions.
-class UndoWarningTasksCompleted extends UndoResult {
-  const UndoWarningTasksCompleted(this.completedTitles);
+/// NOTHING has been rolled back yet: tasks the AI touched have since been
+/// completed by the user, and undoing would revert those completions. The
+/// caller must ask the user first, then re-invoke undo with `force: true`
+/// targeting [batchId]. (Fix-wave Phase 0: the old shape rolled back BEFORE
+/// warning, which made the dialog's Cancel button a lie — §8 E4.)
+class UndoNeedsConfirmation extends UndoResult {
+  const UndoNeedsConfirmation(this.batchId, this.completedTitles);
+  final String batchId;
   final List<String> completedTitles;
+}
+
+/// The rollback ran but hit an error — some changes may not have been
+/// restored. Honest failure instead of the old swallowed-then-UndoSuccess.
+class UndoFailed extends UndoResult {
+  const UndoFailed();
 }
 
 // ─── Executor ─────────────────────────────────────────────────────────────────
@@ -257,19 +267,26 @@ class AiActionExecutor {
 
   /// Undo the most recent AI batch that is in `completed` or `partialFailure`
   /// state and was created within the last 30 minutes.
-  Future<UndoResult> undoLastAiBatch() async {
+  ///
+  /// [force] skips the completed-tasks confirmation gate — pass it only
+  /// after the user explicitly chose "Undo anyway" on a
+  /// [UndoNeedsConfirmation] result.
+  Future<UndoResult> undoLastAiBatch({bool force = false}) async {
     final batch = await batchRepository.findMostRecent();
-    return _undoBatch(batch);
+    return _undoBatch(batch, force: force);
   }
 
   /// Undo a SPECIFIC batch by id — the inline [Undo] on an auto-committed
   /// createIntention message targets its own batch, not whatever ran last.
-  Future<UndoResult> undoBatchById(String batchId) async {
+  Future<UndoResult> undoBatchById(String batchId, {bool force = false}) async {
     final batch = await batchRepository.findByBatchId(batchId);
-    return _undoBatch(batch);
+    return _undoBatch(batch, force: force);
   }
 
-  Future<UndoResult> _undoBatch(IsarAiActionBatch? batch) async {
+  Future<UndoResult> _undoBatch(
+    IsarAiActionBatch? batch, {
+    bool force = false,
+  }) async {
     if (batch == null) {
       return const UndoNotAvailable('No AI changes to undo.');
     }
@@ -290,17 +307,19 @@ class AiActionExecutor {
       );
     }
 
-    // Check if any snapshotted tasks have been completed since the AI batch.
-    final completedTitles = await _findCompletedSnapshotTasks(
-      batch.snapshotJson,
-    );
-
-    await _rollbackBatch(batch.batchId, batch.snapshotJson);
-
-    if (completedTitles.isNotEmpty) {
-      return UndoWarningTasksCompleted(completedTitles);
+    // Dry-run gate: when tasks the batch touched were completed since, ask
+    // BEFORE mutating anything — Cancel must actually cancel (§8 E4).
+    if (!force) {
+      final completedTitles = await _findCompletedSnapshotTasks(
+        batch.snapshotJson,
+      );
+      if (completedTitles.isNotEmpty) {
+        return UndoNeedsConfirmation(batch.batchId, completedTitles);
+      }
     }
-    return const UndoSuccess();
+
+    final ok = await _rollbackBatch(batch.batchId, batch.snapshotJson);
+    return ok ? const UndoSuccess() : const UndoFailed();
   }
 
   // ─── Snapshot ─────────────────────────────────────────────────────────────
@@ -362,8 +381,10 @@ class AiActionExecutor {
   // ─── Rollback ─────────────────────────────────────────────────────────────
 
   /// Restore all snapshotted entities from [snapshotJson] and trigger
-  /// recompute through the coordinator.
-  Future<void> _rollbackBatch(String batchId, String snapshotJson) async {
+  /// recompute through the coordinator. Returns false when the task-restore
+  /// leg failed — callers must not report success on false (§8 G4; the
+  /// full typed-inverse-log rollback lands in fix-wave Phase 2).
+  Future<bool> _rollbackBatch(String batchId, String snapshotJson) async {
     await _rollbackCreatedIntentions(batchId);
     await _rollbackMemoryActions(batchId);
     try {
@@ -407,8 +428,10 @@ class AiActionExecutor {
         AiActionBatchState.rolledBack,
         undoneAtMs: DateTime.now().millisecondsSinceEpoch,
       );
+      return true;
     } catch (e) {
-      debugPrint('ai_action_executor: swallowed error: $e');
+      debugPrint('ai_action_executor: rollback failed: $e');
+      return false;
     }
   }
 

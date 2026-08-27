@@ -688,15 +688,34 @@ class AiAssistantService extends ChangeNotifier {
 
   /// Inline Undo on an auto-committed intention message: tombstones the
   /// created intention(s), cancels their nudges, and rewrites the bubble.
+  ///
+  /// `force: true` — this inline chip targets its own intention/memory
+  /// batch; the completed-tasks confirmation gate exists for schedule
+  /// plans, and no dialog surface exists in this flow. (Phase 2's
+  /// per-entity inverse log removes task snapshots from these batches
+  /// entirely, making the force irrelevant.)
   Future<void> undoAutoCommittedBatch(String messageId, String batchId) async {
-    final result = await _actionExecutor.undoBatchById(batchId);
+    final result = await _actionExecutor.undoBatchById(batchId, force: true);
     final idx = _messages.indexWhere((m) => m.id == messageId);
+    final succeeded = result is UndoSuccess;
     if (result is UndoNotAvailable) {
       _addMessage(
         AiChatMessage(
           id: StableId.generate('msg'),
           role: ChatRole.assistant,
           content: result.reason,
+          timestamp: DateTime.now(),
+        ),
+      );
+    } else if (result is UndoFailed) {
+      // Honest failure: keep the chip so the user can try again.
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content:
+              "I couldn't undo that just now — nothing else was changed. "
+              'Tap Undo again to retry.',
           timestamp: DateTime.now(),
         ),
       );
@@ -710,6 +729,7 @@ class AiAssistantService extends ChangeNotifier {
     _logEvent('aiIntentionAutoCommitUndone', {
       'sessionId': _sessionId,
       'available': result is! UndoNotAvailable,
+      'succeeded': succeeded,
     });
     notifyListeners();
   }
