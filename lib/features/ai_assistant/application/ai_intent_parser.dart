@@ -55,6 +55,7 @@ class AiIntentParser {
     AiPlannedChanges? previousPlan,
     Map<String, dynamic>? proactiveContext,
     bool voiceMode = false,
+    String? retryTurnId,
   }) async {
     // Fast path — "what can you do?" gets a real answer, never the LLM's
     // guess or a clarify loop.
@@ -177,13 +178,20 @@ class AiIntentParser {
     } catch (e) {
       return AiPlannedChanges(
         sessionId: sessionId,
-        followUpQuestion:
-            "I'm having trouble reading your schedule right now. Could you try again?",
+        responseType: AiResponseType.informational,
+        isError: true,
+        informationalMessage:
+            "I'm having trouble reading your schedule right now. Could you "
+            'try again?',
       );
     }
     assembleSw.stop();
+    payload.retryTurnId = retryTurnId;
 
-    // Step 2 — Call AI client
+    // Step 2 — Call AI client. Failures return as ERROR results (fix-wave
+    // Phase 3, §8 H1/H10): honest copy + a retryable turnId — never a
+    // followUpQuestion, which polluted the next turn's prompt, counted as
+    // a model question in analytics, and blocked the voice fast path.
     final modelSw = Stopwatch()..start();
     late AiPlannedChanges result;
     try {
@@ -191,17 +199,29 @@ class AiIntentParser {
     } on AiOperatingLayerException catch (e) {
       // Network-honest copy (P2-13): being offline is a fact of the world,
       // not a failure of the request — say so instead of a vague apology.
-      final msg = e.isNetwork
-          ? "You're offline — I need a connection for this. "
-                "Ask me again once you're back online."
+      // A SLOW round-trip is its own honest fact (§8 H3): 'deadline-
+      // exceeded' used to be labeled offline, blaming the user's
+      // connection while the server was still working.
+      final msg = e.isTimeout
+          ? "That took too long — I've stopped waiting."
+          : e.isNetwork
+          ? "You're offline — I need a connection for this."
           : e.isRateLimit
-          ? "I've hit my request limit. Please try again in a moment."
-          : "Something went wrong processing your request. Please try again.";
-      return AiPlannedChanges(sessionId: sessionId, followUpQuestion: msg);
+          ? "I've hit my request limit. Give it a moment."
+          : 'Something went wrong processing your request.';
+      return AiPlannedChanges(
+        sessionId: sessionId,
+        responseType: AiResponseType.informational,
+        isError: true,
+        informationalMessage: msg,
+        retryTurnId: e.turnId,
+      );
     } catch (_) {
       return AiPlannedChanges(
         sessionId: sessionId,
-        followUpQuestion: 'I ran into an unexpected issue. Please try again.',
+        responseType: AiResponseType.informational,
+        isError: true,
+        informationalMessage: 'I ran into an unexpected issue.',
       );
     }
     modelSw.stop();

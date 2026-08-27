@@ -380,6 +380,25 @@ async function enforceRateLimit(
   });
 }
 
+/** Best-effort compensation when the upstream leg fails AFTER the turn was
+ * charged (fix-wave Phase 3, AUDIT.md §8 H4): an OpenAI outage must not eat
+ * the user's hourly quota — before this, every visible retry burned one of
+ * the 40 turns while delivering nothing. The turn fields are deliberately
+ * KEPT, so a client retry with the same turnId rides the free same-turn
+ * follow-up window. Imprecision under concurrency is accepted (same stance
+ * as markChatOverQuota). Follow-ups (loopIndex > 0) were never charged. */
+async function refundChatTurn(uid: string, loopIndex: number): Promise<void> {
+  if (loopIndex > 0) return;
+  try {
+    await getFirestore()
+      .collection("aiUsage")
+      .doc(uid)
+      .set({ count: FieldValue.increment(-1) }, { merge: true });
+  } catch (error) {
+    logger.warn("refundChatTurn failed", { uid, error: `${error}` });
+  }
+}
+
 export const aiChat = onCall(
   {
     secrets: [openAiApiKey],
@@ -501,17 +520,20 @@ export const aiChat = onCall(
         response = await fetchPromise;
       } catch (error) {
         logger.error("OpenAI request failed", { uid, purpose, error: `${error}` });
+        if (route.quotaClass === "user") await refundChatTurn(uid, loopIndex);
         throw new HttpsError("unavailable", "AI service unreachable. Try again.");
       }
     }
 
     if (response.status === 429) {
       logger.warn("OpenAI rate limited", { uid, purpose });
+      if (route.quotaClass === "user") await refundChatTurn(uid, loopIndex);
       throw new HttpsError("resource-exhausted", "AI service is busy. Try again shortly.");
     }
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       logger.error("OpenAI non-200", { uid, purpose, status: response.status, body: body.slice(0, 500) });
+      if (route.quotaClass === "user") await refundChatTurn(uid, loopIndex);
       throw new HttpsError(
         response.status >= 500 ? "unavailable" : "internal",
         "AI request failed.",
@@ -542,6 +564,7 @@ export const aiChat = onCall(
 
     if ((content === null || content.length === 0) && toolCalls.length === 0) {
       logger.error("OpenAI empty content", { uid, purpose });
+      if (route.quotaClass === "user") await refundChatTurn(uid, loopIndex);
       throw new HttpsError("internal", "AI returned an empty response.");
     }
 
@@ -688,6 +711,7 @@ export const aiChatStream = onRequest(
       response = await fetchPromise;
     } catch (error) {
       logger.error("aiChatStream OpenAI request failed", { uid, error: `${error}` });
+      await refundChatTurn(uid, 0);
       res.status(502).json({ error: "AI service unreachable." });
       return;
     }
@@ -696,6 +720,7 @@ export const aiChatStream = onRequest(
       logger.error("aiChatStream OpenAI non-200", {
         uid, status: response.status, body: body.slice(0, 300),
       });
+      await refundChatTurn(uid, 0);
       res.status(response.status === 429 ? 429 : 502).json({ error: "AI service error." });
       return;
     }
@@ -713,8 +738,14 @@ export const aiChatStream = onRequest(
     res.setHeader("Cache-Control", "no-store");
 
     // Parse OpenAI SSE → NDJSON delta lines. Chars counted for telemetry.
+    // Honest ending contract (fix-wave Phase 3, §8 H5/G18): the terminator
+    // carries finish_reason, an upstream SSE error emits an {"e": …} line,
+    // and a mid-pipe death emits one too when the socket still stands — a
+    // truncated reply must never end indistinguishably from a complete one.
     let sseCarry = "";
     let chars = 0;
+    let finishReason: string | null = null;
+    let upstreamErrored = false;
     try {
       for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
         sseCarry += Buffer.from(chunk).toString("utf8");
@@ -727,7 +758,18 @@ export const aiChatStream = onRequest(
           if (payload === "[DONE]") continue;
           try {
             const parsed = JSON.parse(payload);
-            const delta: unknown = parsed?.choices?.[0]?.delta?.content;
+            if (parsed?.error != null) {
+              upstreamErrored = true;
+              logger.error("aiChatStream upstream SSE error", {
+                uid, error: JSON.stringify(parsed.error).slice(0, 300),
+              });
+              continue;
+            }
+            const choice = parsed?.choices?.[0];
+            if (typeof choice?.finish_reason === "string") {
+              finishReason = choice.finish_reason;
+            }
+            const delta: unknown = choice?.delta?.content;
             if (typeof delta === "string" && delta.length > 0) {
               chars += delta.length;
               res.write(`${JSON.stringify({ d: delta })}\n`);
@@ -737,10 +779,20 @@ export const aiChatStream = onRequest(
           }
         }
       }
-      res.write(`${JSON.stringify({ done: true })}\n`);
+      if (upstreamErrored) {
+        res.write(`${JSON.stringify({ e: "upstream" })}\n`);
+      } else {
+        res.write(`${JSON.stringify({ done: true, finish: finishReason ?? "stop" })}\n`);
+      }
     } catch (error) {
-      // Client hung up or upstream died mid-stream: nothing useful to send.
+      // Client hung up or upstream died mid-stream. When our socket still
+      // stands, say so — silence here used to present half a reply as done.
       logger.warn("aiChatStream pipe ended early", { uid, error: `${error}` });
+      try {
+        if (!res.writableEnded) res.write(`${JSON.stringify({ e: "upstream" })}\n`);
+      } catch {
+        // Socket already gone.
+      }
     } finally {
       res.end();
     }

@@ -31,7 +31,7 @@ class _FakeDismissedRepo implements DismissedSuggestionRepository {
 void main() {
   group('AiChatSuggestionEnricher', () {
     test('returns proactive prompts when tomorrow is empty', () async {
-      const payload = AiOperatingLayerPayload(
+      final payload = AiOperatingLayerPayload(
         userInput: 'What is my plan for tomorrow?',
         tomorrowTasks: [],
         tomorrowSchedule: [],
@@ -58,7 +58,7 @@ void main() {
     });
 
     test('skips dismissed suggestion types', () async {
-      const payload = AiOperatingLayerPayload(
+      final payload = AiOperatingLayerPayload(
         userInput: 'What is on tomorrow?',
         tomorrowTasks: [],
         tomorrowSchedule: [],
@@ -87,7 +87,7 @@ void main() {
 
   group('AiScheduleAnswerFormatter', () {
     test('formats week overview from payload', () {
-      const payload = AiOperatingLayerPayload(
+      final payload = AiOperatingLayerPayload(
         userInput: 'What does my week look like?',
         weekOverview: [
           {'label': 'today', 'date': '2026-06-16', 'taskCount': 2, 'scheduledCount': 1},
@@ -103,7 +103,7 @@ void main() {
     });
 
     test('formats goal progress with coaching tone', () {
-      const payload = AiOperatingLayerPayload(
+      final payload = AiOperatingLayerPayload(
         userInput: 'How am I doing on my goals?',
         goalProgress: [
           {

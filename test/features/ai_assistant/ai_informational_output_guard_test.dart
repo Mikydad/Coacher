@@ -28,7 +28,7 @@ void main() {
 
   group('formatter output safety', () {
     test('schedule and goal formatters avoid internal tokens', () {
-      const payload = AiOperatingLayerPayload(
+      final payload = AiOperatingLayerPayload(
         userInput: 'How am I doing on my goals?',
         goalProgress: [
           {
@@ -50,7 +50,7 @@ void main() {
       expect(goalAnswer, isNotNull);
       expect(AiInformationalOutputGuard.looksLikeInternalLeak(goalAnswer!), isFalse);
 
-      const weekPayload = AiOperatingLayerPayload(
+      final weekPayload = AiOperatingLayerPayload(
         userInput: 'What does my week look like?',
         weekOverview: [
           {'label': 'today', 'date': '2026-06-16', 'taskCount': 1, 'scheduledCount': 1},

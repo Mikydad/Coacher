@@ -26,6 +26,9 @@ class AiChatMessage {
     this.isExecuted = false,
     this.isCancelled = false,
     this.autoCommittedBatchId,
+    this.isError = false,
+    this.retryInput,
+    this.retryTurnId,
   });
 
   final String id;
@@ -61,6 +64,17 @@ class AiChatMessage {
   /// renders inline [View] [Undo] affordances under the bubble.
   final String? autoCommittedBatchId;
 
+  /// A failed turn (fix-wave Phase 3, §8 H1): rendered with error styling
+  /// and — when [retryInput] is set — a Retry chip that re-runs the turn.
+  final bool isError;
+
+  /// The user input the failed turn was answering; Retry re-sends it.
+  final String? retryInput;
+
+  /// The failed turn's id — Retry passes it back so the server treats the
+  /// re-run as a free same-turn follow-up instead of double-charging.
+  final String? retryTurnId;
+
   bool get hasPreviewCard => plannedChanges != null && !isLoading;
   bool get hasDraftPlan =>
       draftPlan != null && plannedChanges == null && !isLoading;
@@ -78,6 +92,9 @@ class AiChatMessage {
     bool? isExecuted,
     bool? isCancelled,
     String? autoCommittedBatchId,
+    bool? isError,
+    String? retryInput,
+    String? retryTurnId,
     bool clearDraftPlan = false,
     bool clearPlannedChanges = false,
     bool clearAutoCommittedBatchId = false,
@@ -103,6 +120,9 @@ class AiChatMessage {
       autoCommittedBatchId: clearAutoCommittedBatchId
           ? null
           : (autoCommittedBatchId ?? this.autoCommittedBatchId),
+      isError: isError ?? this.isError,
+      retryInput: retryInput ?? this.retryInput,
+      retryTurnId: retryTurnId ?? this.retryTurnId,
     );
   }
 

@@ -1586,6 +1586,74 @@ class _MessageItem extends StatelessWidget {
       return UserMessageBubble(content: message.content);
     }
 
+    // Failed turn (fix-wave Phase 3, §8 H1 — the Telegram model's honest
+    // half): distinct error treatment + a Retry chip that re-runs the turn
+    // quota-free. The old shape was indistinguishable apology prose, and
+    // recovery meant retyping the message.
+    if (message.isError) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 48, 0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 10,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.inkCard,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: AppColors.danger.withValues(alpha: 0.45),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    size: 16,
+                    color: AppColors.danger,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      message.content,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.35,
+                        color: AppColors.fg,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (message.retryInput != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+              child: ActionChip(
+                avatar: Icon(
+                  Icons.refresh_rounded,
+                  size: 14,
+                  color: AppColors.cyan,
+                ),
+                label: const Text('Retry', style: TextStyle(fontSize: 12)),
+                backgroundColor: AppColors.inkCard,
+                side: BorderSide(
+                  color: AppColors.cyan.withValues(alpha: 0.25),
+                ),
+                onPressed: service.isLoading
+                    ? null
+                    : () => service.retryTurn(message.id),
+              ),
+            ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

@@ -29,6 +29,8 @@ class AiOperatingLayerException implements Exception {
     this.message, {
     this.statusCode,
     this.isNetwork = false,
+    this.isTimeout = false,
+    this.turnId,
   });
 
   final String message;
@@ -38,13 +40,23 @@ class AiOperatingLayerException implements Exception {
   /// instead of a generic error that blames the request.
   final bool isNetwork;
 
+  /// The round-trip TOOK TOO LONG (fix-wave Phase 3, §8 H3) — distinct
+  /// copy from offline, and the abandoned turn was already charged, so a
+  /// retry should reuse [turnId].
+  final bool isTimeout;
+
+  /// The turnId of the failed turn. A retry that passes it back rides the
+  /// server's same-turn window (loopIndex > 0 within 3 minutes is FREE) —
+  /// without it, every retry double-charged the hourly quota (§8 H1/H3).
+  final String? turnId;
+
   bool get isRateLimit => statusCode == 429;
 
   @override
   String toString() =>
       'AiOperatingLayerException($message'
       '${statusCode != null ? ", status=$statusCode" : ""}'
-      '${isNetwork ? ", network" : ""})';
+      '${isNetwork ? ", network" : ""}${isTimeout ? ", timeout" : ""})';
 }
 
 // ─── System prompt (agent mode) ───────────────────────────────────────────────
@@ -411,8 +423,14 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
       {'role': 'user', 'content': userPrompt},
     ];
 
-    final turnId =
+    // A retry reuses the failed turn's id so the server's same-turn window
+    // makes it quota-free (fix-wave Phase 3); its rounds shift to
+    // loopIndex >= 1, which is what the server's free-follow-up branch
+    // keys on.
+    final retryTurnId = payload.retryTurnId;
+    final turnId = retryTurnId ??
         'turn_${DateTime.now().millisecondsSinceEpoch}_${payload.userInput.hashCode.toRadixString(16)}';
+    final loopIndexOffset = retryTurnId != null ? 1 : 0;
 
     // One prose-plan repair per turn — a model that ignores the nudge twice
     // isn't going to comply on the third ask.
@@ -426,7 +444,7 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
           messages: messages,
           tools: kCoachAgentTools,
           turnId: turnId,
-          loopIndex: loop,
+          loopIndex: (loop + loopIndexOffset).clamp(0, kMaxLoops),
           temperature: 0.45,
           // Voice turns cap lower: short spoken prose generates faster.
           // 500 (not less) so a propose_changes tool call's JSON payload
@@ -440,6 +458,8 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
           e.message,
           statusCode: e.statusCode,
           isNetwork: e.isNetwork,
+          isTimeout: e.isTimeout,
+          turnId: turnId,
         );
       }
       if (kDebugMode) {

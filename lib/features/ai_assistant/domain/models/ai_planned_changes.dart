@@ -20,7 +20,20 @@ class AiPlannedChanges {
     this.followUpQuestion,
     this.informationalMessage,
     this.suggestedPrompts = const [],
+    this.isError = false,
+    this.retryTurnId,
   });
+
+  /// A failed round-trip rendered as an honest, RETRYABLE error (fix-wave
+  /// Phase 3, §8 H1/H10). Error results carry their copy in
+  /// [informationalMessage] and never set [followUpQuestion] — the old
+  /// shape polluted the next turn's prompt ("You just asked the user:
+  /// 'You're offline…'"), the clarify metric, and the voice fast path.
+  final bool isError;
+
+  /// The failed turn's id — a retry passes it back so the server's
+  /// same-turn window makes the retry quota-free.
+  final String? retryTurnId;
 
   final String sessionId;
   final AiResponseType responseType;
@@ -76,6 +89,8 @@ class AiPlannedChanges {
     String? followUpQuestion,
     String? informationalMessage,
     List<String>? suggestedPrompts,
+    bool? isError,
+    String? retryTurnId,
   }) {
     return AiPlannedChanges(
       sessionId: sessionId ?? this.sessionId,
@@ -86,6 +101,8 @@ class AiPlannedChanges {
       followUpQuestion: followUpQuestion ?? this.followUpQuestion,
       informationalMessage: informationalMessage ?? this.informationalMessage,
       suggestedPrompts: suggestedPrompts ?? this.suggestedPrompts,
+      isError: isError ?? this.isError,
+      retryTurnId: retryTurnId ?? this.retryTurnId,
     );
   }
 

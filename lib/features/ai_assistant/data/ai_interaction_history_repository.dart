@@ -40,7 +40,12 @@ class AiInteractionHistoryRepository {
 
     final entry = IsarAiInteractionHistory()
       ..sessionId = sessionId
-      ..userInput = userInput
+      // Capped: the last 10 turns replay verbatim in every prompt, so one
+      // oversized paste used to multiply token cost — and could exceed the
+      // server's payload cap — for the rest of the session (§8 R5).
+      ..userInput = userInput.length > 4000
+          ? '${userInput.substring(0, 3997)}…'
+          : userInput
       ..parsedActionsJson = jsonEncode(
         parsedActions.map((a) => a.toJson()).toList(),
       )

@@ -8,6 +8,17 @@ import '../domain/models/ai_intent_kind.dart';
 import 'ai_operating_layer_client.dart';
 import 'ai_payload_assembler.dart';
 
+/// The reply stream ended without a clean finish: an upstream error, a
+/// token-cap truncation, or a dead pipe. Deltas received before it are
+/// real; the reply as a whole is INCOMPLETE (fix-wave Phase 3, §8 H5).
+class AiVoiceStreamTruncated implements Exception {
+  const AiVoiceStreamTruncated(this.reason);
+  final String reason;
+
+  @override
+  String toString() => 'AiVoiceStreamTruncated($reason)';
+}
+
 /// Client transport for the aiChatStream endpoint (voice Level 2).
 ///
 /// POSTs the conversation and yields text deltas as the model writes them.
@@ -65,14 +76,32 @@ Stream<String> streamCoachReply({
               if (delta is String && delta.isNotEmpty && !closed) {
                 controller.add(delta);
               }
-              if (parsed['done'] == true) return;
+              // Honest ending contract (fix-wave Phase 3, §8 H5): the
+              // server names how the reply ended. An explicit upstream
+              // error — or a token-cap truncation — surfaces as a stream
+              // error after the received deltas, never as a clean finish.
+              if (parsed['e'] != null) {
+                throw const AiVoiceStreamTruncated('upstream error');
+              }
+              if (parsed['done'] == true) {
+                if (parsed['finish'] == 'length') {
+                  throw const AiVoiceStreamTruncated('token cap');
+                }
+                return;
+              }
             }
+          } on AiVoiceStreamTruncated {
+            rethrow;
           } catch (_) {
             // Torn line mid-flush — the carry buffer handles real splits;
             // anything else is skipped.
           }
         }
       }
+      // Stream ended WITHOUT the done marker: the pipe died mid-reply.
+      // Treating this as success is how half-sentence replies were spoken
+      // and persisted as complete (§8 H5/G18).
+      throw const AiVoiceStreamTruncated('stream ended without done');
     } catch (e) {
       if (!closed) controller.addError(e);
     }

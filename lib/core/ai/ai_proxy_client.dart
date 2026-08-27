@@ -14,27 +14,41 @@ import 'package:flutter/foundation.dart' show Uint8List;
 /// "you're offline" instead of the misleading generic "something went
 /// wrong" — network-inherent features get honesty, not fake blame.
 class AiProxyException implements Exception {
-  const AiProxyException(this.message, {this.statusCode, this.isNetwork = false});
+  const AiProxyException(
+    this.message, {
+    this.statusCode,
+    this.isNetwork = false,
+    this.isTimeout = false,
+  });
 
   final String message;
   final int? statusCode;
   final bool isNetwork;
+
+  /// The request TOOK TOO LONG — distinct from [isNetwork] since fix-wave
+  /// Phase 3 (§8 H3): 'deadline-exceeded' used to be classed as network,
+  /// so slow-connection users were told "you're offline" while online.
+  final bool isTimeout;
 
   bool get isRateLimit => statusCode == 429;
 
   @override
   String toString() =>
       'AiProxyException($message${statusCode != null ? ', status=$statusCode' : ''}'
-      '${isNetwork ? ', network' : ''})';
+      '${isNetwork ? ', network' : ''}${isTimeout ? ', timeout' : ''})';
 }
 
 /// Cloud Functions codes that mean "couldn't reach the server", as opposed
-/// to "the server said no".
-bool _isNetworkFunctionsCode(String code) =>
-    code == 'unavailable' || code == 'deadline-exceeded';
+/// to "the server said no". 'deadline-exceeded' is deliberately NOT here —
+/// it means SLOW, and belongs to [_isTimeoutFunctionsCode].
+bool _isNetworkFunctionsCode(String code) => code == 'unavailable';
+
+bool _isTimeoutFunctionsCode(String code) => code == 'deadline-exceeded';
 
 bool _looksLikeNetworkError(Object e) =>
-    e is SocketException || e is TimeoutException || e is HttpException;
+    e is SocketException || e is HttpException;
+
+bool _looksLikeTimeoutError(Object e) => e is TimeoutException;
 
 /// One tool invocation requested by the model during an agent turn.
 class AiProxyToolCall {
@@ -108,6 +122,7 @@ class AiProxyClient {
         e.message ?? e.code,
         statusCode: _statusCodeForFunctionsError(e.code),
         isNetwork: _isNetworkFunctionsCode(e.code),
+        isTimeout: _isTimeoutFunctionsCode(e.code),
       );
     } on AiProxyException {
       rethrow;
@@ -115,6 +130,7 @@ class AiProxyClient {
       throw AiProxyException(
         'Network error: $e',
         isNetwork: _looksLikeNetworkError(e),
+        isTimeout: _looksLikeTimeoutError(e),
       );
     }
   }
@@ -183,6 +199,7 @@ class AiProxyClient {
         e.message ?? e.code,
         statusCode: _statusCodeForFunctionsError(e.code),
         isNetwork: _isNetworkFunctionsCode(e.code),
+        isTimeout: _isTimeoutFunctionsCode(e.code),
       );
     } on AiProxyException {
       rethrow;
@@ -190,6 +207,7 @@ class AiProxyClient {
       throw AiProxyException(
         'Network error: $e',
         isNetwork: _looksLikeNetworkError(e),
+        isTimeout: _looksLikeTimeoutError(e),
       );
     }
   }
@@ -221,6 +239,7 @@ class AiProxyClient {
         e.message ?? e.code,
         statusCode: _statusCodeForFunctionsError(e.code),
         isNetwork: _isNetworkFunctionsCode(e.code),
+        isTimeout: _isTimeoutFunctionsCode(e.code),
       );
     } on AiProxyException {
       rethrow;
@@ -228,6 +247,7 @@ class AiProxyClient {
       throw AiProxyException(
         'Network error: $e',
         isNetwork: _looksLikeNetworkError(e),
+        isTimeout: _looksLikeTimeoutError(e),
       );
     }
   }

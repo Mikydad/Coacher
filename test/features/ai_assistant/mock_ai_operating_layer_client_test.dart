@@ -36,7 +36,7 @@ void main() {
 
     test('returns empty schedule message when tomorrow has no tasks', () async {
       const client = MockAiOperatingLayerClient();
-      const payload = AiOperatingLayerPayload(
+      final payload = AiOperatingLayerPayload(
         userInput: 'What\'s on my schedule tomorrow?',
       );
 
@@ -48,7 +48,7 @@ void main() {
 
     test('returns mutate plan for action requests', () async {
       const client = MockAiOperatingLayerClient();
-      const payload = AiOperatingLayerPayload(
+      final payload = AiOperatingLayerPayload(
         userInput: 'Add workout at 6am tomorrow',
       );
 
@@ -60,7 +60,7 @@ void main() {
 
     test('returns unsupported for circle queries', () async {
       const client = MockAiOperatingLayerClient();
-      const payload = AiOperatingLayerPayload(
+      final payload = AiOperatingLayerPayload(
         userInput: 'What did my circle post?',
       );
 
@@ -72,7 +72,7 @@ void main() {
 
     test('returns suggest plan for planning requests', () async {
       const client = MockAiOperatingLayerClient();
-      const payload = AiOperatingLayerPayload(
+      final payload = AiOperatingLayerPayload(
         userInput: 'Help me plan tomorrow',
       );
 

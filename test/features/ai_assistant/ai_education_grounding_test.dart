@@ -111,7 +111,7 @@ void main() {
 
   test('prompt builder emits the FEATURE GUIDE block', () {
     final prompt = ProxyAiOperatingLayerClient.debugBuildUserPrompt(
-      const AiOperatingLayerPayload(
+      AiOperatingLayerPayload(
         userInput: 'What is Focus?',
         featureGuide: 'Focus Sessions — timer for one task.',
       ),

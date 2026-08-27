@@ -5,7 +5,7 @@
 /// - No raw Firestore document IDs.
 /// - No internal object references or schema field names.
 class AiOperatingLayerPayload {
-  const AiOperatingLayerPayload({
+  AiOperatingLayerPayload({
     required this.userInput,
     this.activeTasks = const [],
     this.goals = const [],
@@ -35,7 +35,15 @@ class AiOperatingLayerPayload {
     this.openPromises = const [],
     this.deviceContext = const [],
     this.voiceMode = false,
+    this.retryTurnId,
   });
+
+  /// Set by [AiIntentParser] when this turn RETRIES a failed one: the
+  /// client reuses this turnId (rounds at loopIndex >= 1) so the server's
+  /// same-turn window makes the retry quota-free (fix-wave Phase 3).
+  /// Mutable by design — the payload is assembled before the parser knows
+  /// whether the turn is a retry.
+  String? retryTurnId;
 
   /// The raw user input for this turn.
   final String userInput;

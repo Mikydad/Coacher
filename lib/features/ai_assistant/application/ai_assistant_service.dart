@@ -101,6 +101,23 @@ class AiAssistantService extends ChangeNotifier {
     _proactiveSuggestionType = suggestionType;
   }
 
+  /// Bumped by [startNewSession]: any turn still awaiting the model when
+  /// the session rotates abandons ALL state mutation and history writes
+  /// (fix-wave Phase 3, §8 R1 — a late reply used to land as the first
+  /// message of the NEXT session, arming a plan whose context was gone).
+  int _turnGeneration = 0;
+
+  /// Turns typed while another turn is in flight (settled Q6, the Telegram
+  /// model): their user bubbles render immediately, the parse runs when
+  /// the current turn settles. FIFO, small cap.
+  final List<({String input, bool voiceMode})> _queuedTurns = [];
+  static const _kMaxQueuedTurns = 3;
+
+  /// Honest ceiling on one message (fix-wave Phase 3, §8 R5): the server
+  /// hard-rejects ~120k-char payloads, and an oversized input replayed
+  /// from history poisoned every later turn of the session.
+  static const _kMaxInputChars = 4000;
+
   Map<String, dynamic>? get _proactiveContextForPayload {
     if (_proactiveSuggestionId == null) return null;
     return {
@@ -116,7 +133,32 @@ class AiAssistantService extends ChangeNotifier {
   /// read aloud, so the parser routes it through the `coach_agent_voice`
   /// purpose for short conversational prose (latency batch 2026-08-07).
   Future<void> sendMessage(String userInput, {bool voiceMode = false}) async {
-    if (userInput.trim().isEmpty) return;
+    final text = userInput.trim();
+    if (text.isEmpty) return;
+
+    if (text.length > _kMaxInputChars) {
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.user,
+          content: '${text.substring(0, 200)}…',
+          timestamp: DateTime.now(),
+        ),
+      );
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content:
+              "That message is too long for me — about "
+              '${text.length - _kMaxInputChars} characters over. Trim it '
+              'down (or split it up) and send it again.',
+          timestamp: DateTime.now(),
+        ),
+      );
+      notifyListeners();
+      return;
+    }
 
     // Memory Phase 2: keep the session's inactivity clock fresh so
     // summarize-then-purge knows when this session actually ended.
@@ -147,6 +189,41 @@ class AiAssistantService extends ChangeNotifier {
           timestamp: DateTime.now(),
         ),
       );
+      notifyListeners();
+      return;
+    }
+
+    // Queue instead of block (fix-wave Phase 3, settled Q6): typing never
+    // waits on the network. The bubble renders now; the parse runs when
+    // the in-flight turn settles. Queued turns skip the short-reply
+    // interceptors at drain time — their pending-plan context will have
+    // been superseded by the in-flight reply anyway, and the 2026-08-22
+    // guards (unrequested-delete strip, greeting routing) cover the
+    // parser path.
+    if (_isLoading) {
+      if (_queuedTurns.length >= _kMaxQueuedTurns) {
+        _addMessage(
+          AiChatMessage(
+            id: StableId.generate('msg'),
+            role: ChatRole.assistant,
+            content:
+                "I'm still working through your last messages — give me a "
+                'second before the next one.',
+            timestamp: DateTime.now(),
+          ),
+        );
+        notifyListeners();
+        return;
+      }
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.user,
+          content: text,
+          timestamp: DateTime.now(),
+        ),
+      );
+      _queuedTurns.add((input: text, voiceMode: voiceMode));
       notifyListeners();
       return;
     }
@@ -199,7 +276,13 @@ class AiAssistantService extends ChangeNotifier {
   Future<void> _parseAndRespond(
     String userInput, {
     required bool voiceMode,
+    String? retryTurnId,
   }) async {
+    // Session-generation guard (fix-wave Phase 3, §8 R1): if the sheet
+    // closes mid-turn, startNewSession rotates the session while we await
+    // the model — the late reply must then be abandoned entirely, never
+    // appended to the next session's empty thread or saved under its id.
+    final generation = _turnGeneration;
     // 2. Append loading message (thinking…)
     final loadingId = StableId.generate('msg');
     _addMessage(
@@ -235,6 +318,7 @@ class AiAssistantService extends ChangeNotifier {
         previousPlan: previousForParser,
         proactiveContext: _proactiveContextForPayload,
         voiceMode: voiceMode,
+        retryTurnId: retryTurnId,
       );
     } catch (e) {
       // Offline / AI-down: intention capture must not depend on the network
@@ -257,11 +341,65 @@ class AiAssistantService extends ChangeNotifier {
         );
         return;
       }
-      _replaceLoadingMessage(
-        loadingId,
-        "I ran into an unexpected error. Please try again.",
-      );
+      if (generation != _turnGeneration) return;
+      _removeMessage(loadingId);
       _setLoading(false);
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content: 'I ran into an unexpected error.',
+          timestamp: DateTime.now(),
+          isError: true,
+          retryInput: userInput.trim(),
+        ),
+      );
+      notifyListeners();
+      return;
+    }
+
+    // Abandon a reply that outlived its session (§8 R1) — the sheet was
+    // closed mid-turn. No thread mutation, no pending state, no history.
+    if (generation != _turnGeneration) return;
+
+    // Honest failure with a Retry (fix-wave Phase 3, §8 H1): the parser
+    // returns errors as isError results — never followUpQuestions, which
+    // polluted the next prompt and the clarify metric (H10). Before
+    // surfacing, try the offline promise heuristic (PRD §4.2): capturing
+    // "I need to call mom" locally beats an error bubble. (This is also
+    // where that heuristic becomes REACHABLE — the parser's old catch
+    // swallowed network errors before the outer one ever saw them.)
+    if (result.isError) {
+      _removeMessage(loadingId);
+      _setLoading(false);
+      final heuristicParams = IntentionHeuristicParser.parseToActionParams(
+        userInput.trim(),
+      );
+      if (heuristicParams != null) {
+        await _autoCommitIntentionActions(
+          [
+            AiAction(
+              actionType: ActionType.createIntention,
+              parameters: heuristicParams,
+            ),
+          ],
+          modelMessage: null,
+        );
+        return;
+      }
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content: result.informationalMessage ?? 'Something went wrong.',
+          timestamp: DateTime.now(),
+          isError: true,
+          retryInput: userInput.trim(),
+          retryTurnId: result.retryTurnId,
+        ),
+      );
+      _logEvent('aiTurnFailed', {'sessionId': _sessionId});
+      notifyListeners();
       return;
     }
 
@@ -477,6 +615,7 @@ class AiAssistantService extends ChangeNotifier {
   }
 
   Stream<String> _runStreamedVoiceTurn(String text, AiIntentRoute route) {
+    final generation = _turnGeneration;
     unawaited(_memoryExtraction?.noteSessionActivity(_sessionId));
     _addMessage(
       AiChatMessage(
@@ -505,6 +644,10 @@ class AiAssistantService extends ChangeNotifier {
 
     final buffer = StringBuffer();
     var settled = false;
+    // The stream ended without a clean finish — the partial is honest, but
+    // the bubble must SAY it's partial (§8 H5: half-sentence replies used
+    // to persist as complete answers).
+    var truncated = false;
     // The source's done/cancel events must not close [out] while the agent
     // fallback still owes it the reply — the error arrives first, the
     // source's trailing done right behind it.
@@ -518,11 +661,18 @@ class AiAssistantService extends ChangeNotifier {
     void settle() {
       if (settled) return;
       settled = true;
+      // Session rotated mid-turn (§8 R1): the thread this bubble lived in
+      // is gone — abandon everything, including the history save.
+      if (generation != _turnGeneration) return;
       final full = buffer.toString().trim();
       if (full.isEmpty) {
         _removeMessage(bubbleId);
       } else {
-        final message = AiInformationalOutputGuard.sanitize(full);
+        var message = AiInformationalOutputGuard.sanitize(full);
+        if (truncated) {
+          message = '$message …\n\n(That reply got cut off — ask again '
+              'for the rest.)';
+        }
         _replaceLoadingMessage(bubbleId, message);
         unawaited(
           _historyRepository.save(
@@ -547,6 +697,10 @@ class AiAssistantService extends ChangeNotifier {
     Future<void> fallBackToAgentPath() async {
       settled = true;
       fallingBack = true;
+      if (generation != _turnGeneration) {
+        if (!out.isClosed) unawaited(out.close());
+        return;
+      }
       _removeMessage(bubbleId);
       _setLoading(false);
       try {
@@ -578,6 +732,7 @@ class AiAssistantService extends ChangeNotifier {
               unawaited(fallBackToAgentPath());
               return;
             }
+            if (e is AiVoiceStreamTruncated) truncated = true;
             settle();
             if (!out.isClosed) {
               out.addError(e);
@@ -741,12 +896,36 @@ class AiAssistantService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Re-runs a failed turn from its error bubble (fix-wave Phase 3, §8 H1
+  /// — the Telegram model's honest half). The failed turn's id rides along
+  /// so the server's same-turn window makes the retry QUOTA-FREE; the old
+  /// recovery was retyping the message and paying a second turn.
+  Future<void> retryTurn(String messageId) async {
+    if (_isLoading) return;
+    final idx = _messages.indexWhere((m) => m.id == messageId);
+    if (idx == -1) return;
+    final message = _messages[idx];
+    final input = message.retryInput;
+    if (input == null || input.isEmpty) return;
+    _messages.removeAt(idx);
+    notifyListeners();
+    await _parseAndRespond(
+      input,
+      voiceMode: false,
+      retryTurnId: message.retryTurnId,
+    );
+  }
+
   /// Confirms and executes [planFromCard] when provided (source of truth from the
   /// preview card). Falls back to [_pendingPlan] for backwards compatibility.
   Future<void> confirmPlan([
     AiPlannedChanges? planFromCard,
     String? previewMessageId,
   ]) async {
+    // Re-entrancy guard (fix-wave Phase 3, §8 R2): a double-tap on Confirm
+    // used to execute the plan twice — the button only disabled on the
+    // NEXT frame's rebuild.
+    if (_isLoading) return;
     final plan = planFromCard ?? _pendingPlan;
     if (plan == null) {
       _addMessage(
@@ -778,6 +957,12 @@ class AiAssistantService extends ChangeNotifier {
 
     _setLoading(true);
 
+    // Guarded (fix-wave Phase 3, §8 H2): a throw from the executor's
+    // bookkeeping or the history writes used to leave _isLoading stuck
+    // true — SEND dead, card buttons dead, thinking dots forever, and the
+    // only recovery wiped the conversation. Now: honest bubble, the card
+    // stays confirmable, and loading ALWAYS resets.
+    try {
     final result = await _actionExecutor.execute(plan.actions);
 
     // History marking is truthful (fix-wave Phase 2, §8 M1/G8): only the
@@ -818,7 +1003,6 @@ class AiAssistantService extends ChangeNotifier {
     _pendingPlan = null;
     _markPlanExecuted(previewMessageId, plan.sessionId);
     _demoteCurrentPlan();
-    _setLoading(false);
 
     // Per-item outcomes (fix-wave Phase 2, settled Q4): successes stay
     // applied, failures are named individually — never the old
@@ -864,6 +1048,22 @@ class AiAssistantService extends ChangeNotifier {
           'confidence': action.confidence,
         });
       }
+    }
+    } catch (e) {
+      debugPrint('confirmPlan failed: $e');
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content:
+              'Applying that hit a snag — nothing was lost. '
+              'Tap Confirm to try again.',
+          timestamp: DateTime.now(),
+          isError: true,
+        ),
+      );
+    } finally {
+      _setLoading(false);
     }
 
     notifyListeners();
@@ -957,6 +1157,11 @@ class AiAssistantService extends ChangeNotifier {
     // failures stay pending and the bootstrap sweep retries).
     final endedSessionId = _sessionId;
     unawaited(_memoryExtraction?.onSessionEnded(endedSessionId));
+    // Any turn still awaiting the model belongs to the DEAD session —
+    // bumping the generation makes it abandon all mutation on arrival
+    // (fix-wave Phase 3, §8 R1). Queued turns die with their session.
+    _turnGeneration++;
+    _queuedTurns.clear();
     _sessionId = StableId.generate('session');
     _messages.clear();
     _pendingPlan = null;
@@ -1160,6 +1365,21 @@ class AiAssistantService extends ChangeNotifier {
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
+    if (!value) _drainQueuedTurn();
+  }
+
+  /// Runs the next queued turn once the current one settles (settled Q6).
+  /// Decoupled to a microtask so the drain never re-enters from inside a
+  /// notifyListeners cycle.
+  void _drainQueuedTurn() {
+    if (_queuedTurns.isEmpty) return;
+    final generation = _turnGeneration;
+    Future(() async {
+      if (_isLoading || _queuedTurns.isEmpty) return;
+      if (generation != _turnGeneration) return; // session rotated
+      final next = _queuedTurns.removeAt(0);
+      await _parseAndRespond(next.input, voiceMode: next.voiceMode);
+    });
   }
 
   void _logEvent(String name, [Map<String, dynamic>? props]) {

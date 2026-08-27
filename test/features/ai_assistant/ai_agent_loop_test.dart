@@ -32,7 +32,7 @@ class _ScriptedProxy implements AiProxyClient {
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 
-const _payload = AiOperatingLayerPayload(userInput: 'session-input');
+final _payload = AiOperatingLayerPayload(userInput: 'session-input');
 
 void main() {
   test('plain text response becomes an informational reply', () async {

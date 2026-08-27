@@ -35,7 +35,7 @@ class _ScriptedProxy implements AiProxyClient {
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 
-const _payload = AiOperatingLayerPayload(userInput: 'session-input');
+final _payload = AiOperatingLayerPayload(userInput: 'session-input');
 
 const _validCall = AiProxyToolCall(
   id: 'call_ok',
@@ -194,7 +194,7 @@ void main() {
     final client = ProxyAiOperatingLayerClient(proxy: proxy);
 
     final result = await client.parseIntent(
-      const AiOperatingLayerPayload(userInput: 'x', intentKind: 'mutate'),
+      AiOperatingLayerPayload(userInput: 'x', intentKind: 'mutate'),
     );
 
     expect(proxy.calls, hasLength(2));
@@ -221,7 +221,7 @@ void main() {
     final client = ProxyAiOperatingLayerClient(proxy: proxy);
 
     final result = await client.parseIntent(
-      const AiOperatingLayerPayload(userInput: 'x', intentKind: 'query'),
+      AiOperatingLayerPayload(userInput: 'x', intentKind: 'query'),
     );
 
     expect(proxy.calls, hasLength(1));

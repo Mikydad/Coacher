@@ -25,6 +25,7 @@ class _CountingParser implements AiIntentParser {
     AiPlannedChanges? previousPlan,
     Map<String, dynamic>? proactiveContext,
     bool voiceMode = false,
+    String? retryTurnId,
   }) async => _results[calls++];
 
   @override

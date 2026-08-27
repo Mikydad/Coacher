@@ -23,6 +23,7 @@ class _ScriptedParser implements AiIntentParser {
     AiPlannedChanges? previousPlan,
     Map<String, dynamic>? proactiveContext,
     bool voiceMode = false,
+    String? retryTurnId,
   }) async => _results[_next++];
 
   @override
