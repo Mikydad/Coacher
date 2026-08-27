@@ -3,6 +3,7 @@ import '../../education/presentation/help_dot.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../feedback/application/tester_mode_controller.dart';
 import '../application/ai_summary_providers.dart';
 import '../application/delivery_providers.dart';
 import '../application/focus_providers.dart';
@@ -95,11 +96,15 @@ class _AnalyticsProgressScreenState
         centerTitle: true,
         actions: [
           const HelpAppBarButton('analytics'),
-          IconButton(
-            tooltip: 'Test AI coaching summary',
-            onPressed: () => _testAiSummary(context, ref),
-            icon: const Icon(Icons.auto_awesome),
-          ),
+          // Tester-only: this button is the sole trigger of a real (billed)
+          // summary recompute outside the card's own refresh — it was
+          // shipping ungated to every user (fix-wave Phase 0, §8 H6/C5).
+          if (ref.watch(testerModeProvider))
+            IconButton(
+              tooltip: 'Test AI coaching summary',
+              onPressed: () => _testAiSummary(context, ref),
+              icon: const Icon(Icons.auto_awesome),
+            ),
           IconButton(
             tooltip: 'Recompute insights now',
             onPressed: () async {

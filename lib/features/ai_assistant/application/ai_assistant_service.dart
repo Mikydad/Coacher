@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../../core/ai/ai_remote_config_service.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../education/domain/feature_guides.dart';
 import '../../intentions/application/intention_capture.dart';
@@ -455,6 +456,12 @@ class AiAssistantService extends ChangeNotifier {
     final streamer = _voiceReplyStreamer;
     final text = userInput.trim();
     if (streamer == null || text.isEmpty) return null;
+    // The ai_enabled kill switch must gate this path too: the agent client
+    // is swapped for the honest disabled fallback at build time, but the
+    // stream endpoint was called directly and kept spending while operators
+    // believed AI was off (GPT-5.6 G13). Returning null routes the turn to
+    // the agent path, which degrades honestly.
+    if (!AiRemoteConfigService.instance.lastKnownAiEnabled) return null;
     if (_pendingPlan != null || _pendingClarification != null) return null;
     final currentUser = Firebase.apps.isEmpty
         ? null

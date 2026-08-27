@@ -30,9 +30,7 @@ import '../../support/isar_test_harness.dart';
 const _day = '2026-08-27';
 
 class _FakePlanningRepo implements PlanningRepository {
-  _FakePlanningRepo({this.currentTasks = const []});
-
-  List<PlannedTask> currentTasks;
+  List<PlannedTask> currentTasks = const [];
   final upserted = <PlannedTask>[];
 
   @override
@@ -73,6 +71,7 @@ class _FakePlanningRepo implements PlanningRepository {
 }
 
 class _NoopFake {
+  @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 

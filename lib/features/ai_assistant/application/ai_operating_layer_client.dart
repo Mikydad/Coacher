@@ -861,18 +861,49 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
 // ─── Factory helper ───────────────────────────────────────────────────────────
 
 /// Builds the correct client from Remote Config.
-/// Returns [MockAiOperatingLayerClient] when AI is disabled remotely.
+///
+/// When the `ai_enabled` kill switch is off: release builds get
+/// [DisabledAiOperatingLayerClient] — an honest "Coach is unavailable"
+/// answer for every turn. The old behavior routed production to
+/// [MockAiOperatingLayerClient], whose canned "Morning Workout" plan
+/// REALLY executed on confirm — during exactly the incidents where trust
+/// matters most, the coach fabricated (fix-wave Phase 0, §8 H6). The mock
+/// stays available in debug builds for offline UI work.
 Future<AiOperatingLayerClient> buildAiOperatingLayerClient({
   AiCoachToolRunner? toolRunner,
 }) async {
   final aiEnabled = await AiRemoteConfigService.instance.isAiEnabled();
 
   if (!aiEnabled) {
-    debugPrint('[AiOperatingLayer] AI disabled remotely — using mock client.');
-    return const MockAiOperatingLayerClient();
+    if (kDebugMode) {
+      debugPrint('[AiOperatingLayer] AI disabled remotely — mock (debug).');
+      return const MockAiOperatingLayerClient();
+    }
+    debugPrint('[AiOperatingLayer] AI disabled remotely — honest fallback.');
+    return const DisabledAiOperatingLayerClient();
   }
 
   return ProxyAiOperatingLayerClient(toolRunner: toolRunner);
+}
+
+// ─── Disabled client (kill switch) ────────────────────────────────────────────
+
+/// The honest kill-switch client: every turn gets the same truthful
+/// unavailable answer. Never fabricates plans, never executes anything.
+class DisabledAiOperatingLayerClient implements AiOperatingLayerClient {
+  const DisabledAiOperatingLayerClient();
+
+  @override
+  Future<AiPlannedChanges> parseIntent(AiOperatingLayerPayload payload) async {
+    return AiPlannedChanges(
+      sessionId: payload.userInput,
+      responseType: AiResponseType.informational,
+      informationalMessage:
+          "I'm taking a short break for maintenance — your schedule, "
+          'tasks, goals, and reminders all keep working as normal from '
+          "the app's own screens. Check back in a bit.",
+    );
+  }
 }
 
 // ─── Mock client ──────────────────────────────────────────────────────────────

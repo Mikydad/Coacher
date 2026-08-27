@@ -22,12 +22,15 @@ import 'layer4_delivery_policy.dart';
 // aiSummaryRepositoryProvider is declared in core/di/providers.dart
 
 /// Resolves to [ProxyCoachingAiClient] (backed by the `aiChat` Cloud Function)
-/// when AI is enabled, or [MockCoachingAiClient] when disabled remotely.
+/// when AI is enabled, or [DisabledCoachingAiClient] when disabled remotely —
+/// it throws, which routes recompute into the deterministic renderer
+/// (honest degradation) instead of persisting "[mock]" text as a real
+/// summary (fix-wave Phase 0, §8 H6).
 /// This is an async provider because Remote Config requires a network fetch.
 final coachingAiClientProvider = FutureProvider<CoachingAiClient>((ref) async {
   final aiEnabled = await AiRemoteConfigService.instance.isAiEnabled();
   if (!aiEnabled) {
-    return const MockCoachingAiClient();
+    return const DisabledCoachingAiClient();
   }
   return ProxyCoachingAiClient();
 });

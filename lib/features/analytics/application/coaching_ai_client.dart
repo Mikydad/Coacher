@@ -213,10 +213,28 @@ Generate the coaching summary.
   }
 }
 
+// ─── Disabled client (kill switch) ────────────────────────────────────────────
+
+/// Used when the `ai_enabled` kill switch is off: throws immediately so the
+/// recompute provider falls into its [DeterministicCoachingRenderer] path —
+/// the honest degradation that renderer exists for. The old wiring returned
+/// [MockCoachingAiClient] here, whose "[mock] Coaching summary…" text passed
+/// the validator and was persisted as a genuine non-fallback summary for up
+/// to 18h (fix-wave Phase 0, §8 H6).
+class DisabledCoachingAiClient implements CoachingAiClient {
+  const DisabledCoachingAiClient();
+
+  @override
+  Future<AiSummaryResponse> generateSummary(CoachingAiPayload payload) async {
+    throw const AiClientException('AI disabled by kill switch');
+  }
+}
+
 // ─── Mock client ──────────────────────────────────────────────────────────────
 
-/// Deterministic mock client for tests and offline mode.
-/// Returns a predictable [AiSummaryResponse] without any network calls.
+/// Deterministic mock client FOR TESTS ONLY — its response contains literal
+/// "[mock]" text. Production kill-switch paths use
+/// [DisabledCoachingAiClient] instead.
 class MockCoachingAiClient implements CoachingAiClient {
   const MockCoachingAiClient({this.shouldFail = false});
 

@@ -48,17 +48,28 @@ class AiRemoteConfigService {
     }
   }
 
+  bool _lastKnownAiEnabled = true;
+
   /// Whether AI features are enabled. Acts as a remote kill switch; when
-  /// false, callers must use their mock/deterministic fallbacks.
+  /// false, callers must use their honest/deterministic fallbacks.
   Future<bool> isAiEnabled() async {
     await _ensureInitialized();
     try {
-      return FirebaseRemoteConfig.instance.getBool(kRemoteConfigAiEnabled);
+      _lastKnownAiEnabled = FirebaseRemoteConfig.instance.getBool(
+        kRemoteConfigAiEnabled,
+      );
+      return _lastKnownAiEnabled;
     } catch (e) {
       debugPrint('[AiRemoteConfigService] Failed to read ai_enabled: $e');
       return true;
     }
   }
+
+  /// Synchronous view of the last [isAiEnabled] read (default true before
+  /// any read). For sync call sites that cannot await — e.g. the voice
+  /// streaming gate, which must respect the kill switch the async client
+  /// build already honored (fix-wave Phase 0, GPT-5.6 G13).
+  bool get lastKnownAiEnabled => _lastKnownAiEnabled;
 
   /// Force a fresh fetch from Firebase — useful after a config push.
   Future<void> refresh() async {
