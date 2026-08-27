@@ -2238,3 +2238,21 @@ not silent reversal.
   is date-aware; the card discloses edit/modify field changes (E11).
   Suite 1587 green, analyzer 97 baseline. Next: Phase 2 (undo v2
   inverse-op log), per the batch order.
+
+- **2026-08-27 · AI fix wave, Phase 2 shipped: undo v2 (inverse-op log).**
+  One commit (7039219). The date-wide task snapshot is gone: every
+  mutating handler records its exact inverse (delete-the-create /
+  restore-row + restore-reminder-configs / restore-goal / delete-fact…),
+  persisted after EVERY dispatched action; rollback applies the log in
+  reverse with per-op guards. Consequences: undoing a memory/intention
+  batch can no longer touch schedule tasks (G3), creates finally revert
+  with their configs + notifications + derived blocks (E3/E7), a crash
+  mid-batch is repaired by a bootstrap sweep (E8), and `pruneOld()` runs.
+  Per-item outcomes per Q4: a failed action no longer rolls back its
+  confirmed siblings; undo of a partialFailure reverts exactly the
+  survivors. History marking truthful (M1/G8): only the newest session
+  entry, only when something applied. Undo providers are Isar watch
+  streams — the chip appears the instant a batch completes; manual
+  invalidations deleted. Legacy snapshots (30-min window across the
+  update) still roll back via the old path. Suite 1592 green. Next:
+  Phase 3 (honest failure + races).
