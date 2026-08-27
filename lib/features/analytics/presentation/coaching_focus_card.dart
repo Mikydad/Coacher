@@ -30,8 +30,18 @@ class HomeCoachingFocusCard extends ConsumerWidget {
       compact: false,
       hideWhenEmpty: true,
       onRefresh: () {
+        // Invalidate AND read: invalidating a FutureProvider nothing is
+        // watching executes nothing — this button was a silent no-op
+        // (fix-wave Phase 0, GPT-5.6 G29). The reads run the recomputes;
+        // results land via the watched focus/summary streams. Errors are
+        // already handled inside the recompute providers (deterministic
+        // fallback), so a failed read only means "nothing new".
         ref.invalidate(recomputeCoachingFocusProvider);
         ref.invalidate(recomputeAiSummaryProvider);
+        Future.wait([
+          ref.read(recomputeCoachingFocusProvider.future),
+          ref.read(recomputeAiSummaryProvider.future),
+        ]).ignore();
       },
     );
   }
