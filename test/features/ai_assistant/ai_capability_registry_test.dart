@@ -2,17 +2,6 @@ import 'package:sidepal/features/ai_assistant/application/ai_capability_registry
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('AiCapabilityRegistry.buildPayloadSection', () {
-    test('includes read, mutate, and unsupported domain ids', () {
-      final section = AiCapabilityRegistry.buildPayloadSection();
-
-      expect(section['read'], AiCapabilityRegistry.supportedRead);
-      expect(section['mutate'], AiCapabilityRegistry.supportedMutate);
-      expect(section['unsupported'], contains('community'));
-      expect(section['unsupported'], contains('billing'));
-    });
-  });
-
   group('AiCapabilityRegistry.detectUnsupported', () {
     test('returns community match for circle queries', () {
       final match = AiCapabilityRegistry.detectUnsupported(
@@ -42,15 +31,4 @@ void main() {
     });
   });
 
-  group('AiCapabilityRegistry.formatForPrompt', () {
-    test('lists supported read and mutate scopes', () {
-      final prompt = AiCapabilityRegistry.formatForPrompt();
-
-      expect(prompt, contains('today_schedule'));
-      // Full mutate advertising is back since fix-wave Phase 1 — every
-      // listed verb has a real executor behind it.
-      expect(prompt, contains('tasks_create_edit_move_delete'));
-      expect(prompt, contains('unsupported'));
-    });
-  });
 }

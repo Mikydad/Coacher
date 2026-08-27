@@ -23,7 +23,6 @@ import '../../profile/application/profile_preference_service.dart';
 import '../data/ai_interaction_history_repository.dart';
 import '../domain/models/ai_intent_kind.dart';
 import '../domain/models/ai_operating_layer_payload.dart';
-import 'ai_capability_registry.dart';
 import 'entity_normaliser.dart';
 
 /// Assembles the [AiOperatingLayerPayload] from live app data.
@@ -89,12 +88,26 @@ class AiPayloadAssembler {
       // Memory sections are per-turn (never session-cached): rememberFact /
       // updateFact / forgetFact auto-commit mid-session and the local write
       // IS the update.
-      _buildMemoryFacts(),
+      _buildMemoryFacts(userInput),
       _buildPeopleDigest(),
       _buildEpisodicSummaries(),
       _buildOpenPromises(),
       _buildDeviceContext(),
     ]);
+
+    // Route-conditioned trimming (fix-wave Phase 6, §8 M7/P3): a bare
+    // "hi" used to ship the full week overview and 14-day patterns to
+    // OpenAI every turn. Sections a turn cannot use are dropped from the
+    // SENT payload — the slice itself stays whole in the session cache, so
+    // a follow-up that needs more pays no extra reads. Suggest/mutate
+    // turns keep everything: planning needs the full picture.
+    final kind = intentRoute?.kind;
+    final focus = intentRoute?.focusDate;
+    final planningTurn =
+        kind == null || kind == AiIntentKind.suggest || kind == AiIntentKind.mutate;
+    final sendWeek = planningTurn || focus == AiFocusDate.week;
+    final sendTomorrow = planningTurn || focus == AiFocusDate.tomorrow;
+    final sendPatterns = planningTurn;
 
     return AiOperatingLayerPayload(
       userInput: userInput,
@@ -102,17 +115,16 @@ class AiPayloadAssembler {
       goals: schedule.goals,
       goalProgress: schedule.goalProgress,
       todaySchedule: schedule.todaySchedule,
-      tomorrowTasks: schedule.tomorrowTasks,
-      tomorrowSchedule: schedule.tomorrowSchedule,
-      weekOverview: schedule.weekOverview,
+      tomorrowTasks: sendTomorrow ? schedule.tomorrowTasks : const [],
+      tomorrowSchedule: sendTomorrow ? schedule.tomorrowSchedule : const [],
+      weekOverview: sendWeek ? schedule.weekOverview : const [],
       focusState: schedule.focusState,
       contextOverride: schedule.contextOverride,
       behaviorPreferences: schedule.behaviorPreferences,
       sessionHistory: dynamicResults[0] as List<Map<String, dynamic>>,
-      recentPatterns: schedule.recentPatterns,
+      recentPatterns: sendPatterns ? schedule.recentPatterns : const [],
       conversationHistory: dynamicResults[1] as List<Map<String, dynamic>>,
       completedInSession: dynamicResults[2] as List<String>,
-      capabilities: AiCapabilityRegistry.buildPayloadSection(),
       intentHint: intentRoute?.toPromptHint(),
       intentKind: intentRoute?.kind.name,
       proactiveContext: proactiveContext,
@@ -122,7 +134,9 @@ class AiPayloadAssembler {
         schedule.todaySchedule,
         fromMinuteOfDay: _nowMinuteOfDay(),
       ),
-      tomorrowFreeWindows: computeFreeWindows(schedule.tomorrowSchedule),
+      tomorrowFreeWindows: sendTomorrow
+          ? computeFreeWindows(schedule.tomorrowSchedule)
+          : const [],
       memoryFacts: dynamicResults[3] as List<String>,
       peopleDigest: dynamicResults[4] as List<String>,
       episodicSummaries: dynamicResults[5] as List<String>,
@@ -176,15 +190,19 @@ class AiPayloadAssembler {
   /// Injected facts get their [MemoryFact.lastReferencedAtMs] stamped
   /// fire-and-forget (throttled — a chatty session must not produce
   /// dozens of outbox writes per turn).
-  Future<List<String>> _buildMemoryFacts() async {
+  Future<List<String>> _buildMemoryFacts([String userInput = '']) async {
     final repo = memoryFactsRepository;
     if (repo == null) return const [];
     try {
       final all = await repo.fetchFactsOnce();
-      final facts = all
+      final candidates = all
           .where((f) => f.kind != MemoryFactKind.episodicSummary)
-          .take(_kMaxMemoryFacts)
           .toList(growable: false);
+      final facts = selectMemoryFacts(
+        candidates,
+        userInput: userInput,
+        limit: _kMaxMemoryFacts,
+      );
       if (facts.isEmpty) return const [];
 
       final cutoff = DateTime.now()
@@ -207,6 +225,68 @@ class AiPayloadAssembler {
       debugPrint('[AiPayloadAssembler] memory facts failed: $e');
       return const [];
     }
+  }
+
+  /// Scored selection instead of newest-N (fix-wave Phase 6, §8 M6): the
+  /// old slice was strictly recency-ranked, so after ~3 chatty sessions a
+  /// foundational fact ("has type-1 diabetes", "works night shifts") was
+  /// evicted from the prompt by newer trivia — and the Coach's amnesia
+  /// looked like a model failure while the fact still showed in "What
+  /// SidePal knows". Blend: what the user CONFIRMED outranks inference,
+  /// durable kinds outrank observations, facts matching the current input
+  /// jump the queue, and the long-collected (previously never-read)
+  /// lastReferencedAtMs finally participates.
+  @visibleForTesting
+  static List<MemoryFact> selectMemoryFacts(
+    List<MemoryFact> candidates, {
+    required String userInput,
+    required int limit,
+  }) {
+    if (candidates.length <= limit) return candidates;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    const dayMs = 24 * 60 * 60 * 1000;
+    final inputTokens = userInput
+        .toLowerCase()
+        .split(RegExp(r'[^a-z0-9]+'))
+        .where((t) => t.length > 3)
+        .toSet();
+
+    double score(MemoryFact f) {
+      var s = switch (f.provenance) {
+        MemoryProvenance.userConfirmed => 2.0,
+        MemoryProvenance.userStated => 1.5,
+        MemoryProvenance.derivedDeterministic => 0.7,
+        MemoryProvenance.aiInferred => 0.3,
+      };
+      s += switch (f.kind) {
+        MemoryFactKind.preference || MemoryFactKind.semanticFact => 1.5,
+        MemoryFactKind.promiseNote => 0.8,
+        MemoryFactKind.learnedPattern => 0.7,
+        _ => 0.4,
+      };
+      final ageDays = (nowMs - f.updatedAtMs) / dayMs;
+      if (ageDays < 7) {
+        s += 1.0;
+      } else if (ageDays < 30) {
+        s += 0.5;
+      }
+      final referencedAgo = f.lastReferencedAtMs;
+      if (referencedAgo != null && (nowMs - referencedAgo) < 7 * dayMs) {
+        s += 0.5;
+      }
+      if (inputTokens.isNotEmpty &&
+          f.content
+              .toLowerCase()
+              .split(RegExp(r'[^a-z0-9]+'))
+              .any((t) => t.length > 3 && inputTokens.contains(t))) {
+        s += 3.0;
+      }
+      return s;
+    }
+
+    final scored = [for (final f in candidates) (fact: f, score: score(f))]
+      ..sort((a, b) => b.score.compareTo(a.score));
+    return [for (final e in scored.take(limit)) e.fact];
   }
 
   /// The grounding contract line format (PRD §5.3). The label tells the
@@ -398,7 +478,11 @@ class AiPayloadAssembler {
       final today = DateTime.now();
       final dayFutures = <Future<Map<String, dynamic>>>[];
       for (var offset = 0; offset < 7; offset++) {
-        final day = today.add(Duration(days: offset));
+        // Calendar arithmetic, not Duration (fix-wave Phase 6, R9): on a
+        // 25h fall-back day, now+24h lands on the SAME calendar day —
+        // duplicate date keys, a wrong "tomorrow" label, double-counted
+        // stats. DateTime normalizes d+offset correctly across DST.
+        final day = DateTime(today.year, today.month, today.day + offset);
         dayFutures.add(_buildDayOverview(day, offset));
       }
       return await Future.wait(dayFutures);
@@ -637,7 +721,7 @@ class AiPayloadAssembler {
       final modeCounts = <String, int>{};
 
       for (var daysBack = 0; daysBack < 7; daysBack++) {
-        final day = today.subtract(Duration(days: daysBack));
+        final day = DateTime(today.year, today.month, today.day - daysBack);
         final dateKey =
             '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
 
@@ -775,7 +859,7 @@ class AiPayloadAssembler {
       final categoryData = <String, _CategoryStats>{};
 
       for (var daysBack = 0; daysBack < 14; daysBack++) {
-        final day = today.subtract(Duration(days: daysBack));
+        final day = DateTime(today.year, today.month, today.day - daysBack);
         final dateKey =
             '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
 

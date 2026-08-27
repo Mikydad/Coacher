@@ -66,10 +66,39 @@ void main() {
   });
 
   group('robustness', () {
-    test('malformed JSON degrades to an empty extraction', () {
-      expect(MemoryExtractionParser.parse('not json', transcript).isEmpty, isTrue);
-      expect(MemoryExtractionParser.parse('[]', transcript).isEmpty, isTrue);
-      expect(MemoryExtractionParser.parse('', transcript).isEmpty, isTrue);
+    test(
+        'malformed JSON THROWS — never masquerades as "nothing durable" '
+        '(fix-wave Phase 6, §8 M3: an empty parse marked the session '
+        'extracted and the purge deleted the raw turns permanently)', () {
+      expect(
+        () => MemoryExtractionParser.parse('not json', transcript),
+        throwsFormatException,
+      );
+      expect(
+        () => MemoryExtractionParser.parse('[]', transcript),
+        throwsFormatException,
+      );
+      expect(
+        () => MemoryExtractionParser.parse('', transcript),
+        throwsFormatException,
+      );
+      // A truncated object (the 900-token cap's signature) throws too.
+      expect(
+        () => MemoryExtractionParser.parse(
+          '{"facts": [{"content": "likes mor',
+          transcript,
+        ),
+        throwsFormatException,
+      );
+    });
+
+    test('markdown-fenced JSON decodes (the reflection parser tolerance)',
+        () {
+      final parsed = MemoryExtractionParser.parse(
+        '```json\n{"facts": [], "people": [], "observations": []}\n```',
+        transcript,
+      );
+      expect(parsed.isEmpty, isTrue);
     });
 
     test('caps: max 8 facts, 5 people, 3 observations', () {

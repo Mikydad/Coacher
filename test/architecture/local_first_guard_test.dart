@@ -35,11 +35,29 @@ void main() {
     // delete with a 3s timeout; offline failure is accepted residual risk.
     'lib/core/push/push_messaging_service.dart':
         'logout device-token removal is network-inherent (server truth)',
+    // Circle pulse is SHARED circle content generated on an explicit
+    // moderator action — network-inherent by nature, and since fix-wave
+    // Phase 6 the save reports an honest per-outcome result
+    // (PulseSaveFailed) instead of silently discarding the paid AI reply.
+    'lib/features/community/data/ai_pulse_repository.dart':
+        'shared circle content; save failure surfaces honestly (Phase 6)',
+    // PRE-EXISTING, surfaced when the regex learned the injected-field
+    // shape (Phase 6): multi-user circle writes. Removal votes are
+    // rules-checked shared state (same class as membership transactions);
+    // notif prefs should move to the outbox — tracked as follow-up debt.
+    'lib/features/community/data/removal_vote_repository.dart':
+        'multi-user vote docs are rules-checked server truth',
+    'lib/features/community/data/circle_notif_prefs_repository.dart':
+        'FOLLOW-UP DEBT: per-user prefs belong on the outbox',
   };
 
   test('no awaited Firestore writes outside the sync outbox', () {
+    // Also matches writes through an INJECTED Firestore field
+    // (`await _firestore...` / `await _col(...)`) — the shape the pulse
+    // repository proved invisible to the instance-only regex (fix-wave
+    // Phase 6, GPT-5.6 G26).
     final banned = RegExp(
-      r'await\s+FirebaseFirestore\s*\.\s*instance',
+      r'await\s+(FirebaseFirestore\s*\.\s*instance|_firestore\b|_col\s*\()',
       multiLine: true,
     );
     final violations = <String>[];

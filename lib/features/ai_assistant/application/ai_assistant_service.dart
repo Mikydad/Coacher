@@ -834,11 +834,17 @@ class AiAssistantService extends ChangeNotifier {
           a.actionType == ActionType.updateFact ||
           a.actionType == ActionType.forgetFact,
     );
+    // Memory batches always show the EXECUTOR's summary — it echoes the
+    // exact stored/deleted content next to the Undo (fix-wave Phase 6,
+    // §8 M2: the model's own "Noted!" used to win, hiding what was
+    // actually written until the user checked "What SidePal knows").
     final content = exec.hasFailures
         ? (isMemoryBatch
               ? exec.toSummaryMessage()
               : "I couldn't save that promise — please try again.")
-        : (trimmedModel?.isNotEmpty == true
+        : (isMemoryBatch
+              ? exec.toSummaryMessage()
+              : trimmedModel?.isNotEmpty == true
               ? trimmedModel!
               : exec.toSummaryMessage());
     _addMessage(
@@ -1173,6 +1179,9 @@ class AiAssistantService extends ChangeNotifier {
     // (fix-wave Phase 3, §8 R1). Queued turns die with their session.
     _turnGeneration++;
     _queuedTurns.clear();
+    // Evict the dead session's cached schedule slice (fix-wave Phase 6,
+    // R9): entries used to accumulate for the app's lifetime.
+    _onScheduleMutated?.call(_sessionId);
     _sessionId = StableId.generate('session');
     _messages.clear();
     _pendingPlan = null;

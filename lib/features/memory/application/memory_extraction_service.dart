@@ -205,7 +205,17 @@ class MemoryExtractionService {
       return false;
     }
 
-    final parsed = MemoryExtractionParser.parse(content, transcript);
+    final ParsedExtraction parsed;
+    try {
+      parsed = MemoryExtractionParser.parse(content, transcript);
+    } on FormatException catch (e) {
+      // A 200-OK response whose JSON was cut off or malformed is a
+      // FAILURE, not "nothing durable" (fix-wave Phase 6, §8 M3): stay
+      // pending so the sweep retries and the purge keeps deferring.
+      debugPrint('[MemoryExtraction] unparseable response: $e');
+      await _sessionState.bumpAttemptCount(sessionId);
+      return false;
+    }
     await _persistExtraction(sessionId, parsed, transcript);
     await _sessionState.markExtracted(sessionId);
     return true;
@@ -224,8 +234,12 @@ class MemoryExtractionService {
       final existing = await _people.findByReference(candidate.name);
       if (existing != null) {
         personIdByName[candidate.name.toLowerCase()] = existing.id;
-        // A conversation mentioning them is a deterministic interaction.
-        await _people.recordInteraction(existing.id, nowMs);
+        // Mentioning someone is NOT interacting with them (fix-wave
+        // Phase 6, §8 M4): "I miss Sarah, I haven't seen her in months"
+        // used to reset Sarah's interaction clock to today — suppressing
+        // the relationship-gap nudge for another 21 days and telling the
+        // next prompt "interacted today". lastInteractionAtMs moves only
+        // on COMPLETED intentions (relationship_care_service).
         continue;
       }
       final person = Person(
@@ -329,11 +343,27 @@ class MemoryExtractionService {
   Future<void> _writeTruncationSummary(String sessionId) async {
     final rows = await _history.getAllForSession(sessionId);
     if (rows.isEmpty) return;
-    final topics = rows
-        .map((r) => r.userInput.trim())
+    // Summarize from the ASSISTANT's own turn summaries, newest first
+    // (fix-wave Phase 6, §8 M5): the old shape copied the first three raw
+    // user utterances verbatim into a permanent, synced fact — health or
+    // relationship disclosures escaping the 48h privacy boundary forever,
+    // and the lowest-quality summary possible (openers are greetings).
+    // Falls back to LAST user turns (the substantive end of a session),
+    // clipped short, only when no assistant summaries exist.
+    var topics = rows.reversed
+        .map((r) => (r.assistantSummary ?? '').trim())
         .where((s) => s.isNotEmpty)
         .take(3)
+        .map((s) => s.length > 60 ? '${s.substring(0, 57)}…' : s)
         .join('; ');
+    if (topics.isEmpty) {
+      topics = rows.reversed
+          .map((r) => r.userInput.trim())
+          .where((s) => s.isNotEmpty)
+          .take(3)
+          .map((s) => s.length > 40 ? '${s.substring(0, 37)}…' : s)
+          .join('; ');
+    }
     if (topics.isEmpty) return;
     final content = 'Talked about: $topics';
     final nowMs = DateTime.now().millisecondsSinceEpoch;

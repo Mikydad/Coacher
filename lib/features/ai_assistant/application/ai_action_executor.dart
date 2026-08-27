@@ -182,12 +182,17 @@ class AiActionExecutor {
       // restore it exactly (the task snapshot cannot cover facts).
       if (action.actionType == ActionType.updateFact ||
           action.actionType == ActionType.forgetFact) {
-        final target = await _resolveFactRef(
-          action.parameters['factRef'] as String?,
-        );
-        if (target != null) {
-          action.parameters['_targetFactId'] = target.id;
-          action.parameters['_prevFactJson'] = jsonEncode(target.toMap());
+        try {
+          final target = await _resolveFactRef(
+            action.parameters['factRef'] as String?,
+          );
+          if (target != null) {
+            action.parameters['_targetFactId'] = target.id;
+            action.parameters['_prevFactJson'] = jsonEncode(target.toMap());
+          }
+        } on ArgumentError {
+          // Ambiguous ref — the handler re-resolves and surfaces the
+          // disambiguation question as its per-action failure.
         }
       }
       // modify/delete goal: same pattern — stash the pre-mutation goal so
@@ -980,22 +985,55 @@ class AiActionExecutor {
       personId = (await peopleRepository?.findByReference(personName))?.id;
     }
 
+    // Verify the model's paraphrase against the user's own words (fix-wave
+    // Phase 6, §8 M2): the extraction pipeline demotes unverified claims to
+    // aiInferred, but this chat path stored the paraphrase as userStated
+    // truth at confidence 1.0 — a mishearing became a fact the system
+    // prompt asserts plainly in every future conversation. Unsupported
+    // content demotes so the Coach hedges, and the ack always ECHOES what
+    // was stored so a wrong write is visible next to its Undo.
+    final rawUtterance = (p['rawUtterance'] as String?)?.trim();
+    final supported =
+        rawUtterance != null && _utteranceSupports(capped, rawUtterance);
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     final fact = MemoryFact(
       id: (p['_factId'] as String?) ?? StableId.generate('memfact'),
       kind: kind,
       content: capped,
       personId: personId,
-      provenance: MemoryProvenance.userStated,
-      confidence: 1.0,
-      sourceQuote: (p['rawUtterance'] as String?)?.trim(),
+      provenance: supported
+          ? MemoryProvenance.userStated
+          : MemoryProvenance.aiInferred,
+      confidence: supported ? 1.0 : 0.6,
+      sourceQuote: rawUtterance,
       createdAtMs: nowMs,
       updatedAtMs: nowMs,
     );
     fact.validate();
     await repo.upsertFact(fact);
     ops.add({'op': 'deleteFact', 'factId': fact.id});
-    return 'Noted — I\'ll remember that.';
+    return 'Noted — I\'ll remember: "$capped".';
+  }
+
+  /// True when every meaningful word of [content] is anchored in the
+  /// user's [utterance] (shared 4-char prefix tolerates inflection:
+  /// "prefers" ↔ "prefer"). Deterministic — a paraphrase that invents
+  /// words the user never said fails.
+  static bool _utteranceSupports(String content, String utterance) {
+    final normalize = MemoryExtractionParser.normalizeForMatch;
+    final utteranceTokens = normalize(utterance)
+        .split(RegExp(r'[^a-z0-9]+'))
+        .where((t) => t.length >= 4)
+        .map((t) => t.substring(0, 4))
+        .toSet();
+    final contentTokens = normalize(content)
+        .split(RegExp(r'[^a-z0-9]+'))
+        .where((t) => t.length >= 4)
+        .toList();
+    if (contentTokens.isEmpty) return utteranceTokens.isNotEmpty;
+    return contentTokens.every(
+      (t) => utteranceTokens.contains(t.substring(0, 4)),
+    );
   }
 
   /// Edit an existing fact. The user correcting the record is confirmation
@@ -1013,7 +1051,10 @@ class AiActionExecutor {
       throw ArgumentError('newContent is required to update a memory');
     }
     final targetId = p['_targetFactId'] as String?;
-    final target = targetId != null ? await repo.getFact(targetId) : null;
+    var target = targetId != null ? await repo.getFact(targetId) : null;
+    // Unstashed (ambiguous or unresolved at pre-pass): resolve here so an
+    // ambiguity question reaches the user as this action's failure copy.
+    target ??= await _resolveFactRef(p['factRef'] as String?);
     if (target == null) {
       throw ArgumentError(
         'I couldn\'t find that memory — check "What SidePal knows".',
@@ -1044,7 +1085,8 @@ class AiActionExecutor {
       throw StateError('Memory is not available in this build.');
     }
     final targetId = p['_targetFactId'] as String?;
-    final target = targetId != null ? await repo.getFact(targetId) : null;
+    var target = targetId != null ? await repo.getFact(targetId) : null;
+    target ??= await _resolveFactRef(p['factRef'] as String?);
     if (target == null) {
       throw ArgumentError(
         'I couldn\'t find that memory — check "What SidePal knows".',
@@ -1052,30 +1094,56 @@ class AiActionExecutor {
     }
     ops.add({'op': 'restoreFact', 'fact': target.toMap()});
     await repo.deleteFact(target.id);
-    return 'Forgotten.';
+    // Name the casualty (§8 E14): a bare "Forgotten." never revealed WHICH
+    // memory a fuzzy match deleted.
+    return 'Forgotten: "${target.content}".';
   }
 
-  /// Resolves a model-provided fact reference ("prefers morning workouts")
-  /// to a live fact: exact normalized match first, then containment either
-  /// way. Null when nothing matches — the handler surfaces the failure.
+  /// Resolves a model-provided fact reference to a live fact:
+  /// a `[mem:<id>]` marker or bare id first (the payload hands the model
+  /// exact ids — the most reliable ref), then exact normalized content,
+  /// then containment. AMBIGUOUS containment throws a question naming the
+  /// candidates (fix-wave Phase 6, §8 E14): "forget what I said about the
+  /// gym" used to silently tombstone whichever gym-fact was newest.
+  /// Null when nothing matches — the handler surfaces the failure.
   Future<MemoryFact?> _resolveFactRef(String? factRef) async {
     final repo = memoryFactsRepository;
     if (repo == null || factRef == null || factRef.trim().isEmpty) {
       return null;
     }
+    final facts = await repo.fetchFactsOnce();
+
+    final idMatch = RegExp(r'mem:([A-Za-z0-9_\-]+)').firstMatch(factRef);
+    final refId = idMatch?.group(1) ?? factRef.trim();
+    for (final f in facts) {
+      if (f.id == refId) return f;
+    }
+
     final needle = MemoryExtractionParser.normalizeForMatch(factRef);
     if (needle.isEmpty) return null;
-    final facts = await repo.fetchFactsOnce();
     for (final f in facts) {
       if (MemoryExtractionParser.normalizeForMatch(f.content) == needle) {
         return f;
       }
     }
-    for (final f in facts) {
-      final content = MemoryExtractionParser.normalizeForMatch(f.content);
-      if (content.contains(needle) || needle.contains(content)) return f;
+    final contained = [
+      for (final f in facts)
+        if (MemoryExtractionParser.normalizeForMatch(
+              f.content,
+            ).contains(needle) ||
+            needle.contains(MemoryExtractionParser.normalizeForMatch(f.content)))
+          f,
+    ];
+    if (contained.length > 1) {
+      final listed = contained
+          .take(3)
+          .map((f) => '"${f.content}"')
+          .join(' or ');
+      throw ArgumentError(
+        'I know a few memories like that — which one: $listed?',
+      );
     }
-    return null;
+    return contained.isEmpty ? null : contained.single;
   }
 
   // ─── Task handlers ────────────────────────────────────────────────────────

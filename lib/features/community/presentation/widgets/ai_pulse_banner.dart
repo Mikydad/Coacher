@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/ai_pulse_providers.dart';
+import '../../application/circle_ai_pulse_service.dart';
 import '../sheets/challenge_create_sheet.dart';
 
 import '../../../../core/presentation/app_colors.dart';
@@ -32,14 +33,26 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
       _updatedLabel = null;
     });
     try {
-      final pulse = await ref
+      final result = await ref
           .read(circleAiPulseServiceProvider)
           .generateDailyPulse(widget.circleId);
       if (mounted) {
+        // Honest per-outcome copy (fix-wave Phase 6, §8 H9): cooldown,
+        // no activity, offline, and save failure used to all read
+        // "Nothing new yet".
         setState(() {
-          _updatedLabel = pulse != null
-              ? 'Updated just now'
-              : 'Nothing new yet';
+          _updatedLabel = switch (result) {
+            PulseGenerated() => 'Updated just now',
+            PulseOnCooldown() =>
+              'A fresh pulse already ran — try again in a bit.',
+            PulseNoActivity() => 'Nothing new yet — no activity today.',
+            PulseAiUnavailable(isNetwork: true) =>
+              "You're offline — try again when connected.",
+            PulseAiUnavailable() =>
+              'AI is unavailable right now — try again shortly.',
+            PulseSaveFailed() =>
+              "Generated but couldn't save — tap to try again.",
+          };
         });
       }
     } finally {
@@ -308,7 +321,7 @@ class _PulsingDotState extends State<_PulsingDot>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _anim,
-      builder: (_, __) => Container(
+      builder: (_, child) => Container(
         width: 8,
         height: 8,
         decoration: BoxDecoration(
@@ -321,7 +334,7 @@ class _PulsingDotState extends State<_PulsingDot>
 }
 
 class _MemberAvatar extends StatelessWidget {
-  _MemberAvatar({required this.name, required this.userId});
+  const _MemberAvatar({required this.name, required this.userId});
   final String name;
   final String userId;
 

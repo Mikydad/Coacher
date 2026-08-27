@@ -15,6 +15,15 @@ final circleAiPulseServiceProvider = Provider<CircleAiPulseService>((ref) {
     pulseRepo: ref.read(aiPulseRepositoryProvider),
     feedRepo: ref.read(activityFeedRepositoryProvider),
     challengeRepo: ref.read(challengeRepositoryProvider),
+    // Attribution integrity (fix-wave Phase 6, §8 S5): parsed memberLines
+    // naming anyone outside the circle's real member list are dropped.
+    memberIdsLookup: (circleId) async {
+      final members = await ref
+          .read(circleMemberRepositoryProvider)
+          .watchMembers(circleId)
+          .first;
+      return {for (final m in members) m.userId};
+    },
   );
 });
 

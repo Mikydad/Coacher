@@ -126,10 +126,17 @@ final recomputeAiSummaryProvider = FutureProvider<AiSummaryResponse>((
     justCompletedTask: false,
   );
 
+  // Style-aware from the START (fix-wave Phase 6, §8 M10 as corrected by
+  // the GPT-5.6 cross-audit): the prompt's framing already honored the
+  // user's coaching style via CoachingAiPayload.fromFocus, but THIS early
+  // derivation — which decides summaryType and the cache TTL — defaulted
+  // to balanced, so a supportive user's cache keyed on the wrong framing.
+  final earlyStyle = ref.read(activeCoachingStyleProvider);
   final framing = deriveCoachingFraming(
     focusReason: focus.focusReason,
     focusScore: focus.focusScore,
     urgencyScore: focus.scoreBreakdown.urgencyScore,
+    coachingStyle: earlyStyle,
   );
   final summaryType = deriveSummaryType(
     framing: framing,

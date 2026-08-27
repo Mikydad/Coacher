@@ -101,14 +101,32 @@ class MemoryExtractionParser {
     return normalizeForMatch(transcript).contains(q);
   }
 
+  /// Throws [FormatException] on undecodable input (fix-wave Phase 6,
+  /// §8 M3): a token-truncated or malformed response used to parse as an
+  /// EMPTY extraction — indistinguishable from "nothing durable" — so the
+  /// session was marked extracted with zero facts written and the 48h
+  /// purge then deleted the raw turns permanently, against the module's
+  /// own "continuity is never silently lost" contract. Callers treat the
+  /// throw as a transport-grade failure: stay pending, retry.
   static ParsedExtraction parse(String content, String transcript) {
     Map<String, dynamic> decoded;
     try {
-      final raw = jsonDecode(content);
-      if (raw is! Map<String, dynamic>) return const ParsedExtraction();
+      // Fence-tolerant, like the reflection parser: models wrap JSON in
+      // markdown fences under drift even with response_format set.
+      var cleaned = content.trim();
+      final fence = RegExp(
+        r'^```(?:json)?\s*([\s\S]*?)\s*```$',
+      ).firstMatch(cleaned);
+      if (fence != null) cleaned = fence.group(1)!.trim();
+      final raw = jsonDecode(cleaned);
+      if (raw is! Map<String, dynamic>) {
+        throw const FormatException('extraction root is not an object');
+      }
       decoded = raw;
-    } catch (_) {
-      return const ParsedExtraction();
+    } on FormatException {
+      rethrow;
+    } catch (e) {
+      throw FormatException('extraction undecodable: $e');
     }
 
     final facts = <ExtractedFactCandidate>[];
@@ -141,6 +159,10 @@ class MemoryExtractionParser {
         if (entry is! Map) continue;
         final title = entry['title'];
         if (title is! String || title.trim().isEmpty) continue;
+        // Same 80-char cap the reflection parser enforces (fix-wave
+        // Phase 6): an uncapped observation title became an unbounded
+        // intention title bloating every future prompt.
+        if (title.trim().length > 80) continue;
         final minutes = entry['estimatedMinutes'];
         observations.add(
           ExtractedObservationCandidate(
