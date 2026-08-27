@@ -1,5 +1,6 @@
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
+import '../../goals/application/goal_period_helpers.dart';
 import '../../goals/data/goals_repository.dart';
 import '../../goals/domain/models/goal_enums.dart';
 import '../../goals/domain/models/user_goal.dart';
@@ -279,19 +280,31 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
           .toList();
       final suggestions = <ProactiveSuggestion>[];
 
+      final now = DateTime.now();
       for (final goal in goals) {
         if (goal.status != GoalStatus.active) continue;
 
-        final totalMs = goal.periodEndMs - goal.periodStartMs;
+        // Pace is measured inside the goal's current evaluation window
+        // (one repeat cycle, or the whole period for one-time goals) —
+        // the same semantics the Goals surfaces use, so this card can
+        // never contradict them (fix-wave Phase 0, §8 H7: progress used
+        // to be hardcoded 0, accusing every on-track goal of being
+        // "~elapsed% behind").
+        final window = GoalPeriodHelpers.evaluationWindow(goal, now);
+        final totalMs =
+            window.end.millisecondsSinceEpoch -
+            window.start.millisecondsSinceEpoch;
         if (totalMs <= 0) continue;
 
-        final elapsedMs =
-            DateTime.now().millisecondsSinceEpoch - goal.periodStartMs;
+        final elapsedMs = now.millisecondsSinceEpoch -
+            window.start.millisecondsSinceEpoch;
         final elapsedRatio = elapsedMs / totalMs;
         if (elapsedRatio <= 0 || elapsedRatio > 1.0) continue;
 
-        // If goal has a currentValue we use that; otherwise assume 0%
-        final currentProgress = _estimateGoalProgress(goal);
+        final currentProgress = await _actualGoalProgress(goal, window);
+        // No readable progress (target 0 / read failure) → say nothing
+        // rather than fabricate a number.
+        if (currentProgress == null) continue;
         final expectedProgress = elapsedRatio;
         final gap = expectedProgress - currentProgress;
 
@@ -425,15 +438,32 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
 
-  /// Estimates goal progress as a 0–1 ratio.
-  /// Currently uses a simple time-based proxy until a proper progress
-  /// tracking layer is added (Phase 5+).
-  double _estimateGoalProgress(UserGoal goal) {
-    // If the goal tracks completions in currentValue, use that
+  /// Real goal progress as a 0–1 ratio inside the current evaluation
+  /// window: sum of check-in values over the window ÷ targetValue — the
+  /// same accumulation `goalTodayProgressProvider` renders on the Goals
+  /// surfaces. Returns null when no honest number exists (target 0,
+  /// unreadable check-ins) so the caller stays silent instead of guessing.
+  Future<double?> _actualGoalProgress(
+    UserGoal goal,
+    ({DateTime start, DateTime end}) window,
+  ) async {
     final target = goal.targetValue;
-    if (target <= 0) return 0;
-    // Without a real current value, we conservatively return 0
-    // (meaning any behind-pace gap will surface the suggestion)
-    return 0;
+    if (target <= 0) return null;
+    try {
+      final startKey = DateKeys.yyyymmdd(window.start);
+      final endKey = DateKeys.yyyymmdd(window.end);
+      final checkIns = await goalsRepository.getCheckInsForGoal(
+        goal.id,
+        startDateKey: startKey,
+        endDateKey: endKey,
+      );
+      final currentValue = checkIns.fold<double>(
+        0.0,
+        (sum, c) => sum + (c.value ?? 0),
+      );
+      return (currentValue / target).clamp(0.0, 1.0);
+    } catch (_) {
+      return null;
+    }
   }
 }
