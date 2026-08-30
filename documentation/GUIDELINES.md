@@ -2407,3 +2407,44 @@ not silent reversal.
   work deferred to its own phase. *Why:* answered by Miko 2026-08-30 against
   the lettered options in `tasks/prd-reminder-system-v2.md`; recorded here so
   implementation sessions don't reopen them.
+
+- **2026-08-30 · Reminder V2 Phase R1 shipped: delivery correctness only.**
+  FR-R-01…08 on branch `feat/reminder-system-v2` (commits R1.1 + R1.2).
+  Boot reconciliation now reads BOTH OS queues — a future reminder lives only
+  in the pending queue, so comparing against the delivered tray alone marked
+  every correctly-armed reminder lost and re-delivered it at app open (T1);
+  `reEvaluateIfAppropriate` respects `enabled`, re-arms at the ORIGINAL time,
+  and can no longer propose `now`. The task path cancels only when it will
+  not arm a replacement (C6); the snooze interaction is sequenced before the
+  re-plan (L2); escalation persists on ignores and the ignore stamps the
+  reminder so one missed notification cannot be counted once per app-open
+  (M2/C7); timezone failure is recorded and retried on resume instead of
+  running a whole session silently in UTC (T3); `copyWith` can clear
+  nullables (L4). *Why:* these eight would have poisoned every later phase —
+  V2's state machine cannot be built on a boot pass that fabricates
+  deliveries. *Judgment calls worth not relitigating:* (a) a reconciled row
+  whose time has PASSED is cancelled and left for the R2 state machine, never
+  delivered — boot is not allowed to decide Overdue vs Expired; (b) a
+  restored reminder is typed `ReminderType.scheduled`, not `followUp`,
+  because it is the user's own first delivery and the CoachingStyle back-off
+  must not suppress it; (c) `RoutineModePolicy.baseSnoozeMinutes` was
+  DELETED rather than delegated — tracing all 15 references found no code
+  that read it to produce a delay, so T5 was a dormant duplicate, not a live
+  divergence, and `AdaptiveReminderPolicy` is now documented as the single
+  cadence source. *Still open from R1:* FR-R-06's user-facing half (the
+  reminder health row) is FR-R-80 / task 6.1 in R2 — the flags it reads
+  (`isTimeZoneResolved`, `timeZoneFailureReason`) ship here. The
+  airplane-mode QA pass per FR-R-70 is manual and not yet run. **R1 does not
+  fix "reminds once then goes silent"** — that is C1/C2/C3/C4, and it dies in
+  R2 (state spine, goal double-arm) and R3 (ladder engine).
+
+- **2026-08-30 · Reminder V2 task-list sequencing: the template bank moves to
+  R3.** PRD §11 assigns FR-R-63 (copy) wholly to R4, but FR-R-34 (R3)
+  requires every compiled ladder slot to carry a pre-written string. The
+  deterministic half of the template bank is therefore task 8.0 in R3, and R4
+  adds only the AI-generated per-task variants on top. *Why:* R3 cannot ship
+  a working ladder without strings, and composing at delivery time would
+  violate the PRD's one architecture rule. *Also pulled forward:*
+  `ReminderConfig.copyWith`'s inability to clear nullables (AUDIT L4) is not
+  in FR-R-01…08 but every nullable R2 adds would inherit the trap, so it
+  shipped in R1.
