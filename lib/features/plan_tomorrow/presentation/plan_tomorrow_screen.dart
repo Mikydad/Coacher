@@ -14,6 +14,7 @@ import '../../add_task/presentation/add_task_sheet.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/domain/models/block.dart';
 import '../../planning/domain/models/routine.dart';
+import '../../reminders/application/reminder_sync_service.dart';
 import '../../planning/domain/models/routine_mode.dart';
 import '../../planning/domain/models/task_item.dart';
 import '../../analytics/application/delivery_providers.dart';
@@ -226,7 +227,15 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
         priority: t.priority,
         orderIndex: orderIndex,
         reminderEnabled: t.reminderEnabled,
-        reminderTimeIso: t.reminderTimeIso,
+        // The reminder's DATE moves with the task, its time of day stays put
+        // (AUDIT §10 C3). Leaving yesterday's date here is what made a
+        // carried-forward task arm nothing at all.
+        reminderTimeIso:
+            ReminderSyncService.shiftIsoToDate(
+              t.reminderTimeIso,
+              DateTime.now().add(const Duration(days: 1)),
+            )?.toIso8601String() ??
+            t.reminderTimeIso,
         status: TaskStatus.notStarted,
         createdAtMs: t.createdAtMs,
         updatedAtMs: now,
@@ -239,6 +248,12 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
         modeRefId: t.modeRefId,
       ),
     );
+    await ref
+        .read(reminderSyncServiceProvider)
+        .shiftToDate(
+          t.id,
+          targetDay: DateTime.now().add(const Duration(days: 1)),
+        );
     // migrated to coordinator
     await ScheduleMutationCoordinator.instance.run(
       TaskUpdatedMutation(

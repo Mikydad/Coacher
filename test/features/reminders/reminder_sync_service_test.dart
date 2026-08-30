@@ -352,4 +352,85 @@ void main() {
 
     expect(orchestrator.evaluated, isEmpty);
   });
+
+  // ── C3: a task carried to tomorrow keeps a reminder ────────────────────────
+
+  group('shiftToDate — carry-forward (AUDIT §10 C3)', () {
+    test('shiftIsoToDate moves the date and keeps the time of day', () {
+      final shifted = ReminderSyncService.shiftIsoToDate(
+        DateTime(2026, 3, 24, 7, 45).toIso8601String(),
+        DateTime(2026, 3, 25, 23, 59),
+      );
+      expect(shifted, DateTime(2026, 3, 25, 7, 45));
+    });
+
+    test('shiftIsoToDate is null-safe', () {
+      expect(
+        ReminderSyncService.shiftIsoToDate(null, DateTime(2026, 3, 25)),
+        isNull,
+      );
+      expect(
+        ReminderSyncService.shiftIsoToDate('not a date', DateTime(2026, 3, 25)),
+        isNull,
+      );
+    });
+
+    test(
+      'moving a task to tomorrow re-arms its reminder instead of silently '
+      'dropping it',
+      () async {
+        final now = DateTime(2026, 3, 24, 10, 0);
+        // A reminder set for 07:00 today — already past, so today it arms
+        // nothing, which is exactly the state a carried task inherits.
+        final repo = _FakeReminderRepository()
+          ..seed([
+            _reminder(now: now, pendingAction: false).copyWith(
+              scheduledAtIso: DateTime(2026, 3, 24, 7, 0).toIso8601String(),
+            ),
+          ]);
+        final orchestrator = _FakeOrchestratorService();
+        final service = _makeService(repo, orchestrator, now);
+
+        // Before: nothing to arm — the past timestamp yields no intent.
+        await service.scheduleFromCache();
+        expect(orchestrator.evaluated, isEmpty);
+
+        await service.shiftToDate('t1', targetDay: DateTime(2026, 3, 25));
+
+        final stored = (await repo.listAllReminders()).single;
+        expect(
+          DateTime.parse(stored.scheduledAtIso!),
+          DateTime(2026, 3, 25, 7, 0),
+        );
+        // And it is armed again.
+        expect(orchestrator.evaluated, hasLength(1));
+        expect(
+          orchestrator.evaluated.single.proposedAt,
+          DateTime(2026, 3, 25, 7, 0),
+        );
+      },
+    );
+
+    test('shiftToDate clears any stale escalation state', () async {
+      final now = DateTime(2026, 3, 24, 10, 0);
+      final repo = _FakeReminderRepository()
+        ..seed([_reminder(now: now, escalationLevel: 3)]);
+      final service = _makeService(repo, _FakeOrchestratorService(), now);
+
+      await service.shiftToDate('t1', targetDay: DateTime(2026, 3, 25));
+
+      final stored = (await repo.listAllReminders()).single;
+      expect(stored.escalationLevel, 0);
+      expect(stored.pendingAction, isFalse);
+      expect(stored.nextPromptAtIso, isNull);
+    });
+
+    test('shiftToDate on an unknown task is a safe no-op', () async {
+      final now = DateTime(2026, 3, 24, 10, 0);
+      final repo = _FakeReminderRepository()..seed([]);
+      final service = _makeService(repo, _FakeOrchestratorService(), now);
+      await service.shiftToDate('nobody', targetDay: DateTime(2026, 3, 25));
+      expect(await repo.listAllReminders(), isEmpty);
+    });
+  });
 }

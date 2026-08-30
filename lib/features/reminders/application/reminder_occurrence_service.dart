@@ -1,0 +1,264 @@
+import 'package:flutter/foundation.dart';
+
+import '../../../core/utils/date_keys.dart';
+import '../../../core/utils/stable_id.dart';
+import '../data/reminder_occurrence_repository.dart';
+import '../data/reminder_repository.dart';
+import '../domain/models/reminder_config.dart';
+import '../domain/models/reminder_occurrence.dart';
+import '../domain/models/reminder_occurrence_enums.dart';
+import 'adaptive_reminder_policy.dart';
+import 'notification_route_resolver.dart';
+import 'reminder_state_machine.dart';
+
+/// What one [L-ALIVE] sweep did — returned so callers can log it and tests
+/// can assert on it without reaching into the repository.
+class ReminderSweepResult {
+  const ReminderSweepResult({
+    this.advanced = 0,
+    this.created = 0,
+    this.nowOverdue = 0,
+  });
+
+  /// Occurrences whose state moved.
+  final int advanced;
+
+  /// Occurrences created by the backfill.
+  final int created;
+
+  /// Of [advanced], how many became overdue — the number the Recovery Card
+  /// is about to show.
+  final int nowOverdue;
+
+  bool get didWork => advanced > 0 || created > 0;
+
+  @override
+  String toString() =>
+      'ReminderSweepResult(advanced: $advanced, created: $created, '
+      'nowOverdue: $nowOverdue)';
+}
+
+/// Keeps [ReminderOccurrence] rows in step with reality (FR-R-12 / FR-R-13).
+///
+/// This is the [L-ALIVE] layer: it runs when the app is alive — open, resume,
+/// timer end, check-in, day change — and does two things.
+///
+/// 1. **Advance.** Every unresolved occurrence is re-evaluated against the
+///    clock. Because [ReminderStateMachine] is retroactive, the app does not
+///    need to have been running when a window closed; a sweep at 6 PM
+///    correctly concludes what happened at 3:10 PM.
+/// 2. **Backfill.** Every enabled [ReminderConfig] gets an occurrence for the
+///    day it is scheduled on, so rows that predate V2 join the machine
+///    (PRD §9) and a newly saved reminder is immediately represented.
+///
+/// Every read and write is local. Nothing here awaits the network.
+class ReminderOccurrenceService {
+  ReminderOccurrenceService({
+    required ReminderOccurrenceRepository occurrences,
+    required ReminderRepository reminders,
+    DateTime Function()? now,
+  }) : _occurrences = occurrences,
+       _reminders = reminders,
+       _now = now ?? DateTime.now;
+
+  final ReminderOccurrenceRepository _occurrences;
+  final ReminderRepository _reminders;
+  final DateTime Function() _now;
+
+  /// Backfill horizon. A config scheduled before the start of today does NOT
+  /// get an occurrence conjured for it.
+  ///
+  /// Without this bound, the first sweep after upgrading would mint an
+  /// occurrence for every stale config in the database and immediately mark
+  /// them overdue — greeting the user with a wall of months-old misses they
+  /// can do nothing about. V2's promise is "nothing is lost from here on",
+  /// not "here is everything you ever missed".
+  static DateTime _backfillFloor(DateTime now) =>
+      DateTime(now.year, now.month, now.day);
+
+  /// One [L-ALIVE] pass.
+  Future<ReminderSweepResult> sweep() async {
+    final now = _now();
+    try {
+      final created = await _backfill(now);
+      final advanced = await _advance(now);
+      final result = ReminderSweepResult(
+        advanced: advanced.length,
+        created: created,
+        nowOverdue: advanced
+            .where((o) => o.state == ReminderOccurrenceState.overdue)
+            .length,
+      );
+      if (result.didWork) {
+        debugPrint('[ReminderOccurrence] sweep: $result');
+      }
+      return result;
+    } catch (e, st) {
+      debugPrint('[ReminderOccurrence] sweep failed: $e\n$st');
+      return const ReminderSweepResult();
+    }
+  }
+
+  Future<List<ReminderOccurrence>> _advance(DateTime now) async {
+    final open = await _occurrences.listUnresolved();
+    if (open.isEmpty) return const [];
+    final changed = ReminderStateMachine.advanceAll(open, now: now);
+    if (changed.isEmpty) return const [];
+    await _occurrences.upsertAll(changed);
+    return changed;
+  }
+
+  Future<int> _backfill(DateTime now) async {
+    final configs = await _reminders.listAllReminders();
+    if (configs.isEmpty) return 0;
+
+    final floorMs = _backfillFloor(now).millisecondsSinceEpoch;
+    final toCreate = <ReminderOccurrence>[];
+
+    for (final config in configs) {
+      if (!config.enabled) continue;
+      final scheduledAt = _scheduledAtOf(config);
+      if (scheduledAt == null) continue;
+      if (scheduledAt.millisecondsSinceEpoch < floorMs) continue;
+
+      final dateKey = DateKeys.yyyymmdd(scheduledAt);
+      final existing = await _occurrences.findByKey(
+        entityKind: ReminderEntityKinds.task,
+        entityId: config.taskId,
+        dateKey: dateKey,
+      );
+      if (existing != null) continue;
+
+      toCreate.add(
+        occurrenceForConfig(config, scheduledAt: scheduledAt, now: now),
+      );
+    }
+
+    if (toCreate.isEmpty) return 0;
+    await _occurrences.upsertAll(toCreate);
+    return toCreate.length;
+  }
+
+  /// Builds (but does not persist) the occurrence a config implies.
+  ///
+  /// Classification defaults to the migration values from PRD §9 — flexible,
+  /// criticality 1 — because the heuristic classifier is task 4.0. When it
+  /// lands it overwrites these, except where the user has spoken.
+  @visibleForTesting
+  static ReminderOccurrence occurrenceForConfig(
+    ReminderConfig config, {
+    required DateTime scheduledAt,
+    required DateTime now,
+  }) {
+    final nowMs = now.millisecondsSinceEpoch;
+    return ReminderOccurrence(
+      id: StableId.generate('rocc'),
+      entityId: config.taskId,
+      entityKind: ReminderEntityKinds.task,
+      dateKey: DateKeys.yyyymmdd(scheduledAt),
+      scheduledAtMs: scheduledAt.millisecondsSinceEpoch,
+      windowMinutes: AdaptiveReminderPolicy.windowMinutesFor(config.modeRefId),
+      entityTitle: config.taskTitle,
+      modeRefId: config.modeRefId,
+      state: ReminderOccurrenceState.upcoming,
+      classificationSource: ClassificationSource.migration,
+      createdAtMs: nowMs,
+      updatedAtMs: nowMs,
+    );
+  }
+
+  /// Ensure the occurrence for a just-saved config exists and matches it.
+  ///
+  /// Called on the save path so a reminder the user just set is represented
+  /// immediately, rather than at the next sweep.
+  Future<ReminderOccurrence?> ensureForConfig(ReminderConfig config) async {
+    if (!config.enabled) return null;
+    final scheduledAt = _scheduledAtOf(config);
+    if (scheduledAt == null) return null;
+
+    final now = _now();
+    final dateKey = DateKeys.yyyymmdd(scheduledAt);
+    final existing = await _occurrences.findByKey(
+      entityKind: ReminderEntityKinds.task,
+      entityId: config.taskId,
+      dateKey: dateKey,
+    );
+
+    if (existing != null) {
+      // An already-resolved day is not reopened by a config edit; the edit
+      // produces the NEXT occurrence instead.
+      if (existing.isResolved) return existing;
+      final updated = existing.copyWith(
+        scheduledAtMs: scheduledAt.millisecondsSinceEpoch,
+        windowMinutes: AdaptiveReminderPolicy.windowMinutesFor(
+          config.modeRefId,
+        ),
+        entityTitle: config.taskTitle,
+        modeRefId: config.modeRefId,
+        updatedAtMs: now.millisecondsSinceEpoch,
+      );
+      final advanced = ReminderStateMachine.advance(updated, now: now);
+      await _occurrences.upsert(advanced);
+      return advanced;
+    }
+
+    final created = ReminderStateMachine.advance(
+      occurrenceForConfig(config, scheduledAt: scheduledAt, now: now),
+      now: now,
+    );
+    await _occurrences.upsert(created);
+    return created;
+  }
+
+  /// Resolve whatever occurrence [entityId] currently has open (FR-R-13).
+  ///
+  /// Completing, skipping or rescheduling a task is one user gesture: the
+  /// local write and the state change happen together, with no network in
+  /// between.
+  Future<ReminderOccurrence?> resolveForEntity(
+    String entityId, {
+    required ReminderResolutionKind kind,
+    String? reason,
+  }) async {
+    final open = await _openFor(entityId);
+    if (open == null) return null;
+    final resolved = ReminderStateMachine.resolve(
+      open,
+      kind: kind,
+      reason: reason,
+      now: _now(),
+    );
+    await _occurrences.upsert(resolved);
+    return resolved;
+  }
+
+  /// The user started this entity — a timer, a focus session, a check-in.
+  Future<ReminderOccurrence?> markActiveForEntity(String entityId) async {
+    final open = await _openFor(entityId);
+    if (open == null) return null;
+    final active = ReminderStateMachine.markActive(open, now: _now());
+    if (identical(active, open)) return open;
+    await _occurrences.upsert(active);
+    return active;
+  }
+
+  /// The entity is gone. Its occurrences go with it — a deleted task must not
+  /// keep surfacing on the Recovery Card.
+  Future<void> deleteForEntity(String entityId) =>
+      _occurrences.deleteForEntity(entityId);
+
+  /// The most recent unresolved occurrence for [entityId], if any.
+  Future<ReminderOccurrence?> _openFor(String entityId) async {
+    final rows = await _occurrences.listForEntity(entityId);
+    for (final row in rows) {
+      if (!row.isResolved) return row;
+    }
+    return null;
+  }
+
+  static DateTime? _scheduledAtOf(ReminderConfig config) {
+    final iso = config.scheduledAtIso;
+    if (iso == null) return null;
+    return DateTime.tryParse(iso);
+  }
+}

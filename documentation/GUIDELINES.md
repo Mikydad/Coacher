@@ -2476,3 +2476,21 @@ not silent reversal.
   rather than to whenever the app noticed. `requiresResolutionReason` states
   Extreme's contract; the surface offering the choice enforces it, because a
   state machine that silently refuses a write is the worse failure.
+
+- **2026-08-30 · AUDIT §10 C3 corrected: there is no task recurrence model, so
+  "recurring task roll-forward" has no subject — carry-forward does.** The
+  audit framed C3 as "habit-style tasks that recur daily remind exactly once
+  in their life". Reading the planning domain: `Routine` carries its own
+  `dateKey` (routines are per-day containers), Plan-Tomorrow mints a fresh
+  routine + blocks + tasks with new `StableId`s, and a task's `planDateKey`
+  pins it to one day. Nothing recurs. What *is* real is
+  `_moveToTomorrow` (`plan_tomorrow_screen.dart`): it reuses the SAME task id
+  and preserves `reminderTimeIso`, which still carries yesterday's date, and
+  never moves the config's `scheduledAtIso` either — so `_nextReminderTime`
+  parses a past timestamp, returns null, and a carried-forward task is armed
+  with nothing. The reminder silently stops existing the moment the user moves
+  the task. *Fix:* `ReminderSyncService.shiftToDate` moves the date and keeps
+  the time of day, resolves the old day's occurrence as `rescheduled`, and
+  re-arms; the carry-forward UI shifts `reminderTimeIso` with the same helper.
+  *Why this is recorded:* a later session reading C3 would otherwise go
+  looking for a recurrence engine to fix, or build one that has no callers.

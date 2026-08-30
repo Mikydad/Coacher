@@ -29,6 +29,7 @@ import '../../features/reminders/application/attention_orchestrator_providers.da
 import '../../features/reminders/application/reminder_sync_service.dart';
 import '../../features/reminders/data/isar_reminder_repository.dart';
 import '../../features/reminders/data/reminder_cache_store.dart';
+import '../../features/reminders/application/reminder_occurrence_service.dart';
 import '../../features/reminders/data/isar_reminder_occurrence_repository.dart';
 import '../../features/reminders/data/reminder_occurrence_repository.dart';
 import '../../features/reminders/data/reminder_repository.dart';
@@ -123,6 +124,14 @@ final reminderOccurrenceRepositoryProvider =
       (ref) => const IsarReminderOccurrenceRepository(),
     );
 
+/// The [L-ALIVE] layer: advances occurrences and backfills missing ones.
+final reminderOccurrenceServiceProvider = Provider<ReminderOccurrenceService>(
+  (ref) => ReminderOccurrenceService(
+    occurrences: ref.read(reminderOccurrenceRepositoryProvider),
+    reminders: ref.read(reminderRepositoryProvider),
+  ),
+);
+
 /// Everything the state machine still owns, straight off the Isar watch
 /// stream. The Recovery Card reads this — never an invalidate-and-refetch;
 /// the local write IS the update.
@@ -144,6 +153,7 @@ final reminderSyncServiceProvider = Provider<ReminderSyncService>(
       ref.read(localNotificationsServiceProvider),
     ),
     orchestratorService: ref.read(attentionOrchestratorServiceProvider),
+    occurrenceService: ref.read(reminderOccurrenceServiceProvider),
   ),
 );
 

@@ -4,9 +4,11 @@ import '../../../core/notifications/local_notifications_service.dart';
 import '../../../core/utils/stable_id.dart';
 import 'adaptive_reminder_policy.dart';
 import 'attention_orchestrator_service.dart';
+import 'reminder_occurrence_service.dart';
 import 'interruption_level_resolver.dart';
 import '../data/reminder_repository.dart';
 import '../domain/models/reminder_config.dart';
+import '../domain/models/reminder_occurrence_enums.dart';
 import '../domain/models/reminder_intent.dart';
 import '../domain/models/reminder_type.dart';
 
@@ -78,16 +80,23 @@ class ReminderSyncService {
     required ReminderRepository repository,
     required ReminderNotificationsPort notifications,
     required AttentionOrchestratorService orchestratorService,
+
+    /// The V2 state machine's [L-ALIVE] layer. Optional so existing tests and
+    /// legacy wiring keep working; when absent, occurrences simply are not
+    /// tracked and nothing else changes.
+    ReminderOccurrenceService? occurrenceService,
     DateTime Function()? now,
   }) : _repository = repository,
        _notifications = notifications,
        _orchestrator = orchestratorService,
+       _occurrences = occurrenceService,
        _now = now ?? DateTime.now;
 
   final ReminderRepository _repository;
   // Kept for: requestPermissionsIfNeeded, and goal-reminder direct scheduling.
   final ReminderNotificationsPort _notifications;
   final AttentionOrchestratorService _orchestrator;
+  final ReminderOccurrenceService? _occurrences;
   final DateTime Function() _now;
 
   Future<bool> ensurePermissions() =>
@@ -99,6 +108,14 @@ class ReminderSyncService {
     await _repository.hydrateFromRemoteForTasks(taskIds);
     final reminders = await _repository.listAllReminders();
     await _applyReminders(reminders);
+    // A reminder the user just set should exist in the state machine now, not
+    // at the next sweep — the Recovery Card and the task row read occurrences.
+    final ids = taskIds.toSet();
+    for (final r in reminders) {
+      if (ids.contains(r.taskId)) {
+        await _occurrences?.ensureForConfig(r);
+      }
+    }
   }
 
   Future<void> scheduleFromCache() async {
@@ -106,8 +123,33 @@ class ReminderSyncService {
     await _applyReminders(reminders);
   }
 
-  Future<void> markTaskStarted(String taskId) =>
-      _resolveReminder(taskId, keepEnabled: false);
+  /// The user started the task (timer/focus start). `Active` is an opt-in
+  /// signal: it stops the ladder without claiming the task is done.
+  Future<void> markTaskStarted(String taskId) async {
+    await _occurrences?.markActiveForEntity(taskId);
+    await _resolveReminder(taskId, keepEnabled: false);
+  }
+
+  /// The user completed the task — the occurrence is resolved in the same
+  /// gesture as the local write (FR-R-13), with no network in between.
+  Future<void> markTaskCompleted(String taskId) async {
+    await _occurrences?.resolveForEntity(
+      taskId,
+      kind: ReminderResolutionKind.completed,
+    );
+    await _resolveReminder(taskId, keepEnabled: false);
+  }
+
+  /// The user skipped or rescheduled it. [reason] is required by Extreme mode
+  /// (FR-R-42) and enforced by the surface offering the choice.
+  Future<void> markTaskDeferred(
+    String taskId, {
+    required ReminderResolutionKind kind,
+    String? reason,
+  }) async {
+    await _occurrences?.resolveForEntity(taskId, kind: kind, reason: reason);
+    await _resolveReminder(taskId, keepEnabled: false);
+  }
 
   /// Task deleted: cancel the armed OS notification AND delete the config.
   /// Deleting the config matters as much as the cancel — `scheduleFromCache`
@@ -116,10 +158,82 @@ class ReminderSyncService {
   Future<void> removeForDeletedTask(String taskId) async {
     await _orchestrator.cancelForEntity(taskId);
     await _repository.deleteRemindersForTask(taskId);
+    // A deleted task must stop surfacing on the Recovery Card.
+    await _occurrences?.deleteForEntity(taskId);
   }
 
-  Future<void> markLogicalReasonProvided(String taskId) =>
-      _resolveReminder(taskId, keepEnabled: false);
+  /// The user gave a logical reason instead of doing it — a deferral, which
+  /// resolves the occurrence as skipped and carries the reason into the
+  /// record Extreme mode demands (FR-R-42).
+  Future<void> markLogicalReasonProvided(String taskId, {String? reason}) async {
+    await _occurrences?.resolveForEntity(
+      taskId,
+      kind: ReminderResolutionKind.skipped,
+      reason: reason,
+    );
+    await _resolveReminder(taskId, keepEnabled: false);
+  }
+
+  /// Move a task's reminder onto [targetDay], keeping its time of day.
+  ///
+  /// AUDIT §10 C3, precisely located. Carrying a task to tomorrow
+  /// (`_moveToTomorrow`) reuses the SAME task id and preserves
+  /// `reminderTimeIso` — which still carries yesterday's date. The config's
+  /// `scheduledAtIso` is likewise never moved, so `_nextReminderTime` parses
+  /// a past timestamp, returns null, and the carried task is armed with
+  /// nothing. The reminder silently stops existing the moment the user moves
+  /// the task.
+  ///
+  /// (The audit framed C3 as "recurring tasks remind once in their life".
+  /// There is no task recurrence model here — routines are per-day containers
+  /// and each day's tasks are new rows — so carry-forward is the real and
+  /// only subject.)
+  ///
+  /// The old day's occurrence resolves as `rescheduled`; the new day gets its
+  /// own, which is the whole point of occurrences being separate from config.
+  Future<void> shiftToDate(String taskId, {required DateTime targetDay}) async {
+    final reminders = await _repository.listAllReminders();
+    final i = reminders.indexWhere((r) => r.taskId == taskId);
+    if (i < 0) return;
+    final current = reminders[i];
+
+    final shifted = shiftIsoToDate(current.scheduledAtIso, targetDay);
+    if (shifted == null) return;
+
+    // The day that is being left behind was not completed — it moved.
+    await _occurrences?.resolveForEntity(
+      taskId,
+      kind: ReminderResolutionKind.rescheduled,
+    );
+
+    final nowMs = _now().millisecondsSinceEpoch;
+    final updated = current.copyWith(
+      scheduledAtIso: shifted.toIso8601String(),
+      pendingAction: false,
+      escalationLevel: 0,
+      nextPromptAtIso: null,
+      updatedAtMs: nowMs,
+    );
+    await _upsertQuietly(updated);
+    await _applyReminders(await _repository.listAllReminders());
+    await _occurrences?.ensureForConfig(updated);
+  }
+
+  /// Rebuilds [iso] on [targetDay], keeping hour/minute. Null when [iso] is
+  /// absent or unparseable.
+  static DateTime? shiftIsoToDate(String? iso, DateTime targetDay) {
+    if (iso == null) return null;
+    final parsed = DateTime.tryParse(iso);
+    if (parsed == null) return null;
+    return DateTime(
+      targetDay.year,
+      targetDay.month,
+      targetDay.day,
+      parsed.hour,
+      parsed.minute,
+      parsed.second,
+    );
+  }
 
   /// Produces a follow-up [ReminderIntent] and passes it through the
   /// orchestrator pipeline (replaces the old direct-schedule snooze path).

@@ -172,28 +172,32 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
       `IsarGoalCheckIn` pattern), shared by tasks and goals — not on
       `ReminderConfig`, which stays the user's long-lived *config*. Recurring
       task roll-forward (C3) is folded in here alongside the goal double-arm
-      (C4).
+      (C4) — but see the C3 note: there is no task recurrence model, so C3's
+      real subject is the carry-forward flow.
   - [x] 3.1 Extend `ReminderConfig` + `IsarReminder` with `state`, `taxonomy`,
         `criticality`, `windowMinutes`, `ladderPosition`, `overdueSinceMs`,
         `resolutionKind`, `resolutionReason`, `classificationSource`,
         `classifierVersion`; regenerate with build_runner.
-  - [~] 3.2 Extend `toMap`/`fromMap` and the merge phase so the new fields
+  - [x] 3.2 Extend `toMap`/`fromMap` and the merge phase so the new fields
         replicate LWW on `updatedAtMs`; migrate existing rows to
         `{flexible, criticality 1, source: migration}` (PRD §9).
-        *Serialization + `_pullReminderOccurrences` merge phase done; the
-        backfill of existing `ReminderConfig` rows into occurrences rides on
-        the [L-ALIVE] wiring in 3.5.*
+        *Backfill is horizon-bounded: configs scheduled before the start of
+        today are NOT resurrected, so upgrading does not greet the user with
+        a wall of months-old misses.*
   - [x] 3.3 Write the pure transition module (`reminder_state_machine.dart`):
         `advance(config, now, plan, interactions) → ReminderState` with an
         injected clock and zero I/O.
   - [x] 3.4 Make Due→Overdue/Expired retroactive — evaluated from
         `windowEnd` vs `now`, never requiring the app to have been alive.
-  - [ ] 3.5 Call the machine from every [L-ALIVE] trigger (app open, resume,
+  - [x] 3.5 Call the machine from every [L-ALIVE] trigger (app open, resume,
         timer end, check-in, day change, override end) via the recompute graph.
-  - [ ] 3.6 Cancel remaining slots + write state in the same gesture on
+  - [x] 3.6 Cancel remaining slots + write state in the same gesture on
         complete / start / delete / reschedule.
   - [ ] 3.7 Arm the **next** goal occurrence at the same time as the current one
         (two armed max) so a missed app-open cannot silence a daily goal. (C4)
+        *Needs slot-aware goal notification ids (`idFromGoalId(id, slot:)`)
+        mirrored in the route resolver — today's entity-scoped cancel would
+        make slot 1 destroy slot 0.*
   - [ ] 3.8 Tests: retroactive transition with a fake clock; goal double-arm;
         resolution cancels slots; migration defaults.
 

@@ -95,7 +95,9 @@ Future<bool> completeTaskFromNotification(
 
     // Clears the reminder config and cancels the OS notification.
     try {
-      await container.read(reminderSyncServiceProvider).markTaskStarted(taskId);
+      await container
+          .read(reminderSyncServiceProvider)
+          .markTaskCompleted(taskId);
     } catch (e) {
       debugPrint('[NotifTap] done: reminder cleanup failed: $e');
     }

@@ -145,6 +145,24 @@ class UnifiedRecomputeGraph {
     // throttled inside rearmIfStale so frequent flushes stay cheap. All
     // reads are local (IsarGoalsRepository), so this is airplane-mode safe.
     if (scope.notifications) {
+      // The reminder state machine's [L-ALIVE] pass (FR-R-12): advance every
+      // unresolved occurrence against the clock and backfill any enabled
+      // config that has no occurrence yet. Retroactive, so a window that
+      // closed while the app was dead is still resolved correctly. All reads
+      // are local — airplane-mode safe.
+      try {
+        if (_generationChanged(capturedGeneration)) return;
+        final sweep = await container
+            .read(reminderOccurrenceServiceProvider)
+            .sweep();
+        if (sweep.didWork) {
+          debugPrint('[UnifiedRecomputeGraph] step:reminderOccurrences $sweep');
+        }
+      } catch (e) {
+        debugPrint(
+          '[UnifiedRecomputeGraph] step:reminderOccurrences failed: $e',
+        );
+      }
       try {
         final goals = await container
             .read(goalsRepositoryProvider)

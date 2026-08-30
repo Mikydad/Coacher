@@ -96,7 +96,7 @@ Future<void> completePlannedTaskRow(
         'task_completed_${sourceSurface}_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
     modeRefId: t.modeRefId,
   );
-  await ref.read(reminderSyncServiceProvider).markTaskStarted(t.id);
+  await ref.read(reminderSyncServiceProvider).markTaskCompleted(t.id);
   // migrated to coordinator
   await ScheduleMutationCoordinator.instance.run(
     TaskCompletedMutation(
