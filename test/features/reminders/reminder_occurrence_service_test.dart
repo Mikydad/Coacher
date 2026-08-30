@@ -58,6 +58,11 @@ class _FakeOccurrences implements ReminderOccurrenceRepository {
   Stream<List<ReminderOccurrence>> watchUnresolved() => const Stream.empty();
 
   @override
+  Stream<List<ReminderOccurrence>> watchRecoveryPool({
+    required int todayStartMs,
+  }) => const Stream.empty();
+
+  @override
   Stream<List<ReminderOccurrence>> watchForEntity(String entityId) =>
       const Stream.empty();
 }

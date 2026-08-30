@@ -399,7 +399,7 @@ Color _derivedAccent(
   return HSLColor.fromAHSL(1, hue, saturation, lightness).toColor();
 }
 
-class _HubTaskTile extends StatelessWidget {
+class _HubTaskTile extends ConsumerWidget {
   const _HubTaskTile({
     required this.row,
     required this.onEdit,
@@ -436,14 +436,19 @@ class _HubTaskTile extends StatelessWidget {
   };
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = row.task;
+    final isOverdue = ref.watch(overdueEntityIdsProvider).contains(t.id);
     final accent = _taskAccent(t);
     final done = t.status == TaskStatus.completed;
 
     // Meta chunks, each rendered as its own span so the reminder can carry
     // a bell in the accent color mid-line.
     final chunks = <(String, bool)>[
+      // Overdue leads and takes the accent flag: it is the one thing on this
+      // row that is asking for something (FR-R-50's task-list badge). Uses
+      // the row's existing meta-span mechanism rather than a bolted-on chip.
+      if (isOverdue) ('Overdue', true),
       if (t.durationMinutes > 0) ('${t.durationMinutes} min', false),
       if (t.category != null && t.category!.trim().isNotEmpty)
         (t.category!, false),

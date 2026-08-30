@@ -56,6 +56,7 @@ class IsarReminderOccurrence {
   String? resolutionKind;
   String? resolutionReason;
   int? resolvedAtMs;
+  String? dismissedForDayKey;
   late int createdAtMs;
 
   static String keyFor(String entityKind, String entityId, String dateKey) =>
@@ -83,6 +84,7 @@ class IsarReminderOccurrence {
       ..resolutionKind = o.resolutionKind?.toStorage()
       ..resolutionReason = o.resolutionReason
       ..resolvedAtMs = o.resolvedAtMs
+      ..dismissedForDayKey = o.dismissedForDayKey
       ..createdAtMs = o.createdAtMs;
   }
 
@@ -108,6 +110,7 @@ class IsarReminderOccurrence {
       resolutionKind: ReminderResolutionKind.fromStorage(resolutionKind),
       resolutionReason: resolutionReason,
       resolvedAtMs: resolvedAtMs,
+      dismissedForDayKey: dismissedForDayKey,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs,
     );

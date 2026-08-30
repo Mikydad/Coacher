@@ -302,6 +302,24 @@ class ReminderOccurrenceService {
     return active;
   }
 
+  /// Wave a row off the Recovery Card for today (FR-R-40, Flexible only).
+  ///
+  /// Deliberately not a resolution: the task is still undone, so the
+  /// occurrence keeps its state and its overdue history, and day rollover
+  /// carries it into Plan-Tomorrow as a suggestion. It just stops being
+  /// mentioned for the rest of today.
+  Future<ReminderOccurrence?> dismissForToday(String entityId) async {
+    final open = await _openFor(entityId);
+    if (open == null) return null;
+    final now = _now();
+    final dismissed = open.copyWith(
+      dismissedForDayKey: DateKeys.todayKey(now),
+      updatedAtMs: now.millisecondsSinceEpoch,
+    );
+    await _occurrences.upsert(dismissed);
+    return dismissed;
+  }
+
   /// The entity is gone. Its occurrences go with it — a deleted task must not
   /// keep surfacing on the Recovery Card.
   Future<void> deleteForEntity(String entityId) =>

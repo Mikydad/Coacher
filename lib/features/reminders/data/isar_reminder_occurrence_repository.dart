@@ -44,6 +44,20 @@ class IsarReminderOccurrenceRepository
   }
 
   @override
+  Stream<List<ReminderOccurrence>> watchRecoveryPool({
+    required int todayStartMs,
+  }) {
+    return _isar.isarReminderOccurrences
+        .filter()
+        .group((q) => q.not().stateEqualTo(_resolvedState))
+        .or()
+        .scheduledAtMsGreaterThan(todayStartMs, include: true)
+        .sortByScheduledAtMs()
+        .watch(fireImmediately: true)
+        .map((rows) => rows.map((e) => e.toDomain()).toList());
+  }
+
+  @override
   Future<List<ReminderOccurrence>> listUnresolved() async {
     final rows = await _isar.isarReminderOccurrences
         .filter()

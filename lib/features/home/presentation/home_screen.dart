@@ -59,6 +59,8 @@ import '../../../app/application/main_tab_navigation.dart';
 import '../../analytics/presentation/analytics_progress_screen.dart';
 import '../../ai_assistant/presentation/widgets/coach_ai_fab.dart';
 import '../../context_override/domain/models/interruption_level.dart';
+import '../../reminders/presentation/recovery_card.dart';
+import '../../reminders/presentation/recovery_navigation.dart';
 import '../../context_override/presentation/active_override_banner.dart';
 import '../../context_override/presentation/context_override_quick_activate_sheet.dart';
 import '../../context_override/presentation/post_override_review_card.dart';
@@ -200,6 +202,12 @@ class HomeScreen extends ConsumerWidget {
           const PromisesSection(),
           const SizedBox(height: 20),
           const ActiveOverrideBanner(),
+          // What SidePal still owes you leads the recovery band (FR-R-50):
+          // above the post-override review, because an overdue task is a
+          // standing debt while that card is a one-off.
+          RecoveryCard(
+            onOpenTask: (entityId) => openRecoveryTask(context, ref, entityId),
+          ),
           const PostOverrideReviewCard(),
           const _DailyDisciplineSection(),
           const SizedBox(height: 16),

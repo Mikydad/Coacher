@@ -26,6 +26,16 @@ abstract class ReminderOccurrenceRepository {
 
   Future<List<ReminderOccurrence>> listUnresolved();
 
+  /// Live pool the Recovery Card draws from: everything still unresolved,
+  /// PLUS today's resolved rows.
+  ///
+  /// Today's resolved rows are needed because routine misses expire rather
+  /// than going overdue (§3.2) — they are terminal, yet they still owe the
+  /// user one digest line. [todayStartMs] is local midnight.
+  Stream<List<ReminderOccurrence>> watchRecoveryPool({
+    required int todayStartMs,
+  });
+
   /// Every occurrence for [entityId], resolved or not.
   Future<List<ReminderOccurrence>> listForEntity(String entityId);
 

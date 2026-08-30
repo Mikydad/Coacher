@@ -43,6 +43,7 @@ class ReminderOccurrence {
     this.resolutionKind,
     this.resolutionReason,
     this.resolvedAtMs,
+    this.dismissedForDayKey,
     required this.createdAtMs,
     required this.updatedAtMs,
   });
@@ -103,6 +104,16 @@ class ReminderOccurrence {
 
   final int? resolvedAtMs;
 
+  /// The local day (`yyyy-MM-dd`) on which the user waved this row off the
+  /// Recovery Card (FR-R-40, Flexible mode).
+  ///
+  /// Dismissing is NOT resolving: the task is still undone, so the occurrence
+  /// stays unresolved and keeps its overdue history. It simply stops being
+  /// mentioned for the rest of that day, and day rollover carries it into
+  /// Plan-Tomorrow as a suggestion. Storing the day rather than a boolean is
+  /// what makes it expire on its own at midnight, with nothing to reset.
+  final String? dismissedForDayKey;
+
   final int createdAtMs;
   final int updatedAtMs;
 
@@ -129,8 +140,12 @@ class ReminderOccurrence {
 
   bool get isResolved => state.isTerminal;
 
-  /// Unresolved and past its window — what the Recovery Card lists.
+  /// Unresolved and past its window — the raw pool the Recovery Card draws
+  /// from before dismissal and taxonomy filtering.
   bool get isOverdue => state == ReminderOccurrenceState.overdue;
+
+  /// Whether the user has waved this off for [dayKey].
+  bool isDismissedOn(String dayKey) => dismissedForDayKey == dayKey;
 
   void validate() {
     ModelValidators.requireNotBlank(id, 'reminderOccurrence.id');
@@ -158,6 +173,7 @@ class ReminderOccurrence {
     Object? resolutionKind = _sentinel,
     Object? resolutionReason = _sentinel,
     Object? resolvedAtMs = _sentinel,
+    Object? dismissedForDayKey = _sentinel,
     int? updatedAtMs,
   }) {
     return ReminderOccurrence(
@@ -193,6 +209,9 @@ class ReminderOccurrence {
       resolvedAtMs: resolvedAtMs == _sentinel
           ? this.resolvedAtMs
           : resolvedAtMs as int?,
+      dismissedForDayKey: dismissedForDayKey == _sentinel
+          ? this.dismissedForDayKey
+          : dismissedForDayKey as String?,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     );
@@ -217,6 +236,7 @@ class ReminderOccurrence {
     if (resolutionKind != null) 'resolutionKind': resolutionKind!.toStorage(),
     if (resolutionReason != null) 'resolutionReason': resolutionReason,
     if (resolvedAtMs != null) 'resolvedAtMs': resolvedAtMs,
+    if (dismissedForDayKey != null) 'dismissedForDayKey': dismissedForDayKey,
     'createdAtMs': createdAtMs,
     'updatedAtMs': updatedAtMs,
   };
@@ -246,6 +266,7 @@ class ReminderOccurrence {
       ),
       resolutionReason: map['resolutionReason'] as String?,
       resolvedAtMs: (map['resolvedAtMs'] as num?)?.toInt(),
+      dismissedForDayKey: map['dismissedForDayKey'] as String?,
       createdAtMs: (map['createdAtMs'] as num?)?.toInt() ?? 0,
       updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
     );

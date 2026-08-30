@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../reminders/presentation/recovery_navigation.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../execution/application/execution_controller.dart';
@@ -210,6 +211,15 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
             ),
           ),
         );
+      }
+      if (!mounted) return;
+      // The strongest recovery moment (§3.6): a session just ended, so the
+      // user is between things. Shows only when something is genuinely open,
+      // and before the auto-next flow so it cannot interrupt it midway.
+      try {
+        await showRecoveryPromptIfNeeded(context, ref);
+      } catch (e) {
+        debugPrint('[TimerSession] recovery prompt failed: $e');
       }
       if (!mounted) return;
       if (result.completionPercent >= 100) {

@@ -2520,3 +2520,23 @@ not silent reversal.
   `flexible`, so a missed sleep task will ask for disposition at a recovery
   moment. Left alone because it is exactly the category-guessing (a) rejects
   — revisit if it annoys in testing.
+
+- **2026-08-30 · Recovery Card semantics: "dismiss" quiets for the day, and
+  the routine digest names rather than counts.** FR-R-40 calls a Flexible
+  overdue row "dismissible" without saying what that means. Settled: dismissing
+  is **not** resolving — the task is still undone, so the occurrence keeps its
+  state and overdue history and only stops being mentioned for the rest of that
+  local day (`dismissedForDayKey`, which expires at midnight with nothing to
+  reset). Day rollover then carries it into Plan-Tomorrow, which is what
+  FR-R-40's "auto-rolls into Plan-Tomorrow" already promised. *Rejected:*
+  resolving it as skipped (overstates what the user did — they waved a card
+  away, they did not decide to skip), and re-surfacing at the next recovery
+  moment (reads as nagging in the mode whose whole point is being gentle).
+  Disciplined and Extreme rows ignore a dismissal outright — the contract is
+  the mode's, not the row's history. *Also:* FR-R-52's example digest "Water:
+  3 of 6 today" assumes a task can recur several times within one day; this app
+  has no intra-day recurrence (occurrences are one per entity per day), so the
+  digest names the routines missed instead of counting repeats. *Deferred:*
+  FR-R-53's aggregated recovery notification moves to R3 (task 7.0), because
+  its "qualifying free gap" is the same plan/boundary math FR-R-31 builds and
+  writing gap-finding twice would mean discarding the first version.

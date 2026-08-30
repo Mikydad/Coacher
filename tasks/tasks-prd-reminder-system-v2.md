@@ -214,23 +214,26 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
         user` and is never overwritten.
   - [x] 4.5 Guard: classification may never flip `enabled` off. (FR-R-23)
 
-- [ ] **5.0 Recovery & overdue surfacing** *(FR-R-50…54)*
-  - [ ] 5.1 `Recovery Card` widget — top of Home when non-empty, alongside
+- [x] **5.0 Recovery & overdue surfacing** *(FR-R-50…54)*
+  - [x] 5.1 `Recovery Card` widget — top of Home when non-empty, alongside
         `SeizeTheMomentCard`/`PostOverrideReviewCard`; `SectionHeader`, tokens
         only, ordered criticality desc → overdue-since asc, one primary action
         per row.
-  - [ ] 5.2 Per-mode affordances on each row (Flexible dismissible /
+  - [x] 5.2 Per-mode affordances on each row (Flexible dismissible /
         Disciplined persistent / Extreme non-dismissible) reading
         `EffectiveTaskMode`.
-  - [ ] 5.3 Same content as a post-session prompt at timer/focus completion.
-  - [ ] 5.4 Routine-class misses collapse to one digest line ("Water: 3 of 6
-        today") — never a row per miss, never a push.
-  - [ ] 5.5 Aggregated recovery notification: find a qualifying free gap,
-        schedule ONE summary, ledger-capped at 2/day (D6); tap deep-links Home
-        to the card.
-  - [ ] 5.6 Day rollover carries unresolved items into Plan-Tomorrow with their
+  - [x] 5.3 Same content as a post-session prompt at timer/focus completion.
+  - [x] 5.4 Routine-class misses collapse to one digest line — never a row per
+        miss, never a push. *The PRD's "Water: 3 of 6 today" assumes intra-day
+        recurrence, which this app does not have (one occurrence per entity per
+        day); the digest names the routines missed instead.*
+  - [→] 5.5 Aggregated recovery notification — **deferred to R3** (settled
+        2026-08-30): its "qualifying free gap" is the same plan/boundary math
+        FR-R-31 builds in task 7.0, and writing gap-finding twice would mean
+        throwing the first one away.
+  - [x] 5.6 Day rollover carries unresolved items into Plan-Tomorrow with their
         overdue history attached.
-  - [ ] 5.7 Task-row Overdue badge in the task list.
+  - [x] 5.7 Task-row Overdue badge in the task list.
 
 - [ ] **6.0 Observability & health** *(FR-R-80…82)*
   - [ ] 6.1 "Reminder health" row in `notification_settings_screen.dart`:

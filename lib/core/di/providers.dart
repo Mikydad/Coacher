@@ -29,6 +29,7 @@ import '../../features/reminders/application/attention_orchestrator_providers.da
 import '../../features/reminders/application/reminder_sync_service.dart';
 import '../../features/reminders/data/isar_reminder_repository.dart';
 import '../../features/reminders/data/reminder_cache_store.dart';
+import '../../features/reminders/application/recovery_view.dart';
 import '../../features/reminders/application/reminder_occurrence_service.dart';
 import '../../features/reminders/data/isar_reminder_occurrence_repository.dart';
 import '../../features/reminders/data/reminder_occurrence_repository.dart';
@@ -133,12 +134,33 @@ final reminderOccurrenceServiceProvider = Provider<ReminderOccurrenceService>(
 );
 
 /// Everything the state machine still owns, straight off the Isar watch
-/// stream. The Recovery Card reads this — never an invalidate-and-refetch;
-/// the local write IS the update.
+/// stream — never an invalidate-and-refetch; the local write IS the update.
 final unresolvedReminderOccurrencesProvider =
     StreamProvider<List<ReminderOccurrence>>(
       (ref) => ref.watch(reminderOccurrenceRepositoryProvider).watchUnresolved(),
     );
+
+/// Entity ids currently Overdue — what a task row consults to show its badge
+/// (FR-R-50's "task list badge"). Derived from the same view the card renders,
+/// so a row and the card can never disagree.
+final overdueEntityIdsProvider = Provider<Set<String>>((ref) {
+  final view = ref.watch(recoveryViewProvider).valueOrNull;
+  if (view == null) return const <String>{};
+  return {for (final row in view.rows) row.occurrence.entityId};
+});
+
+/// What the Recovery Card renders: ordered rows plus the routine digest.
+///
+/// The ordering and dismissal rules live in the pure [RecoveryViewBuilder];
+/// this provider only supplies the stream and the clock.
+final recoveryViewProvider = StreamProvider<RecoveryView>((ref) {
+  final now = DateTime.now();
+  final todayStart = DateTime(now.year, now.month, now.day);
+  return ref
+      .watch(reminderOccurrenceRepositoryProvider)
+      .watchRecoveryPool(todayStartMs: todayStart.millisecondsSinceEpoch)
+      .map((rows) => RecoveryViewBuilder.build(rows, now: DateTime.now()));
+});
 
 @Deprecated(
   'Reminders live in Isar via ReminderRepository; this store is unused.',

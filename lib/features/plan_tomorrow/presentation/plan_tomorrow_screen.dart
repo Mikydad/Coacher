@@ -1025,19 +1025,23 @@ class _CarryForwardSection extends StatelessWidget {
   }
 }
 
-class _CarryForwardTile extends StatelessWidget {
+class _CarryForwardTile extends ConsumerWidget {
   const _CarryForwardTile({required this.row, required this.onMove});
   final PlannedTaskRow row;
   final VoidCallback onMove;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = row.task;
-    final statusLabel = t.status == TaskStatus.inProgress
+    // Unresolved items arrive here with their overdue history attached
+    // (FR-R-54), so tomorrow's plan says which of these already slipped.
+    final isOverdue = ref.watch(overdueEntityIdsProvider).contains(t.id);
+    final baseStatus = t.status == TaskStatus.inProgress
         ? 'In Progress'
         : t.status == TaskStatus.partial
         ? 'Partial'
         : 'Not Started';
+    final statusLabel = isOverdue ? 'Overdue · $baseStatus' : baseStatus;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
