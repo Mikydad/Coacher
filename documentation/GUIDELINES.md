@@ -2374,3 +2374,36 @@ not silent reversal.
   SEND. Suite 1618 green. THE WAVE IS COMPLETE (Phases 0–7); deploy
   `firebase deploy --only functions` ships Phases 3+5+7 server changes
   together, then delete the client's vestigial prompt constants.
+
+- **2026-08-30 · Reminder System V2 direction: deterministic delivery,
+  advisory AI, modes as resolution contracts.** PRD at
+  `tasks/prd-reminder-system-v2.md` (from AUDIT.md §9/§10). Core rules:
+  AI/network never sit in the notification delivery path (pre-scheduled
+  local notifications reading Isar-resident strings are the correctness
+  floor); reminders are driven by a task state machine
+  (Upcoming→Due→Active→Overdue→Resolved) + a time-sensitivity taxonomy
+  (timeSensitive expires / flexible goes Overdue / routine aggregates) +
+  an interruption boundary (next task prunes escalation, computed at
+  schedule time); the three modes differ primarily in what resolution
+  Overdue demands (Flexible dismissible / Disciplined must disposition /
+  Extreme do-reschedule-with-reason-or-surrender), only secondarily in
+  ladder pressure. *Why:* audits showed escalation was reactive-only dead
+  policy, repetition-based "Extreme" would be spam, and any design needing
+  a decision-maker while the app is closed is unimplementable on iOS local
+  notifications. *Considered:* indefinite Extreme re-notification
+  (rejected: bombardment); LLM-composed per-notification delivery
+  (rejected: cost, latency, breaks airplane-mode contract); server-side
+  scheduling as a requirement (rejected: push stays an additive floor).
+
+- **2026-08-30 · Reminder V2 open semantics settled (PRD §12 D1–D8).**
+  Boundary buffer 20 min; reminder windows Flexible 30 / Disciplined 45 /
+  Extreme 60 min; Disciplined day-close is a soft nag (carry forward, never
+  a hard gate); unstaked Extreme offers no Surrender — Do or
+  Reschedule-with-reason only, with a demote-or-drop coach suggestion after
+  3 consecutive reschedules; criticality-3 pierces the sleep window;
+  aggregated recovery notifications capped at 2/day; the AI strategist is
+  suggestion-only in V2 (no auto-apply); Android is parked this wave —
+  ladders gated to inexact scheduling with an honest health note, exact-alarm
+  work deferred to its own phase. *Why:* answered by Miko 2026-08-30 against
+  the lettered options in `tasks/prd-reminder-system-v2.md`; recorded here so
+  implementation sessions don't reopen them.

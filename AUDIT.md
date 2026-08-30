@@ -698,3 +698,805 @@ Ordered; each tier is shippable alone.
 4. **Scheduled debt:** the LOW tables above, a11y pass (U8, extends §7 H3),
    dead-code deletions (parseOperatingLayerJsonMap, weekly pulse, capability
    payload section, batch pruning wiring).
+
+## 9) Notifications, reminders & enforcement modes — deep audit (2026-08-30)
+
+_Report-only; no notification code, configuration, tests, or product behavior
+was changed. Static scope: task and goal reminder persistence, Flexible /
+Disciplined / Extreme mode resolution, adaptive cadence, attention
+orchestration, notification ledger and reconciliation, lifecycle re-arming,
+timezone handling, iOS/Android setup, push rescue, settings UX, relevant PRDs,
+and existing tests._
+
+### 9.1 Verdict
+
+The reported symptom is real and has a direct code-level explanation:
+**Disciplined and Extreme currently collapse to one notification when the user
+does nothing.** Flexible's one-shot behavior is consistent with its policy, but
+the other two modes are not delivering their advertised persistence.
+
+The system contains two partially joined designs:
+
+1. `AdaptiveReminderPolicy` still defines automatic staged repeat plans for
+   Disciplined and Extreme (`adaptive_reminder_policy.dart:76-198`).
+2. Phase C replaced pre-scheduled chains with one reactive OS slot
+   (`reminder_sync_service.dart:68-75, 202-228`; PRD FR-C-17 through FR-C-22).
+
+The reactive state transition that should join those designs was never
+completed. A normal first OS delivery does not set `pendingAction`, does not
+stamp `lastTriggeredAtMs`, and is not marked delivered in the ledger. Therefore
+the 15-minute ignored check cannot see it and no second reminder is produced.
+The only production writer of `pendingAction: true` is the explicit **Later /
+Snooze** path (`reminder_sync_service.dart:126-163`).
+
+Current mode behavior is therefore:
+
+| Mode | What is actually mode-aware | What happens after passive ignore |
+|---|---|---|
+| Flexible | Initial interruption level `low`; long snooze after **Later**; eligible for batching/suppression | Stops after one reminder — consistent with `autoRepeatEnabled: false` |
+| Disciplined | Initial level `medium`; shorter snooze after **Later** | Stops after one reminder; the encoded staged repeats are unused |
+| Extreme | Initial level `high`; becomes `critical` only after persisted escalation; **Done** cannot bypass the timer contract | Stops after one reminder; “Follow up until I act” is not implemented |
+
+There is no server rescue for task reminders. FCM re-planning only calls the
+intention nudge service (`push_messaging_service.dart:253-266`), so the one
+local OS slot is the complete closed-app reliability floor for tasks.
+
+### 9.2 Root-cause findings
+
+#### N1 — [CRITICAL] The first delivered reminder never enters the ignored/escalation state machine
+
+- New reminders are persisted with `pendingAction: false`, escalation 0, and no
+  `lastTriggeredAtMs` (`add_task_reminder_persistence.dart:77-90`).
+- `_nextReminderTime` returns the original future timestamp only while
+  `pendingAction` is false; once that timestamp is past it returns `null`
+  (`reminder_sync_service.dart:236-271`).
+- `checkIgnoredTimeouts` requires both `pendingAction == true` and a
+  `lastTriggeredAtMs` older than 15 minutes
+  (`attention_orchestrator_service.dart:350-374`).
+- Scheduled OS delivery has no callback that mutates `ReminderConfig`.
+  `markDelivered` is called only for immediate `showNow`, not for
+  `zonedSchedule` deliveries (`attention_orchestrator_service.dart:420-459`).
+- Consequently, doing nothing after the first notification is indistinguishable
+  from a reminder that has not entered escalation. No follow-up is scheduled.
+
+This is the primary cause of “it reminds once and then nothing happens.”
+
+#### N2 — [CRITICAL] Cold-start reconciliation mistakes every future pending alarm for a missing/dismissed notification
+
+- The plugin exposes separate APIs for delivered tray notifications and future
+  pending requests. The app wraps both separately
+  (`local_notifications_service.dart:252-278`).
+- Reconciliation reads only `getActiveNotifications()` (the delivered tray),
+  then compares it with ledger rows in `scheduled` state
+  (`notification_reconciliation_service.dart:57-83`).
+- A legitimate reminder scheduled for later is not in the delivered tray, so
+  reconciliation marks it cancelled and immediately calls
+  `reEvaluateIfAppropriate`, which creates a due-now follow-up
+  (`attention_orchestrator_service.dart:313-348`).
+- Reconciliation is launched unawaited, then `scheduleFromCache` later
+  cancels/re-arms reminders (`app_bootstrap.dart:64-78`). The two operations
+  can race.
+
+User-visible outcomes include a future reminder appearing immediately when the
+app opens, a later alarm being replaced or left alongside an immediate
+delivery depending on platform ordering, and inconsistent ledger state. This is
+the strongest verified explanation for reminders that appear at the wrong time
+around app launch.
+
+The existing reconciliation test actually encodes the faulty assumption:
+“scheduled but not in OS tray = cancelled”
+(`notification_reconciliation_service_test.dart:72-95`). It has no pending
+queue case.
+
+#### N3 — [HIGH] The mode cadence exists as tested policy math, not as a production delivery loop
+
+- Disciplined defines 3 nudges over 10 minutes, 3 over the next 30, then hourly;
+  Extreme defines 3 + 5 then an hourly tail
+  (`adaptive_reminder_policy.dart:76-141`).
+- `autoRepeatOffsets()` is referenced by policy tests but has no production
+  caller (`adaptive_reminder_policy.dart:173-198`;
+  `adaptive_reminder_policy_test.dart:55-75`).
+- The PRD correctly requires a reactive single-next implementation, but the
+  implementation only applies mode cadence on explicit snooze
+  (`reminder_sync_service.dart:126-163`).
+- The ignored follow-up path instead uses a fixed 15 minutes and does not
+  persist the incremented escalation or a new trigger timestamp
+  (`attention_orchestrator_service.dart:546-575`). If it is reached, every
+  later resume can re-process the same stale config.
+- `AdaptiveReminderPolicy.nextStep` clamps escalation at
+  `maxEscalationLevel` (`adaptive_reminder_policy.dart:201-221`), while the
+  Extreme tail branch requires `escalationLevel > maxEscalationLevel`
+  (`reminder_sync_service.dart:248-260`). The tail is unreachable through the
+  normal snooze path.
+
+The unchecked manual QA still promises the removed pre-scheduled chains
+(`tasks/manual-qa-v2.md:22-29`), while the newer PRD promises reactive
+follow-ups (`tasks/prd-phase-c-attention-orchestration.md:207-247`). Neither
+promise matches the shipped no-action behavior.
+
+#### N4 — [HIGH] Reminder sync cancels valid alarms before knowing replacement scheduling will succeed
+
+- `_applyReminders` calls `cancelForEntity` before checking whether the
+  reminder is enabled, has a next time, passes attention policy/budget, or can
+  be scheduled by the OS (`reminder_sync_service.dart:202-228`).
+- The orchestrator itself intentionally checks budget before cancelling the
+  existing slot (`attention_orchestrator_service.dart:394-418`), but the
+  earlier adapter cancellation defeats that safety.
+- If the replacement is suppressed, budget-denied, has a past timestamp, or
+  throws during platform scheduling, the old valid alarm has already gone.
+- `syncForTaskIds` hydrates the requested tasks but then loads and reapplies
+  **all** reminders (`reminder_sync_service.dart:98-101`). Editing one reminder
+  can therefore cancel/reschedule every other task reminder and expose all of
+  them to this failure path.
+
+Goal reminders explicitly avoid this pre-cancel pattern so budget/suppression
+leaves the old slot intact (`goal_reminder_sync_service.dart:94-120`); task
+reminders do not.
+
+#### N5 — [HIGH] Task reminders have no normal roll-forward after their one timestamp passes
+
+- A non-pending past task reminder returns no next time
+  (`reminder_sync_service.dart:266-271`).
+- App resume schedules the unified notification step, but that step re-arms
+  goals and intentions only (`app_lifecycle_task_refresh.dart:120-129`;
+  `unified_recompute_graph.dart:141-171`).
+- Goals have an explicit `rearmIfStale`; tasks do not
+  (`goal_reminder_sync_service.dart:131-140`).
+- Reminder rows are read on demand; there is no Isar reminder watch stream that
+  automatically reschedules OS state (`isar_reminder_repository.dart:34-59`).
+
+This is intentional for a one-time task timestamp only if no mode follow-up is
+expected. It is incompatible with Disciplined/Extreme persistence and means a
+missed task reminder becomes a permanently enabled but inert config.
+
+#### N6 — [HIGH] Android scheduled reminders are not wired for current plugin requirements
+
+The project uses `flutter_local_notifications` 19.5.0 and always requests
+`AndroidScheduleMode.exactAllowWhileIdle`
+(`local_notifications_service.dart:174-211`). The app manifest lacks:
+
+- `SCHEDULE_EXACT_ALARM` plus the corresponding runtime
+  `requestExactAlarmsPermission()` flow;
+- `RECEIVE_BOOT_COMPLETED`;
+- `ScheduledNotificationReceiver`;
+- `ScheduledNotificationBootReceiver`.
+
+The plugin's own 19.5.0 README requires those entries for scheduled/exact
+notifications, while the project manifest contains none
+(`android/app/src/main/AndroidManifest.xml:1-52`). Scheduling errors are caught
+inside the orchestrator and only sent to `debugPrint`
+(`attention_orchestrator_service.dart:418-483`); release mode disables
+`debugPrint` (`main.dart:25-31`), so this fails silently to both user and
+Crashlytics. Reboot also removes the reliability floor because nothing
+re-registers alarms.
+
+Correction to the older §4 audit: `POST_NOTIFICATIONS` is supplied by the
+plugin's own merged manifest in v19.5.0, and the app does request it at runtime
+(`local_notifications_service.dart:158-171`). That specific permission is not
+the current manifest defect; exact-alarm permission and scheduling/boot
+receivers are.
+
+#### N7 — [HIGH] Suppressed reminders are queued but never released when an override ends
+
+- Flexible starts `low`, Disciplined `medium`, and Extreme `high`
+  (`interruption_level_resolver.dart:20-41`).
+- Meeting/focus suppress low and medium; sleep/vacation suppress through high;
+  DND suppresses everything (`override_attention_policy.dart:20-42`).
+- Retryable suppression stores the intent only in the service's in-memory map
+  (`attention_orchestrator_service.dart:109-118, 485-493`).
+- `onOverrideEnded` contains re-delivery logic
+  (`attention_orchestrator_service.dart:218-288`), but there is no caller.
+  Manual and timed override ending return the Phase B empty review directly
+  (`context_override_service.dart:110-145, 178-194`;
+  `context_override_expiry_poller.dart:36-44`).
+
+Thus a Flexible/Disciplined reminder due during a meeting/focus window, or any
+non-critical first reminder due during sleep/vacation, can be suppressed and
+then lost for the process lifetime. Because N4 already cancelled the old slot,
+there is no fallback alarm.
+
+### 9.3 Why reminder times sometimes look miscalculated
+
+#### [HIGH] Boot re-evaluation can convert a future time to “now”
+
+N2 is a real scheduling error, not a timezone display issue. Reconciliation
+uses the wrong OS collection and explicitly builds a follow-up at `_now()`.
+
+#### [MEDIUM] Collision spacing delays whichever reminder is evaluated later, not the lower-importance one
+
+The policy promises that the lower-importance reminder is delayed, but
+`_computeCollisionDelay` never compares importance. It always delays the
+currently evaluated intent to the earlier slot plus three minutes
+(`attention_orchestrator.dart:196-229`). Since all reminders are reapplied in
+repository iteration order, close reminders can move by three minutes based on
+iteration order rather than mode or urgency.
+
+#### [MEDIUM] Reminder timestamps have no timezone identity
+
+- The picker constructs a local `DateTime`
+  (`add_task_reminder_section.dart:81-121`).
+- Persistence uses local `toIso8601String()` with no zone id/offset
+  (`add_task_reminder_persistence.dart:80-89`).
+- Scheduling parses that string and converts the resulting instant to the
+  single `tz.local` configured at app initialization
+  (`local_notifications_service.dart:39-47, 117-127, 174-212`).
+
+This produces inconsistent travel/cross-device semantics. A pending OS request
+keeps the zone/instant from when it was armed; after reopening in another zone,
+`scheduleFromCache` reparses the zone-less value as the new device's local wall
+time and replaces it. The same reminder can therefore shift by the timezone
+difference depending on whether the app was reopened. Another synced device
+also interprets the value in its own local zone. No product rule says whether a
+task time is fixed to its creation zone or should follow the user.
+
+`tz.local` is also configured only once per process, with no resume/timezone
+change refresh. However, `TZDateTime.from` preserves the input instant, so the
+UTC fallback comment in `local_notifications_service.dart:43-46` should not by
+itself be treated as proof of the observed offset for current one-shot task
+times. The missing timezone semantics and re-arm behavior are the verified
+risks. There are no DST, travel, or cross-device timezone tests.
+
+#### [LOW] A near-now scheduling race can move a request forward by a full day
+
+`_normalizeScheduleTime` repeatedly adds 24 hours when the timestamp is no
+longer in the future (`local_notifications_service.dart:510-517`). The
+orchestrator bypasses this for requests already due, which prevents the common
+case, but a barely-future request can become stale while asynchronous budget
+and cancellation work runs. That edge becomes “tomorrow,” not a small delay.
+
+### 9.4 Mode behavior that is calculated but not delivered
+
+#### [MEDIUM] Escalation copy and hard-gate messaging are dead on the task delivery path
+
+`ReminderSyncService.bodyForReminder` builds distinct app-open and logical
+reason copy as escalation rises (`reminder_sync_service.dart:314-342`), but the
+orchestrator never calls it. Task notifications always use the generic
+`"Time to start: …"` body (`attention_orchestrator_service.dart:525-538`).
+The Extreme hard-gate flag therefore changes neither notification text nor OS
+actions. Only the separate **Done** handler prevents an Extreme task from being
+completed without entering the timer flow (`notification_task_actions.dart:20-47`).
+
+#### [MEDIUM] “Silent” and priority decisions do not reach the OS
+
+The pure orchestrator can return `silent: true` for a non-focus low-level
+reminder (`attention_orchestrator.dart:180-194`), but
+`AttentionOrchestratorService` never reads `decision.silent`.
+`LocalNotificationsService` always schedules the task channel at
+`Importance.max` / `Priority.high` on Android and uses default Darwin sound
+behavior (`local_notifications_service.dart:187-209`). Flexible is therefore
+not gentler at actual delivery; it is only easier to suppress.
+
+Focus `priorityBoosted` is likewise logged but does not alter platform
+notification priority (`attention_orchestrator_service.dart:466-476`).
+
+#### [LOW] Missing/legacy modes resolve differently across layers
+
+`EnforcementMode.fromModeRefId(null)` falls back to Disciplined
+(`enforcement_mode.dart:18-32`), while `AdaptiveReminderPolicy` and
+`ReminderSyncService` fall back to Flexible
+(`adaptive_reminder_policy.dart:223-228`;
+`reminder_sync_service.dart:283-299`). Old reminder rows without a mode can
+therefore be treated as different modes by different features.
+
+Extension reminder updates also preserve the old reminder mode rather than
+copying the task's current mode (`auto_next_task_flow.dart:693-719`).
+
+### 9.5 Ledger, permissions, and observability gaps
+
+#### [MEDIUM] Ledger states do not represent what actually happened
+
+- `notificationDelivered` analytics is logged immediately after an OS request
+  is scheduled, not after it fires (`attention_orchestrator_service.dart:438-476`).
+- Future scheduled deliveries stay in `scheduled`; only immediate `showNow`
+  calls become `delivered` (`:455-458`).
+- Ignored and expired ledger states are declared but never written
+  (`notification_ledger_state.dart:1-22`).
+- **Wrong time** records only an interaction string; it does not transition or
+  cancel the scheduled ledger state
+  (`notification_response_handler.dart:473-486`;
+  `notification_ledger_repository.dart:61-74`). On a later cold start,
+  reconciliation can treat that row as missing and re-deliver it, contradicting
+  the “no follow-up escalation” comment.
+- Snooze scheduling uses the mode cadence, but the ledger always records
+  `snoozedUntilMs = now + 15 minutes`
+  (`attention_orchestrator_service.dart:578-588`).
+
+These mismatches make adaptive back-off and production diagnosis unreliable.
+
+#### [MEDIUM] The iOS notification budget's fail-closed contract fails open in production
+
+`NotificationBudget` correctly denies when its source throws
+(`notification_budget.dart:31-52`), and its unit test covers a throwing fake.
+The real source catches every platform error and returns an empty list
+(`local_notifications_service.dart:269-278`). The budget therefore sees zero
+pending notifications and allows scheduling when the queue is actually
+unknown. On iOS this recreates the silent-overflow risk the 56-slot guard was
+written to prevent.
+
+The active-tray wrapper has the same catch-and-empty behavior
+(`local_notifications_service.dart:252-266`), which makes a query failure look
+like “all notifications disappeared” to the already-unsafe reconciliation.
+
+#### [MEDIUM] Permission state and scheduling health are invisible to the user
+
+`DarwinInitializationSettings` is created without disabling its three default
+permission requests (`local_notifications_service.dart:52-109`), so iOS asks
+automatically during deferred startup rather than only after the user enables a
+reminder. If denied, the reminder toggle later shows a snackbar but save still
+persists an enabled reminder and attempts to schedule it
+(`add_task_reminder_persistence.dart:10-22, 77-93`).
+
+The Notifications & Reminders settings page exposes coaching and sleep/override
+preferences, but no OS authorization state, exact-alarm state, pending-reminder
+health, or route to system settings
+(`notification_settings_screen.dart:7-32`). A reminder can look enabled in the
+app while being impossible to deliver.
+
+#### [LOW] Phase C persistence fields are decorative
+
+`ReminderConfig.activeNotificationId` and `evaluationTrace` are serialized to
+Firestore but are absent from the Isar schema conversion
+(`reminder_config.dart:35-44, 53-96`;
+`isar_reminder.dart:20-66`). The orchestrator never writes either field. This
+removes the documented restart fallback and the promised explanation trail.
+
+### 9.6 Test audit
+
+The existing tests are strongest around pure policy and routing, but they do
+not exercise the failure boundary that users experience:
+
+- `adaptive_reminder_policy_test.dart` proves repeat offsets that production
+  never calls.
+- `reminder_sync_service_test.dart` uses an orchestrator that only records
+  intents and a notification scheduler that does nothing
+  (`reminder_sync_service_test.dart:60-110`). Its default fixture starts with
+  `pendingAction: true` (`:169-193`), bypassing the real creation state that
+  causes N1.
+- `attention_orchestrator_test.dart` tests pure decisions, not execution into
+  platform notification details.
+- `notification_reconciliation_service_test.dart` has no future pending queue
+  and codifies the active-tray mistake.
+- `notification_budget_test.dart` proves fail-closed with a throwing fake, but
+  not with the real catch-and-empty adapter.
+- Notification response tests verify tap navigation and action routing, not
+  delivery, recurrence, or closed-app escalation.
+- There is no test for `checkIgnoredTimeouts`, ignored follow-up persistence,
+  Extreme tail exhaustion, task re-arm on resume, `decision.silent` reaching
+  the OS, schedule failure after pre-cancel, timezone/DST/travel, Android
+  manifest requirements, or fire → ignore → next notification.
+- The device QA checklist for automatic Disciplined/Extreme follow-ups remains
+  entirely unchecked (`tasks/manual-qa-v2.md:22-29`).
+
+No tests or device scenarios were executed for this report, consistent with
+the requested audit-only scope.
+
+### 9.7 Verified working
+
+- Add Task resolves explicit task mode → routine mode → profile-scaled default
+  and persists the resolved string on both task and reminder
+  (`add_task_mode_resolution.dart:110-168`;
+  `add_task_reminder_persistence.dart:77-90`).
+- **Later / Snooze** does schedule one new follow-up and uses the mode-aware
+  shortening interval (`reminder_sync_service.dart:126-163`).
+- Starting the timer, completing a task through an allowed notification action,
+  or providing a logical reason disables/cancels that task reminder
+  (`reminder_sync_service.dart:108-122, 167-188`).
+- Extreme's notification **Done** action cannot silently bypass its timer
+  contract (`notification_task_actions.dart:20-47`).
+- Goal reminder recurrence has an explicit next-occurrence computation and
+  app-activity re-arm. Its known limitation is that later occurrences do not
+  continue while the app remains unopened
+  (`goal_reminder_sync_service.dart:63-140`; decision log
+  `documentation/GUIDELINES.md:603-612`).
+- Notification route IDs/payloads and cold-start tap draining are centralized;
+  this audit found the delivery-state machine broken, not the basic task tap
+  routing.
+
+### 9.8 Priority if remediation is authorized later
+
+1. Correct the delivery state model: distinguish pending OS requests from
+   delivered tray items, and make first-fire ignore detectable.
+2. Complete one coherent Disciplined/Extreme reactive cadence, including
+   persisted escalation/tail state and closed-app guarantees.
+3. Remove task pre-cancel/global reapply behavior so a failed replacement
+   cannot destroy a valid alarm.
+4. Wire override-end queue flushing.
+5. Complete Android exact-alarm, receiver, reboot, and inexact-fallback setup.
+6. Define timezone/travel semantics and store enough information to implement
+   them consistently.
+7. Make permission, pending queue, ledger state, and scheduling failures
+   observable; then add device/integration tests across all three modes.
+
+## 10) Notifications, reminders & modes — independent deep audit (Claude, 2026-08-30)
+
+_Audited on branch `feat/ux-fixes-and-stake-surrender`, independently of §9
+(code re-read from scratch; every claim carries a file:line reference).
+Scope: local_notifications_service.dart, notification_budget / ledger /
+reconciliation, reminder_sync_service.dart, attention_orchestrator(.+_service),
+adaptive_reminder_policy.dart, interruption_level_resolver.dart,
+notification_route_resolver.dart, goal_reminder_sync_service/schedule,
+goal_intensity_mode.dart, routine_mode.dart, effective_task_mode.dart,
+coaching_style_delivery_policy.dart, override_attention_policy.dart,
+sleep_window_util.dart, context_override_service/poller, app_bootstrap.dart,
+app_lifecycle_task_refresh.dart, notification_response_handler.dart,
+add_task_reminder_persistence.dart, reminder repositories, remote_isar_merge
+(reminder phase), unified_recompute_graph (notifications step),
+functions/src/intentions/sweep.ts. Report-only; no fixes applied._
+
+### 10.0 How the pipeline actually works (orientation)
+
+Producers (task `ReminderConfig`s, goal reminders, intention nudge ladder,
+stake invites, coach insights) each build a `ReminderIntent` and hand it to
+`AttentionOrchestratorService.evaluate` (`attention_orchestrator_service.dart:123`).
+A pure policy (`attention_orchestrator.dart:53`) decides approve / delay /
+batch / suppress, then `_executeDecision` (`attention_orchestrator_service.dart:379`)
+either `showNow`s (due now) or `zonedSchedule`s (future) exactly ONE OS
+notification per entity slot, and records it in an Isar ledger.
+
+Mode plumbing: a task's `modeRefId` (flexible/disciplined/extreme, resolved by
+`EffectiveTaskMode`) selects a cadence from `AdaptiveReminderPolicy.cadenceFor`
+and an `InterruptionLevel` from `InterruptionLevelResolver`; goal intensity 1–5
+maps onto the same three modes (`goal_intensity_mode.dart:16`). A global
+`CoachingStyle` adds a back-off rule on follow-ups.
+
+The critical structural fact: **everything is client-side one-shot
+scheduling.** There is no OS-side repeat for tasks or goals anymore (the
+Phase 0 reroute retired the repeating matchers — `goal_reminder_sync_service.dart:17-24`),
+no delivery callback when a scheduled notification fires, and the server
+rescue-net covers only intentions (`functions/src/intentions/sweep.ts`).
+Every "next" reminder exists only if some app-open code path re-arms it.
+That single design property produces most of the symptoms below.
+
+### 10.1 Why a reminder fires once and then goes silent
+
+#### C1 — [CRITICAL] The mode escalation machine only starts if the user taps "Later"
+- `pendingAction: true` is written in exactly one place in the entire app:
+  `ReminderSyncService.requestSnooze` (`reminder_sync_service.dart:145`).
+- The only thing that detects an ignored notification,
+  `checkIgnoredTimeouts` (`attention_orchestrator_service.dart:355-375`),
+  skips every reminder with `!reminder.pendingAction` (line 362).
+- There is no delivery callback for a fired scheduled notification (iOS
+  doesn't provide one; nothing polls the tray for it), so a notification the
+  user simply ignores — the exact case escalation exists for — leaves no
+  trace that starts the ladder.
+- Net: for all three modes, one notification fires and the disciplined/
+  extreme cadence never engages unless the user *opts into* escalation by
+  pressing Snooze. "It reminds once and then nothing happens" is the
+  designed-in outcome of this wiring, not an edge case.
+
+#### C2 — [CRITICAL] The per-mode repeat plans are dead code
+- `AdaptiveReminderPolicy.cadenceFor` defines rich per-mode plans — extreme:
+  3 nudges/10 min + 5/30 min + hourly tail ×5; disciplined: tail ×24
+  (`adaptive_reminder_policy.dart:75-171`) — and `autoRepeatOffsets`
+  materializes them (lines 176-199).
+- `autoRepeatOffsets` has **zero callers in `lib/`**; its only references are
+  `test/features/reminders/adaptive_reminder_policy_test.dart:61,72`. The
+  fields `autoRepeatEnabled`, `repeatPlan`, `maxFutureNudges` are read by
+  nothing in production.
+- So the difference the modes are supposed to make in *delivery pressure*
+  exists as tested policy math with no execution path. The tests pass while
+  the behavior is absent — a test-suite blind spot worth naming: no test
+  walks "scheduled → fired → ignored → escalate per mode" through the
+  service layer against a fake clock/tray.
+
+#### C3 — [HIGH] One-shot task reminders with no roll-forward
+- `_nextReminderTime` for a non-pending reminder: parse `scheduledAtIso`,
+  return it if future, else `null` (`reminder_sync_service.dart:266-270`).
+  A fired (or missed) reminder's config stays `enabled` with a past
+  timestamp forever; every later sync computes `null` and arms nothing.
+- Habit-style tasks that recur daily therefore remind exactly once in their
+  life unless the user edits the reminder time again
+  (`add_task_reminder_persistence.dart:80-92` is the only writer of
+  `scheduledAtIso`).
+
+#### C4 — [HIGH] Goal reminders only survive as long as the user keeps opening the app
+- Per the Phase 0 reroute each goal has ONE armed occurrence, re-armed by
+  bootstrap, goal saves, and the recompute graph's notifications step
+  (`goal_reminder_sync_service.dart:131-140`,
+  `unified_recompute_graph.dart:140-155`).
+- All re-arm triggers are app-activity. If the phone sits untouched over a
+  weekend, Saturday's goal reminder fires and Sunday's is never scheduled.
+  For a daily goal this is precisely "reminds once, then silence until I
+  happen to open the app."
+- Bootstrap's re-arm additionally waits up to 30 s for a signed-in user and
+  is skipped when none appears (`app_bootstrap.dart:126-142`), so a
+  signed-out/offline cold boot re-arms nothing until a later resume.
+
+#### C5 — [HIGH] Suppressed reminders are queued into a void
+- Suppression with `retryAllowed: true` (active override) parks the intent in
+  the in-memory `_suppressedQueue` (`attention_orchestrator_service.dart:485-494`).
+- The flush, `onOverrideEnded` (line 222), has **zero production callers** —
+  `ContextOverrideService._doEnd` ends overrides with
+  `suppressedItems: const [], // Phase C will populate this`
+  (`context_override_service.dart:184`), and the expiry poller only sets the
+  review-card flag (`context_override_expiry_poller.dart:38-45`).
+- The queue is also process-lifetime only, so even a wired flush would lose
+  contents on kill. Combined with C6 below, evaluating a reminder due within
+  30 min while a meeting/sleep/DND override is active *permanently deletes*
+  it: cancel first, suppress, never retry.
+
+#### C6 — [HIGH] Task re-sync destroys the armed alarm before knowing a replacement will exist
+- `_applyReminders` cancels the entity's live slot up front
+  (`reminder_sync_service.dart:208`) and only then evaluates. If the
+  evaluation ends in suppression (override, coaching back-off), budget
+  denial, or a null intent (blank title), the user's previously armed
+  notification is already gone.
+- The orchestrator itself was explicitly fixed to avoid this — budget check
+  *before* cancel (`attention_orchestrator_service.dart:395-418`) — and the
+  goal path leans on that ordering on purpose
+  (`goal_reminder_sync_service.dart:95-99`). The task path defeats the guard
+  from the caller side. Every `syncForTaskIds`/`scheduleFromCache` run
+  re-rolls this dice for every reminder.
+
+#### C7 — [HIGH] The ignored-detector inflates the back-off counter and can silence a task permanently
+- When `checkIgnoredTimeouts` does fire (post-snooze), nothing updates
+  `lastTriggeredAtMs` or clears `pendingAction` on the ignored path
+  (`attention_orchestrator_service.dart:201-215` mutates only the ledger),
+  so **every** foreground resume past the 15-min window re-fires "ignored"
+  for the same reminder: ledger `ignoredCount` climbs once per app-open
+  without any new delivery having occurred.
+- Under `CoachingStyle.supportive`, `shouldBackOff` trips at 2
+  (`coaching_style_delivery_policy.dart:25-32`) and the follow-up intent is
+  suppressed with `retryAllowed: false` (`attention_orchestrator.dart:71-83`)
+  — the task goes permanently quiet after two app opens.
+- Under other styles the follow-up is re-scheduled to `now + 15 min` on
+  every resume (`_scheduleFollowUp`, line 566), so a user actively using
+  their phone keeps sliding the follow-up in front of themselves and it
+  fires only after they stop.
+- Meanwhile the incremented escalation level is put on the intent but never
+  persisted back to the config (see M2), so the ladder that IS reachable
+  never actually climbs.
+
+#### C8 — [MEDIUM] Saving a task awaits a remote read before arming the reminder
+- `syncForTaskIds` awaits `hydrateFromRemoteForTasks` — a Firestore
+  `whereIn` `.get()` (`reminder_sync_service.dart:98-99`,
+  `isar_reminder_repository.dart:55-61`, `reminder_repository.dart:65-72`) —
+  before the notification is ever evaluated. On a slow connection the
+  reminder for a just-saved task isn't armed until the fetch resolves; kill
+  the app in that window and it is never armed. This is a straight
+  offline-first violation on the save path (CLAUDE.md rule 1/2).
+- Same LWW merge means another device's stale config (older escalation
+  state, old time) can overwrite live local state whenever its
+  `updatedAtMs` is newer by wall clock; a config pulled by
+  `RemoteIsarMerge._pullReminders` is not re-applied to the OS until the
+  next cold start (the recompute graph's notifications step covers goals
+  and intentions only — `unified_recompute_graph.dart:147-171`).
+
+### 10.2 Why the times look miscalculated
+
+#### T1 — [CRITICAL] Boot reconciliation confuses "not yet fired" with "dismissed" and fires reminders early
+- `NotificationReconciliationService` compares ledger rows in
+  `scheduled`/`delivered` state against `getActiveNotifications()` — the
+  **delivered tray** (`notification_reconciliation_service.dart:57-84`). A
+  future-scheduled notification lives in the *pending queue*
+  (`pendingNotificationRequests`), never the tray, so on **every cold start
+  every correctly armed future reminder** is marked cancelled and pushed to
+  `reEvaluateIfAppropriate`.
+- `reEvaluateIfAppropriate` ignores the config's `scheduledAtIso` *and*
+  `enabled` flag and builds a follow-up with `proposedAt: _now()`
+  (`attention_orchestrator_service.dart:320-349`); `_executeDecision` treats
+  a non-future `deliverAt` as immediate (line 394) and calls `showNow` —
+  i.e. the "9 PM" reminder fires the moment the user opens the app at 2 PM,
+  and the immediate `show` with the same deterministic id replaces the real
+  pending 9 PM request.
+- Whether the user actually sees it depends on a race: `reconcile()` is
+  launched `unawaited` (`app_bootstrap.dart:67-73`) concurrently with
+  `scheduleFromCache` (line 78), whose `cancelForEntity` may remove the
+  spurious tray item and re-arm the real time — or run first and be undone.
+  Nondeterministic interleaving is why the misfires feel random. This is
+  the strongest single explanation for "sometimes it miscalculates the
+  times."
+- The same pass also cancels "phantoms": any tray notification whose ledger
+  row is not currently `scheduled`/`delivered` (lines 86-103). A row a
+  snooze race left in `snoozed` state (see L2) gets its visible
+  notification deleted from the tray at next launch.
+
+#### T2 — [HIGH] Collision spacing silently moves user-chosen times, using future "deliveries" and ignoring importance
+- `_executeDecision` records every schedule under `RecentDelivery` with
+  `deliveredAtMs = deliverAt` — including times hours or a day in the
+  future (`attention_orchestrator_service.dart:463-471`).
+- `_computeCollisionDelay` then delays any other entity's intent proposed
+  within ±3 min of that future time to it + 3 min
+  (`attention_orchestrator.dart:201-230`). Two reminders set for 9:00 always
+  land 3 minutes apart; a third at 9:02 lands at 9:06.
+- Which one moves is whatever `_applyReminders` evaluates later (Isar
+  iteration order), and each full re-sync can re-roll the order — so the
+  shifted reminder can change between runs. The docstring says the
+  lower-importance intent is delayed (lines 199-200); `importance` is never
+  consulted in the implementation.
+
+#### T3 — [MEDIUM] Timezone resolution failure silently shifts every reminder by the UTC offset
+- `_configureLocalTimeZone` falls back to leaving `tz.local` = UTC on any
+  `FlutterTimezone` failure with only a debugPrint
+  (`local_notifications_service.dart:117-128`). Every `zonedSchedule` then
+  interprets the wall-clock DateTime as UTC — for a UTC+3 device all
+  reminders fire 3 hours late. Nothing surfaces or retries this; the app
+  runs an entire session in the shifted state.
+- Stored times have no timezone identity anywhere (`scheduledAtIso` /
+  `nextPromptAtIso` are offset-less `toIso8601String()` local strings), so
+  travel across zones re-interprets them in the new local zone by design —
+  unstated but at least self-consistent; the silent-UTC case is the harmful
+  one.
+
+#### T4 — [MEDIUM] The schedule normalizer moves a just-missed time a full DAY forward
+- `_normalizeScheduleTime` advances a non-future `when` by +1 day until it
+  is future (`local_notifications_service.dart:510-518`). `_executeDecision`
+  checks `immediate` before calling `schedule`, but any delay between that
+  check and the plugin call (awaits on budget/ledger/cancel sit in between)
+  turns a due-in-seconds reminder into *tomorrow at the same time* with a
+  ledger row still claiming today. Narrow window, whole-day error, matches
+  a "sometimes wildly wrong" report.
+
+#### T5 — [MEDIUM] Two different snooze tables answer "how long is Later?" per mode
+- `RoutineModePolicy.baseSnoozeMinutes`: flexible 15 / disciplined 10 /
+  extreme 5 (`routine_mode.dart:131-160`).
+- `AdaptiveReminderPolicy` cadence `initialSnoozeMinutes` (used by the
+  notification's Snooze action): flexible 12→8 / disciplined 8→5 /
+  extreme 5→3 by urgency, then decayed −2/level
+  (`adaptive_reminder_policy.dart:75-171`, `:201-222`).
+- The same gesture produces different delays depending on which surface
+  handled it — perceived as time miscalculation.
+
+#### T6 — [LOW] Suppression is evaluated at scheduling time, not delivery time
+- Override suppression applies only to intents *evaluated* while the
+  override is active and due within 30 min (`attention_orchestrator.dart:96-106`).
+  A reminder armed at 22:00 for 23:30 rings mid-sleep-window because local
+  notifications fire unconditionally once scheduled; a reminder evaluated
+  at 23:00 for 23:20 is suppressed (then lost, per C5). Identical settings,
+  opposite outcomes, decided by when the scheduler happened to run.
+
+### 10.3 What the modes actually change today
+
+Intended per the policy tables: cadence + repeat pressure, escalation
+ceiling, hard gate, interruption level, batching exemption. Actual:
+
+#### M1 — [HIGH] InterruptionLevel never reaches the OS
+- `local_notifications_service.dart` contains zero references to
+  `InterruptionLevel`; iOS `DarwinNotificationDetails` sets only
+  `categoryIdentifier` (line 207) and Android uses fixed max-importance
+  channels (lines 193-206, 232-239). An extreme-mode `critical` and a
+  flexible `low` render identically. The level's only real effect is the
+  override suppression matrix (`override_attention_policy.dart:22-44`) —
+  i.e. modes today change *when a reminder is dropped*, not how it sounds.
+- `AttentionDecision.silent` (focus-silence path,
+  `attention_orchestrator.dart:109-116`) is likewise never read by
+  `_executeDecision` — "silent" deliveries are delivered loud.
+
+#### M2 — [HIGH] Escalation level never persists on the ignored path
+- `_scheduleFollowUp` computes `escalation = config.escalationLevel + 1`
+  into the intent but never writes it back
+  (`attention_orchestrator_service.dart:546-576`); only `requestSnooze`
+  advances the stored level (`reminder_sync_service.dart:138-152`).
+- Consequences: extreme's tail-phase logic
+  (`reminder_sync_service.dart:250-261`, `kExtremeMaxTailFollowUps`) is
+  unreachable via ignores; `InterruptionLevelResolver`'s ≥2 escalation
+  bumps rarely trigger; and the escalation copy —
+  "start now or submit a logical reason", "Please open SidePal…"
+  (`bodyForReminder`, `reminder_sync_service.dart:315-342`) — has **no
+  caller on the orchestrator delivery path**. `_buildNotificationBody`
+  always renders "Time to start: X" (`attention_orchestrator_service.dart:526-539`)
+  regardless of mode, level, or hard-gate state.
+
+#### M3 — [MEDIUM] Unknown or custom mode ids silently degrade to flexible
+- `RoutineModeConfig` explicitly supports custom mode ids
+  (`routine_mode.dart:89-129`), but every resolver hard-codes the three
+  built-ins and defaults everything else to flexible
+  (`adaptive_reminder_policy.dart:224-229`, `effective_task_mode.dart:19-44`,
+  `interruption_level_resolver.dart:22-41`). A future custom "strict-ish"
+  mode would quietly get the *weakest* cadence. Today's practical risk is
+  a legacy/typo id doing the same.
+
+#### M4 — [LOW] Batched notifications would show raw intent ids
+- The batch body joins `decision.batchedWith` — which carries intent ids
+  (`ri_…` StableIds), not titles
+  (`attention_orchestrator.dart:133-141`,
+  `attention_orchestrator_service.dart:530-534`). Batching partners come
+  only from the (never-flushed, usually empty) suppressed queue, so this
+  is nearly unreachable — which is itself the finding: FR-C-15/16 semantic
+  batching is effectively inert, and the one visible artifact it could
+  produce is user-facing debug ids.
+
+### 10.4 Ledger & interaction integrity
+
+#### L1 — [MEDIUM] The ledger never learns that a scheduled notification fired
+- `markDelivered` is called only on the `showNow` path
+  (`attention_orchestrator_service.dart:455-459`); a `zonedSchedule`d
+  notification that fires keeps state `scheduled` forever. Reconciliation
+  therefore cannot distinguish "fired and sits in tray" / "fired and
+  user-dismissed" / "never fired" — feeding T1 — and
+  `getDeliveryClaimsByKindInRange`'s "reached the user" heuristic
+  (`notification_ledger_repository.dart:109-126`) undercounts real
+  deliveries for the intention caps.
+
+#### L2 — [MEDIUM] Snooze writes race and can corrupt the new slot's state
+- The response handler fires `onInteractionReceived(snoozed)` **unawaited**
+  and immediately awaits `requestSnooze`
+  (`notification_response_handler.dart:460-471`). `_recordSnooze` looks up
+  the entity's latest ledger row (`attention_orchestrator_service.dart:578-598`);
+  when it loses the race it stamps the *newly scheduled* row
+  `state = snoozed`. That row then falls out of reconciliation's pending
+  set, and its fired notification is cancelled as a phantom at next launch
+  (T1, step 4).
+
+#### L3 — [LOW] Phase C persistence fields are decorative
+- `ReminderConfig.activeNotificationId` and `evaluationTrace` are never
+  written by any reminder-path code (repo-wide grep; the `evaluationTrace`
+  hits are the unrelated analytics focus feature). The doc comments on
+  `reminder_config.dart:36-44` describe behavior that does not exist.
+
+#### L4 — [LOW] `copyWith` cannot clear nullable fields
+- `ReminderConfig.copyWith` uses `?? this.x` for every nullable
+  (`reminder_config.dart:99-132`), so `_resolveReminder`'s
+  `nextPromptAtIso: null` (`reminder_sync_service.dart:179`) silently keeps
+  the stale value. Harmless today only because the pending flag is cleared
+  alongside; it is a trap under any future fix that consults
+  `nextPromptAtIso` independently.
+
+#### L5 — [LOW] Zero user-facing health signals
+- Permission loss surfaces once as an add-task snackbar
+  (`add_task_reminder_persistence.dart:13-23`); budget exhaustion, UTC
+  fallback, reconciliation churn, and schedule failures are debugPrints.
+  There is no "your reminders can't fire" state anywhere in Settings.
+
+### 10.5 Platform notes
+
+- [HIGH] Android is structurally behind iOS here: `exactAllowWhileIdle`
+  needs the exact-alarm permission flow and a boot receiver to survive
+  restarts (cross-ref §4 "Android notification scheduling will not survive
+  release conditions" — still true on this branch). Failures land in
+  `_executeDecision`'s catch as a log line.
+- [MEDIUM] iOS Focus/DND: without time-sensitive/critical entitlements and
+  with interruption levels unmapped (M1), the app-side suppression matrix
+  is the *only* politeness layer, and the OS one applies uniformly on top.
+- [INFO] The 64-pending cap is well-guarded in principle
+  (`notification_budget.dart`, fail-closed), but the practical inventory
+  (1 slot/task + 3/intention + 1/goal + coach insight) sits far below 56 —
+  budget denial is unlikely to be the everyday failure the user sees.
+
+### 10.6 Verified working (genuinely solid pieces)
+
+- Timezone init in the normal case: `flutter_timezone` → `tz.setLocalLocation`
+  with the root-cause comment (`local_notifications_service.dart:43-47`).
+- Local-first storage of configs: Isar + outbox replication + LWW merge
+  (`isar_reminder_repository.dart`), no awaited Firestore *writes* on
+  interaction paths (C8's awaited *read* is the exception).
+- Sleep-window math including midnight crossover
+  (`sleep_window_util.dart:10-27`) and the 30-minute suppression horizon
+  protecting tomorrow's reminders from tonight's window
+  (`attention_orchestrator.dart:17-23,96-99`).
+- Deterministic notification ids mirrored between route resolver and
+  service, with a test enforcing the mirror; slot-scoped cancel for
+  intention ladders vs entity-scoped for single-slot kinds
+  (`attention_orchestrator_service.dart:411-418`).
+- The goal path's budget-safe swap ordering (cancel only after approval —
+  `goal_reminder_sync_service.dart:95-99`).
+- Tap handling: payload prefixes, id-map + reminder-scan fallback,
+  cold-start launch drain with dedupe signature, queue-then-flush
+  navigation (`notification_response_handler.dart`), and the strict/extreme
+  "Done falls through to the focus flow" contract
+  (`notification_task_actions.dart:43-46`).
+- Mode → cadence/level *tables* themselves are coherent and unit-tested;
+  the failure is that production never executes most of them.
+
+### 10.7 Priority order (if remediation is authorized later)
+
+1. **T1** — reconcile against `pendingNotificationRequests() ∪ tray`, and
+   make `reEvaluateIfAppropriate` respect `enabled` + `scheduledAtIso`.
+   Stops the at-launch misfires immediately.
+2. **C1/C2** — since iOS gives no fire callback, the only way disciplined/
+   extreme can keep nudging with the app closed is to pre-schedule the
+   cadence's repeat plan (`autoRepeatOffsets`, within budget) and cancel
+   the tail on interaction. This is what the dead policy was written for.
+3. **C3/C4** — roll `scheduledAtIso` forward for recurring tasks and give
+   goals more than one armed occurrence (or a repeating OS matcher as the
+   closed-app floor).
+4. **C6** — move the task path's cancel after approval, matching goals.
+5. **C5** — wire `onOverrideEnded` from `_doEnd`/poller and persist the
+   suppressed queue.
+6. **C7/M2** — persist escalation on every follow-up; advance
+   `lastTriggeredAtMs` when an ignore is recorded so a resume can't
+   double-count.
+7. **M1** — map InterruptionLevel to per-level Android channels and iOS
+   interruption levels so the modes become audible, not just droppable.
+8. **C8** — make `syncForTaskIds` schedule from local state first and
+   hydrate remotely in the background.
