@@ -250,7 +250,7 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
 
 ### Phase R3 — Ladder engine
 
-- [ ] **7.0 Ladder compiler: slots, boundary, shield, budget** *(FR-R-30…33)*
+- [x] **7.0 Ladder compiler: slots, boundary, shield, budget** *(FR-R-30…33)*
   - [x] 7.1 Move the per-mode ladder shapes + window defaults (D2: 30/45/60)
         into `AdaptiveReminderPolicy` as the single source.
   - [x] 7.2 Pure `compileSlots(config, plan, shields, now) → List<SlotSpec>`.
@@ -265,7 +265,7 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
         ledger-logged.
   - [x] 7.6 Property test: no compiled slot violates boundary, shield, budget
         or window rules.
-  - [ ] 7.7 Android gate (D8): ladders scheduled `inexactAllowWhileIdle`, with
+  - [x] 7.7 Android gate (D8): ladders scheduled `inexactAllowWhileIdle`, with
         the health row stating reminders may arrive late.
 
 - [x] **8.0 Template bank + pre-written slot strings** *(FR-R-63 deterministic
@@ -295,9 +295,9 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
         Surrender, unstaked → Do / Reschedule only (D4).
   - [ ] 9.5 Demote-or-drop coach suggestion after 3 consecutive reschedules of
         the same task — suggestion only, user decides (D4).
-  - [ ] 9.6 Unknown/custom `modeRefId` degrades to Flexible **with a ledger
+  - [x] 9.6 Unknown/custom `modeRefId` degrades to Flexible **with a ledger
         note** instead of silently. (M3)
-  - [ ] 9.7 Map `InterruptionLevel` to the OS: Android channels per level
+  - [x] 9.7 Map `InterruptionLevel` to the OS: Android channels per level
         (low/default/high), iOS `interruptionLevel` passive/active/timeSensitive
         where entitled; `AttentionDecision.silent` delivers passive. (M1)
 

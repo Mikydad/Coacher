@@ -68,6 +68,7 @@ class LadderScheduler {
 
       var armed = 0;
       var dropped = 0;
+      var unknownModes = 0;
 
       // Criticality first, then soonest: when the queue runs short, the most
       // important and most imminent ladders are the ones that keep their
@@ -78,7 +79,23 @@ class LadderScheduler {
         return a.scheduledAtMs.compareTo(b.scheduledAtMs);
       });
 
+      const knownModes = {'flexible', 'disciplined', 'extreme'};
+
       for (final occurrence in ordered) {
+        // M3: every resolver hard-codes the three built-ins and defaults
+        // everything else to flexible — so a legacy or typo'd mode id
+        // quietly gets the WEAKEST contract, which is the opposite of what a
+        // stricter-sounding custom name implies. Degrading is still the right
+        // behaviour; doing it silently is not.
+        final modeId = (occurrence.modeRefId ?? 'flexible').trim().toLowerCase();
+        if (!knownModes.contains(modeId)) {
+          debugPrint(
+            '[LadderScheduler] unknown mode "$modeId" on '
+            '${occurrence.entityId} → degrading to flexible',
+          );
+          unknownModes++;
+        }
+
         // Routine misses never escalate (§3.2) — they roll forward quietly.
         if (occurrence.taxonomy == ReminderTaxonomy.routine &&
             occurrence.state == ReminderOccurrenceState.overdue) {
@@ -112,7 +129,11 @@ class LadderScheduler {
       if (armed > 0 || dropped > 0) {
         debugPrint('[LadderScheduler] armed $armed, dropped $dropped');
       }
-      return LadderSchedulingResult(armed: armed, dropped: dropped);
+      return LadderSchedulingResult(
+        armed: armed,
+        dropped: dropped,
+        unknownModes: unknownModes,
+      );
     } catch (e, st) {
       debugPrint('[LadderScheduler] rearm failed: $e\n$st');
       return const LadderSchedulingResult();
@@ -198,14 +219,23 @@ class LadderScheduler {
 }
 
 class LadderSchedulingResult {
-  const LadderSchedulingResult({this.armed = 0, this.dropped = 0});
+  const LadderSchedulingResult({
+    this.armed = 0,
+    this.dropped = 0,
+    this.unknownModes = 0,
+  });
 
   final int armed;
   final int dropped;
+
+  /// Occurrences whose mode id was not one of the three built-ins and were
+  /// degraded to flexible (M3). Surfaced rather than swallowed.
+  final int unknownModes;
 
   bool get didWork => armed > 0 || dropped > 0;
 
   @override
   String toString() =>
-      'LadderSchedulingResult(armed: $armed, dropped: $dropped)';
+      'LadderSchedulingResult(armed: $armed, dropped: $dropped'
+      '${unknownModes > 0 ? ', unknownModes: $unknownModes' : ''})';
 }

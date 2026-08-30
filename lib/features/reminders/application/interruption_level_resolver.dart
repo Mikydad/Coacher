@@ -40,4 +40,17 @@ abstract final class InterruptionLevelResolver {
             : InterruptionLevel.low;
     }
   }
+
+  /// One step more interruptive — the focus-boost upgrade (FR-R-44).
+  ///
+  /// Mirrors `AttentionOrchestrator._upgradeLevel`, which computed a boosted
+  /// level and then dropped it: the decision recorded `priorityBoosted` but
+  /// not the level it produced, so the boost never reached the OS.
+  static InterruptionLevel upgrade(InterruptionLevel level) =>
+      switch (level) {
+        InterruptionLevel.low => InterruptionLevel.medium,
+        InterruptionLevel.medium => InterruptionLevel.high,
+        InterruptionLevel.high => InterruptionLevel.critical,
+        InterruptionLevel.critical => InterruptionLevel.critical,
+      };
 }

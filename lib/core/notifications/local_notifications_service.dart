@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'
+    hide InterruptionLevel;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -10,7 +11,9 @@ import 'package:timezone/timezone.dart' as tz;
 
 import 'notification_action_ids.dart';
 import 'notification_budget.dart';
+import 'notification_presentation.dart';
 import 'notification_reconciliation_service.dart';
+import '../../features/context_override/domain/models/interruption_level.dart';
 
 /// Narrow OS-notification surface needed by goal reminders (test seam).
 abstract interface class GoalNotificationsPort {
@@ -257,6 +260,13 @@ class LocalNotificationsService
     /// buttons on iOS. Only pass a category whose actions the response
     /// handler actually supports for this payload kind.
     String? darwinCategoryId,
+
+    /// How interruptive this delivery is allowed to be (FR-R-44). Defaults to
+    /// medium so callers that have not adopted levels keep today's behaviour.
+    InterruptionLevel level = InterruptionLevel.medium,
+
+    /// The focus-silence path: arrive without lighting the screen.
+    bool silent = false,
   }) async {
     final scheduled = _normalizeScheduleTime(when);
     await _plugin.zonedSchedule(
@@ -265,12 +275,10 @@ class LocalNotificationsService
       body,
       tz.TZDateTime.from(scheduled, tz.local),
       NotificationDetails(
-        android: const AndroidNotificationDetails(
-          'coach4life_reminders',
-          'Coach4Life Reminders',
-          importance: Importance.max,
-          priority: Priority.high,
-          actions: <AndroidNotificationAction>[
+        android: NotificationPresentation.android(
+          level,
+          silent: silent,
+          actions: const <AndroidNotificationAction>[
             AndroidNotificationAction(
               NotificationActionIds.later,
               'Snooze',
@@ -279,9 +287,13 @@ class LocalNotificationsService
             ),
           ],
         ),
-        iOS: DarwinNotificationDetails(categoryIdentifier: darwinCategoryId),
+        iOS: NotificationPresentation.darwin(
+          level,
+          silent: silent,
+          categoryIdentifier: darwinCategoryId,
+        ),
       ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: NotificationPresentation.scheduleMode,
       payload: payload,
     );
     await _indexNotificationTaskMapping(id: id, payload: payload);
@@ -299,19 +311,20 @@ class LocalNotificationsService
     /// iOS category (see [NotificationCategoryIds]) — due-now deliveries of
     /// task/intention reminders keep their action buttons this way.
     String? darwinCategoryId,
+    InterruptionLevel level = InterruptionLevel.medium,
+    bool silent = false,
   }) async {
     await _plugin.show(
       id,
       title,
       body,
       NotificationDetails(
-        android: const AndroidNotificationDetails(
-          'sidepal_events',
-          'SidePal Events',
-          importance: Importance.max,
-          priority: Priority.high,
+        android: NotificationPresentation.android(level, silent: silent),
+        iOS: NotificationPresentation.darwin(
+          level,
+          silent: silent,
+          categoryIdentifier: darwinCategoryId,
         ),
-        iOS: DarwinNotificationDetails(categoryIdentifier: darwinCategoryId),
       ),
       payload: payload,
     );

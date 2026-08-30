@@ -457,6 +457,18 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
           await _cancelActiveNotification(intent.entityId);
         }
         try {
+          // FR-R-44 / M1: the level the policy computed finally reaches the
+          // OS. `decision.silent` is honoured here too — it was computed by
+          // the focus-silence path and then never read, so "silent"
+          // deliveries were delivered loud.
+          // The policy may upgrade the level on a focus boost; the decision
+          // records that it happened but not the resulting level, so it is
+          // reconstructed here rather than widening the serialized model.
+          final level = decision.priorityBoosted
+              ? InterruptionLevelResolver.upgrade(intent.interruptionLevel)
+              : intent.interruptionLevel;
+          final silent = decision.outcome == AttentionOutcome.approved &&
+              decision.silent;
           if (immediate) {
             await _notifications.showNow(
               id: route.notifId,
@@ -464,6 +476,8 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
               body: body,
               payload: route.payload,
               darwinCategoryId: route.darwinCategoryId,
+              level: level,
+              silent: silent,
             );
           } else {
             await _notifications.schedule(
@@ -473,6 +487,8 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
               when: deliverAt,
               payload: route.payload,
               darwinCategoryId: route.darwinCategoryId,
+              level: level,
+              silent: silent,
             );
           }
           // Persist scheduled state to the ledger. notifId is a UNIQUE

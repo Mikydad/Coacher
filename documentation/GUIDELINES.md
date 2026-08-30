@@ -2607,3 +2607,32 @@ not silent reversal.
   which carries `ri_…` intent ids, so the one artifact batching could produce
   was a notification showing the user internal identifiers; it now counts
   partners instead of naming them.
+
+- **2026-08-30 · Reminder V2 R3: interruption levels reach the OS, and Android
+  is gated to inexact scheduling to match what the health row already
+  claims.** `local_notifications_service.dart` contained ZERO references to
+  `InterruptionLevel`: every notification was posted with `Importance.max` /
+  `Priority.high` on Android and bare `DarwinNotificationDetails` on iOS, so an
+  Extreme `critical` and a Flexible `low` rendered identically (AUDIT §10 M1).
+  The level's only real effect was the override suppression matrix — modes
+  changed *when a reminder was dropped*, never how it arrived.
+  `NotificationPresentation` maps the level onto one Android channel per level
+  (importance is fixed at channel creation, so quieting means posting to a
+  quieter channel — which also gives the user per-level control in system
+  settings) and onto iOS `interruptionLevel`
+  passive/active/timeSensitive. *Two things were computed and then dropped,
+  now both honoured:* `AttentionDecision.silent` (the focus-silence path) was
+  never read by `_executeDecision`, so "silent" deliveries were delivered
+  loud; and the policy's focus-boost upgraded the level into a local variable
+  the decision never carried, so the boost never reached the OS — it is now
+  reconstructed from `priorityBoosted` rather than widening the serialized
+  decision model. *D8 correction:* task 6.0's health row tells Android users
+  reminders are scheduled inexactly so they survive battery optimisation,
+  while the code still used `exactAllowWhileIdle` — the row was describing
+  behaviour that did not exist. `NotificationPresentation.scheduleMode` is now
+  the single place that decides, gated to `inexactAllowWhileIdle` on Android
+  because exactness needs the SCHEDULE_EXACT_ALARM flow and a boot receiver
+  (AUDIT §4) that this wave does not build. *M3:* an unknown or typo'd mode id
+  still degrades to flexible — the weakest contract, which is the opposite of
+  what a stricter-sounding custom name implies — but the degrade is now
+  counted and logged rather than silent.
