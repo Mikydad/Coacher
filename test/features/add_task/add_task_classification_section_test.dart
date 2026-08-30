@@ -22,13 +22,19 @@ Widget _host({
 );
 
 void main() {
-  testWidgets('offers all three classes', (tester) async {
+  testWidgets(
+    'labels state the OUTCOME, never "Flexible" — which on this same screen '
+    'is an Accountability MODE meaning something unrelated',
+    (tester) async {
     await tester.pumpWidget(_host(taxonomy: ReminderTaxonomy.flexible));
 
-    expect(find.text('EXPIRES'), findsOneWidget);
-    expect(find.text('FLEXIBLE'), findsOneWidget);
-    expect(find.text('ROUTINE'), findsOneWidget);
-  });
+      expect(find.text('EXPIRES'), findsOneWidget);
+      expect(find.text('COMES BACK'), findsOneWidget);
+      expect(find.text('ADDS UP'), findsOneWidget);
+      // The collision this renaming exists to prevent.
+      expect(find.text('FLEXIBLE'), findsNothing);
+    },
+  );
 
   testWidgets('explains what the selected class means for a miss', (
     tester,
@@ -68,7 +74,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('ROUTINE'));
+    await tester.tap(find.text('ADDS UP'));
     await tester.pump();
     expect(picked, ReminderTaxonomy.routine);
 

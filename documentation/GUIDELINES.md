@@ -2681,3 +2681,18 @@ not silent reversal.
   guarantee. The named failure stories from FR-R-71 each have a test, because
   "it degrades gracefully" is a claim, and an untested claim about failure is
   the kind that turns out to be false exactly when it matters.
+
+- **2026-08-30 · The "If you miss it" classes are labelled by OUTCOME —
+  EXPIRES / COMES BACK / ADDS UP — because "Flexible" was already taken.**
+  The add-task screen carries two independent controls: *Accountability*
+  (Flexible / Disciplined / Extreme — how hard SidePal pushes) and
+  *If you miss it* (the taxonomy — what the task is worth once the moment
+  passes). Shipping the taxonomy's middle option as "FLEXIBLE" put the same
+  word on both, so a perfectly ordinary task — Disciplined accountability,
+  `flexible` class — read as a contradiction. The axes genuinely differ and
+  the crossed combinations are the useful ones ("take meds" is gentle-but-
+  expiring; "write the chapter" is strict-but-still-worth-doing-later), so the
+  fix is naming, not merging. Labels now state what happens, which also makes
+  the row readable without knowing the vocabulary. *Storage is unaffected* —
+  the enum values stay `timeSensitive` / `flexible` / `routine`; this is a
+  display change only.

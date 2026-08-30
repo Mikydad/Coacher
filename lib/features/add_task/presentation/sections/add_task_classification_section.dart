@@ -11,20 +11,25 @@ const _order = <ReminderTaxonomy>[
   ReminderTaxonomy.routine,
 ];
 
-/// Framed by what happens when you MISS it, because that is the only thing
-/// the taxonomy actually decides (PRD §3.2). "Time-sensitive" is the internal
-/// name; "Expires" is what it does.
+/// Every label states the OUTCOME, because that is the only thing the
+/// taxonomy actually decides (PRD §3.2) — and because the internal names
+/// cannot be shown here. `flexible` collides with the *Accountability* mode
+/// of the same name that sits on this very screen, where it means something
+/// unrelated ("reminders are gentle") — a task can legitimately be
+/// Disciplined accountability with a `flexible` class, which reads as a
+/// contradiction only because of the shared word. Naming all three by what
+/// happens removes the collision and makes the row self-explanatory.
 String _labelFor(ReminderTaxonomy t) => switch (t) {
   ReminderTaxonomy.timeSensitive => 'EXPIRES',
-  ReminderTaxonomy.flexible => 'FLEXIBLE',
-  ReminderTaxonomy.routine => 'ROUTINE',
+  ReminderTaxonomy.flexible => 'COMES BACK',
+  ReminderTaxonomy.routine => 'ADDS UP',
 };
 
 String _explanationFor(ReminderTaxonomy t) => switch (t) {
   ReminderTaxonomy.timeSensitive =>
     'Stops mattering later. Logged as missed — never nagged about.',
   ReminderTaxonomy.flexible =>
-    'Still worth doing. Comes back at a good moment.',
+    'Still worth doing. Resurfaces at a good moment.',
   ReminderTaxonomy.routine =>
     'Low-stakes. Misses just add up in one daily line.',
 };
