@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/notifications/local_notifications_service.dart';
+import '../../time_blocks/application/time_block_providers.dart';
+import '../../time_blocks/domain/models/scheduled_time_block.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 
@@ -33,6 +35,16 @@ class _ReminderDebugScreenState extends ConsumerState<ReminderDebugScreen> {
     final service = LocalNotificationsService.instance;
     final pending = await service.getPendingNotificationRequests();
     final active = await service.getActiveNotifications();
+    final dayStart = DateTime.now().subtract(const Duration(days: 1));
+    List<ScheduledTimeBlock> blocks = const [];
+    try {
+      blocks = await ref
+          .read(timeBlockRepositoryProvider)
+          .listBlocksForDateRange(
+            dayStart,
+            dayStart.add(const Duration(days: 3)),
+          );
+    } catch (_) {}
     return _DebugSnapshot(
       pending: pending
           .map(
@@ -54,6 +66,7 @@ class _ReminderDebugScreenState extends ConsumerState<ReminderDebugScreen> {
             ),
           )
           .toList(),
+      blocks: blocks,
     );
   }
 
@@ -96,6 +109,17 @@ class _ReminderDebugScreenState extends ConsumerState<ReminderDebugScreen> {
               ),
               if (snap.delivered.isEmpty) const _EmptyLine('Tray is empty.'),
               for (final row in snap.delivered) _DebugTile(row: row),
+              const SizedBox(height: 24),
+              SectionHeader(
+                'Time blocks (${snap.blocks.length})',
+                subtitle:
+                    'What overlap detection and the ladder boundary consult. '
+                    'A timed task with a duration should have a row here.',
+              ),
+              if (snap.blocks.isEmpty)
+                const _EmptyLine('No stored blocks — reminder-only tasks '
+                    'and tasks without a duration create none.'),
+              for (final block in snap.blocks) _BlockTile(block: block),
             ],
           );
         },
@@ -105,9 +129,20 @@ class _ReminderDebugScreenState extends ConsumerState<ReminderDebugScreen> {
 }
 
 class _DebugSnapshot {
-  const _DebugSnapshot({required this.pending, required this.delivered});
+  const _DebugSnapshot({
+    required this.pending,
+    required this.delivered,
+    required this.blocks,
+  });
   final List<_DebugRow> pending;
   final List<_DebugRow> delivered;
+
+  /// Stored [ScheduledTimeBlock]s — what the conflict gate and the ladder
+  /// boundary actually consult. Added 2026-08-31 while chasing "overlap
+  /// detection stopped firing": if a task you just saved with a duration has
+  /// no row here, the conflict gate for the NEXT task has nothing to find,
+  /// and the bug is on the write side, not in detection.
+  final List<ScheduledTimeBlock> blocks;
 }
 
 class _DebugRow {
@@ -171,6 +206,40 @@ class _DebugTile extends StatelessWidget {
               fontFeatures: const [FontFeature.tabularFigures()],
               color: AppColors.textMuted,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BlockTile extends StatelessWidget {
+  const _BlockTile({required this.block});
+  final ScheduledTimeBlock block;
+
+  @override
+  Widget build(BuildContext context) {
+    String hhmm(DateTime t) =>
+        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${block.entityKind} · ${hhmm(block.startAt)}–'
+            '${hhmm(block.computedEndAt)} '
+            '(${block.expectedDurationMinutes} min, '
+            '${block.flexibilityType.name})',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          Text(
+            block.entityId,
+            style: TextStyle(fontSize: 11, color: AppColors.textMuted),
           ),
         ],
       ),
