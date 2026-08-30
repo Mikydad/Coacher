@@ -1,0 +1,208 @@
+import 'package:flutter/foundation.dart';
+
+import '../../../core/notifications/notification_budget.dart';
+import '../../../core/utils/date_keys.dart';
+import '../../../core/utils/stable_id.dart';
+import '../../context_override/domain/models/user_attention_state.dart';
+import '../data/reminder_occurrence_repository.dart';
+import '../domain/models/reminder_intent.dart';
+import '../domain/models/reminder_occurrence.dart';
+import '../domain/models/reminder_occurrence_enums.dart';
+import '../domain/models/reminder_type.dart';
+import '../domain/models/slot_spec.dart';
+import 'attention_orchestrator_service.dart';
+import 'interruption_level_resolver.dart';
+import 'ladder_compiler.dart';
+
+/// Supplies the plan the ladder must respect. Injected as a callback so the
+/// scheduler does not depend on the time-blocks feature directly, and so
+/// tests can hand it a fixed day.
+typedef UpcomingStartsLoader = Future<List<DateTime>> Function(DateTime day);
+
+/// Arms compiled ladders (FR-R-30…34) — the [L-PRE] layer.
+///
+/// Every notification this schedules was decided by [LadderCompiler] from
+/// Isar-resident data, with its strings already written. Nothing here waits on
+/// the network, and delivery-time code composes nothing: that is the PRD's one
+/// architecture rule, and this is the class most able to break it.
+class LadderScheduler {
+  LadderScheduler({
+    required ReminderOccurrenceRepository occurrences,
+    required AttentionOrchestratorService orchestrator,
+    required UpcomingStartsLoader loadUpcomingStarts,
+    Future<UserAttentionState?> Function()? loadAttentionState,
+    NotificationBudget? budget,
+    DateTime Function()? now,
+  }) : _occurrences = occurrences,
+       _orchestrator = orchestrator,
+       _loadUpcomingStarts = loadUpcomingStarts,
+       _loadAttentionState = loadAttentionState,
+       _budget = budget,
+       _now = now ?? DateTime.now;
+
+  final ReminderOccurrenceRepository _occurrences;
+  final AttentionOrchestratorService _orchestrator;
+  final UpcomingStartsLoader _loadUpcomingStarts;
+  final Future<UserAttentionState?> Function()? _loadAttentionState;
+  final NotificationBudget? _budget;
+  final DateTime Function() _now;
+
+  /// Deepest ladder any mode defines — how many slots a cancel must sweep.
+  static const int maxLadderSlots = 4;
+
+  /// Re-arm every eligible occurrence's ladder.
+  ///
+  /// Idempotent: slot ids are deterministic, so re-running replaces each slot
+  /// in place rather than stacking duplicates.
+  Future<LadderSchedulingResult> rearmAll() async {
+    final now = _now();
+    try {
+      final open = await _occurrences.listUnresolved();
+      if (open.isEmpty) return const LadderSchedulingResult();
+
+      final upcomingStarts = await _loadUpcomingStarts(now);
+      final shields = await _shieldsFor(now);
+      var remaining =
+          await (_budget?.remainingCapacity() ??
+              Future.value(NotificationBudget.kDefaultSafeCap));
+
+      var armed = 0;
+      var dropped = 0;
+
+      // Criticality first, then soonest: when the queue runs short, the most
+      // important and most imminent ladders are the ones that keep their
+      // depth (FR-R-33's ordering).
+      final ordered = [...open]..sort((a, b) {
+        final byCriticality = b.criticality.compareTo(a.criticality);
+        if (byCriticality != 0) return byCriticality;
+        return a.scheduledAtMs.compareTo(b.scheduledAtMs);
+      });
+
+      for (final occurrence in ordered) {
+        // Routine misses never escalate (§3.2) — they roll forward quietly.
+        if (occurrence.taxonomy == ReminderTaxonomy.routine &&
+            occurrence.state == ReminderOccurrenceState.overdue) {
+          continue;
+        }
+
+        final plan = LadderCompiler.compile(
+          occurrence: occurrence,
+          context: LadderContext(
+            upcomingStarts: upcomingStarts,
+            shields: shields,
+            budgetRemaining: remaining,
+          ),
+          now: now,
+        );
+
+        for (final drop in plan.drops) {
+          dropped++;
+          debugPrint(
+            '[LadderScheduler] ${occurrence.entityId} dropped $drop',
+          );
+        }
+
+        for (final slot in plan.slots) {
+          await _arm(occurrence, slot, now);
+          armed++;
+          remaining = remaining > 0 ? remaining - 1 : 0;
+        }
+      }
+
+      if (armed > 0 || dropped > 0) {
+        debugPrint('[LadderScheduler] armed $armed, dropped $dropped');
+      }
+      return LadderSchedulingResult(armed: armed, dropped: dropped);
+    } catch (e, st) {
+      debugPrint('[LadderScheduler] rearm failed: $e\n$st');
+      return const LadderSchedulingResult();
+    }
+  }
+
+  Future<void> _arm(
+    ReminderOccurrence occurrence,
+    SlotSpec slot,
+    DateTime now,
+  ) async {
+    final modeRefId = occurrence.modeRefId ?? 'flexible';
+    final intent = ReminderIntent(
+      id: StableId.generate('ri_ladder'),
+      entityId: occurrence.entityId,
+      entityKind: occurrence.entityKind,
+      entityTitle: occurrence.entityTitle ?? occurrence.entityId,
+      proposedAt: slot.fireAt,
+      importance: (occurrence.criticality * 25).clamp(0, 100),
+      interruptionLevel: InterruptionLevelResolver.resolve(
+        enforcementMode: modeRefId,
+        escalationLevel: slot.slot,
+        emergencyBypass: occurrence.criticality >= 3,
+      ),
+      enforcementMode: modeRefId,
+      escalationLevel: slot.slot,
+      // Slot 0 IS the reminder; the rest are its follow-ups. The distinction
+      // matters: the CoachingStyle back-off may suppress a follow-up, and
+      // must never suppress the first delivery.
+      reminderType: slot.isFirst
+          ? ReminderType.scheduled
+          : ReminderType.followUp,
+      sourceReason: 'ladder_slot_${slot.slot}',
+      slot: slot.slot,
+      createdAtMs: now.millisecondsSinceEpoch,
+    );
+    await _orchestrator.evaluate(intent);
+  }
+
+  /// Known shield windows: the configured sleep window for today and
+  /// tomorrow. Dynamic shields (a timer the user starts) are handled by the
+  /// [L-ALIVE] recompile, not here.
+  Future<List<ShieldWindow>> _shieldsFor(DateTime now) async {
+    final state = await (_loadAttentionState?.call() ?? Future.value(null));
+    if (state == null || !state.hasSleepWindow) return const [];
+    final start = _todayAt(now, state.sleepWindowStart);
+    final end = _todayAt(now, state.sleepWindowEnd);
+    if (start == null || end == null) return const [];
+
+    // A window that crosses midnight is two spans, not one.
+    if (end.isAfter(start)) {
+      return [ShieldWindow(start: start, end: end, reason: 'sleep')];
+    }
+    return [
+      ShieldWindow(
+        start: start,
+        end: end.add(const Duration(days: 1)),
+        reason: 'sleep',
+      ),
+      ShieldWindow(
+        start: start.subtract(const Duration(days: 1)),
+        end: end,
+        reason: 'sleep',
+      ),
+    ];
+  }
+
+  static DateTime? _todayAt(DateTime now, String? hhmm) {
+    if (hhmm == null || hhmm.isEmpty) return null;
+    final parts = hhmm.trim().split(':');
+    if (parts.length != 2) return null;
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h == null || m == null) return null;
+    return DateTime(now.year, now.month, now.day, h, m);
+  }
+
+  /// The local day key the scheduler treats as "today".
+  static String todayKey(DateTime now) => DateKeys.todayKey(now);
+}
+
+class LadderSchedulingResult {
+  const LadderSchedulingResult({this.armed = 0, this.dropped = 0});
+
+  final int armed;
+  final int dropped;
+
+  bool get didWork => armed > 0 || dropped > 0;
+
+  @override
+  String toString() =>
+      'LadderSchedulingResult(armed: $armed, dropped: $dropped)';
+}

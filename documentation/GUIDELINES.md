@@ -2565,3 +2565,23 @@ not silent reversal.
   `faults` — Android's inexact-scheduling note (D8) is honest context and must
   never raise the quiet Home hint, and an unreadable permission or queue state
   is reported as "Unknown" rather than crying wolf.
+
+- **2026-08-30 · Reminder V2 R3: the ladder compiler owns scheduled slots;
+  the sync service keeps only the snooze re-plan.** With tasks now
+  pre-scheduling a multi-slot ladder (FR-R-30), slot 0 had two potential
+  owners: `ReminderSyncService._applyReminders`, which armed one notification
+  per config, and `LadderScheduler`, which arms the compiled ladder.
+  `_applyReminders` no longer schedules the normal case — only the
+  `pendingAction` snooze re-plan, whose `nextPromptAtIso` is that service's
+  own state and whose occurrence still sits at the original (past) time, so
+  the compiler produces nothing for it and the two cannot collide. *Why it
+  matters:* the compiler is the only thing that knows the interruption
+  boundary, the shields and the budget; a second arming path would silently
+  bypass all three. *Consequences:* task notification ids became slot-aware
+  (`idFromTaskId(id, slot:)`, mirrored in the route resolver, slot 0 keeping
+  its historic value so upgrades cannot orphan an armed notification); tasks
+  joined the multi-slot cancel path, so `cancelForEntity` now sweeps every
+  ladder slot — completing a task at T+2 must silence T+10 and T+25, or the
+  ladder outlives the thing it was reminding about; and the save path
+  explicitly re-arms so a reminder the user just set is scheduled when they
+  leave the screen rather than at the next recompute.

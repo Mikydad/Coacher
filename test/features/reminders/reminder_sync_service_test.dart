@@ -105,7 +105,7 @@ class _FakeOrchestratorService extends AttentionOrchestratorService {
   }
 
   @override
-  Future<void> cancelForEntity(String entityId) async {
+  Future<void> cancelForEntity(String entityId, {int slotCount = 4}) async {
     cancelled.add(entityId);
   }
 }
@@ -193,15 +193,24 @@ ReminderConfig _reminder({
   );
 }
 
+/// Counts ladder re-arms, so tests can assert the delegation rather than
+/// the scheduling this service no longer owns.
+class _RearmSpy {
+  int calls = 0;
+  Future<void> call() async => calls++;
+}
+
 ReminderSyncService _makeService(
   _FakeReminderRepository repo,
   _FakeOrchestratorService orchestrator,
-  DateTime now,
-) {
+  DateTime now, {
+  _RearmSpy? rearm,
+}) {
   return ReminderSyncService(
     repository: repo,
     notifications: _FakeNotifications(),
     orchestratorService: orchestrator,
+    rearmLadders: rearm?.call,
     now: () => now,
   );
 }
@@ -353,6 +362,59 @@ void main() {
     expect(orchestrator.evaluated, isEmpty);
   });
 
+  // ── R3 ownership: the ladder arms scheduled slots, not this service ───────
+
+  test(
+    'a scheduled (non-snoozed) reminder is NOT armed here — the ladder '
+    'compiler owns it, so slot 0 has exactly one owner',
+    () async {
+      final now = DateTime(2026, 3, 24, 10, 0);
+      final repo = _FakeReminderRepository()
+        ..seed([
+          _reminder(now: now, pendingAction: false).copyWith(
+            scheduledAtIso: DateTime(2026, 3, 24, 18, 0).toIso8601String(),
+          ),
+        ]);
+      final orchestrator = _FakeOrchestratorService();
+      final service = _makeService(repo, orchestrator, now);
+
+      await service.scheduleFromCache();
+
+      expect(orchestrator.evaluated, isEmpty);
+      // ...and the live slot is NOT destroyed on the way past (C6 still holds).
+      expect(orchestrator.cancelled, isEmpty);
+    },
+  );
+
+  test('a snoozed reminder IS still re-planned here', () async {
+    final now = DateTime(2026, 3, 24, 10, 0);
+    final repo = _FakeReminderRepository()
+      ..seed([_reminder(now: now, pendingAction: true)]);
+    final orchestrator = _FakeOrchestratorService();
+    final service = _makeService(repo, orchestrator, now);
+
+    await service.scheduleFromCache();
+
+    expect(orchestrator.evaluated, hasLength(1));
+    expect(orchestrator.evaluated.single.reminderType, ReminderType.followUp);
+  });
+
+  test('saving a reminder triggers a ladder re-arm', () async {
+    final now = DateTime(2026, 3, 24, 10, 0);
+    final repo = _FakeReminderRepository()..seed([_reminder(now: now)]);
+    final rearm = _RearmSpy();
+    final service = _makeService(
+      repo,
+      _FakeOrchestratorService(),
+      now,
+      rearm: rearm,
+    );
+
+    await service.syncForTaskIds(['t1']);
+
+    expect(rearm.calls, 1);
+  });
+
   // ── C3: a task carried to tomorrow keeps a reminder ────────────────────────
 
   group('shiftToDate — carry-forward (AUDIT §10 C3)', () {
@@ -376,36 +438,25 @@ void main() {
     });
 
     test(
-      'moving a task to tomorrow re-arms its reminder instead of silently '
-      'dropping it',
+      "moving a task to tomorrow moves its reminder's DATE, keeping the time "
+      'of day — the whole of C3',
       () async {
         final now = DateTime(2026, 3, 24, 10, 0);
-        // A reminder set for 07:00 today — already past, so today it arms
-        // nothing, which is exactly the state a carried task inherits.
+        // A reminder set for 07:00 today — already past, which is exactly the
+        // stale state a carried-forward task used to inherit forever.
         final repo = _FakeReminderRepository()
           ..seed([
             _reminder(now: now, pendingAction: false).copyWith(
               scheduledAtIso: DateTime(2026, 3, 24, 7, 0).toIso8601String(),
             ),
           ]);
-        final orchestrator = _FakeOrchestratorService();
-        final service = _makeService(repo, orchestrator, now);
-
-        // Before: nothing to arm — the past timestamp yields no intent.
-        await service.scheduleFromCache();
-        expect(orchestrator.evaluated, isEmpty);
+        final service = _makeService(repo, _FakeOrchestratorService(), now);
 
         await service.shiftToDate('t1', targetDay: DateTime(2026, 3, 25));
 
         final stored = (await repo.listAllReminders()).single;
         expect(
           DateTime.parse(stored.scheduledAtIso!),
-          DateTime(2026, 3, 25, 7, 0),
-        );
-        // And it is armed again.
-        expect(orchestrator.evaluated, hasLength(1));
-        expect(
-          orchestrator.evaluated.single.proposedAt,
           DateTime(2026, 3, 25, 7, 0),
         );
       },

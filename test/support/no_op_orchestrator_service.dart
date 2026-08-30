@@ -39,7 +39,7 @@ class NoOpOrchestratorService extends AttentionOrchestratorService {
   }
 
   @override
-  Future<void> cancelForEntity(String entityId) async {
+  Future<void> cancelForEntity(String entityId, {int slotCount = 4}) async {
     cancelled.add(entityId);
   }
 

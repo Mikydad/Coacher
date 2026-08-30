@@ -85,11 +85,16 @@ class ReminderSyncService {
     /// legacy wiring keep working; when absent, occurrences simply are not
     /// tracked and nothing else changes.
     ReminderOccurrenceService? occurrenceService,
+
+    /// Re-arms compiled ladders after a save. Injected as a callback to keep
+    /// this service free of a dependency cycle with the scheduler.
+    Future<void> Function()? rearmLadders,
     DateTime Function()? now,
   }) : _repository = repository,
        _notifications = notifications,
        _orchestrator = orchestratorService,
        _occurrences = occurrenceService,
+       _rearmLadders = rearmLadders,
        _now = now ?? DateTime.now;
 
   final ReminderRepository _repository;
@@ -97,6 +102,7 @@ class ReminderSyncService {
   final ReminderNotificationsPort _notifications;
   final AttentionOrchestratorService _orchestrator;
   final ReminderOccurrenceService? _occurrences;
+  final Future<void> Function()? _rearmLadders;
   final DateTime Function() _now;
 
   Future<bool> ensurePermissions() =>
@@ -116,6 +122,9 @@ class ReminderSyncService {
         await _occurrences?.ensureForConfig(r);
       }
     }
+    // Arm the ladder now: a reminder the user just set should be scheduled
+    // when they leave the screen, not at the next recompute.
+    await _rearmLadders?.call();
   }
 
   Future<void> scheduleFromCache() async {
@@ -337,12 +346,18 @@ class ReminderSyncService {
         continue;
       }
 
+      // OWNERSHIP (R3): the ladder compiler owns the SCHEDULED ladder — it is
+      // the only thing that knows the interruption boundary, the shields and
+      // the budget, and arming slot 0 from here as well would give one slot
+      // two owners. What stays here is the SNOOZE re-plan: `nextPromptAtIso`
+      // is this service's own state, and its occurrence is still sitting at
+      // the original (now past) time, so the ladder produces nothing for it.
+      if (!reminder.pendingAction) continue;
+
       final intent = _intentFromConfig(
         reminder,
         proposedAt: nextAt,
-        reminderType: reminder.pendingAction
-            ? ReminderType.followUp
-            : ReminderType.scheduled,
+        reminderType: ReminderType.followUp,
       );
       if (intent == null) {
         await _orchestrator.cancelForEntity(reminder.taskId);
@@ -350,7 +365,7 @@ class ReminderSyncService {
       }
 
       debugPrint(
-        '[ReminderSync] evaluating intent: '
+        '[ReminderSync] snooze re-plan: '
         'task=${reminder.taskId} at=$nextAt escalation=${reminder.escalationLevel}',
       );
       await _orchestrator.evaluate(intent);

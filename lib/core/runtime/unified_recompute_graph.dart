@@ -158,6 +158,14 @@ class UnifiedRecomputeGraph {
         if (sweep.didWork) {
           debugPrint('[UnifiedRecomputeGraph] step:reminderOccurrences $sweep');
         }
+        // [L-PRE]: re-arm compiled ladders against the (possibly changed)
+        // plan. Runs after the sweep so it sees today's freshly backfilled
+        // and freshly advanced occurrences.
+        if (_generationChanged(capturedGeneration)) return;
+        final ladders = await container.read(ladderSchedulerProvider).rearmAll();
+        if (ladders.didWork) {
+          debugPrint('[UnifiedRecomputeGraph] step:ladders $ladders');
+        }
       } catch (e) {
         debugPrint(
           '[UnifiedRecomputeGraph] step:reminderOccurrences failed: $e',

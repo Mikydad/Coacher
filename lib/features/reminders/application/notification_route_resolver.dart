@@ -91,8 +91,13 @@ NotificationRoute resolveNotificationRoute(ReminderIntent intent) {
       );
     default: // task / habit
       return NotificationRoute(
-        // Mirrors LocalNotificationsService.idFromTaskId(slot: 0).
-        notifId: ('task:${intent.entityId}:0').hashCode.abs() % 2147483647,
+        // Mirrors LocalNotificationsService.idFromTaskId — slot-aware since
+        // FR-R-30, because a task's ladder pre-schedules several moments and
+        // each must be cancellable on its own. Slot 0 keeps the historic id,
+        // so a notification armed by an older build stays cancellable.
+        notifId:
+            ('task:${intent.entityId}:${intent.slot}').hashCode.abs() %
+            2147483647,
         payload: 'task:$encoded',
         darwinCategoryId: NotificationCategoryIds.taskReminder,
       );

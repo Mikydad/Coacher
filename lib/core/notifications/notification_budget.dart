@@ -52,4 +52,22 @@ class NotificationBudget {
     }
     return ok;
   }
+
+  /// How many more notifications fit under the safety margin.
+  ///
+  /// The ladder compiler needs a COUNT, not a yes/no: a task whose mode calls
+  /// for four slots may only have room for two, and dropping the deepest two
+  /// is better than dropping the task. Fails CLOSED (0) for the same reason
+  /// [canSchedule] fails closed — scheduling blind into a possibly-full queue
+  /// recreates the silent-overflow bug this class exists to prevent.
+  Future<int> remainingCapacity() async {
+    try {
+      final pending = await _pending.getPendingNotificationRequests();
+      final left = _safeCap - pending.length;
+      return left < 0 ? 0 : left;
+    } catch (e) {
+      debugPrint('[NotificationBudget] pending query failed, reporting 0: $e');
+      return 0;
+    }
+  }
 }

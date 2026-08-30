@@ -289,8 +289,24 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
     );
   }
 
-  /// Cancel the active OS notification for [entityId] (replaces 64-slot loop).
-  Future<void> cancelForEntity(String entityId) async {
+  /// Cancel every armed notification for [entityId].
+  ///
+  /// Tasks now pre-schedule a ladder (FR-R-30), so an entity-scoped cancel
+  /// has to sweep each slot: completing a task at T+2 must silence T+10 and
+  /// T+25 too, or the ladder outlives the thing it was reminding about
+  /// (FR-R-13). Slot ids are deterministic, so cancelling one that was never
+  /// armed is a harmless no-op.
+  Future<void> cancelForEntity(String entityId, {int slotCount = 4}) async {
+    for (var slot = 0; slot < slotCount; slot++) {
+      final notifId = _notifications.idFromTaskId(entityId, slot: slot);
+      try {
+        await _notifications.cancel(notifId);
+      } catch (e) {
+        debugPrint('attention_orchestrator_service: swallowed error: $e');
+      }
+      await _ledger.markCancelledByNotifId(notifId);
+    }
+    // Non-task kinds (and any legacy row) still resolve through the ledger.
     await _cancelActiveNotification(entityId);
   }
 
@@ -522,7 +538,9 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
   /// slot-scoped rather than entity-scoped cancels.
   static bool _isMultiSlotKind(String entityKind) =>
       entityKind == ReminderEntityKinds.intention ||
-      entityKind == ReminderEntityKinds.goal;
+      entityKind == ReminderEntityKinds.goal ||
+      entityKind == ReminderEntityKinds.task ||
+      entityKind == ReminderEntityKinds.habit;
 
   /// Slot-scoped cancel: only the given OS notification id (and its ledger
   /// row), leaving the entity's sibling slots untouched.

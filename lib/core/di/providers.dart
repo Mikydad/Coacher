@@ -29,6 +29,9 @@ import '../../features/reminders/application/attention_orchestrator_providers.da
 import '../../features/reminders/application/reminder_sync_service.dart';
 import '../../features/reminders/data/isar_reminder_repository.dart';
 import '../../features/reminders/data/reminder_cache_store.dart';
+import '../../features/context_override/application/context_override_providers.dart';
+import '../../features/time_blocks/application/time_block_providers.dart';
+import '../../features/reminders/application/ladder_scheduler.dart';
 import '../../features/reminders/application/recovery_view.dart';
 import '../../features/reminders/application/reminder_occurrence_service.dart';
 import '../../features/reminders/data/isar_reminder_occurrence_repository.dart';
@@ -140,6 +143,31 @@ final unresolvedReminderOccurrencesProvider =
       (ref) => ref.watch(reminderOccurrenceRepositoryProvider).watchUnresolved(),
     );
 
+/// Arms compiled ladders ([L-PRE], FR-R-30…34).
+///
+/// The boundary comes from the day's real scheduled blocks and the shield
+/// from the configured sleep window, both loaded locally — nothing here waits
+/// on the network.
+final ladderSchedulerProvider = Provider<LadderScheduler>((ref) {
+  return LadderScheduler(
+    occurrences: ref.read(reminderOccurrenceRepositoryProvider),
+    orchestrator: ref.read(attentionOrchestratorServiceProvider),
+    loadUpcomingStarts: (day) async {
+      final dayStart = DateTime(day.year, day.month, day.day);
+      final blocks = await ref
+          .read(timeBlockRepositoryProvider)
+          .listBlocksForDateRange(
+            dayStart,
+            dayStart.add(const Duration(days: 1)),
+          );
+      return blocks.map((b) => b.startAt).toList(growable: false);
+    },
+    loadAttentionState: () =>
+        ref.read(contextOverrideRepositoryProvider).getAttentionState(),
+    budget: ref.read(notificationBudgetProvider),
+  );
+});
+
 /// Entity ids currently Overdue — what a task row consults to show its badge
 /// (FR-R-50's "task list badge"). Derived from the same view the card renders,
 /// so a row and the card can never disagree.
@@ -176,6 +204,7 @@ final reminderSyncServiceProvider = Provider<ReminderSyncService>(
     ),
     orchestratorService: ref.read(attentionOrchestratorServiceProvider),
     occurrenceService: ref.read(reminderOccurrenceServiceProvider),
+    rearmLadders: () => ref.read(ladderSchedulerProvider).rearmAll(),
   ),
 );
 
