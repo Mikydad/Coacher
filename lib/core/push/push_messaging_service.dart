@@ -55,6 +55,11 @@ class PushMessagingService {
   /// FCM token rotation.
   String? _registeredUid;
 
+  /// Whether the [L-PUSH] rescue net has this device registered — read by the
+  /// reminder health row (FR-R-80). Push is an ADDITIVE floor, never a
+  /// dependency, so "not registered" is reported as context, not a fault.
+  bool get isRegistered => _registeredUid != null;
+
   /// Wires token registration + message handlers. Safe to call more than
   /// once; only the first call takes effect.
   Future<void> initialize(ProviderContainer container) async {

@@ -213,6 +213,39 @@ class LocalNotificationsService
     return iosOk && androidOk;
   }
 
+  /// Read the OS permission state WITHOUT prompting.
+  ///
+  /// Distinct from [requestPermissionsIfNeeded], which shows the system
+  /// dialog: the health row has to be able to say "reminders can't fire"
+  /// without pestering the user every time they open Settings.
+  ///
+  /// Null means "could not determine" — an unreadable platform channel is
+  /// not the same as a denial, and the health row says so rather than
+  /// crying wolf.
+  Future<bool?> areNotificationsPermitted() async {
+    try {
+      final ios = _plugin
+          .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin
+          >();
+      if (ios != null) {
+        final options = await ios.checkPermissions();
+        if (options == null) return null;
+        // Alert is the one that matters: badge/sound off is a preference,
+        // alert off means a reminder cannot appear at all.
+        return options.isAlertEnabled;
+      }
+      final android = _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
+      return await android?.areNotificationsEnabled();
+    } catch (e) {
+      debugPrint('[Notif] permission check failed: $e');
+      return null;
+    }
+  }
+
   Future<void> schedule({
     required int id,
     required String title,

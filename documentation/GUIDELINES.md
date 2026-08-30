@@ -2540,3 +2540,28 @@ not silent reversal.
   FR-R-53's aggregated recovery notification moves to R3 (task 7.0), because
   its "qualifying free gap" is the same plan/boundary math FR-R-31 builds and
   writing gap-finding twice would mean discarding the first version.
+
+- **2026-08-30 · "Presumed fired" is how iOS gives us a delivery callback —
+  and delivery times are stamped retroactively.** iOS offers no callback when
+  a scheduled local notification fires, which is why `markDelivered` was
+  reachable only from the `showNow` path and every scheduled reminder stayed
+  `scheduled` forever (AUDIT §10 L1). Boot reconciliation now infers it: a
+  ledger row **in the tray** demonstrably fired; a row **past its time and no
+  longer in the pending queue** is *presumed fired*, because the OS removes a
+  scheduled notification from pending when it fires and local notifications
+  fire whether or not the app is alive. This refines R1, where the past-due
+  branch marked rows `cancelled` as a stated R2 seam. Presumed-fired is never
+  permission to re-deliver — the state machine still owns Overdue vs Expired.
+  *And the timestamp is retroactive:* `markDelivered` takes the slot's own
+  scheduled time, because a reminder that fired at 2 PM and was noticed at
+  6 PM was delivered at 2 PM — stamping "now" would turn every delivery
+  metric into a measure of app-open frequency. Same principle as
+  `overdueSinceMs`. *Lifecycle shape, deliberately not one enum:* `state`
+  tracks the SLOT (scheduled → delivered → cancelled, with `snoozed` as the
+  replan branch), `interactionType`/`interactedAtMs` track what the USER did,
+  and `ignoredCount` counts unanswered deliveries. Collapsing them would lose
+  the difference between "the OS no longer holds this" and "the user dealt
+  with it". *Health surfacing:* `ReminderHealth` separates `issues` from
+  `faults` — Android's inexact-scheduling note (D8) is honest context and must
+  never raise the quiet Home hint, and an unreadable permission or queue state
+  is reported as "Unknown" rather than crying wolf.

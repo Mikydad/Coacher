@@ -15,7 +15,7 @@ class NoOpNotificationLedger implements NotificationLedgerRepository {
   Future<void> markCancelledByNotifId(int notifId) async {}
 
   @override
-  Future<void> markDelivered(int notifId) async {}
+  Future<void> markDelivered(int notifId, {int? deliveredAtMs}) async {}
 
   @override
   Future<void> markInteraction(int notifId, String interactionType) async {}

@@ -48,13 +48,36 @@ class NotificationLedgerRepository {
   }
 
   /// Transition an entry to [NotificationLedgerState.delivered] by notifId.
-  Future<void> markDelivered(int notifId) async {
+  /// Stamp a slot as having reached the user.
+  ///
+  /// [deliveredAtMs] is the moment it actually fired. Boot-time fired
+  /// detection passes the slot's own scheduled time, because a reminder that
+  /// fired at 2 PM and was noticed at 6 PM was delivered at 2 PM — "when we
+  /// noticed" would make every delivery metric a measure of app-open
+  /// frequency. Omit it only when delivery is happening right now
+  /// (the `showNow` path).
+  ///
+  /// ## The slot lifecycle (FR-R-81)
+  ///
+  /// It is spread across three fields on purpose, not one state enum:
+  /// - [IsarNotificationLedgerEntry.state] — where the SLOT is: `scheduled` →
+  ///   `delivered` → `cancelled`, with `snoozed` as the re-plan branch.
+  /// - `interactionType` / `interactedAtMs` — what the USER did with it
+  ///   (opened, dismissed, snoozed). Orthogonal: a slot can be delivered and
+  ///   opened, or delivered and ignored.
+  /// - `ignoredCount` — how many times it went unanswered, reset by any
+  ///   positive interaction.
+  ///
+  /// Collapsing these into one enum would lose the distinction between "the
+  /// OS no longer holds this" and "the user did something about it".
+  Future<void> markDelivered(int notifId, {int? deliveredAtMs}) async {
     final entry = await findByNotifId(notifId);
     if (entry == null) return;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
     entry
       ..state = NotificationLedgerState.delivered.name
-      ..deliveredAtMs = DateTime.now().millisecondsSinceEpoch
-      ..updatedAtMs = DateTime.now().millisecondsSinceEpoch;
+      ..deliveredAtMs = deliveredAtMs ?? entry.deliveredAtMs ?? nowMs
+      ..updatedAtMs = nowMs;
     await upsertEntry(entry);
   }
 

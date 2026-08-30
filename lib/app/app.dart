@@ -36,6 +36,7 @@ import '../features/settings/presentation/account_settings_screen.dart';
 import '../features/settings/presentation/coach_ai_settings_screen.dart';
 import '../features/settings/presentation/smart_timing_settings_screen.dart';
 import '../features/settings/presentation/notification_settings_screen.dart';
+import '../features/reminders/presentation/reminder_debug_screen.dart';
 import '../features/settings/presentation/reminder_settings_screen.dart';
 import '../features/tasks_hub/presentation/task_detail_screen.dart';
 import '../features/tasks_hub/presentation/tasks_hub_screen.dart';
@@ -192,6 +193,7 @@ class CoachForLifeApp extends ConsumerWidget {
         AboutSupportScreen.routeName: (_) => const AboutSupportScreen(),
         NotificationSettingsScreen.routeName: (_) =>
             const NotificationSettingsScreen(),
+        ReminderDebugScreen.routeName: (_) => const ReminderDebugScreen(),
         ReminderSettingsScreen.routeName: (_) => const ReminderSettingsScreen(),
         FeedbackScreen.routeName: (_) => const FeedbackScreen(),
         ProfileScreen.routeName: (_) => const ProfileScreen(),

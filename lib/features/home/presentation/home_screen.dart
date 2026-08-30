@@ -60,6 +60,7 @@ import '../../analytics/presentation/analytics_progress_screen.dart';
 import '../../ai_assistant/presentation/widgets/coach_ai_fab.dart';
 import '../../context_override/domain/models/interruption_level.dart';
 import '../../reminders/presentation/recovery_card.dart';
+import '../../reminders/presentation/reminder_health_section.dart';
 import '../../reminders/presentation/recovery_navigation.dart';
 import '../../context_override/presentation/active_override_banner.dart';
 import '../../context_override/presentation/context_override_quick_activate_sheet.dart';
@@ -205,6 +206,9 @@ class HomeScreen extends ConsumerWidget {
           // What SidePal still owes you leads the recovery band (FR-R-50):
           // above the post-override review, because an overdue task is a
           // standing debt while that card is a one-off.
+          // Silence is the normal state (FR-R-80): this appears only when
+          // reminders genuinely cannot do their job.
+          const ReminderHealthHomeHint(),
           RecoveryCard(
             onOpenTask: (entityId) => openRecoveryTask(context, ref, entityId),
           ),

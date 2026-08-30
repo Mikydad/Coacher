@@ -135,21 +135,25 @@ void main() {
       },
     );
 
-    test('a row present in the delivered tray is also left alone', () async {
-      await ledger.upsertEntry(
-        entry(notifId: 300, entityId: 'task-alive', scheduledFor: past),
-      );
+    test(
+      'a row sitting in the delivered tray is stamped delivered, not '
+      're-delivered (FR-R-81 / L1)',
+      () async {
+        await ledger.upsertEntry(
+          entry(notifId: 300, entityId: 'task-alive', scheduledFor: past),
+        );
 
-      final notifs = _FakeNotifications(active: [_notif(300)]);
-      final orchestrator = _FakeOrchestrator();
+        final notifs = _FakeNotifications(active: [_notif(300)]);
+        final orchestrator = _FakeOrchestrator();
 
-      await service(notifs, orchestrator).reconcile();
+        await service(notifs, orchestrator).reconcile();
 
-      final updated = await ledger.findByNotifId(300);
-      expect(updated!.state, equals(NotificationLedgerState.scheduled.name));
-      expect(orchestrator.calls, isEmpty);
-      expect(notifs.cancelledIds, isEmpty);
-    });
+        final updated = await ledger.findByNotifId(300);
+        expect(updated!.state, equals(NotificationLedgerState.delivered.name));
+        expect(orchestrator.calls, isEmpty);
+        expect(notifs.cancelledIds, isEmpty);
+      },
+    );
   });
 
   group('NotificationReconciliationService — genuinely lost rows', () {
@@ -174,8 +178,8 @@ void main() {
     );
 
     test(
-      'lost row whose time has PASSED is cancelled and never re-delivered '
-      '(the state machine owns it, not boot)',
+      'a row past its time and no longer pending is PRESUMED FIRED — the '
+      'closest thing iOS gives to a delivery callback (L1)',
       () async {
         await ledger.upsertEntry(
           entry(notifId: 120, entityId: 'task-missed', scheduledFor: past),
@@ -187,12 +191,13 @@ void main() {
         await service(notifs, orchestrator).reconcile();
 
         final updated = await ledger.findByNotifId(120);
-        expect(updated!.state, equals(NotificationLedgerState.cancelled.name));
+        expect(updated!.state, equals(NotificationLedgerState.delivered.name));
+        // Presumed fired is NOT permission to fire it again.
         expect(orchestrator.calls, isEmpty);
       },
     );
 
-    test('a row with no stored time takes the conservative branch', () async {
+    test('a row with no stored time is never re-delivered', () async {
       final row = entry(notifId: 130, entityId: 'task-untimed', scheduledFor: future)
         ..scheduledForMs = null;
       await ledger.upsertEntry(row);
@@ -204,7 +209,21 @@ void main() {
 
       expect(orchestrator.calls, isEmpty);
       final updated = await ledger.findByNotifId(130);
-      expect(updated!.state, equals(NotificationLedgerState.cancelled.name));
+      expect(updated!.state, equals(NotificationLedgerState.delivered.name));
+    });
+
+    test('the pass records what it did, for the health row (FR-R-80)', () async {
+      await ledger.upsertEntry(
+        entry(notifId: 150, entityId: 'fired', scheduledFor: past),
+      );
+
+      await service(_FakeNotifications(), _FakeOrchestrator()).reconcile();
+
+      expect(NotificationReconciliationService.lastRunAtMs, isNotNull);
+      expect(
+        NotificationReconciliationService.lastRunSummary,
+        contains('1 delivered'),
+      );
     });
 
     test(
@@ -235,9 +254,10 @@ void main() {
 
         await service(notifs, orchestrator).reconcile();
 
+        // Slot 140's time has passed and it is no longer pending → fired.
         expect(
           (await ledger.findByNotifId(140))!.state,
-          equals(NotificationLedgerState.cancelled.name),
+          equals(NotificationLedgerState.delivered.name),
         );
         expect(
           (await ledger.findByNotifId(141))!.state,

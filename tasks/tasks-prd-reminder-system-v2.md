@@ -235,17 +235,17 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
         overdue history attached.
   - [x] 5.7 Task-row Overdue badge in the task list.
 
-- [ ] **6.0 Observability & health** *(FR-R-80…82)*
-  - [ ] 6.1 "Reminder health" row in `notification_settings_screen.dart`:
+- [x] **6.0 Observability & health** *(FR-R-80…82)*
+  - [x] 6.1 "Reminder health" row in `notification_settings_screen.dart`:
         permission state, pending-queue usage vs budget, timezone state, last
         reconciliation result, [L-PUSH] registration.
-  - [ ] 6.2 One quiet dismissible Home hint on any red condition (sync-line
+  - [x] 6.2 One quiet dismissible Home hint on any red condition (sync-line
         pattern).
-  - [ ] 6.3 Full slot lifecycle in the ledger (scheduled → fired-detected →
+  - [x] 6.3 Full slot lifecycle in the ledger (scheduled → fired-detected →
         interacted/ignored → cancelled/expired).
-  - [ ] 6.4 Fired-detection pass at [L-ALIVE] via tray + pending diff, so
+  - [x] 6.4 Fired-detection pass at [L-ALIVE] via tray + pending diff, so
         `delivered` finally means delivered. (L1)
-  - [ ] 6.5 Tester-gated debug screen listing every armed OS notification with
+  - [x] 6.5 Tester-gated debug screen listing every armed OS notification with
         its ladder slot, entity and scheduled time.
 
 ### Phase R3 — Ladder engine
