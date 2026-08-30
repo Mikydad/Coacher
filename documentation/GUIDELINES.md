@@ -2448,3 +2448,31 @@ not silent reversal.
   `ReminderConfig.copyWith`'s inability to clear nullables (AUDIT L4) is not
   in FR-R-01…08 but every nullable R2 adds would inherit the trap, so it
   shipped in R1.
+
+- **2026-08-30 · Reminder V2: occurrence state lives in its own entity, not on
+  `ReminderConfig`.** A new `ReminderOccurrence` (Isar + outbox + watch
+  provider + merge phase), keyed `entityKind|entityId|dateKey` — the same
+  composite-key shape as `IsarGoalCheckIn` — shared by tasks, habits and
+  goals. *Why:* `ReminderConfig` is the user's long-lived **configuration**
+  (when, which mode, on/off); an occurrence is a single **moment** (today's
+  2 PM study block vs yesterday's missed one). Conflating them is precisely
+  why a fired reminder leaves its config `enabled` with a past timestamp
+  forever so every later sync arms nothing (AUDIT §10 C3), and why goal
+  reminders — which persist no row at all today — cannot say "yesterday's
+  occurrence was missed". Separation also preserves the per-occurrence
+  history that success metrics 2 and 3 (% resolved within 24 h; Extreme
+  resolution rate) are literally counting. *Considered and rejected:*
+  extending `ReminderConfig` in place (cheapest, but a goal occurrence would
+  have nowhere to carry a resolution reason, and a recurring task's history
+  would be one overwritten row); generalising `ReminderConfig` from `taskId`
+  to `(entityId, entityKind)` (wide migration on a synced entity, and goal
+  rows would duplicate `UserGoal` as a source of truth). *Also settled:*
+  recurring-task roll-forward (C3) is folded into task 3.0 next to the goal
+  double-arm (C4), so R2 ends with "nothing is silently lost" true for both.
+  *Consequence to protect:* the state machine
+  (`reminder_state_machine.dart`) is a PURE total function of
+  `(occurrence, now)` — no I/O, no ambient clock — and transitions are
+  retroactive, stamping `overdueSinceMs` to the occurrence's own `windowEnd`
+  rather than to whenever the app noticed. `requiresResolutionReason` states
+  Extreme's contract; the surface offering the choice enforces it, because a
+  state machine that silently refuses a write is the worse failure.
