@@ -229,6 +229,28 @@ abstract final class AdaptiveReminderPolicy {
     );
   }
 
+  /// The mode's ladder: minute offsets from the scheduled time at which a
+  /// notification may fire, before any pruning (FR-R-30).
+  ///
+  /// | Mode        | Slots              | Window |
+  /// |-------------|--------------------|--------|
+  /// | Flexible    | T+0, T+15          | 30 min |
+  /// | Disciplined | T+0, T+10, T+25    | 45 min |
+  /// | Extreme     | T+0, T+5, T+15, T+30 | 60 min |
+  ///
+  /// These SUPERSEDE the old `repeatPlan` / [autoRepeatOffsets] cadences,
+  /// which were never executed by any production code path (AUDIT §10 C2) and
+  /// were far heavier — extreme alone specified three nudges per 10 minutes
+  /// plus an hourly tail of five. Repetition at that density is the
+  /// bombardment the V2 design exists to avoid; pressure now comes from the
+  /// mode's resolution contract, not from volume.
+  static List<int> ladderOffsetsFor(String? modeRefId) =>
+      switch (_modeFromRef(modeRefId)) {
+        RoutineMode.flexible => const [0, 15],
+        RoutineMode.disciplined => const [0, 10, 25],
+        RoutineMode.extreme => const [0, 5, 15, 30],
+      };
+
   /// Reminder-window length per mode (PRD D2 / FR-R-30): Flexible 30,
   /// Disciplined 45, Extreme 60 minutes.
   ///
