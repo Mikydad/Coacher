@@ -14,7 +14,10 @@ import 'notification_reconciliation_service.dart';
 
 /// Narrow OS-notification surface needed by goal reminders (test seam).
 abstract interface class GoalNotificationsPort {
-  int idFromGoalId(String goalId);
+  /// Slot-aware since FR-R-14: a goal keeps up to TWO armed occurrences, so
+  /// the ids must be individually cancellable (slot 0 keeps its historic
+  /// value, so a notification armed by an older build is not orphaned).
+  int idFromGoalId(String goalId, {int slot});
   int idFromGoalIdWeekday(String goalId, int weekday);
   int idFromGoalIdMonthDay(String goalId, int dayOfMonth);
   Future<void> cancel(int id);
@@ -321,9 +324,15 @@ class LocalNotificationsService
       ('task:$taskId:$slot').hashCode.abs() % 2147483647;
 
   /// Distinct from [idFromTaskId] to reduce id collisions between modules.
+  ///
+  /// Slot 0 deliberately keeps the historic single-slot derivation: an
+  /// upgrading device has a goal notification already armed under that id,
+  /// and changing it would leave an uncancellable orphan in the OS queue.
+  /// Slots ≥ 1 use the intention-style scheme (FR-R-14's second occurrence).
   @override
-  int idFromGoalId(String goalId) =>
-      (goalId.hashCode ^ 0x474f414c).abs() % 2147483647;
+  int idFromGoalId(String goalId, {int slot = 0}) => slot == 0
+      ? (goalId.hashCode ^ 0x474f414c).abs() % 2147483647
+      : ('goal:$goalId:$slot').hashCode.abs() % 2147483647;
 
   /// Slot-aware intention nudge ids (0 = primary, 1 = deadline-eve safety,
   /// 2 = fallback). Mirrored by resolveNotificationRoute for intentions.

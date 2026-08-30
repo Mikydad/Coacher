@@ -45,6 +45,34 @@ DateTime? nextGoalActionDayReminderLocal({
   return null;
 }
 
+/// The next [count] fires on the goal's **action days** inside its period,
+/// soonest first. Returns fewer than [count] (possibly none) when the period
+/// ends first.
+///
+/// FR-R-14 keeps two armed at a time: every re-arm trigger in this app is app
+/// activity, so a single armed occurrence means an untouched phone fires one
+/// goal reminder and then goes quiet (AUDIT §10 C4).
+List<DateTime> nextGoalActionDayReminders({
+  required UserGoal goal,
+  required int minutesFromMidnight,
+  required DateTime now,
+  int count = 2,
+}) {
+  final out = <DateTime>[];
+  var cursor = now;
+  for (var i = 0; i < count; i++) {
+    final next = nextGoalActionDayReminderLocal(
+      goal: goal,
+      minutesFromMidnight: minutesFromMidnight,
+      now: cursor,
+    );
+    if (next == null) break;
+    out.add(next);
+    cursor = next;
+  }
+  return out;
+}
+
 /// Next fire on [weekday] (1=Mon…7=Sun) inside the goal's period, or null if
 /// that weekday never occurs again before the period ends.
 DateTime? nextGoalWeekdayReminderLocal({

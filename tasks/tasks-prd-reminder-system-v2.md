@@ -166,7 +166,7 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
 
 ### Phase R2 — State spine + heuristics
 
-- [ ] **3.0 Task reminder state machine** *(FR-R-10…14)*
+- [x] **3.0 Task reminder state machine** *(FR-R-10…14)*
       **Settled 2026-08-30:** occurrence state lives in a NEW
       `ReminderOccurrence` entity keyed `entityKind|entityId|dateKey` (the
       `IsarGoalCheckIn` pattern), shared by tasks and goals — not on
@@ -193,12 +193,12 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
         timer end, check-in, day change, override end) via the recompute graph.
   - [x] 3.6 Cancel remaining slots + write state in the same gesture on
         complete / start / delete / reschedule.
-  - [ ] 3.7 Arm the **next** goal occurrence at the same time as the current one
+  - [x] 3.7 Arm the **next** goal occurrence at the same time as the current one
         (two armed max) so a missed app-open cannot silence a daily goal. (C4)
-        *Needs slot-aware goal notification ids (`idFromGoalId(id, slot:)`)
-        mirrored in the route resolver — today's entity-scoped cancel would
-        make slot 1 destroy slot 0.*
-  - [ ] 3.8 Tests: retroactive transition with a fake clock; goal double-arm;
+        *Slot-aware `idFromGoalId(id, slot:)` mirrored in the route resolver;
+        slot 0 keeps its historic derivation so an upgrade cannot orphan an
+        armed notification. Goals joined the multi-slot cancel path.*
+  - [x] 3.8 Tests: retroactive transition with a fake clock; goal double-arm;
         resolution cancels slots; migration defaults.
 
 - [ ] **4.0 Heuristic classifier + user override** *(FR-R-20, 21, 23)*

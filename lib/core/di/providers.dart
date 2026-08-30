@@ -161,6 +161,7 @@ final goalReminderSyncServiceProvider = Provider<GoalReminderSyncService>(
   (ref) => GoalReminderSyncService(
     notifications: ref.read(localNotificationsServiceProvider),
     orchestrator: ref.read(attentionOrchestratorServiceProvider),
+    occurrenceService: ref.read(reminderOccurrenceServiceProvider),
   ),
 );
 

@@ -6,7 +6,9 @@ import '../../planning/domain/models/routine_mode.dart';
 import '../../reminders/application/attention_orchestrator_service.dart';
 import '../../reminders/application/interruption_level_resolver.dart';
 import '../../reminders/application/notification_route_resolver.dart';
+import '../../reminders/application/reminder_occurrence_service.dart';
 import '../../reminders/domain/models/reminder_intent.dart';
+import '../../reminders/domain/models/reminder_type.dart';
 import '../domain/models/user_goal.dart';
 import 'goal_intensity_mode.dart';
 import 'goal_reminder_schedule.dart';
@@ -26,14 +28,28 @@ class GoalReminderSyncService {
   GoalReminderSyncService({
     required GoalNotificationsPort notifications,
     required AttentionOrchestratorService orchestrator,
+
+    /// V2 state machine. Optional so existing wiring and tests keep working.
+    ReminderOccurrenceService? occurrenceService,
     DateTime Function()? now,
   }) : _n = notifications,
        _orchestrator = orchestrator,
+       _occurrences = occurrenceService,
        _now = now ?? DateTime.now;
 
   final GoalNotificationsPort _n;
   final AttentionOrchestratorService _orchestrator;
+  final ReminderOccurrenceService? _occurrences;
   final DateTime Function() _now;
+
+  /// How many occurrences a goal keeps armed at once (FR-R-14).
+  ///
+  /// One was the Phase 0 reroute's compromise, and it is why a phone left
+  /// untouched over a weekend fires Saturday's goal reminder and never
+  /// schedules Sunday's: every re-arm trigger is app activity (AUDIT §10 C4).
+  /// Two means one missed app-open can no longer silence a daily goal, at a
+  /// cost of one extra pending slot per goal — within FR-R-33's budget.
+  static const int kArmedOccurrences = 2;
 
   /// Throttle for [rearmIfStale] — recompute flushes are frequent; the
   /// roll-forward only needs to catch day changes and fired reminders.
@@ -44,7 +60,9 @@ class GoalReminderSyncService {
   /// the retired per-weekday/per-month-day slots from before the Phase 0
   /// reroute, so upgrading users don't keep stale repeating notifications.
   Future<void> cancelForGoal(String goalId) async {
-    await _n.cancel(_n.idFromGoalId(goalId));
+    for (var slot = 0; slot < kArmedOccurrences; slot++) {
+      await _n.cancel(_n.idFromGoalId(goalId, slot: slot));
+    }
     await _cancelLegacySlots(goalId);
     await _orchestrator.cancelForEntity(goalId);
   }
@@ -79,46 +97,70 @@ class GoalReminderSyncService {
         'Goal commitment: time to act or consciously adjust.',
     };
 
-    // Single next occurrence across ALL cadences: isActionDay handles daily,
-    // weekly weekday selections, monthly days, and interval repeats.
-    final first = nextGoalActionDayReminderLocal(
+    // The next [kArmedOccurrences] occurrences across ALL cadences:
+    // isActionDay handles daily, weekly weekday selections, monthly days and
+    // interval repeats. Arming the SECOND one now is the C4 fix — every
+    // re-arm trigger in this app is app activity, so a single armed
+    // occurrence means a phone left alone over a weekend fires Saturday's
+    // reminder and never schedules Sunday's.
+    final fireTimes = nextGoalActionDayReminders(
       goal: goal,
       minutesFromMidnight: minutes,
       now: now,
+      count: kArmedOccurrences,
     );
-    if (first == null) {
+    if (fireTimes.isEmpty) {
       debugPrint('Goal reminder skipped (no slot in period): goal=${goal.id}');
       await cancelForGoal(goal.id);
       return;
     }
 
     // Schedule path: only sweep the retired legacy slots up front. The LIVE
-    // slot is swapped by the orchestrator itself (after the budget check),
+    // slots are swapped by the orchestrator itself (after the budget check),
     // so a suppressed or budget-denied evaluation leaves the previously
     // armed reminder intact instead of destroying it (review finding A).
     await _cancelLegacySlots(goal.id);
 
-    final intent = ReminderIntent(
-      id: StableId.generate('ri_goal'),
-      entityId: goal.id,
-      entityKind: ReminderEntityKinds.goal,
-      entityTitle: 'Goal: ${goal.title}',
-      proposedAt: first,
-      importance: 50,
-      interruptionLevel: InterruptionLevelResolver.resolve(
+    // The goal's period may end before a second occurrence exists; cancel any
+    // stale sibling so it cannot outlive the plan.
+    for (var slot = fireTimes.length; slot < kArmedOccurrences; slot++) {
+      await _n.cancel(_n.idFromGoalId(goal.id, slot: slot));
+    }
+
+    for (var slot = 0; slot < fireTimes.length; slot++) {
+      final fireAt = fireTimes[slot];
+      final intent = ReminderIntent(
+        id: StableId.generate('ri_goal'),
+        entityId: goal.id,
+        entityKind: ReminderEntityKinds.goal,
+        entityTitle: 'Goal: ${goal.title}',
+        proposedAt: fireAt,
+        importance: 50,
+        interruptionLevel: InterruptionLevelResolver.resolve(
+          enforcementMode: mode.name,
+          escalationLevel: 0,
+          emergencyBypass: false,
+        ),
         enforcementMode: mode.name,
-        escalationLevel: 0,
-        emergencyBypass: false,
-      ),
-      enforcementMode: mode.name,
-      sourceReason: 'goal_reminder',
-      bodyOverride: body,
-      createdAtMs: now.millisecondsSinceEpoch,
-    );
-    try {
-      await _orchestrator.evaluate(intent);
-    } catch (e, st) {
-      debugPrint('Goal reminder schedule failed: $e $st');
+        reminderType: ReminderType.scheduled,
+        sourceReason: 'goal_reminder',
+        bodyOverride: body,
+        slot: slot,
+        createdAtMs: now.millisecondsSinceEpoch,
+      );
+      try {
+        await _orchestrator.evaluate(intent);
+      } catch (e, st) {
+        debugPrint('Goal reminder schedule failed: $e $st');
+      }
+      // Each armed occurrence joins the state machine, so a fired-but-
+      // unresolved goal day becomes visible instead of vanishing (FR-R-14).
+      await _occurrences?.ensureForGoalOccurrence(
+        goalId: goal.id,
+        title: 'Goal: ${goal.title}',
+        scheduledAt: fireAt,
+        modeRefId: mode.name,
+      );
     }
   }
 

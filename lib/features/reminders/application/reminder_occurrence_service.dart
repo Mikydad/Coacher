@@ -210,6 +210,58 @@ class ReminderOccurrenceService {
     return created;
   }
 
+  /// Register one armed goal occurrence with the state machine (FR-R-14).
+  ///
+  /// Goals hold no reminder config of their own — `applyForGoal` derives their
+  /// fire times from `UserGoal` — so this is their entry point into the same
+  /// machine tasks use. Goal misses are `routine`-class by default: an
+  /// individual missed day of a recurring goal aggregates into the digest
+  /// rather than demanding disposition, which is what §3.2 asks for.
+  Future<ReminderOccurrence?> ensureForGoalOccurrence({
+    required String goalId,
+    required String title,
+    required DateTime scheduledAt,
+    String? modeRefId,
+  }) async {
+    final now = _now();
+    final dateKey = DateKeys.yyyymmdd(scheduledAt);
+    final existing = await _occurrences.findByKey(
+      entityKind: ReminderEntityKinds.goal,
+      entityId: goalId,
+      dateKey: dateKey,
+    );
+    // A day already dealt with is not reopened by a re-arm sweep.
+    if (existing != null && existing.isResolved) return existing;
+
+    final base =
+        existing ??
+        ReminderOccurrence(
+          id: StableId.generate('rocc'),
+          entityId: goalId,
+          entityKind: ReminderEntityKinds.goal,
+          dateKey: dateKey,
+          scheduledAtMs: scheduledAt.millisecondsSinceEpoch,
+          windowMinutes: AdaptiveReminderPolicy.windowMinutesFor(modeRefId),
+          entityTitle: title,
+          modeRefId: modeRefId,
+          taxonomy: ReminderTaxonomy.routine,
+          classificationSource: ClassificationSource.heuristic,
+          createdAtMs: now.millisecondsSinceEpoch,
+          updatedAtMs: now.millisecondsSinceEpoch,
+        );
+
+    final updated = base.copyWith(
+      scheduledAtMs: scheduledAt.millisecondsSinceEpoch,
+      windowMinutes: AdaptiveReminderPolicy.windowMinutesFor(modeRefId),
+      entityTitle: title,
+      modeRefId: modeRefId,
+      updatedAtMs: now.millisecondsSinceEpoch,
+    );
+    final advanced = ReminderStateMachine.advance(updated, now: now);
+    await _occurrences.upsert(advanced);
+    return advanced;
+  }
+
   /// Resolve whatever occurrence [entityId] currently has open (FR-R-13).
   ///
   /// Completing, skipping or rescheduling a task is one user gesture: the

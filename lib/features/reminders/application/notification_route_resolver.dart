@@ -52,8 +52,13 @@ NotificationRoute resolveNotificationRoute(ReminderIntent intent) {
     case ReminderEntityKinds.goal:
       return NotificationRoute(
         // Mirrors LocalNotificationsService.idFromGoalId — kept in sync by
-        // notification_route_resolver_test.
-        notifId: (intent.entityId.hashCode ^ 0x474f414c).abs() % 2147483647,
+        // notification_route_resolver_test. Slot 0 keeps the historic
+        // derivation so an already-armed goal notification stays cancellable
+        // across the upgrade; slot 1 is FR-R-14's second armed occurrence.
+        notifId: intent.slot == 0
+            ? (intent.entityId.hashCode ^ 0x474f414c).abs() % 2147483647
+            : ('goal:${intent.entityId}:${intent.slot}').hashCode.abs() %
+                  2147483647,
         payload: 'goal:$encoded',
       );
     case ReminderEntityKinds.stakeInvite:

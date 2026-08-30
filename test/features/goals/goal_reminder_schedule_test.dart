@@ -153,4 +153,74 @@ void main() {
     );
     expect(goalShouldScheduleDailyReminder(g, DateTime(2025, 3, 2)), isFalse);
   });
+
+  group('nextGoalActionDayReminders — FR-R-14 double-arm', () {
+    UserGoal daily({int repeatInterval = 1}) => _goal(
+      startMs: DateTime(2025, 3, 1).millisecondsSinceEpoch,
+      endMs: DateTime(2025, 3, 31, 23, 59).millisecondsSinceEpoch,
+      repeatInterval: repeatInterval,
+    );
+
+    test('returns the next two action days, soonest first', () {
+      final times = nextGoalActionDayReminders(
+        goal: daily(),
+        minutesFromMidnight: 9 * 60,
+        now: DateTime(2025, 3, 1, 8, 0),
+      );
+      expect(times, [
+        DateTime(2025, 3, 1, 9, 0),
+        DateTime(2025, 3, 2, 9, 0),
+      ]);
+    });
+
+    test('honours the interval when picking the second', () {
+      final times = nextGoalActionDayReminders(
+        goal: daily(repeatInterval: 2),
+        minutesFromMidnight: 9 * 60,
+        now: DateTime(2025, 3, 1, 8, 0),
+      );
+      expect(times, [
+        DateTime(2025, 3, 1, 9, 0),
+        DateTime(2025, 3, 3, 9, 0),
+      ]);
+    });
+
+    test('returns fewer when the period runs out', () {
+      final oneDay = _goal(
+        startMs: DateTime(2025, 3, 1).millisecondsSinceEpoch,
+        endMs: DateTime(2025, 3, 1, 23, 59).millisecondsSinceEpoch,
+      );
+      expect(
+        nextGoalActionDayReminders(
+          goal: oneDay,
+          minutesFromMidnight: 9 * 60,
+          now: DateTime(2025, 3, 1, 8, 0),
+        ),
+        hasLength(1),
+      );
+    });
+
+    test('returns empty when the period is already over', () {
+      expect(
+        nextGoalActionDayReminders(
+          goal: daily(),
+          minutesFromMidnight: 9 * 60,
+          now: DateTime(2025, 5, 1, 8, 0),
+        ),
+        isEmpty,
+      );
+    });
+
+    test('count is honoured beyond two', () {
+      expect(
+        nextGoalActionDayReminders(
+          goal: daily(),
+          minutesFromMidnight: 9 * 60,
+          now: DateTime(2025, 3, 1, 8, 0),
+          count: 4,
+        ),
+        hasLength(4),
+      );
+    });
+  });
 }

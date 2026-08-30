@@ -428,10 +428,13 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
             return;
           }
         }
-        // Intentions pre-schedule a ladder of slots per entity — cancel only
-        // THIS slot's previous incarnation, or scheduling slot 1 would
-        // destroy slot 0. Single-slot kinds keep the entity-scoped cancel.
-        if (intent.entityKind == ReminderEntityKinds.intention) {
+        // Multi-slot kinds pre-schedule several delivery moments per entity —
+        // cancel only THIS slot's previous incarnation, or arming slot 1
+        // would destroy slot 0. Intentions have always done this; goals join
+        // them under FR-R-14, which keeps two occurrences armed so a missed
+        // app-open cannot silence a daily goal. Single-slot kinds keep the
+        // entity-scoped cancel.
+        if (_isMultiSlotKind(intent.entityKind)) {
           await _cancelByNotifId(route.notifId);
         } else {
           await _cancelActiveNotification(intent.entityId);
@@ -514,6 +517,12 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
         );
     }
   }
+
+  /// Kinds that arm more than one notification per entity, and therefore need
+  /// slot-scoped rather than entity-scoped cancels.
+  static bool _isMultiSlotKind(String entityKind) =>
+      entityKind == ReminderEntityKinds.intention ||
+      entityKind == ReminderEntityKinds.goal;
 
   /// Slot-scoped cancel: only the given OS notification id (and its ledger
   /// row), leaving the entity's sibling slots untouched.

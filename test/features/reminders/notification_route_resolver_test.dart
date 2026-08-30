@@ -6,18 +6,22 @@ import 'package:sidepal/features/context_override/domain/models/interruption_lev
 import 'package:sidepal/features/reminders/application/notification_route_resolver.dart';
 import 'package:sidepal/features/reminders/domain/models/reminder_intent.dart';
 
-ReminderIntent _intent(String entityKind, {String entityId = 'e1'}) =>
-    ReminderIntent(
-      id: 'ri_test',
-      entityId: entityId,
-      entityKind: entityKind,
-      entityTitle: 'Title',
-      proposedAt: DateTime(2025, 3, 1, 9),
-      importance: 50,
-      interruptionLevel: InterruptionLevel.medium,
-      enforcementMode: 'flexible',
-      createdAtMs: 0,
-    );
+ReminderIntent _intent(
+  String entityKind, {
+  String entityId = 'e1',
+  int slot = 0,
+}) => ReminderIntent(
+  id: 'ri_test',
+  entityId: entityId,
+  entityKind: entityKind,
+  entityTitle: 'Title',
+  proposedAt: DateTime(2025, 3, 1, 9),
+  importance: 50,
+  interruptionLevel: InterruptionLevel.medium,
+  enforcementMode: 'flexible',
+  slot: slot,
+  createdAtMs: 0,
+);
 
 void main() {
   final notifications = LocalNotificationsService.instance;
@@ -52,6 +56,35 @@ void main() {
       expect(route.payload, 'goal:e1');
       expect(route.darwinCategoryId, isNull);
       expect(route.immediate, isFalse);
+    },
+  );
+
+  test(
+    "goal slot 1 mirrors the service's slot-aware id and is distinct from "
+    'slot 0 (FR-R-14: two armed occurrences must be separately cancellable)',
+    () {
+      final slot0 = resolveNotificationRoute(
+        _intent(ReminderEntityKinds.goal),
+      );
+      final slot1 = resolveNotificationRoute(
+        _intent(ReminderEntityKinds.goal, slot: 1),
+      );
+
+      expect(slot1.notifId, notifications.idFromGoalId('e1', slot: 1));
+      expect(slot1.notifId, isNot(slot0.notifId));
+      // Same tap destination either way — the slot is a scheduling detail.
+      expect(slot1.payload, 'goal:e1');
+    },
+  );
+
+  test(
+    'goal slot 0 keeps its historic id so an upgrade cannot orphan an armed '
+    'notification',
+    () {
+      expect(
+        resolveNotificationRoute(_intent(ReminderEntityKinds.goal)).notifId,
+        ('e1'.hashCode ^ 0x474f414c).abs() % 2147483647,
+      );
     },
   );
 
