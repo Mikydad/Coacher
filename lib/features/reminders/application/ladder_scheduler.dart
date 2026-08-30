@@ -129,7 +129,7 @@ class LadderScheduler {
       id: StableId.generate('ri_ladder'),
       entityId: occurrence.entityId,
       entityKind: occurrence.entityKind,
-      entityTitle: occurrence.entityTitle ?? occurrence.entityId,
+      entityTitle: slot.title,
       proposedAt: slot.fireAt,
       importance: (occurrence.criticality * 25).clamp(0, 100),
       interruptionLevel: InterruptionLevelResolver.resolve(
@@ -146,6 +146,9 @@ class LadderScheduler {
           ? ReminderType.scheduled
           : ReminderType.followUp,
       sourceReason: 'ladder_slot_${slot.slot}',
+      // Pre-written (FR-R-34) — _buildNotificationBody honours bodyOverride,
+      // so the delivery path composes nothing for a ladder slot.
+      bodyOverride: slot.body,
       slot: slot.slot,
       createdAtMs: now.millisecondsSinceEpoch,
     );

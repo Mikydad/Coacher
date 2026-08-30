@@ -251,33 +251,33 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
 ### Phase R3 — Ladder engine
 
 - [ ] **7.0 Ladder compiler: slots, boundary, shield, budget** *(FR-R-30…33)*
-  - [ ] 7.1 Move the per-mode ladder shapes + window defaults (D2: 30/45/60)
+  - [x] 7.1 Move the per-mode ladder shapes + window defaults (D2: 30/45/60)
         into `AdaptiveReminderPolicy` as the single source.
-  - [ ] 7.2 Pure `compileSlots(config, plan, shields, now) → List<SlotSpec>`.
-  - [ ] 7.3 Boundary pruning: drop slots ≥ `nextBoundary` (next scheduled item
+  - [x] 7.2 Pure `compileSlots(config, plan, shields, now) → List<SlotSpec>`.
+  - [x] 7.3 Boundary pruning: drop slots ≥ `nextBoundary` (next scheduled item
         − 20 min, D1), computed at scheduling time from the plan.
-  - [ ] 7.4 Shield pruning for known windows (scheduled focus blocks, sleep
+  - [x] 7.4 Shield pruning for known windows (scheduled focus blocks, sleep
         window); criticality 3 pierces boundary **and** sleep (D5) but still
         stops hard at `windowEnd`.
-  - [ ] 7.5 Budget policy under the 64-cap: full ladders today only, T+0 for
+  - [x] 7.5 Budget policy under the 64-cap: full ladders today only, T+0 for
         tomorrow+, ≤ 2 goal occurrences, intentions keep 3; drop order
         criticality desc → soonest first → deepest slot first; every drop
         ledger-logged.
-  - [ ] 7.6 Property test: no compiled slot violates boundary, shield, budget
+  - [x] 7.6 Property test: no compiled slot violates boundary, shield, budget
         or window rules.
   - [ ] 7.7 Android gate (D8): ladders scheduled `inexactAllowWhileIdle`, with
         the health row stating reminders may arrive late.
 
-- [ ] **8.0 Template bank + pre-written slot strings** *(FR-R-63 deterministic
+- [x] **8.0 Template bank + pre-written slot strings** *(FR-R-63 deterministic
       half, FR-R-34 — see sequencing note 1)*
-  - [ ] 8.1 One bank keyed by (mode, escalation step, taxonomy, entity kind),
+  - [x] 8.1 One bank keyed by (mode, escalation step, taxonomy, entity kind),
         absorbing today's orphaned `ReminderSyncService.bodyForReminder` and
         the generic `_buildNotificationBody`.
-  - [ ] 8.2 Every `SlotSpec` carries its final title/body + payload; delivery
+  - [x] 8.2 Every `SlotSpec` carries its final title/body + payload; delivery
         composes nothing.
-  - [ ] 8.3 Fix the batched-body path so it renders titles, not raw `ri_…`
+  - [x] 8.3 Fix the batched-body path so it renders titles, not raw `ri_…`
         intent ids. (M4)
-  - [ ] 8.4 Coverage test: every (mode × step × taxonomy) combination resolves
+  - [x] 8.4 Coverage test: every (mode × step × taxonomy) combination resolves
         to a non-empty string.
 
 - [ ] **9.0 Modes as resolution contracts + OS interruption levels**

@@ -2,6 +2,7 @@ import '../../../core/utils/date_keys.dart';
 import '../domain/models/reminder_occurrence.dart';
 import '../domain/models/slot_spec.dart';
 import 'adaptive_reminder_policy.dart';
+import 'reminder_copy_bank.dart';
 
 /// A span during which reminders are withheld: a scheduled focus block, or
 /// the configured sleep window.
@@ -127,6 +128,16 @@ abstract final class LadderCompiler {
         continue;
       }
 
+      // The string is written HERE, not at delivery (FR-R-34): by the time
+      // the OS fires this slot the app may not be running at all.
+      final copy = ReminderCopyBank.forSlot(
+        entityTitle: occurrence.entityTitle ?? '',
+        entityKind: occurrence.entityKind,
+        modeRefId: occurrence.modeRefId,
+        taxonomy: occurrence.taxonomy,
+        ladderPosition: i,
+        criticality: occurrence.criticality,
+      );
       slots.add(
         SlotSpec(
           slot: i,
@@ -135,6 +146,8 @@ abstract final class LadderCompiler {
           entityId: occurrence.entityId,
           entityKind: occurrence.entityKind,
           criticality: occurrence.criticality,
+          title: copy.title,
+          body: copy.body,
           modeRefId: occurrence.modeRefId,
         ),
       );

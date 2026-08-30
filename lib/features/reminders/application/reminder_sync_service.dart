@@ -455,33 +455,4 @@ class ReminderSyncService {
     if (title == null || title.isEmpty) return 'Task Reminder';
     return title;
   }
-
-  String bodyForReminder(ReminderConfig reminder) {
-    final cadence = AdaptiveReminderPolicy.cadenceFor(
-      modeRefId: reminder.modeRefId,
-      blockUrgencyScore: reminder.blockUrgencyScore,
-    );
-    final step = AdaptiveReminderPolicy.nextStep(
-      cadence: cadence,
-      currentEscalationLevel: reminder.escalationLevel,
-      emergencyBypass: reminder.emergencyBypass,
-    );
-    if (step.enableNonEssentialActionGate) {
-      final t = reminder.taskTitle?.trim();
-      if (t != null && t.isNotEmpty) {
-        return 'Action needed for "$t": start now or submit a logical reason.';
-      }
-      return 'Action needed: start now or submit a logical reason to continue.';
-    }
-    if (step.requireAppOpenNudge) {
-      final t = reminder.taskTitle?.trim();
-      if (t != null && t.isNotEmpty) {
-        return 'Please open SidePal: start "$t" or provide a logical reason.';
-      }
-      return 'Please open SidePal: start this task or provide a logical reason.';
-    }
-    final t = reminder.taskTitle?.trim();
-    if (t != null && t.isNotEmpty) return 'Time to start "$t".';
-    return 'Time to start your planned task.';
-  }
 }

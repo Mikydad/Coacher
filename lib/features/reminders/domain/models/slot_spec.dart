@@ -12,6 +12,8 @@ class SlotSpec {
     required this.entityId,
     required this.entityKind,
     required this.criticality,
+    required this.title,
+    required this.body,
     this.modeRefId,
   });
 
@@ -25,6 +27,12 @@ class SlotSpec {
   final String entityId;
   final String entityKind;
   final int criticality;
+
+  /// Written at compile time, used verbatim at delivery (FR-R-34). A slot
+  /// compiled at 9 a.m. for 9 p.m. already knows what it will say.
+  final String title;
+  final String body;
+
   final String? modeRefId;
 
   bool get isFirst => slot == 0;

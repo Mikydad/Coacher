@@ -2585,3 +2585,25 @@ not silent reversal.
   ladder outlives the thing it was reminding about; and the save path
   explicitly re-arms so a reminder the user just set is scheduled when they
   leave the screen rather than at the next recompute.
+
+- **2026-08-30 · Reminder V2 R3: one copy bank, and escalation raises
+  directness rather than volume.** Two disconnected copy paths existed:
+  `ReminderSyncService.bodyForReminder` held the real escalation voice and had
+  **zero callers anywhere**, while `_buildNotificationBody` rendered
+  "Time to start: X" for every mode, every escalation step and every taxonomy
+  (AUDIT §10 M2) — the modes could not sound different because only one
+  sentence was ever reachable. `ReminderCopyBank` replaces both, keyed by
+  (mode × ladder step × taxonomy × criticality), and `bodyForReminder` was
+  DELETED rather than kept: two copy sources is precisely the condition that
+  produced M2. *Voice rule:* escalation gets blunter, never louder or more
+  punishing — a fourth Extreme nudge is more direct than the first, and every
+  mode still opens with the same gentle "Time for X." *Precedence:*
+  criticality 3 outranks mode and speaks plainly (it is the class that pierces
+  sleep; nagging there would be indefensible), and routine never escalates
+  whatever the step. *Totality is the contract:* by the time a compiled slot
+  fires there is nobody left to compose a fallback, so a test walks 200+
+  combinations asserting a non-empty, name-bearing sentence with no template
+  leftovers. *Also fixed:* M4 — the batched body joined `decision.batchedWith`,
+  which carries `ri_…` intent ids, so the one artifact batching could produce
+  was a notification showing the user internal identifiers; it now counts
+  partners instead of naming them.

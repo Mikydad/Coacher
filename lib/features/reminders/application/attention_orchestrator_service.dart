@@ -27,6 +27,7 @@ import '../domain/models/reminder_type.dart';
 import 'attention_orchestrator.dart';
 import 'interruption_level_resolver.dart';
 import 'notification_route_resolver.dart';
+import 'reminder_copy_bank.dart';
 
 const String kAttentionOrchestratorSurface = 'attention_orchestrator';
 
@@ -576,13 +577,25 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
   ) {
     if (decision.outcome == AttentionOutcome.batched &&
         decision.batchedWith.isNotEmpty) {
-      final partnerIds = decision.batchedWith.join(', ');
-      return 'Time to start: ${intent.entityTitle} + $partnerIds';
+      // AUDIT §10 M4: this used to join `batchedWith`, which carries intent
+      // ids (`ri_…` StableIds), so the one artifact batching could produce
+      // was a notification showing the user internal identifiers.
+      return ReminderCopyBank.batchedBody(
+        intent.entityTitle,
+        decision.batchedWith.length,
+      );
     }
-    // Goal reminders and invites carry their own copy; tasks keep the default.
+    // Ladder slots, goal reminders and invites all arrive pre-written
+    // (FR-R-34); this fallback is for the paths that have not adopted the
+    // copy bank yet.
     final override = intent.bodyOverride;
     if (override != null && override.isNotEmpty) return override;
-    return 'Time to start: ${intent.entityTitle}';
+    return ReminderCopyBank.forSlot(
+      entityTitle: intent.entityTitle,
+      entityKind: intent.entityKind,
+      modeRefId: intent.enforcementMode,
+      ladderPosition: intent.escalationLevel,
+    ).body;
   }
 
   void _trimRecentDeliveries() {

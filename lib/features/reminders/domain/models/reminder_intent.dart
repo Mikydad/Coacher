@@ -56,7 +56,8 @@ class ReminderIntent {
   final String sourceReason;
 
   /// Notification body for non-task intents (goal reminders, stake invites).
-  /// Null means the orchestrator's default "Time to start: …" body.
+  /// Null means the orchestrator falls back to the copy bank for this
+  /// intent's mode and escalation step (FR-R-63).
   final String? bodyOverride;
 
   /// Ladder slot for entities that pre-schedule several delivery moments
