@@ -1,6 +1,7 @@
 import 'package:isar_community/isar.dart';
 
 import '../../../features/reminders/domain/models/reminder_config.dart';
+import '../../../features/reminders/domain/models/reminder_occurrence_enums.dart';
 
 part 'isar_reminder.g.dart';
 
@@ -29,6 +30,13 @@ class IsarReminder {
   String? nextPromptAtIso;
   late int createdAtMs;
 
+  /// Stable classification (FR-R-20/21). Stored as strings so a row written
+  /// by a newer client degrades instead of throwing.
+  String taxonomy = 'flexible';
+  int criticality = 1;
+  String classificationSource = 'heuristic';
+  int? classifierVersion;
+
   static IsarReminder fromDomain(ReminderConfig r) {
     return IsarReminder()
       ..reminderId = r.id
@@ -44,7 +52,11 @@ class IsarReminder {
       ..emergencyBypass = r.emergencyBypass
       ..lastTriggeredAtMs = r.lastTriggeredAtMs
       ..nextPromptAtIso = r.nextPromptAtIso
-      ..createdAtMs = r.createdAtMs;
+      ..createdAtMs = r.createdAtMs
+      ..taxonomy = r.taxonomy.toStorage()
+      ..criticality = r.criticality
+      ..classificationSource = r.classificationSource.toStorage()
+      ..classifierVersion = r.classifierVersion;
   }
 
   ReminderConfig toDomain() {
@@ -61,6 +73,12 @@ class IsarReminder {
       emergencyBypass: emergencyBypass,
       lastTriggeredAtMs: lastTriggeredAtMs,
       nextPromptAtIso: nextPromptAtIso,
+      taxonomy: ReminderTaxonomy.fromStorage(taxonomy),
+      criticality: criticality,
+      classificationSource: ClassificationSource.fromStorage(
+        classificationSource,
+      ),
+      classifierVersion: classifierVersion,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs,
     );

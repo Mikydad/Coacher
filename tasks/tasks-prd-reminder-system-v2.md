@@ -201,16 +201,18 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
   - [x] 3.8 Tests: retroactive transition with a fake clock; goal double-arm;
         resolution cancels slots; migration defaults.
 
-- [ ] **4.0 Heuristic classifier + user override** *(FR-R-20, 21, 23)*
-  - [ ] 4.1 One pure `classifyTask(title, time, duration, category, recurrence)
-        → {class, criticality}` implementing the FR-R-20 rules.
-  - [ ] 4.2 Golden-set test: ≥ 30 titles → expected class, run in CI.
-  - [ ] 4.3 Call it synchronously at task creation and on material edit; write
+- [x] **4.0 Heuristic classifier + user override** *(FR-R-20, 21, 23)*
+  - [x] 4.1 One pure `classify(title, hasReminderTime, duration, category,
+        isHabitAnchor) → {taxonomy, criticality, rule}` implementing FR-R-20,
+        adapted to this app's real vocabulary (settled 2026-08-30: habit
+        anchor is the routine signal; heuristic caps criticality at 2).
+  - [x] 4.2 Golden-set test: ≥ 30 titles → expected class, run in CI.
+  - [x] 4.3 Call it synchronously at task creation and on material edit; write
         `classificationSource: heuristic`.
-  - [ ] 4.4 Task-editor row: three-way class chip + a `critical` toggle shown
+  - [x] 4.4 Task-editor row: three-way class chip + a `critical` toggle shown
         only for `timeSensitive`; a user change sets `classificationSource:
         user` and is never overwritten.
-  - [ ] 4.5 Guard: classification may never flip `enabled` off. (FR-R-23)
+  - [x] 4.5 Guard: classification may never flip `enabled` off. (FR-R-23)
 
 - [ ] **5.0 Recovery & overdue surfacing** *(FR-R-50…54)*
   - [ ] 5.1 `Recovery Card` widget — top of Home when non-empty, alongside

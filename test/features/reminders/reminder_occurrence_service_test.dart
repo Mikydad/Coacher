@@ -132,8 +132,8 @@ void main() {
       final made = occ.rows.values.single;
       expect(made.entityId, 't1');
       expect(made.entityKind, 'task');
-      // PRD §9 migration defaults until the classifier (task 4.0) lands.
-      expect(made.classificationSource, ClassificationSource.migration);
+      // Snapshot from the config, which carries the stable answer.
+      expect(made.classificationSource, ClassificationSource.heuristic);
       expect(made.taxonomy, ReminderTaxonomy.flexible);
       expect(made.criticality, 1);
       // D2: flexible windows are 30 minutes.

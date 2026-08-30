@@ -13,6 +13,8 @@ import '../../planning/domain/models/routine.dart';
 import '../../planning/application/form_draft_autosave.dart';
 import '../../planning/application/form_draft_providers.dart';
 import '../../planning/domain/add_task_duration.dart';
+import '../../reminders/application/reminder_classifier.dart';
+import '../../reminders/domain/models/reminder_occurrence_enums.dart';
 import '../../planning/domain/models/add_task_form_draft.dart';
 import '../../planning/domain/models/task_item.dart';
 import '../../planning/domain/sleep_task.dart';
@@ -36,6 +38,7 @@ import 'sections/add_task_accountability_deep_work_row.dart';
 import 'sections/add_task_accountability_row.dart';
 import 'sections/add_task_advanced_section.dart';
 import 'sections/add_task_category_section.dart';
+import 'sections/add_task_classification_section.dart';
 import 'sections/add_task_duration_section.dart';
 import 'sections/add_task_reminder_section.dart';
 import 'sections/add_task_sleep_extras_section.dart';
@@ -69,6 +72,14 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
   bool _reminder = false;
   bool _focusSession = false;
   bool _isHabitAnchor = false;
+
+  /// Taxonomy the USER picked, if they picked one (FR-R-21). Null means the
+  /// heuristic's answer stands and is what the chip displays.
+  ReminderTaxonomy? _userTaxonomy;
+
+  /// Criticality 3 — the one thing that pierces the boundary, the Focus
+  /// Shield and the sleep window. Only ever set here, never by the heuristic.
+  bool _userCritical = false;
   DateTime _reminderTime = DateTime.now().add(const Duration(minutes: 10));
   bool _saving = false;
   bool _loaded = false;
@@ -351,6 +362,14 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
           _existingReminderId = load.reminderId;
           _reminderCreatedAtMs = load.reminderCreatedAtMs;
         }
+        // Only a USER classification is restored. If the heuristic decided
+        // last time, let it decide again from the current title/duration —
+        // a stale guess is worse than a fresh one.
+        final stored = load.classification;
+        if (stored != null) {
+          _userTaxonomy = stored.taxonomy;
+          _userCritical = stored.criticality >= 3;
+        }
         _modeRefId = loaded.modeRefId?.trim().isNotEmpty == true
             ? loaded.modeRefId!
             : 'flexible';
@@ -554,6 +573,13 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         reminderTime: _reminderTime,
         existingReminderId: _existingReminderId,
         reminderCreatedAtMs: _reminderCreatedAtMs,
+        durationMinutes: _resolvedDurationMinutes,
+        category: _category,
+        isHabitAnchor: _isHabitAnchor,
+        userTaxonomy: _userTaxonomy,
+        userCriticality: _userTaxonomy == null
+            ? null
+            : (_userCritical ? 3 : _heuristicClassification.criticality),
       );
       if (reminderId != null) _existingReminderId ??= reminderId;
       // migrated to coordinator
@@ -601,6 +627,22 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
   );
 
   int get _effectiveDurationMinutes => _resolvedDurationMinutes;
+
+  /// What the classification chip shows: the user's choice when they have
+  /// made one, otherwise the heuristic's live answer for the current title,
+  /// duration, category and habit toggle. Recomputed as they type, so the
+  /// chip is never stale and never a required decision.
+  ReminderClassification get _heuristicClassification =>
+      ReminderClassifier.classify(
+        title: _controller.text.trim(),
+        hasReminderTime: _reminder,
+        durationMinutes: _resolvedDurationMinutes,
+        category: _category,
+        isHabitAnchor: _isHabitAnchor,
+      );
+
+  ReminderTaxonomy get _effectiveTaxonomy =>
+      _userTaxonomy ?? _heuristicClassification.taxonomy;
 
   Future<void> _editCustomDuration() async {
     final sleep = isSleepCategory(_category);
@@ -803,6 +845,30 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                             onReminderTimeChanged: (time) =>
                                 setState(() => _reminderTime = time),
                           ),
+                          // Classification only matters when a reminder
+                          // exists — it selects the ladder's shape, not
+                          // whether one is armed (FR-R-23).
+                          if (_reminder) ...[
+                            const SizedBox(height: 12),
+                            AddTaskClassificationSection(
+                              taxonomy: _effectiveTaxonomy,
+                              isCritical: _userCritical,
+                              onTaxonomyChanged: (t) => setState(() {
+                                _userTaxonomy = t;
+                                // Critical is meaningless off the expiring
+                                // class; drop it rather than keep it hidden
+                                // and armed.
+                                if (t != ReminderTaxonomy.timeSensitive) {
+                                  _userCritical = false;
+                                }
+                              }),
+                              onCriticalChanged: (v) => setState(() {
+                                _userCritical = v;
+                                // Ticking Critical IS choosing the class.
+                                _userTaxonomy ??= _effectiveTaxonomy;
+                              }),
+                            ),
+                          ],
                           const SizedBox(height: 12),
                           AddTaskDurationSection(
                             category: _category,

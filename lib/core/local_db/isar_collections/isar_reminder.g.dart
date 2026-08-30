@@ -22,60 +22,80 @@ const IsarReminderSchema = CollectionSchema(
       name: r'blockUrgencyScore',
       type: IsarType.long,
     ),
-    r'createdAtMs': PropertySchema(
+    r'classificationSource': PropertySchema(
       id: 1,
+      name: r'classificationSource',
+      type: IsarType.string,
+    ),
+    r'classifierVersion': PropertySchema(
+      id: 2,
+      name: r'classifierVersion',
+      type: IsarType.long,
+    ),
+    r'createdAtMs': PropertySchema(
+      id: 3,
       name: r'createdAtMs',
       type: IsarType.long,
     ),
+    r'criticality': PropertySchema(
+      id: 4,
+      name: r'criticality',
+      type: IsarType.long,
+    ),
     r'emergencyBypass': PropertySchema(
-      id: 2,
+      id: 5,
       name: r'emergencyBypass',
       type: IsarType.bool,
     ),
-    r'enabled': PropertySchema(id: 3, name: r'enabled', type: IsarType.bool),
+    r'enabled': PropertySchema(id: 6, name: r'enabled', type: IsarType.bool),
     r'escalationLevel': PropertySchema(
-      id: 4,
+      id: 7,
       name: r'escalationLevel',
       type: IsarType.long,
     ),
     r'lastTriggeredAtMs': PropertySchema(
-      id: 5,
+      id: 8,
       name: r'lastTriggeredAtMs',
       type: IsarType.long,
     ),
     r'modeRefId': PropertySchema(
-      id: 6,
+      id: 9,
       name: r'modeRefId',
       type: IsarType.string,
     ),
     r'nextPromptAtIso': PropertySchema(
-      id: 7,
+      id: 10,
       name: r'nextPromptAtIso',
       type: IsarType.string,
     ),
     r'pendingAction': PropertySchema(
-      id: 8,
+      id: 11,
       name: r'pendingAction',
       type: IsarType.bool,
     ),
     r'reminderId': PropertySchema(
-      id: 9,
+      id: 12,
       name: r'reminderId',
       type: IsarType.string,
     ),
     r'scheduledAtIso': PropertySchema(
-      id: 10,
+      id: 13,
       name: r'scheduledAtIso',
       type: IsarType.string,
     ),
-    r'taskId': PropertySchema(id: 11, name: r'taskId', type: IsarType.string),
+    r'taskId': PropertySchema(id: 14, name: r'taskId', type: IsarType.string),
     r'taskTitle': PropertySchema(
-      id: 12,
+      id: 15,
       name: r'taskTitle',
       type: IsarType.string,
     ),
+    r'taxonomy': PropertySchema(
+      id: 16,
+      name: r'taxonomy',
+      type: IsarType.string,
+    ),
     r'updatedAtMs': PropertySchema(
-      id: 13,
+      id: 17,
       name: r'updatedAtMs',
       type: IsarType.long,
     ),
@@ -142,6 +162,7 @@ int _isarReminderEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  bytesCount += 3 + object.classificationSource.length * 3;
   {
     final value = object.modeRefId;
     if (value != null) {
@@ -168,6 +189,7 @@ int _isarReminderEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
+  bytesCount += 3 + object.taxonomy.length * 3;
   return bytesCount;
 }
 
@@ -178,19 +200,23 @@ void _isarReminderSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeLong(offsets[0], object.blockUrgencyScore);
-  writer.writeLong(offsets[1], object.createdAtMs);
-  writer.writeBool(offsets[2], object.emergencyBypass);
-  writer.writeBool(offsets[3], object.enabled);
-  writer.writeLong(offsets[4], object.escalationLevel);
-  writer.writeLong(offsets[5], object.lastTriggeredAtMs);
-  writer.writeString(offsets[6], object.modeRefId);
-  writer.writeString(offsets[7], object.nextPromptAtIso);
-  writer.writeBool(offsets[8], object.pendingAction);
-  writer.writeString(offsets[9], object.reminderId);
-  writer.writeString(offsets[10], object.scheduledAtIso);
-  writer.writeString(offsets[11], object.taskId);
-  writer.writeString(offsets[12], object.taskTitle);
-  writer.writeLong(offsets[13], object.updatedAtMs);
+  writer.writeString(offsets[1], object.classificationSource);
+  writer.writeLong(offsets[2], object.classifierVersion);
+  writer.writeLong(offsets[3], object.createdAtMs);
+  writer.writeLong(offsets[4], object.criticality);
+  writer.writeBool(offsets[5], object.emergencyBypass);
+  writer.writeBool(offsets[6], object.enabled);
+  writer.writeLong(offsets[7], object.escalationLevel);
+  writer.writeLong(offsets[8], object.lastTriggeredAtMs);
+  writer.writeString(offsets[9], object.modeRefId);
+  writer.writeString(offsets[10], object.nextPromptAtIso);
+  writer.writeBool(offsets[11], object.pendingAction);
+  writer.writeString(offsets[12], object.reminderId);
+  writer.writeString(offsets[13], object.scheduledAtIso);
+  writer.writeString(offsets[14], object.taskId);
+  writer.writeString(offsets[15], object.taskTitle);
+  writer.writeString(offsets[16], object.taxonomy);
+  writer.writeLong(offsets[17], object.updatedAtMs);
 }
 
 IsarReminder _isarReminderDeserialize(
@@ -201,20 +227,24 @@ IsarReminder _isarReminderDeserialize(
 ) {
   final object = IsarReminder();
   object.blockUrgencyScore = reader.readLong(offsets[0]);
-  object.createdAtMs = reader.readLong(offsets[1]);
-  object.emergencyBypass = reader.readBool(offsets[2]);
-  object.enabled = reader.readBool(offsets[3]);
-  object.escalationLevel = reader.readLong(offsets[4]);
+  object.classificationSource = reader.readString(offsets[1]);
+  object.classifierVersion = reader.readLongOrNull(offsets[2]);
+  object.createdAtMs = reader.readLong(offsets[3]);
+  object.criticality = reader.readLong(offsets[4]);
+  object.emergencyBypass = reader.readBool(offsets[5]);
+  object.enabled = reader.readBool(offsets[6]);
+  object.escalationLevel = reader.readLong(offsets[7]);
   object.id = id;
-  object.lastTriggeredAtMs = reader.readLongOrNull(offsets[5]);
-  object.modeRefId = reader.readStringOrNull(offsets[6]);
-  object.nextPromptAtIso = reader.readStringOrNull(offsets[7]);
-  object.pendingAction = reader.readBool(offsets[8]);
-  object.reminderId = reader.readString(offsets[9]);
-  object.scheduledAtIso = reader.readStringOrNull(offsets[10]);
-  object.taskId = reader.readString(offsets[11]);
-  object.taskTitle = reader.readStringOrNull(offsets[12]);
-  object.updatedAtMs = reader.readLong(offsets[13]);
+  object.lastTriggeredAtMs = reader.readLongOrNull(offsets[8]);
+  object.modeRefId = reader.readStringOrNull(offsets[9]);
+  object.nextPromptAtIso = reader.readStringOrNull(offsets[10]);
+  object.pendingAction = reader.readBool(offsets[11]);
+  object.reminderId = reader.readString(offsets[12]);
+  object.scheduledAtIso = reader.readStringOrNull(offsets[13]);
+  object.taskId = reader.readString(offsets[14]);
+  object.taskTitle = reader.readStringOrNull(offsets[15]);
+  object.taxonomy = reader.readString(offsets[16]);
+  object.updatedAtMs = reader.readLong(offsets[17]);
   return object;
 }
 
@@ -228,30 +258,38 @@ P _isarReminderDeserializeProp<P>(
     case 0:
       return (reader.readLong(offset)) as P;
     case 1:
-      return (reader.readLong(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 2:
-      return (reader.readBool(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 3:
-      return (reader.readBool(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 4:
       return (reader.readLong(offset)) as P;
     case 5:
-      return (reader.readLongOrNull(offset)) as P;
-    case 6:
-      return (reader.readStringOrNull(offset)) as P;
-    case 7:
-      return (reader.readStringOrNull(offset)) as P;
-    case 8:
       return (reader.readBool(offset)) as P;
+    case 6:
+      return (reader.readBool(offset)) as P;
+    case 7:
+      return (reader.readLong(offset)) as P;
+    case 8:
+      return (reader.readLongOrNull(offset)) as P;
     case 9:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 10:
       return (reader.readStringOrNull(offset)) as P;
     case 11:
-      return (reader.readString(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 12:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 13:
+      return (reader.readStringOrNull(offset)) as P;
+    case 14:
+      return (reader.readString(offset)) as P;
+    case 15:
+      return (reader.readStringOrNull(offset)) as P;
+    case 16:
+      return (reader.readString(offset)) as P;
+    case 17:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -691,6 +729,223 @@ extension IsarReminderQueryFilter
   }
 
   QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  classificationSourceEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'classificationSource',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  classificationSourceGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'classificationSource',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  classificationSourceLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'classificationSource',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  classificationSourceBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'classificationSource',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  classificationSourceStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'classificationSource',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  classificationSourceEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'classificationSource',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  classificationSourceContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'classificationSource',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  classificationSourceMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'classificationSource',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  classificationSourceIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'classificationSource', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  classificationSourceIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          property: r'classificationSource',
+          value: '',
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  classifierVersionIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'classifierVersion'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  classifierVersionIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'classifierVersion'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  classifierVersionEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'classifierVersion', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  classifierVersionGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'classifierVersion',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  classifierVersionLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'classifierVersion',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  classifierVersionBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'classifierVersion',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
   createdAtMsEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -736,6 +991,61 @@ extension IsarReminderQueryFilter
       return query.addFilterCondition(
         FilterCondition.between(
           property: r'createdAtMs',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  criticalityEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'criticality', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  criticalityGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'criticality',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  criticalityLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'criticality',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  criticalityBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'criticality',
           lower: lower,
           includeLower: includeLower,
           upper: upper,
@@ -1881,6 +2191,147 @@ extension IsarReminderQueryFilter
   }
 
   QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  taxonomyEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'taxonomy',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  taxonomyGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'taxonomy',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  taxonomyLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'taxonomy',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  taxonomyBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'taxonomy',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  taxonomyStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'taxonomy',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  taxonomyEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'taxonomy',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  taxonomyContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'taxonomy',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  taxonomyMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'taxonomy',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  taxonomyIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'taxonomy', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  taxonomyIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'taxonomy', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
   updatedAtMsEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -1958,6 +2409,34 @@ extension IsarReminderQuerySortBy
     });
   }
 
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy>
+  sortByClassificationSource() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'classificationSource', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy>
+  sortByClassificationSourceDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'classificationSource', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy>
+  sortByClassifierVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'classifierVersion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy>
+  sortByClassifierVersionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'classifierVersion', Sort.desc);
+    });
+  }
+
   QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy> sortByCreatedAtMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAtMs', Sort.asc);
@@ -1968,6 +2447,19 @@ extension IsarReminderQuerySortBy
   sortByCreatedAtMsDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAtMs', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy> sortByCriticality() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticality', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy>
+  sortByCriticalityDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticality', Sort.desc);
     });
   }
 
@@ -2115,6 +2607,18 @@ extension IsarReminderQuerySortBy
     });
   }
 
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy> sortByTaxonomy() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'taxonomy', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy> sortByTaxonomyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'taxonomy', Sort.desc);
+    });
+  }
+
   QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy> sortByUpdatedAtMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'updatedAtMs', Sort.asc);
@@ -2145,6 +2649,34 @@ extension IsarReminderQuerySortThenBy
     });
   }
 
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy>
+  thenByClassificationSource() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'classificationSource', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy>
+  thenByClassificationSourceDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'classificationSource', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy>
+  thenByClassifierVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'classifierVersion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy>
+  thenByClassifierVersionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'classifierVersion', Sort.desc);
+    });
+  }
+
   QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy> thenByCreatedAtMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAtMs', Sort.asc);
@@ -2155,6 +2687,19 @@ extension IsarReminderQuerySortThenBy
   thenByCreatedAtMsDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAtMs', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy> thenByCriticality() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticality', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy>
+  thenByCriticalityDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticality', Sort.desc);
     });
   }
 
@@ -2314,6 +2859,18 @@ extension IsarReminderQuerySortThenBy
     });
   }
 
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy> thenByTaxonomy() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'taxonomy', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy> thenByTaxonomyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'taxonomy', Sort.desc);
+    });
+  }
+
   QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy> thenByUpdatedAtMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'updatedAtMs', Sort.asc);
@@ -2337,9 +2894,32 @@ extension IsarReminderQueryWhereDistinct
     });
   }
 
+  QueryBuilder<IsarReminder, IsarReminder, QDistinct>
+  distinctByClassificationSource({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'classificationSource',
+        caseSensitive: caseSensitive,
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QDistinct>
+  distinctByClassifierVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'classifierVersion');
+    });
+  }
+
   QueryBuilder<IsarReminder, IsarReminder, QDistinct> distinctByCreatedAtMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'createdAtMs');
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QDistinct> distinctByCriticality() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'criticality');
     });
   }
 
@@ -2430,6 +3010,14 @@ extension IsarReminderQueryWhereDistinct
     });
   }
 
+  QueryBuilder<IsarReminder, IsarReminder, QDistinct> distinctByTaxonomy({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'taxonomy', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<IsarReminder, IsarReminder, QDistinct> distinctByUpdatedAtMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'updatedAtMs');
@@ -2452,9 +3040,29 @@ extension IsarReminderQueryProperty
     });
   }
 
+  QueryBuilder<IsarReminder, String, QQueryOperations>
+  classificationSourceProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'classificationSource');
+    });
+  }
+
+  QueryBuilder<IsarReminder, int?, QQueryOperations>
+  classifierVersionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'classifierVersion');
+    });
+  }
+
   QueryBuilder<IsarReminder, int, QQueryOperations> createdAtMsProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'createdAtMs');
+    });
+  }
+
+  QueryBuilder<IsarReminder, int, QQueryOperations> criticalityProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'criticality');
     });
   }
 
@@ -2524,6 +3132,12 @@ extension IsarReminderQueryProperty
   QueryBuilder<IsarReminder, String?, QQueryOperations> taskTitleProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'taskTitle');
+    });
+  }
+
+  QueryBuilder<IsarReminder, String, QQueryOperations> taxonomyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'taxonomy');
     });
   }
 

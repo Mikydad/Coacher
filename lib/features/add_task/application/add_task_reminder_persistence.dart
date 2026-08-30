@@ -5,7 +5,9 @@ import '../../../core/di/providers.dart';
 import '../../../core/tier/tier_providers.dart';
 import '../../../core/tier/upgrade_prompt.dart';
 import '../../../core/utils/stable_id.dart';
+import '../../reminders/application/reminder_classifier.dart';
 import '../../reminders/domain/models/reminder_config.dart';
+import '../../reminders/domain/models/reminder_occurrence_enums.dart';
 
 /// Reminder-toggle side effect: request notification permission and surface a
 /// snackbar when it is denied. (Persistence for the save path lives beside
@@ -38,6 +40,18 @@ Future<String?> persistAddTaskReminder(
   required DateTime reminderTime,
   String? existingReminderId,
   int? reminderCreatedAtMs,
+
+  /// Classification inputs (FR-R-20). Optional so callers that predate the
+  /// classifier keep compiling; absent, the heuristic still runs on the title.
+  int? durationMinutes,
+  String? category,
+  bool isHabitAnchor = false,
+
+  /// A classification the USER chose in the editor. When present it wins and
+  /// is stamped `ClassificationSource.user`, never to be overwritten by the
+  /// heuristic or by AI (FR-R-21).
+  ReminderTaxonomy? userTaxonomy,
+  int? userCriticality,
 }) async {
   // New enabled reminder = one more active configuration — gate it (the
   // task itself is already saved; only the reminder is withheld).
@@ -77,7 +91,34 @@ Future<String?> persistAddTaskReminder(
 
   final now = DateTime.now().millisecondsSinceEpoch;
   final createdAt = reminderCreatedAtMs ?? now;
-  final reminder = ReminderConfig(
+
+  // Classify synchronously, offline, at save time (FR-R-20). The AI upgrade
+  // (FR-R-22) refines this in the background later; it never blocks the save.
+  final heuristic = ReminderClassifier.classify(
+    title: taskTitle,
+    hasReminderTime: reminderEnabled,
+    durationMinutes: durationMinutes,
+    category: category,
+    isHabitAnchor: isHabitAnchor,
+  );
+  final userChose = userTaxonomy != null || userCriticality != null;
+
+  // On edit this function rebuilds the config from scratch, which would reset
+  // classificationSource to `heuristic` and quietly discard an earlier user
+  // override. Carry the stored classification forward so withClassification
+  // can see who last spoke (FR-R-21).
+  ReminderConfig? previous;
+  if (existingReminderId != null) {
+    final all = await ref.read(reminderRepositoryProvider).listAllReminders();
+    for (final r in all) {
+      if (r.id == existingReminderId) {
+        previous = r;
+        break;
+      }
+    }
+  }
+
+  var reminder = ReminderConfig(
     id: existingReminderId ?? StableId.generate('reminder'),
     taskId: taskId,
     taskTitle: taskTitle,
@@ -85,9 +126,29 @@ Future<String?> persistAddTaskReminder(
     scheduledAtIso: reminderEnabled ? reminderTime.toIso8601String() : null,
     modeRefId: modeRefId,
     blockUrgencyScore: blockUrgency,
+    taxonomy: previous?.taxonomy ?? ReminderTaxonomy.flexible,
+    criticality: previous?.criticality ?? 1,
+    classificationSource:
+        previous?.classificationSource ?? ClassificationSource.heuristic,
+    classifierVersion: previous?.classifierVersion,
     createdAtMs: createdAt,
     updatedAtMs: now,
   );
+
+  // Precedence: the user's own choice, else the heuristic — and the heuristic
+  // never overwrites an earlier user override (withClassification enforces
+  // it). FR-R-23: neither path can touch `enabled`.
+  reminder = reminder.withClassification(
+    taxonomy: userTaxonomy ?? heuristic.taxonomy,
+    criticality: userCriticality ?? heuristic.criticality,
+    source: userChose
+        ? ClassificationSource.user
+        : ClassificationSource.heuristic,
+    classifierVersion: userChose ? null : ReminderClassifier.version,
+    updatedAtMs: now,
+    force: userChose,
+  );
+
   await ref.read(reminderRepositoryProvider).upsertReminder(reminder);
   await ref.read(reminderSyncServiceProvider).syncForTaskIds([taskId]);
   return reminder.id;

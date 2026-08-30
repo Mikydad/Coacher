@@ -141,9 +141,10 @@ class ReminderOccurrenceService {
 
   /// Builds (but does not persist) the occurrence a config implies.
   ///
-  /// Classification defaults to the migration values from PRD §9 — flexible,
-  /// criticality 1 — because the heuristic classifier is task 4.0. When it
-  /// lands it overwrites these, except where the user has spoken.
+  /// Classification is SNAPSHOT from the config, not recomputed here: the
+  /// config carries the stable answer (and the user's override, which must
+  /// survive the day), while each occurrence holds the day's copy that the
+  /// state machine and the ladder actually read.
   @visibleForTesting
   static ReminderOccurrence occurrenceForConfig(
     ReminderConfig config, {
@@ -161,7 +162,10 @@ class ReminderOccurrenceService {
       entityTitle: config.taskTitle,
       modeRefId: config.modeRefId,
       state: ReminderOccurrenceState.upcoming,
-      classificationSource: ClassificationSource.migration,
+      taxonomy: config.taxonomy,
+      criticality: config.criticality,
+      classificationSource: config.classificationSource,
+      classifierVersion: config.classifierVersion,
       createdAtMs: nowMs,
       updatedAtMs: nowMs,
     );
@@ -195,6 +199,10 @@ class ReminderOccurrenceService {
         ),
         entityTitle: config.taskTitle,
         modeRefId: config.modeRefId,
+        taxonomy: config.taxonomy,
+        criticality: config.criticality,
+        classificationSource: config.classificationSource,
+        classifierVersion: config.classifierVersion,
         updatedAtMs: now.millisecondsSinceEpoch,
       );
       final advanced = ReminderStateMachine.advance(updated, now: now);

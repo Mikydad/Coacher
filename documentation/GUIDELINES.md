@@ -2494,3 +2494,29 @@ not silent reversal.
   re-arms; the carry-forward UI shifts `reminderTimeIso` with the same helper.
   *Why this is recorded:* a later session reading C3 would otherwise go
   looking for a recurrence engine to fix, or build one that has no callers.
+
+- **2026-08-30 · Reminder V2 classifier: habit anchor is the routine signal,
+  and the heuristic never grants criticality 3.** FR-R-20's rules name a
+  category vocabulary this app does not have ("work/meeting",
+  "health/hydration/chore"); the real set is Study / Fitness / Work /
+  Personal / Plan / Sleep plus arbitrary custom names. Two adaptations,
+  settled with Miko: **(a)** `routine` comes from the user's own "Habit
+  anchor" toggle alone, not from guessing at category names — a real signal
+  beats an inferred one, and it needs no category mapping to drift; **(b)**
+  the heuristic caps criticality at **2**, superseding FR-R-20's `meds: 3`.
+  *Why (b):* criticality 3 is the only thing allowed to pierce the
+  interruption boundary, the Focus Shield *and* the sleep window (D5), and no
+  substring match earns that — "social media catch-up" contains "med", and
+  the cost of a false positive is waking someone at 3 a.m. The editor's
+  Critical toggle is how 3 is granted, deliberately one tap. Keyword matching
+  is whole-word (tokenised), and `session`/`train`/`bus` are explicitly
+  excluded because they read as ordinary work far more often than as
+  appointments. *Also settled:* classification lives on `ReminderConfig`
+  (stable, survives the day, holds the user override) and is **snapshot** onto
+  each `ReminderOccurrence` at arming time; a config row with no taxonomy
+  field at all is marked `migration` rather than `heuristic`, so FR-R-22's AI
+  pass can target never-classified rows without touching `user` ones.
+  *Observation, not acted on:* Sleep-category tasks currently classify as
+  `flexible`, so a missed sleep task will ask for disposition at a recovery
+  moment. Left alone because it is exactly the category-guessing (a) rejects
+  — revisit if it annoys in testing.

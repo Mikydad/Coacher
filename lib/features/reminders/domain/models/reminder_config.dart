@@ -1,4 +1,5 @@
 import '../../../../core/validation/model_validators.dart';
+import 'reminder_occurrence_enums.dart';
 
 class ReminderConfig {
   const ReminderConfig({
@@ -16,6 +17,10 @@ class ReminderConfig {
     this.nextPromptAtIso,
     this.activeNotificationId,
     this.evaluationTrace = const [],
+    this.taxonomy = ReminderTaxonomy.flexible,
+    this.criticality = 1,
+    this.classificationSource = ClassificationSource.heuristic,
+    this.classifierVersion,
     required this.createdAtMs,
     required this.updatedAtMs,
   });
@@ -43,8 +48,51 @@ class ReminderConfig {
   /// Appended by [AttentionOrchestratorService] for explainability/debug.
   final List<String> evaluationTrace;
 
+  /// The task's stable classification (FR-R-20/21).
+  ///
+  /// It lives on the CONFIG, not only on an occurrence, because it must
+  /// survive the day: an occurrence is one moment, and tomorrow's would
+  /// otherwise forget that the user said "this is routine". Each occurrence
+  /// takes a snapshot of these at arming time, which is what the state
+  /// machine and the ladder read.
+  final ReminderTaxonomy taxonomy;
+
+  /// 0 = nice-to-do … 3 = critical. The heuristic never sets 3 — only the
+  /// user does, via the editor's Critical toggle (settled 2026-08-30).
+  final int criticality;
+
+  final ClassificationSource classificationSource;
+  final int? classifierVersion;
+
   final int createdAtMs;
   final int updatedAtMs;
+
+  /// Apply a freshly computed classification, honouring precedence.
+  ///
+  /// A `user` classification is authoritative and is never overwritten by a
+  /// heuristic or by AI (FR-R-21); [force] exists for the editor itself,
+  /// which IS the user speaking.
+  ///
+  /// FR-R-23: this only ever touches taxonomy/criticality/source. It cannot
+  /// disable a reminder the user configured — classification selects the
+  /// ladder's shape, never whether one exists.
+  ReminderConfig withClassification({
+    required ReminderTaxonomy taxonomy,
+    required int criticality,
+    required ClassificationSource source,
+    int? classifierVersion,
+    required int updatedAtMs,
+    bool force = false,
+  }) {
+    if (!force && classificationSource.isAuthoritative) return this;
+    return copyWith(
+      taxonomy: taxonomy,
+      criticality: criticality.clamp(0, 3),
+      classificationSource: source,
+      classifierVersion: classifierVersion,
+      updatedAtMs: updatedAtMs,
+    );
+  }
 
   void validate() {
     ModelValidators.requireNotBlank(id, 'reminder.id');
@@ -67,6 +115,10 @@ class ReminderConfig {
     if (activeNotificationId != null)
       'activeNotificationId': activeNotificationId,
     if (evaluationTrace.isNotEmpty) 'evaluationTrace': evaluationTrace,
+    'taxonomy': taxonomy.toStorage(),
+    'criticality': criticality,
+    'classificationSource': classificationSource.toStorage(),
+    if (classifierVersion != null) 'classifierVersion': classifierVersion,
     'createdAtMs': createdAtMs,
     'updatedAtMs': updatedAtMs,
   };
@@ -91,6 +143,18 @@ class ReminderConfig {
       nextPromptAtIso: map['nextPromptAtIso'] as String?,
       activeNotificationId: (map['activeNotificationId'] as num?)?.toInt(),
       evaluationTrace: trace,
+      taxonomy: ReminderTaxonomy.fromStorage(map['taxonomy'] as String?),
+      criticality: (map['criticality'] as num?)?.toInt() ?? 1,
+      // A row with no taxonomy field at all predates classification, so it is
+      // marked `migration` rather than pretending a heuristic ever looked at
+      // it (PRD §9). FR-R-22's AI pass can then target migration/heuristic
+      // rows and leave `user` ones alone.
+      classificationSource: map.containsKey('taxonomy')
+          ? ClassificationSource.fromStorage(
+              map['classificationSource'] as String?,
+            )
+          : ClassificationSource.migration,
+      classifierVersion: (map['classifierVersion'] as num?)?.toInt(),
       createdAtMs: map['createdAtMs'] as int,
       updatedAtMs: map['updatedAtMs'] as int,
     );
@@ -118,6 +182,10 @@ class ReminderConfig {
     Object? nextPromptAtIso = _sentinel,
     Object? activeNotificationId = _sentinel,
     List<String>? evaluationTrace,
+    ReminderTaxonomy? taxonomy,
+    int? criticality,
+    ClassificationSource? classificationSource,
+    Object? classifierVersion = _sentinel,
     int? updatedAtMs,
   }) {
     return ReminderConfig(
@@ -147,6 +215,12 @@ class ReminderConfig {
           ? this.activeNotificationId
           : activeNotificationId as int?,
       evaluationTrace: evaluationTrace ?? this.evaluationTrace,
+      taxonomy: taxonomy ?? this.taxonomy,
+      criticality: criticality ?? this.criticality,
+      classificationSource: classificationSource ?? this.classificationSource,
+      classifierVersion: classifierVersion == _sentinel
+          ? this.classifierVersion
+          : classifierVersion as int?,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     );
