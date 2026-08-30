@@ -2636,3 +2636,24 @@ not silent reversal.
   still degrades to flexible — the weakest contract, which is the opposite of
   what a stricter-sounding custom name implies — but the degrade is now
   counted and logged rather than silent.
+
+- **2026-08-30 · Reminder V2 R3: D4's "staked → Surrender" branch has no
+  subject for a task, and the reason dialog is now shared.** FR-R-42 / D4
+  specifies that an overdue Extreme item offers Do / Reschedule-with-reason /
+  **Surrender** when staked, and Do / Reschedule-with-reason when not. In this
+  codebase stakes attach to **goals**, not tasks — `goal_actions.dart` owns
+  `liveStake` and the `surrender` callable — so a task occurrence has nothing
+  to surrender. A staked goal keeps its existing flow; a task in Extreme mode
+  gets D4's unstaked contract. Recorded so a later session does not go
+  building a task-stake concept that has no other half. *Also:* the
+  "why are plans changing?" dialog was private to `home_screen.dart` and has
+  been extracted to `planning/presentation/override_reason_dialog.dart`, so
+  the Recovery Card demands the same thing, validated by the same
+  `FlowTransitionEvent.validateReasonNote` rule — one definition of what
+  counts as a reason, rather than "ok" passing on one surface and failing on
+  another. *D4's release valve:* consecutive reschedules are counted from
+  occurrence HISTORY rather than a counter on the config, because
+  "consecutive" is a property of the sequence — doing the task once breaks the
+  streak, and a stored counter would need remembering to reset. At three, the
+  app suggests easing the mode or dropping the task; it is a suggestion, and
+  SidePal never demotes anything on its own.

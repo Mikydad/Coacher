@@ -354,4 +354,96 @@ void main() {
       expect(occ.rows, isEmpty);
     });
   });
+
+  group('consecutiveReschedules — D4 release valve', () {
+    ReminderOccurrence resolved(
+      String id,
+      DateTime at,
+      ReminderResolutionKind kind,
+    ) => ReminderOccurrence(
+      id: id,
+      entityId: 't1',
+      entityKind: 'task',
+      dateKey: ReminderOccurrence.dateKeyFor(at.millisecondsSinceEpoch),
+      scheduledAtMs: at.millisecondsSinceEpoch,
+      windowMinutes: 30,
+      entityTitle: 'Study',
+      state: ReminderOccurrenceState.resolved,
+      resolutionKind: kind,
+      createdAtMs: 1,
+      updatedAtMs: 1,
+    );
+
+    test('counts a run of reschedules', () async {
+      final occ = _FakeOccurrences();
+      for (var i = 1; i <= 3; i++) {
+        final o = resolved(
+          'r$i',
+          twoPm.subtract(Duration(days: i)),
+          ReminderResolutionKind.rescheduled,
+        );
+        occ.rows[o.occurrenceKey] = o;
+      }
+      final svc = service(occ, _FakeReminders());
+
+      expect(await svc.consecutiveReschedules('t1'), 3);
+    });
+
+    test('actually doing it once breaks the streak', () async {
+      final occ = _FakeOccurrences();
+      final recent = resolved(
+        'r1',
+        twoPm.subtract(const Duration(days: 1)),
+        ReminderResolutionKind.rescheduled,
+      );
+      final done = resolved(
+        'r2',
+        twoPm.subtract(const Duration(days: 2)),
+        ReminderResolutionKind.completed,
+      );
+      final older = resolved(
+        'r3',
+        twoPm.subtract(const Duration(days: 3)),
+        ReminderResolutionKind.rescheduled,
+      );
+      for (final o in [recent, done, older]) {
+        occ.rows[o.occurrenceKey] = o;
+      }
+      final svc = service(occ, _FakeReminders());
+
+      // Only the run since the last completion counts.
+      expect(await svc.consecutiveReschedules('t1'), 1);
+    });
+
+    test("today's still-open occurrence does not break the streak", () async {
+      final occ = _FakeOccurrences();
+      final open = ReminderOccurrence(
+        id: 'open',
+        entityId: 't1',
+        entityKind: 'task',
+        dateKey: ReminderOccurrence.dateKeyFor(twoPm.millisecondsSinceEpoch),
+        scheduledAtMs: twoPm.millisecondsSinceEpoch,
+        windowMinutes: 30,
+        entityTitle: 'Study',
+        state: ReminderOccurrenceState.overdue,
+        createdAtMs: 1,
+        updatedAtMs: 1,
+      );
+      final moved = resolved(
+        'r1',
+        twoPm.subtract(const Duration(days: 1)),
+        ReminderResolutionKind.rescheduled,
+      );
+      occ.rows[open.occurrenceKey] = open;
+      occ.rows[moved.occurrenceKey] = moved;
+      final svc = service(occ, _FakeReminders());
+
+      expect(await svc.consecutiveReschedules('t1'), 1);
+    });
+
+    test('no history means no streak', () async {
+      final svc = service(_FakeOccurrences(), _FakeReminders());
+      expect(await svc.consecutiveReschedules('t1'), 0);
+    });
+  });
 }

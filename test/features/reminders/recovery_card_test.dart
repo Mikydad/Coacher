@@ -31,7 +31,11 @@ ReminderOccurrence _occ({
 RecoveryRow _row(ReminderOccurrence o) =>
     RecoveryRow(occurrence: o, insistence: RecoveryInsistence.forMode(o.modeRefId));
 
-Widget _host(RecoveryView view, {void Function(String)? onOpenTask}) {
+Widget _host(
+  RecoveryView view, {
+  void Function(String)? onOpenTask,
+  void Function(RecoveryRow, ReminderResolutionKind)? onResolve,
+}) {
   return ProviderScope(
     overrides: [
       recoveryViewProvider.overrideWith((ref) => Stream.value(view)),
@@ -39,7 +43,7 @@ Widget _host(RecoveryView view, {void Function(String)? onOpenTask}) {
     child: MaterialApp(
       home: Scaffold(
         body: SingleChildScrollView(
-          child: RecoveryCard(onOpenTask: onOpenTask),
+          child: RecoveryCard(onOpenTask: onOpenTask, onResolve: onResolve),
         ),
       ),
     ),
@@ -203,6 +207,90 @@ void main() {
 
     test('a missing timestamp still says something true', () {
       expect(recoveryWaitedLabel(null), 'Overdue');
+    });
+  });
+
+  group('the modes demand different things (FR-R-40..42)', () {
+    testWidgets('Flexible gets no overflow — the gentlest mode stays plain', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _host(
+          RecoveryView(rows: [_row(_occ(id: 'f', title: 'Study'))]),
+          onResolve: (_, __) {},
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byTooltip('Not today'), findsOneWidget);
+      expect(find.byTooltip('Other options'), findsNothing);
+    });
+
+    testWidgets('Disciplined and Extreme offer a disposition instead', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _host(
+          RecoveryView(
+            rows: [
+              _row(_occ(id: 'd', title: 'D', modeRefId: 'disciplined')),
+              _row(_occ(id: 'e', title: 'E', modeRefId: 'extreme')),
+            ],
+          ),
+          onResolve: (_, __) {},
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byTooltip('Not today'), findsNothing);
+      expect(find.byTooltip('Other options'), findsNWidgets(2));
+    });
+
+    testWidgets('the overflow reports the chosen disposition', (tester) async {
+      ReminderResolutionKind? chosen;
+      RecoveryRow? from;
+      await tester.pumpWidget(
+        _host(
+          RecoveryView(
+            rows: [
+              _row(_occ(id: 'd', title: 'Study', modeRefId: 'disciplined')),
+            ],
+          ),
+          onResolve: (row, kind) {
+            from = row;
+            chosen = kind;
+          },
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Other options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Reschedule'));
+      await tester.pumpAndSettle();
+
+      expect(chosen, ReminderResolutionKind.rescheduled);
+      expect(from!.occurrence.entityId, 'd');
+    });
+
+    testWidgets('Skip is offered too', (tester) async {
+      ReminderResolutionKind? chosen;
+      await tester.pumpWidget(
+        _host(
+          RecoveryView(
+            rows: [_row(_occ(id: 'e', title: 'Study', modeRefId: 'extreme'))],
+          ),
+          onResolve: (_, kind) => chosen = kind,
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Other options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
+
+      expect(chosen, ReminderResolutionKind.skipped);
     });
   });
 }

@@ -302,6 +302,29 @@ class ReminderOccurrenceService {
     return active;
   }
 
+  /// How many times in a row this entity's most recent occurrences were
+  /// rescheduled rather than done (D4 / FR-R-42).
+  ///
+  /// Counted from occurrence history rather than a counter on the config,
+  /// because "consecutive" is a property of the sequence: doing the task once
+  /// breaks the streak, and a stored counter would need remembering to reset.
+  Future<int> consecutiveReschedules(String entityId) async {
+    final rows = await _occurrences.listForEntity(entityId);
+    var count = 0;
+    for (final row in rows) {
+      // listForEntity is newest-first; stop at the first occurrence that
+      // ended any other way.
+      if (row.resolutionKind == ReminderResolutionKind.rescheduled) {
+        count++;
+        continue;
+      }
+      if (row.isResolved) break;
+      // An unresolved occurrence (today's, still open) does not break the
+      // streak — it has not ended yet.
+    }
+    return count;
+  }
+
   /// Wave a row off the Recovery Card for today (FR-R-40, Flexible only).
   ///
   /// Deliberately not a resolution: the task is still undone, so the

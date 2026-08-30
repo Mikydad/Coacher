@@ -6,6 +6,7 @@ import '../../../core/di/providers.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../application/recovery_view.dart';
+import '../domain/models/reminder_occurrence_enums.dart';
 
 /// The Recovery Card (FR-R-50): what SidePal still owes you.
 ///
@@ -18,11 +19,16 @@ import '../application/recovery_view.dart';
 /// by shouting in red. The only accent is the existing amber token, and only
 /// for genuinely critical rows.
 class RecoveryCard extends ConsumerWidget {
-  const RecoveryCard({super.key, this.onOpenTask});
+  const RecoveryCard({super.key, this.onOpenTask, this.onResolve});
 
   /// Tapping a row's primary action. Injectable so the timer-end prompt can
   /// reuse this card with its own navigation.
   final void Function(String entityId)? onOpenTask;
+
+  /// Disposition chosen from a row's overflow (FR-R-41/42). Injectable for
+  /// the same reason, and so widget tests can observe the contract without a
+  /// navigator.
+  final void Function(RecoveryRow row, ReminderResolutionKind kind)? onResolve;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -57,6 +63,9 @@ class RecoveryCard extends ConsumerWidget {
                           .read(reminderOccurrenceServiceProvider)
                           .dismissForToday(row.occurrence.entityId)
                     : null,
+                onResolve: onResolve == null
+                    ? null
+                    : (kind) => onResolve!(row, kind),
               ),
             if (overflow > 0)
               Padding(
@@ -96,10 +105,12 @@ class _RecoveryRowTile extends StatelessWidget {
     required this.row,
     required this.onDo,
     this.onDismiss,
+    this.onResolve,
   });
 
   final RecoveryRow row;
   final VoidCallback onDo;
+  final void Function(ReminderResolutionKind kind)? onResolve;
 
   /// Null for Disciplined and Extreme — their contract is that the row does
   /// not go away just because you looked at it.
@@ -155,6 +166,29 @@ class _RecoveryRowTile extends StatelessWidget {
                 size: 15,
                 color: AppColors.textMuted,
               ),
+            )
+          // Flexible needs no disposition at all (FR-R-40), so it gets no
+          // overflow: the gentlest mode should not sprout a menu.
+          else if (onResolve != null && !row.insistence.canDismiss)
+            PopupMenuButton<ReminderResolutionKind>(
+              tooltip: 'Other options',
+              padding: EdgeInsets.zero,
+              icon: Icon(
+                CupertinoIcons.ellipsis,
+                size: 16,
+                color: AppColors.textMuted,
+              ),
+              onSelected: onResolve,
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: ReminderResolutionKind.rescheduled,
+                  child: Text('Reschedule'),
+                ),
+                const PopupMenuItem(
+                  value: ReminderResolutionKind.skipped,
+                  child: Text('Skip'),
+                ),
+              ],
             ),
         ],
       ),

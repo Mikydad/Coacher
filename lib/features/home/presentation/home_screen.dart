@@ -34,6 +34,7 @@ import '../../analytics/domain/models/analytics_event.dart';
 import '../../analytics/domain/models/current_coaching_focus.dart';
 import '../../analytics/domain/models/generated_insight.dart';
 import '../../planning/domain/models/accountability_log.dart';
+import '../../planning/presentation/override_reason_dialog.dart';
 import '../../planning/domain/models/flow_transition_event.dart';
 import '../../planning/domain/models/block.dart';
 import '../../planning/domain/models/routine.dart';
@@ -211,6 +212,8 @@ class HomeScreen extends ConsumerWidget {
           const ReminderHealthHomeHint(),
           RecoveryCard(
             onOpenTask: (entityId) => openRecoveryTask(context, ref, entityId),
+            onResolve: (row, kind) =>
+                resolveRecoveryRow(context, ref, row, kind),
           ),
           const PostOverrideReviewCard(),
           const _DailyDisciplineSection(),
@@ -1896,7 +1899,7 @@ Future<void> _openPlansChangedFlow(
   );
   if (action == null || !context.mounted) return;
 
-  final reason = await _promptOverrideReason(context);
+  final reason = await promptOverrideReason(context);
   if (reason == null) return;
   if (!context.mounted) return;
   final routineForPolicy = await _routineForPlannedRow(ref, row);
@@ -2154,85 +2157,6 @@ Future<bool?> _confirmStrictOverride(
   );
   confirmCtrl.dispose();
   return ok;
-}
-
-Future<({OverrideReasonCategory reason, String note})?> _promptOverrideReason(
-  BuildContext context,
-) async {
-  final reasons = OverrideReasonCategory.values;
-  OverrideReasonCategory selectedReason = reasons.first;
-  final noteCtrl = TextEditingController();
-  String? errorText;
-  final choice =
-      await showDialog<({OverrideReasonCategory reason, String note})>(
-        context: context,
-        builder: (ctx) => StatefulBuilder(
-          builder: (ctx, setState) => AlertDialog(
-            title: const Text('Why are plans changing?'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<OverrideReasonCategory>(
-                  initialValue: selectedReason,
-                  items: [
-                    for (final r in reasons)
-                      DropdownMenuItem(value: r, child: Text(r.label)),
-                  ],
-                  onChanged: (v) =>
-                      setState(() => selectedReason = v ?? reasons.first),
-                  decoration: const InputDecoration(
-                    labelText: 'Reason category',
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  textCapitalization: TextCapitalization.sentences,
-                  controller: noteCtrl,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'Logical reason (1-2 sentences)',
-                    hintText: 'Explain clearly why this is the best move now.',
-                  ),
-                ),
-                if (errorText != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      errorText!,
-                      style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  final note = noteCtrl.text.trim();
-                  try {
-                    FlowTransitionEvent.validateReasonNote(note);
-                  } catch (_) {
-                    setState(
-                      () => errorText = 'Give a clear reason in 1-2 sentences.',
-                    );
-                    return;
-                  }
-                  Navigator.pop(ctx, (reason: selectedReason, note: note));
-                },
-                child: const Text('Continue'),
-              ),
-            ],
-          ),
-        ),
-      );
-  noteCtrl.dispose();
-  return choice;
 }
 
 class _NeonCard extends StatelessWidget {

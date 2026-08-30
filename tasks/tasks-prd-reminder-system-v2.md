@@ -280,20 +280,23 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
   - [x] 8.4 Coverage test: every (mode × step × taxonomy) combination resolves
         to a non-empty string.
 
-- [ ] **9.0 Modes as resolution contracts + OS interruption levels**
+- [x] **9.0 Modes as resolution contracts + OS interruption levels**
       *(FR-R-35, 40…44)*
-  - [ ] 9.1 Per-slot interaction contract: Done / Later (single unified snooze)
+  - [x] 9.1 Per-slot interaction contract: Done / Later (single unified snooze)
         / Wrong time (closes window now) / plain tap; any interaction cancels
         remaining slots.
-  - [ ] 9.2 Flexible: dismissible card entry, rolls into Plan-Tomorrow as a
+  - [x] 9.2 Flexible: dismissible card entry, rolls into Plan-Tomorrow as a
         suggestion, no reason required.
-  - [ ] 9.3 Disciplined: persistent entry demanding Do now / Reschedule / Skip;
+  - [x] 9.3 Disciplined: persistent entry demanding Do now / Reschedule / Skip;
         one inline Plan-Tomorrow prompt, carry forward if unanswered — soft nag,
         never a hard gate (D3).
-  - [ ] 9.4 Extreme: non-dismissible entry; reschedule requires a non-empty
-        reason logged to the accountability log; staked → Do / Reschedule /
-        Surrender, unstaked → Do / Reschedule only (D4).
-  - [ ] 9.5 Demote-or-drop coach suggestion after 3 consecutive reschedules of
+  - [x] 9.4 Extreme: non-dismissible entry; reschedule requires a non-empty
+        reason logged to the accountability log (D4's UNSTAKED contract).
+        *D4's staked branch has no subject for a task: stakes attach to GOALS
+        in this codebase (`goal_actions.dart` owns liveStake + the surrender
+        callable), so a staked goal keeps its existing surrender flow and a
+        task gets Do / Reschedule-with-reason only.*
+  - [x] 9.5 Demote-or-drop coach suggestion after 3 consecutive reschedules of
         the same task — suggestion only, user decides (D4).
   - [x] 9.6 Unknown/custom `modeRefId` degrades to Flexible **with a ledger
         note** instead of silently. (M3)
