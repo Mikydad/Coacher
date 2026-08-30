@@ -96,38 +96,61 @@ class ReminderConfig {
     );
   }
 
+  /// Nullable fields use the `_sentinel` convention (as in
+  /// `circle_notif_prefs.dart` / `ai_pulse.dart`) so passing an explicit
+  /// `null` CLEARS the field instead of silently keeping the old value.
+  ///
+  /// The `?? this.x` form it replaces made `nextPromptAtIso: null` a no-op —
+  /// `_resolveReminder` had been asking to clear the pending prompt and
+  /// keeping a stale timestamp instead (AUDIT §10 L4). Harmless only while
+  /// nothing read the field independently; every nullable added by Reminder
+  /// V2 would have inherited the same trap.
   ReminderConfig copyWith({
     bool? enabled,
-    String? scheduledAtIso,
-    String? taskTitle,
-    String? modeRefId,
+    Object? scheduledAtIso = _sentinel,
+    Object? taskTitle = _sentinel,
+    Object? modeRefId = _sentinel,
     int? blockUrgencyScore,
     bool? pendingAction,
     int? escalationLevel,
     bool? emergencyBypass,
-    int? lastTriggeredAtMs,
-    String? nextPromptAtIso,
-    int? activeNotificationId,
+    Object? lastTriggeredAtMs = _sentinel,
+    Object? nextPromptAtIso = _sentinel,
+    Object? activeNotificationId = _sentinel,
     List<String>? evaluationTrace,
     int? updatedAtMs,
   }) {
     return ReminderConfig(
       id: id,
       taskId: taskId,
-      taskTitle: taskTitle ?? this.taskTitle,
+      taskTitle: taskTitle == _sentinel
+          ? this.taskTitle
+          : taskTitle as String?,
       enabled: enabled ?? this.enabled,
-      scheduledAtIso: scheduledAtIso ?? this.scheduledAtIso,
-      modeRefId: modeRefId ?? this.modeRefId,
+      scheduledAtIso: scheduledAtIso == _sentinel
+          ? this.scheduledAtIso
+          : scheduledAtIso as String?,
+      modeRefId: modeRefId == _sentinel
+          ? this.modeRefId
+          : modeRefId as String?,
       blockUrgencyScore: blockUrgencyScore ?? this.blockUrgencyScore,
       pendingAction: pendingAction ?? this.pendingAction,
       escalationLevel: escalationLevel ?? this.escalationLevel,
       emergencyBypass: emergencyBypass ?? this.emergencyBypass,
-      lastTriggeredAtMs: lastTriggeredAtMs ?? this.lastTriggeredAtMs,
-      nextPromptAtIso: nextPromptAtIso ?? this.nextPromptAtIso,
-      activeNotificationId: activeNotificationId ?? this.activeNotificationId,
+      lastTriggeredAtMs: lastTriggeredAtMs == _sentinel
+          ? this.lastTriggeredAtMs
+          : lastTriggeredAtMs as int?,
+      nextPromptAtIso: nextPromptAtIso == _sentinel
+          ? this.nextPromptAtIso
+          : nextPromptAtIso as String?,
+      activeNotificationId: activeNotificationId == _sentinel
+          ? this.activeNotificationId
+          : activeNotificationId as int?,
       evaluationTrace: evaluationTrace ?? this.evaluationTrace,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     );
   }
 }
+
+const Object _sentinel = Object();

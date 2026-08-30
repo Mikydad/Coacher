@@ -311,13 +311,25 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
     }
   }
 
-  /// Re-evaluate whether a notification should be re-scheduled for [entityId].
+  /// Re-arm a reminder the OS lost, at its **original** time.
   ///
-  /// Called by [NotificationReconciliationService] when a ledger entry is
-  /// found in `scheduled`/`delivered` state but is missing from the OS tray
-  /// (the app was killed before the notification fired or the OS dismissed it).
+  /// Called by [NotificationReconciliationService] when a ledger entry in
+  /// `scheduled`/`delivered` state is missing from BOTH OS queues.
+  ///
+  /// This path is deliberately conservative (FR-R-01/FR-R-02). It re-arms only
+  /// when all three hold: the config still exists, the user still has the
+  /// reminder `enabled`, and the target time is still in the future. It never
+  /// proposes `now` — that is what made every cold start deliver the evening's
+  /// reminders at breakfast (AUDIT §10 T1).
+  ///
+  /// The restored intent is [ReminderType.scheduled], not a follow-up: it IS
+  /// the user's original first delivery, so the CoachingStyle back-off that
+  /// guards against over-eager follow-ups must not suppress it.
   @override
-  Future<void> reEvaluateIfAppropriate(String entityId) async {
+  Future<void> reEvaluateIfAppropriate(
+    String entityId, {
+    DateTime? scheduledFor,
+  }) async {
     final reminders = await _reminderRepo.listAllReminders();
     final config = reminders.cast<dynamic>().firstWhere(
       (r) => (r as dynamic).taskId == entityId,
@@ -325,27 +337,38 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
     );
     if (config == null) return; // task was deleted — nothing to reschedule
 
+    // A reminder the user switched off stays off, whatever the OS queue says.
+    if (!(config.enabled as bool? ?? false)) return;
+
+    // Prefer the caller's time (the ledger row's own scheduledFor); fall back
+    // to the config's stored time. Anything non-future is not ours to deliver.
+    final storedIso = config.scheduledAtIso as String?;
+    final deliverAt =
+        scheduledFor ??
+        (storedIso == null ? null : DateTime.tryParse(storedIso));
+    if (deliverAt == null || !deliverAt.isAfter(_now())) return;
+
     final modeRefId = config.modeRefId as String? ?? 'flexible';
     final level = InterruptionLevelResolver.resolve(
       enforcementMode: modeRefId,
       escalationLevel: config.escalationLevel as int? ?? 0,
       emergencyBypass: config.emergencyBypass as bool? ?? false,
     );
-    final followUp = ReminderIntent(
+    final restored = ReminderIntent(
       id: StableId.generate('ri_reconcile'),
       entityId: entityId,
       entityKind: 'task',
       entityTitle: config.taskTitle as String? ?? entityId,
-      proposedAt: _now(),
+      proposedAt: deliverAt,
       importance: (config.blockUrgencyScore as int? ?? 50).clamp(0, 100),
       interruptionLevel: level,
       enforcementMode: modeRefId,
       escalationLevel: config.escalationLevel as int? ?? 0,
-      reminderType: ReminderType.followUp,
+      reminderType: ReminderType.scheduled,
       sourceReason: 'boot_reconciliation',
       createdAtMs: _now().millisecondsSinceEpoch,
     );
-    await evaluate(followUp);
+    await evaluate(restored);
   }
 
   /// Called on every app foreground resume.

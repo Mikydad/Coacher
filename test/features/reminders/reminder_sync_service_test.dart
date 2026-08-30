@@ -237,8 +237,11 @@ void main() {
     expect(orchestrator.evaluated, isEmpty);
   });
 
+  // ── C6: the armed alarm survives an evaluation that arms nothing ──────────
+
   test(
-    'cancelForEntity is called once per reminder during applyReminders',
+    'applyReminders does not pre-cancel a reminder it is about to evaluate '
+    '(C6: the orchestrator owns the swap, after approval)',
     () async {
       final now = DateTime(2026, 3, 24, 10, 0);
       final repo = _FakeReminderRepository()..seed([_reminder(now: now)]);
@@ -247,7 +250,43 @@ void main() {
 
       await service.scheduleFromCache();
 
-      // cancelForEntity called once (before evaluate) — not 64 times.
+      // The reminder WAS evaluated...
+      expect(orchestrator.evaluated.length, 1);
+      // ...and the caller did not destroy the live slot on the way in. The
+      // cancel now happens inside _executeDecision, after the budget check
+      // approves — so a suppression or denial leaves the user's alarm intact.
+      expect(orchestrator.cancelled, isEmpty);
+    },
+  );
+
+  test(
+    'applyReminders cancels a reminder it will NOT arm a replacement for',
+    () async {
+      final now = DateTime(2026, 3, 24, 10, 0);
+      final repo = _FakeReminderRepository()
+        ..seed([_reminder(now: now).copyWith(enabled: false)]);
+      final orchestrator = _FakeOrchestratorService();
+      final service = _makeService(repo, orchestrator, now);
+
+      await service.scheduleFromCache();
+
+      expect(orchestrator.evaluated, isEmpty);
+      expect(orchestrator.cancelled.where((id) => id == 't1').length, 1);
+    },
+  );
+
+  test(
+    'a blank-title reminder produces no intent and still gets cancelled',
+    () async {
+      final now = DateTime(2026, 3, 24, 10, 0);
+      final repo = _FakeReminderRepository()
+        ..seed([_reminder(now: now, taskTitle: '  ')]);
+      final orchestrator = _FakeOrchestratorService();
+      final service = _makeService(repo, orchestrator, now);
+
+      await service.scheduleFromCache();
+
+      expect(orchestrator.evaluated, isEmpty);
       expect(orchestrator.cancelled.where((id) => id == 't1').length, 1);
     },
   );

@@ -204,12 +204,24 @@ class ReminderSyncService {
   /// No direct [LocalNotificationsService.schedule] calls here.
   Future<void> _applyReminders(List<ReminderConfig> reminders) async {
     for (final reminder in reminders) {
-      // Cancel the current active slot (single cancel, not 64-slot loop).
-      await _orchestrator.cancelForEntity(reminder.taskId);
-      if (!reminder.enabled) continue;
+      // The cancel is deliberately NOT unconditional (AUDIT §10 C6).
+      // Cancelling up front and only then evaluating means a suppression
+      // (active override, coaching back-off), a budget denial or a blank
+      // title destroys the alarm the user already had, with nothing armed in
+      // its place. So cancel only on the paths that will NOT arm a
+      // replacement; when we do evaluate, the orchestrator's own
+      // post-approval cancel performs the swap — the ordering the goal path
+      // already relies on (goal_reminder_sync_service.dart).
+      if (!reminder.enabled) {
+        await _orchestrator.cancelForEntity(reminder.taskId);
+        continue;
+      }
 
       final nextAt = _nextReminderTime(reminder);
-      if (nextAt == null) continue;
+      if (nextAt == null) {
+        await _orchestrator.cancelForEntity(reminder.taskId);
+        continue;
+      }
 
       final intent = _intentFromConfig(
         reminder,
@@ -218,7 +230,10 @@ class ReminderSyncService {
             ? ReminderType.followUp
             : ReminderType.scheduled,
       );
-      if (intent == null) continue;
+      if (intent == null) {
+        await _orchestrator.cancelForEntity(reminder.taskId);
+        continue;
+      }
 
       debugPrint(
         '[ReminderSync] evaluating intent: '

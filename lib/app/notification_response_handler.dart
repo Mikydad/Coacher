@@ -459,13 +459,16 @@ Future<void> handleNotificationResponse(
 
   if (response.actionId == NotificationActionIds.later) {
     debugPrint('[NotifTap] snooze action for task=$taskId');
-    // Record snooze interaction (logs analytics + detects repeated snooze pattern).
-    unawaited(
-      orchestrator.onInteractionReceived(
-        taskId,
-        NotificationInteractionType.snoozed,
-        notifId: response.id,
-      ),
+    // Record the snooze interaction BEFORE re-planning (AUDIT §10 L2).
+    // Unawaited, these two race: _recordSnooze looks up the entity's latest
+    // ledger row, and when it loses it stamps state=snoozed on the row
+    // requestSnooze just created for the NEW slot. That row then falls out of
+    // reconciliation's live set and its notification is cancelled as a
+    // phantom at next launch. Sequencing costs one await and removes the race.
+    await orchestrator.onInteractionReceived(
+      taskId,
+      NotificationInteractionType.snoozed,
+      notifId: response.id,
     );
     await sync.requestSnooze(taskId);
     return;

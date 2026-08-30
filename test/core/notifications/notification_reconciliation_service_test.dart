@@ -12,30 +12,57 @@ import '../../support/isar_test_harness.dart';
 
 // ── Fakes implementing the abstract interfaces ────────────────────────────────
 
+/// Models the two OS queues independently, as the real platform does: a
+/// future-scheduled notification lives ONLY in `pending`, one already on
+/// screen lives ONLY in `active`.
 class _FakeNotifications implements ActiveNotificationsSource {
-  final List<ActiveNotification> active;
-  final List<int> cancelledIds = [];
+  _FakeNotifications({
+    List<ActiveNotification>? active,
+    List<PendingNotificationRequest>? pending,
+  }) : active = active ?? const [],
+       pending = pending ?? const [];
 
-  _FakeNotifications(this.active);
+  final List<ActiveNotification> active;
+  final List<PendingNotificationRequest> pending;
+  final List<int> cancelledIds = [];
 
   @override
   Future<List<ActiveNotification>> getActiveNotifications() async => active;
 
   @override
+  Future<List<PendingNotificationRequest>>
+  getPendingNotificationRequests() async => pending;
+
+  @override
   Future<void> cancel(int id) async => cancelledIds.add(id);
 }
 
+class _ReArmCall {
+  const _ReArmCall(this.entityId, this.scheduledFor);
+  final String entityId;
+  final DateTime? scheduledFor;
+}
+
 class _FakeOrchestrator implements OrchestratorReEvaluator {
-  final List<String> reEvaluatedIds = [];
+  final List<_ReArmCall> calls = [];
+
+  List<String> get reEvaluatedIds =>
+      calls.map((c) => c.entityId).toList(growable: false);
 
   @override
-  Future<void> reEvaluateIfAppropriate(String entityId) async {
-    reEvaluatedIds.add(entityId);
+  Future<void> reEvaluateIfAppropriate(
+    String entityId, {
+    DateTime? scheduledFor,
+  }) async {
+    calls.add(_ReArmCall(entityId, scheduledFor));
   }
 }
 
 ActiveNotification _notif(int id) =>
     ActiveNotification(id: id, channelId: 'test', title: 'Test', body: 'body');
+
+PendingNotificationRequest _pending(int id) =>
+    PendingNotificationRequest(id, 'Test', 'body', null);
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +70,11 @@ void main() {
   Isar? isar;
   Directory? dir;
   late NotificationLedgerRepository ledger;
+
+  // Fixed clock so "future" and "past" are unambiguous.
+  final now = DateTime(2026, 8, 30, 14, 0);
+  final future = now.add(const Duration(hours: 7)); // tonight at 21:00
+  final past = now.subtract(const Duration(hours: 2)); // noon, already gone
 
   setUp(() async {
     final opened = await openTempIsar();
@@ -53,90 +85,216 @@ void main() {
 
   tearDown(() async => closeTempIsar(isar!, dir!));
 
-  IsarNotificationLedgerEntry _entry({
+  IsarNotificationLedgerEntry entry({
     required int notifId,
     required String entityId,
+    required DateTime scheduledFor,
     NotificationLedgerState state = NotificationLedgerState.scheduled,
+    String entityKind = 'task',
   }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
     return IsarNotificationLedgerEntry()
       ..notifId = notifId
       ..entityId = entityId
-      ..entityKind = 'task'
+      ..entityKind = entityKind
       ..state = state.name
-      ..scheduledForMs = now
+      ..scheduledForMs = scheduledFor.millisecondsSinceEpoch
       ..sourceContext = 'test'
-      ..updatedAtMs = now;
+      ..updatedAtMs = now.millisecondsSinceEpoch;
   }
 
-  group('NotificationReconciliationService', () {
+  NotificationReconciliationService service(
+    _FakeNotifications notifs,
+    _FakeOrchestrator orchestrator,
+  ) => NotificationReconciliationService(
+    ledger: ledger,
+    notifications: notifs,
+    orchestrator: orchestrator,
+    now: () => now,
+  );
+
+  group('NotificationReconciliationService — T1: the pending queue counts', () {
     test(
-      'ledger entry in scheduled state NOT in OS tray → marked cancelled',
+      'a correctly armed FUTURE reminder sits in the pending queue and is '
+      'left completely alone (the at-app-open misfire)',
       () async {
         await ledger.upsertEntry(
-          _entry(notifId: 100, entityId: 'task-ghost'),
+          entry(notifId: 100, entityId: 'task-tonight', scheduledFor: future),
         );
 
-        final fakeNotifs = _FakeNotifications([]); // empty tray
-        final fakeOrchestrator = _FakeOrchestrator();
+        // Empty tray — exactly the cold-start state that used to mark this
+        // row cancelled and re-deliver it immediately.
+        final notifs = _FakeNotifications(pending: [_pending(100)]);
+        final orchestrator = _FakeOrchestrator();
 
-        await NotificationReconciliationService(
-          ledger: ledger,
-          notifications: fakeNotifs,
-          orchestrator: fakeOrchestrator,
-        ).reconcile();
+        await service(notifs, orchestrator).reconcile();
 
-        final updated = await ledger.findByEntityId('task-ghost');
+        final updated = await ledger.findByNotifId(100);
+        expect(updated!.state, equals(NotificationLedgerState.scheduled.name));
+        expect(orchestrator.calls, isEmpty);
+        expect(notifs.cancelledIds, isEmpty);
+      },
+    );
+
+    test('a row present in the delivered tray is also left alone', () async {
+      await ledger.upsertEntry(
+        entry(notifId: 300, entityId: 'task-alive', scheduledFor: past),
+      );
+
+      final notifs = _FakeNotifications(active: [_notif(300)]);
+      final orchestrator = _FakeOrchestrator();
+
+      await service(notifs, orchestrator).reconcile();
+
+      final updated = await ledger.findByNotifId(300);
+      expect(updated!.state, equals(NotificationLedgerState.scheduled.name));
+      expect(orchestrator.calls, isEmpty);
+      expect(notifs.cancelledIds, isEmpty);
+    });
+  });
+
+  group('NotificationReconciliationService — genuinely lost rows', () {
+    test(
+      'lost row still in the FUTURE re-arms at its ORIGINAL time, never now',
+      () async {
+        await ledger.upsertEntry(
+          entry(notifId: 110, entityId: 'task-lost', scheduledFor: future),
+        );
+
+        final notifs = _FakeNotifications(); // both queues empty
+        final orchestrator = _FakeOrchestrator();
+
+        await service(notifs, orchestrator).reconcile();
+
+        expect(orchestrator.calls.length, 1);
+        expect(orchestrator.calls.single.entityId, 'task-lost');
+        expect(orchestrator.calls.single.scheduledFor, equals(future));
+        // and emphatically not "now"
+        expect(orchestrator.calls.single.scheduledFor, isNot(equals(now)));
+      },
+    );
+
+    test(
+      'lost row whose time has PASSED is cancelled and never re-delivered '
+      '(the state machine owns it, not boot)',
+      () async {
+        await ledger.upsertEntry(
+          entry(notifId: 120, entityId: 'task-missed', scheduledFor: past),
+        );
+
+        final notifs = _FakeNotifications();
+        final orchestrator = _FakeOrchestrator();
+
+        await service(notifs, orchestrator).reconcile();
+
+        final updated = await ledger.findByNotifId(120);
+        expect(updated!.state, equals(NotificationLedgerState.cancelled.name));
+        expect(orchestrator.calls, isEmpty);
+      },
+    );
+
+    test('a row with no stored time takes the conservative branch', () async {
+      final row = entry(notifId: 130, entityId: 'task-untimed', scheduledFor: future)
+        ..scheduledForMs = null;
+      await ledger.upsertEntry(row);
+
+      final notifs = _FakeNotifications();
+      final orchestrator = _FakeOrchestrator();
+
+      await service(notifs, orchestrator).reconcile();
+
+      expect(orchestrator.calls, isEmpty);
+      final updated = await ledger.findByNotifId(130);
+      expect(updated!.state, equals(NotificationLedgerState.cancelled.name));
+    });
+
+    test(
+      'reconciling one lost slot of a multi-slot entity spares its siblings',
+      () async {
+        // Intention ladders arm several slots under ONE entityId; the old
+        // entity-scoped markCancelled took out whichever row it found first.
+        await ledger.upsertEntry(
+          entry(
+            notifId: 140,
+            entityId: 'intention-1',
+            entityKind: 'intention',
+            scheduledFor: past,
+          ),
+        );
+        await ledger.upsertEntry(
+          entry(
+            notifId: 141,
+            entityId: 'intention-1',
+            entityKind: 'intention',
+            scheduledFor: future,
+          ),
+        );
+
+        // Slot 141 is still correctly armed; slot 140 is gone.
+        final notifs = _FakeNotifications(pending: [_pending(141)]);
+        final orchestrator = _FakeOrchestrator();
+
+        await service(notifs, orchestrator).reconcile();
+
         expect(
-          updated!.state,
+          (await ledger.findByNotifId(140))!.state,
           equals(NotificationLedgerState.cancelled.name),
         );
-        expect(fakeOrchestrator.reEvaluatedIds, contains('task-ghost'));
-      },
-    );
-
-    test(
-      'OS tray notification NOT in ledger → cancelled via notifications.cancel',
-      () async {
-        // Tray has notifId 200 but ledger is empty.
-        final fakeNotifs = _FakeNotifications([_notif(200)]);
-        final fakeOrchestrator = _FakeOrchestrator();
-
-        await NotificationReconciliationService(
-          ledger: ledger,
-          notifications: fakeNotifs,
-          orchestrator: fakeOrchestrator,
-        ).reconcile();
-
-        expect(fakeNotifs.cancelledIds, contains(200));
-      },
-    );
-
-    test(
-      'ledger entry in scheduled state IS in OS tray → unchanged after reconcile',
-      () async {
-        await ledger.upsertEntry(
-          _entry(notifId: 300, entityId: 'task-alive'),
-        );
-
-        final fakeNotifs = _FakeNotifications([_notif(300)]); // tray has it
-        final fakeOrchestrator = _FakeOrchestrator();
-
-        await NotificationReconciliationService(
-          ledger: ledger,
-          notifications: fakeNotifs,
-          orchestrator: fakeOrchestrator,
-        ).reconcile();
-
-        final updated = await ledger.findByEntityId('task-alive');
-        // Still scheduled — not cancelled
         expect(
-          updated!.state,
+          (await ledger.findByNotifId(141))!.state,
           equals(NotificationLedgerState.scheduled.name),
         );
-        expect(fakeOrchestrator.reEvaluatedIds, isEmpty);
-        expect(fakeNotifs.cancelledIds, isEmpty);
       },
     );
+  });
+
+  group('NotificationReconciliationService — phantom pass', () {
+    test('a tray notification with no ledger row at all is cancelled', () async {
+      final notifs = _FakeNotifications(active: [_notif(200)]);
+      final orchestrator = _FakeOrchestrator();
+
+      await service(notifs, orchestrator).reconcile();
+
+      expect(notifs.cancelledIds, contains(200));
+    });
+
+    test(
+      'a tray notification whose row a snooze race left in snoozed state is '
+      'NOT cancelled (L2 fallout)',
+      () async {
+        await ledger.upsertEntry(
+          entry(
+            notifId: 210,
+            entityId: 'task-snoozed',
+            scheduledFor: past,
+            state: NotificationLedgerState.snoozed,
+          ),
+        );
+
+        final notifs = _FakeNotifications(active: [_notif(210)]);
+        final orchestrator = _FakeOrchestrator();
+
+        await service(notifs, orchestrator).reconcile();
+
+        expect(notifs.cancelledIds, isEmpty);
+      },
+    );
+
+    test('a tray notification whose row is cancelled is swept', () async {
+      await ledger.upsertEntry(
+        entry(
+          notifId: 220,
+          entityId: 'task-dead',
+          scheduledFor: past,
+          state: NotificationLedgerState.cancelled,
+        ),
+      );
+
+      final notifs = _FakeNotifications(active: [_notif(220)]);
+      final orchestrator = _FakeOrchestrator();
+
+      await service(notifs, orchestrator).reconcile();
+
+      expect(notifs.cancelledIds, contains(220));
+    });
   });
 }
