@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../reminders/application/attention_orchestrator_providers.dart';
 
 import '../data/context_override_repository.dart';
 import '../domain/models/context_override.dart';
@@ -18,6 +19,11 @@ final contextOverrideRepositoryProvider = Provider<ContextOverrideRepository>(
 final contextOverrideServiceProvider = Provider<ContextOverrideService>((ref) {
   return ContextOverrideService(
     repository: ref.read(contextOverrideRepositoryProvider),
+    // C5: ending an override flushes the reminders it withheld, instead of
+    // leaving them in a queue nothing ever drained.
+    flushSuppressed: (ended, startedAtMs) => ref
+        .read(attentionOrchestratorServiceProvider)
+        .onOverrideEnded(ended, startedAtMs),
   );
 });
 

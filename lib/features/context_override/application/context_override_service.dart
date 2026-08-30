@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../data/context_override_repository.dart';
 import '../domain/models/context_override.dart';
 import '../domain/models/post_override_review.dart';
@@ -75,11 +76,21 @@ List<OverridePreset> presetDurations(ContextOverride type) {
 class ContextOverrideService {
   ContextOverrideService({
     required ContextOverrideRepository repository,
+
+    /// Flushes reminders that were withheld while the override was active
+    /// (AUDIT §10 C5). Injected as a callback so this service keeps no
+    /// dependency on the reminders feature. Null means no flush — the
+    /// pre-Phase-C behaviour.
+    Future<PostOverrideReview?> Function(ContextOverride ended, int startedAtMs)?
+    flushSuppressed,
     DateTime Function()? now,
   }) : _repository = repository,
+       _flushSuppressed = flushSuppressed,
        _now = now ?? DateTime.now;
 
   final ContextOverrideRepository _repository;
+  final Future<PostOverrideReview?> Function(ContextOverride, int)?
+  _flushSuppressed;
   final DateTime Function() _now;
 
   // ─── Activate ─────────────────────────────────────────────────────────────
@@ -177,12 +188,31 @@ class ContextOverrideService {
 
   Future<PostOverrideReview> _doEnd(UserAttentionState current) async {
     final nowMs = _now().millisecondsSinceEpoch;
-    final review = PostOverrideReview(
-      overrideType: current.activeOverride,
-      activeFromMs: current.lastOverrideActivatedAt ?? nowMs,
-      activeUntilMs: nowMs,
-      suppressedItems: const [], // Phase C will populate this
-    );
+    final startedAtMs = current.lastOverrideActivatedAt ?? nowMs;
+    final endedType = current.activeOverride;
+
+    // C5: `onOverrideEnded` had ZERO production callers — this method passed
+    // `suppressedItems: const []` with a "Phase C will populate this" comment
+    // and nothing ever did. Every reminder withheld during an override was
+    // parked in an in-memory queue that was never flushed, so evaluating a
+    // reminder while a meeting or sleep override was active effectively
+    // deleted it. The flush runs BEFORE the state write so it still sees the
+    // override that was active.
+    PostOverrideReview? flushed;
+    try {
+      flushed = await _flushSuppressed?.call(endedType, startedAtMs);
+    } catch (e) {
+      debugPrint('[ContextOverride] suppressed flush failed: $e');
+    }
+
+    final review =
+        flushed ??
+        PostOverrideReview(
+          overrideType: endedType,
+          activeFromMs: startedAtMs,
+          activeUntilMs: nowMs,
+          suppressedItems: const [],
+        );
     final updated = current.copyWith(
       activeOverride: ContextOverride.none,
       overrideExpiresAt: null,

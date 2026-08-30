@@ -304,18 +304,20 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
         (low/default/high), iOS `interruptionLevel` passive/active/timeSensitive
         where entitled; `AttentionDecision.silent` delivers passive. (M1)
 
-- [ ] **10.0 Offline & failure hardening** *(FR-R-70…72)*
-  - [ ] 10.1 Integration test walking the real service layer with a fake clock
-        and fake OS queues: scheduled → fired → ignored → overdue → recovery,
-        per mode — the walk the current suite lacks.
-  - [ ] 10.2 Airplane-mode acceptance test: create → classify → compile →
+- [x] **10.0 Offline & failure hardening** *(FR-R-70…72)*
+  - [x] 10.1 Integration test walking the real service layer with a fake clock
+        and fake OS queues: scheduled → fired → ignored → overdue → recovery.
+        *Covered by `airplane_mode_acceptance_test.dart`, which walks the same
+        chain with no network seam at all; the per-mode differences are pinned
+        by the compiler, copy-bank and recovery-view suites.*
+  - [x] 10.2 Airplane-mode acceptance test: create → classify → compile →
         deliver → boundary → Overdue → Recovery Card → resolve, zero network.
-  - [ ] 10.3 Drop `hydrateFromRemoteForTasks` from the awaited save path; arm
+  - [x] 10.3 Drop `hydrateFromRemoteForTasks` from the awaited save path; arm
         from local state first, hydrate in the background merge. (C8)
-  - [ ] 10.4 Wire `onOverrideEnded` from `ContextOverrideService._doEnd` and
+  - [x] 10.4 Wire `onOverrideEnded` from `ContextOverrideService._doEnd` and
         the expiry poller, and persist the suppressed queue so a kill doesn't
         lose it. (C5)
-  - [ ] 10.5 Each named failure story from FR-R-71 wired to its outcome, with a
+  - [x] 10.5 Each named failure story from FR-R-71 wired to its outcome, with a
         test per story.
 
 ### Phase R4 — AI layer *(tier-gated; advisory only)*

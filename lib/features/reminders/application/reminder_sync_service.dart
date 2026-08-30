@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/notifications/local_notifications_service.dart';
@@ -111,7 +112,18 @@ class ReminderSyncService {
   // ── Public sync methods ───────────────────────────────────────────────────
 
   Future<void> syncForTaskIds(List<String> taskIds) async {
-    await _repository.hydrateFromRemoteForTasks(taskIds);
+    // AUDIT §10 C8: this used to AWAIT hydrateFromRemoteForTasks — a
+    // Firestore `whereIn` .get() — before the reminder was ever evaluated. On
+    // a slow connection a just-saved reminder stayed unarmed until the fetch
+    // resolved, and killing the app in that window meant it was never armed
+    // at all. That is a straight offline-first violation on the save path
+    // (CLAUDE.md rules 1 and 2): local state is authoritative, so arm from it
+    // first and let the remote merge catch up in the background.
+    unawaited(
+      _repository.hydrateFromRemoteForTasks(taskIds).catchError((Object e) {
+        debugPrint('[ReminderSync] background hydrate failed: $e');
+      }),
+    );
     final reminders = await _repository.listAllReminders();
     await _applyReminders(reminders);
     // A reminder the user just set should exist in the state machine now, not

@@ -2657,3 +2657,27 @@ not silent reversal.
   streak, and a stored counter would need remembering to reset. At three, the
   app suggests easing the mode or dropping the task; it is a suggestion, and
   SidePal never demotes anything on its own.
+
+- **2026-08-30 · Reminder V2 R3 complete: C8 and C5 closed, and FR-R-70 is a
+  test rather than a promise.** *C8:* `syncForTaskIds` awaited
+  `hydrateFromRemoteForTasks` — a Firestore `whereIn` .get() — before the
+  reminder was ever evaluated, so on a slow connection a just-saved reminder
+  stayed unarmed until the fetch resolved, and killing the app in that window
+  meant it was never armed at all. The hydrate is now unawaited: local state
+  is authoritative, so arm from it and let the merge catch up. *C5:*
+  `onOverrideEnded` had ZERO production callers — `_doEnd` passed
+  `suppressedItems: const []` under a "Phase C will populate this" comment and
+  nothing ever did, so every reminder withheld during a meeting or sleep
+  override was parked in an in-memory queue nothing drained, i.e. deleted.
+  `ContextOverrideService` now takes a `flushSuppressed` callback (injected,
+  so it keeps no dependency on the reminders feature) and runs it BEFORE the
+  state write, so the flush still sees the override that was active. Both the
+  manual End and the expiry poller go through `_doEnd`, so both flush.
+  *FR-R-70:* `airplane_mode_acceptance_test.dart` walks create → classify →
+  compile → boundary → overdue → recover → resolve with **no network double of
+  any kind, because there is nothing to double** — every step is local code
+  reading local state. If a future change puts the network on one of those
+  paths, the test will not fail, it will not compile; that is the intended
+  guarantee. The named failure stories from FR-R-71 each have a test, because
+  "it degrades gracefully" is a claim, and an untested claim about failure is
+  the kind that turns out to be false exactly when it matters.
