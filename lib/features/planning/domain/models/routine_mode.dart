@@ -23,6 +23,12 @@ extension RoutineModeStorage on RoutineMode {
 
 /// Immutable policy contract derived from mode + context.
 ///
+/// Deliberately carries NO snooze duration (FR-R-07 / AUDIT §10 T5). This
+/// class used to define `baseSnoozeMinutes` — flexible 15 / disciplined 10 /
+/// extreme 5 — a second, divergent answer to "how long is Later?" that
+/// nothing ever read. `AdaptiveReminderPolicy` is the single cadence source;
+/// a future in-app defer surface must read it, not reintroduce a table here.
+///
 /// Future extension points:
 /// - user-defined modes can map into this policy shape;
 /// - AI-assisted tuning can write these values safely without schema changes.
@@ -31,7 +37,6 @@ class RoutineModePolicy {
     required this.mode,
     required this.requireTimerForCompletion,
     required this.allowHardGate,
-    required this.baseSnoozeMinutes,
     required this.maxExtensionMinutes,
     required this.requireReasonForDeferral,
   });
@@ -39,7 +44,6 @@ class RoutineModePolicy {
   final RoutineMode mode;
   final bool requireTimerForCompletion;
   final bool allowHardGate;
-  final int baseSnoozeMinutes;
   final int maxExtensionMinutes;
   final bool requireReasonForDeferral;
 
@@ -47,7 +51,6 @@ class RoutineModePolicy {
     RoutineMode? mode,
     bool? requireTimerForCompletion,
     bool? allowHardGate,
-    int? baseSnoozeMinutes,
     int? maxExtensionMinutes,
     bool? requireReasonForDeferral,
   }) {
@@ -56,7 +59,6 @@ class RoutineModePolicy {
       requireTimerForCompletion:
           requireTimerForCompletion ?? this.requireTimerForCompletion,
       allowHardGate: allowHardGate ?? this.allowHardGate,
-      baseSnoozeMinutes: baseSnoozeMinutes ?? this.baseSnoozeMinutes,
       maxExtensionMinutes: maxExtensionMinutes ?? this.maxExtensionMinutes,
       requireReasonForDeferral:
           requireReasonForDeferral ?? this.requireReasonForDeferral,
@@ -67,7 +69,6 @@ class RoutineModePolicy {
     'mode': mode.storageValue,
     'requireTimerForCompletion': requireTimerForCompletion,
     'allowHardGate': allowHardGate,
-    'baseSnoozeMinutes': baseSnoozeMinutes,
     'maxExtensionMinutes': maxExtensionMinutes,
     'requireReasonForDeferral': requireReasonForDeferral,
   };
@@ -78,7 +79,6 @@ class RoutineModePolicy {
       requireTimerForCompletion:
           map['requireTimerForCompletion'] as bool? ?? false,
       allowHardGate: map['allowHardGate'] as bool? ?? false,
-      baseSnoozeMinutes: (map['baseSnoozeMinutes'] as num?)?.toInt() ?? 10,
       maxExtensionMinutes: (map['maxExtensionMinutes'] as num?)?.toInt() ?? 60,
       requireReasonForDeferral:
           map['requireReasonForDeferral'] as bool? ?? true,
@@ -135,7 +135,6 @@ class RoutineModeConfig {
           mode: RoutineMode.flexible,
           requireTimerForCompletion: false,
           allowHardGate: false,
-          baseSnoozeMinutes: 15,
           maxExtensionMinutes: 60,
           requireReasonForDeferral: true,
         );
@@ -144,7 +143,6 @@ class RoutineModeConfig {
           mode: RoutineMode.disciplined,
           requireTimerForCompletion: true,
           allowHardGate: false,
-          baseSnoozeMinutes: 10,
           maxExtensionMinutes: 45,
           requireReasonForDeferral: true,
         );
@@ -153,7 +151,6 @@ class RoutineModeConfig {
           mode: RoutineMode.extreme,
           requireTimerForCompletion: true,
           allowHardGate: true,
-          baseSnoozeMinutes: 5,
           maxExtensionMinutes: 30,
           requireReasonForDeferral: true,
         );

@@ -115,6 +115,11 @@ class _AppLifecycleTaskRefreshState
       _lastTodayKey = DateKeys.todayKey();
       unawaited(_refreshAfterResume());
       unawaited(_drainLaunchNotificationResponse());
+      // Retry a failed timezone resolution (FR-R-06 / AUDIT §10 T3). While
+      // unresolved, tz.local stays UTC and every scheduled reminder fires
+      // offset by the device's UTC offset for the whole session. No-op once
+      // resolved.
+      unawaited(LocalNotificationsService.instance.ensureTimeZoneResolved());
       // Check whether any active context override has expired.
       unawaited(ref.read(contextOverrideExpiryPollerProvider).checkNow());
       // Check for notifications that were delivered but never interacted with.

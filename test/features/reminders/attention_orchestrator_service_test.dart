@@ -7,6 +7,7 @@ import 'package:sidepal/features/context_override/domain/models/user_attention_s
 import 'package:sidepal/features/reminders/application/attention_orchestrator_service.dart';
 import 'package:sidepal/features/reminders/data/reminder_repository.dart';
 import 'package:sidepal/features/reminders/domain/models/attention_decision.dart';
+import 'package:sidepal/features/reminders/domain/models/notification_interaction_type.dart';
 import 'package:sidepal/features/reminders/domain/models/reminder_config.dart';
 import 'package:sidepal/features/reminders/domain/models/reminder_intent.dart';
 import 'package:sidepal/features/reminders/domain/models/reminder_type.dart';
@@ -62,7 +63,7 @@ class _Service extends AttentionOrchestratorService {
         notifications: LocalNotificationsService.instance,
         ledger: NoOpNotificationLedger(),
         logEvent: _noOpLog,
-        now: () => _fixedNow,
+        now: () => _clock.now,
       );
 
   final List<ReminderIntent> evaluated = [];
@@ -77,7 +78,15 @@ class _Service extends AttentionOrchestratorService {
   }
 }
 
-final _fixedNow = DateTime(2026, 8, 30, 14, 0);
+/// Mutable clock: `super(...)` cannot read an instance field, so the service's
+/// `now` closure reads this holder instead.
+class _Clock {
+  _Clock(this.now);
+  DateTime now;
+}
+
+final _start = DateTime(2026, 8, 30, 14, 0);
+final _clock = _Clock(_start);
 
 Future<void> _noOpLog({
   required AnalyticsEventType type,
@@ -121,6 +130,9 @@ ReminderConfig _config({
   bool enabled = true,
   DateTime? scheduledAt,
   String? taskTitle = 'Evening study',
+  bool pendingAction = false,
+  int escalationLevel = 0,
+  DateTime? lastTriggeredAt,
 }) => ReminderConfig(
   id: 'r1',
   taskId: 't1',
@@ -129,15 +141,20 @@ ReminderConfig _config({
   scheduledAtIso: scheduledAt?.toIso8601String(),
   modeRefId: 'disciplined',
   blockUrgencyScore: 60,
-  createdAtMs: _fixedNow.millisecondsSinceEpoch,
-  updatedAtMs: _fixedNow.millisecondsSinceEpoch,
+  pendingAction: pendingAction,
+  escalationLevel: escalationLevel,
+  lastTriggeredAtMs: lastTriggeredAt?.millisecondsSinceEpoch,
+  createdAtMs: _start.millisecondsSinceEpoch,
+  updatedAtMs: _start.millisecondsSinceEpoch,
 );
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 void main() {
-  final tonight = _fixedNow.add(const Duration(hours: 7)); // 21:00
-  final earlier = _fixedNow.subtract(const Duration(hours: 2)); // 12:00
+  setUp(() => _clock.now = _start);
+
+  final tonight = _start.add(const Duration(hours: 7)); // 21:00
+  final earlier = _start.subtract(const Duration(hours: 2)); // 12:00
 
   group('reEvaluateIfAppropriate — FR-R-01 / FR-R-02', () {
     test(
@@ -152,7 +169,7 @@ void main() {
 
         expect(service.evaluated.length, 1);
         expect(service.evaluated.single.proposedAt, equals(tonight));
-        expect(service.evaluated.single.proposedAt.isAfter(_fixedNow), isTrue);
+        expect(service.evaluated.single.proposedAt.isAfter(_start), isTrue);
       },
     );
 
@@ -220,5 +237,113 @@ void main() {
         );
       },
     );
+  });
+
+  group('escalation & ignore integrity — FR-R-04 / FR-R-05', () {
+    test(
+      'an ignore persists the climbed escalation level (M2: the ladder used '
+      'to reset because the level lived only on the intent)',
+      () async {
+        final repo = _FakeReminderRepository()
+          ..seed([_config(scheduledAt: tonight, escalationLevel: 1)]);
+        final service = _Service(repo);
+
+        await service.onInteractionReceived(
+          't1',
+          NotificationInteractionType.ignored,
+        );
+
+        expect(service.evaluated.single.escalationLevel, 2);
+        final stored = (await repo.listAllReminders()).single;
+        expect(stored.escalationLevel, 2);
+      },
+    );
+
+    test('an ignore also stamps lastTriggeredAtMs', () async {
+      final repo = _FakeReminderRepository()
+        ..seed([_config(scheduledAt: tonight)]);
+      final service = _Service(repo);
+
+      await service.onInteractionReceived(
+        't1',
+        NotificationInteractionType.ignored,
+      );
+
+      final stored = (await repo.listAllReminders()).single;
+      expect(stored.lastTriggeredAtMs, _start.millisecondsSinceEpoch);
+    });
+
+    test(
+      'a second resume inside the window does NOT re-count the same missed '
+      'notification (C7: ignoredCount climbed once per app-open)',
+      () async {
+        final repo = _FakeReminderRepository()
+          ..seed([
+            _config(
+              scheduledAt: tonight,
+              pendingAction: true,
+              escalationLevel: 1,
+              lastTriggeredAt: _start.subtract(const Duration(minutes: 20)),
+            ),
+          ]);
+        final service = _Service(repo);
+
+        // First resume past the 15-minute window: one ignore counted.
+        await service.checkIgnoredTimeouts();
+        expect(service.evaluated.length, 1);
+
+        // The user opens the app again five minutes later. No new
+        // notification has been delivered in between, so nothing new has
+        // been ignored.
+        _clock.now = _start.add(const Duration(minutes: 5));
+        await service.checkIgnoredTimeouts();
+        expect(service.evaluated.length, 1);
+
+        _clock.now = _start.add(const Duration(minutes: 10));
+        await service.checkIgnoredTimeouts();
+        expect(service.evaluated.length, 1);
+
+        final stored = (await repo.listAllReminders()).single;
+        expect(stored.escalationLevel, 2); // climbed exactly once
+      },
+    );
+
+    test(
+      'once a full window has passed the ladder climbs again',
+      () async {
+        final repo = _FakeReminderRepository()
+          ..seed([
+            _config(
+              scheduledAt: tonight,
+              pendingAction: true,
+              escalationLevel: 1,
+              lastTriggeredAt: _start.subtract(const Duration(minutes: 20)),
+            ),
+          ]);
+        final service = _Service(repo);
+
+        await service.checkIgnoredTimeouts();
+        _clock.now = _start.add(const Duration(minutes: 16));
+        await service.checkIgnoredTimeouts();
+
+        expect(service.evaluated.length, 2);
+        expect((await repo.listAllReminders()).single.escalationLevel, 3);
+      },
+    );
+
+    test('a reminder with no pending action is never auto-ignored', () async {
+      final repo = _FakeReminderRepository()
+        ..seed([
+          _config(
+            scheduledAt: tonight,
+            lastTriggeredAt: _start.subtract(const Duration(hours: 3)),
+          ),
+        ]);
+      final service = _Service(repo);
+
+      await service.checkIgnoredTimeouts();
+
+      expect(service.evaluated, isEmpty);
+    });
   });
 }

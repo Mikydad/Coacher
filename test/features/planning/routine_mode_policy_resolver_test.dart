@@ -19,12 +19,11 @@ void main() {
       );
 
       expect(result.requireTimerForCompletion, isTrue);
-      expect(result.baseSnoozeMinutes, lessThanOrEqualTo(10));
       expect(result.maxExtensionMinutes, lessThanOrEqualTo(45));
       expect(result.requireReasonForDeferral, isTrue);
     });
 
-    test('urgent flexible task still tightens to short snooze', () {
+    test('urgent flexible task still tightens timer and extension', () {
       final flexible = RoutineModeConfig.defaults().firstWhere(
         (m) => m.baseMode == RoutineMode.flexible,
       );
@@ -36,7 +35,6 @@ void main() {
       );
 
       expect(result.requireTimerForCompletion, isTrue);
-      expect(result.baseSnoozeMinutes, 5);
       expect(result.maxExtensionMinutes, lessThanOrEqualTo(60));
     });
 

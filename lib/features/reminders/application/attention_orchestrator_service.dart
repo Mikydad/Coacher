@@ -21,6 +21,7 @@ import '../domain/models/attention_decision.dart';
 import '../domain/models/attention_outcome.dart';
 import '../domain/models/notification_interaction_type.dart';
 import '../domain/models/recent_delivery.dart';
+import '../domain/models/reminder_config.dart';
 import '../domain/models/reminder_intent.dart';
 import '../domain/models/reminder_type.dart';
 import 'attention_orchestrator.dart';
@@ -330,40 +331,36 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
     String entityId, {
     DateTime? scheduledFor,
   }) async {
-    final reminders = await _reminderRepo.listAllReminders();
-    final config = reminders.cast<dynamic>().firstWhere(
-      (r) => (r as dynamic).taskId == entityId,
-      orElse: () => null,
-    );
+    final config = await _findConfig(entityId);
     if (config == null) return; // task was deleted — nothing to reschedule
 
     // A reminder the user switched off stays off, whatever the OS queue says.
-    if (!(config.enabled as bool? ?? false)) return;
+    if (!config.enabled) return;
 
     // Prefer the caller's time (the ledger row's own scheduledFor); fall back
     // to the config's stored time. Anything non-future is not ours to deliver.
-    final storedIso = config.scheduledAtIso as String?;
+    final storedIso = config.scheduledAtIso;
     final deliverAt =
         scheduledFor ??
         (storedIso == null ? null : DateTime.tryParse(storedIso));
     if (deliverAt == null || !deliverAt.isAfter(_now())) return;
 
-    final modeRefId = config.modeRefId as String? ?? 'flexible';
+    final modeRefId = config.modeRefId ?? 'flexible';
     final level = InterruptionLevelResolver.resolve(
       enforcementMode: modeRefId,
-      escalationLevel: config.escalationLevel as int? ?? 0,
-      emergencyBypass: config.emergencyBypass as bool? ?? false,
+      escalationLevel: config.escalationLevel,
+      emergencyBypass: config.emergencyBypass,
     );
     final restored = ReminderIntent(
       id: StableId.generate('ri_reconcile'),
       entityId: entityId,
       entityKind: 'task',
-      entityTitle: config.taskTitle as String? ?? entityId,
+      entityTitle: config.taskTitle ?? entityId,
       proposedAt: deliverAt,
-      importance: (config.blockUrgencyScore as int? ?? 50).clamp(0, 100),
+      importance: config.blockUrgencyScore.clamp(0, 100),
       interruptionLevel: level,
       enforcementMode: modeRefId,
-      escalationLevel: config.escalationLevel as int? ?? 0,
+      escalationLevel: config.escalationLevel,
       reminderType: ReminderType.scheduled,
       sourceReason: 'boot_reconciliation',
       createdAtMs: _now().millisecondsSinceEpoch,
@@ -567,35 +564,62 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
   }
 
   Future<void> _scheduleFollowUp(String entityId) async {
-    final reminders = await _reminderRepo.listAllReminders();
-    final config = reminders.cast<dynamic>().firstWhere(
-      (r) => (r as dynamic).taskId == entityId,
-      orElse: () => null,
-    );
+    final config = await _findConfig(entityId);
     if (config == null) return;
 
-    final modeRefId = config.modeRefId as String? ?? 'flexible';
-    final escalation = (config.escalationLevel as int? ?? 0) + 1;
+    final modeRefId = config.modeRefId ?? 'flexible';
+    final escalation = config.escalationLevel + 1;
+    final nowMs = _now().millisecondsSinceEpoch;
+
+    // Persist the climb AND stamp the ignore before anything else
+    // (FR-R-04 / FR-R-05).
+    //
+    // M2: the incremented level used to live only on the intent and was
+    // never written back, so the ladder never climbed through ignores —
+    // extreme's tail phase and the whole escalation copy bank were
+    // unreachable except via an explicit snooze.
+    //
+    // C7: without advancing lastTriggeredAtMs, checkIgnoredTimeouts counts
+    // the SAME un-acted-on notification again on every foreground resume
+    // past the 15-minute window. ignoredCount climbs once per app-open with
+    // no new delivery behind it, and under CoachingStyle.supportive the
+    // back-off trips at two — silencing the task permanently. Stamping now
+    // bounds it to at most one ignore per window.
+    await _reminderRepo.upsertReminder(
+      config.copyWith(
+        escalationLevel: escalation,
+        lastTriggeredAtMs: nowMs,
+        updatedAtMs: nowMs,
+      ),
+    );
+
     final level = InterruptionLevelResolver.resolve(
       enforcementMode: modeRefId,
       escalationLevel: escalation,
-      emergencyBypass: config.emergencyBypass as bool? ?? false,
+      emergencyBypass: config.emergencyBypass,
     );
     final followUp = ReminderIntent(
       id: StableId.generate('ri_followup'),
       entityId: entityId,
       entityKind: 'task',
-      entityTitle: config.taskTitle as String? ?? entityId,
+      entityTitle: config.taskTitle ?? entityId,
       proposedAt: _now().add(const Duration(minutes: 15)),
-      importance: (config.blockUrgencyScore as int? ?? 50).clamp(0, 100),
+      importance: config.blockUrgencyScore.clamp(0, 100),
       interruptionLevel: level,
       enforcementMode: modeRefId,
       escalationLevel: escalation,
       reminderType: ReminderType.followUp,
       sourceReason: 'ignored_timeout_followup',
-      createdAtMs: _now().millisecondsSinceEpoch,
+      createdAtMs: nowMs,
     );
     await evaluate(followUp);
+  }
+
+  /// Typed lookup of the reminder config for [entityId], or null.
+  Future<ReminderConfig?> _findConfig(String entityId) async {
+    final reminders = await _reminderRepo.listAllReminders();
+    final index = reminders.indexWhere((r) => r.taskId == entityId);
+    return index < 0 ? null : reminders[index];
   }
 
   Future<void> _recordSnooze(String entityId) async {

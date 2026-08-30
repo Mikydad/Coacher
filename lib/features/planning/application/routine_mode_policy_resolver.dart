@@ -42,7 +42,6 @@ class RoutineModePolicyResolver {
     return p.copyWith(
       requireTimerForCompletion: true,
       allowHardGate: p.allowHardGate || p.mode == RoutineMode.extreme,
-      baseSnoozeMinutes: p.baseSnoozeMinutes > 5 ? p.baseSnoozeMinutes - 5 : 5,
       maxExtensionMinutes: p.maxExtensionMinutes > 30
           ? 30
           : p.maxExtensionMinutes,
@@ -54,7 +53,6 @@ class RoutineModePolicyResolver {
     return p.copyWith(
       requireTimerForCompletion: true,
       allowHardGate: p.allowHardGate || p.mode == RoutineMode.extreme,
-      baseSnoozeMinutes: p.baseSnoozeMinutes > 5 ? p.baseSnoozeMinutes - 5 : 5,
       maxExtensionMinutes: p.maxExtensionMinutes > 45
           ? 45
           : p.maxExtensionMinutes,
@@ -64,7 +62,6 @@ class RoutineModePolicyResolver {
 
   RoutineModePolicy _tightenModeratelyUrgent(RoutineModePolicy p) {
     return p.copyWith(
-      baseSnoozeMinutes: p.baseSnoozeMinutes > 5 ? p.baseSnoozeMinutes - 5 : 5,
       maxExtensionMinutes: p.maxExtensionMinutes > 45
           ? 45
           : p.maxExtensionMinutes,
@@ -75,7 +72,6 @@ class RoutineModePolicyResolver {
     return p.copyWith(
       requireTimerForCompletion: true,
       allowHardGate: p.allowHardGate || p.mode == RoutineMode.extreme,
-      baseSnoozeMinutes: 5,
       maxExtensionMinutes: p.maxExtensionMinutes > 30
           ? 30
           : p.maxExtensionMinutes,

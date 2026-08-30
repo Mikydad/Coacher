@@ -57,6 +57,14 @@ class EscalationDecision {
   final bool enableNonEssentialActionGate;
 }
 
+/// **The single source of reminder cadence** (FR-R-07 / AUDIT §10 T5).
+///
+/// Every surface that answers "how long is Later?" — the notification's Snooze
+/// action, and any in-app defer added later — reads its snooze durations from
+/// here. `RoutineModePolicy` used to carry a second, divergent
+/// `baseSnoozeMinutes` table; it has been removed rather than reconciled,
+/// because nothing consumed it and a dormant duplicate is exactly how the two
+/// answers diverged in the first place.
 abstract final class AdaptiveReminderPolicy {
   /// Returns a [ReminderCadence] for the given enforcement intensity.
   ///

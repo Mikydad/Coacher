@@ -114,16 +114,55 @@ class LocalNotificationsService
     );
   }
 
+  // ── Timezone health (FR-R-06 / AUDIT §10 T3) ───────────────────────────────
+
+  bool _timeZoneResolved = false;
+  String? _resolvedTimeZoneName;
+  String? _timeZoneFailureReason;
+
+  /// Whether `tz.local` actually points at the device's zone.
+  ///
+  /// When false, every [schedule] call interprets its wall-clock time as UTC:
+  /// on a UTC+3 device every reminder fires three hours late, for the whole
+  /// session, with nothing but a debugPrint to say so. Read by the reminder
+  /// health row (FR-R-80) and retried on resume via
+  /// [ensureTimeZoneResolved].
+  bool get isTimeZoneResolved => _timeZoneResolved;
+
+  /// The IANA zone name in force, or null while unresolved.
+  String? get resolvedTimeZoneName => _resolvedTimeZoneName;
+
+  /// Why the last resolution attempt failed, for the health row.
+  String? get timeZoneFailureReason => _timeZoneFailureReason;
+
+  /// Retry resolution if it previously failed. Cheap no-op once resolved, so
+  /// it is safe to call on every foreground resume.
+  Future<bool> ensureTimeZoneResolved() async {
+    if (_timeZoneResolved) return true;
+    await _configureLocalTimeZone();
+    return _timeZoneResolved;
+  }
+
   Future<void> _configureLocalTimeZone() async {
     try {
       final timeZoneName =
           (await FlutterTimezone.getLocalTimezone()).identifier;
       tz.setLocalLocation(tz.getLocation(timeZoneName));
+      _timeZoneResolved = true;
+      _resolvedTimeZoneName = timeZoneName;
+      _timeZoneFailureReason = null;
       debugPrint('[Notif] local timezone set to $timeZoneName');
     } catch (e) {
-      // Fall back to UTC if the device timezone can't be resolved. Better to
-      // keep scheduling (possibly offset) than to crash notification init.
-      debugPrint('[Notif] failed to resolve local timezone, using UTC: $e');
+      // Keep scheduling rather than crashing notification init — but do NOT
+      // let the shifted state pass silently. The flag drives the health row
+      // and [ensureTimeZoneResolved] retries on the next resume.
+      _timeZoneResolved = false;
+      _resolvedTimeZoneName = null;
+      _timeZoneFailureReason = e.toString();
+      debugPrint(
+        '[Notif] failed to resolve local timezone — scheduling in UTC until '
+        'a retry succeeds: $e',
+      );
     }
   }
 

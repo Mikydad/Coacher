@@ -144,23 +144,23 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
         `enabled` and never fires early, `_applyReminders` keeps the armed slot
         when evaluation is suppressed, and `copyWith` can clear.
 
-- [ ] **2.0 Escalation, ignore and cadence integrity**
+- [x] **2.0 Escalation, ignore and cadence integrity**
       *(FR-R-04, 05, 06, 07; AUDIT M2, C7, T3, T5)*
-  - [ ] 2.1 Persist the incremented `escalationLevel` back to the config in
+  - [x] 2.1 Persist the incremented `escalationLevel` back to the config in
         `_scheduleFollowUp` before evaluating the follow-up intent, so the
         ladder climbs on ignores and not only on snoozes. (M2)
-  - [ ] 2.2 Stamp `lastTriggeredAtMs` (and clear/advance the pending marker)
+  - [x] 2.2 Stamp `lastTriggeredAtMs` (and clear/advance the pending marker)
         when the ignored path records an ignore, so one missed notification is
         counted once rather than once per app-open. (C7)
-  - [ ] 2.3 Surface timezone-resolution failure: keep a resolved/unresolved flag
+  - [x] 2.3 Surface timezone-resolution failure: keep a resolved/unresolved flag
         on the notifications service, retry `_configureLocalTimeZone` on
         foreground resume, and expose the state for the FR-R-80 health row
         instead of silently scheduling every reminder in UTC. (T3)
-  - [ ] 2.4 Delete `RoutineModePolicy.baseSnoozeMinutes` (model field,
+  - [x] 2.4 Delete `RoutineModePolicy.baseSnoozeMinutes` (model field,
         serialization, the four resolver tightening branches, the two test
         assertions), leaving `AdaptiveReminderPolicy` as the sole documented
         cadence source with a comment saying so. (T5)
-  - [ ] 2.5 Tests: escalation persists across an ignore; a second resume inside
+  - [x] 2.5 Tests: escalation persists across an ignore; a second resume inside
         the window does not re-count the same ignore; timezone failure sets the
         unresolved flag and a later resume clears it.
 
