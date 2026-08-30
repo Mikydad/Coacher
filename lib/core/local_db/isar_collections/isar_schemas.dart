@@ -26,6 +26,7 @@ import 'isar_person.dart';
 import 'isar_onboarding_profile.dart';
 import 'isar_points.dart';
 import 'isar_reminder.dart';
+import 'isar_reminder_occurrence.dart';
 import 'isar_routine.dart';
 import 'isar_scheduled_time_block.dart';
 import 'isar_stake_challenge.dart';
@@ -49,6 +50,7 @@ const isarSchemaList = [
   IsarDeliveryHistoryEntrySchema,
   IsarGeneratedInsightSchema,
   IsarReminderSchema,
+  IsarReminderOccurrenceSchema,
   IsarGoalSchema,
   IsarGoalActionSchema,
   IsarGoalMilestoneSchema,

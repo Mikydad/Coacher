@@ -26,6 +26,11 @@ class FirestorePaths {
   static String get timerSessions => '$userRoot/timerSessions';
   static String get taskScores => '$userRoot/taskScores';
   static String get reminders => '$userRoot/reminders';
+
+  /// One doc per entity per scheduled day — the reminder state machine's
+  /// unit (PRD §3.1). Distinct from [reminders], which holds the user's
+  /// long-lived configuration.
+  static String get reminderOccurrences => '$userRoot/reminderOccurrences';
   static String get routineModes => '$userRoot/routineModes';
   static String get flowTransitionEvents => '$userRoot/flowTransitionEvents';
   static String get accountabilityLogs => '$userRoot/accountabilityLogs';

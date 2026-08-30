@@ -229,6 +229,19 @@ abstract final class AdaptiveReminderPolicy {
     );
   }
 
+  /// Reminder-window length per mode (PRD D2 / FR-R-30): Flexible 30,
+  /// Disciplined 45, Extreme 60 minutes.
+  ///
+  /// `windowEnd = scheduledAt + windowMinutes`. From R3 the interruption
+  /// boundary may shorten a window; nothing may lengthen it. Lives here
+  /// because this class is the single source of cadence numbers.
+  static int windowMinutesFor(String? modeRefId) =>
+      switch (_modeFromRef(modeRefId)) {
+        RoutineMode.flexible => 30,
+        RoutineMode.disciplined => 45,
+        RoutineMode.extreme => 60,
+      };
+
   static RoutineMode _modeFromRef(String? modeRefId) {
     final raw = modeRefId?.trim().toLowerCase();
     if (raw == 'disciplined') return RoutineMode.disciplined;

@@ -29,7 +29,10 @@ import '../../features/reminders/application/attention_orchestrator_providers.da
 import '../../features/reminders/application/reminder_sync_service.dart';
 import '../../features/reminders/data/isar_reminder_repository.dart';
 import '../../features/reminders/data/reminder_cache_store.dart';
+import '../../features/reminders/data/isar_reminder_occurrence_repository.dart';
+import '../../features/reminders/data/reminder_occurrence_repository.dart';
 import '../../features/reminders/data/reminder_repository.dart';
+import '../../features/reminders/domain/models/reminder_occurrence.dart';
 import '../../features/ai_assistant/data/ai_interaction_history_repository.dart';
 import '../../features/community/application/circle_providers.dart';
 import '../../features/community/application/user_circle_membership_service.dart';
@@ -113,6 +116,20 @@ final scoringControllerProvider = Provider<ScoringController>(
 final reminderRepositoryProvider = Provider<ReminderRepository>(
   (ref) => IsarReminderRepository(FirestoreReminderRepository()),
 );
+
+/// Reminder occurrences — the state machine's unit (PRD §3.1).
+final reminderOccurrenceRepositoryProvider =
+    Provider<ReminderOccurrenceRepository>(
+      (ref) => const IsarReminderOccurrenceRepository(),
+    );
+
+/// Everything the state machine still owns, straight off the Isar watch
+/// stream. The Recovery Card reads this — never an invalidate-and-refetch;
+/// the local write IS the update.
+final unresolvedReminderOccurrencesProvider =
+    StreamProvider<List<ReminderOccurrence>>(
+      (ref) => ref.watch(reminderOccurrenceRepositoryProvider).watchUnresolved(),
+    );
 
 @Deprecated(
   'Reminders live in Isar via ReminderRepository; this store is unused.',

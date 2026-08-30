@@ -21,8 +21,10 @@ import '../../features/accountability/domain/models/points.dart';
 import '../../features/accountability/domain/models/stake_challenge.dart';
 import '../../features/accountability/domain/models/stake_evidence.dart';
 import '../../features/planning/domain/models/task_item.dart';
+import '../../features/reminders/data/reminder_occurrence_repository.dart';
 import '../../features/reminders/data/reminder_repository.dart';
 import '../../features/reminders/domain/models/reminder_config.dart';
+import '../../features/reminders/domain/models/reminder_occurrence.dart';
 import '../../features/time_blocks/domain/models/scheduled_time_block.dart';
 import '../firebase/firestore_client.dart';
 import '../local_db/isar_collections/isar_block.dart';
@@ -38,6 +40,7 @@ import '../local_db/isar_collections/isar_person.dart';
 import '../local_db/isar_collections/isar_onboarding_profile.dart';
 import '../local_db/isar_collections/isar_scheduled_time_block.dart';
 import '../local_db/isar_collections/isar_reminder.dart';
+import '../local_db/isar_collections/isar_reminder_occurrence.dart';
 import '../local_db/isar_collections/isar_blocked_user.dart';
 import '../local_db/isar_collections/isar_points.dart';
 import '../local_db/isar_collections/isar_routine.dart';
@@ -139,6 +142,8 @@ class RemoteIsarMerge {
     await _pullRoutinesBlocksTasks();
     _abortIfUidChanged();
     await _pullReminders();
+
+    await _pullReminderOccurrences();
     _abortIfUidChanged();
     await _pullGoals();
     _abortIfUidChanged();
@@ -257,6 +262,25 @@ class RemoteIsarMerge {
         await _mergeReminder(r);
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip reminder ${doc.id}: $e\n$st');
+      }
+    }
+  }
+
+  Future<void> _pullReminderOccurrences() async {
+    final cursor = await _cursorFor('reminderOccurrences');
+    final snap = await _afterCursor(
+      _client.userCollection('reminderOccurrences'),
+      cursor,
+    ).get();
+    for (final doc in snap.docs) {
+      try {
+        final o = reminderOccurrenceFromFirestoreDoc(doc);
+        _noteSeen('reminderOccurrences', o.updatedAtMs);
+        await _mergeReminderOccurrence(o);
+      } catch (e, st) {
+        debugPrint(
+          'RemoteIsarMerge: skip reminderOccurrence ${doc.id}: $e\n$st',
+        );
       }
     }
   }
@@ -814,6 +838,28 @@ class RemoteIsarMerge {
     await _isar.writeTxn(() async {
       await _isar.isarReminders.putByReminderId(
         IsarReminder.fromDomain(incoming),
+      );
+    });
+    _appliedCount++;
+  }
+
+  Future<void> _mergeReminderOccurrence(ReminderOccurrence incoming) async {
+    // Keyed by the natural composite key, not the doc id: two devices that
+    // independently armed the same entity on the same day must converge on
+    // ONE occurrence row, and LWW on updatedAtMs picks the winner.
+    final existing = await _isar.isarReminderOccurrences
+        .filter()
+        .occurrenceKeyEqualTo(incoming.occurrenceKey)
+        .findFirst();
+    if (!shouldApplyRemoteUpdatedAt(
+      localUpdatedAtMs: existing?.updatedAtMs,
+      remoteUpdatedAtMs: incoming.updatedAtMs,
+    )) {
+      return;
+    }
+    await _isar.writeTxn(() async {
+      await _isar.isarReminderOccurrences.putByOccurrenceKey(
+        IsarReminderOccurrence.fromDomain(incoming),
       );
     });
     _appliedCount++;

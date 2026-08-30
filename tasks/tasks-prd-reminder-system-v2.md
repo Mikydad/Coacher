@@ -167,17 +167,26 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
 ### Phase R2 — State spine + heuristics
 
 - [ ] **3.0 Task reminder state machine** *(FR-R-10…14)*
-  - [ ] 3.1 Extend `ReminderConfig` + `IsarReminder` with `state`, `taxonomy`,
+      **Settled 2026-08-30:** occurrence state lives in a NEW
+      `ReminderOccurrence` entity keyed `entityKind|entityId|dateKey` (the
+      `IsarGoalCheckIn` pattern), shared by tasks and goals — not on
+      `ReminderConfig`, which stays the user's long-lived *config*. Recurring
+      task roll-forward (C3) is folded in here alongside the goal double-arm
+      (C4).
+  - [x] 3.1 Extend `ReminderConfig` + `IsarReminder` with `state`, `taxonomy`,
         `criticality`, `windowMinutes`, `ladderPosition`, `overdueSinceMs`,
         `resolutionKind`, `resolutionReason`, `classificationSource`,
         `classifierVersion`; regenerate with build_runner.
-  - [ ] 3.2 Extend `toMap`/`fromMap` and the `_pullReminders` merge phase so the
-        new fields replicate LWW on `updatedAtMs`; migrate existing rows to
+  - [~] 3.2 Extend `toMap`/`fromMap` and the merge phase so the new fields
+        replicate LWW on `updatedAtMs`; migrate existing rows to
         `{flexible, criticality 1, source: migration}` (PRD §9).
-  - [ ] 3.3 Write the pure transition module (`reminder_state_machine.dart`):
+        *Serialization + `_pullReminderOccurrences` merge phase done; the
+        backfill of existing `ReminderConfig` rows into occurrences rides on
+        the [L-ALIVE] wiring in 3.5.*
+  - [x] 3.3 Write the pure transition module (`reminder_state_machine.dart`):
         `advance(config, now, plan, interactions) → ReminderState` with an
         injected clock and zero I/O.
-  - [ ] 3.4 Make Due→Overdue/Expired retroactive — evaluated from
+  - [x] 3.4 Make Due→Overdue/Expired retroactive — evaluated from
         `windowEnd` vs `now`, never requiring the app to have been alive.
   - [ ] 3.5 Call the machine from every [L-ALIVE] trigger (app open, resume,
         timer end, check-in, day change, override end) via the recompute graph.
