@@ -27,6 +27,7 @@ const _goalPayloadPrefix = 'goal:';
 const _layer4PayloadPrefix = 'layer4:';
 const _stakePayloadPrefix = 'stake:';
 const _intentionPayloadPrefix = 'intention:';
+const _recoveryPayloadPrefix = 'recovery:';
 const _pendingNotificationIntentPrefsKey = 'pending_notification_intent_v1';
 
 class _PendingRouteIntent {
@@ -310,6 +311,19 @@ Future<void> handleNotificationResponse(
       if (!_pushNowIfReady(GoalDetailScreen.routeName, arguments: goalId)) {
         _queuePendingIntent(_PendingRouteIntent.goal(goalId));
       }
+    });
+    return;
+  }
+
+  // The aggregated recovery summary (FR-R-53) names no entity — it stands
+  // for all of them — so it lands on Home, where the Recovery Card lives.
+  if (raw.startsWith(_recoveryPayloadPrefix)) {
+    debugPrint('[NotifTap] recovery summary tap -> home');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Home is the root route, so pop back to it rather than pushing a
+      // second copy on top of whatever the user was doing.
+      final nav = appNavigatorKey.currentState;
+      nav?.popUntil((route) => route.isFirst);
     });
     return;
   }

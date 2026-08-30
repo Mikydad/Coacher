@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../firebase/firestore_client.dart';
 import '../notifications/local_notifications_service.dart';
 import '../notifications/notification_budget.dart';
+import '../notifications/notification_ledger_repository.dart';
 import '../offline/offline_store.dart';
 import '../sync/sync_service.dart';
 import '../tier/tier_providers.dart';
@@ -31,7 +32,10 @@ import '../../features/reminders/data/isar_reminder_repository.dart';
 import '../../features/reminders/data/reminder_cache_store.dart';
 import '../../features/context_override/application/context_override_providers.dart';
 import '../../features/time_blocks/application/time_block_providers.dart';
+import '../../features/reminders/application/ladder_compiler.dart';
 import '../../features/reminders/application/ladder_scheduler.dart';
+import '../../features/time_blocks/domain/models/scheduled_time_block.dart';
+import '../../features/reminders/application/recovery_notification_scheduler.dart';
 import '../../features/reminders/application/recovery_view.dart';
 import '../../features/reminders/application/reminder_occurrence_service.dart';
 import '../../features/reminders/data/isar_reminder_occurrence_repository.dart';
@@ -167,6 +171,42 @@ final ladderSchedulerProvider = Provider<LadderScheduler>((ref) {
     budget: ref.read(notificationBudgetProvider),
   );
 });
+
+/// The one push the recovery system gets (FR-R-53 / D6).
+final recoveryNotificationSchedulerProvider =
+    Provider<RecoveryNotificationScheduler>((ref) {
+      return RecoveryNotificationScheduler(
+        occurrences: ref.read(reminderOccurrenceRepositoryProvider),
+        orchestrator: ref.read(attentionOrchestratorServiceProvider),
+        ledger: NotificationLedgerRepository(OfflineStore.instance.isar!),
+        loadUpcomingStarts: (day) async {
+          final blocks = await _blocksForDay(ref, day);
+          return blocks.map((b) => b.startAt).toList(growable: false);
+        },
+        // Full spans as shields: a start time alone says nothing about when
+        // the block ends, so starts-only would let a summary land in the
+        // middle of a two-hour session.
+        loadShields: (day) async {
+          final blocks = await _blocksForDay(ref, day);
+          return blocks
+              .map(
+                (b) => ShieldWindow(
+                  start: b.startAt,
+                  end: b.computedEndAt,
+                  reason: 'scheduled',
+                ),
+              )
+              .toList(growable: false);
+        },
+      );
+    });
+
+Future<List<ScheduledTimeBlock>> _blocksForDay(Ref ref, DateTime day) {
+  final dayStart = DateTime(day.year, day.month, day.day);
+  return ref
+      .read(timeBlockRepositoryProvider)
+      .listBlocksForDateRange(dayStart, dayStart.add(const Duration(days: 1)));
+}
 
 /// Entity ids currently Overdue — what a task row consults to show its badge
 /// (FR-R-50's "task list badge"). Derived from the same view the card renders,

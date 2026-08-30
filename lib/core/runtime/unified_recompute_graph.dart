@@ -166,6 +166,13 @@ class UnifiedRecomputeGraph {
         if (ladders.didWork) {
           debugPrint('[UnifiedRecomputeGraph] step:ladders $ladders');
         }
+        // FR-R-53: at most one summary for everything still open, into a
+        // genuinely free gap, capped at two a day. Runs last so it sees the
+        // final overdue set.
+        if (_generationChanged(capturedGeneration)) return;
+        await container
+            .read(recoveryNotificationSchedulerProvider)
+            .scheduleIfNeeded();
       } catch (e) {
         debugPrint(
           '[UnifiedRecomputeGraph] step:reminderOccurrences failed: $e',

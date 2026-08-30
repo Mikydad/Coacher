@@ -227,10 +227,9 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
         miss, never a push. *The PRD's "Water: 3 of 6 today" assumes intra-day
         recurrence, which this app does not have (one occurrence per entity per
         day); the digest names the routines missed instead.*
-  - [→] 5.5 Aggregated recovery notification — **deferred to R3** (settled
-        2026-08-30): its "qualifying free gap" is the same plan/boundary math
-        FR-R-31 builds in task 7.0, and writing gap-finding twice would mean
-        throwing the first one away.
+  - [x] 5.5 Aggregated recovery notification — built in R3 once FR-R-31's
+        boundary math existed. ONE summary for everything open, ≤2/day capped
+        against the ledger, placed by the pure `RecoveryGapFinder`.
   - [x] 5.6 Day rollover carries unresolved items into Plan-Tomorrow with their
         overdue history attached.
   - [x] 5.7 Task-row Overdue badge in the task list.

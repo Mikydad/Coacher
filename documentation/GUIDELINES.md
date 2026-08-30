@@ -2696,3 +2696,22 @@ not silent reversal.
   the row readable without knowing the vocabulary. *Storage is unaffected* —
   the enum values stay `timeSensitive` / `flexible` / `routine`; this is a
   display change only.
+
+- **2026-08-30 · FR-R-53's recovery summary: one push, placed by the same
+  rules the ladder obeys.** Deferred out of R2 because its "qualifying free
+  gap" needed FR-R-31's boundary math; built once that existed.
+  `RecoveryGapFinder` is pure and takes the ladder's own constraints — far
+  enough ahead not to feel instant, at least 15 minutes before the day winds
+  down, clear of the 20-minute run-up to every scheduled item, and outside
+  every shield. *Two rules worth keeping:* the run-up window includes the
+  start moment itself (a summary arriving exactly as a meeting begins is the
+  interruption the rule exists to prevent), and callers pass scheduled blocks
+  as **both** start times *and* full spans — a start time says nothing about
+  when a block ends, so starts-only would let a summary land in the middle of
+  a two-hour session. *The cap is read from the ledger, not memory*, so
+  force-quitting cannot hand the user an unlimited supply. *The summary is
+  deliberately `InterruptionLevel.low`:* it is a digest of things already
+  missed, nothing about it is urgent, and making it loud would punish someone
+  for having a bad day. Routine misses and items dismissed today are excluded
+  from its count — they have already been answered. A day with no room simply
+  gets no summary; that is a valid answer, not a failure.

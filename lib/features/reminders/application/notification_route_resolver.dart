@@ -18,6 +18,10 @@ abstract final class ReminderEntityKinds {
   /// and the ledger apply — its own 3/day + 4h producer budget still
   /// gates upstream.
   static const String coachInsight = 'coach_insight';
+
+  /// The aggregated recovery summary (FR-R-53). One notification standing in
+  /// for every overdue item, never one per item.
+  static const String recovery = 'recovery';
 }
 
 /// Where an intent's notification goes: deterministic OS id, tap payload,
@@ -77,6 +81,17 @@ NotificationRoute resolveNotificationRoute(ReminderIntent intent) {
         // the tap handler splits on `::` without percent-decoding.
         notifId: kCoachingInsightNotificationId,
         payload: 'layer4:${intent.entityId}',
+      );
+    case ReminderEntityKinds.recovery:
+      return NotificationRoute(
+        // Slot-aware so the day's two summaries (D6) can coexist and be
+        // cancelled independently. The entityId is the day key, which makes
+        // the ids naturally unique per day.
+        notifId:
+            ('recovery:${intent.entityId}:${intent.slot}').hashCode.abs() %
+            2147483647,
+        // No entity to open — the tap lands on Home, where the card lives.
+        payload: 'recovery:$encoded',
       );
     case ReminderEntityKinds.intention:
       return NotificationRoute(
