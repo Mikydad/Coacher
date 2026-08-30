@@ -266,31 +266,51 @@ void main() {
 
       await tester.tap(find.byTooltip('Other options'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Reschedule'));
+      await tester.tap(find.text('Move to tomorrow'));
       await tester.pumpAndSettle();
 
       expect(chosen, ReminderResolutionKind.rescheduled);
       expect(from!.occurrence.entityId, 'd');
     });
 
-    testWidgets('Skip is offered too', (tester) async {
+    testWidgets('Disciplined offers Skip', (tester) async {
       ReminderResolutionKind? chosen;
       await tester.pumpWidget(
         _host(
           RecoveryView(
-            rows: [_row(_occ(id: 'e', title: 'Study', modeRefId: 'extreme'))],
+            rows: [
+              _row(_occ(id: 'd', title: 'D-task', modeRefId: 'disciplined')),
+            ],
           ),
           onResolve: (_, kind) => chosen = kind,
         ),
       );
       await tester.pump();
-
       await tester.tap(find.byTooltip('Other options'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Skip'));
       await tester.pumpAndSettle();
-
       expect(chosen, ReminderResolutionKind.skipped);
+    });
+
+    testWidgets('Extreme offers no Skip — Do, or move it (D4)', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _host(
+          RecoveryView(
+            rows: [_row(_occ(id: 'e', title: 'E-task', modeRefId: 'extreme'))],
+          ),
+          onResolve: (_, __) {},
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.byTooltip('Other options'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Move to tomorrow'), findsOneWidget);
+      // The one-tap give-up D4 excludes, even with a reason attached.
+      expect(find.text('Skip'), findsNothing);
     });
   });
 }

@@ -346,4 +346,25 @@ void main() {
       expect(service.evaluated, isEmpty);
     });
   });
+
+  group('reEvaluateIfAppropriate — A5: the slot survives the restore', () {
+    test('restores a lost follow-up under its own slot, not slot 0', () async {
+      final repo = _FakeReminderRepository()
+        ..seed([_config(scheduledAt: _start.add(const Duration(hours: 7)))]);
+      final service = _Service(repo);
+
+      await service.reEvaluateIfAppropriate(
+        't1',
+        scheduledFor: _start.add(const Duration(hours: 7)),
+        slot: 2,
+      );
+
+      expect(service.evaluated.single.slot, 2);
+      // Restore, not escalation: the back-off must not suppress it.
+      expect(
+        service.evaluated.single.reminderType,
+        ReminderType.scheduled,
+      );
+    });
+  });
 }

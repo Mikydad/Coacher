@@ -19,6 +19,8 @@ void main() {
     DateTime? scheduledAt,
     ReminderOccurrenceState state = ReminderOccurrenceState.upcoming,
     ReminderResolutionKind? resolutionKind,
+    ReminderTaxonomy taxonomy = ReminderTaxonomy.flexible,
+    DateTime? snoozedUntil,
   }) {
     final at = scheduledAt ?? twoPm;
     return ReminderOccurrence(
@@ -31,8 +33,10 @@ void main() {
       entityTitle: 'Study',
       modeRefId: modeRefId,
       state: state,
+      taxonomy: taxonomy,
       criticality: criticality,
       resolutionKind: resolutionKind,
+      snoozedUntilMs: snoozedUntil?.millisecondsSinceEpoch,
       createdAtMs: 1,
       updatedAtMs: 1,
     );
@@ -334,6 +338,57 @@ void main() {
         }
       }
       expect(checked, greaterThan(100));
+    });
+  });
+
+  group('snooze re-plans the remaining ladder (FR-R-35 / A2)', () {
+    test('slots the snooze pre-empts are dropped; later ones survive', () {
+      // Snoozed until 14:12: T+0 is past anyway, T+10 (14:10) is pre-empted,
+      // T+25 (14:25) survives — deferring the ladder is not resigning it.
+      final plan = compile(
+        occurrence: occ(
+          snoozedUntil: twoPm.add(const Duration(minutes: 12)),
+        ),
+        now: twoPm.add(const Duration(minutes: 1)),
+      );
+
+      expect(plan.slots.map((s) => s.offsetMinutes), [25]);
+      expect(
+        plan.drops.where((d) => d.reason == SlotDropReason.snoozed).single
+            .offsetMinutes,
+        10,
+      );
+    });
+
+    test('a snooze past the whole ladder silences it entirely', () {
+      final plan = compile(
+        occurrence: occ(
+          snoozedUntil: twoPm.add(const Duration(minutes: 40)),
+        ),
+        now: twoPm.add(const Duration(minutes: 1)),
+      );
+      expect(plan.slots, isEmpty);
+    });
+  });
+
+  group('routine never escalates (§3.2 / A4)', () {
+    test('whatever the mode, a routine item speaks once', () {
+      for (final mode in ['flexible', 'disciplined', 'extreme']) {
+        final plan = compile(
+          occurrence: occ(
+            modeRefId: mode,
+            windowMinutes: 60,
+            taxonomy: ReminderTaxonomy.routine,
+          ),
+        );
+        expect(plan.slots.map((s) => s.offsetMinutes), [0], reason: mode);
+        // Shape, not pruning: no drops are logged for the missing follow-ups.
+        expect(
+          plan.drops.where((d) => d.reason == SlotDropReason.window),
+          isEmpty,
+          reason: mode,
+        );
+      }
     });
   });
 }

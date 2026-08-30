@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../planning/domain/models/accountability_log.dart';
+import '../../planning/application/move_task_to_tomorrow.dart';
 import '../../planning/presentation/override_reason_dialog.dart';
 import '../application/attention_orchestrator_providers.dart';
 import '../application/recovery_view.dart';
@@ -102,8 +103,33 @@ Future<void> resolveRecoveryRow(
       .read(attentionOrchestratorServiceProvider)
       .cancelForEntity(row.occurrence.entityId);
 
-  if (kind == ReminderResolutionKind.rescheduled && context.mounted) {
-    await _maybeSuggestDemoteOrDrop(context, ref, row);
+  if (kind == ReminderResolutionKind.rescheduled) {
+    // AUDIT A1: "reschedule" has to actually move something. The task row
+    // lands in tomorrow's plan (same id, time of day kept, status reset) and
+    // shiftToDate moves the reminder config with it — creating tomorrow's
+    // occurrence and re-arming its ladder. If the row is not in today's plan
+    // (an occurrence from an older day), only the reminder side moves; the
+    // carry-forward section owns the stale row.
+    final rows = ref.read(todayAllTasksRowsProvider).valueOrNull;
+    final row0 = rows
+        ?.where((r) => r.task.id == row.occurrence.entityId)
+        .firstOrNull;
+    if (row0 != null) {
+      try {
+        await moveTaskRowToTomorrow(ref, row0);
+      } catch (e) {
+        debugPrint('[Recovery] task-row move failed: $e');
+      }
+    }
+    await ref
+        .read(reminderSyncServiceProvider)
+        .shiftToDate(
+          row.occurrence.entityId,
+          targetDay: DateTime.now().add(const Duration(days: 1)),
+        );
+    if (context.mounted) {
+      await _maybeSuggestDemoteOrDrop(context, ref, row);
+    }
   }
 }
 

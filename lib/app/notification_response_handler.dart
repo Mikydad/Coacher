@@ -490,9 +490,8 @@ Future<void> handleNotificationResponse(
 
   if (response.actionId == NotificationActionIds.wrongTime) {
     debugPrint('[NotifTap] wrong-time action for task=$taskId');
-    // Ledgered as dismissed ("this moment was wrong") — no follow-up
-    // escalation. The opportunity planner (humanizing Phase 1) reads these
-    // to avoid similar moments.
+    // Ledgered as dismissed ("this moment was wrong") — the opportunity
+    // planner reads these to avoid similar moments.
     unawaited(
       orchestrator.onInteractionReceived(
         taskId,
@@ -500,6 +499,19 @@ Future<void> handleNotificationResponse(
         notifId: response.id,
       ),
     );
+    // FR-R-35 / AUDIT A8: "Wrong time" CLOSES the window now — the state
+    // machine decides Overdue vs Expired by taxonomy — and the rest of the
+    // ladder is cancelled, because a user who said "wrong time" must not get
+    // the T+10 follow-up at the same wrong time. Guarded: a tap handler
+    // never crashes on bookkeeping.
+    try {
+      await container
+          .read(reminderOccurrenceServiceProvider)
+          .closeWindowNow(taskId);
+      await orchestrator.cancelForEntity(taskId);
+    } catch (e) {
+      debugPrint('[NotifTap] wrong-time close failed: $e');
+    }
     return;
   }
 

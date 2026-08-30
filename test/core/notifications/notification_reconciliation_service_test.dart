@@ -38,9 +38,10 @@ class _FakeNotifications implements ActiveNotificationsSource {
 }
 
 class _ReArmCall {
-  const _ReArmCall(this.entityId, this.scheduledFor);
+  const _ReArmCall(this.entityId, this.scheduledFor, this.slot);
   final String entityId;
   final DateTime? scheduledFor;
+  final int slot;
 }
 
 class _FakeOrchestrator implements OrchestratorReEvaluator {
@@ -53,8 +54,9 @@ class _FakeOrchestrator implements OrchestratorReEvaluator {
   Future<void> reEvaluateIfAppropriate(
     String entityId, {
     DateTime? scheduledFor,
+    int slot = 0,
   }) async {
-    calls.add(_ReArmCall(entityId, scheduledFor));
+    calls.add(_ReArmCall(entityId, scheduledFor, slot));
   }
 }
 

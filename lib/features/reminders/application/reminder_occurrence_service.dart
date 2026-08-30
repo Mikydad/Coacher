@@ -325,6 +325,51 @@ class ReminderOccurrenceService {
     return count;
   }
 
+  /// The user hit "Wrong time": this moment was wrong, so the window closes
+  /// NOW rather than at its scheduled end (FR-R-35 / AUDIT A8).
+  ///
+  /// Taxonomy decides what that means, exactly as a natural close would:
+  /// time-sensitive expires (logged as missed, never mentioned again);
+  /// routine expires into the digest; flexible goes straight to Overdue —
+  /// stamped to now, because the user just declared the window over.
+  Future<ReminderOccurrence?> closeWindowNow(String entityId) async {
+    final open = await _openFor(entityId);
+    if (open == null) return null;
+    final now = _now();
+    final ReminderOccurrence closed;
+    if (open.taxonomy == ReminderTaxonomy.flexible) {
+      closed = open.copyWith(
+        state: ReminderOccurrenceState.overdue,
+        overdueSinceMs: now.millisecondsSinceEpoch,
+        updatedAtMs: now.millisecondsSinceEpoch,
+      );
+    } else {
+      closed = ReminderStateMachine.resolve(
+        open,
+        kind: ReminderResolutionKind.expired,
+        now: now,
+      );
+    }
+    await _occurrences.upsert(closed);
+    return closed;
+  }
+
+  /// The user hit "Later": record where their snooze re-plans delivery to,
+  /// so the compiler stops re-arming the slots it pre-empts (FR-R-35).
+  Future<ReminderOccurrence?> recordSnooze(
+    String entityId, {
+    required DateTime until,
+  }) async {
+    final open = await _openFor(entityId);
+    if (open == null) return null;
+    final updated = open.copyWith(
+      snoozedUntilMs: until.millisecondsSinceEpoch,
+      updatedAtMs: _now().millisecondsSinceEpoch,
+    );
+    await _occurrences.upsert(updated);
+    return updated;
+  }
+
   /// Wave a row off the Recovery Card for today (FR-R-40, Flexible only).
   ///
   /// Deliberately not a resolution: the task is still undone, so the

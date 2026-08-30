@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/local_db/isar_collections/isar_notification_ledger_entry.dart';
 import '../../../core/notifications/notification_ledger_repository.dart';
+import '../../../core/notifications/notification_ledger_state.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../context_override/domain/models/interruption_level.dart';
@@ -72,7 +74,16 @@ class RecoveryNotificationScheduler {
 
       if (actionable.isEmpty) return false;
 
-      final alreadySent = await _countToday(now);
+      final todayRows = await _todayRows(now);
+      // AUDIT A6: one summary AT A TIME, not merely two a day. The recompute
+      // graph runs on every open/resume/mutation, so without this guard sweep
+      // #2 armed summary #2 minutes after #1 — the "cap" became the routine.
+      final stillArmed = todayRows.any(
+        (r) => r.state == NotificationLedgerState.scheduled.name,
+      );
+      if (stillArmed) return false;
+
+      final alreadySent = todayRows.length;
       if (alreadySent >= maxPerDay) {
         debugPrint('[RecoveryNotification] day cap reached ($alreadySent)');
         return false;
@@ -124,18 +135,17 @@ class RecoveryNotificationScheduler {
     }
   }
 
-  /// How many summaries this local day already claimed.
+  /// This local day's summary rows — armed and delivered alike.
   ///
   /// Read from the ledger, not from memory: the cap has to survive a restart,
   /// or force-quitting the app would hand the user an unlimited supply.
-  Future<int> _countToday(DateTime now) async {
+  Future<List<IsarNotificationLedgerEntry>> _todayRows(DateTime now) async {
     final dayStart = DateTime(now.year, now.month, now.day);
-    final rows = await _ledger.getDeliveryClaimsByKindInRange(
+    return _ledger.getDeliveryClaimsByKindInRange(
       entityKind: ReminderEntityKinds.recovery,
       startMs: dayStart.millisecondsSinceEpoch,
       endMs: dayStart.add(const Duration(days: 1)).millisecondsSinceEpoch,
     );
-    return rows.length;
   }
 }
 

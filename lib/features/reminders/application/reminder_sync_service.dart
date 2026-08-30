@@ -221,6 +221,11 @@ class ReminderSyncService {
     final shifted = shiftIsoToDate(current.scheduledAtIso, targetDay);
     if (shifted == null) return;
 
+    // AUDIT A7: the old day's compiled slots must not outlive the move — a
+    // future→future reschedule left them armed at the old times, and only
+    // slot 0 was ever replaced by the new day's compile.
+    await _orchestrator.cancelForEntity(taskId);
+
     // The day that is being left behind was not completed — it moved.
     await _occurrences?.resolveForEntity(
       taskId,
@@ -238,6 +243,8 @@ class ReminderSyncService {
     await _upsertQuietly(updated);
     await _applyReminders(await _repository.listAllReminders());
     await _occurrences?.ensureForConfig(updated);
+    // Arm the new day's ladder now rather than at the next recompute.
+    await _rearmLadders?.call();
   }
 
   /// Rebuilds [iso] on [targetDay], keeping hour/minute. Null when [iso] is
@@ -276,6 +283,15 @@ class ReminderSyncService {
       emergencyBypass: emergencyBypass || current.emergencyBypass,
     );
     final nextAt = _now().add(Duration(minutes: step.snoozeMinutes));
+
+    // FR-R-35 / AUDIT A2: "Later" re-plans the REMAINING ladder. Without this
+    // sweep, T+10 and T+25 stayed armed at their original times on top of the
+    // snoozed delivery — snoozing produced MORE notifications than ignoring.
+    // The occurrence records the snooze so the next recompile cannot quietly
+    // re-arm the slots it pre-empts.
+    await _orchestrator.cancelForEntity(taskId);
+    await _occurrences?.recordSnooze(taskId, until: nextAt);
+
     final updated = current.copyWith(
       pendingAction: true,
       enabled: true,

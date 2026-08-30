@@ -446,4 +446,64 @@ void main() {
       expect(await svc.consecutiveReschedules('t1'), 0);
     });
   });
+
+  group('closeWindowNow — "Wrong time" (FR-R-35 / A8)', () {
+    test('a flexible task goes straight to Overdue, stamped to now', () async {
+      final occ = _FakeOccurrences();
+      final svc = service(occ, _FakeReminders([config()]));
+      await svc.sweep();
+      // The sweep already made it overdue (window long past); reset to due
+      // to model the user hitting Wrong time DURING the window.
+      final open = occ.rows.values.single;
+      occ.rows[open.occurrenceKey] = open.copyWith(
+        state: ReminderOccurrenceState.due,
+        overdueSinceMs: null,
+      );
+
+      final closed = await svc.closeWindowNow('t1');
+
+      expect(closed!.state, ReminderOccurrenceState.overdue);
+      // Stamped to NOW: the user just declared the window over — this is the
+      // one overdue stamp that is not retroactive, because the close itself
+      // happened now.
+      expect(closed.overdueSinceMs, now.millisecondsSinceEpoch);
+    });
+
+    test('a time-sensitive task expires — never mentioned again', () async {
+      final occ = _FakeOccurrences();
+      final svc = service(
+        occ,
+        _FakeReminders([config(taskId: 'meds')]),
+      );
+      await svc.sweep();
+      final open = occ.rows.values.single;
+      occ.rows[open.occurrenceKey] = open.copyWith(
+        state: ReminderOccurrenceState.due,
+        taxonomy: ReminderTaxonomy.timeSensitive,
+      );
+
+      final closed = await svc.closeWindowNow('meds');
+
+      expect(closed!.state, ReminderOccurrenceState.resolved);
+      expect(closed.resolutionKind, ReminderResolutionKind.expired);
+    });
+
+    test('no open occurrence is a safe no-op', () async {
+      final svc = service(_FakeOccurrences(), _FakeReminders());
+      expect(await svc.closeWindowNow('nobody'), isNull);
+    });
+  });
+
+  group('recordSnooze (A2)', () {
+    test('stamps where the snooze re-plans to', () async {
+      final occ = _FakeOccurrences();
+      final svc = service(occ, _FakeReminders([config()]));
+      await svc.sweep();
+
+      final until = now.add(const Duration(minutes: 12));
+      final snoozed = await svc.recordSnooze('t1', until: until);
+
+      expect(snoozed!.snoozedUntilMs, until.millisecondsSinceEpoch);
+    });
+  });
 }

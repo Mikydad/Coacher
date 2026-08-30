@@ -179,15 +179,20 @@ class _RecoveryRowTile extends StatelessWidget {
                 color: AppColors.textMuted,
               ),
               onSelected: onResolve,
+              // D4: unstaked Extreme is Do / Reschedule-with-reason ONLY.
+              // Offering Skip — even with a reason — is the one-tap give-up
+              // the contract excludes; Disciplined keeps it (FR-R-41 lists
+              // Skip among its dispositions).
               itemBuilder: (_) => [
                 const PopupMenuItem(
                   value: ReminderResolutionKind.rescheduled,
-                  child: Text('Reschedule'),
+                  child: Text('Move to tomorrow'),
                 ),
-                const PopupMenuItem(
-                  value: ReminderResolutionKind.skipped,
-                  child: Text('Skip'),
-                ),
+                if (row.insistence != RecoveryInsistence.demanding)
+                  const PopupMenuItem(
+                    value: ReminderResolutionKind.skipped,
+                    child: Text('Skip'),
+                  ),
               ],
             ),
         ],

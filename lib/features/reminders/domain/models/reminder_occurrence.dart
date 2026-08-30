@@ -44,6 +44,7 @@ class ReminderOccurrence {
     this.resolutionReason,
     this.resolvedAtMs,
     this.dismissedForDayKey,
+    this.snoozedUntilMs,
     required this.createdAtMs,
     required this.updatedAtMs,
   });
@@ -114,6 +115,15 @@ class ReminderOccurrence {
   /// what makes it expire on its own at midnight, with nothing to reset.
   final String? dismissedForDayKey;
 
+  /// When the user last hit "Later", the moment their snooze re-plans
+  /// delivery to (FR-R-35).
+  ///
+  /// The ladder compiler drops slots that fire before this: the snooze
+  /// PRE-EMPTS them — a user who asked for quiet-until-2:12 must not get the
+  /// T+10 slot at 2:10 anyway. Slots after it survive, because "Later"
+  /// defers the ladder, it does not resign from it.
+  final int? snoozedUntilMs;
+
   final int createdAtMs;
   final int updatedAtMs;
 
@@ -174,6 +184,7 @@ class ReminderOccurrence {
     Object? resolutionReason = _sentinel,
     Object? resolvedAtMs = _sentinel,
     Object? dismissedForDayKey = _sentinel,
+    Object? snoozedUntilMs = _sentinel,
     int? updatedAtMs,
   }) {
     return ReminderOccurrence(
@@ -212,6 +223,9 @@ class ReminderOccurrence {
       dismissedForDayKey: dismissedForDayKey == _sentinel
           ? this.dismissedForDayKey
           : dismissedForDayKey as String?,
+      snoozedUntilMs: snoozedUntilMs == _sentinel
+          ? this.snoozedUntilMs
+          : snoozedUntilMs as int?,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     );
@@ -237,6 +251,7 @@ class ReminderOccurrence {
     if (resolutionReason != null) 'resolutionReason': resolutionReason,
     if (resolvedAtMs != null) 'resolvedAtMs': resolvedAtMs,
     if (dismissedForDayKey != null) 'dismissedForDayKey': dismissedForDayKey,
+    if (snoozedUntilMs != null) 'snoozedUntilMs': snoozedUntilMs,
     'createdAtMs': createdAtMs,
     'updatedAtMs': updatedAtMs,
   };
@@ -267,6 +282,7 @@ class ReminderOccurrence {
       resolutionReason: map['resolutionReason'] as String?,
       resolvedAtMs: (map['resolvedAtMs'] as num?)?.toInt(),
       dismissedForDayKey: map['dismissedForDayKey'] as String?,
+      snoozedUntilMs: (map['snoozedUntilMs'] as num?)?.toInt(),
       createdAtMs: (map['createdAtMs'] as num?)?.toInt() ?? 0,
       updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
     );

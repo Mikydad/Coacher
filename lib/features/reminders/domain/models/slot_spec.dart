@@ -63,6 +63,10 @@ enum SlotDropReason {
   /// Not today, so only the first slot is armed until it becomes today.
   notToday,
 
+  /// Pre-empted by the user's own snooze: they asked for quiet until a
+  /// moment after this slot would have fired (FR-R-35).
+  snoozed,
+
   /// The OS pending queue had no room.
   budget,
 }

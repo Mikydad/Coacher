@@ -347,6 +347,7 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
   Future<void> reEvaluateIfAppropriate(
     String entityId, {
     DateTime? scheduledFor,
+    int slot = 0,
   }) async {
     final config = await _findConfig(entityId);
     if (config == null) return; // task was deleted — nothing to reschedule
@@ -380,6 +381,9 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
       escalationLevel: config.escalationLevel,
       reminderType: ReminderType.scheduled,
       sourceReason: 'boot_reconciliation',
+      // The slot it was lost from (A5): the route derives the OS id from
+      // this, so the restore replaces the LOST notification, not slot 0.
+      slot: slot,
       createdAtMs: _now().millisecondsSinceEpoch,
     );
     await evaluate(restored);

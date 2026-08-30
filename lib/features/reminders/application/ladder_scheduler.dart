@@ -11,6 +11,7 @@ import '../domain/models/reminder_occurrence_enums.dart';
 import '../domain/models/reminder_type.dart';
 import '../domain/models/slot_spec.dart';
 import 'attention_orchestrator_service.dart';
+import 'notification_route_resolver.dart';
 import 'interruption_level_resolver.dart';
 import 'ladder_compiler.dart';
 
@@ -82,6 +83,18 @@ class LadderScheduler {
       const knownModes = {'flexible', 'disciplined', 'extreme'};
 
       for (final occurrence in ordered) {
+        // AUDIT A3: tasks and habits ONLY. Goal occurrences exist for
+        // state-machine visibility, but their arming belongs to
+        // GoalReminderSyncService — whose slot 1 is TOMORROW'S occurrence
+        // under the same `goal:<id>:1` OS id a ladder follow-up would claim.
+        // Compiling a ladder here overwrote tomorrow's armed day with a T+10
+        // nudge, quietly undoing the C4 fix. Intentions likewise own their
+        // own three-slot ladder.
+        if (occurrence.entityKind != ReminderEntityKinds.task &&
+            occurrence.entityKind != ReminderEntityKinds.habit) {
+          continue;
+        }
+
         // M3: every resolver hard-codes the three built-ins and defaults
         // everything else to flexible — so a legacy or typo'd mode id
         // quietly gets the WEAKEST contract, which is the opposite of what a
@@ -94,12 +107,6 @@ class LadderScheduler {
             '${occurrence.entityId} → degrading to flexible',
           );
           unknownModes++;
-        }
-
-        // Routine misses never escalate (§3.2) — they roll forward quietly.
-        if (occurrence.taxonomy == ReminderTaxonomy.routine &&
-            occurrence.state == ReminderOccurrenceState.overdue) {
-          continue;
         }
 
         final plan = LadderCompiler.compile(

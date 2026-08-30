@@ -1,5 +1,6 @@
 import '../../../core/utils/date_keys.dart';
 import '../domain/models/reminder_occurrence.dart';
+import '../domain/models/reminder_occurrence_enums.dart';
 import '../domain/models/slot_spec.dart';
 import 'adaptive_reminder_policy.dart';
 import 'reminder_copy_bank.dart';
@@ -82,9 +83,18 @@ abstract final class LadderCompiler {
         ? boundary
         : windowEnd;
 
-    final offsets = AdaptiveReminderPolicy.ladderOffsetsFor(
+    // §3.2 / AUDIT A4: routine never escalates — whatever the mode says, a
+    // routine item speaks once. This is shape selection, not pruning, so no
+    // drop is logged: the ladder a routine item is entitled to IS one slot.
+    // (A routine occurrence that is already overdue compiles to nothing at
+    // all — it expires into the digest rather than going overdue, so an
+    // overdue routine row is legacy data, not a delivery obligation.)
+    final baseOffsets = AdaptiveReminderPolicy.ladderOffsetsFor(
       occurrence.modeRefId,
     );
+    final offsets = occurrence.taxonomy == ReminderTaxonomy.routine
+        ? baseOffsets.take(1).toList(growable: false)
+        : baseOffsets;
 
     // FR-R-33: a day that has not arrived gets its first slot only. Full
     // ladders for every future day at once would exhaust the 64-slot queue on
@@ -104,6 +114,20 @@ abstract final class LadderCompiler {
       }
       if (!fireAt.isAfter(now)) {
         drops.add(SlotDrop(slot: i, offsetMinutes: offset, reason: SlotDropReason.past));
+        continue;
+      }
+      // FR-R-35 / AUDIT A2: "Later" re-plans the remaining ladder. A slot
+      // the snooze pre-empts must not fire anyway — that would make snoozing
+      // produce MORE notifications than ignoring. Slots after the snooze
+      // survive: deferring the ladder is not resigning from it.
+      final snoozedUntilMs = occurrence.snoozedUntilMs;
+      if (snoozedUntilMs != null &&
+          !fireAt.isAfter(
+            DateTime.fromMillisecondsSinceEpoch(snoozedUntilMs),
+          )) {
+        drops.add(
+          SlotDrop(slot: i, offsetMinutes: offset, reason: SlotDropReason.snoozed),
+        );
         continue;
       }
       if (!fireAt.isBefore(effectiveEnd)) {

@@ -2715,3 +2715,30 @@ not silent reversal.
   for having a bad day. Routine misses and items dismissed today are excluded
   from its count — they have already been answered. A day with no room simply
   gets no summary; that is a valid answer, not a failure.
+
+- **2026-08-31 · Reminder V2 audit fixes, wave 1 (A1–A8 + C1 from the
+  2026-08-31 self-audit).** The audit's theme held: every bug lived at a seam
+  between subsystems built in different phases. *A1:* the Recovery Card's
+  Reschedule collected a reason, resolved the occurrence, and moved nothing —
+  it is now "Move to tomorrow" and does what it says (headless
+  `moveTaskRowToTomorrow` + `shiftToDate`; a row not in today's plan moves
+  only its reminder side, the carry-forward section owns the stale row).
+  *A2:* "Later" now re-plans the remaining ladder: `requestSnooze` sweeps the
+  armed slots and stamps `snoozedUntilMs` on the occurrence, and the compiler
+  drops slots the snooze pre-empts (new `SlotDropReason.snoozed`) while
+  keeping later ones — deferring the ladder is not resigning from it. Without
+  the stamp, the next recompile silently re-armed what the sweep cancelled.
+  *A3:* the ladder scheduler arms tasks/habits ONLY — a goal ladder's slot 1
+  claimed the same `goal:<id>:1` OS id as tomorrow's occurrence and quietly
+  undid the C4 double-arm. *A4:* routine taxonomy compiles to one slot
+  regardless of mode — shape selection, not pruning, so no drop is logged.
+  *A5:* boot re-arm restores a lost slot under its OWN slot id (derived by
+  matching the deterministic id scheme) instead of clobbering healthy slot 0.
+  *A6:* the recovery summary refuses to arm while one is still pending —
+  the ≤2/day cap alone made two-back-to-back the daily routine. *A7:*
+  `shiftToDate` sweeps the old day's armed slots and re-arms the new day.
+  *A8:* task "Wrong time" now closes the window through the state machine
+  (flexible → Overdue stamped to NOW — the one non-retroactive stamp, because
+  the user just declared the window over; others expire) and cancels the
+  ladder. *C1:* Extreme's overflow offers Move-to-tomorrow only — Skip, even
+  with a reason, is the one-tap give-up D4 excludes; Disciplined keeps it.

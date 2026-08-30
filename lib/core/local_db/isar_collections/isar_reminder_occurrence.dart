@@ -57,6 +57,7 @@ class IsarReminderOccurrence {
   String? resolutionReason;
   int? resolvedAtMs;
   String? dismissedForDayKey;
+  int? snoozedUntilMs;
   late int createdAtMs;
 
   static String keyFor(String entityKind, String entityId, String dateKey) =>
@@ -85,6 +86,7 @@ class IsarReminderOccurrence {
       ..resolutionReason = o.resolutionReason
       ..resolvedAtMs = o.resolvedAtMs
       ..dismissedForDayKey = o.dismissedForDayKey
+      ..snoozedUntilMs = o.snoozedUntilMs
       ..createdAtMs = o.createdAtMs;
   }
 
@@ -111,6 +113,7 @@ class IsarReminderOccurrence {
       resolutionReason: resolutionReason,
       resolvedAtMs: resolvedAtMs,
       dismissedForDayKey: dismissedForDayKey,
+      snoozedUntilMs: snoozedUntilMs,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs,
     );

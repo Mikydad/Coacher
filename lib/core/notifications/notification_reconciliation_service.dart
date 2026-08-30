@@ -34,6 +34,12 @@ abstract interface class OrchestratorReEvaluator {
   Future<void> reEvaluateIfAppropriate(
     String entityId, {
     DateTime? scheduledFor,
+
+    /// Which ladder slot the lost row was (AUDIT A5). Re-arming under the
+    /// wrong slot id replaces a HEALTHY sibling: a lost T+25 restored as
+    /// slot 0 destroys the correct T+0 notification and mis-times its
+    /// replacement.
+    int slot = 0,
   });
 }
 
@@ -77,6 +83,19 @@ class NotificationReconciliationService {
   final ActiveNotificationsSource notifications;
   final OrchestratorReEvaluator orchestrator;
   final DateTime Function() _now;
+
+  /// Which task-ladder slot [notifId] belongs to, derived by matching the
+  /// deterministic id scheme (mirroring `idFromTaskId`). 0 when nothing
+  /// matches — non-task kinds have their own id namespaces and their
+  /// re-evaluation path ignores the slot anyway.
+  static int _slotOf(String entityId, int notifId) {
+    for (var slot = 0; slot < 4; slot++) {
+      if (('task:$entityId:$slot').hashCode.abs() % 2147483647 == notifId) {
+        return slot;
+      }
+    }
+    return 0;
+  }
 
   Future<void> reconcile() async {
     try {
@@ -142,17 +161,20 @@ class NotificationReconciliationService {
           : DateTime.fromMillisecondsSinceEpoch(scheduledForMs);
       if (scheduledFor != null && scheduledFor.isAfter(now)) {
         // Genuinely lost: its time has not come and the OS no longer holds
-        // it. Re-arm at the ORIGINAL time, never now.
+        // it. Re-arm at the ORIGINAL time, never now — and under the slot id
+        // it was lost from, or the restore replaces a healthy sibling (A5).
         await ledger.markCancelledByNotifId(entry.notifId);
         lost++;
+        final slot = _slotOf(entry.entityId, entry.notifId);
         debugPrint(
           '[NotificationReconciliation] notifId=${entry.notifId} '
-          'entity=${entry.entityId} lost from both queues → re-arming at its '
-          'original time $scheduledFor',
+          'entity=${entry.entityId} slot=$slot lost from both queues → '
+          're-arming at its original time $scheduledFor',
         );
         await orchestrator.reEvaluateIfAppropriate(
           entry.entityId,
           scheduledFor: scheduledFor,
+          slot: slot,
         );
       } else {
         // Presumed fired (FR-R-81 / L1). Stamping `delivered` is what makes

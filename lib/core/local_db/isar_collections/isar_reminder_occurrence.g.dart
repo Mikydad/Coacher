@@ -104,19 +104,24 @@ const IsarReminderOccurrenceSchema = CollectionSchema(
       name: r'scheduledAtMs',
       type: IsarType.long,
     ),
-    r'state': PropertySchema(id: 18, name: r'state', type: IsarType.string),
+    r'snoozedUntilMs': PropertySchema(
+      id: 18,
+      name: r'snoozedUntilMs',
+      type: IsarType.long,
+    ),
+    r'state': PropertySchema(id: 19, name: r'state', type: IsarType.string),
     r'taxonomy': PropertySchema(
-      id: 19,
+      id: 20,
       name: r'taxonomy',
       type: IsarType.string,
     ),
     r'updatedAtMs': PropertySchema(
-      id: 20,
+      id: 21,
       name: r'updatedAtMs',
       type: IsarType.long,
     ),
     r'windowMinutes': PropertySchema(
-      id: 21,
+      id: 22,
       name: r'windowMinutes',
       type: IsarType.long,
     ),
@@ -313,10 +318,11 @@ void _isarReminderOccurrenceSerialize(
   writer.writeString(offsets[15], object.resolutionReason);
   writer.writeLong(offsets[16], object.resolvedAtMs);
   writer.writeLong(offsets[17], object.scheduledAtMs);
-  writer.writeString(offsets[18], object.state);
-  writer.writeString(offsets[19], object.taxonomy);
-  writer.writeLong(offsets[20], object.updatedAtMs);
-  writer.writeLong(offsets[21], object.windowMinutes);
+  writer.writeLong(offsets[18], object.snoozedUntilMs);
+  writer.writeString(offsets[19], object.state);
+  writer.writeString(offsets[20], object.taxonomy);
+  writer.writeLong(offsets[21], object.updatedAtMs);
+  writer.writeLong(offsets[22], object.windowMinutes);
 }
 
 IsarReminderOccurrence _isarReminderOccurrenceDeserialize(
@@ -345,10 +351,11 @@ IsarReminderOccurrence _isarReminderOccurrenceDeserialize(
   object.resolutionReason = reader.readStringOrNull(offsets[15]);
   object.resolvedAtMs = reader.readLongOrNull(offsets[16]);
   object.scheduledAtMs = reader.readLong(offsets[17]);
-  object.state = reader.readString(offsets[18]);
-  object.taxonomy = reader.readString(offsets[19]);
-  object.updatedAtMs = reader.readLong(offsets[20]);
-  object.windowMinutes = reader.readLong(offsets[21]);
+  object.snoozedUntilMs = reader.readLongOrNull(offsets[18]);
+  object.state = reader.readString(offsets[19]);
+  object.taxonomy = reader.readString(offsets[20]);
+  object.updatedAtMs = reader.readLong(offsets[21]);
+  object.windowMinutes = reader.readLong(offsets[22]);
   return object;
 }
 
@@ -396,12 +403,14 @@ P _isarReminderOccurrenceDeserializeProp<P>(
     case 17:
       return (reader.readLong(offset)) as P;
     case 18:
-      return (reader.readString(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 19:
       return (reader.readString(offset)) as P;
     case 20:
-      return (reader.readLong(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 21:
+      return (reader.readLong(offset)) as P;
+    case 22:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -4070,6 +4079,103 @@ extension IsarReminderOccurrenceQueryFilter
     IsarReminderOccurrence,
     QAfterFilterCondition
   >
+  snoozedUntilMsIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'snoozedUntilMs'),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  snoozedUntilMsIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'snoozedUntilMs'),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  snoozedUntilMsEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'snoozedUntilMs', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  snoozedUntilMsGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'snoozedUntilMs',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  snoozedUntilMsLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'snoozedUntilMs',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  snoozedUntilMsBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'snoozedUntilMs',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
   stateEqualTo(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -4841,6 +4947,20 @@ extension IsarReminderOccurrenceQuerySortBy
   }
 
   QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QAfterSortBy>
+  sortBySnoozedUntilMs() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'snoozedUntilMs', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QAfterSortBy>
+  sortBySnoozedUntilMsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'snoozedUntilMs', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QAfterSortBy>
   sortByState() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'state', Sort.asc);
@@ -5171,6 +5291,20 @@ extension IsarReminderOccurrenceQuerySortThenBy
   }
 
   QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QAfterSortBy>
+  thenBySnoozedUntilMs() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'snoozedUntilMs', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QAfterSortBy>
+  thenBySnoozedUntilMsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'snoozedUntilMs', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QAfterSortBy>
   thenByState() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'state', Sort.asc);
@@ -5371,6 +5505,13 @@ extension IsarReminderOccurrenceQueryWhereDistinct
   }
 
   QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QDistinct>
+  distinctBySnoozedUntilMs() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'snoozedUntilMs');
+    });
+  }
+
+  QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QDistinct>
   distinctByState({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'state', caseSensitive: caseSensitive);
@@ -5535,6 +5676,13 @@ extension IsarReminderOccurrenceQueryProperty
   scheduledAtMsProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'scheduledAtMs');
+    });
+  }
+
+  QueryBuilder<IsarReminderOccurrence, int?, QQueryOperations>
+  snoozedUntilMsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'snoozedUntilMs');
     });
   }
 
