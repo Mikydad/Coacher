@@ -44,6 +44,7 @@ class ReminderOccurrence {
     this.resolutionReason,
     this.resolvedAtMs,
     this.dismissedForDayKey,
+    this.aiBody,
     this.snoozedUntilMs,
     required this.createdAtMs,
     required this.updatedAtMs,
@@ -124,6 +125,10 @@ class ReminderOccurrence {
   /// defers the ladder, it does not resign from it.
   final int? snoozedUntilMs;
 
+  /// Snapshot of the config's AI copy variant (FR-R-63) at arming time —
+  /// slot 0's body when present; the bank covers everything else.
+  final String? aiBody;
+
   final int createdAtMs;
   final int updatedAtMs;
 
@@ -185,6 +190,7 @@ class ReminderOccurrence {
     Object? resolvedAtMs = _sentinel,
     Object? dismissedForDayKey = _sentinel,
     Object? snoozedUntilMs = _sentinel,
+    Object? aiBody = _sentinel,
     int? updatedAtMs,
   }) {
     return ReminderOccurrence(
@@ -226,6 +232,7 @@ class ReminderOccurrence {
       snoozedUntilMs: snoozedUntilMs == _sentinel
           ? this.snoozedUntilMs
           : snoozedUntilMs as int?,
+      aiBody: aiBody == _sentinel ? this.aiBody : aiBody as String?,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     );
@@ -252,6 +259,7 @@ class ReminderOccurrence {
     if (resolvedAtMs != null) 'resolvedAtMs': resolvedAtMs,
     if (dismissedForDayKey != null) 'dismissedForDayKey': dismissedForDayKey,
     if (snoozedUntilMs != null) 'snoozedUntilMs': snoozedUntilMs,
+    if (aiBody != null) 'aiBody': aiBody,
     'createdAtMs': createdAtMs,
     'updatedAtMs': updatedAtMs,
   };
@@ -283,6 +291,7 @@ class ReminderOccurrence {
       resolvedAtMs: (map['resolvedAtMs'] as num?)?.toInt(),
       dismissedForDayKey: map['dismissedForDayKey'] as String?,
       snoozedUntilMs: (map['snoozedUntilMs'] as num?)?.toInt(),
+      aiBody: map['aiBody'] as String?,
       createdAtMs: (map['createdAtMs'] as num?)?.toInt() ?? 0,
       updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
     );

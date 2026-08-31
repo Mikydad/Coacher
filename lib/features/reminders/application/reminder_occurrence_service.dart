@@ -166,6 +166,7 @@ class ReminderOccurrenceService {
       criticality: config.criticality,
       classificationSource: config.classificationSource,
       classifierVersion: config.classifierVersion,
+      aiBody: config.aiBody,
       createdAtMs: nowMs,
       updatedAtMs: nowMs,
     );
@@ -203,6 +204,7 @@ class ReminderOccurrenceService {
         criticality: config.criticality,
         classificationSource: config.classificationSource,
         classifierVersion: config.classifierVersion,
+        aiBody: config.aiBody,
         updatedAtMs: now.millisecondsSinceEpoch,
       );
       final advanced = ReminderStateMachine.advance(updated, now: now);

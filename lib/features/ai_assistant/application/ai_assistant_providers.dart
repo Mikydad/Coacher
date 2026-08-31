@@ -338,6 +338,38 @@ final proactiveSuggestionEngineProvider = Provider<ProactiveSuggestionEngine>((
     dismissedRepo: ref.read(dismissedSuggestionRepositoryProvider),
     normaliser: ref.read(entityNormaliserProvider),
     optimisationService: ref.read(scheduleOptimisationServiceProvider),
+    // Reminder V2 strategist proposals (FR-R-61): today's day-scoped
+    // suggestions from the Thinking Loop, rendered like any other card.
+    // The pre-drafted input hands the ask to the coach — the user sends it,
+    // the coach's confirmed tools (with their 30-min undo) execute it. D7's
+    // no-auto-apply, using machinery that already exists.
+    strategistSource: () async {
+      final proposals = await ref
+          .read(strategistProposalsStoreProvider)
+          .loadForDay(DateKeys.todayKey());
+      final now = DateTime.now();
+      return [
+        for (final p in proposals)
+          ProactiveSuggestion(
+            id: 'strategist_${p.kind}_${p.taskId}',
+            type: ProactiveSuggestionType.reminderStrategy,
+            title: p.taskTitle.isEmpty ? 'A reminder to rethink' : p.taskTitle,
+            description: p.suggestion,
+            preDraftedInput: switch (p.kind) {
+              'reschedule' =>
+                'Help me find a better time for "${p.taskTitle}" — it keeps slipping.',
+              'ladderTuning' =>
+                'Adjust how "${p.taskTitle}" reminds me — the current rhythm is not working.',
+              'aggregate' =>
+                'Make "${p.taskTitle}" quieter — batch its misses instead of reminding each time.',
+              _ =>
+                'Should I drop "${p.taskTitle}"? Walk me through whether to keep it.',
+            },
+            confidence: 0.55,
+            generatedAt: now,
+          ),
+      ];
+    },
   );
 });
 

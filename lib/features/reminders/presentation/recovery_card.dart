@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
+import '../application/recovery_triage_service.dart';
 import '../application/recovery_view.dart';
 import '../domain/models/reminder_occurrence_enums.dart';
 
@@ -35,8 +36,16 @@ class RecoveryCard extends ConsumerWidget {
     final view = ref.watch(recoveryViewProvider).valueOrNull;
     if (view == null || view.isEmpty) return const SizedBox.shrink();
 
-    final shown = view.rows.take(RecoveryViewBuilder.maxRows).toList();
-    final overflow = view.rows.length - shown.length;
+    // FR-R-62: the deterministic order renders NOW; if the one bounded
+    // triage call has answered, its ranking and headline enhance in place.
+    // valueOrNull means a pending or failed call changes nothing.
+    final triage = ref.watch(recoveryTriageProvider).valueOrNull;
+    final ordered = triage == null
+        ? view.rows
+        : RecoveryTriageService.applyOrder(view.rows, triage);
+
+    final shown = ordered.take(RecoveryViewBuilder.maxRows).toList();
+    final overflow = ordered.length - shown.length;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -51,7 +60,8 @@ class RecoveryCard extends ConsumerWidget {
               shown.isEmpty ? 'Today' : _headline(view.rows.length),
               subtitle: shown.isEmpty
                   ? null
-                  : 'Still open — do one now, or move it.',
+                  : (triage?.headline ??
+                        'Still open — do one now, or move it.'),
             ),
             if (shown.isNotEmpty) const SizedBox(height: 4),
             for (final row in shown)

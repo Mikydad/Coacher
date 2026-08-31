@@ -73,6 +73,20 @@ export const DEFAULT_ROUTES: Record<string, PurposeRoute> = {
   summarize: {
     model: "gpt-4o-mini", maxTokens: 600, quotaClass: "system", enabled: true, temperature: 0.2,
   },
+  // Reminder V2 (FR-R-22): background taxonomy upgrade for task reminders.
+  // Batched (N tasks, 1 call), temperature 0 for deterministic JSON, tiny
+  // cap — the payload is one line per task and the reply one object per
+  // task. System budget: the heuristic classifier is the permanent floor,
+  // so exhaustion or `enabled: false` silently degrades to it (FR-R-71).
+  classify_task: {
+    model: "gpt-4o-mini", maxTokens: 400, quotaClass: "system", enabled: true, temperature: 0,
+  },
+  // Reminder V2 (FR-R-62): ranks >=3 unresolved overdue items at a recovery
+  // moment. Bounded hard client-side (<=2/day) and cheap here; the card
+  // renders deterministically first and only enhances if this answers.
+  recovery_triage: {
+    model: "gpt-4o-mini", maxTokens: 200, quotaClass: "system", enabled: true, temperature: 0,
+  },
   // Thinking Loop (humanizing Phase 7): ≤1 budgeted reflection pass per
   // device-day over the user's full local picture. `enabled: false` here or
   // via Remote Config is the kill switch — the client silent-skips.

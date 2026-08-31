@@ -1,3 +1,4 @@
+import 'dart:async';
 import '../../education/presentation/first_time_feature_card.dart';
 import 'package:flutter/material.dart';
 import '../../education/presentation/help_dot.dart';
@@ -95,6 +96,16 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
   /// visit — a soft nag, never a gate. Dismissing it lets the tasks carry
   /// forward as Overdue-flagged suggestions exactly as D3 settled.
   bool _disciplinedPromptDismissed = false;
+
+  bool _aiSweepFired = false;
+
+  /// FR-R-22's batch variant: planning tomorrow is the natural moment the
+  /// day's reminders exist together, so one call classifies them all.
+  void _fireAiClassifySweep() {
+    if (_aiSweepFired) return;
+    _aiSweepFired = true;
+    unawaited(ref.read(reminderAiClassifierProvider).sweep());
+  }
 
   void _initExpansion(List<Routine> slots) {
     if (_initialized) return;
@@ -332,6 +343,7 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
   Widget build(BuildContext context) {
     final slotsAsync = ref.watch(tomorrowRoutineSlotsProvider);
     final todayAsync = ref.watch(todayAllTasksRowsProvider);
+    _fireAiClassifySweep();
     final tomorrow = DateTime.now().add(const Duration(days: 1));
 
     return Scaffold(

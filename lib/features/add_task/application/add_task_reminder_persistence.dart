@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -151,5 +152,9 @@ Future<String?> persistAddTaskReminder(
 
   await ref.read(reminderRepositoryProvider).upsertReminder(reminder);
   await ref.read(reminderSyncServiceProvider).syncForTaskIds([taskId]);
+  // FR-R-22: the AI upgrade rides behind the save, never on it. The sweep
+  // batches every still-unclassified config in one call, degrades silently,
+  // and cannot touch what the user chose above.
+  unawaited(ref.read(reminderAiClassifierProvider).sweep());
   return reminder.id;
 }

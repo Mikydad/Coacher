@@ -53,6 +53,15 @@ class ThinkingLoopService {
     required InsightCacheRepository insightCache,
     AiProxyClient? proxy,
     AiRemoteConfigService? remoteConfig,
+
+    /// Reminder aggregates for the strategist (FR-R-61) — injected so this
+    /// service keeps no dependency on the reminders feature. Null keeps the
+    /// pre-strategist payload byte-identical.
+    Future<Map<String, dynamic>?> Function()? loadReminderAggregates,
+
+    /// Receives the pass's validated reminder proposals for the day.
+    Future<void> Function(List<ReminderStrategyProposal> proposals)?
+    onReminderProposals,
     DateTime Function()? now,
   }) : _facts = facts,
        _people = people,
@@ -61,6 +70,8 @@ class ThinkingLoopService {
        _insightCache = insightCache,
        _proxy = proxy ?? AiProxyClient(),
        _remoteConfig = remoteConfig ?? AiRemoteConfigService.instance,
+       _loadReminderAggregates = loadReminderAggregates,
+       _onReminderProposals = onReminderProposals,
        _now = now ?? DateTime.now;
 
   final MemoryFactsRepository _facts;
@@ -70,6 +81,9 @@ class ThinkingLoopService {
   final InsightCacheRepository _insightCache;
   final AiProxyClient _proxy;
   final AiRemoteConfigService _remoteConfig;
+  final Future<Map<String, dynamic>?> Function()? _loadReminderAggregates;
+  final Future<void> Function(List<ReminderStrategyProposal>)?
+  _onReminderProposals;
   final DateTime Function() _now;
 
   static const lastDayPrefsKey = 'thinking_loop_last_day_v1';
@@ -134,6 +148,22 @@ class ThinkingLoopService {
         intentions: intentions,
         now: now,
       );
+      // FR-R-61: the strategist rides THIS pass — locally pre-computed
+      // aggregates, never raw ledger rows, no additional call (FR-R-64).
+      final reminderAggregates = await (_loadReminderAggregates?.call() ??
+          Future<Map<String, dynamic>?>.value(null));
+      final reminderTasks = <String, String>{};
+      if (reminderAggregates != null) {
+        snapshot['reminders'] = reminderAggregates;
+        final tasks = reminderAggregates['tasks'];
+        if (tasks is List) {
+          for (final t in tasks) {
+            if (t is Map && t['id'] is String) {
+              reminderTasks[t['id'] as String] = (t['title'] as String?) ?? '';
+            }
+          }
+        }
+      }
 
       String content;
       try {
@@ -173,7 +203,12 @@ class ThinkingLoopService {
           for (final i in await _intentions.fetchAllIncludingTombstones())
             ReflectionParser.titleKey(i.title),
         },
+        reminderTasks: reminderTasks,
       );
+
+      if (parsed.reminderProposals.isNotEmpty) {
+        await _onReminderProposals?.call(parsed.reminderProposals);
+      }
 
       await _apply(parsed, now);
       await prefs.setString(lastDayPrefsKey, today);
@@ -340,6 +375,9 @@ Return STRICT JSON, no prose:
   ],
   "observations": [
     {"message": "hedged, gentle observation, max 200 chars", "basedOn": ["<id>"]}
+  ],
+  "reminderProposals": [
+    {"kind": "reschedule|ladderTuning|aggregate|drop", "taskId": "<id from snapshot.reminders.tasks>", "suggestion": "one warm sentence, max 160 chars"}
   ]
 }
 
@@ -348,5 +386,6 @@ Rules:
 - "dormantIntentions" are standing wishes the user implied but never asked to be reminded of — they create NO notifications. Max 3. Never duplicate an existing intention.
 - "hintUpdates" only when the snapshot shows a timing pattern (e.g. repeated snoozes) suggesting a better time block. Max 5.
 - "observations" are for a possible forget/avoid/change worth mentioning. Phrase as a hedged question or gentle notice ("You might be…", "Looks like…"), never a command or diagnosis. Max 1.
-- Empty arrays are the right answer for an unremarkable snapshot: {"dormantIntentions":[],"hintUpdates":[],"observations":[]}.
+- "reminderProposals" only when snapshot.reminders shows a task genuinely struggling (repeated overdueDays, ignored, reschedules): "reschedule" = a better time, "ladderTuning" = gentler or firmer follow-ups, "aggregate" = misses should be batched quietly, "drop" = worth asking whether to keep it. Max 3, one per task, only ids from snapshot.reminders.tasks. These are SUGGESTIONS the user applies themselves - phrase them as offers, never verdicts.
+- Empty arrays are the right answer for an unremarkable snapshot: {"dormantIntentions":[],"hintUpdates":[],"observations":[],"reminderProposals":[]}.
 ''';

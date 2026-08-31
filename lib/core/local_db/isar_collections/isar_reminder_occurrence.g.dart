@@ -18,110 +18,111 @@ const IsarReminderOccurrenceSchema = CollectionSchema(
   name: r'IsarReminderOccurrence',
   id: -2710081797454308221,
   properties: {
+    r'aiBody': PropertySchema(id: 0, name: r'aiBody', type: IsarType.string),
     r'classificationSource': PropertySchema(
-      id: 0,
+      id: 1,
       name: r'classificationSource',
       type: IsarType.string,
     ),
     r'classifierVersion': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'classifierVersion',
       type: IsarType.long,
     ),
     r'createdAtMs': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'createdAtMs',
       type: IsarType.long,
     ),
     r'criticality': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'criticality',
       type: IsarType.long,
     ),
-    r'dateKey': PropertySchema(id: 4, name: r'dateKey', type: IsarType.string),
+    r'dateKey': PropertySchema(id: 5, name: r'dateKey', type: IsarType.string),
     r'dismissedForDayKey': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'dismissedForDayKey',
       type: IsarType.string,
     ),
     r'entityId': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'entityId',
       type: IsarType.string,
     ),
     r'entityKind': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'entityKind',
       type: IsarType.string,
     ),
     r'entityTitle': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'entityTitle',
       type: IsarType.string,
     ),
     r'ladderPosition': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'ladderPosition',
       type: IsarType.long,
     ),
     r'modeRefId': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'modeRefId',
       type: IsarType.string,
     ),
     r'occurrenceId': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'occurrenceId',
       type: IsarType.string,
     ),
     r'occurrenceKey': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'occurrenceKey',
       type: IsarType.string,
     ),
     r'overdueSinceMs': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'overdueSinceMs',
       type: IsarType.long,
     ),
     r'resolutionKind': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'resolutionKind',
       type: IsarType.string,
     ),
     r'resolutionReason': PropertySchema(
-      id: 15,
+      id: 16,
       name: r'resolutionReason',
       type: IsarType.string,
     ),
     r'resolvedAtMs': PropertySchema(
-      id: 16,
+      id: 17,
       name: r'resolvedAtMs',
       type: IsarType.long,
     ),
     r'scheduledAtMs': PropertySchema(
-      id: 17,
+      id: 18,
       name: r'scheduledAtMs',
       type: IsarType.long,
     ),
     r'snoozedUntilMs': PropertySchema(
-      id: 18,
+      id: 19,
       name: r'snoozedUntilMs',
       type: IsarType.long,
     ),
-    r'state': PropertySchema(id: 19, name: r'state', type: IsarType.string),
+    r'state': PropertySchema(id: 20, name: r'state', type: IsarType.string),
     r'taxonomy': PropertySchema(
-      id: 20,
+      id: 21,
       name: r'taxonomy',
       type: IsarType.string,
     ),
     r'updatedAtMs': PropertySchema(
-      id: 21,
+      id: 22,
       name: r'updatedAtMs',
       type: IsarType.long,
     ),
     r'windowMinutes': PropertySchema(
-      id: 22,
+      id: 23,
       name: r'windowMinutes',
       type: IsarType.long,
     ),
@@ -253,6 +254,12 @@ int _isarReminderOccurrenceEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.aiBody;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.classificationSource.length * 3;
   bytesCount += 3 + object.dateKey.length * 3;
   {
@@ -300,29 +307,30 @@ void _isarReminderOccurrenceSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeString(offsets[0], object.classificationSource);
-  writer.writeLong(offsets[1], object.classifierVersion);
-  writer.writeLong(offsets[2], object.createdAtMs);
-  writer.writeLong(offsets[3], object.criticality);
-  writer.writeString(offsets[4], object.dateKey);
-  writer.writeString(offsets[5], object.dismissedForDayKey);
-  writer.writeString(offsets[6], object.entityId);
-  writer.writeString(offsets[7], object.entityKind);
-  writer.writeString(offsets[8], object.entityTitle);
-  writer.writeLong(offsets[9], object.ladderPosition);
-  writer.writeString(offsets[10], object.modeRefId);
-  writer.writeString(offsets[11], object.occurrenceId);
-  writer.writeString(offsets[12], object.occurrenceKey);
-  writer.writeLong(offsets[13], object.overdueSinceMs);
-  writer.writeString(offsets[14], object.resolutionKind);
-  writer.writeString(offsets[15], object.resolutionReason);
-  writer.writeLong(offsets[16], object.resolvedAtMs);
-  writer.writeLong(offsets[17], object.scheduledAtMs);
-  writer.writeLong(offsets[18], object.snoozedUntilMs);
-  writer.writeString(offsets[19], object.state);
-  writer.writeString(offsets[20], object.taxonomy);
-  writer.writeLong(offsets[21], object.updatedAtMs);
-  writer.writeLong(offsets[22], object.windowMinutes);
+  writer.writeString(offsets[0], object.aiBody);
+  writer.writeString(offsets[1], object.classificationSource);
+  writer.writeLong(offsets[2], object.classifierVersion);
+  writer.writeLong(offsets[3], object.createdAtMs);
+  writer.writeLong(offsets[4], object.criticality);
+  writer.writeString(offsets[5], object.dateKey);
+  writer.writeString(offsets[6], object.dismissedForDayKey);
+  writer.writeString(offsets[7], object.entityId);
+  writer.writeString(offsets[8], object.entityKind);
+  writer.writeString(offsets[9], object.entityTitle);
+  writer.writeLong(offsets[10], object.ladderPosition);
+  writer.writeString(offsets[11], object.modeRefId);
+  writer.writeString(offsets[12], object.occurrenceId);
+  writer.writeString(offsets[13], object.occurrenceKey);
+  writer.writeLong(offsets[14], object.overdueSinceMs);
+  writer.writeString(offsets[15], object.resolutionKind);
+  writer.writeString(offsets[16], object.resolutionReason);
+  writer.writeLong(offsets[17], object.resolvedAtMs);
+  writer.writeLong(offsets[18], object.scheduledAtMs);
+  writer.writeLong(offsets[19], object.snoozedUntilMs);
+  writer.writeString(offsets[20], object.state);
+  writer.writeString(offsets[21], object.taxonomy);
+  writer.writeLong(offsets[22], object.updatedAtMs);
+  writer.writeLong(offsets[23], object.windowMinutes);
 }
 
 IsarReminderOccurrence _isarReminderOccurrenceDeserialize(
@@ -332,30 +340,31 @@ IsarReminderOccurrence _isarReminderOccurrenceDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = IsarReminderOccurrence();
-  object.classificationSource = reader.readString(offsets[0]);
-  object.classifierVersion = reader.readLongOrNull(offsets[1]);
-  object.createdAtMs = reader.readLong(offsets[2]);
-  object.criticality = reader.readLong(offsets[3]);
-  object.dateKey = reader.readString(offsets[4]);
-  object.dismissedForDayKey = reader.readStringOrNull(offsets[5]);
-  object.entityId = reader.readString(offsets[6]);
-  object.entityKind = reader.readString(offsets[7]);
-  object.entityTitle = reader.readStringOrNull(offsets[8]);
+  object.aiBody = reader.readStringOrNull(offsets[0]);
+  object.classificationSource = reader.readString(offsets[1]);
+  object.classifierVersion = reader.readLongOrNull(offsets[2]);
+  object.createdAtMs = reader.readLong(offsets[3]);
+  object.criticality = reader.readLong(offsets[4]);
+  object.dateKey = reader.readString(offsets[5]);
+  object.dismissedForDayKey = reader.readStringOrNull(offsets[6]);
+  object.entityId = reader.readString(offsets[7]);
+  object.entityKind = reader.readString(offsets[8]);
+  object.entityTitle = reader.readStringOrNull(offsets[9]);
   object.id = id;
-  object.ladderPosition = reader.readLong(offsets[9]);
-  object.modeRefId = reader.readStringOrNull(offsets[10]);
-  object.occurrenceId = reader.readString(offsets[11]);
-  object.occurrenceKey = reader.readString(offsets[12]);
-  object.overdueSinceMs = reader.readLongOrNull(offsets[13]);
-  object.resolutionKind = reader.readStringOrNull(offsets[14]);
-  object.resolutionReason = reader.readStringOrNull(offsets[15]);
-  object.resolvedAtMs = reader.readLongOrNull(offsets[16]);
-  object.scheduledAtMs = reader.readLong(offsets[17]);
-  object.snoozedUntilMs = reader.readLongOrNull(offsets[18]);
-  object.state = reader.readString(offsets[19]);
-  object.taxonomy = reader.readString(offsets[20]);
-  object.updatedAtMs = reader.readLong(offsets[21]);
-  object.windowMinutes = reader.readLong(offsets[22]);
+  object.ladderPosition = reader.readLong(offsets[10]);
+  object.modeRefId = reader.readStringOrNull(offsets[11]);
+  object.occurrenceId = reader.readString(offsets[12]);
+  object.occurrenceKey = reader.readString(offsets[13]);
+  object.overdueSinceMs = reader.readLongOrNull(offsets[14]);
+  object.resolutionKind = reader.readStringOrNull(offsets[15]);
+  object.resolutionReason = reader.readStringOrNull(offsets[16]);
+  object.resolvedAtMs = reader.readLongOrNull(offsets[17]);
+  object.scheduledAtMs = reader.readLong(offsets[18]);
+  object.snoozedUntilMs = reader.readLongOrNull(offsets[19]);
+  object.state = reader.readString(offsets[20]);
+  object.taxonomy = reader.readString(offsets[21]);
+  object.updatedAtMs = reader.readLong(offsets[22]);
+  object.windowMinutes = reader.readLong(offsets[23]);
   return object;
 }
 
@@ -367,50 +376,52 @@ P _isarReminderOccurrenceDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 1:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 2:
-      return (reader.readLong(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 3:
       return (reader.readLong(offset)) as P;
     case 4:
-      return (reader.readString(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 5:
-      return (reader.readStringOrNull(offset)) as P;
-    case 6:
       return (reader.readString(offset)) as P;
+    case 6:
+      return (reader.readStringOrNull(offset)) as P;
     case 7:
       return (reader.readString(offset)) as P;
     case 8:
-      return (reader.readStringOrNull(offset)) as P;
-    case 9:
-      return (reader.readLong(offset)) as P;
-    case 10:
-      return (reader.readStringOrNull(offset)) as P;
-    case 11:
       return (reader.readString(offset)) as P;
+    case 9:
+      return (reader.readStringOrNull(offset)) as P;
+    case 10:
+      return (reader.readLong(offset)) as P;
+    case 11:
+      return (reader.readStringOrNull(offset)) as P;
     case 12:
       return (reader.readString(offset)) as P;
     case 13:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 14:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 15:
       return (reader.readStringOrNull(offset)) as P;
     case 16:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 17:
-      return (reader.readLong(offset)) as P;
-    case 18:
       return (reader.readLongOrNull(offset)) as P;
+    case 18:
+      return (reader.readLong(offset)) as P;
     case 19:
-      return (reader.readString(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 20:
       return (reader.readString(offset)) as P;
     case 21:
-      return (reader.readLong(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 22:
+      return (reader.readLong(offset)) as P;
+    case 23:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1304,6 +1315,213 @@ extension IsarReminderOccurrenceQueryFilter
           IsarReminderOccurrence,
           QFilterCondition
         > {
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  aiBodyIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'aiBody'),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  aiBodyIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'aiBody'),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  aiBodyEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'aiBody',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  aiBodyGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'aiBody',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  aiBodyLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'aiBody',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  aiBodyBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'aiBody',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  aiBodyStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'aiBody',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  aiBodyEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'aiBody',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  aiBodyContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'aiBody',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  aiBodyMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'aiBody',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  aiBodyIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'aiBody', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<
+    IsarReminderOccurrence,
+    IsarReminderOccurrence,
+    QAfterFilterCondition
+  >
+  aiBodyIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'aiBody', value: ''),
+      );
+    });
+  }
+
   QueryBuilder<
     IsarReminderOccurrence,
     IsarReminderOccurrence,
@@ -4695,6 +4913,20 @@ extension IsarReminderOccurrenceQueryLinks
 extension IsarReminderOccurrenceQuerySortBy
     on QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QSortBy> {
   QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QAfterSortBy>
+  sortByAiBody() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'aiBody', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QAfterSortBy>
+  sortByAiBodyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'aiBody', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QAfterSortBy>
   sortByClassificationSource() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'classificationSource', Sort.asc);
@@ -5024,6 +5256,20 @@ extension IsarReminderOccurrenceQuerySortThenBy
           IsarReminderOccurrence,
           QSortThenBy
         > {
+  QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QAfterSortBy>
+  thenByAiBody() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'aiBody', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QAfterSortBy>
+  thenByAiBodyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'aiBody', Sort.desc);
+    });
+  }
+
   QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QAfterSortBy>
   thenByClassificationSource() {
     return QueryBuilder.apply(this, (query) {
@@ -5364,6 +5610,13 @@ extension IsarReminderOccurrenceQuerySortThenBy
 extension IsarReminderOccurrenceQueryWhereDistinct
     on QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QDistinct> {
   QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QDistinct>
+  distinctByAiBody({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'aiBody', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IsarReminderOccurrence, IsarReminderOccurrence, QDistinct>
   distinctByClassificationSource({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(
@@ -5550,6 +5803,13 @@ extension IsarReminderOccurrenceQueryProperty
   QueryBuilder<IsarReminderOccurrence, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<IsarReminderOccurrence, String?, QQueryOperations>
+  aiBodyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'aiBody');
     });
   }
 

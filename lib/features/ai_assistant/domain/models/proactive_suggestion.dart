@@ -14,6 +14,11 @@ enum ProactiveSuggestionType {
 
   /// Fatigue stacking / reminder noise optimisation.
   lowEnergySlot,
+
+  /// The reminder strategist's daily proposals (Reminder V2, FR-R-61):
+  /// reschedule / ladder-tuning / aggregate / drop suggestions computed by
+  /// the Thinking Loop over local delivery aggregates. Suggestion-only (D7).
+  reminderStrategy,
 }
 
 /// A lightweight suggestion the Proactive Engine surfaces on the Home screen.

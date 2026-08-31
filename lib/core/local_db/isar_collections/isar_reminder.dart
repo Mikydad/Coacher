@@ -36,6 +36,7 @@ class IsarReminder {
   int criticality = 1;
   String classificationSource = 'heuristic';
   int? classifierVersion;
+  String? aiBody;
 
   static IsarReminder fromDomain(ReminderConfig r) {
     return IsarReminder()
@@ -56,7 +57,8 @@ class IsarReminder {
       ..taxonomy = r.taxonomy.toStorage()
       ..criticality = r.criticality
       ..classificationSource = r.classificationSource.toStorage()
-      ..classifierVersion = r.classifierVersion;
+      ..classifierVersion = r.classifierVersion
+      ..aiBody = r.aiBody;
   }
 
   ReminderConfig toDomain() {
@@ -79,6 +81,7 @@ class IsarReminder {
         classificationSource,
       ),
       classifierVersion: classifierVersion,
+      aiBody: aiBody,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs,
     );

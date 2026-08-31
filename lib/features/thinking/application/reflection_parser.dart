@@ -48,25 +48,83 @@ class ReflectionObservation {
   final List<String> basedOn;
 }
 
+/// One strategist proposal about a task's reminders (FR-R-61). Suggestion
+/// only — D7 forbids auto-apply, so a proposal is words plus a pre-drafted
+/// coach command, never a mutation.
+class ReminderStrategyProposal {
+  const ReminderStrategyProposal({
+    required this.kind,
+    required this.taskId,
+    required this.taskTitle,
+    required this.suggestion,
+  });
+
+  /// `reschedule` | `ladderTuning` | `aggregate` | `drop`.
+  final String kind;
+  final String taskId;
+  final String taskTitle;
+
+  /// One short human sentence ("Study keeps slipping past 2pm — try 6pm?").
+  final String suggestion;
+
+  Map<String, dynamic> toMap() => {
+    'kind': kind,
+    'taskId': taskId,
+    'taskTitle': taskTitle,
+    'suggestion': suggestion,
+  };
+
+  static ReminderStrategyProposal? fromMap(Map<String, dynamic> map) {
+    final kind = map['kind'];
+    final taskId = map['taskId'];
+    final title = map['taskTitle'];
+    final suggestion = map['suggestion'];
+    if (kind is! String ||
+        taskId is! String ||
+        title is! String ||
+        suggestion is! String) {
+      return null;
+    }
+    return ReminderStrategyProposal(
+      kind: kind,
+      taskId: taskId,
+      taskTitle: title,
+      suggestion: suggestion,
+    );
+  }
+}
+
 class ParsedReflection {
   const ParsedReflection({
     this.dormantIntentions = const [],
     this.hintUpdates = const [],
     this.observation,
+    this.reminderProposals = const [],
   });
 
   final List<ReflectionDormantCandidate> dormantIntentions;
   final List<ReflectionHintUpdate> hintUpdates;
   final ReflectionObservation? observation;
+  final List<ReminderStrategyProposal> reminderProposals;
 
   bool get isEmpty =>
-      dormantIntentions.isEmpty && hintUpdates.isEmpty && observation == null;
+      dormantIntentions.isEmpty &&
+      hintUpdates.isEmpty &&
+      observation == null &&
+      reminderProposals.isEmpty;
 }
 
 class ReflectionParser {
   static const maxDormant = 3;
   static const maxHints = 5;
+  static const maxReminderProposals = 3;
   static const timeBlocks = {'morning', 'afternoon', 'evening'};
+  static const reminderProposalKinds = {
+    'reschedule',
+    'ladderTuning',
+    'aggregate',
+    'drop',
+  };
 
   /// [knownIds] is the grounding universe (snapshot fact/person/intention
   /// ids); [openIntentionIds] gates hint targets; [existingTitleKeys] are
@@ -76,6 +134,11 @@ class ReflectionParser {
     required Set<String> knownIds,
     required Set<String> openIntentionIds,
     required Set<String> existingTitleKeys,
+
+    /// Task ids present in the snapshot's reminder aggregates — the only
+    /// tasks a strategist proposal may name. `{id: title}` so the proposal
+    /// carries a human name without a later join.
+    Map<String, String> reminderTasks = const {},
   }) {
     final decoded = _decode(content);
     if (decoded == null) return const ParsedReflection();
@@ -140,10 +203,38 @@ class ReflectionParser {
       break; // At most ONE observation per pass — quiet-app principle.
     }
 
+    // Strategist proposals (FR-R-61): grounded to snapshot task ids, kinds
+    // whitelisted, hard-capped. A proposal is prose — validation here is the
+    // whole safety story, because nothing downstream executes it.
+    final proposals = <ReminderStrategyProposal>[];
+    final seenProposalTasks = <String>{};
+    for (final raw in _list(decoded['reminderProposals'])) {
+      if (proposals.length >= maxReminderProposals) break;
+      if (raw is! Map) continue;
+      final kind = raw['kind'];
+      final taskId = raw['taskId'];
+      final suggestion = raw['suggestion'];
+      if (kind is! String || !reminderProposalKinds.contains(kind)) continue;
+      if (taskId is! String || !reminderTasks.containsKey(taskId)) continue;
+      if (!seenProposalTasks.add(taskId)) continue; // one per task
+      if (suggestion is! String) continue;
+      final trimmed = suggestion.trim();
+      if (trimmed.isEmpty || trimmed.length > 160) continue;
+      proposals.add(
+        ReminderStrategyProposal(
+          kind: kind,
+          taskId: taskId,
+          taskTitle: reminderTasks[taskId]!,
+          suggestion: trimmed,
+        ),
+      );
+    }
+
     return ParsedReflection(
       dormantIntentions: dormant,
       hintUpdates: hints,
       observation: observation,
+      reminderProposals: proposals,
     );
   }
 

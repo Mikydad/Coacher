@@ -37,6 +37,19 @@ describe('resolveRoute', () => {
     assert.equal(route.temperature, 0);
   });
 
+  it('classify_task (Reminder V2, FR-R-22) is a deterministic system purpose', () => {
+    const route = resolveRoute('classify_task', {});
+    assert.equal(route.quotaClass, 'system');
+    assert.equal(route.temperature, 0);
+    assert.equal(route.enabled, true);
+  });
+
+  it('recovery_triage (Reminder V2, FR-R-62) is a bounded system purpose', () => {
+    const route = resolveRoute('recovery_triage', {});
+    assert.equal(route.quotaClass, 'system');
+    assert.equal(route.maxTokens, 200);
+  });
+
   it('reflect (Thinking Loop, Phase 7) is a system purpose', () => {
     const route = resolveRoute('reflect', {});
     assert.equal(route.quotaClass, 'system');

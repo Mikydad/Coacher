@@ -321,33 +321,33 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
 
 ### Phase R4 — AI layer *(tier-gated; advisory only)*
 
-- [ ] **11.0 `classifyTask` endpoint + background upgrade path**
+- [x] **11.0 `classifyTask` endpoint + background upgrade path**
       *(FR-R-22, 60, 64, 65)*
-  - [ ] 11.1 Cloud Function beside `ai_routing.ts`: owned prompt, App Check,
+  - [x] 11.1 Cloud Function beside `ai_routing.ts`: owned prompt, App Check,
         strict JSON schema, Haiku-class model, per-user token budget.
-  - [ ] 11.2 Fire-and-forget client call after the local save; result lands as a
+  - [x] 11.2 Fire-and-forget client call after the local save; result lands as a
         normal Isar write → reminder recompile.
-  - [ ] 11.3 Batch variant for Plan-Tomorrow (N tasks, 1 call).
-  - [ ] 11.4 `classifierVersion` gating — re-classify only on material
+  - [x] 11.3 Batch variant for Plan-Tomorrow (N tasks, 1 call).
+  - [x] 11.4 `classifierVersion` gating — re-classify only on material
         title/time change; never overwrite `classificationSource: user`.
-  - [ ] 11.5 Guardrails in code: AI cannot disable/delete a reminder, exceed
+  - [x] 11.5 Guardrails in code: AI cannot disable/delete a reminder, exceed
         ladder bounds, or soften Extreme; invalid output is discarded silently.
-  - [ ] 11.6 Tier gate: heuristics free, AI classification Pro.
+  - [x] 11.6 Tier gate: heuristics free, AI classification Pro.
 
-- [ ] **12.0 Strategist, triage and AI copy variants** *(FR-R-61, 62, 63 AI half)*
-  - [ ] 12.1 Locally pre-computed aggregates into the Thinking Loop bundle
+- [x] **12.0 Strategist, triage and AI copy variants** *(FR-R-61, 62, 63 AI half)*
+  - [x] 12.1 Locally pre-computed aggregates into the Thinking Loop bundle
         (delivered/opened/ignored/snoozed/wrong-time counts, engagement-by-hour,
         overdue history, mode) — raw ledger rows never leave the device.
-  - [ ] 12.2 Strict-schema proposals (`rescheduleSuggestion`, `ladderTuning`
+  - [x] 12.2 Strict-schema proposals (`rescheduleSuggestion`, `ladderTuning`
         clamped to mode bounds, `aggregateSuggestion`, `dropSuggestion`).
-  - [ ] 12.3 Surface in morning brief / coach with one-tap apply, `source:
+  - [x] 12.3 Surface in morning brief / coach with one-tap apply, `source:
         ai_strategist` provenance and undo. **No auto-apply** (D7).
-  - [ ] 12.4 Recovery triage: ≥ 3 unresolved + connectivity → one bounded call
+  - [x] 12.4 Recovery triage: ≥ 3 unresolved + connectivity → one bounded call
         rendered as a suggestion header; the card renders immediately and
         enhances only if the response arrives.
-  - [ ] 12.5 AI copy variants stored on the config row, used verbatim by
+  - [x] 12.5 AI copy variants stored on the config row, used verbatim by
         [L-PRE]; template bank stays the fallback.
-  - [ ] 12.6 Cost ceiling per FR-R-64, with silent degradation on exhaustion.
+  - [x] 12.6 Cost ceiling per FR-R-64, with silent degradation on exhaustion.
 
 ### Phase R5 — Push floor
 

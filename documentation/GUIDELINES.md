@@ -2770,3 +2770,37 @@ not silent reversal.
   the day's occurrence open on the Recovery Card; partial keeps
   `markTaskStarted` deliberately, because a partially-done task is genuinely
   unfinished and `Active` stops the ladder while staying visible.
+
+- **2026-08-31 · Phase R4 shipped: the AI layer is purposes on the existing
+  proxy, and apply is the coach, not new machinery.** Three decisions worth
+  not relitigating. **(a) No new callables.** FR-R-22's "classifyTask Cloud
+  Function" and FR-R-62's triage are PURPOSES (`classify_task`,
+  `recovery_triage`) in the `ai_routing.ts` registry riding the existing
+  `aiChat` proxy — same App Check flag, same system daily budget, same
+  silent-skip, per-purpose kill switch for free. The PRD's "Haiku-class
+  model" translates to the registry's cheap tier (`gpt-4o-mini`); this
+  codebase's AI stack is OpenAI and the reminder layer follows the house
+  stack. **(b) The strategist rides the reflect pass** (FR-R-64): locally
+  pre-computed `ReminderStrategyAggregates` (per-task counts, sparse
+  hour-histogram, overdue/reschedule history — raw ledger rows never leave)
+  join the reflection snapshot; `ReflectionParser` validates
+  `reminderProposals` (kinds whitelisted, ids grounded to the snapshot's
+  tasks, one per task, max 3, 160 chars); a day-scoped SharedPreferences
+  store holds them — preference-grade data, deliberately not the local-first
+  entity set. **(c) D7's "one-tap apply + undo" is implemented as a
+  pre-drafted Coach message**, not a bespoke apply pipeline: proposals join
+  the Coach FAB's ProactiveSuggestion panel (per Miko 2026-08-31), and
+  tapping one pre-fills the coach input — the user sends it, and the coach's
+  confirmed tools with their existing 30-minute undo execute. Nothing that
+  reads the proposals store can mutate anything. *Guardrails in code
+  (FR-R-65):* the AI classifier is clamped to criticality ≤ 2 (it may not
+  grant the level that pierces sleep), cannot touch `user` rows (filtered
+  AND refused at write), cannot reach `enabled` or the schedule; FR-R-63's
+  warm variant replaces SLOT 0's body only — escalation steps and
+  criticality-3 copy stay the bank's, so generated warmth can never soften
+  the escalation contract. *Retry semantics:* one classify attempt per
+  config version per session ("retry only on material edit" — an edit
+  changes `updatedAtMs`); triage is memoized per overdue-pool and capped
+  2/day in persisted prefs. *End-to-end verification waits on the pending
+  `firebase deploy --only functions`* — by design the client degrades
+  silently until then (FR-R-71).

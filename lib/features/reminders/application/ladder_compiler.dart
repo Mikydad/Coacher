@@ -162,6 +162,17 @@ abstract final class LadderCompiler {
         ladderPosition: i,
         criticality: occurrence.criticality,
       );
+      // FR-R-63: the AI's warm variant may replace SLOT 0 only. Escalation
+      // steps keep the bank — warmth can vary, the escalation contract
+      // (Extreme asks for a reason, criticality 3 speaks plainly) cannot be
+      // softened by generated copy (FR-R-65).
+      final aiBody = occurrence.aiBody?.trim();
+      final body = (i == 0 &&
+              occurrence.criticality < piercingCriticality &&
+              aiBody != null &&
+              aiBody.isNotEmpty)
+          ? aiBody
+          : copy.body;
       slots.add(
         SlotSpec(
           slot: i,
@@ -171,7 +182,7 @@ abstract final class LadderCompiler {
           entityKind: occurrence.entityKind,
           criticality: occurrence.criticality,
           title: copy.title,
-          body: copy.body,
+          body: body,
           modeRefId: occurrence.modeRefId,
         ),
       );

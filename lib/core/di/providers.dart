@@ -33,10 +33,15 @@ import '../../features/reminders/data/isar_reminder_repository.dart';
 import '../../features/reminders/data/reminder_cache_store.dart';
 import '../../features/context_override/application/context_override_providers.dart';
 import '../../features/time_blocks/application/time_block_providers.dart';
+import '../ai/ai_proxy_client.dart';
+import '../../features/reminders/application/reminder_ai_classifier.dart';
+import '../../features/reminders/application/reminder_strategy_aggregates.dart';
+import '../../features/reminders/application/strategist_proposals_store.dart';
 import '../../features/reminders/application/ladder_compiler.dart';
 import '../../features/reminders/application/ladder_scheduler.dart';
 import '../../features/time_blocks/domain/models/scheduled_time_block.dart';
 import '../../features/reminders/application/recovery_notification_scheduler.dart';
+import '../../features/reminders/application/recovery_triage_service.dart';
 import '../../features/reminders/application/recovery_view.dart';
 import '../../features/reminders/application/reminder_occurrence_service.dart';
 import '../../features/reminders/data/isar_reminder_occurrence_repository.dart';
@@ -165,6 +170,63 @@ final ladderSchedulerProvider = Provider<LadderScheduler>((ref) {
   );
 });
 
+/// Day-scoped strategist proposals (FR-R-61) — written by the Thinking
+/// Loop's daily pass, read by the Coach suggestions panel.
+final strategistProposalsStoreProvider = Provider<StrategistProposalsStore>(
+  (ref) => StrategistProposalsStore(),
+);
+
+/// Builds the strategist's input: aggregates over local delivery data.
+/// Raw ledger rows never leave the device (FR-R-61).
+Future<Map<String, dynamic>?> loadReminderStrategyAggregates(Ref ref) async {
+  try {
+    final configs = await ref
+        .read(reminderRepositoryProvider)
+        .listAllReminders();
+    if (configs.where((c) => c.enabled).isEmpty) return null;
+    final now = DateTime.now();
+    final occurrences = await ref
+        .read(reminderOccurrenceRepositoryProvider)
+        .listInRange(
+          startMs: now
+              .subtract(const Duration(days: 14))
+              .millisecondsSinceEpoch,
+          endMs: now.add(const Duration(days: 1)).millisecondsSinceEpoch,
+        );
+    final ledger = await NotificationLedgerRepository(
+      OfflineStore.instance.isar!,
+    ).getAllEntries();
+    return ReminderStrategyAggregates.build(
+      configs: configs,
+      occurrences: occurrences,
+      ledgerEntries: ledger,
+    );
+  } catch (e) {
+    debugPrint('[Strategist] aggregates unavailable: $e');
+    return null;
+  }
+}
+
+/// The background classification upgrade (FR-R-22) — advisory only, Pro-tier
+/// (FR-R-60), silent on every failure (FR-R-71).
+final reminderAiClassifierProvider = Provider<ReminderAiClassifier>((ref) {
+  return ReminderAiClassifier(
+    reminders: ref.read(reminderRepositoryProvider),
+    occurrences: ref.read(reminderOccurrenceServiceProvider),
+    chat: (messages) => AiProxyClient().chat(
+      messages: messages,
+      purpose: 'classify_task',
+      maxTokens: 400,
+      temperature: 0,
+    ),
+    // FR-R-60: heuristics free, AI classification Pro. `isBypassed` is true
+    // when enforcement is off (today) or the user is Pro — matching how
+    // every other tier gate reads.
+    isAiTierEnabled: () => ref.read(tierGateProvider).isBypassed,
+    rearmLadders: () => ref.read(ladderSchedulerProvider).rearmAll(),
+  );
+});
+
 /// The one push the recovery system gets (FR-R-53 / D6).
 final recoveryNotificationSchedulerProvider =
     Provider<RecoveryNotificationScheduler>((ref) {
@@ -231,6 +293,28 @@ Future<List<ScheduledTimeBlock>> _blocksForDay(Ref ref, DateTime day) {
       .read(timeBlockRepositoryProvider)
       .listBlocksForDateRange(dayStart, dayStart.add(const Duration(days: 1)));
 }
+
+/// The triage call's service (FR-R-62). Session-scoped memo + persisted
+/// 2/day cap live inside.
+final recoveryTriageServiceProvider = Provider<RecoveryTriageService>((ref) {
+  return RecoveryTriageService(
+    chat: (messages) => AiProxyClient().chat(
+      messages: messages,
+      purpose: 'recovery_triage',
+      maxTokens: 200,
+      temperature: 0,
+    ),
+    isAiTierEnabled: () => ref.read(tierGateProvider).isBypassed,
+  );
+});
+
+/// The card's AI enhancement: null immediately (deterministic order stands),
+/// a headline + ranking if one bounded call answers (FR-R-62).
+final recoveryTriageProvider = FutureProvider<RecoveryTriage?>((ref) async {
+  final view = ref.watch(recoveryViewProvider).valueOrNull;
+  if (view == null) return null;
+  return ref.read(recoveryTriageServiceProvider).triage(view);
+});
 
 /// Entity ids currently Overdue — what a task row consults to show its badge
 /// (FR-R-50's "task list badge"). Derived from the same view the card renders,

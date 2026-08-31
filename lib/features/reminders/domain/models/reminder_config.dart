@@ -21,6 +21,7 @@ class ReminderConfig {
     this.criticality = 1,
     this.classificationSource = ClassificationSource.heuristic,
     this.classifierVersion,
+    this.aiBody,
     required this.createdAtMs,
     required this.updatedAtMs,
   });
@@ -63,6 +64,12 @@ class ReminderConfig {
 
   final ClassificationSource classificationSource;
   final int? classifierVersion;
+
+  /// AI-pre-generated warm first-reminder line (FR-R-63), written at
+  /// classification time and used VERBATIM by the compiled slot 0. The
+  /// template bank is the permanent fallback and keeps every escalation
+  /// step — warmth is allowed to vary, the escalation contract is not.
+  final String? aiBody;
 
   final int createdAtMs;
   final int updatedAtMs;
@@ -119,6 +126,7 @@ class ReminderConfig {
     'criticality': criticality,
     'classificationSource': classificationSource.toStorage(),
     if (classifierVersion != null) 'classifierVersion': classifierVersion,
+    if (aiBody != null) 'aiBody': aiBody,
     'createdAtMs': createdAtMs,
     'updatedAtMs': updatedAtMs,
   };
@@ -155,6 +163,7 @@ class ReminderConfig {
             )
           : ClassificationSource.migration,
       classifierVersion: (map['classifierVersion'] as num?)?.toInt(),
+      aiBody: map['aiBody'] as String?,
       createdAtMs: map['createdAtMs'] as int,
       updatedAtMs: map['updatedAtMs'] as int,
     );
@@ -186,6 +195,7 @@ class ReminderConfig {
     int? criticality,
     ClassificationSource? classificationSource,
     Object? classifierVersion = _sentinel,
+    Object? aiBody = _sentinel,
     int? updatedAtMs,
   }) {
     return ReminderConfig(
@@ -221,6 +231,7 @@ class ReminderConfig {
       classifierVersion: classifierVersion == _sentinel
           ? this.classifierVersion
           : classifierVersion as int?,
+      aiBody: aiBody == _sentinel ? this.aiBody : aiBody as String?,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     );

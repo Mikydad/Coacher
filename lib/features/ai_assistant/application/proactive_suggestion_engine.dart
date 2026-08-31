@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../goals/application/goal_period_helpers.dart';
@@ -32,7 +33,13 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
     required this.dismissedRepo,
     required this.normaliser,
     required this.optimisationService,
+    this.strategistSource,
   });
+
+  /// Reminder V2's strategist proposals (FR-R-61), merged alongside the
+  /// deterministic rules. Injected as a plain callback so this engine keeps
+  /// no dependency on the reminders feature; null means no strategist.
+  final Future<List<ProactiveSuggestion>> Function()? strategistSource;
 
   final PlanningRepository planningRepository;
   final GoalsRepository goalsRepository;
@@ -67,6 +74,7 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
       _ruleGoalBehindPace(suppressed),
       _ruleOptimiseOrder(suppressed),
       _ruleScheduleOptimisation(suppressed),
+      _strategistSuggestions(suppressed),
     ]);
 
     for (final list in results) {
@@ -87,6 +95,23 @@ class ProactiveSuggestionEngine implements ProactiveSuggestionSource {
 
     _updateAnalyticsSummary(top);
     return top;
+  }
+
+  /// FR-R-61's surface: strategist proposals join the same panel, the same
+  /// "Not now" suppression and the same daily cap as every other suggestion.
+  Future<List<ProactiveSuggestion>> _strategistSuggestions(
+    Set<ProactiveSuggestionType> suppressed,
+  ) async {
+    if (strategistSource == null) return const [];
+    if (suppressed.contains(ProactiveSuggestionType.reminderStrategy)) {
+      return const [];
+    }
+    try {
+      return await strategistSource!();
+    } catch (e) {
+      debugPrint('[ProactiveEngine] strategist source failed: $e');
+      return const [];
+    }
   }
 
   void _updateAnalyticsSummary(List<ProactiveSuggestion> shown) {

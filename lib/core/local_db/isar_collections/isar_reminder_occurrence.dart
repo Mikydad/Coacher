@@ -57,6 +57,7 @@ class IsarReminderOccurrence {
   String? resolutionReason;
   int? resolvedAtMs;
   String? dismissedForDayKey;
+  String? aiBody;
   int? snoozedUntilMs;
   late int createdAtMs;
 
@@ -86,6 +87,7 @@ class IsarReminderOccurrence {
       ..resolutionReason = o.resolutionReason
       ..resolvedAtMs = o.resolvedAtMs
       ..dismissedForDayKey = o.dismissedForDayKey
+      ..aiBody = o.aiBody
       ..snoozedUntilMs = o.snoozedUntilMs
       ..createdAtMs = o.createdAtMs;
   }
@@ -113,6 +115,7 @@ class IsarReminderOccurrence {
       resolutionReason: resolutionReason,
       resolvedAtMs: resolvedAtMs,
       dismissedForDayKey: dismissedForDayKey,
+      aiBody: aiBody,
       snoozedUntilMs: snoozedUntilMs,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs,
