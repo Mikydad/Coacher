@@ -32,6 +32,9 @@ import '../application/stake_functions.dart';
 import '../application/stakes_providers.dart';
 import '../domain/models/points.dart';
 import '../domain/models/stake_challenge.dart';
+import '../../profile/application/profile_providers.dart';
+import 'cards/card_preview_screen.dart';
+import 'cards/commitment_card.dart';
 import 'stake_challenge_detail_screen.dart';
 import 'stake_photo_cache.dart';
 
@@ -90,8 +93,9 @@ class AccountabilityCreateFlow extends ConsumerStatefulWidget {
 enum _Step { configure, promise, review }
 
 /// What's on the line: photo (P1), h2h points (P2), money ($ — SIMULATED
-/// until Stripe activates; debug builds only), practice.
-enum _StakeChoice { photo, h2h, money, practice }
+/// until Stripe activates; debug builds only), public (the user's word —
+/// tasks/prd-public-commitment-cards.md), practice.
+enum _StakeChoice { photo, h2h, money, public, practice }
 
 class _AccountabilityCreateFlowState
     extends ConsumerState<AccountabilityCreateFlow> {
@@ -153,7 +157,8 @@ class _AccountabilityCreateFlowState
                   ...commitment,
                   (_keyAntiCharity, _antiCharityId != null),
                 ],
-                _StakeChoice.practice => commitment,
+                // Public needs nothing beyond the commitment (FR-7).
+                _StakeChoice.public || _StakeChoice.practice => commitment,
               },
       _Step.promise => [
         (_keyWhy, _why.text.trim().isNotEmpty),
@@ -254,6 +259,7 @@ class _AccountabilityCreateFlowState
   bool get _isPractice => _stake == _StakeChoice.practice;
   bool get _isH2h => _stake == _StakeChoice.h2h;
   bool get _isMoney => _stake == _StakeChoice.money;
+  bool get _isPublic => _stake == _StakeChoice.public;
 
   // Consent + pledge
   bool _consentIsMe = false;
@@ -357,6 +363,7 @@ class _AccountabilityCreateFlowState
           _StakeChoice.money => [
             ('Anti-charity', _antiCharityId != null, _keyAntiCharity),
           ],
+          _StakeChoice.public ||
           _StakeChoice.practice => <(String, bool, GlobalKey?)>[],
         },
       ],
@@ -489,7 +496,7 @@ class _AccountabilityCreateFlowState
       (_cadence != GoalRepeatCadence.monthly || _monthDays.isNotEmpty);
 
   bool get _stakeDetailsValid => switch (_stake) {
-    _StakeChoice.practice => true,
+    _StakeChoice.public || _StakeChoice.practice => true,
     _StakeChoice.photo => _circleId != null && _photo != null,
     _StakeChoice.h2h =>
       _circleId != null &&
@@ -988,6 +995,12 @@ class _AccountabilityCreateFlowState
       'Fail and it\'s donated to a cause you can\'t stand. No real '
           'money until Stripe is live.',
     ),
+    _StakeChoice.public => (
+      Icons.campaign_rounded,
+      AppColors.amber,
+      'Public commitment',
+      'Post your promise. A result card follows — win or lose.',
+    ),
     _StakeChoice.practice => (
       Icons.school_rounded,
       AppColors.textSoft,
@@ -1002,6 +1015,7 @@ class _AccountabilityCreateFlowState
     _StakeChoice.photo,
     _StakeChoice.h2h,
     if (kDebugMode) _StakeChoice.money,
+    _StakeChoice.public,
     _StakeChoice.practice,
   ];
 
@@ -1151,7 +1165,88 @@ class _AccountabilityCreateFlowState
       _StakeChoice.photo => _photoConfigFields(),
       _StakeChoice.h2h => _h2hFields(),
       _StakeChoice.money => _moneyFields(),
+      _StakeChoice.public => _publicExplainerFields(),
     };
+  }
+
+  /// Public commitment has no inputs — instead the three-card arc is
+  /// explained up front so the user knows what they're signing up for
+  /// (FR-7): pledge card now, crown or missed card at the deadline.
+  List<Widget> _publicExplainerFields() {
+    Widget row(IconData icon, Color color, String title, String sub) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    sub,
+                    style: TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 12.5,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return [
+      _microLabel('HOW IT WORKS'),
+      const SizedBox(height: 10),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        decoration: BoxDecoration(
+          color: AppColors.inkCard,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.fg12),
+        ),
+        child: Column(
+          children: [
+            row(
+              Icons.ios_share_rounded,
+              AppColors.amber,
+              'Pledge card — now',
+              'You get a shareable card with your promise and the date. '
+                  'Post it where people will see it.',
+            ),
+            row(
+              Icons.emoji_events_rounded,
+              AppColors.statusGreen,
+              'Crown card — if you finish',
+              'Proof you called your shot. Made to be shared.',
+            ),
+            row(
+              Icons.replay_rounded,
+              AppColors.coral,
+              'Missed card — if you don\'t',
+              'Your progress, the miss, and a recommit. It goes on the '
+                  'record either way.',
+            ),
+          ],
+        ),
+      ),
+    ];
   }
 
   List<Widget> _photoConfigFields() {
@@ -2099,6 +2194,51 @@ class _AccountabilityCreateFlowState
             ],
           ),
         ),
+        // Public commitment: the why doubles as the card's motivation note
+        // (FR-8) — offer starters, always editable.
+        if (_isPublic) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final s in const [
+                'I\'m putting in the work today for the future I want '
+                    'tomorrow.',
+                'No excuses this time. Watch me.',
+                'I said it out loud so I can\'t back out.',
+              ])
+                GestureDetector(
+                  onTap: () => setState(() => _why.text = s),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _why.text == s
+                          ? AppColors.accent.withValues(alpha: 0.16)
+                          : AppColors.inkCard,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: _why.text == s
+                            ? AppColors.accent
+                            : AppColors.fg12,
+                      ),
+                    ),
+                    child: Text(
+                      s,
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
         if (_needsConsent) ...[
           const SizedBox(height: 28),
           Column(
@@ -2140,6 +2280,12 @@ class _AccountabilityCreateFlowState
         '\$${(_moneyCents / 100).toStringAsFixed(0)} on the line',
         'CHARGED AT START · REFUNDED IF YOU PASS',
         AppColors.coral,
+      ),
+      _StakeChoice.public => (
+        'STAKE — YOUR WORD',
+        'Your word, in public',
+        'PLEDGE CARD NOW · RESULT CARD AT THE DEADLINE',
+        AppColors.amber,
       ),
       _StakeChoice.practice => (
         'PRACTICE RUN',
@@ -2432,6 +2578,7 @@ class _AccountabilityCreateFlowState
       _StakeChoice.photo => 'solo_photo',
       _StakeChoice.h2h => 'h2h_points',
       _StakeChoice.money => 'solo_money',
+      _StakeChoice.public => 'solo_public',
       _StakeChoice.practice => 'practice',
     };
 
@@ -2447,7 +2594,9 @@ class _AccountabilityCreateFlowState
     final storagePath = 'stake_photos/$id/$uid.jpg';
     final revealWindowMins = _revealWindowMins;
     final mode = _mode;
-    final callableCircleId = _isPractice ? '' : (_circleId ?? '');
+    final callableCircleId = (_isPractice || _isPublic)
+        ? ''
+        : (_circleId ?? '');
     final opponentUid = _isH2h ? _opponentUid : null;
     final h2hStake = _isH2h ? _h2hStake : null;
     final charityId = _isH2h ? _charityId : null;
@@ -2524,11 +2673,14 @@ class _AccountabilityCreateFlowState
           _StakeChoice.photo => StakeChallengeType.soloPhoto,
           _StakeChoice.h2h => StakeChallengeType.h2hPoints,
           _StakeChoice.money => StakeChallengeType.soloMoney,
+          _StakeChoice.public => StakeChallengeType.soloPublic,
           _StakeChoice.practice => StakeChallengeType.practice,
         },
         status: status,
         creatorUid: uid,
-        circleId: (_isPractice || _isMoney) ? '' : (_circleId ?? ''),
+        circleId: (_isPractice || _isMoney || _isPublic)
+            ? ''
+            : (_circleId ?? ''),
         participants: [
           StakeParticipant(
             uid: uid,
@@ -2536,6 +2688,7 @@ class _AccountabilityCreateFlowState
             stakeKind: switch (_stake) {
               _StakeChoice.photo => 'photo',
               _StakeChoice.money => 'money',
+              _StakeChoice.public => 'public',
               _ => 'points',
             },
             stakeAmount: _isH2h
@@ -2595,6 +2748,7 @@ class _AccountabilityCreateFlowState
         _StakeChoice.photo => StakeChallengeStatus.draft,
         _StakeChoice.h2h => StakeChallengeStatus.pendingAccept,
         _StakeChoice.money ||
+        _StakeChoice.public ||
         _StakeChoice.practice => StakeChallengeStatus.active,
       },
       photoState: isPhoto ? StakePhotoState.pendingScreen : null,
@@ -2694,12 +2848,29 @@ class _AccountabilityCreateFlowState
 
     if (!mounted) return;
     final nav = Navigator.of(context);
+    // Public commitment: the pledge card is the payoff of committing —
+    // it lands on top of the detail screen the moment the challenge is
+    // live, all local (FR-10). Dismissing it reveals the detail screen.
+    final pledgeCard = _isPublic
+        ? CommitmentCardData(
+            state: CommitmentCardState.pledge,
+            goalTitle: title,
+            deadline: _rangeEnd,
+            displayName: ref.read(displayNameProvider),
+            note: pledgeWhy,
+          )
+        : null;
     nav.pop();
     nav.push(
       MaterialPageRoute(
         builder: (_) => StakeChallengeDetailScreen(challengeId: id),
       ),
     );
+    if (pledgeCard != null) {
+      nav.push(
+        MaterialPageRoute(builder: (_) => CardPreviewScreen(data: pledgeCard)),
+      );
+    }
   }
 
   // ─── Small shared widgets ──────────────────────────────────────────────────
