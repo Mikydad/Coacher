@@ -2742,3 +2742,31 @@ not silent reversal.
   the user just declared the window over; others expire) and cancels the
   ladder. *C1:* Extreme's overflow offers Move-to-tomorrow only — Skip, even
   with a reason, is the one-tap give-up D4 excludes; Disciplined keeps it.
+
+- **2026-08-31 · Reminder V2 audit fixes, wave 2 (B1–B4, D1) — and drops
+  became effective, not just recorded.** *B1:* the FR-R-41 day-close prompt
+  actually exists now: Plan-Tomorrow shows ONE inline card when Disciplined
+  tasks went overdue undecided — "Move to tomorrow" dispositions them all via
+  the headless mover, "Not now" lets them carry forward as Overdue-flagged
+  rows. Soft nag, never a gate (D3). *B2:* the dynamic Focus Shield is real:
+  `markTaskStarted` takes the session length, and `rearmAll(extraShields:)`
+  recompiles with the session window shielding OTHER entities' slots. The
+  key mechanism: **the drop loop now actively cancels armed leftovers** —
+  compiling a slot away only prevented *future* arming, so a shield or
+  boundary that appeared after a slot was armed used to change nothing until
+  the next cold start's phantom sweep. Session end needs no explicit unwind:
+  the completion mutation's recompute compiles without the shield and
+  re-arms, and an abandoned session self-heals the same way. Criticality 3
+  ignores the session shield (D5). *B3:* FR-R-33's "every drop is
+  ledger-logged" is now true — `logDrop` writes a `cancelled` row with
+  `ladder_drop_<reason>` in sourceContext (visible in the debug screen; can
+  never read as a delivery claim). Only real losses are logged: boundary,
+  shield, budget, snoozed, window — `past` and `notToday` are the calendar
+  doing its job. *B4:* fired-detection reconciliation runs on warm resume
+  (10-minute throttle), so a device that stays warm for days still stamps
+  `delivered`. *D1:* resolved occurrences prune at 30 days — the method had
+  zero callers. *Also caught:* Home's check-in path still called
+  `markTaskStarted` on COMPLETION (an R2.2 miss — third such site), leaving
+  the day's occurrence open on the Recovery Card; partial keeps
+  `markTaskStarted` deliberately, because a partially-done task is genuinely
+  unfinished and `Active` stops the ladder while staying visible.

@@ -169,6 +169,7 @@ final ladderSchedulerProvider = Provider<LadderScheduler>((ref) {
     loadAttentionState: () =>
         ref.read(contextOverrideRepositoryProvider).getAttentionState(),
     budget: ref.read(notificationBudgetProvider),
+    ledger: NotificationLedgerRepository(OfflineStore.instance.isar!),
   );
 });
 
@@ -245,6 +246,17 @@ final reminderSyncServiceProvider = Provider<ReminderSyncService>(
     orchestratorService: ref.read(attentionOrchestratorServiceProvider),
     occurrenceService: ref.read(reminderOccurrenceServiceProvider),
     rearmLadders: () => ref.read(ladderSchedulerProvider).rearmAll(),
+    shieldSession: (length) {
+      final now = DateTime.now();
+      return ref
+          .read(ladderSchedulerProvider)
+          .rearmAll(
+            extraShields: [
+              ShieldWindow(start: now, end: now.add(length), reason: 'focus'),
+            ],
+          )
+          .then((_) {});
+    },
   ),
 );
 

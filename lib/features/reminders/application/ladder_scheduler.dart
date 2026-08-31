@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/notifications/notification_budget.dart';
+import '../../../core/notifications/notification_ledger_repository.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../context_override/domain/models/user_attention_state.dart';
@@ -33,12 +34,17 @@ class LadderScheduler {
     required UpcomingStartsLoader loadUpcomingStarts,
     Future<UserAttentionState?> Function()? loadAttentionState,
     NotificationBudget? budget,
+
+    /// Slot-drop record (FR-R-33 / B3). Optional so tests and legacy wiring
+    /// keep working; absent, drops are debugPrint-only.
+    NotificationLedgerRepository? ledger,
     DateTime Function()? now,
   }) : _occurrences = occurrences,
        _orchestrator = orchestrator,
        _loadUpcomingStarts = loadUpcomingStarts,
        _loadAttentionState = loadAttentionState,
        _budget = budget,
+       _ledger = ledger,
        _now = now ?? DateTime.now;
 
   final ReminderOccurrenceRepository _occurrences;
@@ -46,6 +52,7 @@ class LadderScheduler {
   final UpcomingStartsLoader _loadUpcomingStarts;
   final Future<UserAttentionState?> Function()? _loadAttentionState;
   final NotificationBudget? _budget;
+  final NotificationLedgerRepository? _ledger;
   final DateTime Function() _now;
 
   /// Deepest ladder any mode defines — how many slots a cancel must sweep.
@@ -55,14 +62,20 @@ class LadderScheduler {
   ///
   /// Idempotent: slot ids are deterministic, so re-running replaces each slot
   /// in place rather than stacking duplicates.
-  Future<LadderSchedulingResult> rearmAll() async {
+  Future<LadderSchedulingResult> rearmAll({
+    /// Ephemeral shields for THIS pass — the dynamic half of FR-R-32
+    /// (audit B2): a timer the user just started shields its whole session,
+    /// and the recompile at session end (via the recompute graph's
+    /// notifications scope) lifts it again.
+    List<ShieldWindow> extraShields = const [],
+  }) async {
     final now = _now();
     try {
       final open = await _occurrences.listUnresolved();
       if (open.isEmpty) return const LadderSchedulingResult();
 
       final upcomingStarts = await _loadUpcomingStarts(now);
-      final shields = await _shieldsFor(now);
+      final shields = [...await _shieldsFor(now), ...extraShields];
       var remaining =
           await (_budget?.remainingCapacity() ??
               Future.value(NotificationBudget.kDefaultSafeCap));
@@ -123,6 +136,32 @@ class LadderScheduler {
           dropped++;
           debugPrint(
             '[LadderScheduler] ${occurrence.entityId} dropped $drop',
+          );
+          // Drops must be EFFECTIVE and RECORDED (B2/B3). Effective: a
+          // boundary or shield that appeared after a slot was armed silences
+          // the armed leftover now, not at the next cold start. Recorded:
+          // FR-R-33's "no silent truncation" — but only for reasons that
+          // represent real loss; `past` and `notToday` are the calendar
+          // doing its job.
+          const effectiveReasons = {
+            SlotDropReason.boundary,
+            SlotDropReason.shield,
+            SlotDropReason.budget,
+            SlotDropReason.snoozed,
+            SlotDropReason.window,
+          };
+          if (!effectiveReasons.contains(drop.reason)) continue;
+          await _orchestrator.cancelTaskSlot(occurrence.entityId, drop.slot);
+          await _ledger?.logDrop(
+            notifId:
+                ('task:${occurrence.entityId}:${drop.slot}').hashCode.abs() %
+                2147483647,
+            entityId: occurrence.entityId,
+            entityKind: occurrence.entityKind,
+            scheduledForMs: occurrence.scheduledAt
+                .add(Duration(minutes: drop.offsetMinutes))
+                .millisecondsSinceEpoch,
+            reason: drop.reason.name,
           );
         }
 

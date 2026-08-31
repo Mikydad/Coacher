@@ -88,7 +88,16 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
     if (execState.targetType == TimerSessionTargetType.task &&
         execState.taskId.isNotEmpty) {
       unawaited(
-        ref.read(reminderSyncServiceProvider).markTaskStarted(execState.taskId),
+        ref
+            .read(reminderSyncServiceProvider)
+            .markTaskStarted(
+              execState.taskId,
+              // The dynamic Focus Shield (FR-R-32): other entities' armed
+              // slots inside this session are silenced for its duration.
+              sessionLength: (execState.targetDurationMinutes ?? 0) > 0
+                  ? Duration(minutes: execState.targetDurationMinutes!)
+                  : null,
+            ),
       );
     }
     if (mounted) {

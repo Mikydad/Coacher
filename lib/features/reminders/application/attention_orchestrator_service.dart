@@ -563,6 +563,16 @@ class AttentionOrchestratorService implements OrchestratorReEvaluator {
       entityKind == ReminderEntityKinds.task ||
       entityKind == ReminderEntityKinds.habit;
 
+  /// Cancel ONE task-ladder slot, leaving its siblings armed.
+  ///
+  /// The compiler's drop loop uses this to make drops effective (audit B2/B3):
+  /// a boundary or shield that appears AFTER a slot was armed must silence
+  /// that slot now, not at the next cold start's phantom sweep.
+  Future<void> cancelTaskSlot(String entityId, int slot) async {
+    final notifId = _notifications.idFromTaskId(entityId, slot: slot);
+    await _cancelByNotifId(notifId);
+  }
+
   /// Slot-scoped cancel: only the given OS notification id (and its ledger
   /// row), leaving the entity's sibling slots untouched.
   Future<void> _cancelByNotifId(int notifId) async {

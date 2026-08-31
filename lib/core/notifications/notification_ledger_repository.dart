@@ -23,6 +23,34 @@ class NotificationLedgerRepository {
     });
   }
 
+  /// Record a compiled slot the ladder had to give up (FR-R-33 / audit B3).
+  ///
+  /// "Every drop is ledger-logged (no silent truncation)": a ladder that
+  /// quietly loses slots is indistinguishable from one that was never
+  /// configured, and the debug screen + delivery metrics need the record.
+  /// The row lands in `cancelled` state so it can never read as a delivery
+  /// claim; [reason] survives in [IsarNotificationLedgerEntry.sourceContext].
+  Future<void> logDrop({
+    required int notifId,
+    required String entityId,
+    required String entityKind,
+    required int scheduledForMs,
+    required String reason,
+  }) async {
+    final existing = await findByNotifId(notifId);
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final entry = existing ?? IsarNotificationLedgerEntry();
+    entry
+      ..notifId = notifId
+      ..entityId = entityId
+      ..entityKind = entityKind
+      ..state = NotificationLedgerState.cancelled.name
+      ..scheduledForMs = scheduledForMs
+      ..sourceContext = 'ladder_drop_$reason'
+      ..updatedAtMs = nowMs;
+    await upsertEntry(entry);
+  }
+
   /// Transition an entry to [NotificationLedgerState.cancelled] by entityId.
   Future<void> markCancelled(String entityId) async {
     final entry = await findByEntityId(entityId);

@@ -4,6 +4,9 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/notifications/local_notifications_service.dart';
+import '../core/notifications/notification_ledger_repository.dart';
+import '../core/notifications/notification_reconciliation_service.dart';
+import '../core/offline/offline_store.dart';
 import '../core/push/push_messaging_service.dart';
 import '../core/runtime/recompute_scope.dart';
 import '../core/runtime/unified_recompute_graph.dart';
@@ -41,6 +44,13 @@ class _AppLifecycleTaskRefreshState
   /// purge ceilings or retries deferred extractions.
   static const Duration _kMaintenanceMinInterval = Duration(hours: 6);
   int _lastMaintenanceMs = 0;
+
+  /// Fired-detection reconciliation on warm resumes (FR-R-81 / audit B4):
+  /// bootstrap alone means a device that stays warm for days never stamps
+  /// `delivered` on anything, and the delivery counts drift back into the
+  /// undercounting the boot pass was built to fix.
+  static const Duration _kReconcileMinInterval = Duration(minutes: 10);
+  int _lastReconcileMs = 0;
 
   @override
   void initState() {
@@ -126,6 +136,22 @@ class _AppLifecycleTaskRefreshState
       unawaited(
         ref.read(attentionOrchestratorServiceProvider).checkIgnoredTimeouts(),
       );
+      // Fired-detection + lost-slot re-arm on resume, throttled (B4). Same
+      // pass bootstrap runs; all reads are local (two plugin queries + Isar).
+      final nowMsR = DateTime.now().millisecondsSinceEpoch;
+      if (nowMsR - _lastReconcileMs > _kReconcileMinInterval.inMilliseconds) {
+        _lastReconcileMs = nowMsR;
+        final isar = OfflineStore.instance.isar;
+        if (isar != null) {
+          unawaited(
+            NotificationReconciliationService(
+              ledger: NotificationLedgerRepository(isar),
+              notifications: LocalNotificationsService.instance,
+              orchestrator: ref.read(attentionOrchestratorServiceProvider),
+            ).reconcile(),
+          );
+        }
+      }
       // One-shot goal reminders (Phase 0 reroute) roll forward on app
       // activity: a warm resume must re-arm the next occurrence too, not
       // just cold starts and mutations. Throttled inside rearmIfStale.

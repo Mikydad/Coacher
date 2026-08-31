@@ -18,6 +18,15 @@ class NoOpNotificationLedger implements NotificationLedgerRepository {
   Future<void> markDelivered(int notifId, {int? deliveredAtMs}) async {}
 
   @override
+  Future<void> logDrop({
+    required int notifId,
+    required String entityId,
+    required String entityKind,
+    required int scheduledForMs,
+    required String reason,
+  }) async {}
+
+  @override
   Future<void> markInteraction(int notifId, String interactionType) async {}
 
   @override

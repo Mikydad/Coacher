@@ -11,6 +11,7 @@ import '../../planning/application/planned_task_providers.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../add_task/presentation/add_task_args.dart';
 import '../../add_task/presentation/add_task_sheet.dart';
+import '../../planning/application/move_task_to_tomorrow.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/domain/models/block.dart';
 import '../../planning/domain/models/routine.dart';
@@ -89,6 +90,11 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
   final Set<String> _expandedSlots = {};
   bool _carryForwardExpanded = true;
   bool _initialized = false;
+
+  /// FR-R-41 (audit B1): the Disciplined day-close prompt shows once per
+  /// visit — a soft nag, never a gate. Dismissing it lets the tasks carry
+  /// forward as Overdue-flagged suggestions exactly as D3 settled.
+  bool _disciplinedPromptDismissed = false;
 
   void _initExpansion(List<Routine> slots) {
     if (_initialized) return;
@@ -186,6 +192,38 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
     );
     if (mounted) setState(() => _expandedSlots.add(routineId));
     invalidateTomorrowProviders(ref);
+  }
+
+  /// FR-R-41: disposition every overdue Disciplined task in one gesture.
+  /// Headless move (no per-task slot picker — this is the "just deal with
+  /// them" affordance); the reminder side follows via shiftToDate.
+  Future<void> _moveDisciplinedToTomorrow(List<PlannedTaskRow> rows) async {
+    for (final row in rows) {
+      try {
+        await moveTaskRowToTomorrow(ref, row);
+        await ref
+            .read(reminderSyncServiceProvider)
+            .shiftToDate(
+              row.task.id,
+              targetDay: DateTime.now().add(const Duration(days: 1)),
+            );
+      } catch (e) {
+        debugPrint('[PlanTomorrow] disciplined move failed: $e');
+      }
+    }
+    setState(() => _disciplinedPromptDismissed = true);
+    invalidateTomorrowProviders(ref);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            rows.length == 1
+                ? 'Moved to tomorrow.'
+                : '${rows.length} tasks moved to tomorrow.',
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _moveToTomorrow(BuildContext context, PlannedTaskRow row) async {
@@ -335,6 +373,14 @@ class _PlanTomorrowScreenState extends ConsumerState<PlanTomorrowScreen> {
                       children: [
                         PlanTomorrowAddSlotButton(onPressed: _addSlot),
                         const SizedBox(height: 28),
+                        _DisciplinedDayClosePrompt(
+                          todayAsync: todayAsync,
+                          dismissed: _disciplinedPromptDismissed,
+                          onDismiss: () => setState(
+                            () => _disciplinedPromptDismissed = true,
+                          ),
+                          onMoveAll: _moveDisciplinedToTomorrow,
+                        ),
                         _CarryForwardSection(
                           todayAsync: todayAsync,
                           expanded: _carryForwardExpanded,
@@ -1301,6 +1347,88 @@ class _PlanSummarySheet extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// FR-R-41 / D3: Disciplined's day-close is a soft nag, never a hard gate.
+///
+/// Shows when today still holds Disciplined tasks that went Overdue without a
+/// disposition. One inline prompt per visit: answer it and they move; dismiss
+/// it and they carry into tomorrow's plan as Overdue-flagged suggestions —
+/// never silently dropped, never blocking the flow.
+class _DisciplinedDayClosePrompt extends ConsumerWidget {
+  const _DisciplinedDayClosePrompt({
+    required this.todayAsync,
+    required this.dismissed,
+    required this.onDismiss,
+    required this.onMoveAll,
+  });
+
+  final AsyncValue<List<PlannedTaskRow>> todayAsync;
+  final bool dismissed;
+  final VoidCallback onDismiss;
+  final Future<void> Function(List<PlannedTaskRow> rows) onMoveAll;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (dismissed) return const SizedBox.shrink();
+    final rows = todayAsync.valueOrNull;
+    if (rows == null) return const SizedBox.shrink();
+
+    final overdueIds = ref.watch(overdueEntityIdsProvider);
+    final undecided = rows
+        .where(
+          (r) =>
+              overdueIds.contains(r.task.id) &&
+              (r.task.modeRefId ?? '').trim().toLowerCase() == 'disciplined' &&
+              r.task.status != TaskStatus.completed,
+        )
+        .toList(growable: false);
+    if (undecided.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(
+          color: AppColors.amber.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.amber.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              undecided.length == 1
+                  ? '1 Disciplined task still needs a decision'
+                  : '${undecided.length} Disciplined tasks still need a decision',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'They went overdue today without an answer. Move them into '
+              "tomorrow's plan, or leave them — they'll carry over either way.",
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: AppColors.fg70,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                FilledButton(
+                  onPressed: () => onMoveAll(undecided),
+                  child: const Text('Move to tomorrow'),
+                ),
+                const SizedBox(width: 8),
+                TextButton(onPressed: onDismiss, child: const Text('Not now')),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

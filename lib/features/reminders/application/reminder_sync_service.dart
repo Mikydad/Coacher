@@ -90,12 +90,17 @@ class ReminderSyncService {
     /// Re-arms compiled ladders after a save. Injected as a callback to keep
     /// this service free of a dependency cycle with the scheduler.
     Future<void> Function()? rearmLadders,
+
+    /// Recompiles ladders with the running focus session as a shield — the
+    /// dynamic half of FR-R-32 (audit B2). Injected for the same reason.
+    Future<void> Function(Duration sessionLength)? shieldSession,
     DateTime Function()? now,
   }) : _repository = repository,
        _notifications = notifications,
        _orchestrator = orchestratorService,
        _occurrences = occurrenceService,
        _rearmLadders = rearmLadders,
+       _shieldSession = shieldSession,
        _now = now ?? DateTime.now;
 
   final ReminderRepository _repository;
@@ -104,6 +109,7 @@ class ReminderSyncService {
   final AttentionOrchestratorService _orchestrator;
   final ReminderOccurrenceService? _occurrences;
   final Future<void> Function()? _rearmLadders;
+  final Future<void> Function(Duration sessionLength)? _shieldSession;
   final DateTime Function() _now;
 
   Future<bool> ensurePermissions() =>
@@ -146,9 +152,19 @@ class ReminderSyncService {
 
   /// The user started the task (timer/focus start). `Active` is an opt-in
   /// signal: it stops the ladder without claiming the task is done.
-  Future<void> markTaskStarted(String taskId) async {
+  ///
+  /// [sessionLength], when the caller knows it, raises the dynamic Focus
+  /// Shield (FR-R-32 / audit B2): OTHER entities' armed slots inside the
+  /// session window are silenced now, and the recompile the completion
+  /// mutation triggers lifts the shield when the session ends. An abandoned
+  /// session self-heals the same way — the next recompute compiles without
+  /// the shield and re-arms what it covered.
+  Future<void> markTaskStarted(String taskId, {Duration? sessionLength}) async {
     await _occurrences?.markActiveForEntity(taskId);
     await _resolveReminder(taskId, keepEnabled: false);
+    if (sessionLength != null && sessionLength.inMinutes > 0) {
+      await _shieldSession?.call(sessionLength);
+    }
   }
 
   /// The user completed the task — the occurrence is resolved in the same

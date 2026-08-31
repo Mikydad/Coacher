@@ -10,6 +10,7 @@ import '../firebase/firebase_initializer.dart';
 import '../firebase/firestore_client.dart';
 import '../notifications/local_notifications_service.dart';
 import '../notifications/notification_ledger_repository.dart';
+import '../../features/reminders/data/isar_reminder_occurrence_repository.dart';
 import '../notifications/notification_reconciliation_service.dart';
 import '../offline/offline_store.dart';
 import '../push/push_messaging_service.dart';
@@ -73,6 +74,15 @@ class AppBootstrap {
     );
     // Prune ledger entries older than 72 hours.
     unawaited(ledger.pruneOlderThan(const Duration(hours: 72)));
+    // Resolved reminder occurrences age out too (audit D1: the prune method
+    // existed with zero callers, so history grew forever). Thirty days keeps
+    // everything the success metrics and the consecutive-reschedule streak
+    // read; unresolved rows are never touched.
+    unawaited(
+      const IsarReminderOccurrenceRepository().pruneResolvedOlderThan(
+        const Duration(days: 30),
+      ),
+    );
 
     await SyncService.instance.initialize();
     await container.read(reminderSyncServiceProvider).scheduleFromCache();

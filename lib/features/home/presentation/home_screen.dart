@@ -1405,7 +1405,14 @@ class _FlowNowStrip extends ConsumerWidget {
       if (execState.phase == ExecutionPhase.notStarted) {
         ctrl.start();
         unawaited(
-          ref.read(reminderSyncServiceProvider).markTaskStarted(task.id),
+          ref
+              .read(reminderSyncServiceProvider)
+              .markTaskStarted(
+                task.id,
+                sessionLength: task.durationMinutes > 0
+                    ? Duration(minutes: task.durationMinutes)
+                    : null,
+              ),
         );
       }
       return;
@@ -1438,7 +1445,16 @@ class _FlowNowStrip extends ConsumerWidget {
       durationMinutes: task.durationMinutes,
     );
     ctrl.start();
-    unawaited(ref.read(reminderSyncServiceProvider).markTaskStarted(task.id));
+    unawaited(
+      ref
+          .read(reminderSyncServiceProvider)
+          .markTaskStarted(
+            task.id,
+            sessionLength: task.durationMinutes > 0
+                ? Duration(minutes: task.durationMinutes)
+                : null,
+          ),
+    );
   }
 
   static String _formatElapsed(Duration elapsed) {
@@ -2396,7 +2412,15 @@ Future<void> _completeTaskFromHome(
       reason: scoreResult.reason,
       modeRefId: t.modeRefId,
     );
-    await ref.read(reminderSyncServiceProvider).markTaskStarted(t.id);
+    // R2.2 missed this site: Home's check-in called markTaskStarted even on
+    // completion, leaving the day's occurrence open on the Recovery Card.
+    // Partial keeps markTaskStarted deliberately — the task is genuinely
+    // unfinished, and Active stops the ladder while staying visible.
+    if (isComplete) {
+      await ref.read(reminderSyncServiceProvider).markTaskCompleted(t.id);
+    } else {
+      await ref.read(reminderSyncServiceProvider).markTaskStarted(t.id);
+    }
     await ref
         .read(scoringControllerProvider)
         .submit(
