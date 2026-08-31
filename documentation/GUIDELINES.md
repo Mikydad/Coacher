@@ -2804,3 +2804,28 @@ not silent reversal.
   2/day in persisted prefs. *End-to-end verification waits on the pending
   `firebase deploy --only functions`* — by design the client degrades
   silently until then (FR-R-71).
+
+- **2026-08-31 · Phase R5 shipped: the push floor covers exactly what a
+  compiled ladder cannot.** `reminderSweep` (functions/src/reminders/) clones
+  intentionSweep's shape — 15-minute cron, pure `rescue_rules.ts`, paged
+  collection-group query on a SINGLE range field (`scheduledAtMs`, field
+  override in firestore.indexes.json per errors.md), server-owned
+  `users/{uid}/reminderRescue/{occId}` bookkeeping excluded from the client
+  rules wildcard. *Scope is deliberately narrow:* local notifications fire
+  with the app closed, so [L-PUSH] adds only (1) the Extreme tail — hourly
+  ×3 past windowEnd, slots the ladder never arms because it stops at
+  windowEnd by design — and (2) the crit-3 in-window net for a device dark
+  since BEFORE the due moment (Android post-restart, where D8 deferred the
+  boot receiver). D5 binds the server too: no crit-3 push past windowEnd.
+  *Idempotency vs local slots (13.3) is the freshness gate:* a heartbeat
+  within 30 minutes means the local engine owns delivery, and the crit-3 net
+  additionally requires the last heartbeat to PREDATE the due moment (a
+  later beat means the ladder was compiled and will fire on its own).
+  *Consequence:* `recordHeartbeat` moved from a once-per-day throttle to 20
+  minutes — the daily beat predates R5 and served only the morning brief;
+  against a 30-minute freshness rule it made every afternoon device look
+  dark. *Client:* `reminder_rescue` taps replan exactly like intention
+  rescues — the app is alive again, the local ladder resumes ownership.
+  **Every task in tasks-prd-reminder-system-v2.md is now complete. The whole
+  system (R4 endpoints + R5 cron + the callables pending since August) ships
+  on the next `firebase deploy` (functions, firestore rules AND indexes).**

@@ -69,5 +69,12 @@ bool isRescueNotification(Map<String, dynamic> data) =>
 /// True for the morning-brief push (Phase 5c). Tapping it opens the Coach
 /// with the suggestions panel — the same destination as the in-app
 /// snackbar it replaces for users who didn't open the app.
+/// Reminder V2 [L-PUSH] (task 13.0): the Extreme tail / crit-3 net push.
+/// A tap replans exactly like an intention rescue — the app is alive again,
+/// so the local ladder resumes ownership; the recompute sweep advances the
+/// occurrence and the Recovery Card shows it.
+bool isReminderRescue(Map<String, dynamic> data) =>
+    data['type'] == 'reminder_rescue';
+
 bool isMorningBrief(Map<String, dynamic> data) =>
     data['type'] == 'morning_brief';

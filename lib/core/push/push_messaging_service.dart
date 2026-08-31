@@ -148,12 +148,26 @@ class PushMessagingService {
   /// App-open heartbeat: the freshness signal the sweep uses to choose a
   /// quiet data push over a louder notification-fallback push. Throttled to
   /// once per local day so a chatty foreground cycle doesn't churn the doc.
+  /// Throttle between heartbeat writes. Was once per local DAY — fine when
+  /// the only reader was the morning brief, but the reminder rescue rules
+  /// (task 13.1/13.3) read lastSeenMs as a 30-minute freshness signal: with
+  /// a daily beat, a device alive all afternoon still looked dark and the
+  /// crit-3 net could double an armed ladder. Twenty minutes keeps the beat
+  /// inside the rules' window at one cheap outbox write per interval.
+  static const Duration _kHeartbeatMinInterval = Duration(minutes: 20);
+  int _lastHeartbeatMs = 0;
+
   Future<void> recordHeartbeat({DateTime? now}) async {
     if (!_firebaseReady) return;
-    final today = dayKey(now ?? DateTime.now());
+    final nowDt = now ?? DateTime.now();
+    final today = dayKey(nowDt);
     try {
       final prefs = await SharedPreferences.getInstance();
-      if (prefs.getString(_lastHeartbeatDayKey) == today) return;
+      final nowMs = nowDt.millisecondsSinceEpoch;
+      if (nowMs - _lastHeartbeatMs < _kHeartbeatMinInterval.inMilliseconds) {
+        return;
+      }
+      _lastHeartbeatMs = nowMs;
       final deviceId = await _deviceId(prefs);
       await outboxUpsert(
         entityType: 'deviceToken',
@@ -198,7 +212,9 @@ class PushMessagingService {
   /// (its banner is suppressed above — the replan IS the dedupe). Anything
   /// else is ignored.
   void _onForegroundMessage(RemoteMessage message) {
-    if (!isRescueReplan(message.data) && !isRescueNotification(message.data)) {
+    if (!isRescueReplan(message.data) &&
+        !isRescueNotification(message.data) &&
+        !isReminderRescue(message.data)) {
       return;
     }
     _replan();
@@ -215,7 +231,10 @@ class PushMessagingService {
       requestCoachBriefNavigation();
       return;
     }
-    if (!isRescueNotification(message.data)) return;
+    if (!isRescueNotification(message.data) &&
+        !isReminderRescue(message.data)) {
+      return;
+    }
     _replan();
   }
 

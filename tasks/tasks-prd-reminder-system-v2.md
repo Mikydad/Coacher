@@ -351,13 +351,13 @@ tasks. Every AUDIT §10 finding the PRD cites still stands:
 
 ### Phase R5 — Push floor
 
-- [ ] **13.0 Server rescue net for Extreme tails and criticality 3**
-  - [ ] 13.1 Device heartbeat written on each [L-ALIVE] pass.
-  - [ ] 13.2 Extend the `functions/src/intentions/sweep.ts` cron: for
+- [x] **13.0 Server rescue net for Extreme tails and criticality 3**
+  - [x] 13.1 Device heartbeat written on each [L-ALIVE] pass.
+  - [x] 13.2 Extend the `functions/src/intentions/sweep.ts` cron: for
         Extreme-mode and criticality-3 items unseen past their heartbeat,
         deliver the ladder tail and overdue-recovery push.
-  - [ ] 13.3 Idempotency against locally delivered slots (no double-fire).
-  - [ ] 13.4 Health-row registration state, and UX copy that promises nothing
+  - [x] 13.3 Idempotency against locally delivered slots (no double-fire).
+  - [x] 13.4 Health-row registration state, and UX copy that promises nothing
         depending on push when it is unavailable.
 
 ---

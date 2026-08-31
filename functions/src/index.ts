@@ -36,6 +36,9 @@ export { circleInvite, circleJoinWithInvite } from "./circles/callables";
 export { grantPoints, pointsSignupBonus } from "./stakes/ledger";
 export { stakeSweep } from "./stakes/sweep";
 export { intentionSweep } from "./intentions/sweep";
+// Reminder V2 [L-PUSH] (task 13.0): Extreme tail + crit-3 net for devices
+// the local ladder cannot reach. Additive, never a dependency.
+export { reminderSweep } from "./reminders/sweep";
 export { morningBrief } from "./intentions/morning_brief";
 export { devRunSweep } from "./stakes/dev";
 export { stakeEvidenceArrived, stakeDisbursementReceipt } from "./stakes/triggers";

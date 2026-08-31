@@ -67,7 +67,7 @@ service cloud.firestore {
 
       match /{collection}/{document=**} {
         allow read, write: if isUser(uid)
-          && !(collection in ['rescueState', 'briefState']);
+          && !(collection in ['rescueState', 'briefState', 'reminderRescue']);
       }
 
       // Rescue-net + morning-brief state (Phase 5): written ONLY by the
@@ -78,6 +78,14 @@ service cloud.firestore {
         allow write: if false;
       }
       match /briefState/{docId} {
+        allow read: if isUser(uid);
+        allow write: if false;
+      }
+      // Reminder V2 rescue bookkeeping (task 13.0): written ONLY by the
+      // reminderSweep cron via Admin SDK. A client that could write here
+      // could clobber tailCount and re-open exhausted tails - or suppress
+      // a medication rescue by faking one.
+      match /reminderRescue/{occurrenceId} {
         allow read: if isUser(uid);
         allow write: if false;
       }
