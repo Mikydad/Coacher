@@ -368,6 +368,10 @@ class _StakeIcon extends StatelessWidget {
         Icons.attach_money_rounded,
         AppColors.statusGreen,
       ),
+      StakeChallengeType.soloPublic => (
+        Icons.campaign_rounded,
+        AppColors.amber,
+      ),
       _ => (Icons.photo_camera_rounded, AppColors.coral),
     };
     return Container(

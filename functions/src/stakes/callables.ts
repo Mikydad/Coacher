@@ -73,6 +73,7 @@ const CREATABLE_TYPES: ReadonlySet<ChallengeType> = new Set([
   'practice',
   'h2h_points',
   'solo_money',
+  'solo_public',
 ]);
 
 // ─── Shared guards ───────────────────────────────────────────────────────────
@@ -412,6 +413,14 @@ export const stakeCreateChallenge = onCall(
         stakeAmount: amountCents,
         accepted: true,
       });
+      initialStatus = 'active';
+      assertTransition('draft', 'active');
+    } else if (type === 'solo_public') {
+      // Public commitment (tasks/prd-public-commitment-cards.md): the stake
+      // is the user's public word — the pledge card is shared outside the
+      // app, so nothing is held here and there is no amount, charity, or
+      // circle to validate. Activates immediately.
+      participants.push({ uid, teamId: uid, stakeKind: 'public', accepted: true });
       initialStatus = 'active';
       assertTransition('draft', 'active');
     } else {

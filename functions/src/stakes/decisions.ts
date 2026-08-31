@@ -171,7 +171,12 @@ function routeStake(
   winningTeamIds: readonly string[],
   anySidePassed: boolean,
 ): StakeResolution {
-  if (challenge.type === 'practice') return { kind: 'none' };
+  // Practice holds nothing; solo_public's stake lives outside the app (the
+  // shared pledge card) — the consequence is the client-rendered result
+  // card, so the engine routes nothing either way.
+  if (challenge.type === 'practice' || challenge.type === 'solo_public') {
+    return { kind: 'none' };
+  }
 
   if (participant.stakeKind === 'photo') {
     if (sideWon) return { kind: 'none' }; // photo deleted (P-3)

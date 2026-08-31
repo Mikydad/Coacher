@@ -1149,6 +1149,7 @@ class _AttachedStakeCard extends StatelessWidget {
     final typeLabel = switch (challenge.type) {
       StakeChallengeType.soloPhoto => 'Photo stake',
       StakeChallengeType.soloMoney => 'Money stake',
+      StakeChallengeType.soloPublic => 'Public commitment',
       StakeChallengeType.h2hPoints ||
       StakeChallengeType.h2hMoney => 'Head-to-head stake',
       StakeChallengeType.teamPoints ||

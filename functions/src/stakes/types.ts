@@ -15,6 +15,11 @@
 export type ChallengeType =
   | 'solo_photo'
   | 'solo_money'
+  // Public commitment (tasks/prd-public-commitment-cards.md): the stake is
+  // the user's public word — a pledge card shared outside the app. Nothing
+  // of value is held by the system; resolution routes `none` like practice,
+  // but the outcome is real (result card + record), so it is NOT practice.
+  | 'solo_public'
   | 'h2h_points'
   | 'h2h_money'
   | 'team_points'
@@ -47,7 +52,7 @@ export type ChallengeStatus =
 /** D3 — solo/h2h strictness reuses the app's RoutineMode names. */
 export type SoloMode = 'flexible' | 'disciplined' | 'extreme';
 
-export type StakeKind = 'photo' | 'points' | 'money';
+export type StakeKind = 'photo' | 'points' | 'money' | 'public';
 
 export type EvidenceSource = 'timer' | 'camera' | 'checkin';
 

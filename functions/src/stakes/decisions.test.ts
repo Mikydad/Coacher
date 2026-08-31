@@ -244,7 +244,7 @@ describe('decideChallenge — solo photo', () => {
 
 describe('D10 — no mercy on money', () => {
   it('vetoEligible is false for every non-photo type, even fresh', () => {
-    for (const type of ['solo_money', 'h2h_points', 'h2h_money', 'team_money'] as const) {
+    for (const type of ['solo_money', 'solo_public', 'h2h_points', 'h2h_money', 'team_money'] as const) {
       assert.equal(vetoEligible(challenge({ type }), null, soloDecideAt), false, type);
     }
     assert.equal(vetoEligible(challenge({}), null, soloDecideAt), true);
@@ -519,6 +519,42 @@ describe('practice challenges', () => {
         participants: [participant({ uid: 'u1', photo: undefined })],
       }),
       inputs({}),
+      soloDecideAt,
+    );
+    assert.equal(d.statusAfter, 'completed_forfeit');
+    assert.deepEqual(resolutionOf(d, 'u1').resolution, { kind: 'none' });
+  });
+});
+
+describe('public commitment challenges (solo_public)', () => {
+  const publicChallenge = () =>
+    challenge({
+      type: 'solo_public',
+      participants: [
+        participant({ uid: 'u1', stakeKind: 'public', photo: undefined }),
+      ],
+    });
+
+  it('failing routes nothing — the consequence is the result card', () => {
+    const d = decideChallenge(publicChallenge(), inputs({}), soloDecideAt);
+    assert.equal(d.statusAfter, 'completed_forfeit');
+    assert.deepEqual(resolutionOf(d, 'u1').resolution, { kind: 'none' });
+  });
+
+  it('success routes nothing either — there was never anything held', () => {
+    const d = decideChallenge(
+      publicChallenge(),
+      inputs({ evidence: passingUnits('u1', [0, 1, 2, 3, 4, 5]) }),
+      soloDecideAt,
+    );
+    assert.equal(d.statusAfter, 'completed_success');
+    assert.deepEqual(resolutionOf(d, 'u1').resolution, { kind: 'none' });
+  });
+
+  it('a veto request is ignored — nothing to veto', () => {
+    const d = decideChallenge(
+      publicChallenge(),
+      inputs({ vetoRequests: [{ uid: 'u1', atMs: soloDecideAt - 1 }] }),
       soloDecideAt,
     );
     assert.equal(d.statusAfter, 'completed_forfeit');

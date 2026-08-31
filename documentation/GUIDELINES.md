@@ -2829,3 +2829,26 @@ not silent reversal.
   **Every task in tasks-prd-reminder-system-v2.md is now complete. The whole
   system (R4 endpoints + R5 cron + the callables pending since August) ships
   on the next `firebase deploy` (functions, firestore rules AND indexes).**
+
+- **2026-08-31 · Public Commitment Cards approved — the money stake's
+  replacement is social, not financial.** PRD:
+  `tasks/prd-public-commitment-cards.md`. Real-money stakes stay dead in the
+  UI (payments complexity + App Store gambling exposure, guideline 5.3);
+  the reachable "against yourself" option becomes `soloPublic`
+  (`'solo_public'`, participant `stakeKind: 'public'`): the app renders a
+  shareable pledge card at commit and a result card at resolution
+  (crown "I DID IT." / progress-led "I DIDN'T."), captured on-device via
+  `RepaintBoundary` → PNG → `share_plus`, fully offline. *Settled with Miko
+  (Q1–Q8, PRD §10):* server resolves it exactly like other solo stakes; no
+  gate on actually posting (encouraging copy only); cards carry name +
+  commitment + motivation note (280-char pledge field, suggestion chips) +
+  app-stamped date/status/stats; 9:16 + 1:1; v1 backgrounds are
+  programmatic gradients behind a `cardPlate(state, aspect)` provider so
+  the approved AI-art plates (his three mockups, text stripped) swap in
+  later as pure assets; goal-delete/surrender counts as failure (no free
+  escape hatch — failure card offered, `completed_surrendered`); cards are
+  derived on demand, never stored — re-share forever from challenge detail.
+  Failure card leads with the stat ("22/30 km"), never the confession, and
+  carries the Recommit CTA; zero-progress gets pure recommit framing.
+  `h2hMoney`/`teamMoney`/`soloMoney` stay dormant in the model behind the
+  provider abstraction in case payments ever get legal + simple.

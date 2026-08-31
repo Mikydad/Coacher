@@ -14,6 +14,11 @@ import 'dart:convert';
 enum StakeChallengeType {
   soloPhoto('solo_photo'),
   soloMoney('solo_money'),
+
+  /// Public commitment (tasks/prd-public-commitment-cards.md): the stake is
+  /// the user's public word — a pledge card shared outside the app. No
+  /// money, points, or photo; the consequence is the result card.
+  soloPublic('solo_public'),
   h2hPoints('h2h_points'),
   h2hMoney('h2h_money'),
   teamPoints('team_points'),
