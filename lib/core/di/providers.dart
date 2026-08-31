@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -156,16 +157,7 @@ final ladderSchedulerProvider = Provider<LadderScheduler>((ref) {
   return LadderScheduler(
     occurrences: ref.read(reminderOccurrenceRepositoryProvider),
     orchestrator: ref.read(attentionOrchestratorServiceProvider),
-    loadUpcomingStarts: (day) async {
-      final dayStart = DateTime(day.year, day.month, day.day);
-      final blocks = await ref
-          .read(timeBlockRepositoryProvider)
-          .listBlocksForDateRange(
-            dayStart,
-            dayStart.add(const Duration(days: 1)),
-          );
-      return blocks.map((b) => b.startAt).toList(growable: false);
-    },
+    loadUpcomingStarts: (day) => _boundaryStartsForDay(ref, day),
     loadAttentionState: () =>
         ref.read(contextOverrideRepositoryProvider).getAttentionState(),
     budget: ref.read(notificationBudgetProvider),
@@ -180,10 +172,7 @@ final recoveryNotificationSchedulerProvider =
         occurrences: ref.read(reminderOccurrenceRepositoryProvider),
         orchestrator: ref.read(attentionOrchestratorServiceProvider),
         ledger: NotificationLedgerRepository(OfflineStore.instance.isar!),
-        loadUpcomingStarts: (day) async {
-          final blocks = await _blocksForDay(ref, day);
-          return blocks.map((b) => b.startAt).toList(growable: false);
-        },
+        loadUpcomingStarts: (day) => _boundaryStartsForDay(ref, day),
         // Full spans as shields: a start time alone says nothing about when
         // the block ends, so starts-only would let a summary land in the
         // middle of a two-hour session.
@@ -201,6 +190,40 @@ final recoveryNotificationSchedulerProvider =
         },
       );
     });
+
+/// The interruption boundary's inputs (FR-R-31 / audit C3): the union of
+/// scheduled block starts AND every enabled reminder's time that day.
+///
+/// Blocks alone was a real gap — a `ScheduledTimeBlock` only exists for
+/// tasks with a focus duration, so a day of plain reminder-only tasks had NO
+/// boundary at all, and the heaviest notification days are exactly those.
+/// The PRD's rule is "the start time of the user's next scheduled
+/// task/block", and a reminder-only task is a scheduled task. An
+/// occurrence's own time can never become its own boundary: the compiler
+/// only accepts starts strictly after the occurrence.
+Future<List<DateTime>> _boundaryStartsForDay(Ref ref, DateTime day) async {
+  final dayStart = DateTime(day.year, day.month, day.day);
+  final dayEnd = dayStart.add(const Duration(days: 1));
+  final blocks = await _blocksForDay(ref, day);
+  final starts = <DateTime>[for (final b in blocks) b.startAt];
+  try {
+    final reminders = await ref
+        .read(reminderRepositoryProvider)
+        .listAllReminders();
+    for (final r in reminders) {
+      if (!r.enabled) continue;
+      final iso = r.scheduledAtIso;
+      if (iso == null) continue;
+      final at = DateTime.tryParse(iso);
+      if (at == null) continue;
+      if (at.isBefore(dayStart) || !at.isBefore(dayEnd)) continue;
+      starts.add(at);
+    }
+  } catch (e) {
+    debugPrint('[Boundary] reminder starts unavailable: $e');
+  }
+  return starts;
+}
 
 Future<List<ScheduledTimeBlock>> _blocksForDay(Ref ref, DateTime day) {
   final dayStart = DateTime(day.year, day.month, day.day);

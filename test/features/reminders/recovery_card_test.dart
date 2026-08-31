@@ -33,7 +33,7 @@ RecoveryRow _row(ReminderOccurrence o) =>
 
 Widget _host(
   RecoveryView view, {
-  void Function(String)? onOpenTask,
+  void Function(String, String)? onOpenTask,
   void Function(RecoveryRow, ReminderResolutionKind)? onResolve,
 }) {
   return ProviderScope(
@@ -167,7 +167,7 @@ void main() {
     await tester.pumpWidget(
       _host(
         RecoveryView(rows: [_row(_occ(id: 'task-42', title: 'Study'))]),
-        onOpenTask: (id) => opened = id,
+        onOpenTask: (id, kind) => opened = id,
       ),
     );
     await tester.pump();

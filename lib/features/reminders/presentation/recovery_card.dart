@@ -23,7 +23,7 @@ class RecoveryCard extends ConsumerWidget {
 
   /// Tapping a row's primary action. Injectable so the timer-end prompt can
   /// reuse this card with its own navigation.
-  final void Function(String entityId)? onOpenTask;
+  final void Function(String entityId, String entityKind)? onOpenTask;
 
   /// Disposition chosen from a row's overflow (FR-R-41/42). Injectable for
   /// the same reason, and so widget tests can observe the contract without a
@@ -57,7 +57,10 @@ class RecoveryCard extends ConsumerWidget {
             for (final row in shown)
               _RecoveryRowTile(
                 row: row,
-                onDo: () => onOpenTask?.call(row.occurrence.entityId),
+                onDo: () => onOpenTask?.call(
+                  row.occurrence.entityId,
+                  row.occurrence.entityKind,
+                ),
                 onDismiss: row.insistence.canDismiss
                     ? () => ref
                           .read(reminderOccurrenceServiceProvider)

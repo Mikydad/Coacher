@@ -222,9 +222,13 @@ class ReminderOccurrenceService {
   ///
   /// Goals hold no reminder config of their own — `applyForGoal` derives their
   /// fire times from `UserGoal` — so this is their entry point into the same
-  /// machine tasks use. Goal misses are `routine`-class by default: an
-  /// individual missed day of a recurring goal aggregates into the digest
-  /// rather than demanding disposition, which is what §3.2 asks for.
+  /// machine tasks use. Taxonomy follows intensity (settled with Miko
+  /// 2026-08-31, closing audit C2): a disciplined/extreme-intensity goal's
+  /// missed day is `flexible`-class — it lands on the Recovery Card and
+  /// demands what the mode demands — while low-intensity goals stay
+  /// `routine`, aggregating into the digest line. Hardcoding all goals to
+  /// routine meant a missed STAKED goal day surfaced less than an ordinary
+  /// Disciplined task.
   Future<ReminderOccurrence?> ensureForGoalOccurrence({
     required String goalId,
     required String title,
@@ -233,6 +237,7 @@ class ReminderOccurrenceService {
   }) async {
     final now = _now();
     final dateKey = DateKeys.yyyymmdd(scheduledAt);
+    final taxonomy = goalTaxonomyForMode(modeRefId);
     final existing = await _occurrences.findByKey(
       entityKind: ReminderEntityKinds.goal,
       entityId: goalId,
@@ -252,7 +257,7 @@ class ReminderOccurrenceService {
           windowMinutes: AdaptiveReminderPolicy.windowMinutesFor(modeRefId),
           entityTitle: title,
           modeRefId: modeRefId,
-          taxonomy: ReminderTaxonomy.routine,
+          taxonomy: taxonomy,
           classificationSource: ClassificationSource.heuristic,
           createdAtMs: now.millisecondsSinceEpoch,
           updatedAtMs: now.millisecondsSinceEpoch,
@@ -263,12 +268,23 @@ class ReminderOccurrenceService {
       windowMinutes: AdaptiveReminderPolicy.windowMinutesFor(modeRefId),
       entityTitle: title,
       modeRefId: modeRefId,
+      // Intensity edits retune the class on re-arm (a goal raised to
+      // disciplined starts surfacing its misses; one lowered stops).
+      taxonomy: taxonomy,
       updatedAtMs: now.millisecondsSinceEpoch,
     );
     final advanced = ReminderStateMachine.advance(updated, now: now);
     await _occurrences.upsert(advanced);
     return advanced;
   }
+
+  /// C2's mapping, exposed for tests: disciplined/extreme intensity →
+  /// `flexible` (misses surface on the card); everything else → `routine`.
+  static ReminderTaxonomy goalTaxonomyForMode(String? modeRefId) =>
+      switch ((modeRefId ?? '').trim().toLowerCase()) {
+        'disciplined' || 'extreme' => ReminderTaxonomy.flexible,
+        _ => ReminderTaxonomy.routine,
+      };
 
   /// Resolve whatever occurrence [entityId] currently has open (FR-R-13).
   ///

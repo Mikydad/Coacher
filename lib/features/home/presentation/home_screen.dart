@@ -211,7 +211,12 @@ class HomeScreen extends ConsumerWidget {
           // reminders genuinely cannot do their job.
           const ReminderHealthHomeHint(),
           RecoveryCard(
-            onOpenTask: (entityId) => openRecoveryTask(context, ref, entityId),
+            onOpenTask: (entityId, entityKind) => openRecoveryTask(
+              context,
+              ref,
+              entityId,
+              entityKind: entityKind,
+            ),
             onResolve: (row, kind) =>
                 resolveRecoveryRow(context, ref, row, kind),
           ),

@@ -11,6 +11,7 @@ import '../application/recovery_view.dart';
 import '../application/reminder_state_machine.dart';
 import '../domain/models/reminder_occurrence_enums.dart';
 import '../../planning/application/planned_task_providers.dart';
+import '../../goals/presentation/goal_detail_screen.dart';
 import '../../tasks_hub/presentation/task_detail_screen.dart';
 import '../../tasks_hub/presentation/tasks_hub_screen.dart';
 import 'recovery_card.dart';
@@ -24,8 +25,19 @@ import 'recovery_card.dart';
 Future<void> openRecoveryTask(
   BuildContext context,
   WidgetRef ref,
-  String entityId,
-) async {
+  String entityId, {
+  String entityKind = 'task',
+}) async {
+  // A goal occurrence's "Do now" opens the goal itself (C2: goal misses can
+  // reach the card now) — the task-row lookup below would never find it.
+  if (entityKind == 'goal') {
+    await Navigator.pushNamed(
+      context,
+      GoalDetailScreen.routeName,
+      arguments: entityId,
+    );
+    return;
+  }
   final rows = ref.read(todayAllTasksRowsProvider).valueOrNull;
   final row = rows?.where((r) => r.task.id == entityId).firstOrNull;
 
@@ -187,10 +199,15 @@ Future<void> showRecoveryPromptIfNeeded(
           mainAxisSize: MainAxisSize.min,
           children: [
             RecoveryCard(
-              onOpenTask: (entityId) async {
+              onOpenTask: (entityId, entityKind) async {
                 Navigator.pop(sheetContext);
                 if (!context.mounted) return;
-                await openRecoveryTask(context, ref, entityId);
+                await openRecoveryTask(
+                  context,
+                  ref,
+                  entityId,
+                  entityKind: entityKind,
+                );
               },
               onResolve: (row, kind) async {
                 Navigator.pop(sheetContext);

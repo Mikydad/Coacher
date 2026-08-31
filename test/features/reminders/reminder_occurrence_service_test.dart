@@ -506,4 +506,50 @@ void main() {
       expect(snoozed!.snoozedUntilMs, until.millisecondsSinceEpoch);
     });
   });
+
+  group('goal taxonomy follows intensity (audit C2)', () {
+    test('disciplined and extreme goal misses become card-worthy', () {
+      expect(
+        ReminderOccurrenceService.goalTaxonomyForMode('disciplined'),
+        ReminderTaxonomy.flexible,
+      );
+      expect(
+        ReminderOccurrenceService.goalTaxonomyForMode('extreme'),
+        ReminderTaxonomy.flexible,
+      );
+    });
+
+    test('low-intensity goals stay in the digest', () {
+      expect(
+        ReminderOccurrenceService.goalTaxonomyForMode('flexible'),
+        ReminderTaxonomy.routine,
+      );
+      expect(
+        ReminderOccurrenceService.goalTaxonomyForMode(null),
+        ReminderTaxonomy.routine,
+      );
+    });
+
+    test('an intensity edit retunes the class on re-arm', () async {
+      final occ = _FakeOccurrences();
+      final svc = service(occ, _FakeReminders());
+      final at = DateTime(2026, 8, 31, 9, 0);
+
+      await svc.ensureForGoalOccurrence(
+        goalId: 'g1',
+        title: 'Goal: Read',
+        scheduledAt: at,
+        modeRefId: 'flexible',
+      );
+      expect(occ.rows.values.single.taxonomy, ReminderTaxonomy.routine);
+
+      await svc.ensureForGoalOccurrence(
+        goalId: 'g1',
+        title: 'Goal: Read',
+        scheduledAt: at,
+        modeRefId: 'disciplined',
+      );
+      expect(occ.rows.values.single.taxonomy, ReminderTaxonomy.flexible);
+    });
+  });
 }
