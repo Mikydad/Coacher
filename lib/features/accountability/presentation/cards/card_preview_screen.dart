@@ -13,9 +13,13 @@ import 'commitment_card.dart';
 /// sheet. Everything is local — this screen must never wait on the network,
 /// and skipping the share changes nothing about the challenge (FR-11, Q3).
 class CardPreviewScreen extends StatefulWidget {
-  const CardPreviewScreen({super.key, required this.data});
+  const CardPreviewScreen({super.key, required this.data, this.onRecommit});
 
   final CommitmentCardData data;
+
+  /// FR-17 — shown on failure cards: opens the create flow pre-filled with
+  /// the same commitment so the miss turns into a recommitment.
+  final VoidCallback? onRecommit;
 
   @override
   State<CardPreviewScreen> createState() => _CardPreviewScreenState();
@@ -194,6 +198,21 @@ class _CardPreviewScreenState extends State<CardPreviewScreen> {
                 ),
               ),
             ),
+            if (widget.onRecommit != null) ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: OutlinedButton.icon(
+                    onPressed: widget.onRecommit,
+                    icon: const Icon(Icons.replay_rounded, size: 18),
+                    label: const Text('Recommit — round two'),
+                  ),
+                ),
+              ),
+            ],
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: Text(

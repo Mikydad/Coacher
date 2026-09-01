@@ -321,6 +321,7 @@ class StakeChallenge {
     this.sideCharities = const {},
     this.bothLoseCharityId,
     this.antiCharityId,
+    this.pledgeWhy,
     this.receipts = const {},
     required this.deadlineMs,
     this.photoState,
@@ -354,6 +355,10 @@ class StakeChallenge {
 
   /// $-1 — solo money: the anti-charity that gets the stake on forfeit.
   final String? antiCharityId;
+
+  /// PSY-1 — the pledge "why" (stored on the doc since 2026-09-01); the
+  /// commitment card's motivation note. Null on older docs.
+  final String? pledgeWhy;
   final int deadlineMs;
 
   final StakePhotoState? photoState;
@@ -452,6 +457,7 @@ class StakeChallenge {
       ),
       bothLoseCharityId: m['bothLoseCharityId'] as String?,
       antiCharityId: m['antiCharityId'] as String?,
+      pledgeWhy: m['pledgeWhy'] as String?,
       receipts: {
         for (final e in ((outcome?['receipts'] as Map?) ?? const {}).entries)
           if (e.value is Map)

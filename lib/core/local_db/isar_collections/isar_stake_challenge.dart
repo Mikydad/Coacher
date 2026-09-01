@@ -39,6 +39,9 @@ class IsarStakeChallenge {
   String? bothLoseCharityId;
   String? antiCharityId;
 
+  /// The pledge "why" (2026-09-01, commitment cards) — null on older rows.
+  String? pledgeWhy;
+
   /// JSON map uid → donation receipt ($-3); empty string when absent.
   late String receiptsJson;
   late int deadlineMs;
@@ -69,6 +72,7 @@ class IsarStakeChallenge {
           c.sideCharities.isEmpty ? '' : jsonEncode(c.sideCharities)
       ..bothLoseCharityId = c.bothLoseCharityId
       ..antiCharityId = c.antiCharityId
+      ..pledgeWhy = c.pledgeWhy
       ..receiptsJson = c.receipts.isEmpty
           ? ''
           : jsonEncode(
@@ -108,6 +112,7 @@ class IsarStakeChallenge {
               .map((k, v) => MapEntry('$k', '$v')),
       bothLoseCharityId: bothLoseCharityId,
       antiCharityId: antiCharityId,
+      pledgeWhy: pledgeWhy,
       receipts: receiptsJson.isEmpty
           ? const {}
           : {

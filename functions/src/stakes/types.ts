@@ -175,6 +175,12 @@ export interface StakeChallenge {
   antiCharityId?: string;
   /** D6 — h2h/team: mutually disliked recipient when everyone loses. */
   bothLoseCharityId?: string;
+  /**
+   * PSY-1 — the creator's pledge "why", stored on the doc (2026-09-01) so
+   * commitment cards can regenerate it forever (P2 cards, FR-21); the
+   * pledge_signed event remains the audit record.
+   */
+  pledgeWhy?: string;
   /** Server-set at activation. */
   deadlineMs: number;
   createdAtMs: number;

@@ -19,7 +19,10 @@ import '../application/stakes_providers.dart';
 import '../data/stakes_repository.dart';
 import '../domain/models/stake_challenge.dart';
 import '../domain/models/stake_evidence.dart';
+import '../../profile/application/profile_providers.dart';
 import 'accountability_create_flow.dart';
+import 'cards/card_preview_screen.dart';
+import 'cards/commitment_card.dart';
 import 'stake_photo_cache.dart';
 import 'stake_reveal_viewer_screen.dart';
 import 'stake_timer_screen.dart';
@@ -238,6 +241,11 @@ class _BodyState extends ConsumerState<_Body> {
         if (c.type == StakeChallengeType.soloMoney) ...[
           const SizedBox(height: 12),
           _moneyStakeCard(),
+        ],
+        if (c.type == StakeChallengeType.soloPublic &&
+            c.status != StakeChallengeStatus.cancelled) ...[
+          const SizedBox(height: 12),
+          _publicCardSection(),
         ],
         if (_isInvitedMe) ...[const SizedBox(height: 12), _inviteActions()],
         if (c.photoState == StakePhotoState.revealed) ...[
@@ -842,6 +850,141 @@ class _BodyState extends ConsumerState<_Body> {
           fontSize: 13,
           height: 1.5,
         ),
+      ),
+    );
+  }
+
+  /// Public commitment (FR-13/FR-21): the card is the stake — always
+  /// re-openable, and the moment the outcome lands the result card is
+  /// offered loudly. Cards are derived from challenge data, never stored.
+  Widget _publicCardSection() {
+    final terminal = c.status.isTerminal;
+    final (headline, sub, cta) = switch (c.status) {
+      StakeChallengeStatus.completedSuccess => (
+        'Your victory card is ready',
+        'You called your shot and hit it. Let them see.',
+        'View & share',
+      ),
+      StakeChallengeStatus.completedForfeit => (
+        'Your card is ready',
+        'Own the miss — the progress counts too.',
+        'View & share',
+      ),
+      StakeChallengeStatus.completedSurrendered => (
+        'Your card is ready',
+        'You stepped back this time. It goes on the record with dignity.',
+        'View & share',
+      ),
+      _ => (
+        'Your word is the stake',
+        'The pledge card is out there. Re-share it any time.',
+        'View pledge card',
+      ),
+    };
+    final tint = switch (c.status) {
+      StakeChallengeStatus.completedSuccess => AppColors.statusGreen,
+      StakeChallengeStatus.completedForfeit ||
+      StakeChallengeStatus.completedSurrendered => AppColors.coral,
+      _ => AppColors.amber,
+    };
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: tint.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: tint.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            headline,
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            sub,
+            style: TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: terminal
+                ? FilledButton.icon(
+                    onPressed: _openCommitmentCard,
+                    icon: const Icon(Icons.ios_share_rounded, size: 18),
+                    label: Text(cta),
+                  )
+                : OutlinedButton(
+                    onPressed: _openCommitmentCard,
+                    child: Text(cta),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openCommitmentCard() {
+    final uid = FirestorePaths.activeUid;
+    final result = c.results.where((r) => r.uid == uid).firstOrNull;
+    final state = switch (c.status) {
+      StakeChallengeStatus.completedSuccess => CommitmentCardState.success,
+      StakeChallengeStatus.completedForfeit ||
+      StakeChallengeStatus.completedSurrendered => CommitmentCardState.failure,
+      _ => CommitmentCardState.pledge,
+    };
+    final data = CommitmentCardData(
+      state: state,
+      goalTitle: c.frozenGoal.title,
+      // deadlineMs is the midnight AFTER the last committed day; -1 lands
+      // the display date on the day the user actually promised.
+      deadline: DateTime.fromMillisecondsSinceEpoch(c.deadlineMs - 1),
+      displayName: ref.read(displayNameProvider),
+      note: c.pledgeWhy ?? '',
+      completedOn: c.decidedAtMs != null
+          ? DateTime.fromMillisecondsSinceEpoch(c.decidedAtMs!)
+          : null,
+      unitsPassed: result?.unitsPassed,
+      unitsRequired: result?.unitsRequired,
+      surrendered: c.status == StakeChallengeStatus.completedSurrendered,
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CardPreviewScreen(
+          data: data,
+          onRecommit: state == CommitmentCardState.failure
+              ? _recommit
+              : null,
+        ),
+      ),
+    );
+  }
+
+  /// FR-17 — a brand-new challenge with the same commitment shape and
+  /// fresh dates; the old card and record stay untouched.
+  void _recommit() {
+    final g = c.frozenGoal;
+    openAccountabilityCreateFlow(
+      context,
+      recommitSeed: RecommitSeed(
+        title: g.title,
+        unitKind: g.unitKind,
+        unitTarget: g.unitTarget,
+        cadence: g.cadence,
+        interval: g.interval,
+        weekdays: g.scheduledWeekdays ?? const [],
+        monthDays: g.repeatDaysOfMonth ?? const [],
+        note: c.pledgeWhy ?? '',
       ),
     );
   }

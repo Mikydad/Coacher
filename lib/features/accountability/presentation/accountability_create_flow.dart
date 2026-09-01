@@ -55,6 +55,7 @@ Future<void> openAccountabilityCreateFlow(
   String? prefilledTitle,
   String? prefilledCircleId,
   String? linkedGoalId,
+  RecommitSeed? recommitSeed,
 }) {
   return Navigator.of(context).push(
     MaterialPageRoute(
@@ -63,9 +64,35 @@ Future<void> openAccountabilityCreateFlow(
         prefilledTitle: prefilledTitle,
         prefilledCircleId: prefilledCircleId,
         linkedGoalId: linkedGoalId,
+        recommitSeed: recommitSeed,
       ),
     ),
   );
+}
+
+/// FR-17 — the Recommit CTA's prefill: the failed challenge's commitment
+/// shape (title, target, rhythm, note), public stake preselected, dates
+/// left fresh for the user to pick.
+class RecommitSeed {
+  const RecommitSeed({
+    required this.title,
+    required this.unitKind,
+    required this.unitTarget,
+    required this.cadence,
+    this.interval = 1,
+    this.weekdays = const [],
+    this.monthDays = const [],
+    this.note = '',
+  });
+
+  final String title;
+  final String unitKind;
+  final int unitTarget;
+  final String cadence;
+  final int interval;
+  final List<int> weekdays;
+  final List<int> monthDays;
+  final String note;
 }
 
 class AccountabilityCreateFlow extends ConsumerStatefulWidget {
@@ -74,6 +101,7 @@ class AccountabilityCreateFlow extends ConsumerStatefulWidget {
     this.prefilledTitle,
     this.prefilledCircleId,
     this.linkedGoalId,
+    this.recommitSeed,
   });
 
   final String? prefilledTitle;
@@ -82,6 +110,10 @@ class AccountabilityCreateFlow extends ConsumerStatefulWidget {
   /// When launched from an existing goal's detail page: the challenge
   /// attaches to THIS goal instead of minting a duplicate one.
   final String? linkedGoalId;
+
+  /// FR-17 — Recommit from a failed public commitment: same shape,
+  /// fresh dates, public stake preselected.
+  final RecommitSeed? recommitSeed;
 
   @override
   ConsumerState<AccountabilityCreateFlow> createState() =>
@@ -275,6 +307,25 @@ class _AccountabilityCreateFlowState
   void initState() {
     super.initState();
     _circleId = widget.prefilledCircleId;
+    final seed = widget.recommitSeed;
+    if (seed != null) {
+      _stake = _StakeChoice.public;
+      _stakeChosen = true;
+      _title.text = seed.title;
+      _target.text = '${seed.unitTarget}';
+      _measurement = seed.unitKind == 'count'
+          ? MeasurementKind.count
+          : MeasurementKind.minutes;
+      _cadence = switch (seed.cadence) {
+        'weekly' => GoalRepeatCadence.weekly,
+        'monthly' => GoalRepeatCadence.monthly,
+        _ => GoalRepeatCadence.daily,
+      };
+      _interval = seed.interval;
+      _weekdays.addAll(seed.weekdays);
+      _monthDays.addAll(seed.monthDays);
+      _why.text = seed.note;
+    }
     // Next-button validity depends on these fields; rebuild as they type.
     _title.addListener(_onFormChanged);
     _target.addListener(_onFormChanged);
@@ -2726,6 +2777,7 @@ class _AccountabilityCreateFlowState
           linkedGoalId: goalId,
         ),
         mode: _mode,
+        pledgeWhy: pledgeWhy,
         sideCharities: _isH2h && _charityId != null
             ? {uid: _charityId!}
             : const {},

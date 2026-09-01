@@ -449,6 +449,7 @@ export const stakeCreateChallenge = onCall(
       participantUids: participants.map((p) => p.uid),
       frozenGoal: goal,
       mode: mode as SoloMode,
+      pledgeWhy,
       deadlineMs,
       createdAtMs: now,
       updatedAtMs: now,

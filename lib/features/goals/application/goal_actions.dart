@@ -153,6 +153,11 @@ Future<bool?> _showStakedDeleteDialog(
           'the photo is deleted unseen. If no veto is available, the '
           'surrender is refused and the stake stays live: finish it or '
           'the photo reveals at the deadline.',
+    // Public commitment (FR-16): quitting counts as a miss — no free
+    // escape hatch, the missed card goes on the record.
+    'public' =>
+      'Surrendering counts as a miss — it goes on your record, and your '
+          'missed card will be waiting on the challenge page.',
     _ => canSurrender ? 'Surrendering ends it now.' : null,
   };
 

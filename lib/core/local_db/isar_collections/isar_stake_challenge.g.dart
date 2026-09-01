@@ -74,43 +74,48 @@ const IsarStakeChallengeSchema = CollectionSchema(
       name: r'photoStateStorage',
       type: IsarType.string,
     ),
-    r'receiptsJson': PropertySchema(
+    r'pledgeWhy': PropertySchema(
       id: 12,
+      name: r'pledgeWhy',
+      type: IsarType.string,
+    ),
+    r'receiptsJson': PropertySchema(
+      id: 13,
       name: r'receiptsJson',
       type: IsarType.string,
     ),
     r'resultsJson': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'resultsJson',
       type: IsarType.string,
     ),
     r'revealExpiresAtMs': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'revealExpiresAtMs',
       type: IsarType.long,
     ),
     r'revealedAtMs': PropertySchema(
-      id: 15,
+      id: 16,
       name: r'revealedAtMs',
       type: IsarType.long,
     ),
     r'sideCharitiesJson': PropertySchema(
-      id: 16,
+      id: 17,
       name: r'sideCharitiesJson',
       type: IsarType.string,
     ),
     r'statusStorage': PropertySchema(
-      id: 17,
+      id: 18,
       name: r'statusStorage',
       type: IsarType.string,
     ),
     r'typeStorage': PropertySchema(
-      id: 18,
+      id: 19,
       name: r'typeStorage',
       type: IsarType.string,
     ),
     r'updatedAtMs': PropertySchema(
-      id: 19,
+      id: 20,
       name: r'updatedAtMs',
       type: IsarType.long,
     ),
@@ -206,6 +211,12 @@ int _isarStakeChallengeEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
+  {
+    final value = object.pledgeWhy;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.receiptsJson.length * 3;
   bytesCount += 3 + object.resultsJson.length * 3;
   bytesCount += 3 + object.sideCharitiesJson.length * 3;
@@ -232,14 +243,15 @@ void _isarStakeChallengeSerialize(
   writer.writeString(offsets[9], object.mode);
   writer.writeString(offsets[10], object.participantsJson);
   writer.writeString(offsets[11], object.photoStateStorage);
-  writer.writeString(offsets[12], object.receiptsJson);
-  writer.writeString(offsets[13], object.resultsJson);
-  writer.writeLong(offsets[14], object.revealExpiresAtMs);
-  writer.writeLong(offsets[15], object.revealedAtMs);
-  writer.writeString(offsets[16], object.sideCharitiesJson);
-  writer.writeString(offsets[17], object.statusStorage);
-  writer.writeString(offsets[18], object.typeStorage);
-  writer.writeLong(offsets[19], object.updatedAtMs);
+  writer.writeString(offsets[12], object.pledgeWhy);
+  writer.writeString(offsets[13], object.receiptsJson);
+  writer.writeString(offsets[14], object.resultsJson);
+  writer.writeLong(offsets[15], object.revealExpiresAtMs);
+  writer.writeLong(offsets[16], object.revealedAtMs);
+  writer.writeString(offsets[17], object.sideCharitiesJson);
+  writer.writeString(offsets[18], object.statusStorage);
+  writer.writeString(offsets[19], object.typeStorage);
+  writer.writeLong(offsets[20], object.updatedAtMs);
 }
 
 IsarStakeChallenge _isarStakeChallengeDeserialize(
@@ -262,14 +274,15 @@ IsarStakeChallenge _isarStakeChallengeDeserialize(
   object.mode = reader.readStringOrNull(offsets[9]);
   object.participantsJson = reader.readString(offsets[10]);
   object.photoStateStorage = reader.readStringOrNull(offsets[11]);
-  object.receiptsJson = reader.readString(offsets[12]);
-  object.resultsJson = reader.readString(offsets[13]);
-  object.revealExpiresAtMs = reader.readLongOrNull(offsets[14]);
-  object.revealedAtMs = reader.readLongOrNull(offsets[15]);
-  object.sideCharitiesJson = reader.readString(offsets[16]);
-  object.statusStorage = reader.readString(offsets[17]);
-  object.typeStorage = reader.readString(offsets[18]);
-  object.updatedAtMs = reader.readLong(offsets[19]);
+  object.pledgeWhy = reader.readStringOrNull(offsets[12]);
+  object.receiptsJson = reader.readString(offsets[13]);
+  object.resultsJson = reader.readString(offsets[14]);
+  object.revealExpiresAtMs = reader.readLongOrNull(offsets[15]);
+  object.revealedAtMs = reader.readLongOrNull(offsets[16]);
+  object.sideCharitiesJson = reader.readString(offsets[17]);
+  object.statusStorage = reader.readString(offsets[18]);
+  object.typeStorage = reader.readString(offsets[19]);
+  object.updatedAtMs = reader.readLong(offsets[20]);
   return object;
 }
 
@@ -305,20 +318,22 @@ P _isarStakeChallengeDeserializeProp<P>(
     case 11:
       return (reader.readStringOrNull(offset)) as P;
     case 12:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 13:
       return (reader.readString(offset)) as P;
     case 14:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 15:
       return (reader.readLongOrNull(offset)) as P;
     case 16:
-      return (reader.readString(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 17:
       return (reader.readString(offset)) as P;
     case 18:
       return (reader.readString(offset)) as P;
     case 19:
+      return (reader.readString(offset)) as P;
+    case 20:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -2287,6 +2302,165 @@ extension IsarStakeChallengeQueryFilter
   }
 
   QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterFilterCondition>
+  pledgeWhyIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'pledgeWhy'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterFilterCondition>
+  pledgeWhyIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'pledgeWhy'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterFilterCondition>
+  pledgeWhyEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'pledgeWhy',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterFilterCondition>
+  pledgeWhyGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'pledgeWhy',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterFilterCondition>
+  pledgeWhyLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'pledgeWhy',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterFilterCondition>
+  pledgeWhyBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'pledgeWhy',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterFilterCondition>
+  pledgeWhyStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'pledgeWhy',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterFilterCondition>
+  pledgeWhyEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'pledgeWhy',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterFilterCondition>
+  pledgeWhyContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'pledgeWhy',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterFilterCondition>
+  pledgeWhyMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'pledgeWhy',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterFilterCondition>
+  pledgeWhyIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'pledgeWhy', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterFilterCondition>
+  pledgeWhyIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'pledgeWhy', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterFilterCondition>
   receiptsJsonEqualTo(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -3370,6 +3544,20 @@ extension IsarStakeChallengeQuerySortBy
   }
 
   QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterSortBy>
+  sortByPledgeWhy() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'pledgeWhy', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterSortBy>
+  sortByPledgeWhyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'pledgeWhy', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterSortBy>
   sortByReceiptsJson() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'receiptsJson', Sort.asc);
@@ -3667,6 +3855,20 @@ extension IsarStakeChallengeQuerySortThenBy
   }
 
   QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterSortBy>
+  thenByPledgeWhy() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'pledgeWhy', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterSortBy>
+  thenByPledgeWhyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'pledgeWhy', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QAfterSortBy>
   thenByReceiptsJson() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'receiptsJson', Sort.asc);
@@ -3881,6 +4083,13 @@ extension IsarStakeChallengeQueryWhereDistinct
   }
 
   QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QDistinct>
+  distinctByPledgeWhy({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'pledgeWhy', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, IsarStakeChallenge, QDistinct>
   distinctByReceiptsJson({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'receiptsJson', caseSensitive: caseSensitive);
@@ -4030,6 +4239,13 @@ extension IsarStakeChallengeQueryProperty
   photoStateStorageProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'photoStateStorage');
+    });
+  }
+
+  QueryBuilder<IsarStakeChallenge, String?, QQueryOperations>
+  pledgeWhyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'pledgeWhy');
     });
   }
 
