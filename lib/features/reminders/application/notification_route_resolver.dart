@@ -11,6 +11,11 @@ abstract final class ReminderEntityKinds {
   static const String habit = 'habit';
   static const String goal = 'goal';
   static const String stakeInvite = 'stake_invite';
+
+  /// "Your result card is ready" — a public commitment reached a terminal
+  /// status (OQ-1, tasks/prd-public-commitment-cards.md). Announced once
+  /// per challenge when sync lands the outcome.
+  static const String stakeCard = 'stake_card';
   static const String intention = 'intention';
 
   /// Layer-4 "coach insight ready" push (V-01): routed through the
@@ -70,6 +75,16 @@ NotificationRoute resolveNotificationRoute(ReminderIntent intent) {
         // Legacy invite id scheme (stable per challenge so a re-emit can't
         // stack duplicates) — pre-migration invites cancel under the same id.
         notifId: intent.entityId.hashCode & 0x7fffffff,
+        payload: 'stake:$encoded',
+        immediate: true,
+      );
+    case ReminderEntityKinds.stakeCard:
+      return NotificationRoute(
+        // Stable per challenge (one outcome, one announcement) and a
+        // distinct id space from the invite scheme for the same challenge.
+        notifId: ('stake_card:${intent.entityId}').hashCode.abs() % 2147483647,
+        // Same tap route as invites: land on Accountability, where the
+        // challenge's card CTA is waiting.
         payload: 'stake:$encoded',
         immediate: true,
       );

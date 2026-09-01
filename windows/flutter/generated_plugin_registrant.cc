@@ -15,6 +15,7 @@
 #include <firebase_storage/firebase_storage_plugin_c_api.h>
 #include <flutter_timezone/flutter_timezone_plugin_c_api.h>
 #include <flutter_tts/flutter_tts_plugin.h>
+#include <gal/gal_plugin_c_api.h>
 #include <isar_community_flutter_libs/isar_flutter_libs_plugin.h>
 #include <share_plus/share_plus_windows_plugin_c_api.h>
 #include <speech_to_text_windows/speech_to_text_windows.h>
@@ -39,6 +40,8 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("FlutterTimezonePluginCApi"));
   FlutterTtsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("FlutterTtsPlugin"));
+  GalPluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("GalPluginCApi"));
   IsarFlutterLibsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("IsarFlutterLibsPlugin"));
   SharePlusWindowsPluginCApiRegisterWithRegistrar(

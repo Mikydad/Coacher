@@ -12,6 +12,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   firebase_storage
   flutter_timezone
   flutter_tts
+  gal
   isar_community_flutter_libs
   share_plus
   speech_to_text_windows

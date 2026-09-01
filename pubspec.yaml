@@ -64,6 +64,7 @@ dependencies:
   just_audio: ^0.10.6
   audio_session: ^0.2.4
   flutter_slidable: ^4.0.3
+  gal: ^2.3.3
 
 dev_dependencies:
   flutter_test:

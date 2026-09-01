@@ -56,6 +56,16 @@ class MainTabShell extends ConsumerWidget {
     ref.listen<List<StakeChallenge>>(stakePendingInvitesProvider, (_, next) {
       _announceNewInvites(context, ref, next);
     });
+    // Public commitment result cards (OQ-1): the moment sync lands a
+    // terminal outcome, announce that the card is ready — once per
+    // challenge, through the orchestrator like invites.
+    ref.listen<AsyncValue<List<StakeChallenge>>>(
+      stakeChallengesStreamProvider,
+      (_, next) {
+        final all = next.valueOrNull;
+        if (all != null) _announceReadyCards(ref, all);
+      },
+    );
 
     return EmailVerificationBanner(
       child: Stack(
@@ -86,6 +96,78 @@ class MainTabShell extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// Result cards already announced (or attempted) this app session.
+  static final Set<String> _sessionCardAnnounced = <String>{};
+
+  /// OQ-1 — "your card is ready": one notification per public commitment
+  /// when its outcome lands, routed through the orchestrator so overrides,
+  /// spacing, and the ledger apply. Only outcomes decided in the last 48h
+  /// announce, so a fresh install never replays history.
+  Future<void> _announceReadyCards(
+    WidgetRef ref,
+    List<StakeChallenge> all,
+  ) async {
+    final uid = FirestorePaths.activeUid;
+    if (uid.isEmpty) return;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    const freshMs = 48 * 60 * 60 * 1000;
+    final ready = all
+        .where(
+          (c) =>
+              c.type == StakeChallengeType.soloPublic &&
+              (c.status == StakeChallengeStatus.completedSuccess ||
+                  c.status == StakeChallengeStatus.completedForfeit ||
+                  c.status == StakeChallengeStatus.completedSurrendered) &&
+              c.decidedAtMs != null &&
+              nowMs - c.decidedAtMs! < freshMs,
+        )
+        .toList();
+    if (ready.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'stake_card_notified_v1_$uid';
+    final seen = (prefs.getStringList(key) ?? const []).toSet();
+    final fresh = ready
+        .where(
+          (c) => !seen.contains(c.id) && !_sessionCardAnnounced.contains(c.id),
+        )
+        .toList();
+    if (fresh.isEmpty) return;
+    _sessionCardAnnounced.addAll(fresh.map((c) => c.id));
+
+    final orchestrator = ref.read(attentionOrchestratorServiceProvider);
+    final delivered = <String>[];
+    for (final c in fresh) {
+      final won = c.status == StakeChallengeStatus.completedSuccess;
+      final now = DateTime.now();
+      final decision = await orchestrator.evaluate(
+        ReminderIntent(
+          id: StableId.generate('ri_stakecard'),
+          entityId: c.id,
+          entityKind: ReminderEntityKinds.stakeCard,
+          entityTitle: won ? 'You did it' : 'Challenge ended',
+          proposedAt: now,
+          importance: 60,
+          interruptionLevel: InterruptionLevel.medium,
+          enforcementMode: 'flexible',
+          sourceReason: 'stake_card_ready',
+          bodyOverride: won
+              ? '"${c.frozenGoal.title}" — your victory card is ready to '
+                    'share.'
+              : '"${c.frozenGoal.title}" — your result card is ready. '
+                    'A setback, not the end.',
+          createdAtMs: now.millisecondsSinceEpoch,
+        ),
+      );
+      if (decision.outcome != AttentionOutcome.suppressed) {
+        delivered.add(c.id);
+      }
+    }
+    if (delivered.isNotEmpty) {
+      await prefs.setStringList(key, {...seen, ...delivered}.toList());
+    }
   }
 
   Future<void> _announceNewInvites(

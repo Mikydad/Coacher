@@ -1,7 +1,9 @@
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:gal/gal.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/presentation/app_colors.dart';
@@ -29,6 +31,7 @@ class _CardPreviewScreenState extends State<CardPreviewScreen> {
   final _boundaryKey = GlobalKey();
   CommitmentCardAspect _aspect = CommitmentCardAspect.story;
   bool _sharing = false;
+  bool _saving = false;
 
   (String, String) get _copy => switch (widget.data.state) {
     CommitmentCardState.pledge => (
@@ -45,29 +48,36 @@ class _CardPreviewScreenState extends State<CardPreviewScreen> {
     ),
   };
 
+  /// Logical 360x640 (or 360x360) x 3 -> 1080x1920 / 1080x1080 (FR-12).
+  Future<Uint8List?> _capturePng() async {
+    final boundary =
+        _boundaryKey.currentContext?.findRenderObject()
+            as RenderRepaintBoundary?;
+    if (boundary == null) return null;
+    final image = await boundary.toImage(pixelRatio: 3.0);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    return bytes?.buffer.asUint8List();
+  }
+
+  String get _exportName {
+    final suffix = _aspect == CommitmentCardAspect.story ? 'story' : 'square';
+    return 'sidepal_${widget.data.state.name}_$suffix';
+  }
+
   Future<void> _share() async {
     if (_sharing) return;
     setState(() => _sharing = true);
     try {
-      final boundary =
-          _boundaryKey.currentContext?.findRenderObject()
-              as RenderRepaintBoundary?;
-      if (boundary == null) return;
-      // Logical 360×640 (or 360×360) × 3 → 1080×1920 / 1080×1080 (FR-12).
-      final image = await boundary.toImage(pixelRatio: 3.0);
-      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-      image.dispose();
-      if (bytes == null) return;
-      final suffix = _aspect == CommitmentCardAspect.story
-          ? 'story'
-          : 'square';
+      final png = await _capturePng();
+      if (png == null) return;
       await SharePlus.instance.share(
         ShareParams(
           files: [
             XFile.fromData(
-              bytes.buffer.asUint8List(),
+              png,
               mimeType: 'image/png',
-              name: 'sidepal_${widget.data.state.name}_$suffix.png',
+              name: '$_exportName.png',
             ),
           ],
         ),
@@ -80,6 +90,44 @@ class _CardPreviewScreenState extends State<CardPreviewScreen> {
       }
     } finally {
       if (mounted) setState(() => _sharing = false);
+    }
+  }
+
+  /// OQ-2 - Save to Photos. gal throws GalException on denied access; the
+  /// message stays honest and local.
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      final png = await _capturePng();
+      if (png == null) return;
+      await Gal.putImageBytes(png, name: _exportName);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Saved to Photos.')));
+      }
+    } on GalException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              e.type == GalExceptionType.accessDenied
+                  ? 'Photos access is off - allow it in Settings to save '
+                        'cards.'
+                  : 'Could not save the card: ${e.type.message}',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not save the card: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -182,20 +230,43 @@ class _CardPreviewScreenState extends State<CardPreviewScreen> {
             const SizedBox(height: 14),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: FilledButton.icon(
-                  onPressed: _sharing ? null : _share,
-                  icon: _sharing
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.ios_share_rounded, size: 20),
-                  label: Text(_sharing ? 'Preparing…' : 'Share'),
-                ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 52,
+                      child: FilledButton.icon(
+                        onPressed: _sharing ? null : _share,
+                        icon: _sharing
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.ios_share_rounded, size: 20),
+                        label: Text(_sharing ? 'Preparing…' : 'Share'),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 52,
+                    height: 52,
+                    child: OutlinedButton(
+                      onPressed: _saving ? null : _save,
+                      style: OutlinedButton.styleFrom(padding: EdgeInsets.zero),
+                      child: _saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.download_rounded, size: 22),
+                    ),
+                  ),
+                ],
               ),
             ),
             if (widget.onRecommit != null) ...[

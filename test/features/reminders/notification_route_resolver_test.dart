@@ -101,6 +101,19 @@ void main() {
     expect(route.immediate, isTrue);
   });
 
+  test('stake card ready routes to its own id space, stake payload, '
+      'immediate (OQ-1)', () {
+    final route = resolveNotificationRoute(
+      _intent(ReminderEntityKinds.stakeCard),
+    );
+
+    expect(route.notifId, 'stake_card:e1'.hashCode.abs() % 2147483647);
+    // Distinct from the invite scheme for the same challenge id.
+    expect(route.notifId, isNot('e1'.hashCode & 0x7fffffff));
+    expect(route.payload, 'stake:e1');
+    expect(route.immediate, isTrue);
+  });
+
   test('coach insight routes to the fixed COIN slot with a layer4 payload '
       '(V-01)', () {
     final route = resolveNotificationRoute(

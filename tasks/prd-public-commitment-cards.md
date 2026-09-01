@@ -254,10 +254,14 @@ generation at runtime, fully offline.
 
 ## 9. Open Questions
 
-- **OQ-1** Local notification when a result card is ready, or in-app CTA only?
-  (v1 ships CTA-only; notification would ride the existing reminder engine.)
-- **OQ-2** "Save to Photos" button on the preview screen — v1 or later? (adds
-  `gal` dependency + iOS permission string.)
+- **OQ-1** ~~Local notification when a result card is ready?~~ **RESOLVED
+  2026-09-01 (Miko: yes):** `stake_card` intents ride the
+  AttentionOrchestrator from the tab shell — once per challenge, only for
+  outcomes decided in the last 48 h (fresh installs never replay history),
+  `stake:` tap payload lands on Accountability.
+- **OQ-2** ~~"Save to Photos" button?~~ **RESOLVED 2026-09-01 (Miko: yes):**
+  `gal` + `NSPhotoLibraryAddUsageDescription` + legacy Android write
+  permission; Save button beside Share on the preview screen.
 - **OQ-3** Final card copy pass + whether cards localize or stay English-only.
 - **OQ-4** Display name source: profile display name — fallback when empty
   (first name? omit the name line?).
