@@ -309,9 +309,43 @@ class CommitmentCard extends StatelessWidget {
 
   List<Widget> _pledgeOverlays(double w, double h) {
     final ts = h / 432;
-    final boxLine = data.displayName.isEmpty
-        ? "I'M SHARING THIS. HOLD ME ACCOUNTABLE."
-        : '${data.displayName.toUpperCase()} · HOLD ME ACCOUNTABLE.';
+    // The plate's gold rectangle spans x 0.28–0.715, y 0.623–0.686
+    // (measured 2026-09-01) — the footer zone must sit INSIDE it, never
+    // the other way around. With a name, two stacked auto-fit lines keep
+    // any name length legible instead of shrinking one long sentence.
+    final footer = data.displayName.isEmpty
+        ? _fitted(
+            "I'M SHARING THIS. HOLD ME ACCOUNTABLE.",
+            color: _Ink.goldBoxText,
+            size: 11,
+            weight: FontWeight.w700,
+          )
+        : Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Expanded(
+                flex: 5,
+                child: _fitted(
+                  data.displayName.toUpperCase(),
+                  color: _Ink.goldBoxText,
+                  size: 12,
+                  weight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              SizedBox(height: h * 0.004),
+              Expanded(
+                flex: 4,
+                child: _fitted(
+                  'HOLD ME ACCOUNTABLE.',
+                  color: _Ink.goldBoxText,
+                  size: 10,
+                  weight: FontWeight.w700,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          );
     return [
       _zone(
         w,
@@ -364,19 +398,7 @@ class CommitmentCard extends StatelessWidget {
         height: 0.046,
         child: _fitted(_date(data.deadline), color: _Ink.goldDeep, size: 22),
       ),
-      _zone(
-        w,
-        h,
-        top: 0.641,
-        height: 0.040,
-        hPad: 0.23,
-        child: _fitted(
-          boxLine,
-          color: _Ink.goldBoxText,
-          size: 12,
-          weight: FontWeight.w700,
-        ),
-      ),
+      _zone(w, h, top: 0.632, height: 0.046, hPad: 0.315, child: footer),
     ];
   }
 
@@ -515,13 +537,15 @@ class CommitmentCard extends StatelessWidget {
           size: 17,
         ),
       ),
+      // Inside the plate's drawn box (x 0.20–0.80, y 0.878–0.949 —
+      // measured 2026-09-01); the old zone leaked past its borders.
       _zone(
         w,
         h,
-        top: 0.872,
-        height: 0.062,
-        hPad: 0.16,
-        child: _body(boxParts.join('\n'), _Ink.redBox, size: 10.5 * ts),
+        top: 0.884,
+        height: 0.058,
+        hPad: 0.23,
+        child: _body(boxParts.join('\n'), _Ink.redBox, size: 10 * ts),
       ),
     ];
   }

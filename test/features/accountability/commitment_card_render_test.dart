@@ -34,10 +34,22 @@ void main() {
       'pledge',
       CommitmentCardData(
         state: CommitmentCardState.pledge,
+        goalTitle: 'I wanna run a mile a day',
+        deadline: sep1,
+        displayName: 'Mikay Dad',
+        note: "I'm putting in the work today for the future I want tomorrow.",
+      ),
+    ),
+    (
+      // Long-name stress case: both footer lines must stay inside the
+      // plate's gold rectangle at any name length.
+      'pledge_longname',
+      CommitmentCardData(
+        state: CommitmentCardState.pledge,
         goalTitle: 'Finish my portfolio',
         deadline: sep1,
-        displayName: 'Miko',
-        note: "I'm putting in the work today for the future I want tomorrow.",
+        displayName: 'Alexandra Wondimagegnehu',
+        note: 'No excuses this time. Watch me.',
       ),
     ),
     (
