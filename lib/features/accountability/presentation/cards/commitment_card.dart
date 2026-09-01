@@ -85,8 +85,6 @@ class _Ink {
   static const goldDeep = Color(0xFF8A6A2E);
   static const gold = Color(0xFFA9822F);
   static const goldBoxText = Color(0xFF6B5320);
-  static const parchmentChip = Color(0xFFF2EADB);
-  static const chipBorder = Color(0xFFC2A05E);
   // Success (dark green/gold plate).
   static const successGoldHi = Color(0xFFF6E7B0);
   static const successGoldLo = Color(0xFFD9A937);
@@ -315,37 +313,6 @@ class CommitmentCard extends StatelessWidget {
         ? "I'M SHARING THIS. HOLD ME ACCOUNTABLE."
         : '${data.displayName.toUpperCase()} · HOLD ME ACCOUNTABLE.';
     return [
-      // Covers the AI-baked QR code in the plate's top-right corner until
-      // the plate is regenerated without it (see asset commit note).
-      Positioned(
-        left: w * 0.795,
-        top: h * 0.075,
-        right: w * 0.043,
-        height: h * 0.094,
-        child: Container(
-          decoration: BoxDecoration(
-            color: _Ink.parchmentChip,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: _Ink.chipBorder, width: 1.2),
-          ),
-          alignment: Alignment.center,
-          child: const FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Padding(
-              padding: EdgeInsets.all(4),
-              child: Text(
-                'SidePal',
-                style: TextStyle(
-                  fontFamily: kCardFontFamily,
-                  color: _Ink.goldDeep,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 11,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
       _zone(
         w,
         h,

@@ -2852,3 +2852,25 @@ not silent reversal.
   carries the Recommit CTA; zero-progress gets pure recommit framing.
   `h2hMoney`/`teamMoney`/`soloMoney` stay dormant in the model behind the
   provider abstraction in case payments ever get legal + simple.
+
+- **2026-09-01 · Public Commitment Cards P1–P4 shipped** (branch
+  feat/public-commitment-cards, PRD tasks/prd-public-commitment-cards.md).
+  *Implementation decisions worth not relitigating:* (1) `pledgeWhy` now
+  lives ON the challenge doc (server + Isar mirror column) so cards
+  regenerate forever — the pledge_signed event stays the audit record;
+  legacy docs render without the note line. (2) The card widget is the
+  decision-logged AppColors/theme exemption (PRD §6): fixed per-state
+  palette, bundled `CardSans` (Roboto from the SDK cache, Apache 2.0) so
+  exports are byte-identical across platforms — flutter_test's Ahem font
+  and iOS/Android divergence both forced this. (3) Plates render at NATIVE
+  aspect (pledge 3:4, results 2:3) composited onto 9:16/1:1 canvases —
+  cover-cropping breaks their framed borders. (4) Result-card labels read
+  "I SAID I WOULD <goal>" because goal titles are imperative ("Finish my
+  portfolio") — verb-carrying labels double the verb. (5) The baked AI QR
+  on the pledge plate was healed out of the JPEG itself (row-sampled
+  parchment patch, scripted in-session) — no plate regeneration needed.
+  (6) Surrender needed ZERO server changes: a zero-stake participant
+  already resolves `completed_surrendered` with honest units. *Still open
+  (OQ-1/OQ-2, Miko's call):* result-card local notification; Save to
+  Photos (`gal` + iOS permission). *Deploy:* `solo_public` + `pledgeWhy`
+  ride the pending `firebase deploy --only functions` with reminder V2.
