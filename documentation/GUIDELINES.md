@@ -2874,3 +2874,29 @@ not silent reversal.
   (OQ-1/OQ-2, Miko's call):* result-card local notification; Save to
   Photos (`gal` + iOS permission). *Deploy:* `solo_public` + `pledgeWhy`
   ride the pending `firebase deploy --only functions` with reminder V2.
+
+- **2026-09-05 · Branch cleanup — coaching-insight-quality idea preserved,
+  code archived.** Post-merge audit of unmerged branches (everything
+  reminder/stakes-era is on main): kept `feat/connect-account`
+  (uid-preserving anonymous→linked upgrade + reinstall recovery — MORE
+  relevant now, since every stake type except practice `requireRegistered`s;
+  stale, needs a rebase-and-review before landing). Deleted
+  `backup/design-pass-old-base` and `claude/kind-volhard-f2344c` (theme
+  work superseded by main's own Obsidian Pulse commits) and
+  `feat/coaching-insight-quality` — that one's code is unrebaseable (the
+  coaching pipeline was rebuilt underneath it) but the commit is kept
+  reachable at tag `archive/coaching-insight-quality`, and **the idea is
+  worth re-implementing fresh**: (1) *Cold-start gate (data maturity)* —
+  count distinct active days + events per entity and globally
+  (observing → calibrating → established; entity leaves observing at
+  ≥3 active days AND ≥5 events, established at ≥7; global established at
+  ≥5 active days). Observing entities emit NO user-facing insights;
+  calibrating allows only high-evidence risk types (streakRisk,
+  fragileStreak, goalAtRisk) at confidence ≥0.55; global-trend insights
+  need global established. With nothing to say pre-maturity, emit a
+  "learning your rhythm — day X of 5" warm-up focus (no AI call, never
+  notifies) instead of guessing. (2) *Style-aware tone* —
+  `expectedToneFor(framing, style)` instead of framing-only, enforced in
+  the AI prompt, the response validator (contradicting output → rejected →
+  deterministic fallback), and the fallback renderer. Full spec in the
+  archived commit's message.
