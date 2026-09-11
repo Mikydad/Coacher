@@ -11,6 +11,8 @@ import '../../goals/application/goal_period_helpers.dart';
 import '../../goals/data/goals_repository.dart';
 import '../../goals/domain/models/goal_check_in.dart';
 import '../../goals/domain/models/goal_enums.dart';
+import '../../direction/data/direction_repository.dart';
+import '../../direction/domain/direction_context_lines.dart';
 import '../../intentions/data/intentions_repository.dart';
 import '../../intentions/domain/models/intention.dart';
 import '../../memory/data/memory_facts_repository.dart';
@@ -41,6 +43,7 @@ class AiPayloadAssembler {
     this.memoryFactsRepository,
     this.peopleRepository,
     this.intentionsRepository,
+    this.directionRepository,
     this.contextSnapshotService,
     EntityNormaliser? normaliser,
     Duration scheduleCacheTtl = const Duration(seconds: 30),
@@ -56,6 +59,10 @@ class AiPayloadAssembler {
   final MemoryFactsRepository? memoryFactsRepository;
   final PeopleRepository? peopleRepository;
   final IntentionsRepository? intentionsRepository;
+
+  /// Direction (2026-09-11): the user's year/quarter/month focus lines —
+  /// per-turn (never session-cached: the user can edit it mid-session).
+  final DirectionRepository? directionRepository;
 
   /// Phase 4b: coarse device-context labels ("free_25m") — never raw
   /// signals — join the prompt when available.
@@ -93,6 +100,7 @@ class AiPayloadAssembler {
       _buildEpisodicSummaries(),
       _buildOpenPromises(),
       _buildDeviceContext(),
+      _buildDirection(),
     ]);
 
     // Route-conditioned trimming (fix-wave Phase 6, §8 M7/P3): a bare
@@ -142,6 +150,7 @@ class AiPayloadAssembler {
       episodicSummaries: dynamicResults[5] as List<String>,
       openPromises: dynamicResults[6] as List<String>,
       deviceContext: dynamicResults[7] as List<String>,
+      direction: dynamicResults[8] as List<String>,
       voiceMode: voiceMode,
     );
   }
@@ -385,6 +394,21 @@ class AiPayloadAssembler {
       return lines.take(15).toList(growable: false);
     } catch (e) {
       debugPrint('[AiPayloadAssembler] open promises failed: $e');
+      return const [];
+    }
+  }
+
+  /// Current-period Direction lines. A previous period must never leak in
+  /// (history ≠ current direction) — `buildDirectionContextLines` enforces
+  /// that; this just reads and delegates.
+  Future<List<String>> _buildDirection() async {
+    final repo = directionRepository;
+    if (repo == null) return const [];
+    try {
+      final entries = await repo.fetchAllOnce();
+      return buildDirectionContextLines(entries, DateTime.now());
+    } catch (e) {
+      debugPrint('[AiPayloadAssembler] direction failed: $e');
       return const [];
     }
   }

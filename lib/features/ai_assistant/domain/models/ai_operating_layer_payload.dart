@@ -34,6 +34,7 @@ class AiOperatingLayerPayload {
     this.episodicSummaries = const [],
     this.openPromises = const [],
     this.deviceContext = const [],
+    this.direction = const [],
     this.voiceMode = false,
     this.retryTurnId,
   });
@@ -141,6 +142,14 @@ class AiOperatingLayerPayload {
   /// signals — no event contents, no locations, no identifiers.
   final List<String> deviceContext;
 
+  /// The user's Direction (PRD/Direction, 2026-09-11): what they say
+  /// matters this year / quarter / month, in their own words, e.g.
+  /// "This month (September): Get SidePal ready for launch". CURRENT
+  /// periods only — a previous period is never sent as context (history
+  /// ≠ current direction). Empty when nothing is set. Context, not a
+  /// command: the prompt tells the model to reason with it quietly.
+  final List<String> direction;
+
   /// This turn arrived by voice and the reply will be spoken aloud
   /// (latency batch 2026-08-07): the client routes it through the
   /// `coach_agent_voice` purpose and adds the short-spoken-reply prompt
@@ -178,5 +187,6 @@ class AiOperatingLayerPayload {
     if (episodicSummaries.isNotEmpty) 'episodicSummaries': episodicSummaries,
     if (openPromises.isNotEmpty) 'openPromises': openPromises,
     if (deviceContext.isNotEmpty) 'deviceContext': deviceContext,
+    if (direction.isNotEmpty) 'direction': direction,
   };
 }

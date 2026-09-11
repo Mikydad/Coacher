@@ -2900,3 +2900,51 @@ not silent reversal.
   the AI prompt, the response validator (contradicting output → rejected →
   deterministic fallback), and the fallback renderer. Full spec in the
   archived commit's message.
+- **2026-09-11 · Direction: a tiny synced context entity, three AI readers,
+  no management.** Settled with Miko (full spec:
+  `PRD/Direction/direction_implementation_prd.md`). Direction = free text
+  (≤280 chars) for what matters this **calendar** year / quarter / month —
+  *not* a goal: no deadline, progress, tasks, or completion. One row per
+  horizon per period with a **deterministic id** `dir_<horizon>_<periodKey>`
+  so two offline devices converge on one document under plain LWW; history
+  is kept (no history UI yet); clearing writes `''`, never a tombstone.
+  Rollover carries the previous text forward as a *suggestion* ("Keep"),
+  never as the new value. Surfaces: Profile hub → `/direction` page with
+  inline autosave (700 ms debounce + blur + dispose; repo no-ops on
+  unchanged text so autosave can't churn `updatedAtMs`); an extremely
+  subtle one-line strip on the Goals tab; a **month-only** dismissible Home
+  card at rollover (no notification; quarter/year never prompt; fresh
+  installs seed the handled key so day 1 shows nothing). Free tier. Readers:
+  Coach (per-turn block in the user prompt + a `## Their direction` server
+  rule), insight phrasing (payload field + rule, prompt version bump), and
+  the Thinking Loop (snapshot + inputs hash + grounding ids; rides the
+  existing single daily `reflectionObservation`). Shared prompt rule,
+  verbatim: *"Direction is context, not a command. Do not repeatedly quote
+  it, preach it, or use it to judge the user's behavior."* *Rejected:*
+  storing it as a `MemoryFact` (scored/evicted, 200-char cap); a
+  planned-task-minutes stand-in for the "direction vs time" mirror
+  (planned ≠ actual — the mirror ships with the Time tracker, next PRD);
+  seeding from onboarding interest tags (an inference the user didn't
+  make); any goal/task ↔ direction linking (Direction = where I'm going,
+  Goals = outcomes, Tasks = doing, Time = did; the AI relates them, the
+  data models don't).
+- **2026-09-12 · Direction entry is `+ Add` → Save / Cancel, not inline
+  autosave (decision 8 revised); D4 device check passed.** Miko's first
+  device run: three always-open autosaving fields read as a form and gave no
+  clear "done" moment under the keyboard (the fading "✓ Saved" is easy to
+  miss). Now: an empty horizon shows its question and a quiet `+ Add` row;
+  tapping opens a field with Save / Cancel (keyboard Done also saves); a set
+  horizon renders as a plain statement, tap to edit; `Keep` under an empty
+  horizon still carries last period's text in one tap. The one piece of
+  autosave kept is an invisible safety net — backing out or backgrounding
+  with a dirty open editor still writes, so text is never lost. Repository,
+  sync, the month card and the AI seams are untouched. *Considered:* a Save
+  pill per always-visible field (still a form); one page-level Save (a
+  form with a footer). **Coach transcript (the D4 sign-off):** with month =
+  "Launch and get the first few hundred users for SidePal", "What should I
+  work on" produced a launch-leaning plan (pre-launch checklist first)
+  without mentioning Direction; "What's my plan for this month" opened with
+  *"This month, your focus is on launching SidePal and getting your first
+  few hundred users"* — paraphrased, not quoted, and only because the
+  question was about the month — then listed goal progress. That is the
+  "reason with it quietly" behavior the prompt rule asks for.

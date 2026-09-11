@@ -65,6 +65,11 @@ class FirestorePaths {
   static String get people => '$userRoot/people';
   static String personDocument(String personId) => '$people/$personId';
 
+  /// Direction (PRD/Direction, 2026-09-11): `users/{uid}/directions/{entryId}`,
+  /// entryId deterministic `dir_<horizon>_<periodKey>`. Blanket owner rule.
+  static String get directions => '$userRoot/directions';
+  static String directionDocument(String entryId) => '$directions/$entryId';
+
   /// Singleton doc (collection `onboarding`, doc `profile`) — what the user
   /// told us during first-launch onboarding (struggles / interests).
   static String get onboardingProfileDoc => '$userRoot/onboarding/profile';

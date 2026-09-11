@@ -16,6 +16,9 @@ import '../../../features/coaching/domain/models/coaching_style.dart';
 import '../../../features/coaching/presentation/widgets/coaching_preference_sections.dart';
 import '../../../features/context_override/application/context_override_providers.dart';
 import '../../analytics/presentation/analytics_progress_screen.dart';
+import '../../direction/application/direction_providers.dart';
+import '../../direction/domain/direction_context_lines.dart';
+import '../../direction/presentation/direction_screen.dart';
 import '../../settings/presentation/about_support_screen.dart';
 import '../../settings/presentation/account_settings_screen.dart';
 import '../../settings/presentation/appearance_sheet.dart';
@@ -675,6 +678,25 @@ class _ProfileHubList extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: Column(
         children: [
+          // Direction (PRD/Direction, 2026-09-11): the page's real entry
+          // point. Subtitle mirrors the month's text so Profile reads what
+          // the user said matters without opening anything.
+          Consumer(
+            builder: (context, ref, _) {
+              final slot = mostSpecificDirectionSlot(
+                ref.watch(currentDirectionProvider),
+              );
+              return SettingRow(
+                icon: Icons.explore_outlined,
+                title: 'Direction',
+                subtitle: slot?.text ??
+                    "Where you're heading — year, quarter, month",
+                trailing: const SettingRowChevron(),
+                onTap: () =>
+                    Navigator.pushNamed(context, DirectionScreen.routeName),
+              );
+            },
+          ),
           SettingRow(
             icon: Icons.schedule_rounded,
             title: 'Smart Timing',

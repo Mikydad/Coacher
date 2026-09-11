@@ -1,5 +1,6 @@
 import '../../education/presentation/first_time_feature_card.dart';
 import '../../education/presentation/help_dot.dart';
+import '../../direction/presentation/direction_strip.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -58,8 +59,12 @@ class GoalsHomeScreen extends ConsumerWidget {
             padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: FirstTimeFeatureCard(guideId: 'goals'),
           ),
+          // Direction (2026-09-11): one quiet line, teaches the feature
+          // without competing with the goal list.
+          const SizedBox(height: 6),
+          const DirectionStrip(),
           // ── Category filter ─────────────────────────────────────────
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           const CategoryChipRow(),
           const SizedBox(height: 16),
 

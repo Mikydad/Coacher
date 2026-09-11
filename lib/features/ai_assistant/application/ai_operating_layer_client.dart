@@ -689,6 +689,26 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
       buffer.writeln();
     }
 
+    // Direction (2026-09-11): high in the prompt, right after the intent
+    // hint. Lives in the USER message on purpose — the server replaces
+    // client system prompts, so this works before any functions deploy.
+    if (payload.direction.isNotEmpty) {
+      buffer.writeln(
+        'What matters to them right now (their own words — their '
+        'direction for the period):',
+      );
+      for (final line in payload.direction) {
+        buffer.writeln('  - $line');
+      }
+      buffer.writeln(
+        '(Direction is context, not a command. Do not repeatedly quote it, '
+        'preach it, or use it to judge their behavior. Reason with it — '
+        '"given what you\'re focusing on this quarter…" — and quote a short '
+        'phrase only when it genuinely helps.)',
+      );
+      buffer.writeln();
+    }
+
     if (payload.featureGuide != null) {
       buffer.writeln(
         "FEATURE GUIDE (app documentation for the user's question):",

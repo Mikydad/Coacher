@@ -1,3 +1,5 @@
+import '../../direction/domain/direction_context_lines.dart';
+import '../../direction/domain/models/direction_entry.dart';
 import '../../intentions/domain/models/intention.dart';
 import '../../memory/domain/models/memory_fact.dart';
 import '../../memory/domain/models/person.dart';
@@ -27,8 +29,23 @@ Map<String, dynamic> buildReflectionSnapshot({
   required List<Person> people,
   required List<Intention> intentions,
   required DateTime now,
+
+  /// Direction (2026-09-11): every stored row; only CURRENT-period,
+  /// non-empty entries reach the snapshot (history ≠ current direction).
+  List<DirectionEntry> directions = const [],
 }) {
   final nowMs = now.millisecondsSinceEpoch;
+  final directionSlots = resolveDirectionSlots(directions, now);
+  final currentDirection = [
+    for (final h in kDirectionHorizonOrder)
+      if (directionSlots[h]!.hasText)
+        {
+          'id': directionSlots[h]!.current!.id,
+          'horizon': h.name,
+          'period': directionSlots[h]!.period.label,
+          'text': directionSlots[h]!.text,
+        },
+  ];
 
   final sortedFacts = [...facts]
     ..sort((a, b) => b.updatedAtMs.compareTo(a.updatedAtMs));
@@ -73,6 +90,7 @@ Map<String, dynamic> buildReflectionSnapshot({
           if (i.activityTags.isNotEmpty) 'tags': i.activityTags,
         },
     ],
+    if (currentDirection.isNotEmpty) 'direction': currentDirection,
   };
 }
 
@@ -99,10 +117,12 @@ Set<String> reflectionKnownIds({
   required List<MemoryFact> facts,
   required List<Person> people,
   required List<Intention> intentions,
+  List<DirectionEntry> directions = const [],
 }) => {
   for (final f in facts) f.id,
   for (final p in people) p.id,
   for (final i in intentions) i.id,
+  for (final d in directions) d.id,
 };
 
 /// Stable hash over the DURABLE identity of the inputs — ids, statuses and
@@ -113,9 +133,13 @@ String reflectionInputsHash({
   required List<MemoryFact> facts,
   required List<Person> people,
   required List<Intention> intentions,
+  List<DirectionEntry> directions = const [],
 }) {
   final parts = <String>[
     for (final f in facts) 'f:${f.id}:${f.updatedAtMs}',
+    // Editing a direction must re-arm the loop; id + stamp only (no
+    // day-relative values, so midnight alone never re-arms it).
+    for (final d in directions) 'd:${d.id}:${d.updatedAtMs}',
     // updatedAtMs matters too (P2-10): renaming a person or editing their
     // relationship must re-arm reflection, not only a new interaction.
     for (final p in people)

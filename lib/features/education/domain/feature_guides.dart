@@ -10,6 +10,7 @@ abstract final class FeatureGuides {
     focus,
     reminders,
     goals,
+    direction,
     circles,
     analytics,
     planTomorrow,
@@ -266,6 +267,46 @@ abstract final class FeatureGuides {
       'What are Tasks?',
     ],
     tryItTabIndex: MainTabIndex.goals,
+  );
+
+  static const direction = FeatureGuide(
+    id: 'direction',
+    title: 'Direction',
+    emoji: '🧭',
+    oneLiner: 'What matters to you this year, quarter, and month.',
+    what:
+        'Direction is where you tell SidePal what you are moving toward — '
+        'in your own words, for this year, this quarter, and this month. '
+        'It is not a goal: no deadline, no progress bar, no tasks. Just '
+        'context SidePal keeps in mind while helping you.',
+    why:
+        'Tasks answer "what now?", goals answer "what for?", and Direction '
+        'answers "where am I heading?". With it, the coach can prioritise '
+        'what actually matters to you instead of giving generic advice.',
+    howSteps: [
+      'Open Profile → Direction.',
+      'Write a sentence for the year, the quarter, or the month — any can '
+          'stay empty.',
+      'It saves as you type. Change it whenever what matters changes.',
+      'At the start of a month, SidePal quietly asks what your focus is.',
+    ],
+    tips: [
+      'Keep it to one sentence — a direction, not a plan.',
+      'SidePal never nags you about it; it only remembers.',
+    ],
+    keywords: [
+      'direction',
+      'focus this month',
+      'focus this quarter',
+      'what matters',
+      'where am i heading',
+      'north star',
+    ],
+    suggestedPrompts: [
+      'What should I work on given my direction?',
+      'How is Direction different from Goals?',
+    ],
+    tryItRoute: '/direction',
   );
 
   static const circles = FeatureGuide(

@@ -22,6 +22,13 @@ describe('server-owned system prompts (fix-wave Phase 5, §8 S1)', () => {
     }
   });
 
+  it('carries the Direction rule (context, not a command)', () => {
+    const base = DEFAULT_SYSTEM_PROMPTS.coach_agent;
+    assert.ok(base.includes('## Their direction'));
+    assert.ok(base.includes('Direction is context, not a command'));
+    assert.ok(base.includes('prefer items that move it'));
+  });
+
   it('voice variants extend the base with their addenda', () => {
     const base = DEFAULT_SYSTEM_PROMPTS.coach_agent;
     assert.ok(DEFAULT_SYSTEM_PROMPTS.coach_agent_voice.startsWith(base));

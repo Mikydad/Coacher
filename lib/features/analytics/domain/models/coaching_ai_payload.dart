@@ -4,7 +4,7 @@ import 'generated_insight.dart';
 
 /// Current prompt template version. Increment when prompts change materially.
 /// Used to correlate AI responses with specific prompt logic in analytics.
-const String kCoachingAiPromptVersion = 'v1.0.0';
+const String kCoachingAiPromptVersion = 'v1.1.0'; // v1.1.0: Direction context
 
 // ─── Coaching framing ─────────────────────────────────────────────────────────
 
@@ -246,6 +246,7 @@ class CoachingAiPayload {
     required this.promptVersion,
     this.coachingStyle = CoachingStyle.balanced,
     this.secondaryInsightType,
+    this.direction = const [],
   });
 
   final String focusId;
@@ -281,6 +282,11 @@ class CoachingAiPayload {
   final AiDeliveryContext deliveryContext;
   final int generatedAtMs;
 
+  /// The user's Direction lines (PRD/Direction, 2026-09-11) — current
+  /// periods only, empty when unset. Phrasing context only: the engine's
+  /// decision is untouched, and the fallback renderer never sees it.
+  final List<String> direction;
+
   /// Prompt template version — must be updated when prompts change materially.
   final String promptVersion;
 
@@ -312,6 +318,7 @@ class CoachingAiPayload {
     'deliveryContext': deliveryContext.toMap(),
     'generatedAtMs': generatedAtMs,
     'promptVersion': promptVersion,
+    if (direction.isNotEmpty) 'direction': direction,
   };
 
   /// Assemble a [CoachingAiPayload] from a [CurrentCoachingFocus] and
@@ -323,6 +330,7 @@ class CoachingAiPayload {
     CoachingStyle coachingStyle = CoachingStyle.balanced,
     InsightType? secondaryInsightType,
     String promptVersion = kCoachingAiPromptVersion,
+    List<String> direction = const [],
   }) {
     final framing = deriveCoachingFraming(
       focusReason: focus.focusReason,
@@ -350,6 +358,7 @@ class CoachingAiPayload {
       deliveryContext: deliveryContext,
       generatedAtMs: DateTime.now().millisecondsSinceEpoch,
       promptVersion: promptVersion,
+      direction: direction,
     );
   }
 }

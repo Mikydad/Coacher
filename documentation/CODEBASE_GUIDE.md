@@ -175,6 +175,7 @@ reprioritization ("task became overdue") with no data change.
 | Data | Storage | Offline durability |
 |---|---|---|
 | Tasks, routines, blocks, reminders, goals, analytics | **Isar + Firestore** (full local-first) | Strong |
+| Direction (year/quarter/month focus text, `users/{uid}/directions`) | **Isar + Firestore** (full local-first; deterministic ids, no tombstones) | Strong |
 | Timer sessions (`execution`), task scores (`scoring`) | **Firestore only** (queue fallback on failure) | Weaker — no local mirror |
 | AI coaching caches, delivery history, coaching style, profile prefs, notification ledger, AI chat history | **Isar only** — never synced | Lost on reinstall/device switch |
 | Community/circles | **Firestore only**, live from network | None |

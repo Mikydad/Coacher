@@ -11,6 +11,8 @@ import '../../analytics/data/insight_cache_repository.dart';
 import '../../analytics/domain/models/behavior_feature_object.dart';
 import '../../analytics/domain/models/detected_pattern.dart';
 import '../../analytics/domain/models/generated_insight.dart';
+import '../../direction/data/direction_repository.dart';
+import '../../direction/domain/models/direction_entry.dart';
 import '../../intentions/application/intention_capture.dart';
 import '../../intentions/data/intentions_repository.dart';
 import '../../intentions/domain/models/intention.dart';
@@ -54,6 +56,11 @@ class ThinkingLoopService {
     AiProxyClient? proxy,
     AiRemoteConfigService? remoteConfig,
 
+    /// Direction (2026-09-11): what the user says matters this
+    /// year/quarter/month joins the snapshot as context (never a task).
+    /// Null keeps the payload byte-identical.
+    DirectionRepository? directions,
+
     /// Reminder aggregates for the strategist (FR-R-61) — injected so this
     /// service keeps no dependency on the reminders feature. Null keeps the
     /// pre-strategist payload byte-identical.
@@ -70,6 +77,7 @@ class ThinkingLoopService {
        _insightCache = insightCache,
        _proxy = proxy ?? AiProxyClient(),
        _remoteConfig = remoteConfig ?? AiRemoteConfigService.instance,
+       _directions = directions,
        _loadReminderAggregates = loadReminderAggregates,
        _onReminderProposals = onReminderProposals,
        _now = now ?? DateTime.now;
@@ -81,6 +89,7 @@ class ThinkingLoopService {
   final InsightCacheRepository _insightCache;
   final AiProxyClient _proxy;
   final AiRemoteConfigService _remoteConfig;
+  final DirectionRepository? _directions;
   final Future<Map<String, dynamic>?> Function()? _loadReminderAggregates;
   final Future<void> Function(List<ReminderStrategyProposal>)?
   _onReminderProposals;
@@ -119,6 +128,14 @@ class ThinkingLoopService {
       final facts = await _facts.fetchFactsOnce();
       final people = await _people.fetchPeopleOnce();
       final intentions = await _intentions.fetchIntentionsOnce();
+      // Direction alone is not worth a call (nothing to connect it to),
+      // so it does not join the empty-gate below.
+      var directions = const <DirectionEntry>[];
+      try {
+        directions = await _directions?.fetchAllOnce() ?? const [];
+      } catch (e) {
+        debugPrint('[ThinkingLoop] direction read failed: $e');
+      }
       if (facts.isEmpty && people.isEmpty && intentions.isEmpty) {
         // Nothing to reflect on — but do NOT mark the day (P2-10): an
         // empty snapshot is usually a fresh install or a just-wiped
@@ -132,6 +149,7 @@ class ThinkingLoopService {
         facts: facts,
         people: people,
         intentions: intentions,
+        directions: directions,
       );
       if (prefs.getString(inputsHashPrefsKey) == hash) {
         // Nothing changed since the last pass — same conclusions, zero
@@ -147,6 +165,7 @@ class ThinkingLoopService {
         people: people,
         intentions: intentions,
         now: now,
+        directions: directions,
       );
       // FR-R-61: the strategist rides THIS pass — locally pre-computed
       // aggregates, never raw ledger rows, no additional call (FR-R-64).
@@ -192,6 +211,7 @@ class ThinkingLoopService {
           facts: facts,
           people: people,
           intentions: intentions,
+          directions: directions,
         ),
         openIntentionIds: {
           for (final i in live)
@@ -387,5 +407,6 @@ Rules:
 - "hintUpdates" only when the snapshot shows a timing pattern (e.g. repeated snoozes) suggesting a better time block. Max 5.
 - "observations" are for a possible forget/avoid/change worth mentioning. Phrase as a hedged question or gentle notice ("You might be…", "Looks like…"), never a command or diagnosis. Max 1.
 - "reminderProposals" only when snapshot.reminders shows a task genuinely struggling (repeated overdueDays, ignored, reschedules): "reschedule" = a better time, "ladderTuning" = gentler or firmer follow-ups, "aggregate" = misses should be batched quietly, "drop" = worth asking whether to keep it. Max 3, one per task, only ids from snapshot.reminders.tasks. These are SUGGESTIONS the user applies themselves - phrase them as offers, never verdicts.
+- snapshot.direction (when present) is what the user says matters this year/quarter/month, in their own words. It is context, not a task. You may make ONE gentle observation connecting the facts/intentions to it when the link is real (e.g. a promise that serves the month's focus keeps getting pushed) — cite the direction id in basedOn. Never judge or preach, never quote it back at length, and never propose a dormantIntention just to "work on" the direction.
 - Empty arrays are the right answer for an unremarkable snapshot: {"dormantIntentions":[],"hintUpdates":[],"observations":[],"reminderProposals":[]}.
 ''';

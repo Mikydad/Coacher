@@ -9,6 +9,8 @@ import '../../features/goals/domain/models/goal_action.dart';
 import '../../features/goals/domain/models/goal_check_in.dart';
 import '../../features/goals/domain/models/goal_milestone.dart';
 import '../../features/goals/domain/models/user_goal.dart';
+import '../../features/direction/data/direction_lww_merge.dart';
+import '../../features/direction/domain/models/direction_entry.dart';
 import '../../features/intentions/domain/models/intention.dart';
 import '../../features/memory/domain/models/memory_fact.dart';
 import '../../features/memory/domain/models/person.dart';
@@ -150,6 +152,8 @@ class RemoteIsarMerge {
     await _pullGoalSubcollections();
     _abortIfUidChanged();
     await _pullIntentions();
+    _abortIfUidChanged();
+    await _pullDirections();
     _abortIfUidChanged();
     await _pullTimeBlocks();
     _abortIfUidChanged();
@@ -424,6 +428,31 @@ class RemoteIsarMerge {
         await _mergeIntention(intention);
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip intention ${doc.id}: $e\n$st');
+      }
+    }
+  }
+
+  /// Direction (`users/{uid}/directions`) — cursor pull, LWW. Core phase:
+  /// the collection sits under the blanket owner rule, so it cannot be
+  /// permission-denied on the live project. No tombstones — a cleared
+  /// entry is an empty `text` with a newer stamp.
+  Future<void> _pullDirections() async {
+    final cursor = await _cursorFor('directions');
+    final snap = await _afterCursor(
+      _client.userCollection('directions'),
+      cursor,
+    ).get();
+    for (final doc in snap.docs) {
+      try {
+        final m = Map<String, dynamic>.from(doc.data());
+        m['id'] = _docFieldId(doc, m);
+        final entry = DirectionEntry.fromMap(m);
+        _noteSeen('directions', entry.updatedAtMs);
+        if (await mergeDirectionEntryLwwIntoIsar(_isar, entry)) {
+          _appliedCount++;
+        }
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip direction ${doc.id}: $e\n$st');
       }
     }
   }

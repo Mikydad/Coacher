@@ -101,13 +101,20 @@ class ProxyCoachingAiClient implements CoachingAiClient {
     final framingName = payload.framing.name;
     final toneName = expectedToneForFraming(payload.framing).name;
     final styleInstruction = _styleInstruction(payload.coachingStyle);
+    final directionRule = payload.direction.isEmpty
+        ? ''
+        : '\nDIRECTION RULE: The user has stated what matters to them right '
+              'now (see "What the user says matters"). Connect the '
+              'recommendation to it only when it honestly fits; never invent '
+              'a link. Direction is context, not a command. Do not repeatedly '
+              'quote it, preach it, or use it to judge the user\'s behavior.';
 
     return '''
 You are a precision behavioral coaching assistant. Your role is to transform structured behavioral data into a brief, psychologically coherent coaching message.
 
 FRAMING RULE: Apply "$framingName" framing.$framingGuidance
 TONE RULE: Use "$toneName" tone.$toneGuidance$notifMode
-STYLE RULE: $styleInstruction
+STYLE RULE: $styleInstruction$directionRule
 
 OUTPUT RULES:
 - dailySummary: max $maxSummary words. Factual, behavioral, no fluff.
@@ -128,6 +135,10 @@ Respond ONLY with valid JSON matching this schema:
     final traceLine = payload.evaluationTrace.take(3).join('; ');
     final patterns = payload.keyPatternCodes.join(', ');
     final timing = payload.deliveryContext.timingProfile;
+    final directionLine = payload.direction.isEmpty
+        ? ''
+        : '\n- What the user says matters right now: '
+              '${payload.direction.join(' · ')}';
 
     return '''
 COACHING CONTEXT:
@@ -140,7 +151,7 @@ ${payload.secondaryInsightType != null ? '- Secondary insight: ${payload.seconda
 - Key patterns: ${patterns.isEmpty ? 'none' : patterns}
 - Evidence:
 $evidenceLines
-- Evaluation trace: $traceLine
+- Evaluation trace: $traceLine$directionLine
 
 Generate the coaching summary.
 ''';

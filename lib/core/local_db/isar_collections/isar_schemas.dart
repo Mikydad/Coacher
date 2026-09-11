@@ -12,6 +12,7 @@ import 'isar_blocked_user.dart';
 import 'isar_coaching_focus.dart';
 import 'isar_delivery_decision_snapshot.dart';
 import 'isar_delivery_history_entry.dart';
+import 'isar_direction_entry.dart';
 import 'isar_generated_insight.dart';
 import 'isar_goal.dart';
 import 'isar_goal_action.dart';
@@ -77,4 +78,5 @@ const isarSchemaList = [
   IsarMemoryFactSchema,
   IsarPersonSchema,
   IsarMemorySessionStateSchema,
+  IsarDirectionEntrySchema,
 ];

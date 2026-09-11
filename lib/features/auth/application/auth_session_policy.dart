@@ -5,6 +5,7 @@ import '../../../core/offline/offline_store.dart';
 import '../../../core/push/push_messaging_service.dart';
 import '../../../core/sync/sync_cursor_store.dart';
 import '../../../core/sync/sync_service.dart';
+import '../../direction/application/new_month_prompt.dart';
 import '../../intentions/application/geofence_arming.dart';
 import '../../thinking/application/thinking_loop_service.dart';
 
@@ -108,6 +109,8 @@ abstract final class AuthSessionPolicy {
       // the rest of the local day after an account switch.
       prefs.remove(ThinkingLoopService.lastDayPrefsKey),
       prefs.remove(ThinkingLoopService.inputsHashPrefsKey),
+      // Direction's month-card flag is per-account (PRD/Direction §5.3).
+      prefs.remove(kDirectionMonthCardHandledPrefsKey),
     ]);
   }
 }

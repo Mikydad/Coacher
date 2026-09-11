@@ -7,6 +7,8 @@ import '../../../core/di/providers.dart';
 import '../../../core/local_db/isar_collections/isar_ai_summary.dart';
 import '../../coaching/application/coaching_style_providers.dart';
 import '../domain/models/ai_summary_response.dart';
+import '../../direction/application/direction_providers.dart';
+import '../../direction/domain/direction_context_lines.dart';
 import '../domain/models/coaching_ai_payload.dart';
 import '../domain/models/current_coaching_focus.dart';
 import '../domain/models/generated_insight.dart';
@@ -169,12 +171,22 @@ final recomputeAiSummaryProvider = FutureProvider<AiSummaryResponse>((
     localDateKey: today,
   );
 
+  // Direction (2026-09-11): phrasing context only — read once, best
+  // effort, never a reason for the summary to fail.
+  var direction = const <String>[];
+  try {
+    final entries =
+        await ref.read(directionRepositoryProvider).fetchAllOnce();
+    direction = buildDirectionContextLines(entries, DateTime.now());
+  } catch (_) {}
+
   final payload = CoachingAiPayload.fromFocus(
     focus: focus,
     primaryInsightType: primaryInsightType,
     deliveryContext: deliveryContext,
     coachingStyle: coachingStyle,
     secondaryInsightType: _findSecondaryInsightType(insights, focus),
+    direction: direction,
   );
 
   // Call AI — await the FutureProvider to resolve the real/mock client.

@@ -14,6 +14,7 @@ import '../core/sync/post_sync_refresh_coordinator.dart';
 import '../core/sync/sync_service.dart';
 import '../core/utils/date_keys.dart';
 import '../features/context_override/application/context_override_expiry_poller.dart';
+import '../features/direction/application/direction_providers.dart';
 import '../features/memory/application/memory_providers.dart';
 import '../features/reminders/application/attention_orchestrator_providers.dart';
 import '../features/thinking/application/thinking_providers.dart';
@@ -97,6 +98,9 @@ class _AppLifecycleTaskRefreshState
     final nowKey = DateKeys.todayKey();
     if (nowKey != _lastTodayKey) {
       _lastTodayKey = nowKey;
+      // Direction periods roll over with the calendar (a new month shows
+      // its Home card on the first tick after midnight, no restart).
+      ref.read(directionClockProvider.notifier).state = DateTime.now();
       PostSyncRefreshCoordinator.instance.schedule(
         tasks: true,
         coachingDelivery: true,
@@ -123,6 +127,7 @@ class _AppLifecycleTaskRefreshState
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _lastTodayKey = DateKeys.todayKey();
+      ref.read(directionClockProvider.notifier).state = DateTime.now();
       unawaited(_refreshAfterResume());
       unawaited(_drainLaunchNotificationResponse());
       // Retry a failed timezone resolution (FR-R-06 / AUDIT §10 T3). While

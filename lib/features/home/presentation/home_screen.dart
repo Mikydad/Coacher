@@ -66,6 +66,7 @@ import '../../reminders/presentation/recovery_navigation.dart';
 import '../../context_override/presentation/active_override_banner.dart';
 import '../../context_override/presentation/context_override_quick_activate_sheet.dart';
 import '../../context_override/presentation/post_override_review_card.dart';
+import '../../direction/presentation/new_month_direction_card.dart';
 import '../../reminders/application/attention_orchestrator_providers.dart';
 import '../../reminders/application/notification_route_resolver.dart';
 import '../../reminders/domain/models/attention_outcome.dart';
@@ -220,6 +221,9 @@ class HomeScreen extends ConsumerWidget {
             onResolve: (row, kind) =>
                 resolveRecoveryRow(context, ref, row, kind),
           ),
+          // Direction's month-rollover ask (2026-09-11): a one-off in the
+          // one-off band, above the post-override review. Silent otherwise.
+          const NewMonthDirectionCard(),
           const PostOverrideReviewCard(),
           const _DailyDisciplineSection(),
           const SizedBox(height: 16),
