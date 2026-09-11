@@ -40,6 +40,7 @@ class _FakeTimerRuntimeCache extends TimerRuntimeCache {
     required Duration elapsed,
     DateTime? runningSince,
     int? targetDurationMinutes,
+    String? activityEventId,
   }) async {
     data = <String, dynamic>{
       'targetType': targetType.storageValue,

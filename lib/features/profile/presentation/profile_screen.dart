@@ -19,6 +19,7 @@ import '../../analytics/presentation/analytics_progress_screen.dart';
 import '../../direction/application/direction_providers.dart';
 import '../../direction/domain/direction_context_lines.dart';
 import '../../direction/presentation/direction_screen.dart';
+import '../../time_tracker/presentation/time_screen.dart';
 import '../../settings/presentation/about_support_screen.dart';
 import '../../settings/presentation/account_settings_screen.dart';
 import '../../settings/presentation/appearance_sheet.dart';
@@ -696,6 +697,13 @@ class _ProfileHubList extends StatelessWidget {
                     Navigator.pushNamed(context, DirectionScreen.routeName),
               );
             },
+          ),
+          SettingRow(
+            icon: Icons.timeline_outlined,
+            title: 'Time',
+            subtitle: 'Record your day, see where your time went',
+            trailing: const SettingRowChevron(),
+            onTap: () => Navigator.pushNamed(context, TimeScreen.routeName),
           ),
           SettingRow(
             icon: Icons.schedule_rounded,

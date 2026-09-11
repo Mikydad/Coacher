@@ -2948,3 +2948,48 @@ not silent reversal.
   few hundred users"* — paraphrased, not quoted, and only because the
   question was about the month — then listed goal progress. That is the
   "reason with it quietly" behavior the prompt rule asks for.
+- **2026-09-12 · Time Tracker: a timestamped activity timeline, not a
+  timer.** Settled with Miko (full spec:
+  `PRD/Time_Tracker/time_tracker_implementation_prd.md`). One synced
+  entity `ActivityEvent` (text ≤80, `startedAtMs`, optional explicit
+  `endedAtMs`, optional *intended* minutes, `dateKey` derived at write,
+  `source` manual|timer, nullable unexposed `category`, tombstone
+  `active`). Durations are **derived**, priority: explicit end → next event
+  → 2-hour cap → untracked gap; beyond the cap the activity is credited
+  nothing and a `? · 3h 51m untracked` row appears (no false precision).
+  Latest entry reads "Ongoing", no live counter. Calendar-day timeline;
+  edits today-only, previous days view-only. Capture = a Home pill
+  (`◷ Track what you're doing +`, under the action circles) opening a
+  small sheet: auto timestamp (editable, clamped to now), text, the
+  user's own recent chips (6, 30 days), optional duration chips, Track;
+  sheet footer links to the full `/time` page (timeline + day pager +
+  per-activity summary at the bottom — no new destination); Profile hub
+  row `Time`. Intended-duration reminder ("30m are up. What are you doing
+  now?") rides the attention orchestrator as entity kind `activity` and
+  **respects** focus/sleep suppression. Focus timer start auto-logs a
+  timer-sourced event; stop writes the explicit end. *Deferred:*
+  `sidepal://track` and Coach one-tap logging (V1.1), plan-suggestion
+  chips (dropped for now), all AI reflection incl. the Direction mirror
+  (V1.2, only once the timeline data is trusted). *Rejected:* a 4 AM day
+  cutoff (a second notion of "day"); a live ticking duration (feels like a
+  timer); bypassing suppression for the duration reminder (an explicit
+  "don't interrupt me" outranks it); auto-stop at the intended duration
+  (intent ≠ stop time). Principle: *SidePal doesn't track your time for
+  you — it makes it effortless to record it, then helps you see what you
+  actually did with it.*
+- **2026-09-12 · Time Tracker shipped (T1–T6) with four implementation
+  choices worth knowing.** (1) All writes go through `TimeTrackerActions`
+  (log / update / delete / end) so the "are up" reminder is cancelled on
+  the next log, edit, delete or explicit end and re-armed on edit — no
+  call site can forget it. (2) The reminder service is callback-injected
+  (`evaluate`, `cancel`) and wired to `AttentionOrchestratorService` only
+  in the provider; entity kind `activity`, one notification per event,
+  importance 45 / interruption low, never for timer-sourced events,
+  never when backdated past its own end. (3) A notification tap lands on
+  the capture sheet through the `/track` host route (opens the sheet,
+  pops itself) so cold starts reuse the pending-intent replay unchanged.
+  (4) The Home pill shows "Scrolling · since 10:03 PM" only while the
+  latest event is younger than the 2-hour cap; the timeline still reads
+  "Ongoing" until the next log. Known V1 limit, accepted: reminders are
+  device-local — a log on device A cannot cancel device B's armed
+  notification; the ledger's ignored back-off bounds the damage.

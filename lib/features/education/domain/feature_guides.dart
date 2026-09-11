@@ -11,6 +11,7 @@ abstract final class FeatureGuides {
     reminders,
     goals,
     direction,
+    time,
     circles,
     analytics,
     planTomorrow,
@@ -307,6 +308,48 @@ abstract final class FeatureGuides {
       'How is Direction different from Goals?',
     ],
     tryItRoute: '/direction',
+  );
+
+  static const time = FeatureGuide(
+    id: 'time',
+    title: 'Time',
+    emoji: '⏱️',
+    oneLiner: 'Record your day. See where your time went.',
+    what:
+        'Tap Track on Home and say what you are doing — "Gym", '
+        '"Scrolling", "Working on SidePal". SidePal stamps the time; the '
+        'next thing you log ends the previous one, so you never type '
+        'durations. The Time page shows the day as a timeline with the '
+        'gaps you did not log left honest, plus a summary at the bottom.',
+    why:
+        'Plans say what you meant to do. The timeline says what you '
+        'actually did. Seeing the two side by side is how you notice your '
+        'own patterns — SidePal never scores or judges them.',
+    howSteps: [
+      'On Home, tap "Track what you\'re doing".',
+      'Type what you are doing, or tap one of your recent activities.',
+      'Optionally add how long you intend to spend.',
+      'Tap Track. Log the next thing when it changes.',
+      'Open Profile → Time to see the timeline and summary.',
+    ],
+    tips: [
+      'Imperfect tracking is fine — three entries a day already tell a story.',
+      'A focus session logs itself, with an exact end.',
+    ],
+    keywords: [
+      'time',
+      'time tracking',
+      'track',
+      'timeline',
+      'where did my time go',
+      'what am i doing',
+      'log activity',
+    ],
+    suggestedPrompts: [
+      'What is the Time page?',
+      'How is Time different from the focus timer?',
+    ],
+    tryItRoute: '/time',
   );
 
   static const circles = FeatureGuide(

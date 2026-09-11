@@ -14,6 +14,7 @@ import '../../features/planning/application/routine_mode_policy_resolver.dart';
 import '../../features/planning/data/isar_planning_repository.dart';
 import '../../features/planning/data/planning_repository.dart';
 import '../../features/execution/application/execution_controller.dart';
+import '../../features/time_tracker/application/time_tracker_providers.dart';
 import '../../features/execution/data/execution_repository.dart';
 import '../../features/execution/data/timer_runtime_cache.dart';
 import '../../features/focus/data/focus_resume_store.dart';
@@ -118,6 +119,7 @@ final executionControllerProvider =
         resumeStore: ref.read(focusResumeStoreProvider),
         initialTaskId: ref.read(activeExecutionTaskIdProvider),
         initialTaskLabel: ref.read(activeExecutionTaskLabelProvider),
+        activityEvents: ref.read(activityEventRepositoryProvider),
       );
     });
 

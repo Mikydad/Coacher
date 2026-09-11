@@ -176,6 +176,7 @@ reprioritization ("task became overdue") with no data change.
 |---|---|---|
 | Tasks, routines, blocks, reminders, goals, analytics | **Isar + Firestore** (full local-first) | Strong |
 | Direction (year/quarter/month focus text, `users/{uid}/directions`) | **Isar + Firestore** (full local-first; deterministic ids, no tombstones) | Strong |
+| Activity events (Time Tracker timeline, `users/{uid}/activityEvents`) | **Isar + Firestore** (full local-first; soft tombstones) | Strong |
 | Timer sessions (`execution`), task scores (`scoring`) | **Firestore only** (queue fallback on failure) | Weaker — no local mirror |
 | AI coaching caches, delivery history, coaching style, profile prefs, notification ledger, AI chat history | **Isar only** — never synced | Lost on reinstall/device switch |
 | Community/circles | **Firestore only**, live from network | None |
@@ -215,7 +216,9 @@ habits, and goals.
 (Morning/Afternoon/Night) for tomorrow and reuses `AddTaskScreen` to place
 tasks into slots (`plan_tomorrow/application/plan_tomorrow_providers.dart`).
 
-**3. Execute** — `FocusSelectionScreen` seeds the single global
+**3. Execute** — (Since 2026-09-12 a fresh timer start also logs a timer-sourced
+`ActivityEvent` for the Time Tracker, and stop writes its explicit end.)
+`FocusSelectionScreen` seeds the single global
 `executionControllerProvider` (a `StateNotifier` wrapping the pure
 `TaskTimerEngine` state machine: notStarted/inProgress/paused/finished).
 `TimerSessionScreen` drives start/pause/stop. Elapsed time is in-memory,

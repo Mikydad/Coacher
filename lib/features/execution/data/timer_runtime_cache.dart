@@ -22,6 +22,10 @@ class TimerRuntimeCache {
     required Duration elapsed,
     DateTime? runningSince,
     int? targetDurationMinutes,
+
+    /// Time Tracker (2026-09-12): the timer-sourced activity event this
+    /// session opened, so a crash-restore still ends the right one.
+    String? activityEventId,
   }) async {
     final file = await _file();
     final payload = <String, dynamic>{
@@ -33,6 +37,7 @@ class TimerRuntimeCache {
       'elapsedMs': elapsed.inMilliseconds,
       'runningSinceMs': runningSince?.millisecondsSinceEpoch,
       'targetDurationMinutes': targetDurationMinutes,
+      'activityEventId': ?activityEventId,
     };
     await file.writeAsString(jsonEncode(payload), flush: true);
   }

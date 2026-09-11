@@ -27,6 +27,10 @@ abstract final class ReminderEntityKinds {
   /// The aggregated recovery summary (FR-R-53). One notification standing in
   /// for every overdue item, never one per item.
   static const String recovery = 'recovery';
+
+  /// Time Tracker intended-duration reminder ("30m are up. What are you
+  /// doing now?") — one per activity event, respects suppression.
+  static const String activity = 'activity';
 }
 
 /// Where an intent's notification goes: deterministic OS id, tap payload,
@@ -107,6 +111,13 @@ NotificationRoute resolveNotificationRoute(ReminderIntent intent) {
             2147483647,
         // No entity to open — the tap lands on Home, where the card lives.
         payload: 'recovery:$encoded',
+      );
+    case ReminderEntityKinds.activity:
+      return NotificationRoute(
+        // One reminder per activity event; stable per event so a
+        // reschedule replaces rather than stacks.
+        notifId: ('activity:${intent.entityId}').hashCode.abs() % 2147483647,
+        payload: 'activity:$encoded',
       );
     case ReminderEntityKinds.intention:
       return NotificationRoute(

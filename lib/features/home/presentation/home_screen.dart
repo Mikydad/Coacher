@@ -67,6 +67,7 @@ import '../../context_override/presentation/active_override_banner.dart';
 import '../../context_override/presentation/context_override_quick_activate_sheet.dart';
 import '../../context_override/presentation/post_override_review_card.dart';
 import '../../direction/presentation/new_month_direction_card.dart';
+import '../../time_tracker/presentation/track_pill.dart';
 import '../../reminders/application/attention_orchestrator_providers.dart';
 import '../../reminders/application/notification_route_resolver.dart';
 import '../../reminders/domain/models/attention_outcome.dart';
@@ -197,7 +198,11 @@ class HomeScreen extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
+          // Time Tracker (2026-09-12): capture is one tap from Home — a thin
+          // pill, not a card; it opens the sheet, never the timeline.
+          const TrackPill(),
+          const SizedBox(height: 16),
           // Humanizing Phase 1 — promises live near the top: seize-the-moment
           // (only when a free window fits an open promise right now), then
           // the ambient promises strip.

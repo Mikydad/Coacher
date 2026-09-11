@@ -1,3 +1,4 @@
+import 'isar_activity_event.dart';
 import 'isar_activity_feed_cache.dart';
 import 'isar_ai_action_batch.dart';
 import 'isar_ai_interaction_history.dart';
@@ -79,4 +80,5 @@ const isarSchemaList = [
   IsarPersonSchema,
   IsarMemorySessionStateSchema,
   IsarDirectionEntrySchema,
+  IsarActivityEventSchema,
 ];

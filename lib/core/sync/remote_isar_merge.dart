@@ -10,6 +10,8 @@ import '../../features/goals/domain/models/goal_check_in.dart';
 import '../../features/goals/domain/models/goal_milestone.dart';
 import '../../features/goals/domain/models/user_goal.dart';
 import '../../features/direction/data/direction_lww_merge.dart';
+import '../../features/time_tracker/data/activity_event_lww_merge.dart';
+import '../../features/time_tracker/domain/models/activity_event.dart';
 import '../../features/direction/domain/models/direction_entry.dart';
 import '../../features/intentions/domain/models/intention.dart';
 import '../../features/memory/domain/models/memory_fact.dart';
@@ -154,6 +156,8 @@ class RemoteIsarMerge {
     await _pullIntentions();
     _abortIfUidChanged();
     await _pullDirections();
+    _abortIfUidChanged();
+    await _pullActivityEvents();
     _abortIfUidChanged();
     await _pullTimeBlocks();
     _abortIfUidChanged();
@@ -453,6 +457,29 @@ class RemoteIsarMerge {
         }
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip direction ${doc.id}: $e\n$st');
+      }
+    }
+  }
+
+  /// Activity events (`users/{uid}/activityEvents`) — cursor pull, LWW.
+  /// Tombstones (`active: false`) merge like any write.
+  Future<void> _pullActivityEvents() async {
+    final cursor = await _cursorFor('activity_events');
+    final snap = await _afterCursor(
+      _client.userCollection('activityEvents'),
+      cursor,
+    ).get();
+    for (final doc in snap.docs) {
+      try {
+        final m = Map<String, dynamic>.from(doc.data());
+        m['id'] = _docFieldId(doc, m);
+        final event = ActivityEvent.fromMap(m);
+        _noteSeen('activity_events', event.updatedAtMs);
+        if (await mergeActivityEventLwwIntoIsar(_isar, event)) {
+          _appliedCount++;
+        }
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip activity event ${doc.id}: $e\n$st');
       }
     }
   }

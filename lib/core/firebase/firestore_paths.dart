@@ -70,6 +70,12 @@ class FirestorePaths {
   static String get directions => '$userRoot/directions';
   static String directionDocument(String entryId) => '$directions/$entryId';
 
+  /// Time Tracker (PRD/Time_Tracker, 2026-09-12): `users/{uid}/activityEvents/{id}`.
+  /// Blanket owner rule; deletes are soft tombstones.
+  static String get activityEvents => '$userRoot/activityEvents';
+  static String activityEventDocument(String eventId) =>
+      '$activityEvents/$eventId';
+
   /// Singleton doc (collection `onboarding`, doc `profile`) — what the user
   /// told us during first-launch onboarding (struggles / interests).
   static String get onboardingProfileDoc => '$userRoot/onboarding/profile';

@@ -6,6 +6,7 @@ import '../../community/application/circle_providers.dart';
 import '../../context_override/application/context_override_providers.dart';
 import '../../direction/application/direction_providers.dart';
 import '../../direction/application/new_month_prompt.dart';
+import '../../time_tracker/application/time_tracker_providers.dart';
 import '../../education/application/getting_started_controller.dart';
 import '../../goals/application/goals_providers.dart';
 import '../../reminders/application/attention_orchestrator_providers.dart';
@@ -60,6 +61,9 @@ void invalidateUserScopedProviders(WidgetRef ref) {
   // new account, and the clock re-stamps so periods resolve fresh.
   ref.invalidate(newMonthPromptControllerProvider);
   ref.invalidate(directionClockProvider);
+
+  // ── Time Tracker ─────────────────────────────────────────────────────────
+  ref.invalidate(timelineDayKeyProvider);
 
   // ── Education / onboarding ───────────────────────────────────────────────
   // The Getting Started controller decides new-vs-existing ONCE per

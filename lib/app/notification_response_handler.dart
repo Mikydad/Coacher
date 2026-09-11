@@ -10,6 +10,7 @@ import '../core/di/providers.dart';
 import '../core/notifications/notification_action_ids.dart';
 import '../features/ai_assistant/presentation/ai_assistant_screen.dart';
 import '../features/analytics/presentation/analytics_progress_screen.dart';
+import '../features/time_tracker/presentation/track_sheet_host_screen.dart';
 import '../features/community/presentation/circle_detail_screen.dart';
 import '../features/focus/presentation/focus_selection_screen.dart';
 import '../features/goals/application/goals_providers.dart';
@@ -28,6 +29,7 @@ const _layer4PayloadPrefix = 'layer4:';
 const _stakePayloadPrefix = 'stake:';
 const _intentionPayloadPrefix = 'intention:';
 const _recoveryPayloadPrefix = 'recovery:';
+const _activityPayloadPrefix = 'activity:';
 const _pendingNotificationIntentPrefsKey = 'pending_notification_intent_v1';
 
 class _PendingRouteIntent {
@@ -70,6 +72,11 @@ class _PendingRouteIntent {
   /// suggestions panel — the same destination as the in-app snackbar.
   const _PendingRouteIntent.coachBrief()
     : this._(routeName: AiAssistantScreen.routeName, openBrief: true);
+
+  /// Time Tracker "are up" tap (PRD/Time_Tracker §6): the capture sheet,
+  /// via the `/track` host route so a cold start lands there too.
+  const _PendingRouteIntent.track()
+    : this._(routeName: TrackSheetHostScreen.routeName);
 
   final String routeName;
   final String? goalId;
@@ -123,6 +130,9 @@ class _PendingRouteIntent {
     }
     if (routeName == AnalyticsProgressScreen.routeName) {
       return const _PendingRouteIntent.progress();
+    }
+    if (routeName == TrackSheetHostScreen.routeName) {
+      return const _PendingRouteIntent.track();
     }
     if (routeName == AiAssistantScreen.routeName) {
       if (map['startVoiceMode'] == true) {
@@ -317,6 +327,33 @@ Future<void> handleNotificationResponse(
 
   // The aggregated recovery summary (FR-R-53) names no entity — it stands
   // for all of them — so it lands on Home, where the Recovery Card lives.
+  // Time Tracker intended-duration reminder: "30m are up. What are you
+  // doing now?" — the tap continues the timeline: open the capture sheet
+  // with the timestamp = now. No entity to complete or snooze.
+  if (raw.startsWith(_activityPayloadPrefix)) {
+    final eventId = Uri.decodeComponent(
+      raw.substring(_activityPayloadPrefix.length),
+    );
+    if (eventId.isNotEmpty) {
+      unawaited(
+        container
+            .read(attentionOrchestratorServiceProvider)
+            .onInteractionReceived(
+              eventId,
+              NotificationInteractionType.opened,
+              notifId: response.id,
+            ),
+      );
+    }
+    debugPrint('[NotifTap] activity reminder tap -> track sheet');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_pushNowIfReady(TrackSheetHostScreen.routeName)) {
+        _queuePendingIntent(const _PendingRouteIntent.track());
+      }
+    });
+    return;
+  }
+
   if (raw.startsWith(_recoveryPayloadPrefix)) {
     debugPrint('[NotifTap] recovery summary tap -> home');
     WidgetsBinding.instance.addPostFrameCallback((_) {

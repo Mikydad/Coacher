@@ -56,6 +56,7 @@ class _FakeTimerRuntimeCache extends TimerRuntimeCache {
     required Duration elapsed,
     DateTime? runningSince,
     int? targetDurationMinutes,
+    String? activityEventId,
   }) async {
     _data = {
       'targetType': targetType.storageValue,
@@ -66,6 +67,7 @@ class _FakeTimerRuntimeCache extends TimerRuntimeCache {
       'elapsedMs': elapsed.inMilliseconds,
       'runningSinceMs': runningSince?.millisecondsSinceEpoch,
       'targetDurationMinutes': targetDurationMinutes,
+      'activityEventId': ?activityEventId,
     };
   }
 
@@ -91,6 +93,7 @@ class _CountingRuntimeCache extends _FakeTimerRuntimeCache {
     required Duration elapsed,
     DateTime? runningSince,
     int? targetDurationMinutes,
+    String? activityEventId,
   }) {
     saveCount++;
     return super.save(
@@ -102,6 +105,7 @@ class _CountingRuntimeCache extends _FakeTimerRuntimeCache {
       elapsed: elapsed,
       runningSince: runningSince,
       targetDurationMinutes: targetDurationMinutes,
+      activityEventId: activityEventId,
     );
   }
 }

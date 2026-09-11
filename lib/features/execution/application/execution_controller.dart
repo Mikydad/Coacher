@@ -1,9 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/stable_id.dart';
 import '../../focus/data/focus_resume_store.dart';
+import '../../time_tracker/data/activity_event_repository.dart';
+import '../../time_tracker/domain/models/activity_event.dart';
 import '../data/execution_repository.dart';
 import '../data/timer_runtime_cache.dart';
 import '../domain/models/timer_session.dart';
@@ -75,6 +79,11 @@ class ExecutionController extends StateNotifier<ExecutionState> {
     required this.resumeStore,
     required String initialTaskId,
     required String initialTaskLabel,
+
+    /// Time Tracker (decision 14): a focus session auto-logs a timer-sourced
+    /// activity event on start and writes its explicit end on stop. Null
+    /// keeps the controller byte-identical for tests and the no-op harness.
+    this.activityEvents,
   }) : _engine = TaskTimerEngine(),
        super(
          ExecutionState(
@@ -111,6 +120,7 @@ class ExecutionController extends StateNotifier<ExecutionState> {
       state.blockLabel,
       snapshot.phase.name,
       state.targetDurationMinutes,
+      _activityEventId,
     ].join('|');
     if (signature == _lastSavedSignature) return;
     _lastSavedSignature = signature;
@@ -128,6 +138,7 @@ class ExecutionController extends StateNotifier<ExecutionState> {
             ? DateTime.now()
             : null,
         targetDurationMinutes: state.targetDurationMinutes,
+        activityEventId: _activityEventId,
       ),
     );
   }
@@ -135,7 +146,12 @@ class ExecutionController extends StateNotifier<ExecutionState> {
   final ExecutionRepository repository;
   final TimerRuntimeCache runtimeCache;
   final FocusResumeStore resumeStore;
+  final ActivityEventRepository? activityEvents;
   final TaskTimerEngine _engine;
+
+  /// The activity event opened by [start] for this session (Time Tracker).
+  String? _activityEventId;
+  String? get activityEventIdForTests => _activityEventId;
   StreamSubscription<TimerSnapshot>? _sub;
   String? _lastSavedSignature;
 
@@ -152,6 +168,7 @@ class ExecutionController extends StateNotifier<ExecutionState> {
     final phase = ExecutionPhase.values.byName(phaseName);
     final elapsed = Duration(milliseconds: (data['elapsedMs'] as int?) ?? 0);
     final runningSinceMs = data['runningSinceMs'] as int?;
+    _activityEventId = data['activityEventId'] as String?;
     state = state.copyWith(
       targetType: targetType,
       taskId: taskId ?? state.taskId,
@@ -212,7 +229,46 @@ class ExecutionController extends StateNotifier<ExecutionState> {
     _engine.restore(phase: ExecutionPhase.notStarted, elapsed: Duration.zero);
   }
 
-  void start() => _engine.start();
+  void start() {
+    final fresh = state.phase == ExecutionPhase.notStarted;
+    _engine.start();
+    // A fresh start (not a resume) is a real "I'm doing this now" moment —
+    // log it. Isar write, milliseconds; the timer UI never waits on it.
+    if (fresh) unawaited(_logActivityStart());
+  }
+
+  Future<void> _logActivityStart() async {
+    final repo = activityEvents;
+    if (repo == null) return;
+    final isTask = state.targetType == TimerSessionTargetType.task;
+    final label = isTask ? state.taskLabel : state.blockLabel;
+    if (label.trim().isEmpty) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final target = state.targetDurationMinutes;
+    try {
+      final saved = await repo.upsert(
+        ActivityEvent.create(
+          text: label.trim().length > kActivityTextMaxChars
+              ? label.trim().substring(0, kActivityTextMaxChars)
+              : label,
+          startedAtMs: now,
+          nowMs: now,
+          intendedMinutes: target != null && target > 0 ? target : null,
+          source: ActivitySource.timer,
+          sourceEntityId: isTask ? state.taskId : state.blockId,
+        ),
+      );
+      _activityEventId = saved.id;
+      // Re-persist the runtime cache with the id (shape changed).
+      _lastSavedSignature = null;
+      _persistIfSessionShapeChanged(
+        TimerSnapshot(phase: state.phase, elapsed: state.elapsed),
+      );
+    } catch (e) {
+      debugPrint('[ExecutionController] activity log failed: $e');
+    }
+  }
+
   void pause() => _engine.pause();
   void resume() => _engine.resume();
 
@@ -242,6 +298,17 @@ class ExecutionController extends StateNotifier<ExecutionState> {
       ),
     };
     await repository.upsertSession(session);
+    // Time Tracker: the timer's exact end becomes the event's explicit end.
+    final activityId = _activityEventId;
+    _activityEventId = null;
+    if (activityId != null) {
+      unawaited(
+        activityEvents?.setEnd(activityId, now).catchError((Object e) {
+          debugPrint('[ExecutionController] activity end failed: $e');
+          return null;
+        }),
+      );
+    }
     if (state.targetType == TimerSessionTargetType.task &&
         state.taskId.isNotEmpty) {
       await resumeStore.saveElapsed(state.taskId, snapshot.elapsed);
