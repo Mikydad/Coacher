@@ -3053,6 +3053,27 @@ not silent reversal.
   on screen — display order only; the builder, the Coach's text and the
   reflection snapshot stay chronological, and previous days read the same
   way for consistency.
+- **2026-09-12 · Crashlytics: dSYMs upload from the Xcode build phase;
+  the smoke test lives behind tester mode.** Audit found the pipeline
+  working (3 crashes received from 1.0.1 (2)) but blind — no dSYM upload
+  phase had ever existed, so the console showed "unprocessed" and an empty
+  Issues list (`errors.md` #25). *Decisions:* (1) Upload from a LAST
+  Xcode build phase (`run` + a background `upload-symbols` sweep of
+  `DWARF_DSYM_FOLDER_PATH` for Flutter's `App.framework.dSYM`), skipped
+  for Debug and simulator. *Rejected:* a manual `firebase crashlytics`
+  CLI step after each archive — it is exactly the step that was forgotten
+  for every release so far; CI upload — there is no CI. (2) The test
+  trigger is a long-press on the About & Support version footer, active
+  only with tester mode ON (the existing per-account, registered-only
+  gate — see 2026-07-11). *Rejected:* `kDebugMode` gating — collection is
+  off in debug builds so the trigger would only exist where it cannot
+  work; a visible Settings row — a "crash the app" button is not for
+  users. (3) The dialog tells the truth about debug builds
+  (`isCrashlyticsCollectionEnabled`, not `kDebugMode`, so a failed
+  4-second enable in release also shows). The crash path uploads on the
+  next launch by design — copy says so, no spinner. (4) Crashlytics calls
+  sit behind `CrashlyticsTestSink` so the widget is tested with a fake;
+  no Firebase in tests.
 - **2026-09-12 · iOS moves to the Elaris Technologies LLC Apple team under
   a new bundle ID `com.elaristechnologies.sidepal`.** Miko enrolled Elaris
   Technologies LLC (Team ID `HW6A4CQ2UB`, Agent = mikydad11@gmail.com) in

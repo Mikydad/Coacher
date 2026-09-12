@@ -223,6 +223,7 @@
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				F7A2E8B91CF90200004384FD /* Mark Flutter output for Xcode clean */,
 				981921FB4E55A862C8F9B67A /* [CP] Copy Pods Resources */,
+				C7A5111C0DE5A1F0B3E4D2A9 /* Upload dSYMs to Crashlytics */,
 			);
 			buildRules = (
 			);
@@ -406,6 +407,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "# Flutter uses CONFIGURATION_BUILD_DIR under the project build/ tree.\n# Without this xattr, Xcode fails Clean Build Folder with:\n# \"not created by the build system and it is not a subfolder of derived data\".\nif [ -n \"${CONFIGURATION_BUILD_DIR}\" ] && [ -d \"${CONFIGURATION_BUILD_DIR}\" ]; then\n  xattr -w com.apple.xcode.CreatedByBuildSystem true \"${CONFIGURATION_BUILD_DIR}\" 2>/dev/null || true\nfi\n";
+		};
+		C7A5111C0DE5A1F0B3E4D2A9 /* Upload dSYMs to Crashlytics */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${TARGET_NAME}",
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}",
+				"${BUILT_PRODUCTS_DIR}/${EXECUTABLE_PATH}",
+				"$(SRCROOT)/$(BUILT_PRODUCTS_DIR)/$(INFOPLIST_PATH)",
+				"${PROJECT_DIR}/Runner/GoogleService-Info.plist",
+			);
+			name = "Upload dSYMs to Crashlytics";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Upload dSYMs to Firebase Crashlytics so crash reports symbolicate.\n# Must stay the LAST phase: by now Flutter's Thin Binary step has placed\n# App.framework.dSYM (Dart AOT symbols) next to Runner.app.dSYM in\n# DWARF_DSYM_FOLDER_PATH. Without these uploads the console shows crashes as\n# \"unprocessed\" (see documentation/errors.md #25).\n# Skipped for Debug + simulator: Crashlytics collection is off there (main.dart)\n# and it keeps local iteration fast.\nif [ \"${CONFIGURATION}\" = \"Debug\" ] || [ \"${PLATFORM_NAME}\" = \"iphonesimulator\" ]; then\n  echo \"Crashlytics: skipping dSYM upload (${CONFIGURATION}/${PLATFORM_NAME})\"\n  exit 0\nfi\nGSP=\"${PROJECT_DIR}/Runner/GoogleService-Info.plist\"\n# Runner.app.dSYM + build event. Validates synchronously (fails the build on\n# a misconfiguration), then uploads in the background.\n\"${PODS_ROOT}/FirebaseCrashlytics/run\" -gsp \"${GSP}\"\n# Sweep the rest of the dSYM folder (App.framework.dSYM, Flutter.framework.dSYM)\n# in the background too, mirroring what `run` does for the main binary.\n\"${PODS_ROOT}/FirebaseCrashlytics/upload-symbols\" -gsp \"${GSP}\" -p ios \"${DWARF_DSYM_FOLDER_PATH}\" > /dev/null 2>&1 &\n";
+			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
 
