@@ -10,6 +10,32 @@ import '../domain/models/user_goal.dart';
 
 /// Firestore: `users/{uid}/goals/{goalId}` with subcollections
 /// `actions`, `milestones`, `checkIns` (check-in doc id = `yyyy-MM-dd`).
+/// Optional fast path: every goal's check-in for one local calendar day.
+///
+/// Kept off [GoalsRepository] (eight `implements` fakes in tests); the Isar
+/// repository answers it with one indexed query, everything else goes
+/// through the [readCheckInsForDate] fallback (one `getTodayCheckIn` per
+/// goal).
+abstract interface class GoalCheckInDateReads {
+  Future<List<GoalCheckIn>> getCheckInsForDate(String dateKey);
+}
+
+Future<List<GoalCheckIn>> readCheckInsForDate(
+  GoalsRepository repo,
+  String dateKey, {
+  required Iterable<String> goalIds,
+}) async {
+  if (repo is GoalCheckInDateReads) {
+    return (repo as GoalCheckInDateReads).getCheckInsForDate(dateKey);
+  }
+  final out = <GoalCheckIn>[];
+  for (final id in goalIds) {
+    final c = await repo.getTodayCheckIn(id, dateKey);
+    if (c != null) out.add(c);
+  }
+  return out;
+}
+
 abstract class GoalsRepository {
   Stream<List<UserGoal>> watchGoals();
 

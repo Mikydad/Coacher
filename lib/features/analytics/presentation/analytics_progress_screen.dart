@@ -8,18 +8,13 @@ import '../application/ai_summary_providers.dart';
 import '../application/delivery_providers.dart';
 import '../application/focus_providers.dart';
 import '../application/analytics_period_bundle_notifier.dart';
-import 'progress/progress_bundle_skeleton.dart';
-import 'progress/goals_habits_section.dart';
+import 'progress/period_body.dart';
 import 'progress/progress_design_tokens.dart';
 import 'progress/progress_insights_row.dart';
-import 'progress/progress_shared_widgets.dart';
-import 'progress/task_integrity_section.dart';
-import 'progress/weekly_summary_hero.dart';
 import '../domain/models/ai_summary_response.dart';
 
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
-import '../../../core/presentation/async_value_ui.dart';
 
 class AnalyticsProgressScreen extends ConsumerStatefulWidget {
   const AnalyticsProgressScreen({super.key});
@@ -85,7 +80,6 @@ class _AnalyticsProgressScreenState
 
   @override
   Widget build(BuildContext context) {
-    final bundleAsync = ref.watch(analyticsPeriodBundleProvider);
     return Scaffold(
       backgroundColor: ProgressDesignTokens.surface,
       appBar: AppBar(
@@ -132,68 +126,26 @@ class _AnalyticsProgressScreenState
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
           const FirstTimeFeatureCard(guideId: 'analytics'),
-          bundleAsync.when(
-            skipLoadingOnReload: true,
-            data: (bundle) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                FadeTransition(
-                  opacity: _summaryFade,
-                  child: SlideTransition(
-                    position: _summarySlide,
-                    child: WeeklySummaryHero(
-                      bundle: bundle,
-                      ringSweep: _ringSweep.value,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: ProgressDesignTokens.sectionSpacing),
-                FadeTransition(
-                  opacity: _cardsFade,
-                  child: SlideTransition(
-                    position: _cardsSlide,
-                    child: ProgressInsightsRow(bundle: bundle),
-                  ),
-                ),
-                const SizedBox(height: ProgressDesignTokens.sectionSpacing),
-                FadeTransition(
-                  opacity: _cardsFade,
-                  child: SlideTransition(
-                    position: _cardsSlide,
-                    child: GoalsHabitsSection(
-                      day: bundle.goalHabitDay,
-                      week: bundle.goalHabitWeek,
-                      month: bundle.goalHabitMonth,
-                      reveal: _stagedProgress(0.45, 0.95),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                FadeTransition(
-                  opacity: _cardsFade,
-                  child: SlideTransition(
-                    position: _cardsSlide,
-                    child: TaskIntegritySection(
-                      day: bundle.taskDay,
-                      week: bundle.taskWeek,
-                      month: bundle.taskMonth,
-                      reveal: _stagedProgress(0.58, 1.0),
-                    ),
-                  ),
-                ),
-              ],
+          FadeTransition(
+            opacity: _summaryFade,
+            child: SlideTransition(
+              position: _summarySlide,
+              child: AnimatedBuilder(
+                animation: _ringSweep,
+                builder: (context, _) =>
+                    ProgressPeriodBody(ringSweep: _ringSweep.value),
+              ),
             ),
-            loading: () => const ProgressBundleSkeleton(),
-            error: (e, _) => swallowedAsyncError(
-              'analytics_progress_screen',
-              e,
-              ProgressTonalCard(
-                child: Text(
-                  'Could not load progress analytics.',
-                  style: TextStyle(
-                    color: ProgressDesignTokens.onSurfaceVariant,
-                  ),
-                ),
+          ),
+          const SizedBox(height: ProgressDesignTokens.sectionSpacing),
+          // Period-agnostic: the coaching focus + AI summary, where the
+          // `layer4:` notification taps land.
+          FadeTransition(
+            opacity: _cardsFade,
+            child: SlideTransition(
+              position: _cardsSlide,
+              child: ProgressInsightsRow(
+                bundle: ref.watch(analyticsPeriodBundleProvider).valueOrNull,
               ),
             ),
           ),
@@ -241,12 +193,6 @@ class _AnalyticsProgressScreenState
     );
   }
 
-  double _stagedProgress(double start, double end) {
-    final t = _introController.value;
-    if (t <= start) return 0;
-    if (t >= end) return 1;
-    return ((t - start) / (end - start)).clamp(0.0, 1.0);
-  }
 }
 
 // ─── AI test result bottom sheet ──────────────────────────────────────────────

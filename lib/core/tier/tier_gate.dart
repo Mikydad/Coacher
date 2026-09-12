@@ -43,6 +43,11 @@ class TierGate {
   bool canCreateGoal(int activeGoalCount) =>
       _allows(activeGoalCount, limits.freeGoals);
 
+  /// Progress history (Week, Month, Quarter, Year views) is Pro; the Day
+  /// view is free (decision 2026-09-12). Home's weekly bar and Profile's
+  /// THIS WEEK stat are single numbers, not history, and stay free.
+  bool get canViewProgressHistory => isBypassed;
+
   bool canCreateReminder(int activeReminderCount) =>
       _allows(activeReminderCount, limits.freeReminders);
 

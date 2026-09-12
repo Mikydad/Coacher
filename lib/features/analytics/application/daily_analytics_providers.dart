@@ -11,8 +11,10 @@ import '../../context_override/application/context_override_providers.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
 import '../../profile/application/profile_providers.dart';
+import '../data/analytics_range_reads.dart';
 import '../data/analytics_repository.dart';
 import '../domain/models/analytics_stats_cache.dart';
+import 'blended_discipline.dart';
 import 'daily_analytics_engine.dart';
 import 'analytics_period_bundle.dart';
 import 'streak_protection.dart';
@@ -32,6 +34,125 @@ Future<DailyAnalyticsSnapshot?> readCachedDailySnapshot(
   );
   if (existing.isEmpty || existing.first.payload.isEmpty) return null;
   return DailyAnalyticsSnapshot.fromPayload(existing.first.payload);
+}
+
+/// Cached daily snapshots of [scopeType] for `fromDateKey..toDateKey`
+/// (inclusive), keyed by dateKey. One range query; days without a cache
+/// row are simply absent.
+Future<Map<String, DailyAnalyticsSnapshot>> readCachedSnapshotMap(
+  AnalyticsRepository repo, {
+  required String scopeType,
+  required String fromDateKey,
+  required String toDateKey,
+}) async {
+  final rows = await readStatsCacheRange(
+    repo,
+    scopeType: scopeType,
+    fromDateKey: fromDateKey,
+    toDateKey: toDateKey,
+  );
+  final out = <String, DailyAnalyticsSnapshot>{};
+  final newestMs = <String, int>{};
+  for (final r in rows) {
+    if (r.payload.isEmpty) continue;
+    // statsId is unique so one row per day is the norm; if two ever
+    // coexist (legacy id formats), keep the newest write.
+    final seen = newestMs[r.dateKey];
+    if (seen != null && r.updatedAtMs < seen) continue;
+    newestMs[r.dateKey] = r.updatedAtMs;
+    out[r.dateKey] = DailyAnalyticsSnapshot.fromPayload(r.payload);
+  }
+  return out;
+}
+
+/// Recomputes one day of [scopeType] from live goals/tasks and persists it.
+/// Used for today (always fresh) and for backfilling uncached past days.
+Future<DailyAnalyticsSnapshot> computeAndPersistDailySnapshot(
+  Ref ref, {
+  required String scopeType,
+  required String dateKey,
+}) async {
+  final computed = scopeType == goalHabitDailyScope
+      ? await _computeGoalHabitDailyForDate(ref, dateKey)
+      : await _computeTaskDailyForDate(ref, dateKey);
+  await _upsertDailySnapshot(
+    ref.read(analyticsRepositoryProvider),
+    scopeType: scopeType,
+    snapshot: computed,
+  );
+  return computed;
+}
+
+/// Monday of the ISO week containing [now] (local midnight).
+DateTime isoWeekStartOf(DateTime now) =>
+    DateTime(now.year, now.month, now.day - (now.weekday - 1));
+
+const int _streakChunkDays = 400;
+
+/// The app's single day streak (decision 2026-09-12): consecutive days
+/// ending today whose blended rate qualified (or were protected), read from
+/// the cache in 400-day chunks until the run breaks or the cache ends.
+/// Today comes from the live snapshots the caller already computed.
+Future<int> computeBlendedCurrentStreakDays(
+  Ref ref, {
+  required DateTime now,
+  required DailyAnalyticsSnapshot todayGoalHabit,
+  required DailyAnalyticsSnapshot todayTask,
+}) async {
+  final repo = ref.read(analyticsRepositoryProvider);
+  final mode = ref.read(defaultEnforcementModeProvider);
+  final attention = ref.read(attentionStateProvider).valueOrNull;
+  final todayKey = DateKeys.todayKey(now);
+  final today = DateTime(now.year, now.month, now.day);
+
+  var total = 0;
+  var chunkEnd = today;
+  while (true) {
+    final chunkStart = DateTime(
+      chunkEnd.year,
+      chunkEnd.month,
+      chunkEnd.day - (_streakChunkDays - 1),
+    );
+    final fromKey = DateKeys.yyyymmdd(chunkStart);
+    final toKey = DateKeys.yyyymmdd(chunkEnd);
+    final goals = await readCachedSnapshotMap(
+      repo,
+      scopeType: goalHabitDailyScope,
+      fromDateKey: fromKey,
+      toDateKey: toKey,
+    );
+    final tasks = await readCachedSnapshotMap(
+      repo,
+      scopeType: taskDailyScope,
+      fromDateKey: fromKey,
+      toDateKey: toKey,
+    );
+    if (toKey == todayKey) {
+      goals[todayKey] = todayGoalHabit;
+      tasks[todayKey] = todayTask;
+    }
+    final rates = <String, double?>{
+      for (final k in {...goals.keys, ...tasks.keys})
+        k: blendedDayRate(goals[k], tasks[k]),
+    };
+    final protected = buildStreakProtectedDateKeys(
+      attention: attention,
+      rangeStartInclusive: chunkStart,
+      rangeEndInclusive: chunkEnd,
+    );
+    final run = blendedCurrentStreak(
+      ratesByDateKey: rates,
+      todayKey: toKey,
+      earliestDateKey: fromKey,
+      protectedDateKeys: protected,
+      mode: mode,
+    );
+    total += run;
+    // The run stopped inside this chunk, or the cache has nothing older.
+    if (run < _streakChunkDays || goals.isEmpty && tasks.isEmpty) break;
+    chunkEnd = DateTime(chunkStart.year, chunkStart.month, chunkStart.day - 1);
+  }
+  return total;
 }
 
 Future<void> _upsertDailySnapshot(
@@ -125,6 +246,12 @@ Future<List<DailyAnalyticsSnapshot>> _readOrComputeDailyRange(
 }) async {
   final repo = ref.read(analyticsRepositoryProvider);
   final todayKey = DateKeys.todayKey();
+  final cached = await readCachedSnapshotMap(
+    repo,
+    scopeType: scopeType,
+    fromDateKey: DateKeys.yyyymmdd(startInclusive),
+    toDateKey: DateKeys.yyyymmdd(endInclusive),
+  );
   final results = <DailyAnalyticsSnapshot>[];
   for (
     var day = DateTime(
@@ -133,26 +260,21 @@ Future<List<DailyAnalyticsSnapshot>> _readOrComputeDailyRange(
       startInclusive.day,
     );
     !day.isAfter(endInclusive);
-    day = day.add(const Duration(days: 1))
+    day = DateTime(day.year, day.month, day.day + 1)
   ) {
     final dateKey = DateKeys.yyyymmdd(day);
-    final existing = await repo.listStatsCache(
-      scopeType: scopeType,
-      scopeId: 'global',
-      dateKey: dateKey,
-    );
-    final shouldRecompute = dateKey == todayKey;
-    if (!shouldRecompute &&
-        existing.isNotEmpty &&
-        existing.first.payload.isNotEmpty) {
-      results.add(DailyAnalyticsSnapshot.fromPayload(existing.first.payload));
+    final existing = cached[dateKey];
+    if (dateKey != todayKey && existing != null) {
+      results.add(existing);
       continue;
     }
-    final computed = scopeType == goalHabitDailyScope
-        ? await _computeGoalHabitDailyForDate(ref, dateKey)
-        : await _computeTaskDailyForDate(ref, dateKey);
-    await _upsertDailySnapshot(repo, scopeType: scopeType, snapshot: computed);
-    results.add(computed);
+    results.add(
+      await computeAndPersistDailySnapshot(
+        ref,
+        scopeType: scopeType,
+        dateKey: dateKey,
+      ),
+    );
   }
   return results;
 }
@@ -229,11 +351,7 @@ Future<AnalyticsPeriodBundle> computeAnalyticsPeriodBundle(Ref ref) async {
     snapshot: todayTask,
   );
 
-  final weekStart = DateTime(
-    now.year,
-    now.month,
-    now.day,
-  ).subtract(const Duration(days: 6));
+  final weekStart = isoWeekStartOf(now);
   final endDay = DateTime(now.year, now.month, now.day);
   final weekGoalHabitRange = await _readOrComputeDailyRange(
     ref,
@@ -274,6 +392,12 @@ Future<AnalyticsPeriodBundle> computeAnalyticsPeriodBundle(Ref ref) async {
     rangeStartInclusive: monthStart,
     rangeEndInclusive: endDay,
   );
+  final blendedStreak = await computeBlendedCurrentStreakDays(
+    ref,
+    now: now,
+    todayGoalHabit: todayGoalHabit,
+    todayTask: todayTask,
+  );
 
   return AnalyticsPeriodBundle(
     goalHabitDay: todayGoalHabit,
@@ -308,5 +432,19 @@ Future<AnalyticsPeriodBundle> computeAnalyticsPeriodBundle(Ref ref) async {
     taskWeekSeries: weekTaskRange
         .map((d) => d.weightedCompletionRate.clamp(0.0, 1.0))
         .toList(),
+    blendedWeekSeries: blendedWeekSeriesOf(weekGoalHabitRange, weekTaskRange),
+    blendedCurrentStreakDays: blendedStreak,
   );
+}
+
+/// Per-day blended values for two parallel day lists (quiet days → 0).
+List<double> blendedWeekSeriesOf(
+  List<DailyAnalyticsSnapshot> goals,
+  List<DailyAnalyticsSnapshot> tasks,
+) {
+  final n = goals.length < tasks.length ? goals.length : tasks.length;
+  return [
+    for (var i = 0; i < n; i++)
+      (blendedDayRate(goals[i], tasks[i]) ?? 0).clamp(0.0, 1.0),
+  ];
 }

@@ -18,7 +18,7 @@ import 'goals_repository.dart';
 /// milestones, check-ins) live in Isar — the UI reads and mutates them
 /// offline in milliseconds. Firestore is replicated in the background via
 /// the outbox (push) and [RemoteIsarMerge] (pull).
-class IsarGoalsRepository implements GoalsRepository {
+class IsarGoalsRepository implements GoalsRepository, GoalCheckInDateReads {
   IsarGoalsRepository();
 
   Isar get _isar => OfflineStore.instance.isar!;
@@ -313,5 +313,15 @@ class IsarGoalsRepository implements GoalsRepository {
               rows.map((e) => e.toDomain()).toList()
                 ..sort((a, b) => a.dateKey.compareTo(b.dateKey)),
         );
+  }
+
+  @override
+  Future<List<GoalCheckIn>> getCheckInsForDate(String dateKey) async {
+    final rows = await _isar.isarGoalCheckIns
+        .filter()
+        .dateKeyEqualTo(dateKey)
+        .findAll();
+    return rows.map((e) => e.toDomain()).toList()
+      ..sort((a, b) => a.goalId.compareTo(b.goalId));
   }
 }

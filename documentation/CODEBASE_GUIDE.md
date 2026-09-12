@@ -234,6 +234,23 @@ transactionally — the task's status is flipped: ≥100% → `completed`, else
 `partial`. The "discipline score" on Home is a different thing entirely: a
 derived weekly completion percentage from analytics.
 
+**Progress page (2026-09-12)** — `features/analytics/presentation/progress/`
+is a period browser over the daily snapshot cache (`IsarAnalyticsStats`,
+scopes `goal_habit_daily` + `task_daily`). One number per day:
+`blended_discipline.dart` (0.6 goals/habits + 0.4 tasks, renormalised when
+only one scope was planned, `null` = quiet day). `domain/progress_period.dart`
+is the Day / ISO-week / month / quarter / year bucket; `progress_selection.dart`
+holds horizon + period + open day (session-scoped, keeps an anchor day when
+zooming); `progress_period_providers.dart` is a `FamilyAsyncNotifier` keyed by
+period — cache-first via `data/analytics_range_reads.dart`, today live,
+uncached past days backfilled in the background. Widgets: `day_ring` (one
+painter, every state), `week_ring_strip`, `month_calendar_grid`,
+`period_heatmap` (quarter/year, not tappable), `day_detail_card` (tasks,
+check-ins, time logged — display only). The app-wide day streak is
+`AnalyticsPeriodBundle.blendedCurrentStreakDays`, walked back through the
+whole cache; Week and beyond are Pro (`TierGate.canViewProgressHistory`,
+`progress_pro_gate.dart`).
+
 **Goals** are deliberately decoupled: `PlannedTask` has **no** `goalId`. Goals
 relate to tasks only through shared time-block conflict detection and the
 habit-anchor aggregator. Goal progress (actions/check-ins/milestones) is

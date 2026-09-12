@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:sidepal/core/offline/offline_store.dart';
 import 'package:sidepal/core/sync/sync_service.dart';
+import 'package:sidepal/features/analytics/data/analytics_range_reads.dart';
 import 'package:sidepal/features/analytics/data/analytics_repository.dart';
 import 'package:sidepal/features/analytics/data/isar_analytics_repository.dart';
 import 'package:sidepal/features/analytics/domain/models/analytics_event.dart';
@@ -158,5 +159,62 @@ void main() {
     expect(all.length, 1);
     expect(all.single.id, 'evt-remote');
     expect(all.single.updatedAtMs, 100);
+  });
+
+  AnalyticsStatsCache _daily(String scope, String dateKey, {String scopeId = 'global'}) {
+    return AnalyticsStatsCache(
+      id: 'analytics::$scope::$dateKey::$scopeId',
+      scopeType: scope,
+      scopeId: scopeId,
+      dateKey: dateKey,
+      payload: const {'createdCount': 1},
+      createdAtMs: 1,
+      updatedAtMs: 1,
+      schemaVersion: 3,
+    );
+  }
+
+  test('listStatsCacheRange honours bounds, scope and global scope id', () async {
+    final repo = IsarAnalyticsRepository(_MemoryRemoteAnalyticsRepository());
+    for (final k in ['2026-08-31', '2026-09-01', '2026-09-15', '2026-09-30', '2026-10-01']) {
+      await repo.upsertStatsCache(_daily('goal_habit_daily', k));
+      await repo.upsertStatsCache(_daily('task_daily', k));
+    }
+    await repo.upsertStatsCache(_daily('goal_habit_daily', '2026-09-10', scopeId: 'habit-1'));
+
+    final rows = await readStatsCacheRange(
+      repo,
+      scopeType: 'goal_habit_daily',
+      fromDateKey: '2026-09-01',
+      toDateKey: '2026-09-30',
+    );
+    expect(rows.map((r) => r.dateKey).toList()..sort(), [
+      '2026-09-01',
+      '2026-09-15',
+      '2026-09-30',
+    ]);
+    expect(rows.every((r) => r.scopeType == 'goal_habit_daily'), isTrue);
+    expect(rows.every((r) => r.scopeId == 'global'), isTrue);
+
+    expect(await readEarliestStatsDateKey(repo, scopeType: 'task_daily'), '2026-08-31');
+    expect(await readEarliestStatsDateKey(repo, scopeType: 'nothing'), isNull);
+  });
+
+  test('readStatsCacheRange falls back to listStatsCache for other repositories', () async {
+    final remote = _MemoryRemoteAnalyticsRepository(
+      stats: [
+        _daily('task_daily', '2026-09-01'),
+        _daily('task_daily', '2026-09-20'),
+        _daily('task_daily', '2026-10-01'),
+      ],
+    );
+    final rows = await readStatsCacheRange(
+      remote,
+      scopeType: 'task_daily',
+      fromDateKey: '2026-09-01',
+      toDateKey: '2026-09-30',
+    );
+    expect(rows.map((r) => r.dateKey).toList(), ['2026-09-01', '2026-09-20']);
+    expect(await readEarliestStatsDateKey(remote, scopeType: 'task_daily'), '2026-09-01');
   });
 }

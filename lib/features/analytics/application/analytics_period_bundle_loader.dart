@@ -7,7 +7,13 @@ import '../../profile/application/profile_providers.dart';
 import '../data/analytics_repository.dart';
 import 'daily_analytics_engine.dart';
 import 'analytics_period_bundle.dart';
-import 'daily_analytics_providers.dart' show readCachedDailySnapshot;
+import 'daily_analytics_providers.dart'
+    show
+        readCachedDailySnapshot,
+        readCachedSnapshotMap,
+        computeBlendedCurrentStreakDays,
+        blendedWeekSeriesOf,
+        isoWeekStartOf;
 import 'streak_protection.dart';
 
 DailyAnalyticsSnapshot emptyDailySnapshot(String dateKey) {
@@ -23,12 +29,20 @@ DailyAnalyticsSnapshot emptyDailySnapshot(String dateKey) {
   );
 }
 
+/// One snapshot per calendar day of the range, cache only (one range
+/// query); days without a cache row are empty.
 Future<List<DailyAnalyticsSnapshot>> _readCachedDailyRange(
   AnalyticsRepository repo, {
   required String scopeType,
   required DateTime startInclusive,
   required DateTime endInclusive,
 }) async {
+  final cached = await readCachedSnapshotMap(
+    repo,
+    scopeType: scopeType,
+    fromDateKey: DateKeys.yyyymmdd(startInclusive),
+    toDateKey: DateKeys.yyyymmdd(endInclusive),
+  );
   final results = <DailyAnalyticsSnapshot>[];
   for (
     var day = DateTime(
@@ -37,15 +51,10 @@ Future<List<DailyAnalyticsSnapshot>> _readCachedDailyRange(
       startInclusive.day,
     );
     !day.isAfter(endInclusive);
-    day = day.add(const Duration(days: 1))
+    day = DateTime(day.year, day.month, day.day + 1)
   ) {
     final dateKey = DateKeys.yyyymmdd(day);
-    final cached = await readCachedDailySnapshot(
-      repo,
-      scopeType: scopeType,
-      dateKey: dateKey,
-    );
-    results.add(cached ?? emptyDailySnapshot(dateKey));
+    results.add(cached[dateKey] ?? emptyDailySnapshot(dateKey));
   }
   return results;
 }
@@ -71,11 +80,8 @@ Future<AnalyticsPeriodBundle?> loadCachedAnalyticsPeriodBundle(Ref ref) async {
   );
   if (todayGoalHabit == null || todayTask == null) return null;
 
-  final weekStart = DateTime(
-    now.year,
-    now.month,
-    now.day,
-  ).subtract(const Duration(days: 6));
+  // Monday of the current ISO week → today (decision 2026-09-12).
+  final weekStart = isoWeekStartOf(now);
   final endDay = DateTime(now.year, now.month, now.day);
 
   final weekGoalHabitRange = await _readCachedDailyRange(
@@ -105,6 +111,13 @@ Future<AnalyticsPeriodBundle?> loadCachedAnalyticsPeriodBundle(Ref ref) async {
     endInclusive: endDay,
   );
 
+  final blendedStreak = await computeBlendedCurrentStreakDays(
+    ref,
+    now: now,
+    todayGoalHabit: todayGoalHabit,
+    todayTask: todayTask,
+  );
+
   return _assembleBundle(
     ref: ref,
     now: now,
@@ -117,6 +130,7 @@ Future<AnalyticsPeriodBundle?> loadCachedAnalyticsPeriodBundle(Ref ref) async {
     weekTaskRange: weekTaskRange,
     monthGoalHabitRange: monthGoalHabitRange,
     monthTaskRange: monthTaskRange,
+    blendedCurrentStreakDays: blendedStreak,
   );
 }
 
@@ -132,6 +146,7 @@ AnalyticsPeriodBundle _assembleBundle({
   required List<DailyAnalyticsSnapshot> weekTaskRange,
   required List<DailyAnalyticsSnapshot> monthGoalHabitRange,
   required List<DailyAnalyticsSnapshot> monthTaskRange,
+  required int blendedCurrentStreakDays,
 }) {
   final enforcementMode = ref.read(defaultEnforcementModeProvider);
   final attention = ref.read(attentionStateProvider).valueOrNull;
@@ -179,5 +194,7 @@ AnalyticsPeriodBundle _assembleBundle({
     taskWeekSeries: weekTaskRange
         .map((d) => d.weightedCompletionRate.clamp(0.0, 1.0))
         .toList(),
+    blendedWeekSeries: blendedWeekSeriesOf(weekGoalHabitRange, weekTaskRange),
+    blendedCurrentStreakDays: blendedCurrentStreakDays,
   );
 }

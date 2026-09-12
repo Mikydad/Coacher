@@ -75,4 +75,23 @@ void main() {
       );
     });
   });
+
+  group('Progress history (Week and beyond) is Pro', () {
+    test('free + enforced is blocked', () {
+      final gate = TierGate(limits: _limits(), tier: UserTier.free);
+      expect(gate.canViewProgressHistory, isFalse);
+    });
+
+    test('Pro, or enforcement off, is allowed', () {
+      expect(
+        TierGate(limits: _limits(), tier: UserTier.pro).canViewProgressHistory,
+        isTrue,
+      );
+      expect(
+        TierGate(limits: _limits(enforced: false), tier: UserTier.free)
+            .canViewProgressHistory,
+        isTrue,
+      );
+    });
+  });
 }

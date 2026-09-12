@@ -3103,3 +3103,56 @@ not silent reversal.
   `com.elaristechnologies.sidepal` (new Firebase Android app, SHA
   fingerprints, `applicationId`/`namespace`, Kotlin package) is the next
   piece of work, decided 2026-09-12.
+
+- **2026-09-12 · Progress becomes a period browser (Day · Week · Month ·
+  Quarter · Year) on one blended day metric.** Plan in
+  `PRD/Progress_Periods/progress_periods_prd.md`, branch
+  `feat/progress-periods`; nothing built yet. Settled: (1) every day is
+  drawn as one ring whose fill is `0.6 × goals/habits weighted rate +
+  0.4 × tasks weighted rate`, renormalised to the scope that was planned
+  when only one was, and `null` ("quiet", hollow ring, em dash) when
+  neither was — the two-card split (60 %/40 % weight) stays visible under
+  the hero; (2) weeks are Monday → Sunday ISO everywhere, so the analytics
+  bundle's trailing-7-day window is retired and Home's weekly bar and
+  sparkline become since-Monday, matching Profile and the Time tracker;
+  (3) Day is free, Week and beyond are Pro — rendered blurred under an
+  "Unlock Progress" pill via `showTierLimitSheet`; this narrows the
+  2026-07-20 tier line "basic analytics (weekly %, calendar)" to Home's and
+  Profile's weekly numbers, with Progress *history* Pro; (4) no per-goal
+  filter and no per-entity daily snapshot — the aggregate
+  `IsarAnalyticsStats` day rows are the whole foundation; per-goal analytics
+  only if users ask; (5) time-tracker minutes appear in the Day detail as a
+  supporting fact ("Time logged 2h 15m") and never feed a rate, ring, or
+  streak. *Why:* the static page could not answer "how did Tuesday go?",
+  and adding history without a single per-day number would have produced
+  two calendars. Data work is deliberately small: a filtered `dateKeyBetween` range
+  read on the stats collection (the current `listStatsCache` loads every
+  row; the `dateKey` index is hash-typed so it cannot serve a range), a `Provider.family` keyed by period, and bounded background
+  backfill of uncached past days. Answered the same day: the app-wide day streak (Home, Profile,
+  Progress) IS the blended streak, walked back through the whole cache in
+  400-day chunks (the old goal/habit streak was silently capped by the week
+  window); quiet days stay streak-breaking; Day-detail task lists are
+  uncapped. The range/earliest reads live on a separate
+  `AnalyticsStatsRangeReads` interface (and `GoalCheckInDateReads` for
+  goals) rather than the repository interfaces, so the eighteen test fakes
+  stay untouched.
+
+- **2026-09-12 · Progress period browser shipped on `feat/progress-periods`
+  (P1–P4).** Implementation calls made while building, so they are not
+  reopened: (1) zooming between horizons keeps an *anchor day* (the open day,
+  else the day the view was reached on), so Month → Week → Day lands where
+  the eye was, and paging into a past period anchors on its last day;
+  (2) quarter and year draw a week-column heatmap whose cells are ~5 px on
+  a phone, so they are deliberately **not tappable** — day detail exists in
+  Day, Week and Month only; (3) the per-scope `currentStreakDays` on the week
+  rollups was found to be capped by the window (7 days before, days-since-
+  Monday now) — every streak surface now reads the blended whole-cache
+  streak, and the per-scope fields survive only for the insights copy;
+  (4) the Pro gate blurs the *real* content under an "Unlock Progress" pill
+  (`ImageFiltered` σ6 + `AbsorbPointer`) rather than showing sample data, and
+  background backfill is skipped for gated horizons; (5) the old
+  `WeeklySummaryHero`, `GoalsHabitsSection` and `TaskIntegritySection` are
+  deleted — their help-guide ids (`weeklySummary`, `goalsHabitsBreakdown`,
+  `taskIntegrity`) live on with rewritten copy on the rollup and split
+  cards; (6) skeletons are per horizon so the cache-hit reveal never
+  re-flows. Not yet verified on a device at the time of writing.

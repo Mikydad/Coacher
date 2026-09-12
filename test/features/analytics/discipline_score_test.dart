@@ -63,10 +63,42 @@ void main() {
       expect(s.taskCurrentDays, 5);
     });
 
-    test('homeDisplayStreakDays matches Home hero (goal/habit week streak)', () {
-      final bundle = _bundle(goalWeek: 0.6, taskWeek: 0.4);
-      expect(homeDisplayStreakDays(bundle), 4);
-      expect(homeDisplayStreakDays(bundle), bundle.goalHabitWeek.currentStreakDays);
+    test('homeDisplayStreakDays is the blended app-wide streak', () {
+      final bundle = AnalyticsPeriodBundle(
+        goalHabitDay: _day(0.2),
+        taskDay: _day(0.8),
+        goalHabitWeek: _rollup(weightedCompletionRate: 0.6, streak: 4),
+        taskWeek: _rollup(weightedCompletionRate: 0.4, streak: 5),
+        goalHabitMonth: _rollup(weightedCompletionRate: 0.22),
+        taskMonth: _rollup(weightedCompletionRate: 0.67),
+        blendedCurrentStreakDays: 23,
+      );
+      expect(homeDisplayStreakDays(bundle), 23);
+    });
+
+    test('disciplineRateWeek blends 60/40 over weighted sums', () {
+      RollupAnalyticsSnapshot r(double created, double completed) =>
+          RollupAnalyticsSnapshot(
+            daysCount: 7,
+            createdCount: created.round(),
+            completedCount: completed.round(),
+            weightedCreated: created,
+            weightedCompleted: completed,
+            completionRate: completed / created,
+            weightedCompletionRate: completed / created,
+            currentStreakDays: 0,
+            bestStreakDays: 0,
+          );
+      final bundle = AnalyticsPeriodBundle(
+        goalHabitDay: _day(0.2),
+        taskDay: _day(0.8),
+        goalHabitWeek: r(10, 10), // 1.0
+        taskWeek: r(10, 5), // 0.5
+        goalHabitMonth: r(1, 1),
+        taskMonth: r(1, 1),
+      );
+      expect(disciplineRateWeek(bundle), closeTo(0.8, 1e-9));
+      expect(disciplinePercentWeek(bundle), 80);
     });
 
     test('disciplineTopCategoryLabel picks leading scope', () {

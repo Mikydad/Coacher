@@ -6,11 +6,10 @@ import '../../../core/presentation/async_value_ui.dart';
 
 /// Combined discipline rate for the weekly hero (0.0–1.0).
 ///
-/// Average of goals/habits and tasks **week** weighted completion rates.
+/// The blended 60/40 week rate (decision 2026-09-12); 0 when nothing was
+/// planned this week.
 double disciplineRateWeek(AnalyticsPeriodBundle bundle) {
-  return (bundle.goalHabitWeek.weightedCompletionRate +
-          bundle.taskWeek.weightedCompletionRate) /
-      2.0;
+  return bundle.blendedWeekRate ?? 0.0;
 }
 
 /// Display percent for the hero ring (0–100).
@@ -29,10 +28,7 @@ String disciplineTopCategoryLabel(AnalyticsPeriodBundle bundle) {
 
 /// Week vs today combined delta for the hero side card (percentage points).
 int disciplineWeekVsTodayDelta(AnalyticsPeriodBundle bundle) {
-  final todayAvg =
-      (bundle.goalHabitDay.weightedCompletionRate +
-          bundle.taskDay.weightedCompletionRate) /
-      2.0;
+  final todayAvg = bundle.blendedTodayRate ?? 0.0;
   final week = disciplineRateWeek(bundle);
   return ((week - todayAvg) * 100).round();
 }
@@ -61,9 +57,10 @@ DisciplineStreakSummary disciplineStreakSummary(AnalyticsPeriodBundle bundle) {
   );
 }
 
-/// Goals/habits current streak days — same metric as the Home hero card.
+/// The app's single day streak (blended 60/40 series, walked back through
+/// the whole cache) — shown on Home, Profile and Progress alike.
 int homeDisplayStreakDays(AnalyticsPeriodBundle bundle) =>
-    bundle.goalHabitWeek.currentStreakDays;
+    bundle.blendedCurrentStreakDays;
 
 /// Shared streak count for Home and Profile heroes.
 final homeDisplayStreakDaysProvider = Provider<int>((ref) {

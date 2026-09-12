@@ -7,9 +7,11 @@ import '../../../core/offline/offline_store.dart';
 import '../../../core/sync/outbox_writer.dart';
 import '../domain/models/analytics_event.dart';
 import '../domain/models/analytics_stats_cache.dart';
+import 'analytics_range_reads.dart';
 import 'analytics_repository.dart';
 
-class IsarAnalyticsRepository implements AnalyticsRepository {
+class IsarAnalyticsRepository
+    implements AnalyticsRepository, AnalyticsStatsRangeReads {
   IsarAnalyticsRepository(this._remote);
 
   final AnalyticsRepository _remote;
@@ -169,5 +171,38 @@ class IsarAnalyticsRepository implements AnalyticsRepository {
         );
       });
     }
+  }
+
+  @override
+  Future<List<AnalyticsStatsCache>> listStatsCacheRange({
+    required String scopeType,
+    required String fromDateKey,
+    required String toDateKey,
+  }) async {
+    // `dateKey` carries a hash index (Isar's default for String), which
+    // only serves equality — so this is a filter scan over the stats
+    // collection (two rows per day of use), not the all-rows load +
+    // Dart filter that `listStatsCache` does.
+    final rows = await _isar.isarAnalyticsStats
+        .filter()
+        .scopeTypeEqualTo(scopeType)
+        .and()
+        .scopeIdEqualTo(kGlobalStatsScopeId)
+        .and()
+        .dateKeyBetween(fromDateKey, toDateKey)
+        .findAll();
+    return rows.map((s) => s.toDomain()).toList();
+  }
+
+  @override
+  Future<String?> earliestStatsDateKey({required String scopeType}) async {
+    final row = await _isar.isarAnalyticsStats
+        .filter()
+        .scopeTypeEqualTo(scopeType)
+        .and()
+        .scopeIdEqualTo(kGlobalStatsScopeId)
+        .sortByDateKey()
+        .findFirst();
+    return row?.dateKey;
   }
 }

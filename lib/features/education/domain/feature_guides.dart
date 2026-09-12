@@ -397,16 +397,19 @@ abstract final class FeatureGuides {
     emoji: '📊',
     oneLiner: 'See how your effort compounds over time.',
     what:
-        'The Progress tab tracks your completion rate, day streak, focus '
-        'time, and trends across the week — plus coaching insights about '
-        'your patterns.',
+        'Progress scores every day with one number: 60% goals and habits, '
+        '40% tasks. Browse it by day, week, month, quarter, or year — each '
+        'day is a ring, and tapping one shows what that day asked of you '
+        'and what you did. Coaching insights sit underneath.',
     why:
         'What gets measured gets improved. Seeing a streak you built is '
         'the strongest reason not to break it.',
     howSteps: [
       'Complete tasks and goal check-ins — the numbers update by '
           'themselves.',
-      'Open the Progress tab to see your streak, score, and weekly trend.',
+      'Pick Day, Week, Month, Quarter, or Year and page back with the '
+          'arrows.',
+      'Tap a ring in Week or Month to open that day\'s detail.',
       'Read the insights — they point at patterns you may not notice.',
     ],
     tips: [
@@ -618,19 +621,28 @@ abstract final class FeatureGuides {
 
   static const weeklySummary = FeatureGuide(
     id: 'weeklySummary',
-    title: 'Weekly Summary',
+    title: 'Period Discipline',
     emoji: '📊',
-    oneLiner: 'How your whole week is going, in one ring.',
+    oneLiner: 'One number for the period you\'re looking at.',
     what:
-        'The ring is your overall completion for this week across tasks '
-        'and goals, weighted by importance. The date range shows which '
-        'week you\'re looking at.',
+        'Discipline is your completion for the selected period: 60% goals '
+        'and habits, 40% tasks, weighted by importance, so a heavy day '
+        'counts more than a light one. "Days met" counts the days that '
+        'cleared your discipline mode\'s bar; a day with nothing planned is '
+        'quiet, not a failure. The chip compares you with the previous '
+        'period.',
     why:
         'Days lie — one bad Tuesday feels like failure. The week is the '
         'honest unit of progress.',
     howSteps: [],
     tips: ['A steady 70% every week beats a perfect Monday and a dead Friday.'],
-    keywords: ['weekly summary', 'weekly summary ring', 'week completion ring'],
+    keywords: [
+      'weekly summary',
+      'period discipline',
+      'discipline number',
+      'period summary',
+      'days met',
+    ],
     suggestedPrompts: ['How am I doing this week?', 'Tell me about Task Integrity'],
   );
 
@@ -638,11 +650,11 @@ abstract final class FeatureGuides {
     id: 'goalsHabitsBreakdown',
     title: 'Goals & Habits',
     emoji: '🏁',
-    oneLiner: 'Your long-term targets, measured by the day, week, and month.',
+    oneLiner: 'The 60% of your score that comes from the long game.',
     what:
-        'This section breaks your goal and habit check-ins into day, week, '
-        'and month views so you can see whether the long game is actually '
-        'moving.',
+        'This bar is your goal and habit completion for the selected '
+        'period. It carries 60% of the Discipline number — when only goals '
+        'were planned on a day, it carries all of it.',
     why:
         'Habits feel invisible day to day. Only the week and month views '
         'show whether they\'re real.',
@@ -658,8 +670,9 @@ abstract final class FeatureGuides {
     oneLiner: 'Do you actually do what you plan?',
     what:
         'Task Integrity compares what you planned against what you '
-        'completed, across the day, week, and month. High integrity means '
-        'your plans can be trusted.',
+        'completed for the selected period. It carries 40% of the '
+        'Discipline number — all of it on days with no goals due. High '
+        'integrity means your plans can be trusted.',
     why:
         'Planning feels like progress but isn\'t. This number keeps your '
         'plans honest — it only moves when you finish things.',
