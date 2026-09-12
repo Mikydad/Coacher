@@ -3053,3 +3053,32 @@ not silent reversal.
   on screen — display order only; the builder, the Coach's text and the
   reflection snapshot stay chronological, and previous days read the same
   way for consistency.
+- **2026-09-12 · iOS moves to the Elaris Technologies LLC Apple team under
+  a new bundle ID `com.elaristechnologies.sidepal`.** Miko enrolled Elaris
+  Technologies LLC (Team ID `HW6A4CQ2UB`, Agent = mikydad11@gmail.com) in
+  the Apple Developer Program; the app had been signing with a family
+  member's team (`9376CS43F2`). *Why a new bundle ID:* `io.sidepal.app`
+  is locked to the old team — an App Store Connect record exists there
+  with an uploaded TestFlight build (1.0.1 (2)), Apple's App Transfer
+  requires at least one App Store release (never happened), and deleting
+  the record would reserve the bundle ID forever (Apple: "if you've
+  uploaded a build, your bundle ID can't be reused"). *Rejected:*
+  launching under the old account and transferring afterwards — the
+  listing would show someone else as seller and every release would
+  depend on that account. *Consequences:* new Firebase iOS app
+  `1:8992228827:ios:a46882654a19b65a9553fe` ("SidePal iOS") with its own
+  Google sign-in client; `GoogleService-Info.plist`, `firebase_options.dart`
+  (gitignored — mirror by hand) and the Info.plist URL scheme all point at
+  it; a new APNs key must be uploaded to Firebase Cloud Messaging for this
+  app; Sign in with Apple test users get fresh identities (Apple scopes
+  them per team) — Google sign-in testers keep their accounts (same
+  Firebase project); TestFlight testers are re-invited to the new App
+  Store Connect app. APNs: key `36ASHD9K89` ("sidepal APNs", Sandbox &
+  Production, Team Scoped) created on the Elaris team and uploaded to
+  Firebase Cloud Messaging for the SidePal iOS app; the .p8 lives outside
+  the repo (`~/Documents/sidepal/Auth/`) and must never be committed.
+  Android stays on `io.sidepal.app` for now — Google Play IDs are
+  unrelated to Apple teams; moving Android to
+  `com.elaristechnologies.sidepal` (new Firebase Android app, SHA
+  fingerprints, `applicationId`/`namespace`, Kotlin package) is the next
+  piece of work, decided 2026-09-12.

@@ -64,3 +64,4 @@ lib/core/config/google_auth_config.local.dart
 ios/build/
 /package-lock.json
 libisar.so
+*.p8
