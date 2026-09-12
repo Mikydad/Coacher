@@ -177,6 +177,7 @@ reprioritization ("task became overdue") with no data change.
 | Tasks, routines, blocks, reminders, goals, analytics | **Isar + Firestore** (full local-first) | Strong |
 | Direction (year/quarter/month focus text, `users/{uid}/directions`) | **Isar + Firestore** (full local-first; deterministic ids, no tombstones) | Strong |
 | Activity events (Time Tracker timeline, `users/{uid}/activityEvents`) | **Isar + Firestore** (full local-first; soft tombstones) | Strong |
+| Activity category rules (Time Tracker V1.2, `users/{uid}/activityCategoryRules`) | **Isar + Firestore** (full local-first; deterministic ids, overwritten never deleted) | Strong |
 | Timer sessions (`execution`), task scores (`scoring`) | **Firestore only** (queue fallback on failure) | Weaker — no local mirror |
 | AI coaching caches, delivery history, coaching style, profile prefs, notification ledger, AI chat history | **Isar only** — never synced | Lost on reinstall/device switch |
 | Community/circles | **Firestore only**, live from network | None |

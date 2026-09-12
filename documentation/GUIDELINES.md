@@ -2993,3 +2993,63 @@ not silent reversal.
   "Ongoing" until the next log. Known V1 limit, accepted: reminders are
   device-local — a log on device A cannot cancel device B's armed
   notification; the ledger's ignored back-off bounds the damage.
+- **2026-09-12 · Time Tracker V1.1 + V1.2: Siri, Coach, categories,
+  week view, and the first reflections — all on the Time page.** Settled
+  with Miko (spec: `PRD/Time_Tracker/time_tracker_v1_2_implementation_prd.md`).
+  *Dropped:* the `sidepal://track?text=` link and user-built Shortcuts.
+  *Siri:* a native App Intent "Log activity" ("Hey Siri, log activity in
+  SidePal" → Siri asks "What are you doing?"; phrases cannot embed a
+  free-text parameter) stamps a pending log the way `SiriVoiceEntry` does; Dart
+  writes the event on launch/resume and shows a Home snackbar. *Coach:*
+  reads today's timeline (per-turn payload block, described never judged)
+  and can propose `logActivity` on the normal confirm card — explicitly
+  NOT auto-committed, because logging writes data. *Gap tap* opens the
+  sheet at the gap's start (today only). *Categories:* fixed set
+  (work, learning, exercise, entertainment, rest, chores, social, other),
+  classified by the daily reflection pass into a synced
+  `ActivityCategoryRule` per normalized text; the edit sheet overrides
+  with a `user` rule that AI never re-proposes; capture stays
+  category-free. *Reflection:* Day | Week toggle; planned-vs-actual only
+  for timer-sourced rows (exact task link — fuzzy matching of manual
+  entries rejected); observations ride the existing daily `reflect` call
+  (snapshot every day, week/month aggregates on boundary days), are
+  cached under `time:*` scopes, and render ONLY on the Time page — never
+  Home / On your radar. The monthly Direction mirror lives on the Time
+  page too, using that month's Direction from history. *Tone:* the banned
+  list (wasted, should, failed, bad, lazy, "you need to", "you should",
+  "you ought to", "you wasted", "you failed", "you were unproductive",
+  "you spent too much", any "correct amount of time" comparison) is
+  enforced by the parser, not just the prompt — a rejected observation is
+  dropped, and silence is the answer. One branch: `feat/time-tracker-v1.2`.
+- **2026-09-12 · Time Tracker V1.1/V1.2 shipped — six implementation
+  choices.** (1) Siri "Log activity" is an AppIntent compiled into the
+  Runner target inside `SiriVoiceEntry.swift`; it stamps `{text, minutes}`
+  and Dart writes the event on launch/resume (empty text opens the sheet,
+  never a blank log). (2) The Coach's `logActivity` is confirm-gated on the
+  standard card, pre-assigns the event id for exact undo, clamps a future
+  time to now, and the Coach's user prompt now carries today's timeline
+  with "describe, never judge" inline (server rule mirrors it). (3)
+  Category rules: deterministic id per normalised text; the repository
+  refuses `ai` over `user`; the reflection snapshot never lists user-set
+  texts; capture stays category-free, the edit sheet overrides. (4) Time
+  observations ride the daily `reflect` call, are tone-checked by the
+  parser (banned list; a violation is dropped, never rewritten), cached
+  under `time:<scope>:<key>`, and rendered only on the Time page — day
+  view shows the day one, week view the week one and the monthly Direction
+  mirror. (5) Week/month boundary aggregates fire once per boundary via
+  two per-account prefs keys in the wipe list. (6) Week totals sum per-day
+  timelines; the 2-hour cap never crosses midnight. Server prompt changed
+  → next functions deploy.
+- **2026-09-12 · Time Tracker device-test fixes: recent list, not chips;
+  newest-first timeline.** Miko's real entries are sentences ("going to
+  the clinic with my mom"), which never fit a pill and made the chip grid
+  ragged. The capture sheet now shows a fixed FIVE-row list under the
+  field: activities logged more than once in the last 30 days first (by
+  count, then recency), one-offs by recency after, typing filters by
+  substring, exact match hidden, "×n" for repeats. *Rejected:* a
+  horizontal chip row (one sentence-chip per screen, endless swiping) and
+  a "More" expander (the sheet grows). The day timeline renders newest
+  first so the current entry and its "Ongoing" marker are the first thing
+  on screen — display order only; the builder, the Coach's text and the
+  reflection snapshot stay chronological, and previous days read the same
+  way for consistency.

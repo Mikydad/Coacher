@@ -26,6 +26,7 @@ import '../../../core/tier/tier_providers.dart';
 import 'ai_action_batch_repository.dart';
 import 'ai_action_batch_state.dart';
 import '../../direction/application/direction_providers.dart';
+import '../../time_tracker/application/time_tracker_providers.dart';
 import '../../intentions/application/intentions_providers.dart';
 import '../../memory/application/memory_providers.dart';
 import 'ai_action_executor.dart';
@@ -94,6 +95,7 @@ final aiPayloadAssemblerProvider = Provider<AiPayloadAssembler>((ref) {
     peopleRepository: ref.read(peopleRepositoryProvider),
     intentionsRepository: ref.read(intentionsRepositoryProvider),
     directionRepository: ref.read(directionRepositoryProvider),
+    activityEventRepository: ref.read(activityEventRepositoryProvider),
     contextSnapshotService: ref.read(contextSnapshotServiceProvider),
   );
 });
@@ -242,6 +244,7 @@ final aiActionExecutorProvider = Provider<AiActionExecutor>((ref) {
     ),
     intentionsRepository: ref.read(intentionsRepositoryProvider),
     intentionNudgeSyncService: ref.read(intentionNudgeSyncServiceProvider),
+    timeTrackerActions: ref.read(timeTrackerActionsProvider),
     memoryFactsRepository: ref.read(memoryFactsRepositoryProvider),
     peopleRepository: ref.read(peopleRepositoryProvider),
   );

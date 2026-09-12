@@ -134,8 +134,12 @@ String reflectionInputsHash({
   required List<Person> people,
   required List<Intention> intentions,
   List<DirectionEntry> directions = const [],
+
+  /// Extra durable parts (Time Tracker V1.2: activity ids + rule stamps).
+  List<String> extraParts = const [],
 }) {
   final parts = <String>[
+    ...extraParts,
     for (final f in facts) 'f:${f.id}:${f.updatedAtMs}',
     // Editing a direction must re-arm the loop; id + stamp only (no
     // day-relative values, so midnight alone never re-arms it).

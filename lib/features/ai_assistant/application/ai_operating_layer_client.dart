@@ -207,6 +207,12 @@ pick sensible times from the free windows yourself instead of asking again.
   will change before anything is applied.
 - Presentation "preview" → the user gave a clear command ("add workout at 6am").
   Keep your text to one short confirmation line.
+- logActivity parameters: text (what they are doing, ≤80 chars, e.g.
+  "Gym"), optional time ("HH:mm" 24-hour, today only — default now),
+  optional intendedMinutes. Use it when the user says what they are doing
+  RIGHT NOW ("I'm at the gym", "just started studying"); never mix it with
+  other action types; if Today's timeline already shows it, say so instead
+  of proposing a duplicate.
 - createIntention parameters: title (short action phrase, e.g. "Call cousin
   Sara"), rawUtterance (the user's exact words), window ("today" |
   "tomorrow" | "this_week" | "weekend"), estimatedMinutes, importance
@@ -341,6 +347,7 @@ const List<Map<String, dynamic>> kCoachAgentTools = [
                     'activateContextOverride',
                     'endContextOverride',
                     'createIntention',
+                    'logActivity',
                     'rememberFact',
                     'updateFact',
                     'forgetFact',
@@ -841,6 +848,18 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
           '${p['lastUsedTime'] != null ? ", usually at ${p['lastUsedTime']}" : ""}'
           '${p['lastUsedDuration'] != null ? ", ~${p['lastUsedDuration']}" : ""}',
         );
+      }
+      buffer.writeln();
+    }
+
+    // Time Tracker (V1.1): the day's recorded truth. Describe, never judge.
+    if (payload.todayActivityLog.isNotEmpty) {
+      buffer.writeln(
+        "Today's timeline (what they actually did — recorded, not planned; "
+        'describe it, never judge it: no "wasted", no "should have"):',
+      );
+      for (final line in payload.todayActivityLog) {
+        buffer.writeln('  - $line');
       }
       buffer.writeln();
     }

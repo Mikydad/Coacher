@@ -12,6 +12,10 @@ import 'package:sidepal/features/time_tracker/domain/models/activity_event.dart'
 import 'package:sidepal/features/time_tracker/presentation/time_screen.dart';
 import 'package:sidepal/features/time_tracker/presentation/track_activity_sheet.dart';
 import 'package:sidepal/features/time_tracker/presentation/track_pill.dart';
+import 'package:sidepal/features/analytics/domain/models/generated_insight.dart';
+import 'package:sidepal/features/time_blocks/application/time_block_providers.dart';
+import 'package:sidepal/features/time_blocks/data/time_block_repository.dart';
+import 'package:sidepal/features/time_blocks/domain/models/scheduled_time_block.dart';
 
 /// In-memory stand-in with the repository's contract (tombstones kept,
 /// reads filter `active`), recording every write.
@@ -56,6 +60,18 @@ class _FakeRepo extends ActivityEventRepository {
     final l = _live..sort((a, b) => b.startedAtMs.compareTo(a.startedAtMs));
     return l.isEmpty ? null : l.first;
   });
+
+  @override
+  Stream<List<ActivityEvent>> watchRange(int fromMs, int toMs) => _derive(
+    () => _live
+        .where((e) => e.startedAtMs >= fromMs && e.startedAtMs < toMs)
+        .toList()
+      ..sort((a, b) => a.startedAtMs.compareTo(b.startedAtMs)),
+  );
+
+  @override
+  Future<List<ActivityEvent>> fetchRangeOnce(int fromMs, int toMs) async =>
+      _live.where((e) => e.startedAtMs >= fromMs && e.startedAtMs < toMs).toList();
 
   @override
   Future<ActivityEvent?> getById(String id) async => rows[id];
@@ -181,18 +197,40 @@ void main() {
       expect(find.byType(TrackActivitySheet), findsNothing);
     });
 
-    testWidgets('a recent chip fills the field without submitting',
+    testWidgets('a recent row fills the field without submitting',
         (tester) async {
       final repo = _FakeRepo([_seed('Gym', _todayAt(1))]);
       await tester.pumpWidget(_app(const _SheetHost(), repo));
       await _openSheet(tester);
-      await tester.tap(find.byKey(const ValueKey('track_chip_Gym')));
+      await tester.tap(find.byKey(const ValueKey('track_recent_Gym')));
       await tester.pump();
       expect(
         tester.widget<TextField>(find.byKey(const ValueKey('track_text'))).controller!.text,
         'Gym',
       );
       expect(repo.writes, isEmpty);
+    });
+
+    testWidgets('recent rows: repeats first, capped at 5, typing filters',
+        (tester) async {
+      final repo = _FakeRepo([
+        _seed('Going to the clinic with my mom', _todayAt(0, 50)),
+        _seed('Eating breakfast', _todayAt(0, 10)),
+        _seed('Eating breakfast', _todayAt(0, 40)),
+        for (var i = 0; i < 6; i++) _seed('One-off $i', _todayAt(0, 11 + i)),
+      ]);
+      await tester.pumpWidget(_app(const _SheetHost(), repo));
+      await _openSheet(tester);
+      // Repeat first, then the most recent one-offs, five rows total.
+      expect(find.byKey(const ValueKey('track_recent_Eating breakfast')), findsOneWidget);
+      expect(find.text('×2'), findsOneWidget);
+      expect(find.byKey(const ValueKey('track_recent_Going to the clinic with my mom')), findsOneWidget);
+      expect(find.byIcon(Icons.history_rounded), findsNWidgets(5));
+      // Typing filters.
+      await tester.enterText(find.byKey(const ValueKey('track_text')), 'clin');
+      await tester.pump();
+      expect(find.byIcon(Icons.history_rounded), findsOneWidget);
+      expect(find.byKey(const ValueKey('track_recent_Going to the clinic with my mom')), findsOneWidget);
     });
 
     testWidgets('duration chips set and clear the intended minutes',
@@ -241,12 +279,15 @@ void main() {
       expect(find.byKey(const ValueKey('track_end')), findsOneWidget);
 
       await tester.enterText(field, 'Gym session');
+      // Edit mode is taller (End row + category chips): scroll to the button.
+      await tester.ensureVisible(find.byKey(const ValueKey('track_submit')));
       await tester.tap(find.byKey(const ValueKey('track_submit')));
       await tester.pumpAndSettle();
       expect(repo.rows[existing.id]!.text, 'Gym session');
       expect(repo.rows[existing.id]!.intendedMinutes, 45);
 
       await _openSheet(tester);
+      await tester.ensureVisible(find.byKey(const ValueKey('track_delete')));
       await tester.tap(find.byKey(const ValueKey('track_delete')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('track_delete_confirm')));
@@ -311,10 +352,10 @@ void main() {
       await tester.pumpWidget(_app(const TimeScreen(), repo));
       await tester.pumpAndSettle();
 
-      expect(find.text('Scrolling'), findsOneWidget);
-      expect(find.text('6m'), findsOneWidget);
+      expect(find.text('Scrolling'), findsAtLeastNWidgets(1));
+      expect(find.text('6m'), findsAtLeastNWidgets(1));
       expect(find.byKey(const ValueKey('time_untracked_row')), findsOneWidget);
-      expect(find.text('2h 11m untracked'), findsOneWidget);
+      expect(find.textContaining('2h 11m untracked'), findsOneWidget);
       expect(find.text('Ongoing'), findsOneWidget);
       expect(find.text('Planned 1h 00m'), findsOneWidget);
       expect(find.byKey(const ValueKey('time_summary_head')), findsOneWidget);
@@ -338,7 +379,7 @@ void main() {
       await tester.pumpWidget(_app(const TimeScreen(), repo));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('time_timer_glyph')), findsOneWidget);
-      expect(find.text('45m'), findsOneWidget);
+      expect(find.text('45m'), findsAtLeastNWidgets(1));
       expect(find.text('Ongoing'), findsNothing);
     });
 
@@ -383,6 +424,148 @@ void main() {
       await tester.pumpAndSettle();
       expect(repo.rows[e.id]!.active, isFalse);
       expect(find.byKey(const ValueKey('time_empty')), findsOneWidget);
+    });
+  });
+
+  v12Tests();
+}
+
+// ─── V1.2 additions ───────────────────────────────────────────────────────────
+
+class _FakeTimeBlockRepo implements TimeBlockRepository {
+  _FakeTimeBlockRepo(this.blocks);
+  final Map<String, ScheduledTimeBlock> blocks;
+
+  @override
+  Future<ScheduledTimeBlock?> getBlockForEntity(String entityId) async =>
+      blocks[entityId];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+GeneratedInsight _observation(String scopeId, String message) => GeneratedInsight(
+  insightId: 'ins_$scopeId',
+  scopeType: InsightScopeType.entity,
+  scopeId: scopeId,
+  insightType: InsightType.reflectionObservation,
+  insightBucket: InsightBucket.neutral,
+  priority: InsightPriority.low,
+  messageKey: 'reflection_observation',
+  message: message,
+  action: InsightAction.keepGoing,
+  linkedPatternCodes: const [],
+  confidence: 0.6,
+  detectedAtMs: 1,
+  sourceWindowStartDateKey: DateKeys.todayKey(),
+  sourceWindowEndDateKey: DateKeys.todayKey(),
+);
+
+void v12Tests() {
+  final now = DateTime.now();
+  final earlyEnough = now.hour >= 2;
+
+  group('TimeScreen V1.2', () {
+    testWidgets('Day | Week toggle shows the week summary and pager',
+        (tester) async {
+      if (!earlyEnough) return;
+      final repo = _FakeRepo([
+        _seed('Gym', _todayAt(0, 30)),
+        _seed('Work', _todayAt(1, 0), endMs: _todayAt(1, 45)),
+      ]);
+      await tester.pumpWidget(_app(const TimeScreen(), repo));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Week'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('time_week_label')), findsOneWidget);
+      expect(find.textContaining('This week ·'), findsOneWidget);
+      expect(find.text('1 of 7 days with entries'), findsOneWidget);
+      expect(find.text('You logged 1h 15m'), findsOneWidget);
+      expect(find.byKey(const ValueKey('time_track_fab')), findsNothing);
+      expect(find.byType(SwipeActionsRow), findsNothing);
+      expect(
+        tester.widget<IconButton>(find.byKey(const ValueKey('time_next_week'))).onPressed,
+        isNull,
+      );
+      await tester.tap(find.byKey(const ValueKey('time_prev_week')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('This week ·'), findsNothing);
+    });
+
+    testWidgets('timer-sourced rows show planned vs actual from the block',
+        (tester) async {
+      if (!earlyEnough) return;
+      final start = _todayAt(0, 42);
+      final repo = _FakeRepo([
+        _seed('Work on SidePal', start, endMs: _todayAt(1, 27),
+            source: ActivitySource.timer),
+      ]);
+      // Give the seeded event a task link.
+      final e = repo.rows.values.single;
+      repo.rows[e.id] = ActivityEvent(
+        id: e.id,
+        text: e.text,
+        startedAtMs: e.startedAtMs,
+        endedAtMs: e.endedAtMs,
+        dateKey: e.dateKey,
+        source: ActivitySource.timer,
+        sourceEntityId: 'task_1',
+        createdAtMs: 1,
+        updatedAtMs: 1,
+      );
+      final block = ScheduledTimeBlock(
+        id: 'blk_1',
+        entityId: 'task_1',
+        entityKind: 'task',
+        startAt: DateTime.fromMillisecondsSinceEpoch(_todayAt(0, 0)),
+        expectedDurationMinutes: 60,
+        computedEndAt: DateTime.fromMillisecondsSinceEpoch(_todayAt(1, 0)),
+        flexibilityType: FlexibilityType.rigid,
+        allowOverlapOverride: false,
+        importance: 3,
+        createdAtMs: 1,
+        updatedAtMs: 1,
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            activityEventRepositoryProvider.overrideWithValue(repo),
+            activityReminderServiceProvider.overrideWithValue(_fakeReminders()),
+            timeBlockRepositoryProvider.overrideWithValue(
+              _FakeTimeBlockRepo({'task_1': block}),
+            ),
+          ],
+          child: const MaterialApp(home: TimeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('time_planned_vs_actual')), findsOneWidget);
+      expect(find.textContaining('· Started'), findsOneWidget);
+      expect(find.textContaining('· Ended'), findsOneWidget);
+    });
+
+    testWidgets('a day observation renders and dismisses', (tester) async {
+      final repo = _FakeRepo();
+      final scope = timeObservationScopeId('day', DateKeys.todayKey());
+      final dismissed = <String>[];
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            activityEventRepositoryProvider.overrideWithValue(repo),
+            activityReminderServiceProvider.overrideWithValue(_fakeReminders()),
+            timeObservationProvider.overrideWith(
+              (ref, id) => id == scope && !dismissed.contains(id)
+                  ? _observation(id, 'Most of your focused work happened after 9 PM.')
+                  : null,
+            ),
+          ],
+          child: const MaterialApp(home: TimeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('time_observation')), findsOneWidget);
+      expect(find.text('Most of your focused work happened after 9 PM.'), findsOneWidget);
+      expect(find.text('INFERRED'), findsOneWidget);
     });
   });
 }

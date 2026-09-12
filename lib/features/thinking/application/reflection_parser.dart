@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import '../../time_tracker/domain/models/activity_category_rule.dart';
+import '../../time_tracker/domain/observation_tone.dart';
+
 /// Pure, defensive parsing of `reflect` responses (humanizing Phase 7).
 ///
 /// The reflection's output is NEVER an action — only labeled proposals,
@@ -94,23 +97,52 @@ class ReminderStrategyProposal {
   }
 }
 
+/// A time observation (Time Tracker V1.2): one per scope per pass, tone-
+/// validated, grounded on activity ids or the aggregate ids.
+class TimeObservation {
+  const TimeObservation({
+    required this.scope,
+    required this.message,
+    required this.basedOn,
+  });
+
+  /// `day` | `week` | `month`.
+  final String scope;
+  final String message;
+  final List<String> basedOn;
+}
+
+/// "Every 'gym' is Exercise" proposed by the pass (Time Tracker V1.2).
+class ActivityCategoryProposal {
+  const ActivityCategoryProposal({required this.text, required this.category});
+
+  final String text;
+  final String category;
+}
+
 class ParsedReflection {
   const ParsedReflection({
     this.dormantIntentions = const [],
     this.hintUpdates = const [],
     this.observation,
     this.reminderProposals = const [],
+    this.timeObservations = const [],
+    this.activityCategories = const [],
   });
 
   final List<ReflectionDormantCandidate> dormantIntentions;
   final List<ReflectionHintUpdate> hintUpdates;
   final ReflectionObservation? observation;
   final List<ReminderStrategyProposal> reminderProposals;
+  final List<TimeObservation> timeObservations;
+  final List<ActivityCategoryProposal> activityCategories;
 
   bool get isEmpty =>
       dormantIntentions.isEmpty &&
       hintUpdates.isEmpty &&
       observation == null &&
+      timeObservations.isEmpty &&
+      activityCategories.isEmpty &&
       reminderProposals.isEmpty;
 }
 
@@ -139,6 +171,12 @@ class ReflectionParser {
     /// tasks a strategist proposal may name. `{id: title}` so the proposal
     /// carries a human name without a later join.
     Map<String, String> reminderTasks = const {},
+
+    /// Time Tracker V1.2: activity ids + aggregate ids a time observation
+    /// may cite, and the uncategorised texts a category proposal may name
+    /// (exact, as sent). Empty = the time sections are ignored.
+    Set<String> activityIds = const {},
+    Set<String> uncategorizedTexts = const {},
   }) {
     final decoded = _decode(content);
     if (decoded == null) return const ParsedReflection();
@@ -203,6 +241,51 @@ class ReflectionParser {
       break; // At most ONE observation per pass — quiet-app principle.
     }
 
+    // Time observations (V1.2): ≤1 per scope, 10..200 chars, grounded on
+    // activity/aggregate ids, and the TONE GUARD — a judging message is
+    // dropped, never rewritten. Silence is the answer.
+    final timeObservations = <TimeObservation>[];
+    final seenScopes = <String>{};
+    if (activityIds.isNotEmpty) {
+      for (final raw in _list(decoded['timeObservations'])) {
+        if (raw is! Map) continue;
+        final scope = _string(raw['scope']);
+        if (scope == null || !const {'day', 'week', 'month'}.contains(scope)) {
+          continue;
+        }
+        if (seenScopes.contains(scope)) continue;
+        final message = _string(raw['message']);
+        if (message == null || message.length < 10 || message.length > 200) {
+          continue;
+        }
+        if (violatesObservationTone(message)) continue;
+        final basedOn = _groundedRefs(raw['basedOn'], activityIds);
+        if (basedOn == null) continue;
+        seenScopes.add(scope);
+        timeObservations.add(
+          TimeObservation(scope: scope, message: message, basedOn: basedOn),
+        );
+      }
+    }
+
+    // Category proposals (V1.2): text must be one we sent, category must be
+    // in the fixed set, ≤20, no duplicates.
+    final categories = <ActivityCategoryProposal>[];
+    final seenTexts = <String>{};
+    if (uncategorizedTexts.isNotEmpty) {
+      for (final raw in _list(decoded['activityCategories'])) {
+        if (categories.length >= 20) break;
+        if (raw is! Map) continue;
+        final text = _string(raw['text']);
+        final category = _string(raw['category']);
+        if (text == null || category == null) continue;
+        if (!uncategorizedTexts.contains(text)) continue;
+        if (!ActivityCategories.isValid(category)) continue;
+        if (!seenTexts.add(text)) continue;
+        categories.add(ActivityCategoryProposal(text: text, category: category));
+      }
+    }
+
     // Strategist proposals (FR-R-61): grounded to snapshot task ids, kinds
     // whitelisted, hard-capped. A proposal is prose — validation here is the
     // whole safety story, because nothing downstream executes it.
@@ -232,6 +315,8 @@ class ReflectionParser {
 
     return ParsedReflection(
       dormantIntentions: dormant,
+      timeObservations: timeObservations,
+      activityCategories: categories,
       hintUpdates: hints,
       observation: observation,
       reminderProposals: proposals,

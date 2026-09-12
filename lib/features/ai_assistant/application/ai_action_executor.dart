@@ -20,6 +20,8 @@ import '../../intentions/domain/models/intention.dart';
 import '../../memory/application/memory_extraction_parser.dart';
 import '../../memory/data/memory_facts_repository.dart';
 import '../../memory/data/people_repository.dart';
+import '../../time_tracker/application/time_tracker_actions.dart';
+import '../../time_tracker/domain/models/activity_event.dart';
 import '../../memory/domain/models/memory_fact.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/data/planning_repository.dart';
@@ -120,6 +122,7 @@ class AiActionExecutor {
     this.intentionNudgeSyncService,
     this.memoryFactsRepository,
     this.peopleRepository,
+    this.timeTrackerActions,
   });
 
   final PlanningRepository planningRepository;
@@ -147,6 +150,10 @@ class AiActionExecutor {
   /// then fail loudly instead of silently no-oping.
   final MemoryFactsRepository? memoryFactsRepository;
   final PeopleRepository? peopleRepository;
+
+  /// Time Tracker (V1.1). Null in legacy tests — logActivity then fails
+  /// loudly instead of silently no-oping.
+  final TimeTrackerActions? timeTrackerActions;
 
   // ─── Public execute ────────────────────────────────────────────────────────
 
@@ -176,6 +183,12 @@ class AiActionExecutor {
       if (action.actionType == ActionType.rememberFact &&
           action.parameters['_factId'] == null) {
         action.parameters['_factId'] = StableId.generate('memfact');
+      }
+      // logActivity: pre-assign the event id so undo can tombstone exactly
+      // what this batch logged.
+      if (action.actionType == ActionType.logActivity &&
+          action.parameters['_activityEventId'] == null) {
+        action.parameters['_activityEventId'] = StableId.generate('act');
       }
       // update/forget mutate an EXISTING fact: resolve the target and stash
       // its pre-mutation state in the persisted params so rollback/undo can
@@ -530,6 +543,7 @@ class AiActionExecutor {
     Map<String, dynamic>? snapshot,
   ) async {
     await _rollbackCreatedIntentions(batchId);
+    await _rollbackLoggedActivities(batchId);
     await _rollbackMemoryActions(batchId);
     await _rollbackGoalActions(batchId);
     try {
@@ -594,6 +608,83 @@ class AiActionExecutor {
     } catch (e) {
       debugPrint('ai_action_executor: swallowed error: $e');
     }
+  }
+
+  /// Undo of a confirmed logActivity: tombstone (+ reminder cancel) via
+  /// the same use case the sheet uses. Ids come from the persisted
+  /// actionsJson (`_activityEventId`, pre-assigned in [execute]).
+  Future<void> _rollbackLoggedActivities(String batchId) async {
+    final actions = timeTrackerActions;
+    if (actions == null) return;
+    try {
+      final batch = await batchRepository.findByBatchId(batchId);
+      if (batch == null) return;
+      final actionList = (jsonDecode(batch.actionsJson) as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+      for (final entry in actionList) {
+        if (entry['type'] != ActionType.logActivity.name) continue;
+        final params = (entry['params'] as Map?)?.cast<String, dynamic>();
+        final id = params?['_activityEventId'] as String?;
+        if (id == null || id.isEmpty) continue;
+        await actions.delete(id);
+      }
+    } catch (e) {
+      debugPrint('ai_action_executor: swallowed error: $e');
+    }
+  }
+
+  // ─── Time Tracker handler (V1.1) ──────────────────────────────────────────
+
+  /// Confirm-gated (never auto-committed): "I'm at the gym now" → the card
+  /// says `Log "Gym" at 7:42 PM`, the user taps Log, this runs. Today only;
+  /// a time later than now clamps to now.
+  Future<String> _logActivity(Map<String, dynamic> p) async {
+    final actions = timeTrackerActions;
+    if (actions == null) {
+      throw StateError('Time tracking is not available in this build.');
+    }
+    final text = (p['text'] as String?)?.trim() ?? '';
+    if (text.isEmpty) {
+      throw ArgumentError('text is required to log an activity');
+    }
+    final now = DateTime.now();
+    var startedAt = now;
+    final time = p['time'] as String?;
+    if (time != null) {
+      final m = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(time.trim());
+      if (m != null) {
+        final h = int.parse(m.group(1)!);
+        final min = int.parse(m.group(2)!);
+        if (h >= 0 && h < 24 && min >= 0 && min < 60) {
+          final candidate = DateTime(now.year, now.month, now.day, h, min);
+          startedAt = candidate.isAfter(now) ? now : candidate;
+        }
+      }
+    }
+    final intended = (p['intendedMinutes'] as num?)?.toInt();
+    final event = ActivityEvent(
+      id: (p['_activityEventId'] as String?) ?? StableId.generate('act'),
+      text: text.length > kActivityTextMaxChars
+          ? text.substring(0, kActivityTextMaxChars)
+          : text,
+      startedAtMs: startedAt.millisecondsSinceEpoch,
+      intendedMinutes: intended != null &&
+              intended >= 1 &&
+              intended <= kActivityIntendedMaxMinutes
+          ? intended
+          : null,
+      dateKey: activityDateKeyFor(startedAt.millisecondsSinceEpoch),
+      source: ActivitySource.manual,
+      createdAtMs: now.millisecondsSinceEpoch,
+      updatedAtMs: now.millisecondsSinceEpoch,
+    );
+    final saved = await actions.log(event);
+    final h = saved.startedAtMs;
+    final d = DateTime.fromMillisecondsSinceEpoch(h);
+    final hh = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    final clock =
+        '$hh:${d.minute.toString().padLeft(2, '0')} ${d.hour < 12 ? 'AM' : 'PM'}';
+    return 'Logged "${saved.text}" at $clock';
   }
 
   /// Undo of memory actions: created facts are tombstoned; updated or
@@ -819,6 +910,9 @@ class AiActionExecutor {
         // Planning happens directly in _createIntention (unthrottled) —
         // no schedule mutation to notify.
         return null;
+      case ActionType.logActivity:
+        // Activity events never touch the schedule.
+        return null;
       case ActionType.rememberFact:
       case ActionType.updateFact:
       case ActionType.forgetFact:
@@ -865,6 +959,8 @@ class AiActionExecutor {
         );
       case ActionType.createIntention:
         return _createIntention(action.parameters, ops);
+      case ActionType.logActivity:
+        return _logActivity(action.parameters);
       case ActionType.rememberFact:
         return _rememberFact(action.parameters, ops);
       case ActionType.updateFact:

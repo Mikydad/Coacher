@@ -60,6 +60,30 @@ class ActivityEventRepository {
         .map((rows) => rows.map((e) => e.toDomain()).toList(growable: false));
   }
 
+  /// Live events with `fromMs <= startedAtMs < toMs`, sorted by start —
+  /// the Week view and the reflection aggregates.
+  Stream<List<ActivityEvent>> watchRange(int fromMs, int toMs) {
+    return _isar.isarActivityEvents
+        .filter()
+        .startedAtMsBetween(fromMs, toMs, includeUpper: false)
+        .and()
+        .activeEqualTo(true)
+        .sortByStartedAtMs()
+        .watch(fireImmediately: true)
+        .map((rows) => rows.map((e) => e.toDomain()).toList(growable: false));
+  }
+
+  Future<List<ActivityEvent>> fetchRangeOnce(int fromMs, int toMs) async {
+    final rows = await _isar.isarActivityEvents
+        .filter()
+        .startedAtMsBetween(fromMs, toMs, includeUpper: false)
+        .and()
+        .activeEqualTo(true)
+        .sortByStartedAtMs()
+        .findAll();
+    return rows.map((e) => e.toDomain()).toList(growable: false);
+  }
+
   /// The most recently started live event, any day — drives the Home
   /// pill's "Scrolling · since 10:03 PM" copy.
   Stream<ActivityEvent?> watchLatest() {

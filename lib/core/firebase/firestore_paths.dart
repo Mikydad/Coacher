@@ -76,6 +76,11 @@ class FirestorePaths {
   static String activityEventDocument(String eventId) =>
       '$activityEvents/$eventId';
 
+  /// Time Tracker V1.2: `users/{uid}/activityCategoryRules/{ruleId}`.
+  static String get activityCategoryRules => '$userRoot/activityCategoryRules';
+  static String activityCategoryRuleDocument(String ruleId) =>
+      '$activityCategoryRules/$ruleId';
+
   /// Singleton doc (collection `onboarding`, doc `profile`) — what the user
   /// told us during first-launch onboarding (struggles / interests).
   static String get onboardingProfileDoc => '$userRoot/onboarding/profile';

@@ -10,7 +10,9 @@ import '../../features/goals/domain/models/goal_check_in.dart';
 import '../../features/goals/domain/models/goal_milestone.dart';
 import '../../features/goals/domain/models/user_goal.dart';
 import '../../features/direction/data/direction_lww_merge.dart';
+import '../../features/time_tracker/data/activity_category_rule_repository.dart';
 import '../../features/time_tracker/data/activity_event_lww_merge.dart';
+import '../../features/time_tracker/domain/models/activity_category_rule.dart';
 import '../../features/time_tracker/domain/models/activity_event.dart';
 import '../../features/direction/domain/models/direction_entry.dart';
 import '../../features/intentions/domain/models/intention.dart';
@@ -158,6 +160,8 @@ class RemoteIsarMerge {
     await _pullDirections();
     _abortIfUidChanged();
     await _pullActivityEvents();
+    _abortIfUidChanged();
+    await _pullActivityCategoryRules();
     _abortIfUidChanged();
     await _pullTimeBlocks();
     _abortIfUidChanged();
@@ -480,6 +484,29 @@ class RemoteIsarMerge {
         }
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip activity event ${doc.id}: $e\n$st');
+      }
+    }
+  }
+
+  /// Activity category rules (`users/{uid}/activityCategoryRules`) — cursor
+  /// pull, LWW. Rules are overwritten, never deleted.
+  Future<void> _pullActivityCategoryRules() async {
+    final cursor = await _cursorFor('activity_category_rules');
+    final snap = await _afterCursor(
+      _client.userCollection('activityCategoryRules'),
+      cursor,
+    ).get();
+    for (final doc in snap.docs) {
+      try {
+        final m = Map<String, dynamic>.from(doc.data());
+        m['id'] = _docFieldId(doc, m);
+        final rule = ActivityCategoryRule.fromMap(m);
+        _noteSeen('activity_category_rules', rule.updatedAtMs);
+        if (await mergeActivityCategoryRuleLwwIntoIsar(_isar, rule)) {
+          _appliedCount++;
+        }
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip category rule ${doc.id}: $e\n$st');
       }
     }
   }

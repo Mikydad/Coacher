@@ -73,7 +73,15 @@ class UntrackedRow extends TimelineRow {
 }
 
 /// [events] may be unsorted and may include tombstones; both are handled.
-List<TimelineRow> buildTimeline(List<ActivityEvent> events) {
+///
+/// [nextDayFirstStartMs] (V1.1): the following day's first event, if any.
+/// It ends the day's last open event when within the cap; beyond the cap
+/// the last event is `capped` with NO untracked row — the gap belongs to
+/// no day, and untracked rows never cross midnight.
+List<TimelineRow> buildTimeline(
+  List<ActivityEvent> events, {
+  int? nextDayFirstStartMs,
+}) {
   final sorted = events.where((e) => e.active).toList()
     ..sort((a, b) => a.startedAtMs.compareTo(b.startedAtMs));
   final rows = <TimelineRow>[];
@@ -99,6 +107,19 @@ List<TimelineRow> buildTimeline(List<ActivityEvent> events) {
     }
 
     if (n == null) {
+      final next = nextDayFirstStartMs;
+      if (next != null && next > e.startedAtMs) {
+        if (next - e.startedAtMs <= capMs) {
+          rows.add(
+            ActivityRow(event: e, endMs: next, endSource: EndSource.nextEvent),
+          );
+        } else {
+          rows.add(
+            ActivityRow(event: e, endMs: null, endSource: EndSource.capped),
+          );
+        }
+        continue;
+      }
       rows.add(ActivityRow(event: e, endMs: null, endSource: EndSource.ongoing));
       continue;
     }

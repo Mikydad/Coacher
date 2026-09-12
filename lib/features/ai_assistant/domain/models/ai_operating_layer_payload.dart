@@ -35,6 +35,7 @@ class AiOperatingLayerPayload {
     this.openPromises = const [],
     this.deviceContext = const [],
     this.direction = const [],
+    this.todayActivityLog = const [],
     this.voiceMode = false,
     this.retryTurnId,
   });
@@ -150,6 +151,12 @@ class AiOperatingLayerPayload {
   /// command: the prompt tells the model to reason with it quietly.
   final List<String> direction;
 
+  /// Today's Time Tracker timeline (V1.1): what the user actually did,
+  /// recorded not planned — e.g. "10:03–10:09 Scrolling · 6m",
+  /// "? · 3h 51m untracked", tail "Logged 8h 42m · untracked 3h 51m".
+  /// Per-turn, max 25 rows. Empty when nothing was logged today.
+  final List<String> todayActivityLog;
+
   /// This turn arrived by voice and the reply will be spoken aloud
   /// (latency batch 2026-08-07): the client routes it through the
   /// `coach_agent_voice` purpose and adds the short-spoken-reply prompt
@@ -188,5 +195,6 @@ class AiOperatingLayerPayload {
     if (openPromises.isNotEmpty) 'openPromises': openPromises,
     if (deviceContext.isNotEmpty) 'deviceContext': deviceContext,
     if (direction.isNotEmpty) 'direction': direction,
+    if (todayActivityLog.isNotEmpty) 'todayActivityLog': todayActivityLog,
   };
 }

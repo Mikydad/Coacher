@@ -94,6 +94,12 @@ class AiMissingFieldDetector {
           _Field('title', 'What did you promise to do?'),
         ]);
 
+      // Time Tracker (V1.1) — only the text is required.
+      case ActionType.logActivity:
+        return _checkFields(p, [
+          _Field('text', 'What are you doing?'),
+        ]);
+
       // Auto-committed memory actions (Phase 2) — one required field each.
       case ActionType.rememberFact:
         return _checkFields(p, [

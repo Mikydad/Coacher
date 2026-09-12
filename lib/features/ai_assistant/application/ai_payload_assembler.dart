@@ -13,6 +13,10 @@ import '../../goals/domain/models/goal_check_in.dart';
 import '../../goals/domain/models/goal_enums.dart';
 import '../../direction/data/direction_repository.dart';
 import '../../direction/domain/direction_context_lines.dart';
+import '../../time_tracker/data/activity_event_repository.dart';
+import '../../time_tracker/domain/day_summary.dart';
+import '../../time_tracker/domain/timeline_builder.dart';
+import '../../time_tracker/domain/timeline_text.dart';
 import '../../intentions/data/intentions_repository.dart';
 import '../../intentions/domain/models/intention.dart';
 import '../../memory/data/memory_facts_repository.dart';
@@ -44,6 +48,7 @@ class AiPayloadAssembler {
     this.peopleRepository,
     this.intentionsRepository,
     this.directionRepository,
+    this.activityEventRepository,
     this.contextSnapshotService,
     EntityNormaliser? normaliser,
     Duration scheduleCacheTtl = const Duration(seconds: 30),
@@ -63,6 +68,9 @@ class AiPayloadAssembler {
   /// Direction (2026-09-11): the user's year/quarter/month focus lines —
   /// per-turn (never session-cached: the user can edit it mid-session).
   final DirectionRepository? directionRepository;
+
+  /// Time Tracker (V1.1): today's timeline, per-turn — the day's truth.
+  final ActivityEventRepository? activityEventRepository;
 
   /// Phase 4b: coarse device-context labels ("free_25m") — never raw
   /// signals — join the prompt when available.
@@ -101,6 +109,7 @@ class AiPayloadAssembler {
       _buildOpenPromises(),
       _buildDeviceContext(),
       _buildDirection(),
+      _buildTodayActivityLog(),
     ]);
 
     // Route-conditioned trimming (fix-wave Phase 6, §8 M7/P3): a bare
@@ -151,6 +160,7 @@ class AiPayloadAssembler {
       openPromises: dynamicResults[6] as List<String>,
       deviceContext: dynamicResults[7] as List<String>,
       direction: dynamicResults[8] as List<String>,
+      todayActivityLog: dynamicResults[9] as List<String>,
       voiceMode: voiceMode,
     );
   }
@@ -409,6 +419,22 @@ class AiPayloadAssembler {
       return buildDirectionContextLines(entries, DateTime.now());
     } catch (e) {
       debugPrint('[AiPayloadAssembler] direction failed: $e');
+      return const [];
+    }
+  }
+
+  /// Today's timeline as plain rows + a totals tail. Recorded truth; the
+  /// prompt tells the model to describe it and never judge it.
+  Future<List<String>> _buildTodayActivityLog() async {
+    final repo = activityEventRepository;
+    if (repo == null) return const [];
+    try {
+      final events = await repo.fetchDayOnce(DateKeys.todayKey());
+      if (events.isEmpty) return const [];
+      final rows = buildTimeline(events);
+      return renderTimelineLines(rows, summary: buildDaySummary(rows));
+    } catch (e) {
+      debugPrint('[AiPayloadAssembler] activity log failed: $e');
       return const [];
     }
   }

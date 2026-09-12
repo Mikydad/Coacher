@@ -4,6 +4,7 @@ import '../../../core/di/providers.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../analytics/application/insight_generation_recompute_service.dart';
 import '../../direction/application/direction_providers.dart';
+import '../../time_tracker/application/time_tracker_providers.dart';
 import '../../intentions/application/intentions_providers.dart';
 import '../../memory/application/memory_providers.dart';
 import 'thinking_loop_service.dart';
@@ -18,6 +19,8 @@ final thinkingLoopServiceProvider = Provider<ThinkingLoopService>(
     orchestrator: ref.read(insightGenerationOrchestratorProvider),
     insightCache: ref.read(insightCacheRepositoryProvider),
     directions: ref.read(directionRepositoryProvider),
+    activityEvents: ref.read(activityEventRepositoryProvider),
+    categoryRules: ref.read(activityCategoryRuleRepositoryProvider),
     // Reminder V2 strategist (FR-R-61): rides this daily pass — aggregates
     // in, day-scoped proposals out, suggestion-only (D7).
     loadReminderAggregates: () => loadReminderStrategyAggregates(ref),

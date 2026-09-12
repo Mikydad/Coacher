@@ -1,3 +1,4 @@
+import 'models/activity_category_rule.dart';
 import 'models/activity_event.dart';
 import 'timeline_builder.dart';
 
@@ -20,6 +21,7 @@ class DaySummary {
     required this.logged,
     required this.untracked,
     required this.lines,
+    this.categoryLines = const [],
   });
 
   static const empty = DaySummary(
@@ -34,15 +36,30 @@ class DaySummary {
   /// Descending by total; at most `maxLines` + an "Other" line.
   final List<SummaryLine> lines;
 
+  /// V1.2: totals per category (labels from [ActivityCategories]) when at
+  /// least one activity that day has a rule; texts without a rule land in
+  /// "Other". Empty when nothing is categorised.
+  final List<SummaryLine> categoryLines;
+
+  bool get hasCategories => categoryLines.isNotEmpty;
+
   bool get isEmpty => logged == Duration.zero && untracked == Duration.zero;
 }
 
 const String kSummaryOtherLabel = 'Other';
 
-DaySummary buildDaySummary(List<TimelineRow> rows, {int maxLines = 6}) {
+DaySummary buildDaySummary(
+  List<TimelineRow> rows, {
+  int maxLines = 6,
+
+  /// normalisedText → category (from the rules). Empty = no category block.
+  Map<String, String> categoryOf = const {},
+}) {
   var logged = Duration.zero;
   var untracked = Duration.zero;
   final totals = <String, Duration>{};
+  final categoryTotals = <String, Duration>{};
+  var anyCategorised = false;
   final labels = <String, ({String label, int at})>{};
 
   for (final row in rows) {
@@ -55,6 +72,10 @@ DaySummary buildDaySummary(List<TimelineRow> rows, {int maxLines = 6}) {
         logged += actual;
         final key = row.event.normalizedText;
         totals[key] = (totals[key] ?? Duration.zero) + actual;
+        final cat = categoryOf[key];
+        if (cat != null) anyCategorised = true;
+        final bucket = cat ?? ActivityCategories.other;
+        categoryTotals[bucket] = (categoryTotals[bucket] ?? Duration.zero) + actual;
         final seen = labels[key];
         if (seen == null || row.event.startedAtMs > seen.at) {
           labels[key] = (label: row.event.text.trim(), at: row.event.startedAtMs);
@@ -83,9 +104,38 @@ DaySummary buildDaySummary(List<TimelineRow> rows, {int maxLines = 6}) {
     lines.add(SummaryLine(label: kSummaryOtherLabel, total: other));
   }
 
-  return DaySummary(logged: logged, untracked: untracked, lines: lines);
+  final categoryLines = <SummaryLine>[];
+  if (anyCategorised) {
+    final ordered = categoryTotals.entries.toList()
+      ..sort((a, b) {
+        // "Other" always last; the rest by total desc, then name.
+        if (a.key == ActivityCategories.other) return 1;
+        if (b.key == ActivityCategories.other) return -1;
+        final byTotal = b.value.compareTo(a.value);
+        return byTotal != 0 ? byTotal : a.key.compareTo(b.key);
+      });
+    for (final e in ordered) {
+      categoryLines.add(
+        SummaryLine(label: ActivityCategories.label(e.key), total: e.value),
+      );
+    }
+  }
+
+  return DaySummary(
+    logged: logged,
+    untracked: untracked,
+    lines: lines,
+    categoryLines: categoryLines,
+  );
 }
 
 /// Convenience for callers holding events rather than rows.
-DaySummary summarizeDay(List<ActivityEvent> events, {int maxLines = 6}) =>
-    buildDaySummary(buildTimeline(events), maxLines: maxLines);
+DaySummary summarizeDay(
+  List<ActivityEvent> events, {
+  int maxLines = 6,
+  Map<String, String> categoryOf = const {},
+}) => buildDaySummary(
+  buildTimeline(events),
+  maxLines: maxLines,
+  categoryOf: categoryOf,
+);

@@ -12,6 +12,14 @@ import '../../analytics/domain/models/behavior_feature_object.dart';
 import '../../analytics/domain/models/detected_pattern.dart';
 import '../../analytics/domain/models/generated_insight.dart';
 import '../../direction/data/direction_repository.dart';
+import '../../direction/domain/direction_periods.dart';
+import '../../time_tracker/data/activity_category_rule_repository.dart';
+import '../../time_tracker/data/activity_event_repository.dart';
+import '../../time_tracker/domain/models/activity_category_rule.dart';
+import '../../time_tracker/domain/models/activity_event.dart';
+import '../../time_tracker/domain/reflection_activity_snapshot.dart';
+import '../../time_tracker/domain/week_periods.dart';
+import '../../time_tracker/domain/week_summary.dart';
 import '../../direction/domain/models/direction_entry.dart';
 import '../../intentions/application/intention_capture.dart';
 import '../../intentions/data/intentions_repository.dart';
@@ -61,6 +69,12 @@ class ThinkingLoopService {
     /// Null keeps the payload byte-identical.
     DirectionRepository? directions,
 
+    /// Time Tracker V1.2: the timeline joins the snapshot (today + last 7
+    /// days + week/month aggregates on boundary days); the pass proposes
+    /// category rules and ≤1 tone-checked observation per scope.
+    ActivityEventRepository? activityEvents,
+    ActivityCategoryRuleRepository? categoryRules,
+
     /// Reminder aggregates for the strategist (FR-R-61) — injected so this
     /// service keeps no dependency on the reminders feature. Null keeps the
     /// pre-strategist payload byte-identical.
@@ -78,6 +92,8 @@ class ThinkingLoopService {
        _proxy = proxy ?? AiProxyClient(),
        _remoteConfig = remoteConfig ?? AiRemoteConfigService.instance,
        _directions = directions,
+       _activityEvents = activityEvents,
+       _categoryRules = categoryRules,
        _loadReminderAggregates = loadReminderAggregates,
        _onReminderProposals = onReminderProposals,
        _now = now ?? DateTime.now;
@@ -90,6 +106,8 @@ class ThinkingLoopService {
   final AiProxyClient _proxy;
   final AiRemoteConfigService _remoteConfig;
   final DirectionRepository? _directions;
+  final ActivityEventRepository? _activityEvents;
+  final ActivityCategoryRuleRepository? _categoryRules;
   final Future<Map<String, dynamic>?> Function()? _loadReminderAggregates;
   final Future<void> Function(List<ReminderStrategyProposal>)?
   _onReminderProposals;
@@ -97,6 +115,11 @@ class ThinkingLoopService {
 
   static const lastDayPrefsKey = 'thinking_loop_last_day_v1';
   static const inputsHashPrefsKey = 'thinking_loop_inputs_hash_v1';
+
+  /// Time Tracker V1.2 boundary flags: the week/month key whose aggregates
+  /// were already reflected on (once per boundary). Per-account → wipe list.
+  static const timeWeekDonePrefsKey = 'thinking_loop_time_week_done_v1';
+  static const timeMonthDonePrefsKey = 'thinking_loop_time_month_done_v1';
 
   /// The synthetic entity scope reflection insights live under. The
   /// delivery-day loader merges ALL entity insights whose source window
@@ -136,7 +159,26 @@ class ThinkingLoopService {
       } catch (e) {
         debugPrint('[ThinkingLoop] direction read failed: $e');
       }
-      if (facts.isEmpty && people.isEmpty && intentions.isEmpty) {
+      // Time Tracker V1.2 inputs — today, the last 7 days, and the rules.
+      var todayActivity = const <ActivityEvent>[];
+      var recentActivity = const <ActivityEvent>[];
+      var rules = const <ActivityCategoryRule>[];
+      try {
+        final repo = _activityEvents;
+        if (repo != null) {
+          todayActivity = await repo.fetchDayOnce(today);
+          final from = DateTime(now.year, now.month, now.day - 7);
+          recentActivity = await repo.fetchRangeOnce(
+            from.millisecondsSinceEpoch,
+            DateTime(now.year, now.month, now.day).millisecondsSinceEpoch,
+          );
+          rules = await _categoryRules?.fetchAllOnce() ?? const [];
+        }
+      } catch (e) {
+        debugPrint('[ThinkingLoop] activity read failed: $e');
+      }
+      final hasActivity = todayActivity.isNotEmpty || recentActivity.isNotEmpty;
+      if (facts.isEmpty && people.isEmpty && intentions.isEmpty && !hasActivity) {
         // Nothing to reflect on — but do NOT mark the day (P2-10): an
         // empty snapshot is usually a fresh install or a just-wiped
         // account switch, and onboarding/remote merge can fill Isar
@@ -150,6 +192,10 @@ class ThinkingLoopService {
         people: people,
         intentions: intentions,
         directions: directions,
+        extraParts: activityHashParts(
+          [...todayActivity, ...recentActivity],
+          rules,
+        ),
       );
       if (prefs.getString(inputsHashPrefsKey) == hash) {
         // Nothing changed since the last pass — same conclusions, zero
@@ -167,6 +213,73 @@ class ThinkingLoopService {
         now: now,
         directions: directions,
       );
+      // Time Tracker V1.2: the activity block. Boundary aggregates only on
+      // the first pass after a new ISO week / calendar month, and only the
+      // PREVIOUS period's data (+ that month's Direction from history).
+      Map<String, dynamic>? activity;
+      String? pendingWeekKey;
+      String? pendingMonthKey;
+      if (_activityEvents != null && hasActivity) {
+        final thisWeek = WeekPeriods.of(now);
+        ({String key, Map<String, List<ActivityEvent>> eventsByDay})? weekB;
+        if (prefs.getString(timeWeekDonePrefsKey) != thisWeek.key) {
+          final prev = WeekPeriods.previous(thisWeek);
+          final events = await _activityEvents.fetchRangeOnce(prev.startMs, prev.endMs);
+          if (events.isNotEmpty) {
+            weekB = (key: prev.key, eventsByDay: groupEventsByDay(events));
+          }
+          pendingWeekKey = thisWeek.key;
+        }
+        ({
+          String key,
+          String label,
+          Map<String, List<ActivityEvent>> eventsByDay,
+          List<String> directionTexts,
+        })?
+        monthB;
+        final thisMonth = WeekPeriods.monthOf(now);
+        if (prefs.getString(timeMonthDonePrefsKey) != thisMonth.key) {
+          final prevMonth = WeekPeriods.monthOf(
+            DateTime.fromMillisecondsSinceEpoch(thisMonth.startMs - 1),
+          );
+          final events = await _activityEvents.fetchRangeOnce(
+            prevMonth.startMs,
+            prevMonth.endMs,
+          );
+          if (events.isNotEmpty) {
+            // That month's Direction texts — history, never current context.
+            final texts = <String>[];
+            for (final d in directions) {
+              if (d.isEmpty) continue;
+              final period = d.period;
+              if (period == null) continue;
+              final inMonth =
+                  (d.horizon == DirectionHorizon.month && d.periodKey == prevMonth.key) ||
+                  (d.horizon != DirectionHorizon.month &&
+                      period.startMs <= prevMonth.startMs &&
+                      period.endMs >= prevMonth.endMs);
+              if (inMonth) texts.add('${d.horizon.name}: ${d.text}');
+            }
+            monthB = (
+              key: prevMonth.key,
+              label: prevMonth.label,
+              eventsByDay: groupEventsByDay(events),
+              directionTexts: texts,
+            );
+          }
+          pendingMonthKey = thisMonth.key;
+        }
+        activity = buildActivitySnapshot(
+          todayKey: today,
+          todayEvents: todayActivity,
+          last7Days: groupEventsByDay(recentActivity),
+          rules: rules,
+          weekBoundary: weekB,
+          monthBoundary: monthB,
+        );
+        snapshot['activity'] = activity;
+      }
+
       // FR-R-61: the strategist rides THIS pass — locally pre-computed
       // aggregates, never raw ledger rows, no additional call (FR-R-64).
       final reminderAggregates = await (_loadReminderAggregates?.call() ??
@@ -224,6 +337,11 @@ class ThinkingLoopService {
             ReflectionParser.titleKey(i.title),
         },
         reminderTasks: reminderTasks,
+        activityIds: activity == null ? const {} : activitySnapshotIds(activity),
+        uncategorizedTexts: {
+          for (final t in (activity?['uncategorizedTexts'] as List? ?? const []))
+            if (t is String) t,
+        },
       );
 
       if (parsed.reminderProposals.isNotEmpty) {
@@ -231,8 +349,15 @@ class ThinkingLoopService {
       }
 
       await _apply(parsed, now);
+      await _applyTime(parsed, now, today: today);
       await prefs.setString(lastDayPrefsKey, today);
       await prefs.setString(inputsHashPrefsKey, hash);
+      if (pendingWeekKey != null) {
+        await prefs.setString(timeWeekDonePrefsKey, pendingWeekKey);
+      }
+      if (pendingMonthKey != null) {
+        await prefs.setString(timeMonthDonePrefsKey, pendingMonthKey);
+      }
     } catch (e) {
       debugPrint('[ThinkingLoop] reflectIfDue failed: $e');
     }
@@ -297,6 +422,46 @@ class ThinkingLoopService {
     return jsonEncode(hints);
   }
 
+  /// Time Tracker V1.2: category rules (AI source — never over a user
+  /// rule) and the per-scope observations, cached under `time:<scope>:<key>`
+  /// so only the Time page reads them.
+  Future<void> _applyTime(
+    ParsedReflection parsed,
+    DateTime now, {
+    required String today,
+  }) async {
+    final rules = _categoryRules;
+    if (rules != null) {
+      for (final c in parsed.activityCategories) {
+        try {
+          await rules.setCategory(
+            c.text,
+            category: c.category,
+            source: CategoryRuleSource.ai,
+          );
+        } catch (e) {
+          debugPrint('[ThinkingLoop] category apply failed: $e');
+        }
+      }
+    }
+    for (final o in parsed.timeObservations) {
+      final key = switch (o.scope) {
+        'week' => WeekPeriods.previous(WeekPeriods.of(now)).key,
+        'month' => WeekPeriods.monthOf(
+          DateTime.fromMillisecondsSinceEpoch(WeekPeriods.monthOf(now).startMs - 1),
+        ).key,
+        _ => today,
+      };
+      await _cacheObservationForScope(
+        scopeId: 'time:${o.scope}:$key',
+        observation: ReflectionObservation(message: o.message, basedOn: o.basedOn),
+        now: now,
+        windowStartKey: today,
+        windowEndKey: today,
+      );
+    }
+  }
+
   /// One observation per pass, cached day-scoped under the synthetic
   /// reflection entity. No observation retires yesterday's — reflections
   /// don't linger past their day.
@@ -312,10 +477,27 @@ class ThinkingLoopService {
       );
       return;
     }
-
     final today = DateKeys.todayKey(now);
+    await _cacheObservationForScope(
+      scopeId: reflectionScopeId,
+      observation: observation,
+      now: now,
+      windowStartKey: today,
+      windowEndKey: today,
+    );
+  }
+
+  /// Runs the Layer-3 policy for a reflection pattern under [scopeId] and
+  /// caches the resulting observation insight with [observation]'s message.
+  Future<void> _cacheObservationForScope({
+    required String scopeId,
+    required ReflectionObservation observation,
+    required DateTime now,
+    required String windowStartKey,
+    required String windowEndKey,
+  }) async {
     final pattern = DetectedPattern(
-      entityId: reflectionScopeId,
+      entityId: scopeId,
       entityKind: BehaviorEntityKind.reflection,
       patternCode: PatternCode.reflectionSignal,
       patternGroup: PatternGroup.reflection,
@@ -324,12 +506,12 @@ class ThinkingLoopService {
       severity: 0.3,
       confidence: 0.6,
       detectedAtMs: now.millisecondsSinceEpoch,
-      sourceWindowStartDateKey: today,
-      sourceWindowEndDateKey: today,
+      sourceWindowStartDateKey: windowStartKey,
+      sourceWindowEndDateKey: windowEndKey,
       metadata: {'basedOn': observation.basedOn},
     );
     final out = _orchestrator.runForEntity(
-      entityId: reflectionScopeId,
+      entityId: scopeId,
       patterns: [pattern],
       now: now,
     );
@@ -339,7 +521,7 @@ class ThinkingLoopService {
         .toList(growable: false);
     await _insightCache.replaceScopeInsights(
       scopeType: InsightScopeType.entity,
-      scopeId: reflectionScopeId,
+      scopeId: scopeId,
       insights: withMessage,
     );
   }
@@ -408,5 +590,9 @@ Rules:
 - "observations" are for a possible forget/avoid/change worth mentioning. Phrase as a hedged question or gentle notice ("You might be…", "Looks like…"), never a command or diagnosis. Max 1.
 - "reminderProposals" only when snapshot.reminders shows a task genuinely struggling (repeated overdueDays, ignored, reschedules): "reschedule" = a better time, "ladderTuning" = gentler or firmer follow-ups, "aggregate" = misses should be batched quietly, "drop" = worth asking whether to keep it. Max 3, one per task, only ids from snapshot.reminders.tasks. These are SUGGESTIONS the user applies themselves - phrase them as offers, never verdicts.
 - snapshot.direction (when present) is what the user says matters this year/quarter/month, in their own words. It is context, not a task. You may make ONE gentle observation connecting the facts/intentions to it when the link is real (e.g. a promise that serves the month's focus keeps getting pushed) — cite the direction id in basedOn. Never judge or preach, never quote it back at length, and never propose a dormantIntention just to "work on" the direction.
-- Empty arrays are the right answer for an unremarkable snapshot: {"dormantIntentions":[],"hintUpdates":[],"observations":[],"reminderProposals":[]}.
+- snapshot.activity (when present) is the user's OWN time log: today's rows, the last 7 days' totals by activity/category/hour band, and on some days a weekBoundary / monthBoundary block for the period that just ended (monthBoundary may carry that month's "direction" — what they said mattered then). Recorded, not planned.
+  - "timeObservations": at most ONE per scope ("day" for today, "week" only when weekBoundary is present, "month" only when monthBoundary is present). Each {"scope","message" (≤200 chars, one sentence, observational — "Most of your focused work happened after 9 PM", "You logged 4 gym sessions this week"), "basedOn": [ids from snapshot.activity — row ids or the block ids]}. For "month", put the direction text next to what the time shows and stop there — no advice.
+  - TONE, strictly: describe, never judge. Never use: wasted, should, failed, bad, lazy, "you need to", "you ought to", "unproductive", "too much", "too little", "not enough", or any comparison implying a correct amount of time. No advice, no verdicts, no praise-as-pressure. If nothing is genuinely notable, return [] — silence is the right answer.
+  - "activityCategories": for texts listed in snapshot.activity.uncategorizedTexts ONLY, propose [{"text": "<exact text as sent>", "category": one of snapshot.activity.categories}]. Skip anything ambiguous.
+- Empty arrays are the right answer for an unremarkable snapshot: {"dormantIntentions":[],"hintUpdates":[],"observations":[],"reminderProposals":[],"timeObservations":[],"activityCategories":[]}.
 ''';

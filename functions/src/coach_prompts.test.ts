@@ -29,6 +29,13 @@ describe('server-owned system prompts (fix-wave Phase 5, §8 S1)', () => {
     assert.ok(base.includes('prefer items that move it'));
   });
 
+  it('carries the Time rules (describe, never judge) and logActivity', () => {
+    const base = DEFAULT_SYSTEM_PROMPTS.coach_agent;
+    assert.ok(base.includes('## Their time'));
+    assert.ok(base.includes('Never call time wasted'));
+    assert.ok(base.includes('logActivity parameters'));
+  });
+
   it('voice variants extend the base with their addenda', () => {
     const base = DEFAULT_SYSTEM_PROMPTS.coach_agent;
     assert.ok(DEFAULT_SYSTEM_PROMPTS.coach_agent_voice.startsWith(base));

@@ -109,6 +109,8 @@ abstract final class AuthSessionPolicy {
       // the rest of the local day after an account switch.
       prefs.remove(ThinkingLoopService.lastDayPrefsKey),
       prefs.remove(ThinkingLoopService.inputsHashPrefsKey),
+      prefs.remove(ThinkingLoopService.timeWeekDonePrefsKey),
+      prefs.remove(ThinkingLoopService.timeMonthDonePrefsKey),
       // Direction's month-card flag is per-account (PRD/Direction §5.3).
       prefs.remove(kDirectionMonthCardHandledPrefsKey),
     ]);

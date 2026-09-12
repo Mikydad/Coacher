@@ -1,3 +1,4 @@
+import 'isar_activity_category_rule.dart';
 import 'isar_activity_event.dart';
 import 'isar_activity_feed_cache.dart';
 import 'isar_ai_action_batch.dart';
@@ -81,4 +82,5 @@ const isarSchemaList = [
   IsarMemorySessionStateSchema,
   IsarDirectionEntrySchema,
   IsarActivityEventSchema,
+  IsarActivityCategoryRuleSchema,
 ];

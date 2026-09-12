@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/presentation/app_colors.dart';
 import '../application/time_tracker_providers.dart';
+import '../domain/models/activity_category_rule.dart';
 import '../domain/models/activity_event.dart';
+import '../domain/recent_activities.dart';
 import 'time_screen.dart';
 
 /// The capture sheet (PRD/Time_Tracker §4) — the common path, so it must
@@ -270,7 +272,10 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
 
   @override
   Widget build(BuildContext context) {
-    final chips = ref.watch(recentActivityChipsProvider);
+    final suggestions = recentActivitySuggestions(
+      ref.watch(recentActivityEventsProvider).valueOrNull ?? const [],
+      query: _text.text,
+    );
     final viewInsets = MediaQuery.of(context).viewInsets;
     final isEdit = widget.isEdit;
 
@@ -405,27 +410,60 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
           ),
 
           // ── Recent ───────────────────────────────────────────────────
-          if (chips.isNotEmpty) ...[
+          // A fixed five-row list, not chips (Miko, 2026-09-12): entries
+          // like "going to the clinic with my mom" never fit a pill.
+          // Repeats first, then recency; typing filters the list.
+          if (suggestions.isNotEmpty) ...[
             const SizedBox(height: 14),
             const _MicroLabel('Recent'),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final chip in chips)
-                  ActionChip(
-                    key: ValueKey('track_chip_$chip'),
-                    label: Text(chip),
-                    onPressed: () {
-                      _text.text = chip;
-                      _text.selection = TextSelection.collapsed(
-                        offset: chip.length,
-                      );
-                    },
+            const SizedBox(height: 4),
+            for (final s in suggestions)
+              InkWell(
+                key: ValueKey('track_recent_${s.text}'),
+                borderRadius: BorderRadius.circular(8),
+                onTap: () {
+                  _text.text = s.text;
+                  _text.selection = TextSelection.collapsed(
+                    offset: s.text.length,
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.history_rounded,
+                        size: 15,
+                        color: AppColors.textSoft.withValues(alpha: 0.7),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          s.text,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.fg,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      if (s.count > 1) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          '×${s.count}',
+                          style: TextStyle(
+                            color: AppColors.fg38,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-              ],
-            ),
+                ),
+              ),
           ],
 
           // ── Duration ─────────────────────────────────────────────────
@@ -457,6 +495,64 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
               ),
             ],
           ),
+
+          // V1.2: category override — edit mode only, capture stays free.
+          // Writes a USER rule for every event with this text.
+          if (isEdit) ...[
+            const SizedBox(height: 14),
+            const _MicroLabel('Category'),
+            const SizedBox(height: 8),
+            Consumer(
+              builder: (context, ref, _) {
+                final rules =
+                    ref.watch(activityCategoryRulesProvider).valueOrNull ??
+                    const <ActivityCategoryRule>[];
+                final key = normalizeActivityText(_text.text);
+                ActivityCategoryRule? current;
+                for (final r in rules) {
+                  if (r.normalizedText == key) {
+                    current = r;
+                    break;
+                  }
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final c in ActivityCategories.all)
+                          ChoiceChip(
+                            key: ValueKey('track_category_$c'),
+                            label: Text(ActivityCategories.label(c)),
+                            selected: current?.category == c,
+                            onSelected: (_) async {
+                              await ref
+                                  .read(activityCategoryRuleRepositoryProvider)
+                                  .setCategory(
+                                    _text.text,
+                                    category: c,
+                                    source: CategoryRuleSource.user,
+                                  );
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      current == null
+                          ? "Applies to every '${_text.text.trim()}'."
+                          : current.isUserSet
+                          ? "Applies to every '${_text.text.trim()}' · set by you"
+                          : "Applies to every '${_text.text.trim()}' · suggested by SidePal",
+                      style: TextStyle(color: AppColors.fg38, fontSize: 11),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
 
           if (_note != null) ...[
             const SizedBox(height: 10),

@@ -154,6 +154,9 @@ class _ActionRow extends StatelessWidget {
       case ActionType.rememberFact:
         return (icon: Icons.add_rounded, color: AppColors.accentDim);
 
+      case ActionType.logActivity:
+        return (icon: Icons.schedule_outlined, color: AppColors.accentDim);
+
       case ActionType.updateFact:
         return (icon: Icons.edit_rounded, color: AppColors.textSoft);
 
@@ -275,6 +278,13 @@ String describePlannedAction(AiAction action) {
     // case an intention rides along in a mixed batch.
     case ActionType.createIntention:
       return 'Remember "${p['title'] ?? 'promise'}"';
+
+    case ActionType.logActivity:
+      final t = p['time'];
+      final m = p['intendedMinutes'];
+      return 'Log "${p['text'] ?? 'activity'}"'
+          '${t != null ? ' at $t' : ' now'}'
+          '${m != null ? ' · ${m}m' : ''}';
 
     case ActionType.rememberFact:
       return 'Remember "${p['content'] ?? 'fact'}"';

@@ -113,6 +113,27 @@ final class DeepLinkBridge {
       deepLinkChannel.invokeMethod("linkReceived", arguments: note.object as? String)
     }
 
+    // Siri "Log activity" (Time Tracker V1.1, 2026-09-12) — pending
+    // payload + warm event, the voice-entry pattern.
+    let siriLogRegistrar = engineBridge.pluginRegistry.registrar(forPlugin: "SidePalSiriLogActivity")
+    let siriLogChannel = FlutterMethodChannel(
+      name: "sidepal/siri_log_activity",
+      binaryMessenger: siriLogRegistrar!.messenger())
+    siriLogChannel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "consumePendingLog":
+        result(SiriLogActivityBridge.consumePending())
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    NotificationCenter.default.addObserver(
+      forName: SiriLogActivityBridge.notificationName,
+      object: nil, queue: .main
+    ) { _ in
+      siriLogChannel.invokeMethod("logRequested", arguments: nil)
+    }
+
     // Ephemeral calendar signal (humanizing Phase 4b): busy intervals only,
     // never titles — see CalendarSignal.swift for the privacy contract.
     let calendarRegistrar = engineBridge.pluginRegistry.registrar(forPlugin: "SidePalCalendarSignal")

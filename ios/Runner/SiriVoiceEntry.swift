@@ -73,6 +73,81 @@ struct SidePalAppShortcuts: AppShortcutsProvider {
       shortTitle: "Talk to SidePal",
       systemImageName: "waveform"
     )
+    // Time Tracker (V1.1): "Hey Siri, log activity in SidePal" → Siri asks
+    // "What are you doing?" (the String parameter's requestValueDialog).
+    // Phrases may only embed AppEntity/AppEnum parameters, never a free
+    // String, so the activity cannot be spoken inline in the phrase.
+    AppShortcut(
+      intent: LogActivityIntent(),
+      phrases: [
+        "Log activity in \(.applicationName)",
+        "Track activity in \(.applicationName)",
+        "Log what I'm doing in \(.applicationName)",
+        "Track my time in \(.applicationName)",
+      ],
+      shortTitle: "Log activity",
+      systemImageName: "clock"
+    )
+  }
+}
+#endif
+
+// ─── Siri "Log activity" (Time Tracker V1.1, 2026-09-12) ─────────────────────
+//
+// "Hey Siri, log Gym in SidePal" → the app opens and Dart creates the
+// activity event. Same cold-start protocol as the voice entry above: the
+// intent stamps a pending payload (UserDefaults JSON) + posts an in-process
+// event; Dart consumes it idempotently on launch, resume, and the warm
+// event. Lives in this file on purpose — no new Xcode file references.
+
+enum SiriLogActivityBridge {
+  static let pendingKey = "sidepal.pendingLogActivity"
+  static let notificationName = Notification.Name("SidePalLogActivityRequested")
+
+  static func stamp(activity: String, minutes: Int?) {
+    var payload: [String: Any] = ["text": activity]
+    if let m = minutes { payload["minutes"] = m }
+    UserDefaults.standard.set(payload, forKey: pendingKey)
+    NotificationCenter.default.post(name: notificationName, object: payload)
+  }
+
+  /// Reads AND clears the pending payload — idempotent consume.
+  static func consumePending() -> [String: Any]? {
+    let pending = UserDefaults.standard.dictionary(forKey: pendingKey)
+    if pending != nil {
+      UserDefaults.standard.removeObject(forKey: pendingKey)
+    }
+    return pending
+  }
+}
+
+#if canImport(AppIntents)
+@available(iOS 16.0, *)
+struct LogActivityIntent: AppIntent {
+  static var title: LocalizedStringResource = "Log activity"
+  static var description = IntentDescription(
+    "Record what you're doing right now in your SidePal timeline.")
+
+  /// Siri foregrounds the app; Dart writes the event (Isar is local).
+  static var openAppWhenRun: Bool = true
+
+  @Parameter(title: "Activity", requestValueDialog: "What are you doing?")
+  var activity: String
+
+  @Parameter(title: "Minutes")
+  var minutes: Int?
+
+  static var parameterSummary: some ParameterSummary {
+    Summary("Log \(\.$activity)") {
+      \.$minutes
+    }
+  }
+
+  @MainActor
+  func perform() async throws -> some IntentResult {
+    let trimmed = activity.trimmingCharacters(in: .whitespacesAndNewlines)
+    SiriLogActivityBridge.stamp(activity: trimmed, minutes: minutes)
+    return .result()
   }
 }
 #endif

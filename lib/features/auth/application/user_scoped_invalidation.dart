@@ -64,6 +64,8 @@ void invalidateUserScopedProviders(WidgetRef ref) {
 
   // ── Time Tracker ─────────────────────────────────────────────────────────
   ref.invalidate(timelineDayKeyProvider);
+  ref.invalidate(timelineModeProvider);
+  ref.invalidate(timelineWeekKeyProvider);
 
   // ── Education / onboarding ───────────────────────────────────────────────
   // The Getting Started controller decides new-vs-existing ONCE per

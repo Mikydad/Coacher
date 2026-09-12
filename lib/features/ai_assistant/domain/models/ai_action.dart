@@ -35,6 +35,10 @@ enum ActionType {
   rememberFact,
   updateFact,
   forgetFact,
+
+  // Time Tracker (V1.1, 2026-09-12) — "I'm at the gym now" → one
+  // confirm-card tap. Deliberately NOT auto-committed: logging writes data.
+  logActivity,
 }
 
 // ─── Risk level enum ─────────────────────────────────────────────────────────
@@ -87,6 +91,7 @@ class AiAction {
       case ActionType.rememberFact:
       case ActionType.updateFact:
       case ActionType.forgetFact:
+      case ActionType.logActivity:
         return AiActionRiskLevel.low;
     }
   }
