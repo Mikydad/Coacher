@@ -23,6 +23,8 @@ class AddTaskReminderSection extends StatelessWidget {
     required this.planDateKey,
     required this.onReminderToggled,
     required this.onReminderTimeChanged,
+    this.alarm = false,
+    this.onAlarmChanged,
   });
 
   final GlobalKey sectionKey;
@@ -38,6 +40,14 @@ class AddTaskReminderSection extends StatelessWidget {
   final String planDateKey;
   final ValueChanged<bool> onReminderToggled;
   final ValueChanged<DateTime> onReminderTimeChanged;
+
+  /// Alarm mode (feat/alarm-mode): the reminder rings until stopped. Shown
+  /// as a small chip beside the plan-day footnote — deliberately not a
+  /// full row, because most reminders are fine as notifications and the
+  /// option should not compete with the pickers. Sleep hides it: its
+  /// wake-up alarm lives in the Sleep extras card, anchored at sleep end.
+  final bool alarm;
+  final ValueChanged<bool>? onAlarmChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -167,17 +177,40 @@ class AddTaskReminderSection extends StatelessWidget {
                                   color: AddTaskColors.faint,
                                 ),
                                 const SizedBox(width: 6),
-                                Text(
-                                  'Plan day · $planLabel',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: AddTaskColors.faint,
-                                    fontWeight: FontWeight.w500,
+                                Expanded(
+                                  child: Text(
+                                    'Plan day · $planLabel',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AddTaskColors.faint,
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
                                 ),
+                                if (!sleep && onAlarmChanged != null)
+                                  AddTaskAlarmChip(
+                                    selected: alarm,
+                                    onChanged: onAlarmChanged!,
+                                  ),
                               ],
                             ),
                           ),
+                          if (!sleep && alarm)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+                              child: Text(
+                                'Rings every 2 minutes for 10 minutes, '
+                                'through focus and quiet hours, until you '
+                                'stop it.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AddTaskColors.faint,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ),
                         ],
                       );
                     },
@@ -185,6 +218,71 @@ class AddTaskReminderSection extends StatelessWidget {
                 ),
               ],
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The little alarm toggle that lives beside the plan-day footnote: a pill
+/// with a bell that fills with the accent when the reminder is an alarm.
+/// Small on purpose (CLAUDE.md: one primary action per screen) — this is a
+/// modifier on the reminder, not a section of its own.
+class AddTaskAlarmChip extends StatelessWidget {
+  const AddTaskAlarmChip({
+    super.key,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final bool selected;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AddTaskColors.accent : AddTaskColors.faint;
+    return Semantics(
+      button: true,
+      toggled: selected,
+      label: 'Alarm',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: () => onChanged(!selected),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+            decoration: BoxDecoration(
+              color: selected
+                  ? AddTaskColors.accent.withValues(alpha: 0.14)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: selected ? AddTaskColors.accentDim : AddTaskColors.border,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  selected ? Icons.alarm_on_rounded : Icons.alarm_rounded,
+                  size: 13,
+                  color: color,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  selected ? 'Alarm on' : 'Alarm',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -1,4 +1,5 @@
 import '../../../../core/validation/model_validators.dart';
+import 'reminder_alert_mode.dart';
 import 'reminder_occurrence_enums.dart';
 
 class ReminderConfig {
@@ -22,6 +23,8 @@ class ReminderConfig {
     this.classificationSource = ClassificationSource.heuristic,
     this.classifierVersion,
     this.aiBody,
+    this.alertMode = ReminderAlertMode.notification,
+    this.alarmOffsetMinutes = 0,
     required this.createdAtMs,
     required this.updatedAtMs,
   });
@@ -70,6 +73,32 @@ class ReminderConfig {
   /// template bank is the permanent fallback and keeps every escalation
   /// step — warmth is allowed to vary, the escalation contract is not.
   final String? aiBody;
+
+  /// Notification (the mode ladder) or alarm (the ladder PLUS a ring ladder
+  /// that pierces every shield). Set only by the user in the editor; the
+  /// heuristic and the AI classifier never touch it.
+  final ReminderAlertMode alertMode;
+
+  /// Minutes after [scheduledAtIso] at which the alarm rings. `0` means the
+  /// alarm marks the task's START and is retired when the task is done
+  /// early. A positive offset marks the task's END — the Sleep category's
+  /// wake-up alarm is `scheduledAt + sleep length` — and survives the task
+  /// being marked done at bedtime, because "I'm going to sleep now" must not
+  /// silence tomorrow's wake-up.
+  final int alarmOffsetMinutes;
+
+  /// True when this reminder rings as an alarm.
+  bool get isAlarm => alertMode.isAlarm;
+
+  /// The moment the alarm's first ring is due, or null when there is no
+  /// scheduled time.
+  DateTime? get alarmAt {
+    final iso = scheduledAtIso;
+    if (iso == null) return null;
+    final parsed = DateTime.tryParse(iso);
+    if (parsed == null) return null;
+    return parsed.add(Duration(minutes: alarmOffsetMinutes));
+  }
 
   final int createdAtMs;
   final int updatedAtMs;
@@ -127,6 +156,8 @@ class ReminderConfig {
     'classificationSource': classificationSource.toStorage(),
     if (classifierVersion != null) 'classifierVersion': classifierVersion,
     if (aiBody != null) 'aiBody': aiBody,
+    'alertMode': alertMode.toStorage(),
+    'alarmOffsetMinutes': alarmOffsetMinutes,
     'createdAtMs': createdAtMs,
     'updatedAtMs': updatedAtMs,
   };
@@ -164,6 +195,9 @@ class ReminderConfig {
           : ClassificationSource.migration,
       classifierVersion: (map['classifierVersion'] as num?)?.toInt(),
       aiBody: map['aiBody'] as String?,
+      alertMode: ReminderAlertMode.fromStorage(map['alertMode'] as String?),
+      alarmOffsetMinutes:
+          ((map['alarmOffsetMinutes'] as num?)?.toInt() ?? 0).clamp(0, 24 * 60),
       createdAtMs: map['createdAtMs'] as int,
       updatedAtMs: map['updatedAtMs'] as int,
     );
@@ -196,6 +230,8 @@ class ReminderConfig {
     ClassificationSource? classificationSource,
     Object? classifierVersion = _sentinel,
     Object? aiBody = _sentinel,
+    ReminderAlertMode? alertMode,
+    int? alarmOffsetMinutes,
     int? updatedAtMs,
   }) {
     return ReminderConfig(
@@ -232,6 +268,8 @@ class ReminderConfig {
           ? this.classifierVersion
           : classifierVersion as int?,
       aiBody: aiBody == _sentinel ? this.aiBody : aiBody as String?,
+      alertMode: alertMode ?? this.alertMode,
+      alarmOffsetMinutes: alarmOffsetMinutes ?? this.alarmOffsetMinutes,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     );

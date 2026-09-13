@@ -158,6 +158,15 @@ class UnifiedRecomputeGraph {
         if (sweep.didWork) {
           debugPrint('[UnifiedRecomputeGraph] step:reminderOccurrences $sweep');
         }
+        // Alarm ring ladders first (feat/alarm-mode): they are the loudest
+        // promise the app makes, so they take their share of the 64-slot
+        // queue before the polite ladders do. Reads the same freshly
+        // advanced occurrences for stop stamps and snoozes.
+        if (_generationChanged(capturedGeneration)) return;
+        final alarms = await container.read(alarmSchedulerProvider).rearmAll();
+        if (alarms.didWork) {
+          debugPrint('[UnifiedRecomputeGraph] step:alarms $alarms');
+        }
         // [L-PRE]: re-arm compiled ladders against the (possibly changed)
         // plan. Runs after the sweep so it sees today's freshly backfilled
         // and freshly advanced occurrences.

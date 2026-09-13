@@ -11,11 +11,15 @@ class AddTaskEditLoad {
     this.reminderId,
     this.reminderCreatedAtMs,
     this.classification,
+    this.alarm = false,
   });
 
   final PlannedTask task;
   final String? reminderId;
   final int? reminderCreatedAtMs;
+
+  /// Whether the stored reminder rings as an alarm (feat/alarm-mode).
+  final bool alarm;
 
   /// The stored classification, so editing shows what SidePal (or the user)
   /// decided last time rather than re-guessing from scratch (FR-R-21).
@@ -52,6 +56,7 @@ Future<AddTaskEditLoad?> loadAddTaskForEdit(
     task: task,
     reminderId: stored?.id,
     reminderCreatedAtMs: stored?.createdAtMs,
+    alarm: stored?.isAlarm ?? false,
     classification:
         stored != null && stored.classificationSource.isAuthoritative
         ? (taxonomy: stored.taxonomy, criticality: stored.criticality)

@@ -38,6 +38,7 @@ import '../ai/ai_proxy_client.dart';
 import '../../features/reminders/application/reminder_ai_classifier.dart';
 import '../../features/reminders/application/reminder_strategy_aggregates.dart';
 import '../../features/reminders/application/strategist_proposals_store.dart';
+import '../../features/reminders/application/alarm_scheduler.dart';
 import '../../features/reminders/application/ladder_compiler.dart';
 import '../../features/reminders/application/ladder_scheduler.dart';
 import '../../features/time_blocks/domain/models/scheduled_time_block.dart';
@@ -169,6 +170,19 @@ final ladderSchedulerProvider = Provider<LadderScheduler>((ref) {
         ref.read(contextOverrideRepositoryProvider).getAttentionState(),
     budget: ref.read(notificationBudgetProvider),
     ledger: NotificationLedgerRepository(OfflineStore.instance.isar!),
+  );
+});
+
+/// Alarm ring ladders (feat/alarm-mode): scheduled straight onto the OS in
+/// their own id namespace, ignoring every shield — see [AlarmScheduler].
+final alarmSchedulerProvider = Provider<AlarmScheduler>((ref) {
+  return AlarmScheduler(
+    reminders: ref.read(reminderRepositoryProvider),
+    occurrences: ref.read(reminderOccurrenceRepositoryProvider),
+    notifications: LocalAlarmNotificationsPort(
+      ref.read(localNotificationsServiceProvider),
+    ),
+    budget: ref.read(notificationBudgetProvider),
   );
 });
 
@@ -354,7 +368,14 @@ final reminderSyncServiceProvider = Provider<ReminderSyncService>(
     ),
     orchestratorService: ref.read(attentionOrchestratorServiceProvider),
     occurrenceService: ref.read(reminderOccurrenceServiceProvider),
-    rearmLadders: () => ref.read(ladderSchedulerProvider).rearmAll(),
+    // A just-saved alarm must be armed when the user leaves the editor, not
+    // at the next recompute — same promise the ladder makes.
+    rearmLadders: () async {
+      await ref.read(alarmSchedulerProvider).rearmAll();
+      await ref.read(ladderSchedulerProvider).rearmAll();
+    },
+    cancelAlarms: (taskId) =>
+        ref.read(alarmSchedulerProvider).cancelForTask(taskId),
     shieldSession: (length) {
       final now = DateTime.now();
       return ref

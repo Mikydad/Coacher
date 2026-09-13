@@ -17,6 +17,7 @@ import '../../reminders/application/reminder_classifier.dart';
 import '../../reminders/domain/models/reminder_occurrence_enums.dart';
 import '../../planning/domain/models/add_task_form_draft.dart';
 import '../../planning/domain/models/task_item.dart';
+import '../../planning/application/task_schedule_display.dart';
 import '../../planning/domain/sleep_task.dart';
 import '../application/add_task_conflict_flow.dart';
 import '../application/add_task_draft_restore.dart';
@@ -70,6 +71,11 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
   String? _category;
 
   bool _reminder = false;
+
+  /// Alarm mode (feat/alarm-mode). For Sleep this is the wake-up alarm at
+  /// sleep end, on by default; for everything else it is the chip beside
+  /// the reminder's plan-day footnote, off by default.
+  bool _alarm = false;
   bool _focusSession = false;
   bool _isHabitAnchor = false;
 
@@ -211,6 +217,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
       customDurationMinutes: _customDurationMinutes,
       category: _category,
       reminder: _reminder,
+      alarm: _alarm,
       focusSession: _focusSession,
       isHabitAnchor: _isHabitAnchor,
       reminderTimeMs: _reminderTime.millisecondsSinceEpoch,
@@ -239,6 +246,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
       _customDurationMinutes = draft.customDurationMinutes;
       _category = draft.category;
       _reminder = draft.reminder;
+      _alarm = draft.alarm;
       _focusSession = draft.focusSession;
       _isHabitAnchor = draft.isHabitAnchor;
       _reminderTime = DateTime.fromMillisecondsSinceEpoch(draft.reminderTimeMs);
@@ -362,6 +370,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
           _existingReminderId = load.reminderId;
           _reminderCreatedAtMs = load.reminderCreatedAtMs;
         }
+        _alarm = load.alarm;
         // Only a USER classification is restored. If the heuristic decided
         // last time, let it decide again from the current title/duration —
         // a stale guess is worse than a fresh one.
@@ -580,6 +589,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         userCriticality: _userTaxonomy == null
             ? null
             : (_userCritical ? 3 : _heuristicClassification.criticality),
+        alarm: _reminder && _alarm,
       );
       if (reminderId != null) _existingReminderId ??= reminderId;
       // migrated to coordinator
@@ -673,6 +683,10 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
     _durationEnabled = true;
     _duration = '8 HOURS';
     _reminder = true;
+    // The wake-up alarm is the reason Sleep gets a reminder at all: picking
+    // Sleep rings at sleep end unless the user says otherwise. (Edit-load
+    // sets the category directly and restores the stored choice instead.)
+    _alarm = true;
     _isRigid = true;
     _focusSession = false;
     if (_controller.text.trim().isEmpty) {
@@ -726,6 +740,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         _applySleepCategoryDefaults(category);
       } else if (wasSleep && sleepDurationChipKeys.contains(_duration)) {
         _duration = '25 MIN';
+        // The wake-up default was Sleep's, not the user's; leaving Sleep
+        // takes it along rather than silently arming a start alarm.
+        _alarm = false;
       }
     });
   }
@@ -844,6 +861,8 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                             },
                             onReminderTimeChanged: (time) =>
                                 setState(() => _reminderTime = time),
+                            alarm: _alarm,
+                            onAlarmChanged: (v) => setState(() => _alarm = v),
                           ),
                           // Classification only matters when a reminder
                           // exists — it selects the ladder's shape, not
@@ -902,6 +921,24 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                               ),
                               onQuietModeChanged: (mode) =>
                                   setState(() => _inAppQuietMode = mode),
+                              alarm: _reminder && _alarm,
+                              sleepEndLabel: formatTaskTimeOfDay(
+                                _reminderTime.add(
+                                  Duration(minutes: _effectiveDurationMinutes),
+                                ),
+                              ),
+                              onAlarmChanged: (v) => setState(() {
+                                _alarm = v;
+                                // A wake-up needs the reminder on; switching
+                                // the alarm on turns the reminder on with it.
+                                if (v && !_reminder) {
+                                  _reminder = true;
+                                  ensureReminderPermissionWithNotice(
+                                    context,
+                                    ref,
+                                  );
+                                }
+                              }),
                             ),
                           ] else ...[
                             AddTaskAccountabilityDeepWorkRow(

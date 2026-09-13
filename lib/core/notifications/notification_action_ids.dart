@@ -22,6 +22,10 @@ abstract final class NotificationActionIds {
   /// Consumed by the notification ledger today; the opportunity planner
   /// (humanizing Phase 1) reads it to avoid similar moments.
   static const String wrongTime = 'wrong_time';
+
+  /// Stop an alarm's ring ladder without touching the task (feat/alarm-mode).
+  /// "Done" also stops it and completes the task; "Later" snoozes the rings.
+  static const String stopAlarm = 'stop_alarm';
 }
 
 abstract final class NotificationCategoryIds {
@@ -33,4 +37,9 @@ abstract final class NotificationCategoryIds {
   /// set as task reminders but its own category so the two surfaces can
   /// diverge later without an app reinstall (see class doc above).
   static const String intentionNudge = 'sidepalIntentionNudge.v1';
+
+  /// Alarm rings (feat/alarm-mode): Stop / Snooze / Done. Its own category
+  /// because the action set differs from a task reminder's — and because a
+  /// ring must never offer "Wrong time", which would close the task's window.
+  static const String alarm = 'sidepalAlarm.v1';
 }

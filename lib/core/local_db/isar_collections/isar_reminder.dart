@@ -1,5 +1,6 @@
 import 'package:isar_community/isar.dart';
 
+import '../../../features/reminders/domain/models/reminder_alert_mode.dart';
 import '../../../features/reminders/domain/models/reminder_config.dart';
 import '../../../features/reminders/domain/models/reminder_occurrence_enums.dart';
 
@@ -38,6 +39,12 @@ class IsarReminder {
   int? classifierVersion;
   String? aiBody;
 
+  /// Alarm mode (feat/alarm-mode). Stored as a string, defaulting to
+  /// `notification`, so rows written before the field existed read as plain
+  /// reminders and a newer value degrades instead of throwing.
+  String alertMode = 'notification';
+  int alarmOffsetMinutes = 0;
+
   static IsarReminder fromDomain(ReminderConfig r) {
     return IsarReminder()
       ..reminderId = r.id
@@ -58,7 +65,9 @@ class IsarReminder {
       ..criticality = r.criticality
       ..classificationSource = r.classificationSource.toStorage()
       ..classifierVersion = r.classifierVersion
-      ..aiBody = r.aiBody;
+      ..aiBody = r.aiBody
+      ..alertMode = r.alertMode.toStorage()
+      ..alarmOffsetMinutes = r.alarmOffsetMinutes;
   }
 
   ReminderConfig toDomain() {
@@ -82,6 +91,8 @@ class IsarReminder {
       ),
       classifierVersion: classifierVersion,
       aiBody: aiBody,
+      alertMode: ReminderAlertMode.fromStorage(alertMode),
+      alarmOffsetMinutes: alarmOffsetMinutes,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs,
     );

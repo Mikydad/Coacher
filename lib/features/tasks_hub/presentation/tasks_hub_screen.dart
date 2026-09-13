@@ -20,6 +20,7 @@ import 'task_detail_screen.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../../../core/presentation/swipe_actions.dart';
+import '../../reminders/application/alarm_providers.dart';
 
 PlannedTask _hubTaskWithOrderIndex(PlannedTaskRow row, int orderIndex) {
   final t = row.task;
@@ -439,6 +440,9 @@ class _HubTaskTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = row.task;
     final isOverdue = ref.watch(overdueEntityIdsProvider).contains(t.id);
+    final isAlarm =
+        t.reminderEnabled &&
+        (ref.watch(alarmTaskIdsProvider).value?.contains(t.id) ?? false);
     final accent = _taskAccent(t);
     final done = t.status == TaskStatus.completed;
 
@@ -452,7 +456,10 @@ class _HubTaskTile extends ConsumerWidget {
       if (t.durationMinutes > 0) ('${t.durationMinutes} min', false),
       if (t.category != null && t.category!.trim().isNotEmpty)
         (t.category!, false),
-      if (t.reminderEnabled) ('Reminder on', true),
+      // An alarm reminder says so — with a bell that RINGS in the meta
+      // line, so the difference from a plain reminder is visible at a
+      // glance and nowhere else on the row (feat/alarm-mode).
+      if (t.reminderEnabled) (isAlarm ? 'Alarm on' : 'Reminder on', true),
       if (showDateKey) (row.dateKey, false),
       if (scorePercent != null) ('$scorePercent%', false),
       if (_statusLabel != null) (_statusLabel!, false),
@@ -570,7 +577,9 @@ class _MetaLine extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(right: 4),
               child: Icon(
-                Icons.notifications_active_rounded,
+                text == 'Alarm on'
+                    ? Icons.alarm_rounded
+                    : Icons.notifications_active_rounded,
                 size: 13,
                 color: accent,
               ),

@@ -94,6 +94,12 @@ class ReminderSyncService {
     /// Recompiles ladders with the running focus session as a shield — the
     /// dynamic half of FR-R-32 (audit B2). Injected for the same reason.
     Future<void> Function(Duration sessionLength)? shieldSession,
+
+    /// Cancels a task's armed alarm rings (feat/alarm-mode). Alarm ids live
+    /// outside the orchestrator's entity cancel on purpose, so the two
+    /// places a task's alarm must die with it — deletion, and a
+    /// start-anchored alarm whose task resolved — call this explicitly.
+    Future<void> Function(String taskId)? cancelAlarms,
     DateTime Function()? now,
   }) : _repository = repository,
        _notifications = notifications,
@@ -101,6 +107,7 @@ class ReminderSyncService {
        _occurrences = occurrenceService,
        _rearmLadders = rearmLadders,
        _shieldSession = shieldSession,
+       _cancelAlarms = cancelAlarms,
        _now = now ?? DateTime.now;
 
   final ReminderRepository _repository;
@@ -110,6 +117,7 @@ class ReminderSyncService {
   final ReminderOccurrenceService? _occurrences;
   final Future<void> Function()? _rearmLadders;
   final Future<void> Function(Duration sessionLength)? _shieldSession;
+  final Future<void> Function(String taskId)? _cancelAlarms;
   final DateTime Function() _now;
 
   Future<bool> ensurePermissions() =>
@@ -194,6 +202,7 @@ class ReminderSyncService {
   /// surviving row would resurrect the notification.
   Future<void> removeForDeletedTask(String taskId) async {
     await _orchestrator.cancelForEntity(taskId);
+    await _cancelAlarms?.call(taskId);
     await _repository.deleteRemindersForTask(taskId);
     // A deleted task must stop surfacing on the Recovery Card.
     await _occurrences?.deleteForEntity(taskId);
@@ -350,6 +359,12 @@ class ReminderSyncService {
     await _upsertQuietly(updated);
     // Replace the 64-slot loop with a single cancel via the orchestrator.
     await _orchestrator.cancelForEntity(taskId);
+    // A start-anchored alarm dies with the task's resolution — done early
+    // means no ring. An end-anchored one (Sleep's wake-up) is left alone:
+    // the recompute decides its fate from the resolution kind.
+    if (reminders[i].isAlarm && reminders[i].alarmOffsetMinutes == 0) {
+      await _cancelAlarms?.call(taskId);
+    }
     if (keepEnabled) {
       await _applyReminders(await _repository.listAllReminders());
     }

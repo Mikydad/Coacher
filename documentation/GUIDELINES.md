@@ -3156,3 +3156,44 @@ not silent reversal.
   `taskIntegrity`) live on with rewritten copy on the rollup and split
   cards; (6) skeletons are per horizon so the cache-hit reveal never
   re-flows. Not yet verified on a device at the time of writing.
+
+- **2026-09-13 · Alarm mode: a reminder can ring as an alarm, on
+  `feat/alarm-mode`.** One synced field pair on `ReminderConfig`
+  (`alertMode` notification|alarm, `alarmOffsetMinutes`), one stop stamp on
+  `ReminderOccurrence` (`alarmStoppedAtMs`), no new entity. Settled with
+  Miko the same day: (1) **Sleep rings at sleep END only** — a wake-up
+  alarm anchored at `reminderTime + sleep length`, shown as a full
+  "Wake-up alarm" row in the Sleep extras card and ON by default for new
+  sleep tasks; bedtime stays a normal notification. (2) Every other
+  category gets a small **"Alarm" chip beside the reminder card's plan-day
+  footnote** — a modifier on the reminder, not a section; Sleep hides the
+  chip. (3) **Ring pattern: every 2 min for 10 min (five rings)**, pierces
+  the interruption boundary, the Focus Shield and the sleep window; Stop /
+  Done / a tap stops it, Snooze quiets for 5 min and restarts the five.
+  (4) **Tasks only in V1** — goals and intentions keep notifications.
+  (5) **iOS engine: the notification floor now, AlarmKit next** — rings are
+  Time Sensitive local notifications with a bundled 28-second sound
+  (`ios/Runner/sidepal_alarm.caf`, generated chime; `res/raw` on Android);
+  the mute switch still silences them, and the Time Sensitive entitlement
+  is now in `Runner.entitlements` (Xcode must refresh the profile). A
+  ring-through-silent alarm is AlarmKit on iOS 26+, planned as the
+  follow-on phase behind a version check. *Architecture:* alarms are
+  **not** compiled by `LadderCompiler` nor evaluated by the attention
+  orchestrator — both are polite by construction, and "polite" is the one
+  thing an alarm must not be. `AlarmScheduler` schedules rings straight
+  onto the OS in its own id namespace (`alarm:<taskId>:<ring>`), so the
+  orchestrator's `cancelForEntity` can never touch them; it runs first in
+  the recompute graph's notifications step (alarms take their share of the
+  64-slot queue before ladders) and after every reminder save. *Lifecycle
+  rule worth remembering:* a start-anchored alarm (offset 0) dies with any
+  resolution of its occurrence (done early = no ring); an end-anchored one
+  (Sleep's wake-up) survives a `completed` resolution — marking Sleep done
+  at bedtime must not silence tomorrow's wake-up — and dies on
+  rescheduled/skipped/expired. Rings are deliberately **not ledgered**:
+  reconciliation re-arms a lost row under the task-slot id scheme, which
+  would turn a lost ring into a plain reminder; a lost ring is simply
+  re-armed by the next recompute. *Android:* stays parked (D8) — rings
+  are inexact there and there is no full-screen intent. *Rejected:*
+  reusing criticality 3 as "alarm" (it is a classification, and the
+  heuristic/AI may not grant it); a separate alarm entity or screen (an
+  alarm is a louder reminder, and lives inside the reminder it belongs to).

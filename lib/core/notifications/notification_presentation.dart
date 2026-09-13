@@ -29,6 +29,17 @@ abstract final class NotificationPresentation {
   /// notifications stay addressable; new deliveries use the levelled ones.
   static const String channelLegacy = 'coach4life_reminders';
 
+  /// Alarm rings (feat/alarm-mode). A channel of its own so Android plays
+  /// them on the ALARM audio stream (so a silenced ringer does not silence
+  /// the wake-up) and the user can tune alarms apart from reminders.
+  static const String channelAlarm = 'sidepal_alarms';
+
+  /// The bundled alarm sound. iOS looks the file up in the main bundle by
+  /// this name (`ios/Runner/sidepal_alarm.caf`, ≤ 30 s — the OS cap);
+  /// Android resolves the raw resource `res/raw/sidepal_alarm`.
+  static const String alarmSoundDarwin = 'sidepal_alarm.caf';
+  static const String alarmSoundAndroidRaw = 'sidepal_alarm';
+
   static fln.AndroidNotificationDetails android(
     InterruptionLevel level, {
     required bool silent,
@@ -69,6 +80,43 @@ abstract final class NotificationPresentation {
           actions: actions,
         ),
     };
+  }
+
+  /// One alarm ring on Android: max importance, the bundled alarm sound on
+  /// the alarm audio stream, and the ring's own action set.
+  static fln.AndroidNotificationDetails androidAlarm({
+    List<fln.AndroidNotificationAction> actions = const [],
+  }) {
+    return fln.AndroidNotificationDetails(
+      channelAlarm,
+      'Alarms',
+      channelDescription:
+          'Wake-up and must-not-miss alarms. Ring until you stop them.',
+      importance: fln.Importance.max,
+      priority: fln.Priority.max,
+      category: fln.AndroidNotificationCategory.alarm,
+      audioAttributesUsage: fln.AudioAttributesUsage.alarm,
+      sound: const fln.RawResourceAndroidNotificationSound(
+        alarmSoundAndroidRaw,
+      ),
+      playSound: true,
+      enableVibration: true,
+      actions: actions,
+    );
+  }
+
+  /// One alarm ring on iOS: the bundled 30-second alarm sound at the
+  /// Time Sensitive level, so it breaks through Focus modes. The mute switch
+  /// still wins — a true ring-through-silent alarm is AlarmKit (iOS 26+),
+  /// planned as the follow-on phase.
+  static fln.DarwinNotificationDetails darwinAlarm({String? categoryIdentifier}) {
+    return fln.DarwinNotificationDetails(
+      categoryIdentifier: categoryIdentifier,
+      presentSound: true,
+      presentAlert: true,
+      sound: alarmSoundDarwin,
+      interruptionLevel: fln.InterruptionLevel.timeSensitive,
+    );
   }
 
   static fln.DarwinNotificationDetails darwin(

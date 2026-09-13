@@ -83,6 +83,29 @@ class LocalNotificationsService
               ),
             ],
           ),
+          // Alarm rings (feat/alarm-mode). Stop is first so it is the
+          // thumb-nearest action on the lock screen; none of the three
+          // offers "Wrong time", which would close the task's window.
+          DarwinNotificationCategory(
+            NotificationCategoryIds.alarm,
+            actions: [
+              DarwinNotificationAction.plain(
+                NotificationActionIds.stopAlarm,
+                'Stop',
+                options: {DarwinNotificationActionOption.foreground},
+              ),
+              DarwinNotificationAction.plain(
+                NotificationActionIds.later,
+                'Snooze',
+                options: {DarwinNotificationActionOption.foreground},
+              ),
+              DarwinNotificationAction.plain(
+                NotificationActionIds.done,
+                'Done',
+                options: {DarwinNotificationActionOption.foreground},
+              ),
+            ],
+          ),
           DarwinNotificationCategory(
             NotificationCategoryIds.intentionNudge,
             actions: [
@@ -299,6 +322,54 @@ class LocalNotificationsService
     await _indexNotificationTaskMapping(id: id, payload: payload);
   }
 
+  /// One alarm ring (feat/alarm-mode): the bundled alarm sound, Time
+  /// Sensitive on iOS, the alarm audio stream on Android, and the Stop /
+  /// Snooze / Done action set. Callers pass only FUTURE moments — the
+  /// ring ladder never wants the normalize step's "push to tomorrow".
+  Future<void> scheduleAlarm({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime when,
+    String? payload,
+  }) async {
+    await _plugin.zonedSchedule(
+      id,
+      title,
+      body,
+      tz.TZDateTime.from(when, tz.local),
+      NotificationDetails(
+        android: NotificationPresentation.androidAlarm(
+          actions: const <AndroidNotificationAction>[
+            AndroidNotificationAction(
+              NotificationActionIds.stopAlarm,
+              'Stop',
+              showsUserInterface: true,
+              cancelNotification: true,
+            ),
+            AndroidNotificationAction(
+              NotificationActionIds.later,
+              'Snooze',
+              showsUserInterface: true,
+              cancelNotification: true,
+            ),
+            AndroidNotificationAction(
+              NotificationActionIds.done,
+              'Done',
+              showsUserInterface: true,
+              cancelNotification: true,
+            ),
+          ],
+        ),
+        iOS: NotificationPresentation.darwinAlarm(
+          categoryIdentifier: NotificationCategoryIds.alarm,
+        ),
+      ),
+      androidScheduleMode: NotificationPresentation.scheduleMode,
+      payload: payload,
+    );
+  }
+
   /// Immediate one-shot notification (no scheduling) — e.g. a challenge
   /// invite the sync layer just discovered while the app is running.
   /// Separate channel from task reminders so users can tune them apart.
@@ -368,6 +439,12 @@ class LocalNotificationsService
 
   int idFromTaskId(String taskId, {int slot = 0}) =>
       ('task:$taskId:$slot').hashCode.abs() % 2147483647;
+
+  /// Alarm ring ids live in their own namespace (feat/alarm-mode), so the
+  /// entity-scoped ladder cancel (`cancelForEntity`) can never touch them:
+  /// a Sleep task marked done at bedtime keeps its wake-up rings armed.
+  int idFromTaskAlarm(String taskId, {int ring = 0}) =>
+      ('alarm:$taskId:$ring').hashCode.abs() % 2147483647;
 
   /// Distinct from [idFromTaskId] to reduce id collisions between modules.
   ///

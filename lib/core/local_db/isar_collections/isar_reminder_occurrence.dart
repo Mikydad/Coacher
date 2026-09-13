@@ -59,6 +59,10 @@ class IsarReminderOccurrence {
   String? dismissedForDayKey;
   String? aiBody;
   int? snoozedUntilMs;
+
+  /// When the user stopped this day's alarm ring ladder (Stop / Done / tap
+  /// on an alarm ring). Null while the alarm is still owed.
+  int? alarmStoppedAtMs;
   late int createdAtMs;
 
   static String keyFor(String entityKind, String entityId, String dateKey) =>
@@ -89,6 +93,7 @@ class IsarReminderOccurrence {
       ..dismissedForDayKey = o.dismissedForDayKey
       ..aiBody = o.aiBody
       ..snoozedUntilMs = o.snoozedUntilMs
+      ..alarmStoppedAtMs = o.alarmStoppedAtMs
       ..createdAtMs = o.createdAtMs;
   }
 
@@ -117,6 +122,7 @@ class IsarReminderOccurrence {
       dismissedForDayKey: dismissedForDayKey,
       aiBody: aiBody,
       snoozedUntilMs: snoozedUntilMs,
+      alarmStoppedAtMs: alarmStoppedAtMs,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs,
     );

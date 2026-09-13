@@ -11,6 +11,7 @@ class AddTaskFormDraft {
     required this.customDurationMinutes,
     this.category,
     required this.reminder,
+    this.alarm = false,
     required this.focusSession,
     required this.isHabitAnchor,
     required this.reminderTimeMs,
@@ -34,6 +35,9 @@ class AddTaskFormDraft {
   final int customDurationMinutes;
   final String? category;
   final bool reminder;
+
+  /// Alarm mode for the reminder (feat/alarm-mode).
+  final bool alarm;
   final bool focusSession;
   final bool isHabitAnchor;
   final int reminderTimeMs;
@@ -65,6 +69,7 @@ class AddTaskFormDraft {
     'customDurationMinutes': customDurationMinutes,
     'category': category,
     'reminder': reminder,
+    'alarm': alarm,
     'focusSession': focusSession,
     'isHabitAnchor': isHabitAnchor,
     'reminderTimeMs': reminderTimeMs,
@@ -91,6 +96,7 @@ class AddTaskFormDraft {
           json['customDurationMinutes'] as int? ?? kAddTaskDefaultCustomMinutes,
       category: json['category'] as String?,
       reminder: json['reminder'] as bool? ?? false,
+      alarm: json['alarm'] as bool? ?? false,
       focusSession: json['focusSession'] as bool? ?? false,
       isHabitAnchor: json['isHabitAnchor'] as bool? ?? false,
       reminderTimeMs:
@@ -119,6 +125,7 @@ class AddTaskFormDraft {
         customDurationMinutes == other.customDurationMinutes &&
         category == other.category &&
         reminder == other.reminder &&
+        alarm == other.alarm &&
         focusSession == other.focusSession &&
         isHabitAnchor == other.isHabitAnchor &&
         reminderTimeMs == other.reminderTimeMs &&

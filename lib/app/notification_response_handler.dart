@@ -16,6 +16,7 @@ import '../features/focus/presentation/focus_selection_screen.dart';
 import '../features/goals/application/goals_providers.dart';
 import '../features/goals/presentation/goal_detail_screen.dart';
 import '../features/planning/application/planned_task_collect.dart';
+import '../features/reminders/application/alarm_scheduler.dart';
 import '../features/reminders/application/attention_orchestrator_providers.dart';
 import '../features/reminders/domain/models/notification_interaction_type.dart';
 import 'app_navigator.dart';
@@ -488,6 +489,47 @@ Future<void> handleNotificationResponse(
         notifId: response.id,
       ),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      navigateToMainTabWithContainer(container, index: MainTabIndex.home);
+    });
+    return;
+  }
+
+  // Alarm ring (feat/alarm-mode). Whatever the gesture, the rings stop
+  // first — a user who touched the alarm has heard it. Stop leaves the task
+  // alone; Snooze re-bases the ring ladder; Done also completes the task
+  // (falling back to a plain stop when the task's contract needs the focus
+  // flow); a bare tap stops and lands on Home. No ring ever reaches the
+  // focus-timer tap flow: a wake-up alarm must not start a "Sleep" timer.
+  if (raw.startsWith(kAlarmPayloadPrefix)) {
+    final taskId = Uri.decodeComponent(
+      raw.substring(kAlarmPayloadPrefix.length),
+    );
+    if (taskId.isEmpty) {
+      debugPrint('[NotifTap] alarm payload empty id -> abort');
+      return;
+    }
+    final alarms = container.read(alarmSchedulerProvider);
+    try {
+      if (response.actionId == NotificationActionIds.later) {
+        debugPrint('[NotifTap] snooze action for alarm task=$taskId');
+        await alarms.snooze(taskId);
+        return;
+      }
+      await alarms.stop(taskId);
+      if (response.actionId == NotificationActionIds.done) {
+        debugPrint('[NotifTap] done action for alarm task=$taskId');
+        await completeTaskFromNotification(taskId, container);
+        return;
+      }
+      if (response.actionId == NotificationActionIds.stopAlarm) {
+        debugPrint('[NotifTap] stop action for alarm task=$taskId');
+        return;
+      }
+    } catch (e) {
+      debugPrint('[NotifTap] alarm action failed: $e');
+    }
+    debugPrint('[NotifTap] alarm tap task=$taskId -> home');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       navigateToMainTabWithContainer(container, index: MainTabIndex.home);
     });

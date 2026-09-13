@@ -6,7 +6,9 @@ import '../../../core/di/providers.dart';
 import '../../../core/tier/tier_providers.dart';
 import '../../../core/tier/upgrade_prompt.dart';
 import '../../../core/utils/stable_id.dart';
+import '../../planning/domain/sleep_task.dart';
 import '../../reminders/application/reminder_classifier.dart';
+import '../../reminders/domain/models/reminder_alert_mode.dart';
 import '../../reminders/domain/models/reminder_config.dart';
 import '../../reminders/domain/models/reminder_occurrence_enums.dart';
 
@@ -53,6 +55,11 @@ Future<String?> persistAddTaskReminder(
   /// heuristic or by AI (FR-R-21).
   ReminderTaxonomy? userTaxonomy,
   int? userCriticality,
+
+  /// Alarm mode (feat/alarm-mode). For the Sleep category the alarm is the
+  /// WAKE-UP — anchored at sleep end, i.e. `reminderTime + durationMinutes`;
+  /// everything else rings at the reminder time itself.
+  bool alarm = false,
 }) async {
   // New enabled reminder = one more active configuration — gate it (the
   // task itself is already saved; only the reminder is withheld).
@@ -119,6 +126,10 @@ Future<String?> persistAddTaskReminder(
     }
   }
 
+  final alarmOffset = alarm && isSleepCategory(category)
+      ? (durationMinutes ?? 0).clamp(0, 24 * 60)
+      : 0;
+
   var reminder = ReminderConfig(
     id: existingReminderId ?? StableId.generate('reminder'),
     taskId: taskId,
@@ -127,6 +138,10 @@ Future<String?> persistAddTaskReminder(
     scheduledAtIso: reminderEnabled ? reminderTime.toIso8601String() : null,
     modeRefId: modeRefId,
     blockUrgencyScore: blockUrgency,
+    alertMode: alarm
+        ? ReminderAlertMode.alarm
+        : ReminderAlertMode.notification,
+    alarmOffsetMinutes: alarmOffset,
     taxonomy: previous?.taxonomy ?? ReminderTaxonomy.flexible,
     criticality: previous?.criticality ?? 1,
     classificationSource:

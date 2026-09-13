@@ -46,6 +46,7 @@ class ReminderOccurrence {
     this.dismissedForDayKey,
     this.aiBody,
     this.snoozedUntilMs,
+    this.alarmStoppedAtMs,
     required this.createdAtMs,
     required this.updatedAtMs,
   });
@@ -129,6 +130,17 @@ class ReminderOccurrence {
   /// slot 0's body when present; the bank covers everything else.
   final String? aiBody;
 
+  /// When the user stopped this day's alarm (Stop, Done, or a tap on any
+  /// ring). The alarm scheduler arms nothing for a day that carries this
+  /// stamp, which is what lets a stopped wake-up alarm stay stopped across
+  /// every later recompute. Null while the alarm is still owed — including
+  /// for a Sleep task already marked done at bedtime, whose wake-up alarm
+  /// is deliberately not retired by completion.
+  final int? alarmStoppedAtMs;
+
+  /// True once the user has stopped the alarm for this day.
+  bool get isAlarmStopped => alarmStoppedAtMs != null;
+
   final int createdAtMs;
   final int updatedAtMs;
 
@@ -191,6 +203,7 @@ class ReminderOccurrence {
     Object? dismissedForDayKey = _sentinel,
     Object? snoozedUntilMs = _sentinel,
     Object? aiBody = _sentinel,
+    Object? alarmStoppedAtMs = _sentinel,
     int? updatedAtMs,
   }) {
     return ReminderOccurrence(
@@ -233,6 +246,9 @@ class ReminderOccurrence {
           ? this.snoozedUntilMs
           : snoozedUntilMs as int?,
       aiBody: aiBody == _sentinel ? this.aiBody : aiBody as String?,
+      alarmStoppedAtMs: alarmStoppedAtMs == _sentinel
+          ? this.alarmStoppedAtMs
+          : alarmStoppedAtMs as int?,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     );
@@ -260,6 +276,7 @@ class ReminderOccurrence {
     if (dismissedForDayKey != null) 'dismissedForDayKey': dismissedForDayKey,
     if (snoozedUntilMs != null) 'snoozedUntilMs': snoozedUntilMs,
     if (aiBody != null) 'aiBody': aiBody,
+    if (alarmStoppedAtMs != null) 'alarmStoppedAtMs': alarmStoppedAtMs,
     'createdAtMs': createdAtMs,
     'updatedAtMs': updatedAtMs,
   };
@@ -292,6 +309,7 @@ class ReminderOccurrence {
       dismissedForDayKey: map['dismissedForDayKey'] as String?,
       snoozedUntilMs: (map['snoozedUntilMs'] as num?)?.toInt(),
       aiBody: map['aiBody'] as String?,
+      alarmStoppedAtMs: (map['alarmStoppedAtMs'] as num?)?.toInt(),
       createdAtMs: (map['createdAtMs'] as num?)?.toInt() ?? 0,
       updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
     );

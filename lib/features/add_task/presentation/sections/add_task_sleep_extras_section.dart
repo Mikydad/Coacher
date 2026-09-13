@@ -17,6 +17,9 @@ class AddTaskSleepExtrasSection extends StatelessWidget {
     required this.inAppQuietMode,
     required this.onSyncChanged,
     required this.onQuietModeChanged,
+    this.alarm = false,
+    this.sleepEndLabel,
+    this.onAlarmChanged,
   });
 
   final String? category;
@@ -26,6 +29,14 @@ class AddTaskSleepExtrasSection extends StatelessWidget {
   final String inAppQuietMode;
   final ValueChanged<bool> onSyncChanged;
   final ValueChanged<String> onQuietModeChanged;
+
+  /// Wake-up alarm (feat/alarm-mode): rings at sleep END — [sleepEndLabel]
+  /// is the formatted end time for the subtitle. Inline here rather than
+  /// behind the reminder card's chip because for Sleep the alarm IS the
+  /// point, and it is on by default for new sleep tasks.
+  final bool alarm;
+  final String? sleepEndLabel;
+  final ValueChanged<bool>? onAlarmChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +50,19 @@ class AddTaskSleepExtrasSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (onAlarmChanged != null) ...[
+              AddTaskToggleRow(
+                icon: Icons.alarm_rounded,
+                iconColor: AddTaskColors.accent,
+                title: 'Wake-up alarm',
+                subtitle: sleepEndLabel == null
+                    ? 'Rings at sleep end until you stop it'
+                    : 'Rings at $sleepEndLabel until you stop it',
+                value: alarm,
+                onChanged: onAlarmChanged!,
+              ),
+              const SizedBox(height: 4),
+            ],
             AddTaskToggleRow(
               icon: Icons.bedtime_rounded,
               iconColor: AddTaskColors.accentDim,

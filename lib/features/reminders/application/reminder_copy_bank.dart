@@ -111,6 +111,32 @@ abstract final class ReminderCopyBank {
     }
   }
 
+  // ── Alarm rings (feat/alarm-mode) ─────────────────────────────────────────
+
+  /// One ring of an alarm's ring ladder. [ring] 0 is the alarm itself; later
+  /// rings say so, because a user who sees the third one should know the
+  /// first two were missed. A wake-up alarm (Sleep's end-anchored alarm)
+  /// speaks about getting up, not about a task called "Sleep".
+  static ReminderCopy alarm({
+    required String entityTitle,
+    int ring = 0,
+    bool isWakeUp = false,
+  }) {
+    if (isWakeUp) {
+      return ReminderCopy(
+        title: 'Wake up',
+        body: ring == 0
+            ? 'Your sleep window is over. Time to get up.'
+            : 'Still ringing — time to get up.',
+      );
+    }
+    final name = _name(entityTitle);
+    return ReminderCopy(
+      title: _titleFor(entityTitle, ReminderEntityKinds.task),
+      body: ring == 0 ? 'Alarm: time for $name.' : 'Alarm still ringing for $name.',
+    );
+  }
+
   // ── Recovery surfaces ─────────────────────────────────────────────────────
 
   /// The aggregated recovery notification (FR-R-53), when one is scheduled.

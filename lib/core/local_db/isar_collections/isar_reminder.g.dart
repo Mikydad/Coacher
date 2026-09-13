@@ -18,85 +18,95 @@ const IsarReminderSchema = CollectionSchema(
   id: -9071037972073274484,
   properties: {
     r'aiBody': PropertySchema(id: 0, name: r'aiBody', type: IsarType.string),
-    r'blockUrgencyScore': PropertySchema(
+    r'alarmOffsetMinutes': PropertySchema(
       id: 1,
+      name: r'alarmOffsetMinutes',
+      type: IsarType.long,
+    ),
+    r'alertMode': PropertySchema(
+      id: 2,
+      name: r'alertMode',
+      type: IsarType.string,
+    ),
+    r'blockUrgencyScore': PropertySchema(
+      id: 3,
       name: r'blockUrgencyScore',
       type: IsarType.long,
     ),
     r'classificationSource': PropertySchema(
-      id: 2,
+      id: 4,
       name: r'classificationSource',
       type: IsarType.string,
     ),
     r'classifierVersion': PropertySchema(
-      id: 3,
+      id: 5,
       name: r'classifierVersion',
       type: IsarType.long,
     ),
     r'createdAtMs': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'createdAtMs',
       type: IsarType.long,
     ),
     r'criticality': PropertySchema(
-      id: 5,
+      id: 7,
       name: r'criticality',
       type: IsarType.long,
     ),
     r'emergencyBypass': PropertySchema(
-      id: 6,
+      id: 8,
       name: r'emergencyBypass',
       type: IsarType.bool,
     ),
-    r'enabled': PropertySchema(id: 7, name: r'enabled', type: IsarType.bool),
+    r'enabled': PropertySchema(id: 9, name: r'enabled', type: IsarType.bool),
     r'escalationLevel': PropertySchema(
-      id: 8,
+      id: 10,
       name: r'escalationLevel',
       type: IsarType.long,
     ),
     r'lastTriggeredAtMs': PropertySchema(
-      id: 9,
+      id: 11,
       name: r'lastTriggeredAtMs',
       type: IsarType.long,
     ),
     r'modeRefId': PropertySchema(
-      id: 10,
+      id: 12,
       name: r'modeRefId',
       type: IsarType.string,
     ),
     r'nextPromptAtIso': PropertySchema(
-      id: 11,
+      id: 13,
       name: r'nextPromptAtIso',
       type: IsarType.string,
     ),
     r'pendingAction': PropertySchema(
-      id: 12,
+      id: 14,
       name: r'pendingAction',
       type: IsarType.bool,
     ),
     r'reminderId': PropertySchema(
-      id: 13,
+      id: 15,
       name: r'reminderId',
       type: IsarType.string,
     ),
     r'scheduledAtIso': PropertySchema(
-      id: 14,
+      id: 16,
       name: r'scheduledAtIso',
       type: IsarType.string,
     ),
-    r'taskId': PropertySchema(id: 15, name: r'taskId', type: IsarType.string),
+    r'taskId': PropertySchema(id: 17, name: r'taskId', type: IsarType.string),
     r'taskTitle': PropertySchema(
-      id: 16,
+      id: 18,
       name: r'taskTitle',
       type: IsarType.string,
     ),
     r'taxonomy': PropertySchema(
-      id: 17,
+      id: 19,
       name: r'taxonomy',
       type: IsarType.string,
     ),
     r'updatedAtMs': PropertySchema(
-      id: 18,
+      id: 20,
       name: r'updatedAtMs',
       type: IsarType.long,
     ),
@@ -169,6 +179,7 @@ int _isarReminderEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
+  bytesCount += 3 + object.alertMode.length * 3;
   bytesCount += 3 + object.classificationSource.length * 3;
   {
     final value = object.modeRefId;
@@ -207,24 +218,26 @@ void _isarReminderSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeString(offsets[0], object.aiBody);
-  writer.writeLong(offsets[1], object.blockUrgencyScore);
-  writer.writeString(offsets[2], object.classificationSource);
-  writer.writeLong(offsets[3], object.classifierVersion);
-  writer.writeLong(offsets[4], object.createdAtMs);
-  writer.writeLong(offsets[5], object.criticality);
-  writer.writeBool(offsets[6], object.emergencyBypass);
-  writer.writeBool(offsets[7], object.enabled);
-  writer.writeLong(offsets[8], object.escalationLevel);
-  writer.writeLong(offsets[9], object.lastTriggeredAtMs);
-  writer.writeString(offsets[10], object.modeRefId);
-  writer.writeString(offsets[11], object.nextPromptAtIso);
-  writer.writeBool(offsets[12], object.pendingAction);
-  writer.writeString(offsets[13], object.reminderId);
-  writer.writeString(offsets[14], object.scheduledAtIso);
-  writer.writeString(offsets[15], object.taskId);
-  writer.writeString(offsets[16], object.taskTitle);
-  writer.writeString(offsets[17], object.taxonomy);
-  writer.writeLong(offsets[18], object.updatedAtMs);
+  writer.writeLong(offsets[1], object.alarmOffsetMinutes);
+  writer.writeString(offsets[2], object.alertMode);
+  writer.writeLong(offsets[3], object.blockUrgencyScore);
+  writer.writeString(offsets[4], object.classificationSource);
+  writer.writeLong(offsets[5], object.classifierVersion);
+  writer.writeLong(offsets[6], object.createdAtMs);
+  writer.writeLong(offsets[7], object.criticality);
+  writer.writeBool(offsets[8], object.emergencyBypass);
+  writer.writeBool(offsets[9], object.enabled);
+  writer.writeLong(offsets[10], object.escalationLevel);
+  writer.writeLong(offsets[11], object.lastTriggeredAtMs);
+  writer.writeString(offsets[12], object.modeRefId);
+  writer.writeString(offsets[13], object.nextPromptAtIso);
+  writer.writeBool(offsets[14], object.pendingAction);
+  writer.writeString(offsets[15], object.reminderId);
+  writer.writeString(offsets[16], object.scheduledAtIso);
+  writer.writeString(offsets[17], object.taskId);
+  writer.writeString(offsets[18], object.taskTitle);
+  writer.writeString(offsets[19], object.taxonomy);
+  writer.writeLong(offsets[20], object.updatedAtMs);
 }
 
 IsarReminder _isarReminderDeserialize(
@@ -235,25 +248,27 @@ IsarReminder _isarReminderDeserialize(
 ) {
   final object = IsarReminder();
   object.aiBody = reader.readStringOrNull(offsets[0]);
-  object.blockUrgencyScore = reader.readLong(offsets[1]);
-  object.classificationSource = reader.readString(offsets[2]);
-  object.classifierVersion = reader.readLongOrNull(offsets[3]);
-  object.createdAtMs = reader.readLong(offsets[4]);
-  object.criticality = reader.readLong(offsets[5]);
-  object.emergencyBypass = reader.readBool(offsets[6]);
-  object.enabled = reader.readBool(offsets[7]);
-  object.escalationLevel = reader.readLong(offsets[8]);
+  object.alarmOffsetMinutes = reader.readLong(offsets[1]);
+  object.alertMode = reader.readString(offsets[2]);
+  object.blockUrgencyScore = reader.readLong(offsets[3]);
+  object.classificationSource = reader.readString(offsets[4]);
+  object.classifierVersion = reader.readLongOrNull(offsets[5]);
+  object.createdAtMs = reader.readLong(offsets[6]);
+  object.criticality = reader.readLong(offsets[7]);
+  object.emergencyBypass = reader.readBool(offsets[8]);
+  object.enabled = reader.readBool(offsets[9]);
+  object.escalationLevel = reader.readLong(offsets[10]);
   object.id = id;
-  object.lastTriggeredAtMs = reader.readLongOrNull(offsets[9]);
-  object.modeRefId = reader.readStringOrNull(offsets[10]);
-  object.nextPromptAtIso = reader.readStringOrNull(offsets[11]);
-  object.pendingAction = reader.readBool(offsets[12]);
-  object.reminderId = reader.readString(offsets[13]);
-  object.scheduledAtIso = reader.readStringOrNull(offsets[14]);
-  object.taskId = reader.readString(offsets[15]);
-  object.taskTitle = reader.readStringOrNull(offsets[16]);
-  object.taxonomy = reader.readString(offsets[17]);
-  object.updatedAtMs = reader.readLong(offsets[18]);
+  object.lastTriggeredAtMs = reader.readLongOrNull(offsets[11]);
+  object.modeRefId = reader.readStringOrNull(offsets[12]);
+  object.nextPromptAtIso = reader.readStringOrNull(offsets[13]);
+  object.pendingAction = reader.readBool(offsets[14]);
+  object.reminderId = reader.readString(offsets[15]);
+  object.scheduledAtIso = reader.readStringOrNull(offsets[16]);
+  object.taskId = reader.readString(offsets[17]);
+  object.taskTitle = reader.readStringOrNull(offsets[18]);
+  object.taxonomy = reader.readString(offsets[19]);
+  object.updatedAtMs = reader.readLong(offsets[20]);
   return object;
 }
 
@@ -271,29 +286,29 @@ P _isarReminderDeserializeProp<P>(
     case 2:
       return (reader.readString(offset)) as P;
     case 3:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 4:
-      return (reader.readLong(offset)) as P;
-    case 5:
-      return (reader.readLong(offset)) as P;
-    case 6:
-      return (reader.readBool(offset)) as P;
-    case 7:
-      return (reader.readBool(offset)) as P;
-    case 8:
-      return (reader.readLong(offset)) as P;
-    case 9:
-      return (reader.readLongOrNull(offset)) as P;
-    case 10:
-      return (reader.readStringOrNull(offset)) as P;
-    case 11:
-      return (reader.readStringOrNull(offset)) as P;
-    case 12:
-      return (reader.readBool(offset)) as P;
-    case 13:
       return (reader.readString(offset)) as P;
-    case 14:
+    case 5:
+      return (reader.readLongOrNull(offset)) as P;
+    case 6:
+      return (reader.readLong(offset)) as P;
+    case 7:
+      return (reader.readLong(offset)) as P;
+    case 8:
+      return (reader.readBool(offset)) as P;
+    case 9:
+      return (reader.readBool(offset)) as P;
+    case 10:
+      return (reader.readLong(offset)) as P;
+    case 11:
+      return (reader.readLongOrNull(offset)) as P;
+    case 12:
       return (reader.readStringOrNull(offset)) as P;
+    case 13:
+      return (reader.readStringOrNull(offset)) as P;
+    case 14:
+      return (reader.readBool(offset)) as P;
     case 15:
       return (reader.readString(offset)) as P;
     case 16:
@@ -301,6 +316,10 @@ P _isarReminderDeserializeProp<P>(
     case 17:
       return (reader.readString(offset)) as P;
     case 18:
+      return (reader.readStringOrNull(offset)) as P;
+    case 19:
+      return (reader.readString(offset)) as P;
+    case 20:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -842,6 +861,202 @@ extension IsarReminderQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.greaterThan(property: r'aiBody', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  alarmOffsetMinutesEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'alarmOffsetMinutes', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  alarmOffsetMinutesGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'alarmOffsetMinutes',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  alarmOffsetMinutesLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'alarmOffsetMinutes',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  alarmOffsetMinutesBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'alarmOffsetMinutes',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  alertModeEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'alertMode',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  alertModeGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'alertMode',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  alertModeLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'alertMode',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  alertModeBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'alertMode',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  alertModeStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'alertMode',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  alertModeEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'alertMode',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  alertModeContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'alertMode',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  alertModeMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'alertMode',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  alertModeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'alertMode', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterFilterCondition>
+  alertModeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'alertMode', value: ''),
       );
     });
   }
@@ -2581,6 +2796,32 @@ extension IsarReminderQuerySortBy
   }
 
   QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy>
+  sortByAlarmOffsetMinutes() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'alarmOffsetMinutes', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy>
+  sortByAlarmOffsetMinutesDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'alarmOffsetMinutes', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy> sortByAlertMode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'alertMode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy> sortByAlertModeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'alertMode', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy>
   sortByBlockUrgencyScore() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'blockUrgencyScore', Sort.asc);
@@ -2829,6 +3070,32 @@ extension IsarReminderQuerySortThenBy
   QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy> thenByAiBodyDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'aiBody', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy>
+  thenByAlarmOffsetMinutes() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'alarmOffsetMinutes', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy>
+  thenByAlarmOffsetMinutesDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'alarmOffsetMinutes', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy> thenByAlertMode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'alertMode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QAfterSortBy> thenByAlertModeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'alertMode', Sort.desc);
     });
   }
 
@@ -3093,6 +3360,21 @@ extension IsarReminderQueryWhereDistinct
   }
 
   QueryBuilder<IsarReminder, IsarReminder, QDistinct>
+  distinctByAlarmOffsetMinutes() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'alarmOffsetMinutes');
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QDistinct> distinctByAlertMode({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'alertMode', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IsarReminder, IsarReminder, QDistinct>
   distinctByBlockUrgencyScore() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'blockUrgencyScore');
@@ -3241,6 +3523,19 @@ extension IsarReminderQueryProperty
   QueryBuilder<IsarReminder, String?, QQueryOperations> aiBodyProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'aiBody');
+    });
+  }
+
+  QueryBuilder<IsarReminder, int, QQueryOperations>
+  alarmOffsetMinutesProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'alarmOffsetMinutes');
+    });
+  }
+
+  QueryBuilder<IsarReminder, String, QQueryOperations> alertModeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'alertMode');
     });
   }
 
