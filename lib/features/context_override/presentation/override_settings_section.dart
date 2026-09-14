@@ -97,7 +97,13 @@ class _CurrentOverrideRow extends ConsumerWidget {
                   ),
                 if (hasOverride && state.overrideExpiresAt == null)
                   Text(
-                    'Until manually ended',
+                    // The automatic sleep window ends at its wake time;
+                    // "End now" pauses it until then (2026-09-15).
+                    state.activeOverride == ContextOverride.none &&
+                            effective == ContextOverride.sleep &&
+                            (state.sleepWindowEnd?.isNotEmpty ?? false)
+                        ? 'Sleep window · until ${state.sleepWindowEnd}'
+                        : 'Until manually ended',
                     style: TextStyle(fontSize: 12, color: AppColors.fg54),
                   ),
               ],

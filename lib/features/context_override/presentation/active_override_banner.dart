@@ -101,11 +101,14 @@ class _ActiveOverrideBannerState extends ConsumerState<ActiveOverrideBanner> {
   }
 
   String _subtitleText(UserAttentionState? state, ContextOverride effective) {
-    // Sleep window override — no manual expiry
+    // Automatic sleep window — "End" pauses it until this wake time.
     if (state != null &&
         effective == ContextOverride.sleep &&
         state.activeOverride == ContextOverride.none) {
-      return 'Sleep window active';
+      final end = state.sleepWindowEnd;
+      return end == null || end.isEmpty
+          ? 'Sleep window active'
+          : 'Sleep window · until $end';
     }
     final expires = state?.overrideExpiresAt;
     if (expires == null) return 'Until you end it';

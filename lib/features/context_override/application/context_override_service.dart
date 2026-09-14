@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../data/context_override_repository.dart';
 import '../domain/models/context_override.dart';
+import 'sleep_window_util.dart';
 import '../domain/models/post_override_review.dart';
 import '../domain/models/user_attention_state.dart';
 
@@ -81,7 +82,10 @@ class ContextOverrideService {
     /// (AUDIT §10 C5). Injected as a callback so this service keeps no
     /// dependency on the reminders feature. Null means no flush — the
     /// pre-Phase-C behaviour.
-    Future<PostOverrideReview?> Function(ContextOverride ended, int startedAtMs)?
+    Future<PostOverrideReview?> Function(
+      ContextOverride ended,
+      int startedAtMs,
+    )?
     flushSuppressed,
     DateTime Function()? now,
   }) : _repository = repository,
@@ -126,7 +130,21 @@ class ContextOverrideService {
   Future<PostOverrideReview> endOverride() async {
     final current = await _currentOrEmpty();
     if (!current.hasActiveOverride) {
-      // Nothing to end — return a no-op review.
+      // No manual override. If the AUTOMATIC sleep window is what the user
+      // sees, "End" pauses it until the next wake time (2026-09-15) —
+      // tomorrow night's window returns on its own. Before this, End here
+      // was a silent no-op and the banner just stayed.
+      final now = _now();
+      if (effectiveOverride(current, now) == ContextOverride.sleep) {
+        final until = nextMorningAfter(now, current.sleepWindowEnd);
+        await _repository.upsertAttentionState(
+          current.copyWith(
+            sleepWindowPausedUntilMs: until.millisecondsSinceEpoch,
+            updatedAtMs: now.millisecondsSinceEpoch,
+          ),
+        );
+      }
+      // Nothing (else) to end — return a no-op review.
       return PostOverrideReview(
         overrideType: ContextOverride.none,
         activeFromMs: 0,

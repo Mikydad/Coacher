@@ -3240,3 +3240,18 @@ not silent reversal.
   hiding the whole section, was rejected because it also removed the +
   entry point). `AppDashedEmptyState` stays in the design system for other
   lists (Discover's "no circles").
+
+- **2026-09-15 · Sleep-window "End" now works.** Root cause: the banner
+  shows the *automatic* sleep window (policy step 2), but `endOverride`
+  only cleared a *manual* override, so End during the window was a silent
+  no-op. Fix settled with Miko: a local-only `sleepWindowPausedUntilMs` on
+  `UserAttentionState` (stored in the Isar row's `payloadJson`, so no
+  schema regeneration; not synced — a sleep window is per device). End
+  during the automatic window sets it to `nextMorningAfter(now,
+  sleepWindowEnd)`; `effectiveOverride` ignores the window while paused,
+  so every consumer (banner, attention orchestrator, context snapshot)
+  follows; tomorrow night's window returns on its own. The banner subtitle
+  now says "Sleep window · until 07:00" so it is clear what End ends. A
+  manual override still wins over the pause. *Rejected:* routing End to
+  the sleep-window settings (asks the user to reconfigure a schedule to
+  get one night off), and clearing the window (would silently disable it).
