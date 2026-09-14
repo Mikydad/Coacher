@@ -164,9 +164,9 @@ class _GoalTemplatePickerScreenState extends State<GoalTemplatePickerScreen> {
                   ),
                 );
               },
-              color: AppColors.surfaceCard,
-              textColor: AppColors.fg,
-              ringColor: AppColors.accentDim,
+              color: AppColors.surfacePanel,
+              textColor: AppColors.textPrimary,
+              ringColor: AppColors.accent,
               active: _selectedId == custom.id,
             ),
           ],

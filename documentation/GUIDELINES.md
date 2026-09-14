@@ -3400,3 +3400,12 @@ not silent reversal.
   sheet clumsy). Tests: `time_export_test` (periods, successor, renderers),
   `time_tracker_ui_test` "Export sheet" group (share hook is a provider so
   the test captures the file instead of hitting the platform).
+
+- **2026-09-15 · Goal template picker joins light mode.** The bento tones
+  were documented as "identical in both themes" (charcoal cards); on the
+  off-white page they read as a dark island, so `BentoPalette`'s five tones
+  now resolve per theme: dark keeps the charcoal recipe untouched, light
+  inverts it like goal tones (pale tinted surface, deep hue glyph, mid-tint
+  ring) and the cards/pill carry the shared shadow. Card text follows
+  (`textPrimary`/`textSecondary` in light). Add Task's flat chip colours are
+  unchanged — they invert to ink on select in both themes.

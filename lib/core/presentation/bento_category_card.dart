@@ -2,6 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'app_card.dart';
+import 'app_colors.dart';
+
 /// One card's three-part color recipe: a near-black tinted [surface], a
 /// muted [accent] that the glyph (and the selection comet) carries, and a
 /// dim [border] for the resting hairline / selection track.
@@ -22,46 +25,83 @@ class BentoTone {
 }
 
 /// Bento palette for the category-first pickers (Add Task, New Goal).
-/// Deliberately fixed raw colors (NOT AppColors tokens): per the design
-/// reference these cards look identical in dark and light themes — only the
-/// page background behind them adapts.
 ///
 /// Two families live here:
-/// - [BentoTone]s — the dark charcoal mosaic cards of the New Goal picker
-///   ([BentoCategoryCard]): black surface, colored icon, colored ring.
+/// - [BentoTone]s — the mosaic cards of the New Goal picker
+///   ([BentoCategoryCard]). Dark keeps the original charcoal recipe (black
+///   surface, colored icon, colored ring). Light (2026-09-15) inverts it the
+///   way goal tones do: a pale tinted surface, a deep hue for the glyph, a
+///   mid tint for the ring — the charcoal cards read as a dark island on
+///   the off-white page. Resolved per theme through [AppColors.isLight].
 /// - The bright flat colors below — the Add Task mini chips, which invert
-///   to [ink] on select and so need a saturated fill.
+///   to [ink] on select and so need a saturated fill (same in both themes).
 abstract final class BentoPalette {
+  static BentoTone get study => AppColors.isLight ? _studyLight : _studyDark;
+  static BentoTone get fitness =>
+      AppColors.isLight ? _fitnessLight : _fitnessDark;
+  static BentoTone get learn => AppColors.isLight ? _learnLight : _learnDark;
+  static BentoTone get read => AppColors.isLight ? _readLight : _readDark;
+  static BentoTone get focus => AppColors.isLight ? _focusLight : _focusDark;
+
   // Charcoal tones — warm/brown/green/purple/blue tinted blacks.
-  static const study = BentoTone(
+  static const _studyDark = BentoTone(
     surface: Color(0xFF2A2622),
     accent: Color(0xFFF2D9A5),
     border: Color(0xFFBFA77A),
   );
-  static const fitness = BentoTone(
+  static const _fitnessDark = BentoTone(
     surface: Color(0xFF292521),
     accent: Color(0xFFD99A68),
     border: Color(0xFF5F4A3A),
   );
-  static const learn = BentoTone(
+  static const _learnDark = BentoTone(
     surface: Color(0xFF242C29),
     accent: Color(0xFF9ACFC2),
     border: Color(0xFF465C55),
   );
-  static const read = BentoTone(
+  static const _readDark = BentoTone(
     surface: Color(0xFF252329),
     accent: Color(0xFFA98BCE),
     border: Color(0xFF554965),
   );
-  static const focus = BentoTone(
+  static const _focusDark = BentoTone(
     surface: Color(0xFF20262C),
     accent: Color(0xFF8FB8DD),
     border: Color(0xFF45586B),
   );
 
-  /// Text drawn on a charcoal card.
-  static const cardText = Color(0xFFF5F5F5);
-  static const cardTextMuted = Color(0xFFA8A8A8);
+  // Light tones — the same hues as pale cards with deep glyphs.
+  static const _studyLight = BentoTone(
+    surface: Color(0xFFF7EEDD),
+    accent: Color(0xFF8A6A2B),
+    border: Color(0xFFD9C79E),
+  );
+  static const _fitnessLight = BentoTone(
+    surface: Color(0xFFF9EBE0),
+    accent: Color(0xFFB5602A),
+    border: Color(0xFFE4C2AA),
+  );
+  static const _learnLight = BentoTone(
+    surface: Color(0xFFE4F3EF),
+    accent: Color(0xFF2C7A6A),
+    border: Color(0xFFB5DDD3),
+  );
+  static const _readLight = BentoTone(
+    surface: Color(0xFFEEE8F6),
+    accent: Color(0xFF6A4A9C),
+    border: Color(0xFFCDBFE6),
+  );
+  static const _focusLight = BentoTone(
+    surface: Color(0xFFE6EFF8),
+    accent: Color(0xFF2F5F8A),
+    border: Color(0xFFB7CEE6),
+  );
+
+  /// Text drawn on a mosaic card — near-white on charcoal, ink on pale.
+  static Color get cardText =>
+      AppColors.isLight ? AppColors.textPrimary : const Color(0xFFF5F5F5);
+  static Color get cardTextMuted =>
+      AppColors.isLight ? AppColors.textSecondary : const Color(0xFFA8A8A8);
 
   // Bright flat colors — Add Task mini chips only.
   static const yellow = Color(0xFFF6D14E);
@@ -158,121 +198,129 @@ class _BentoCategoryCardState extends State<BentoCategoryCard>
     return AnimatedOpacity(
       opacity: widget.dimmed ? 0.82 : 1,
       duration: const Duration(milliseconds: 200),
-      child: Material(
-        color: tone.surface,
-        borderRadius: BorderRadius.circular(24),
-        child: InkWell(
-          onTap: widget.onTap,
+      child: Container(
+        decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
-          child: Stack(
-            // Non-positioned children fill the slot — keeps the hero card
-            // full-width even under the mosaic Column's loose constraints.
-            fit: StackFit.expand,
-            children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxHeight < 96;
-                  return Padding(
-                    padding: EdgeInsets.all(compact ? 10 : 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.label.toUpperCase(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: BentoPalette.cardText,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        const Spacer(),
-                        Icon(
-                          widget.icon,
-                          color: tone.accent,
-                          size: widget.hero
-                              ? 38
-                              : compact
-                              ? 18
-                              : 26,
-                        ),
-                        if (widget.subtitle != null && !compact) ...[
-                          const SizedBox(height: 4),
+          // Light: the pale cards need the shared shadow to lift off the
+          // off-white page; on black the hairline alone does that job.
+          boxShadow: AppColors.isLight ? appCardShadow : null,
+        ),
+        child: Material(
+          color: tone.surface,
+          borderRadius: BorderRadius.circular(24),
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(24),
+            child: Stack(
+              // Non-positioned children fill the slot — keeps the hero card
+              // full-width even under the mosaic Column's loose constraints.
+              fit: StackFit.expand,
+              children: [
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final compact = constraints.maxHeight < 96;
+                    return Padding(
+                      padding: EdgeInsets.all(compact ? 10 : 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            widget.subtitle!,
-                            maxLines: widget.hero ? 1 : 2,
+                            widget.label.toUpperCase(),
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: BentoPalette.cardTextMuted,
+                            style: TextStyle(
+                              color: BentoPalette.cardText,
                               fontSize: 11,
-                              height: 1.3,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
                             ),
                           ),
+                          const Spacer(),
+                          Icon(
+                            widget.icon,
+                            color: tone.accent,
+                            size: widget.hero
+                                ? 38
+                                : compact
+                                ? 18
+                                : 26,
+                          ),
+                          if (widget.subtitle != null && !compact) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              widget.subtitle!,
+                              maxLines: widget.hero ? 1 : 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: BentoPalette.cardTextMuted,
+                                fontSize: 11,
+                                height: 1.3,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                  );
-                },
-              ),
-              // Resting hairline — just enough edge to separate the charcoal
-              // card from the black page without competing with selection.
-              if (!widget.selected)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: tone.border.withValues(alpha: 0.35),
-                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
-              if (widget.selected) ...[
-                // Accent ring with a comet sweep: a bright highlight (with
-                // fading tail) travels the border; the rest of the ring
-                // stays a dim steady accent. Painter, not BoxShadow — the
-                // glow must hug the stroke, never haze the card face.
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: Padding(
-                      padding: const EdgeInsets.all(1),
-                      child: AnimatedBuilder(
-                        animation: _pulse,
-                        builder: (context, _) => CustomPaint(
-                          painter: _CometRingPainter(
-                            t: _pulse.value,
-                            track: tone.border,
-                            comet: tone.accent,
+                // Resting hairline — just enough edge to separate the charcoal
+                // card from the black page without competing with selection.
+                if (!widget.selected)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: tone.border.withValues(alpha: 0.35),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                // Check chip: top-right corner.
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: chipBg,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check_rounded,
-                      size: 15,
-                      color: BentoPalette.cardText,
+                if (widget.selected) ...[
+                  // Accent ring with a comet sweep: a bright highlight (with
+                  // fading tail) travels the border; the rest of the ring
+                  // stays a dim steady accent. Painter, not BoxShadow — the
+                  // glow must hug the stroke, never haze the card face.
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Padding(
+                        padding: const EdgeInsets.all(1),
+                        child: AnimatedBuilder(
+                          animation: _pulse,
+                          builder: (context, _) => CustomPaint(
+                            painter: _CometRingPainter(
+                              t: _pulse.value,
+                              track: tone.border,
+                              comet: tone.accent,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  // Check chip: top-right corner.
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: chipBg,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.check_rounded,
+                        size: 15,
+                        color: BentoPalette.cardText,
+                      ),
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -368,37 +416,43 @@ class BentoPillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: color,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
+    return Container(
+      decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
-        child: Container(
-          height: 56,
-          decoration: active && ringColor != null
-              ? BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: ringColor!, width: 2),
-                )
-              : null,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: textColor),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: textColor,
+        boxShadow: AppColors.isLight ? appCardShadow : null,
+      ),
+      child: Material(
+        color: color,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            height: 56,
+            decoration: active && ringColor != null
+                ? BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: ringColor!, width: 2),
+                  )
+                : null,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 18, color: textColor),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
