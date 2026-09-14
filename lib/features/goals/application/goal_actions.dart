@@ -9,6 +9,7 @@ import '../../../core/presentation/app_colors.dart';
 import '../../accountability/application/stakes_providers.dart';
 import '../../accountability/domain/models/stake_challenge.dart';
 import '../../analytics/application/delivery_providers.dart';
+import '../domain/models/goal_enums.dart';
 import '../domain/models/user_goal.dart';
 import 'goals_providers.dart';
 
@@ -27,14 +28,7 @@ Future<bool> confirmDeleteGoal(
   WidgetRef ref,
   UserGoal goal,
 ) async {
-  final stakes = ref.read(stakeChallengesStreamProvider).value ?? const [];
-  StakeChallenge? liveStake;
-  for (final c in stakes) {
-    if (!c.status.isTerminal && c.frozenGoal.linkedGoalId == goal.id) {
-      liveStake = c;
-      break;
-    }
-  }
+  final liveStake = ref.read(liveStakeForGoalProvider(goal.id));
 
   bool deleteConfirmed;
   bool surrender = false;
@@ -62,7 +56,12 @@ Future<bool> confirmDeleteGoal(
     deleteConfirmed = ok == true;
   } else {
     // null = cancelled, false = delete only, true = delete + surrender.
-    final choice = await _showStakedDeleteDialog(context, goal, liveStake);
+    final choice = await showStakedGoalActionDialog(
+      context,
+      goal,
+      liveStake,
+      action: StakedGoalAction.delete,
+    );
     deleteConfirmed = choice != null;
     surrender = choice == true;
   }
@@ -78,30 +77,84 @@ Future<bool> confirmDeleteGoal(
   invalidateGoals(ref, goalId: goal.id);
 
   if (stakeToSurrender != null) {
-    // Network-inherent, optimistic-then-honest: the goal is already gone
-    // locally; the surrender reconciles in the background and only a
-    // genuine failure speaks up (the stake then simply stays live).
-    final functions = ref.read(stakeFunctionsProvider);
-    unawaited(() async {
-      try {
-        await functions.surrender(stakeToSurrender.id);
-        messenger?.showSnackBar(
-          const SnackBar(content: Text('Stake surrendered.')),
-        );
-      } catch (e) {
-        messenger?.showSnackBar(
-          SnackBar(
-            content: Text(
-              'Surrender failed — the stake stays live in Accountability. '
-              '${_httpsErrorMessage(e)}',
-            ),
-            duration: const Duration(seconds: 6),
-          ),
-        );
-      }
-    }());
+    _surrenderInBackground(ref, messenger, stakeToSurrender);
   }
   return true;
+}
+
+/// Marks [goal] completed (reminders off, coaching caches cleared, time
+/// block removed). One path for the detail-screen menu (2026-09-15).
+///
+/// A goal with a LIVE stake gets the same honesty as delete: completing the
+/// goal does NOT settle the stake — the server only decides at the
+/// deadline, from the proof logged on the challenge page — so the dialog
+/// says so and offers the priced early exit (surrender) for solo stakes.
+/// Returns true when the goal was completed.
+Future<bool> completeGoal(
+  BuildContext context,
+  WidgetRef ref,
+  UserGoal goal,
+) async {
+  final liveStake = ref.read(liveStakeForGoalProvider(goal.id));
+  var surrender = false;
+  if (liveStake != null) {
+    final choice = await showStakedGoalActionDialog(
+      context,
+      goal,
+      liveStake,
+      action: StakedGoalAction.complete,
+    );
+    if (choice == null) return false;
+    surrender = choice;
+  }
+  if (!context.mounted) return false;
+
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  final stakeToSurrender = surrender ? liveStake : null;
+
+  final done = goal.copyWith(
+    status: GoalStatus.completed,
+    updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+  );
+  await ref.read(goalsRepositoryProvider).upsertGoal(done);
+  await ref.read(goalReminderSyncServiceProvider).applyForGoal(done);
+  await clearEntityCoachingCachesForGoal(ref, done.id);
+  await ref.read(goalBlockSyncServiceProvider).removeBlockForGoal(goal.id);
+  invalidateGoals(ref, goalId: goal.id);
+
+  if (stakeToSurrender != null) {
+    _surrenderInBackground(ref, messenger, stakeToSurrender);
+  }
+  return true;
+}
+
+/// Network-inherent, optimistic-then-honest: the goal action already
+/// landed locally; the surrender reconciles in the background and only a
+/// genuine failure speaks up (the stake then simply stays live).
+void _surrenderInBackground(
+  WidgetRef ref,
+  ScaffoldMessengerState? messenger,
+  StakeChallenge stake,
+) {
+  final functions = ref.read(stakeFunctionsProvider);
+  unawaited(() async {
+    try {
+      await functions.surrender(stake.id);
+      messenger?.showSnackBar(
+        const SnackBar(content: Text('Stake surrendered.')),
+      );
+    } catch (e) {
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Surrender failed — the stake stays live in Accountability. '
+            '${_httpsErrorMessage(e)}',
+          ),
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    }
+  }());
 }
 
 /// Server messages are written for users ("No mercy veto available…");
@@ -113,12 +166,41 @@ String _httpsErrorMessage(Object e) {
   return 'Check your connection and try again from the stake page.';
 }
 
-/// Returns null = cancelled, false = delete only, true = delete + surrender.
-Future<bool?> _showStakedDeleteDialog(
+/// What the user is about to do to a goal that has a live stake.
+enum StakedGoalAction { delete, complete }
+
+/// The honest dialog for acting on a goal with a LIVE stake. Returns
+/// null = cancelled, false = act but keep the stake, true = act + surrender.
+/// Visible for tests; production callers are [confirmDeleteGoal] and
+/// [completeGoal].
+Future<bool?> showStakedGoalActionDialog(
   BuildContext context,
   UserGoal goal,
-  StakeChallenge stake,
-) {
+  StakeChallenge stake, {
+  required StakedGoalAction action,
+}) {
+  final verb = switch (action) {
+    StakedGoalAction.delete => 'Delete',
+    StakedGoalAction.complete => 'Complete',
+  };
+  final title = switch (action) {
+    StakedGoalAction.delete => 'Delete goal?',
+    StakedGoalAction.complete => 'Mark complete?',
+  };
+  final question = switch (action) {
+    StakedGoalAction.delete =>
+      'Remove “${goal.title}” and all its actions, milestones, and '
+          'check-ins?',
+    StakedGoalAction.complete =>
+      'Mark “${goal.title}” as completed? It moves to your archive and '
+          'stops reminding and coaching.',
+  };
+  final doesNotEnd = switch (action) {
+    StakedGoalAction.delete => 'Deleting the goal does NOT end it.',
+    StakedGoalAction.complete =>
+      'Completing the goal does NOT end it — a stake can\'t be won early; '
+          'it decides at its deadline from the proof on the challenge page.',
+  };
   final me = stake.participant(FirestorePaths.activeUid);
   final kind = me?.stakeKind ?? '';
   final canSurrender =
@@ -164,15 +246,12 @@ Future<bool?> _showStakedDeleteDialog(
   return showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Delete goal?'),
+      title: Text(title),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Remove “${goal.title}” and all its actions, milestones, and '
-            'check-ins?',
-          ),
+          Text(question),
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
@@ -183,8 +262,7 @@ Future<bool?> _showStakedDeleteDialog(
               border: Border.all(color: AppColors.amber.withValues(alpha: 0.3)),
             ),
             child: Text(
-              'This goal has a live stake. Deleting the goal does NOT end '
-              'it. $keepLine',
+              'This goal has a live stake. $doesNotEnd $keepLine',
               style: TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 13.5,
@@ -213,11 +291,11 @@ Future<bool?> _showStakedDeleteDialog(
         if (canSurrender)
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete & surrender stake'),
+            child: Text('$verb & surrender stake'),
           ),
         FilledButton(
           onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Delete, keep stake'),
+          child: Text('$verb, keep stake'),
         ),
       ],
     ),

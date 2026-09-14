@@ -552,12 +552,8 @@ class GoalDetailScreen extends ConsumerWidget {
         invalidateGoals(ref, goalId: g.id);
         return;
       case 'complete':
-        final done = g.copyWith(status: GoalStatus.completed, updatedAtMs: now);
-        await repo.upsertGoal(done);
-        await ref.read(goalReminderSyncServiceProvider).applyForGoal(done);
-        await clearEntityCoachingCachesForGoal(ref, done.id);
-        await ref.read(goalBlockSyncServiceProvider).removeBlockForGoal(g.id);
-        invalidateGoals(ref, goalId: g.id);
+        // Shared path: a staked goal gets the keep/surrender dialog first.
+        await completeGoal(context, ref, g);
         return;
       case 'reopen':
         final active = g.copyWith(status: GoalStatus.active, updatedAtMs: now);

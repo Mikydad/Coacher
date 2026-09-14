@@ -3350,3 +3350,22 @@ not silent reversal.
   Challenges tabs got the same token-only light pass as the other four
   tabs; the black scrim over chat images stays black by design (it is over
   a photo, not a surface).
+
+- **2026-09-15 · Completing a staked goal warns like delete does.** Follow-up
+  to the staked-card decision above: "Mark complete" on a goal with a live
+  stake used to flip the goal silently while the stake kept running toward
+  its consequence. Now `completeGoal` (goal_actions.dart, the one complete
+  path — the detail-screen menu no longer inlines the side effects) shows
+  the shared `showStakedGoalActionDialog` with `StakedGoalAction.complete`:
+  "Completing the goal does NOT end it — a stake can't be won early; it
+  decides at its deadline from the proof on the challenge page", then
+  "Complete, keep stake" (default) or, for solo non-points stakes,
+  "Complete & surrender stake" with the same priced-exit copy and the same
+  background optimistic-then-honest surrender as delete. Multi-party and
+  pending-verification stakes keep their existing no-surrender wording.
+  *Why surrender is offered at all on completion:* the server only judges
+  at the deadline, so a user who is done with the goal has exactly one way
+  to close the stake early, and it costs what it costs — offering it
+  honestly beats leaving them to discover the stake still ticking. The
+  unstaked complete path is unchanged (no dialog). Tests:
+  `staked_goal_action_dialog_test`.
