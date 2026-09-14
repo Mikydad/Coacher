@@ -3328,3 +3328,14 @@ not silent reversal.
   evidence stays practice-only. *Still open:* completing a staked goal
   leaves the stake running silently — it should warn like delete does
   (keep stake / surrender). Tests: `stake_goal_link_test`.
+
+- **2026-09-15 · Circle detail tabs (Activity, Commitments, Members,
+  Info) light style pass.** Same rule as the Community tab: chrome
+  unchanged (pinned header, scrollable tabs, FABs), tokens only — cards
+  `surfacePanel` + shared shadow at radius 20 instead of `surfaceDark` with
+  a 6 % hairline; badges/chips `surfaceLight`; dialogs and sheets on
+  `surfacePanel`; text-on-accent uses `onAccent` (was `Colors.black`);
+  muted copy uses `textSecondary`; tab bar gains a `divider` hairline and
+  bold selected label. Accent-tinted highlight cards (my commitment,
+  moderator) keep their tint borders on purpose — they are the one
+  "special" card per tab. Chat and Challenges tabs untouched for now.

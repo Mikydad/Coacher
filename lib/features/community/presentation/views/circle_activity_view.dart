@@ -9,6 +9,7 @@ import '../../domain/models/activity_feed_item.dart';
 import '../../domain/models/circle_enums.dart';
 import '../widgets/ai_pulse_banner.dart';
 
+import '../../../../core/presentation/app_card.dart';
 import '../../../../core/presentation/app_colors.dart';
 import '../../../../core/presentation/async_value_ui.dart';
 
@@ -52,7 +53,7 @@ class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
               Center(
                 child: Text(
                   'Could not load activity.',
-                  style: TextStyle(color: AppColors.textMuted),
+                  style: TextStyle(color: AppColors.textSecondary),
                 ),
               ),
             ),
@@ -139,17 +140,17 @@ class _FilterChipRow extends StatelessWidget {
               label: Text(
                 _filterLabel(f),
                 style: TextStyle(
-                  color: isSelected ? Colors.black : AppColors.textMuted,
+                  color: isSelected
+                      ? AppColors.onAccent
+                      : AppColors.textSecondary,
                   fontSize: 13,
                 ),
               ),
               selected: isSelected,
               selectedColor: AppColors.accent,
-              backgroundColor: AppColors.surfaceCard,
+              backgroundColor: AppColors.surfacePanel,
               side: BorderSide(
-                color: isSelected
-                    ? AppColors.accent
-                    : AppColors.fg.withValues(alpha: 0.06),
+                color: isSelected ? AppColors.accent : Colors.transparent,
               ),
               onSelected: (_) => onChanged(f),
             ),
@@ -201,9 +202,9 @@ class _ActivityCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.fg.withValues(alpha: 0.06)),
+        color: AppColors.surfacePanel,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: appCardShadow,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,7 +234,10 @@ class _ActivityCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   _relativeTime(item.createdAtMs),
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -260,12 +264,12 @@ class _SystemActivityPill extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: AppColors.surfaceCard,
+          color: AppColors.surfaceLight,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
           copy,
-          style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
         ),
       ),
     );
@@ -308,7 +312,7 @@ class _EventIcon extends StatelessWidget {
         return (Icons.bar_chart_rounded, AppColors.mint);
       case ActivityEventType.memberJoined:
       case ActivityEventType.memberLeft:
-        return (Icons.group_rounded, AppColors.textMuted);
+        return (Icons.group_rounded, AppColors.textSecondary);
       case ActivityEventType.stakePhotoRevealed:
         return (Icons.local_fire_department_rounded, AppColors.danger);
       case ActivityEventType.screenshotStrike:
@@ -369,7 +373,7 @@ class _EmptyState extends StatelessWidget {
           'No activity yet.\nComplete a goal or task to see progress here.',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: AppColors.textMuted,
+            color: AppColors.textSecondary,
             fontSize: 15,
             height: 1.5,
           ),

@@ -80,7 +80,7 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
 
     if (authAsync.isLoading && !authAsync.hasValue) {
       return Scaffold(
-        backgroundColor: AppColors.surfaceDeep,
+        backgroundColor: AppColors.scaffold,
         body: Center(child: CircularProgressIndicator(color: AppColors.accent)),
       );
     }
@@ -101,7 +101,7 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
     });
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDeep,
+      backgroundColor: AppColors.scaffold,
       body: circleAsync.when(
         loading: () =>
             Center(child: CircularProgressIndicator(color: AppColors.accent)),
@@ -113,7 +113,7 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                   ? 'Could not load circle.\n$e'
                   : 'Could not load circle.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textMuted),
+              style: TextStyle(color: AppColors.textSecondary),
             ),
           ),
         ),
@@ -136,7 +136,7 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
             child: NestedScrollView(
               headerSliverBuilder: (context, innerBoxIsScrolled) => [
                 SliverAppBar(
-                  backgroundColor: AppColors.surfaceDark,
+                  backgroundColor: AppColors.surfacePanel,
                   foregroundColor: AppColors.textPrimary,
                   expandedHeight: 200,
                   pinned: true,
@@ -155,9 +155,14 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                       controller: _tabController,
                       isScrollable: true,
                       labelColor: AppColors.accent,
-                      unselectedLabelColor: AppColors.textMuted,
+                      unselectedLabelColor: AppColors.textSecondary,
+                      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+                      unselectedLabelStyle: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                      ),
                       indicatorColor: AppColors.accent,
                       indicatorSize: TabBarIndicatorSize.label,
+                      dividerColor: AppColors.divider,
                       tabAlignment: TabAlignment.start,
                       tabs: _tabs.map((t) => Tab(text: t)).toList(),
                     ),
@@ -210,13 +215,13 @@ class _CircleHeader extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         // Dark background
-        Container(color: AppColors.surfaceDeep),
+        Container(color: AppColors.scaffold),
         // Glass card
         Positioned.fill(
           child: ClipRRect(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(color: AppColors.fg.withOpacity(0.05)),
+              child: Container(color: AppColors.fg.withValues(alpha: 0.05)),
             ),
           ),
         ),
@@ -246,7 +251,10 @@ class _CircleHeader extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   '$memberCount / ${AccountabilityCircleConst.kMaxMembers} members',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 if (members.isNotEmpty) _MemberAvatarRow(members: members),
@@ -268,9 +276,9 @@ class _StreakBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.accent.withOpacity(0.15),
+        color: AppColors.accent.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.accent.withOpacity(0.3)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -333,7 +341,7 @@ class _MemberAvatarRow extends StatelessWidget {
               child: Text(
                 initial,
                 style: TextStyle(
-                  color: isMe ? Colors.black : color,
+                  color: isMe ? AppColors.onAccent : color,
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
@@ -357,7 +365,7 @@ class _PlaceholderTab extends StatelessWidget {
     return Center(
       child: Text(
         message,
-        style: TextStyle(color: AppColors.textMuted, fontSize: 15),
+        style: TextStyle(color: AppColors.textSecondary, fontSize: 15),
       ),
     );
   }

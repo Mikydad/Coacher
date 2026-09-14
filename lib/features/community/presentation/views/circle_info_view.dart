@@ -10,6 +10,7 @@ import '../../domain/models/circle_enums.dart';
 import '../sheets/circle_invite_sheet.dart';
 import '../sheets/circle_notif_prefs_sheet.dart';
 
+import '../../../../core/presentation/app_card.dart';
 import '../../../../core/presentation/app_colors.dart';
 import '../../../../core/presentation/async_value_ui.dart';
 
@@ -33,7 +34,7 @@ class CircleInfoView extends ConsumerWidget {
         Center(
           child: Text(
             'Could not load circle info.',
-            style: TextStyle(color: AppColors.textMuted),
+            style: TextStyle(color: AppColors.textSecondary),
           ),
         ),
       ),
@@ -55,9 +56,9 @@ class CircleInfoView extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.surfaceDark,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.surfaceSlate),
+                color: AppColors.surfacePanel,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: appCardShadow,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -75,7 +76,7 @@ class CircleInfoView extends ConsumerWidget {
                     Text(
                       circle.description!,
                       style: TextStyle(
-                        color: AppColors.textMuted,
+                        color: AppColors.textSecondary,
                         fontSize: 14,
                       ),
                     ),
@@ -248,7 +249,7 @@ class CircleInfoView extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surfaceDark,
+        backgroundColor: AppColors.surfacePanel,
         title: Text(
           'Delete circle?',
           style: TextStyle(color: AppColors.textPrimary),
@@ -256,12 +257,15 @@ class CircleInfoView extends ConsumerWidget {
         content: Text(
           'This will permanently delete "$circleName" and remove all members. '
           'This cannot be undone.',
-          style: TextStyle(color: AppColors.textMuted),
+          style: TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: TextStyle(color: AppColors.textMuted)),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -298,16 +302,16 @@ class CircleInfoView extends ConsumerWidget {
     // A live stake in this circle blocks leaving (2026-08-25): the stake
     // would keep running — and a photo stake would still reveal here —
     // after the user thought they'd walked away. Settle it first.
-    final liveStakes = (ref.read(stakeChallengesStreamProvider).value ??
-            const [])
-        .where((c) => !c.status.isTerminal && c.circleId == circleId)
-        .toList();
+    final liveStakes =
+        (ref.read(stakeChallengesStreamProvider).value ?? const [])
+            .where((c) => !c.status.isTerminal && c.circleId == circleId)
+            .toList();
     if (liveStakes.isNotEmpty) {
       final title = liveStakes.first.frozenGoal.title;
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: AppColors.surfaceDark,
+          backgroundColor: AppColors.surfacePanel,
           title: Text(
             'You can\'t leave yet',
             style: TextStyle(color: AppColors.textPrimary),
@@ -316,7 +320,7 @@ class CircleInfoView extends ConsumerWidget {
             'You have a live stake in this circle ("$title"). Finish it or '
             'surrender it in Accountability first — leaving wouldn\'t stop '
             'it, and its consequence would still land here.',
-            style: TextStyle(color: AppColors.textMuted),
+            style: TextStyle(color: AppColors.textSecondary),
           ),
           actions: [
             FilledButton(
@@ -331,19 +335,22 @@ class CircleInfoView extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surfaceDark,
+        backgroundColor: AppColors.surfacePanel,
         title: Text(
           'Leave circle?',
           style: TextStyle(color: AppColors.textPrimary),
         ),
         content: Text(
           'You will lose access to the chat, challenges, and activity feed.',
-          style: TextStyle(color: AppColors.textMuted),
+          style: TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: TextStyle(color: AppColors.textMuted)),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -381,7 +388,7 @@ class _SectionLabel extends StatelessWidget {
     return Text(
       text.toUpperCase(),
       style: TextStyle(
-        color: AppColors.textMuted,
+        color: AppColors.textSecondary,
         fontSize: 11,
         fontWeight: FontWeight.w600,
         letterSpacing: 0.8,
@@ -400,17 +407,17 @@ class _Chip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.surfaceCard,
+        color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: AppColors.textMuted),
+          Icon(icon, size: 12, color: AppColors.textSecondary),
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
           ),
         ],
       ),
@@ -459,12 +466,12 @@ class _SettingsTile extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: AppColors.surfaceDark,
+          color: AppColors.surfacePanel,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [
-            Icon(icon, color: AppColors.textMuted, size: 18),
+            Icon(icon, color: AppColors.textSecondary, size: 18),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -474,7 +481,7 @@ class _SettingsTile extends StatelessWidget {
             ),
             Icon(
               Icons.chevron_right_rounded,
-              color: AppColors.textMuted,
+              color: AppColors.textSecondary,
               size: 18,
             ),
           ],
@@ -503,9 +510,9 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.surfaceSlate),
+        color: AppColors.surfacePanel,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: appCardShadow,
       ),
       child: Row(
         children: [
@@ -516,7 +523,7 @@ class _StatCard extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
               ),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -533,7 +540,10 @@ class _StatCard extends StatelessWidget {
                   const SizedBox(width: 3),
                   Text(
                     suffix,
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
                   ),
                 ],
               ),
