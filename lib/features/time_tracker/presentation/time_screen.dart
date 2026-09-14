@@ -12,8 +12,10 @@ import '../application/time_tracker_providers.dart';
 import '../domain/day_summary.dart';
 import '../domain/duration_format.dart';
 import '../domain/models/activity_event.dart';
+import '../domain/time_export.dart';
 import '../domain/timeline_builder.dart';
 import '../domain/week_periods.dart';
+import 'export_time_sheet.dart';
 import 'track_activity_sheet.dart';
 
 /// The Time page (PRD/Time_Tracker §5.2 + V1.2 §5): one day's timeline
@@ -87,6 +89,27 @@ class _TimeScreenState extends ConsumerState<TimeScreen> {
     await ref.read(timeTrackerActionsProvider).delete(event.id);
   }
 
+  /// Export widens around the day being viewed: Day view → that day; Week
+  /// view → today when it is this week, else the week's Monday.
+  void _openExport() {
+    final mode = ref.read(timelineModeProvider);
+    late final DateTime anchor;
+    if (mode == TimelineMode.day) {
+      anchor = DateKeys.parseLocalDateKey(ref.read(timelineDayKeyProvider));
+    } else {
+      final week = weekPeriodForKey(ref.read(timelineWeekKeyProvider));
+      final now = DateTime.now();
+      anchor = week.contains(now) ? now : week.start;
+    }
+    showExportTimeSheet(
+      context,
+      anchor: anchor,
+      initialScope: mode == TimelineMode.day
+          ? TimeExportScope.day
+          : TimeExportScope.week,
+    );
+  }
+
   Future<void> _dismissObservation(String scopeId) async {
     await dismissTimeObservation(
       ref.read(insightCacheRepositoryProvider),
@@ -116,7 +139,15 @@ class _TimeScreenState extends ConsumerState<TimeScreen> {
         ),
         title: const PageTitle('Time'),
         centerTitle: true,
-        actions: const [HelpAppBarButton('time')],
+        actions: [
+          IconButton(
+            key: const ValueKey('time_export_button'),
+            tooltip: 'Export',
+            onPressed: _openExport,
+            icon: const Icon(Icons.ios_share_rounded, size: 20),
+          ),
+          const HelpAppBarButton('time'),
+        ],
       ),
       floatingActionButton: mode == TimelineMode.day && isToday
           ? FloatingActionButton.extended(

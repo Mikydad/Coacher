@@ -6,9 +6,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sidepal/core/presentation/swipe_actions.dart';
 import 'package:sidepal/core/utils/date_keys.dart';
 import 'package:sidepal/features/time_tracker/application/activity_reminder_service.dart';
+import 'package:sidepal/features/time_tracker/application/time_export_service.dart';
 import 'package:sidepal/features/time_tracker/application/time_tracker_providers.dart';
 import 'package:sidepal/features/time_tracker/data/activity_event_repository.dart';
 import 'package:sidepal/features/time_tracker/domain/models/activity_event.dart';
+import 'package:sidepal/features/time_tracker/domain/time_export.dart';
+import 'package:sidepal/features/time_tracker/presentation/export_time_sheet.dart';
 import 'package:sidepal/features/time_tracker/presentation/time_screen.dart';
 import 'package:sidepal/features/time_tracker/presentation/track_activity_sheet.dart';
 import 'package:sidepal/features/time_tracker/presentation/track_pill.dart';
@@ -566,6 +569,119 @@ void v12Tests() {
       expect(find.byKey(const ValueKey('time_observation')), findsOneWidget);
       expect(find.text('Most of your focused work happened after 9 PM.'), findsOneWidget);
       expect(find.text('INFERRED'), findsOneWidget);
+    });
+  });
+  group('Export sheet', () {
+    Widget host(_FakeRepo repo, List<TimeExportFile> shared) => ProviderScope(
+      overrides: [
+        activityEventRepositoryProvider.overrideWithValue(repo),
+        activityReminderServiceProvider.overrideWithValue(_fakeReminders()),
+        shareTimeExportProvider.overrideWithValue((f) async => shared.add(f)),
+      ],
+      child: const MaterialApp(home: TimeScreen()),
+    );
+
+    testWidgets('AppBar button opens the sheet on the viewed day', (tester) async {
+      if (!earlyEnough) return;
+      final repo = _FakeRepo([
+        _seed('Gym', _todayAt(0, 30), endMs: _todayAt(1, 0)),
+      ]);
+      final shared = <TimeExportFile>[];
+      await tester.pumpWidget(host(repo, shared));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('time_export_button')));
+      await tester.pumpAndSettle();
+      expect(find.byType(ExportTimeSheet), findsOneWidget);
+
+      final today = DateTime.now();
+      final expected = TimeExportPeriod.around(TimeExportScope.day, today);
+      expect(find.text(expected.label), findsOneWidget);
+      expect(find.text('Logged 30m'), findsOneWidget);
+    });
+
+    testWidgets('scope switches the label and preview; empty disables Share',
+        (tester) async {
+      if (!earlyEnough) return;
+      final repo = _FakeRepo([
+        _seed('Gym', _todayAt(0, 30), endMs: _todayAt(1, 0)),
+      ]);
+      final shared = <TimeExportFile>[];
+      await tester.pumpWidget(host(repo, shared));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('time_export_button')));
+      await tester.pumpAndSettle();
+
+      final share = find.byKey(const ValueKey('time_export_share'));
+      expect(tester.widget<FilledButton>(share).onPressed, isNotNull);
+
+      await tester.tap(find.text('Month'));
+      await tester.pumpAndSettle();
+      final month = TimeExportPeriod.around(TimeExportScope.month, DateTime.now());
+      expect(find.text(month.label), findsOneWidget);
+      expect(
+        find.textContaining('across 1 of ${month.dayKeys.length} days'),
+        findsOneWidget,
+      );
+
+      // Go to yesterday (no entries) and export the day: Share is disabled.
+      Navigator.of(tester.element(find.byType(ExportTimeSheet))).pop();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('time_prev_day')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('time_export_button')));
+      await tester.pumpAndSettle();
+      expect(find.text('Nothing logged in this period.'), findsOneWidget);
+      expect(tester.widget<FilledButton>(share).onPressed, isNull);
+      expect(shared, isEmpty);
+    });
+
+    testWidgets('Share hands a markdown or json file to the share hook',
+        (tester) async {
+      if (!earlyEnough) return;
+      final repo = _FakeRepo([
+        _seed('Gym', _todayAt(0, 30), endMs: _todayAt(1, 0)),
+      ]);
+      final shared = <TimeExportFile>[];
+      await tester.pumpWidget(host(repo, shared));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('time_export_button')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('time_export_share')));
+      await tester.pumpAndSettle();
+      expect(shared.length, 1);
+      expect(shared.single.name, 'sidepal_time_${DateKeys.todayKey()}.md');
+      expect(shared.single.mimeType, 'text/markdown');
+      expect(shared.single.text, contains('| Gym | 30m |'));
+      expect(find.byType(ExportTimeSheet), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('time_export_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('time_export_format_json')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('time_export_share')));
+      await tester.pumpAndSettle();
+      expect(shared.length, 2);
+      expect(shared.last.name, 'sidepal_time_${DateKeys.todayKey()}.json');
+      expect(shared.last.text, contains('"activity": "Gym"'));
+    });
+
+    testWidgets('Week view opens the sheet on the week scope', (tester) async {
+      if (!earlyEnough) return;
+      final repo = _FakeRepo([
+        _seed('Gym', _todayAt(0, 30), endMs: _todayAt(1, 0)),
+      ]);
+      final shared = <TimeExportFile>[];
+      await tester.pumpWidget(host(repo, shared));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Week'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('time_export_button')));
+      await tester.pumpAndSettle();
+      final week = TimeExportPeriod.around(TimeExportScope.week, DateTime.now());
+      expect(find.text(week.label), findsOneWidget);
+      expect(find.textContaining('across 1 of 7 days'), findsOneWidget);
     });
   });
 }

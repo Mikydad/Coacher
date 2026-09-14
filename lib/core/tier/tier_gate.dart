@@ -48,6 +48,11 @@ class TierGate {
   /// THIS WEEK stat are single numbers, not history, and stay free.
   bool get canViewProgressHistory => isBypassed;
 
+  /// Time-log export (Day / Week / Month file share). Free for now; the
+  /// export sheet is the one caller, so gating later is `=> isBypassed`
+  /// here plus the upgrade pill there (decision 2026-09-15).
+  bool get canExportTimeLog => true;
+
   bool canCreateReminder(int activeReminderCount) =>
       _allows(activeReminderCount, limits.freeReminders);
 

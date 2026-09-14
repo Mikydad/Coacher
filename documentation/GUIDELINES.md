@@ -3369,3 +3369,34 @@ not silent reversal.
   honestly beats leaving them to discover the stake still ticking. The
   unstaked complete path is unchanged (no dialog). Tests:
   `staked_goal_action_dialog_test`.
+
+- **2026-09-15 · Time log export (Day / Week / Month → Markdown or JSON,
+  share sheet).** The Time page AppBar gains an export (⇧) button that
+  opens `ExportTimeSheet`: Period segmented Day | Week | Month widened
+  around the day being viewed (Week view anchors on today when it is this
+  week, else the week's Monday), a live preview line ("Logged 5h 10m across
+  3 of 7 days · untracked 1h"), Format chips Markdown (default, "for AI &
+  notes") | JSON ("for apps"), one Share button. The file is built from
+  Isar alone (`TimeExportService` → `fetchRangeOnce`), so airplane mode is
+  indistinguishable from online; the only failure story is the share
+  sheet being dismissed, which is not a failure. *Fidelity:* each day's
+  timeline is rebuilt with `buildTimeline` including the next morning's
+  first log as successor (the Day view rule), then summed — so per-day
+  numbers match the page exactly; a week total may differ from the Week
+  view by one cross-midnight entry, and the Day rule wins because it is
+  the truer one. Every activity is listed in the totals (no "Other"
+  folding — an export must not hide the long tail); categories appear
+  only when at least one rule applies. Both formats carry the same
+  `kTimeExportDurationsNote` so a model reading the file never treats an
+  inferred end as a recorded one; JSON entries carry `endSource`
+  (explicit / nextEvent / capped / ongoing). Internal ids and sync
+  metadata are never exported; times are local wall time with the zone
+  named once in the header. File name `sidepal_time_<periodKey>.md|json`.
+  *Pro gating (deferred):* `TierGate.canExportTimeLog` exists and returns
+  `true`; gating later is `=> isBypassed` there plus the upgrade pill in
+  the sheet — no other caller. *Rejected:* CSV (a timeline with untracked
+  rows and notes reads worse as CSV than Markdown, and JSON already covers
+  tooling); sharing both formats at once (two files makes the iOS share
+  sheet clumsy). Tests: `time_export_test` (periods, successor, renderers),
+  `time_tracker_ui_test` "Export sheet" group (share hook is a provider so
+  the test captures the file instead of hitting the platform).
