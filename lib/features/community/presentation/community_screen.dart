@@ -12,6 +12,7 @@ import 'circle_detail_screen.dart';
 import 'circle_discovery_screen.dart';
 import 'sheets/circle_join_code_sheet.dart';
 
+import '../../../core/presentation/app_card.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../ai_assistant/presentation/widgets/coach_ai_fab.dart';
 import '../../../core/presentation/page_headers.dart';
@@ -28,17 +29,18 @@ class CommunityScreen extends ConsumerWidget {
     final circlesAsync = ref.watch(myCirclesProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDeep,
+      backgroundColor: AppColors.scaffold,
       appBar: AppBar(
-        backgroundColor: AppColors.surfaceDark,
+        backgroundColor: AppColors.scaffold,
         foregroundColor: AppColors.textPrimary,
         title: const PageTitle('My Circles'),
         centerTitle: true,
         elevation: 0,
+        scrolledUnderElevation: 0,
         actions: [
           const HelpAppBarButton('circles'),
           IconButton(
-            icon: Icon(Icons.explore_rounded, color: AppColors.textMuted),
+            icon: Icon(Icons.explore_rounded, color: AppColors.textPrimary),
             tooltip: 'Discover circles',
             onPressed: () =>
                 Navigator.pushNamed(context, CircleDiscoveryScreen.routeName),
@@ -70,10 +72,10 @@ class CommunityScreen extends ConsumerWidget {
                 }
                 return RefreshIndicator(
                   color: AppColors.accent,
-                  backgroundColor: AppColors.surfaceDark,
+                  backgroundColor: AppColors.surfacePanel,
                   onRefresh: () async => invalidateCircleScopedProviders(ref),
                   child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                     // Index 0 is the once-only intro card.
                     itemCount: circles.length + 1,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -110,9 +112,9 @@ class CommunityScreen extends ConsumerWidget {
   void _showCreateOrDiscover(BuildContext context, WidgetRef ref) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.surfacePanel,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) => SafeArea(
         child: Column(
@@ -123,14 +125,14 @@ class CommunityScreen extends ConsumerWidget {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.fg.withOpacity(0.12),
+                color: AppColors.divider,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 16),
             ListTile(
               leading: CircleAvatar(
-                backgroundColor: AppColors.surfaceCard,
+                backgroundColor: AppColors.surfaceLight,
                 child: Icon(Icons.add_rounded, color: AppColors.accent),
               ),
               title: Text(
@@ -161,7 +163,7 @@ class CommunityScreen extends ConsumerWidget {
             ),
             ListTile(
               leading: CircleAvatar(
-                backgroundColor: AppColors.surfaceCard,
+                backgroundColor: AppColors.surfaceLight,
                 child: Icon(Icons.explore_rounded, color: AppColors.cyanDeep),
               ),
               title: Text(
@@ -182,7 +184,7 @@ class CommunityScreen extends ConsumerWidget {
             ),
             ListTile(
               leading: CircleAvatar(
-                backgroundColor: AppColors.surfaceCard,
+                backgroundColor: AppColors.surfaceLight,
                 child: Icon(Icons.key_rounded, color: AppColors.gold),
               ),
               title: Text(
@@ -232,12 +234,12 @@ class _DiscoverCirclesState extends ConsumerWidget {
 
     return RefreshIndicator(
       color: AppColors.accent,
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.surfacePanel,
       onRefresh: () async => ref.invalidate(discoverCirclesProvider(_category)),
       child: discoverAsync.when(
         loading: () => ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
             const FirstTimeFeatureCard(guideId: 'circles'),
             const SizedBox(height: 24),
@@ -257,7 +259,7 @@ class _DiscoverCirclesState extends ConsumerWidget {
           e,
           ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             children: [
               const FirstTimeFeatureCard(guideId: 'circles'),
               const SizedBox(height: 24),
@@ -275,7 +277,7 @@ class _DiscoverCirclesState extends ConsumerWidget {
           final itemCount = circles.isEmpty ? 3 : circles.length + 2;
           return ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             itemCount: itemCount,
             separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (_, i) {
@@ -340,22 +342,23 @@ class _MyCircleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      // Redesign 2026-09-15: white card with the shared shadow, no hairline.
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: AppColors.surfaceDark,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.fg.withOpacity(0.06)),
+          color: AppColors.surfacePanel,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: appCardShadow,
         ),
         child: Row(
           children: [
             // Category icon/initial
             Container(
-              width: 48,
-              height: 48,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
-                color: AppColors.accent.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
+                color: AppColors.actionTint,
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Center(
                 child: Text(
@@ -379,7 +382,7 @@ class _MyCircleCard extends StatelessWidget {
                     circle.name,
                     style: TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 16,
+                      fontSize: 17,
                       fontWeight: FontWeight.w600,
                     ),
                     maxLines: 1,
@@ -429,7 +432,10 @@ class _MyCircleCard extends StatelessWidget {
                     ],
                   ),
                 const SizedBox(height: 4),
-                Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textSecondary,
+                ),
               ],
             ),
           ],
@@ -446,14 +452,18 @@ class _CategoryBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.surfaceCard,
-        borderRadius: BorderRadius.circular(6),
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         category[0].toUpperCase() + category.substring(1),
-        style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+        style: TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     );
   }

@@ -17,6 +17,7 @@ import 'circle_auth_guard.dart';
 import 'circle_detail_screen.dart';
 import 'sheets/circle_join_code_sheet.dart';
 
+import '../../../core/presentation/app_card.dart';
 import '../../../core/presentation/app_colors.dart';
 
 const _kAllCategories = [
@@ -279,13 +280,14 @@ class _CircleDiscoveryScreenState extends ConsumerState<CircleDiscoveryScreen>
     }
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDeep,
+      backgroundColor: AppColors.scaffold,
       appBar: AppBar(
-        backgroundColor: AppColors.surfaceDark,
+        backgroundColor: AppColors.scaffold,
         foregroundColor: AppColors.textPrimary,
         title: const PageTitle('Discover circles'),
         centerTitle: true,
         elevation: 0,
+        scrolledUnderElevation: 0,
         actions: [
           IconButton(
             tooltip: 'Join with a key',
@@ -296,9 +298,12 @@ class _CircleDiscoveryScreenState extends ConsumerState<CircleDiscoveryScreen>
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.accent,
-          unselectedLabelColor: AppColors.textMuted,
+          unselectedLabelColor: AppColors.textSecondary,
+          labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
           indicatorColor: AppColors.accent,
           indicatorSize: TabBarIndicatorSize.label,
+          dividerColor: AppColors.divider,
           tabs: const [
             Tab(text: 'Browse'),
             Tab(text: 'Search'),
@@ -379,24 +384,16 @@ class _BrowseTab extends StatelessWidget {
                   child: CircularProgressIndicator(color: AppColors.accent),
                 )
               : ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                   children: [
                     // Recommendations section
                     if (recommendations.isNotEmpty) ...[
-                      Padding(
-                        padding: EdgeInsets.only(bottom: 10),
-                        child: Text(
-                          'RECOMMENDED FOR YOU',
-                          style: TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 12),
+                        child: AppSectionLabel('RECOMMENDED FOR YOU'),
                       ),
                       SizedBox(
-                        height: 140,
+                        height: 150,
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
                           itemCount: recommendations.length,
@@ -408,17 +405,9 @@ class _BrowseTab extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      Text(
-                        'ALL CIRCLES',
-                        style: TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 24),
+                      const AppSectionLabel('ALL CIRCLES'),
+                      const SizedBox(height: 12),
                     ],
                     // All circles list
                     if (circles == null || circles!.isEmpty)
@@ -462,12 +451,12 @@ class _RecommendedCircleCard extends StatelessWidget {
         arguments: circle.id,
       ),
       child: Container(
-        width: 180,
-        padding: const EdgeInsets.all(12),
+        width: 190,
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppColors.surfaceDark,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+          color: AppColors.surfacePanel,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: appCardShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -479,7 +468,7 @@ class _RecommendedCircleCard extends StatelessWidget {
                     circle.name,
                     style: TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 13,
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
                     maxLines: 1,
@@ -513,18 +502,18 @@ class _RecommendedCircleCard extends StatelessWidget {
                   onTap: () => onJoin(circle),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
+                      horizontal: 12,
+                      vertical: 6,
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(999),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Join',
                       style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 11,
+                        color: AppColors.onAccent,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -547,33 +536,54 @@ class _CategoryChipRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Pills (redesign 2026-09-15): olive when selected, white with the
+    // shared shadow otherwise — no chip borders.
     return SizedBox(
-      height: 52,
+      height: 60,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        clipBehavior: Clip.none,
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
         itemCount: _kAllCategories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
           final cat = _kAllCategories[i];
           final isSelected = cat == selected;
-          return ChoiceChip(
-            label: Text(
-              cat[0].toUpperCase() + cat.substring(1),
-              style: TextStyle(
-                color: isSelected ? Colors.black : AppColors.textMuted,
-                fontSize: 13,
+          return GestureDetector(
+            onTap: () => onChanged(cat),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.accent : AppColors.surfacePanel,
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: isSelected ? null : appCardShadow,
+              ),
+              child: Row(
+                children: [
+                  if (isSelected) ...[
+                    Icon(
+                      Icons.check_rounded,
+                      size: 16,
+                      color: AppColors.onAccent,
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  Text(
+                    cat[0].toUpperCase() + cat.substring(1),
+                    style: TextStyle(
+                      color: isSelected
+                          ? AppColors.onAccent
+                          : AppColors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
-            selected: isSelected,
-            selectedColor: AppColors.accent,
-            backgroundColor: AppColors.surfaceCard,
-            side: BorderSide(
-              color: isSelected
-                  ? AppColors.accent
-                  : AppColors.fg.withOpacity(0.06),
-            ),
-            onSelected: (_) => onChanged(cat),
           );
         },
       ),
@@ -611,32 +621,42 @@ class _SearchTab extends StatelessWidget {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(16),
-          child: TextField(
-            controller: controller,
-            onChanged: onChanged,
-            onTapOutside: (_) => dismissKeyboard(context),
-            style: TextStyle(color: AppColors.textPrimary),
-            decoration: InputDecoration(
-              hintText: 'Search circles…',
-              hintStyle: TextStyle(color: AppColors.textMuted),
-              prefixIcon: Icon(
-                Icons.search_rounded,
-                color: AppColors.textMuted,
-              ),
-              filled: true,
-              fillColor: AppColors.surfaceDark,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.fg.withOpacity(0.06)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.fg.withOpacity(0.06)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.accent),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: appCardShadow,
+            ),
+            child: TextField(
+              controller: controller,
+              onChanged: onChanged,
+              onTapOutside: (_) => dismissKeyboard(context),
+              style: TextStyle(color: AppColors.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'Search circles…',
+                hintStyle: TextStyle(color: AppColors.textSecondary),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: AppColors.textSecondary,
+                ),
+                filled: true,
+                fillColor: AppColors.surfacePanel,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 14,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  borderSide: BorderSide(color: AppColors.accent, width: 1.5),
+                ),
               ),
             ),
           ),
@@ -653,7 +673,7 @@ class _SearchTab extends StatelessWidget {
                   message: 'No circles found for "${controller.text}"',
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                   itemCount: results.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (_, i) => CircleCard(
@@ -694,12 +714,13 @@ class _CircleCardState extends State<CircleCard> {
     final isFull = circle.memberCount >= AccountabilityCircle.kMaxMembers;
     final isJoined = widget.joined;
 
+    // Redesign 2026-09-15: white card with the shared shadow, no hairline.
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.fg.withOpacity(0.06)),
+        color: AppColors.surfacePanel,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: appCardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -712,7 +733,7 @@ class _CircleCardState extends State<CircleCard> {
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
-                    fontSize: 16,
+                    fontSize: 17,
                   ),
                 ),
               ),
@@ -725,7 +746,7 @@ class _CircleCardState extends State<CircleCard> {
               circle.description!,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
           ],
           const SizedBox(height: 12),
@@ -782,28 +803,28 @@ class _CircleCardState extends State<CircleCard> {
                       if (mounted) setState(() => _joining = false);
                     },
               style: FilledButton.styleFrom(
-                backgroundColor: isJoined
-                    ? AppColors.surfaceCard
-                    : isFull
-                    ? AppColors.surfaceCard
+                backgroundColor: isJoined || isFull
+                    ? AppColors.surfaceLight
                     : AppColors.accent,
-                foregroundColor: isJoined
-                    ? AppColors.textMuted
-                    : isFull
-                    ? AppColors.textMuted
-                    : Colors.black,
+                foregroundColor: isJoined || isFull
+                    ? AppColors.textPrimary
+                    : AppColors.onAccent,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                minimumSize: const Size.fromHeight(40),
+                minimumSize: const Size.fromHeight(48),
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
               ),
               child: _joining
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.black,
+                        color: AppColors.onAccent,
                       ),
                     )
                   : Text(
@@ -831,16 +852,16 @@ class _CategoryBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.accent.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(6),
+        color: AppColors.actionTint,
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         category[0].toUpperCase() + category.substring(1),
         style: TextStyle(
           color: AppColors.accent,
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -856,23 +877,23 @@ class _PolicyBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final isOpen = policy == JoinPolicy.open;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.surfaceCard,
-        borderRadius: BorderRadius.circular(6),
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             isOpen ? Icons.lock_open_rounded : Icons.lock_rounded,
-            size: 11,
-            color: AppColors.textMuted,
+            size: 12,
+            color: AppColors.textSecondary,
           ),
           const SizedBox(width: 4),
           Text(
             isOpen ? 'Open' : 'Approval',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
           ),
         ],
       ),
@@ -888,12 +909,8 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.textMuted, fontSize: 15),
-        ),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+        child: AppDashedEmptyState(message: message),
       ),
     );
   }

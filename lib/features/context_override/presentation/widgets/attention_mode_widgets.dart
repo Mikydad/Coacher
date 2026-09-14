@@ -3,14 +3,20 @@ import 'package:flutter/material.dart';
 import '../../../../core/presentation/app_colors.dart';
 
 /// Obsidian Pulse tokens for attention mode sheet — visual only.
+/// Light (redesign 2026-09-14): white sheet, light-gray option cards, olive
+/// accent — the old 50% black scrim painted the cards black on white.
+/// Dark keeps its original values.
 abstract final class AttentionModeColors {
-  static Color get sheet => AppColors.dark121212;
-  static Color get card => AppColors.inkCard;
-  static Color get cardOverlay => AppColors.blackScrim50;
-  static Color get lime => AppColors.accentBright;
+  static Color get sheet =>
+      AppColors.isLight ? AppColors.surfacePanel : AppColors.dark121212;
+  static Color get card => AppColors.surfaceLight;
+  static Color get cardOverlay =>
+      AppColors.isLight ? AppColors.surfaceLight : AppColors.blackScrim50;
+  static Color get lime => AppColors.accent;
+  static Color get onLime => AppColors.onAccent;
   static Color get cyan => AppColors.cyan;
-  static Color get label => AppColors.grayIos;
-  static Color get handle => AppColors.gray33;
+  static Color get label => AppColors.textSecondary;
+  static Color get handle => AppColors.divider;
 }
 
 class AttentionModeSheetHandle extends StatelessWidget {
@@ -85,10 +91,10 @@ class AttentionModeTypeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: AttentionModeColors.cardOverlay,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
@@ -108,8 +114,8 @@ class AttentionModeTypeCard extends StatelessWidget {
                     Text(
                       title,
                       style: TextStyle(
-                        color: AppColors.fg,
-                        fontWeight: FontWeight.w500,
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
                         fontSize: 16,
                       ),
                     ),
@@ -120,7 +126,7 @@ class AttentionModeTypeCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: AttentionModeColors.label,
-                        fontSize: 12,
+                        fontSize: 13,
                       ),
                     ),
                   ],
@@ -165,7 +171,7 @@ class AttentionModeDurationChip extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.black : AppColors.fg70,
+            color: selected ? AttentionModeColors.onLime : AppColors.fg70,
             fontWeight: FontWeight.w600,
             fontSize: 13,
           ),
@@ -197,8 +203,10 @@ class AttentionModeActivateButton extends StatelessWidget {
           disabledBackgroundColor: AttentionModeColors.lime.withValues(
             alpha: 0.35,
           ),
-          foregroundColor: Colors.black,
-          disabledForegroundColor: Colors.black54,
+          foregroundColor: AttentionModeColors.onLime,
+          disabledForegroundColor: AttentionModeColors.onLime.withValues(
+            alpha: 0.6,
+          ),
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(26),

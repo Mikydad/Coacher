@@ -3212,3 +3212,21 @@ not silent reversal.
   `SettingRow` and `SettingsSectionHeader` were restyled once, so the
   settings sub-pages follow for free. Account note and Log Out stay,
   restyled; the identity card lost its decorative glow blob.
+
+- **2026-09-15 · Set-mode sheet and Community screens restyled (same
+  branch, style only).** (1) The quick-activate sheet's option cards were
+  painted with the 50 % black scrim token, which is a dark-mode value —
+  black cards on a white sheet in light. `AttentionModeColors` now maps to
+  white sheet / light-gray cards / olive accent in light and keeps its dark
+  values. (2) Community tab (both the "my circles" list and the
+  discover-first state) and the Discover circles screen moved to the card
+  system: white cards with the shared shadow, soft category/policy pills,
+  pill-shaped category chips and search field, white-on-olive Join. Settled
+  with Miko: **chrome is unchanged** — the centered small-caps `PageTitle`,
+  the help/discover icons, the "+ Circle" FAB and the Browse/Search tabs
+  all stay; only Home and Profile carry the wordmark header. (3) The sleep
+  "End does nothing" report was diagnosed, not fixed: the banner shows the
+  *automatic* sleep window, and `endOverride` is a no-op when no manual
+  override exists. Proposed fix (parked until Miko decides): a local
+  `sleepWindowPausedUntilMs` on the attention state that End sets to the
+  next wake time.
