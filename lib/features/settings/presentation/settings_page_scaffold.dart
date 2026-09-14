@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/presentation/app_card.dart';
+
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 
@@ -62,15 +64,7 @@ class SettingsSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      label.toUpperCase(),
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 2,
-        color: kSettingsOnSurfaceVariant,
-      ),
-    );
+    return AppSectionLabel(label.toUpperCase());
   }
 }
 

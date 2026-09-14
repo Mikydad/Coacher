@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/presentation/app_card.dart';
 import '../../../../core/presentation/app_colors.dart';
 import '../../../education/presentation/first_time_feature_card.dart';
 import '../../../education/presentation/help_dot.dart';
@@ -187,28 +188,31 @@ class _DisciplineTile extends StatelessWidget {
         iconColor = AppColors.cyan;
       case EnforcementMode.disciplined:
         icon = Icons.bolt_rounded;
-        iconColor = isActive ? AppColors.limeShadow : AppColors.accentDim;
+        iconColor = AppColors.accent;
       case EnforcementMode.extreme:
         icon = Icons.shield_rounded;
         iconColor = AppColors.coral;
     }
+    // The active mode sits on a filled olive disc — white glyph on it.
+    if (isActive) iconColor = AppColors.onAccent;
 
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
+        // Redesign 2026-09-14: white card with the shared shadow; the active
+        // mode carries an olive outline and a filled olive disc.
         decoration: BoxDecoration(
-          color: isActive
-              ? AppColors.accentBright.withValues(alpha: 0.05)
-              : AppColors.inkDeep,
-          borderRadius: BorderRadius.circular(16),
+          color: AppColors.surfacePanel,
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isActive
-                ? AppColors.accentDim.withValues(alpha: 0.5)
+                ? AppColors.accent.withValues(alpha: 0.6)
                 : Colors.transparent,
-            width: 2,
+            width: 1.5,
           ),
+          boxShadow: appCardShadow,
         ),
         child: Row(
           children: [
@@ -217,7 +221,7 @@ class _DisciplineTile extends StatelessWidget {
               height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isActive ? AppColors.accentDim : AppColors.inkElevated,
+                color: isActive ? AppColors.accent : AppColors.surfaceLight,
               ),
               child: Icon(icon, color: iconColor, size: 20),
             ),
@@ -234,11 +238,9 @@ class _DisciplineTile extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: isActive
-                                ? AppColors.limeCream
-                                : AppColors.white,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ),
@@ -251,7 +253,10 @@ class _DisciplineTile extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     mode.description,
-                    style: TextStyle(fontSize: 12, color: AppColors.textSoft),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -287,16 +292,6 @@ class _ToneTile extends StatelessWidget {
     CoachingStyle.intense => 'Radical honesty only',
   };
 
-  Color _textColor() {
-    if (isActive) return AppColors.limeCream;
-    return switch (style) {
-      CoachingStyle.supportive => AppColors.cyan,
-      CoachingStyle.balanced => AppColors.white,
-      CoachingStyle.disciplined => AppColors.white,
-      CoachingStyle.intense => AppColors.coral,
-    };
-  }
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -304,20 +299,30 @@ class _ToneTile extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
+        // Redesign 2026-09-14: white card, no outline (the mock keeps the
+        // olive outline for Discipline Mode only), gray disc with the
+        // coach glyph.
         decoration: BoxDecoration(
-          color: isActive
-              ? AppColors.accentBright.withValues(alpha: 0.08)
-              : AppColors.inkDeep,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isActive
-                ? AppColors.accentDim.withValues(alpha: 0.4)
-                : Colors.transparent,
-            width: 2,
-          ),
+          color: AppColors.surfacePanel,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: appCardShadow,
         ),
         child: Row(
           children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.surfaceLight,
+              ),
+              child: Icon(
+                Icons.school_rounded,
+                color: AppColors.textPrimary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -330,9 +335,9 @@ class _ToneTile extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: _textColor(),
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ),
@@ -345,7 +350,10 @@ class _ToneTile extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     copyFor(style),
-                    style: TextStyle(fontSize: 11, color: AppColors.textSoft),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -366,18 +374,20 @@ class _ActivePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.bindTheme(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.limeCream,
+        color: AppColors.actionTint,
         borderRadius: BorderRadius.circular(99),
       ),
       child: Text(
         'ACTIVE',
         style: TextStyle(
-          fontSize: 9,
+          fontSize: 10,
           fontWeight: FontWeight.w700,
-          color: AppColors.onAccent,
+          letterSpacing: 0.6,
+          color: AppColors.accent,
         ),
       ),
     );
@@ -396,7 +406,7 @@ class _ExpandChevron extends StatelessWidget {
       duration: const Duration(milliseconds: 260),
       child: Icon(
         Icons.expand_more_rounded,
-        color: AppColors.textSoft,
+        color: AppColors.textSecondary,
         size: 22,
       ),
     );

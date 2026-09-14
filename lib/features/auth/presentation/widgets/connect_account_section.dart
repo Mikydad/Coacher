@@ -232,7 +232,7 @@ class ConnectAccountSection extends ConsumerWidget {
           backgroundColor: AppColors.accent,
           foregroundColor: AppColors.onAccent,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
         child: const Row(

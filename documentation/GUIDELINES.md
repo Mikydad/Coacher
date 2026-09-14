@@ -3195,3 +3195,20 @@ not silent reversal.
   `build` — the shared surfaces, `PageTitle`/`SectionHeader` and the
   wordmark now do. Branched from `main`, not from the unmerged
   `feat/alarm-mode` (no overlap).
+
+- **2026-09-14 · Profile page joins the light redesign (same branch,
+  second commit).** Settled with Miko from his mock: (1) the **lime stats
+  slab is gone** — it fought the olive palette in light mode; it is now a
+  white card with an olive flame, three stats split by hairlines (the
+  olive-filled alternative was rejected so the page keeps exactly one
+  filled element, the active mode's disc). (2) **Header = Home's**: a
+  30px "Profile" wordmark, no back chevron (it is a tab) and **no gear**
+  — there is no settings hub to open, the list lives on the page.
+  (3) **Mode and tone keep inline expansion**; the mock's right chevron
+  was read as navigation but a new screen was not wanted. Discipline Mode
+  keeps its olive outline as the active-state cue; Coach Tone has none,
+  per the mock, and gained a gray coach-glyph disc. (4) **Settings rows
+  keep their subtitles** inside one white card with indented hairlines;
+  `SettingRow` and `SettingsSectionHeader` were restyled once, so the
+  settings sub-pages follow for free. Account note and Log Out stay,
+  restyled; the identity card lost its decorative glow blob.

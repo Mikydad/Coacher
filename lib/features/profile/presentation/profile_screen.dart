@@ -1,12 +1,9 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/presentation/app_card.dart';
 import '../../../core/presentation/theme_brightness_controller.dart';
-import '../../../core/presentation/page_headers.dart';
 
-import '../../../app/application/main_tab_navigation.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../auth/application/auth_session_policy.dart';
 import '../../auth/application/user_scoped_invalidation.dart';
@@ -42,11 +39,12 @@ Color get _kSurface => AppColors.ink;
 Color get _kSurfaceHigh => AppColors.inkWarm;
 Color get _kSurfaceHighest => AppColors.inkElevated;
 Color get _kOnSurface => AppColors.white;
-Color get _kOnSurfaceVariant => AppColors.textSoft;
-Color get _kOnPrimaryFixed => AppColors.limeShadow;
+Color get _kOnSurfaceVariant => AppColors.textSecondary;
 Color get _kError => AppColors.coral;
-Color get _kPrimaryContainer => AppColors.accentBright;
-Color get _kOnPrimaryContainer => AppColors.accentDeep;
+// Stats card (redesign 2026-09-14): a white card, not the lime slab — the
+// neon fought the olive palette in light mode.
+Color get _kPrimaryContainer => AppColors.inkWarm;
+Color get _kOnPrimaryContainer => AppColors.white;
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -77,15 +75,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final service = ref.read(profilePreferenceServiceProvider);
     await service.setDisplayName(_nameController.text);
     if (mounted) setState(() => _editingName = false);
-  }
-
-  void _onBackPressed() {
-    final nav = Navigator.of(context);
-    if (nav.canPop()) {
-      nav.pop();
-      return;
-    }
-    navigateToMainTab(context, ref, index: MainTabIndex.home);
   }
 
   Future<void> _signOut() async {
@@ -152,185 +141,163 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: _kSurface,
-      // Frosted glass top bar — no AppBar widget so we get full-bleed hero
-      body: Stack(
-        children: [
-          CustomScrollView(
-            slivers: [
-              // ── Transparent space for the frosted header
-              const SliverToBoxAdapter(child: SizedBox(height: 72)),
+      // Redesign 2026-09-14: same header as Home — a plain wordmark, no
+      // back chevron (Profile is a tab) and no gear (settings live below).
+      appBar: AppBar(
+        toolbarHeight: 72,
+        titleSpacing: 20,
+        centerTitle: false,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: _kSurface,
+        title: Text(
+          'Profile',
+          style: TextStyle(
+            fontSize: 30,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.8,
+            height: 1.1,
+            color: _kOnSurface,
+          ),
+        ),
+      ),
+      body: CustomScrollView(
+        slivers: [
+          const SliverToBoxAdapter(child: SizedBox(height: 4)),
 
-              // ── Profile Hero ──────────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 4,
-                  ),
-                  child: _ProfileHero(
-                    initial: initial,
-                    effectiveName: effectiveName,
-                    editingName: _editingName,
-                    nameController: _nameController,
-                    coachingStyle: coachingStyle,
-                    streakCount: streakDays,
-                    tasksLabel: heroStats.tasksLabel,
-                    goalsLabel: heroStats.goalsLabel,
-                    onEditTap: () => setState(() => _editingName = true),
-                    onSaveName: _saveName,
-                  ),
-                ),
+          // ── Profile Hero ──────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: _ProfileHero(
+                initial: initial,
+                effectiveName: effectiveName,
+                editingName: _editingName,
+                nameController: _nameController,
+                coachingStyle: coachingStyle,
+                streakCount: streakDays,
+                tasksLabel: heroStats.tasksLabel,
+                goalsLabel: heroStats.goalsLabel,
+                onEditTap: () => setState(() => _editingName = true),
+                onSaveName: _saveName,
               ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-              // ── Progress (2026-08-23): sits directly under the streak
-              // card so checking progress is the first thing available,
-              // not a row buried in the settings list.
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: SettingRow(
-                      icon: Icons.leaderboard_rounded,
-                      title: 'Progress',
-                      subtitle: 'Score trends, streaks & analytics',
-                      // Dot while a coaching focus is waiting unseen —
-                      // clears once the focus card renders on Progress.
-                      trailing: ref.watch(hasUnseenCoachingFocusProvider)
-                          ? Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.danger,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                const SettingRowChevron(),
-                              ],
-                            )
-                          : const SettingRowChevron(),
-                      onTap: () => Navigator.pushNamed(
-                        context,
-                        AnalyticsProgressScreen.routeName,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 28)),
-
-              // ── Discipline Mode + Coach Tone (2026-08-23): the two knobs
-              // reached for most often sit out in the open, above the
-              // settings doors — each collapsed to its active value.
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: DisciplineModeSection(),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 18)),
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: CoachToneSection(),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
-
-              // ── Grouped hub (Profile reorg 2026-08-23): every knob lives
-              // on a focused sub-page; this list is just the doors in.
-              const SliverToBoxAdapter(child: _SectionLabel(label: 'Settings')),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: _ProfileHubList(quietLabel: quietLabel),
-                ),
-              ),
-
-              // ── Account (guest only: connect prompt; registered users see
-              // their identity in Account settings) ─────────────────────────
-              if (!ref.watch(isRegisteredProvider)) ...[
-                const SliverToBoxAdapter(child: SizedBox(height: 32)),
-                const SliverToBoxAdapter(
-                  child: _SectionLabel(label: 'Account'),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Text(
-                      'Connect an account so your data survives phone changes '
-                      'and reinstalls.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: _kOnSurfaceVariant.withValues(alpha: 0.7),
-                      ),
-                    ),
-                  ),
-                ),
-                const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
-                    child: ConnectAccountSection(),
-                  ),
-                ),
-              ],
-
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
-
-              // ── Log Out ───────────────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _LogOutButton(onTap: _signOut),
-                ),
-              ),
-
-              // Version footer + tester-mode taps moved to About & Support.
-              const SliverToBoxAdapter(child: SizedBox(height: 48)),
-            ],
+            ),
           ),
 
-          // ── Frosted glass top bar (matches home screen style) ─────────────
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: Container(
-                  height: 72,
-                  color: _kSurface.withValues(alpha: 0.8),
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                  child: SafeArea(
-                    bottom: false,
-                    child: Row(
-                      children: [
-                        GestureDetector(
-                          onTap: _onBackPressed,
-                          child: Icon(
-                            Icons.arrow_back_ios_new_rounded,
-                            color: _kOnSurface,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        const PageTitle('Profile'),
-                      ],
-                    ),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
+          // ── Progress (2026-08-23): sits directly under the streak
+          // card so checking progress is the first thing available,
+          // not a row buried in the settings list.
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: AppCard(
+                padding: EdgeInsets.zero,
+                radius: 20,
+                clipBehavior: Clip.antiAlias,
+                child: SettingRow(
+                  icon: Icons.leaderboard_rounded,
+                  title: 'Progress',
+                  subtitle: 'Score trends, streaks & analytics',
+                  // Dot while a coaching focus is waiting unseen —
+                  // clears once the focus card renders on Progress.
+                  trailing: ref.watch(hasUnseenCoachingFocusProvider)
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: AppColors.danger,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const SettingRowChevron(),
+                          ],
+                        )
+                      : const SettingRowChevron(),
+                  onTap: () => Navigator.pushNamed(
+                    context,
+                    AnalyticsProgressScreen.routeName,
                   ),
                 ),
               ),
             ),
           ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 28)),
+
+          // ── Discipline Mode + Coach Tone (2026-08-23): the two knobs
+          // reached for most often sit out in the open, above the
+          // settings doors — each collapsed to its active value.
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: DisciplineModeSection(),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 18)),
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: CoachToneSection(),
+            ),
+          ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 32)),
+
+          // ── Grouped hub (Profile reorg 2026-08-23): every knob lives
+          // on a focused sub-page; this list is just the doors in.
+          const SliverToBoxAdapter(child: _SectionLabel(label: 'Settings')),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: _ProfileHubList(quietLabel: quietLabel),
+            ),
+          ),
+
+          // ── Account (guest only: connect prompt; registered users see
+          // their identity in Account settings) ─────────────────────────
+          if (!ref.watch(isRegisteredProvider)) ...[
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+            const SliverToBoxAdapter(child: _SectionLabel(label: 'Account')),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  'Connect an account so your data survives phone changes '
+                  'and reinstalls.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.35,
+                    color: _kOnSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: ConnectAccountSection(),
+              ),
+            ),
+          ],
+
+          const SliverToBoxAdapter(child: SizedBox(height: 32)),
+
+          // ── Log Out ───────────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _LogOutButton(onTap: _signOut),
+            ),
+          ),
+
+          // Version footer + tester-mode taps moved to About & Support.
+          const SliverToBoxAdapter(child: SizedBox(height: 48)),
         ],
       ),
     );
@@ -371,238 +338,209 @@ class _ProfileHero extends StatelessWidget {
     return Column(
       children: [
         // Identity card
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: _kSurfaceHigh,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Stack(
+        AppCard(
+          padding: const EdgeInsets.all(22),
+          child: Row(
             children: [
-              // Background glow
-              Positioned(
-                right: -16,
-                top: -16,
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _kPrimary.withValues(alpha: 0.08),
-                  ),
-                  child: const SizedBox.shrink(),
-                ),
-              ),
-              Row(
+              // Avatar
+              Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  // Avatar
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: _kPrimaryDim.withValues(alpha: 0.2),
-                            width: 2,
-                          ),
-                          color: _kSurfaceHighest,
-                        ),
-                        child: Center(
-                          child: Text(
-                            initial,
-                            style: TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.bold,
-                              color: _kPrimary,
-                            ),
-                          ),
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _kPrimary.withValues(alpha: 0.35),
+                        width: 2,
+                      ),
+                      color: _kSurfaceHighest,
+                    ),
+                    child: Center(
+                      child: Text(
+                        initial,
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: _kPrimary,
                         ),
                       ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            color: _kPrimary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.verified_rounded,
-                            size: 14,
-                            color: _kOnPrimaryFixed,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _kPrimary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(99),
-                            border: Border.all(
-                              color: _kPrimary.withValues(alpha: 0.2),
-                            ),
-                          ),
-                          child: Text(
-                            coachingStyle.displayName.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.2,
-                              color: _kPrimary,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        // Name / editor
-                        if (editingName)
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  textCapitalization: TextCapitalization.words,
-                                  controller: nameController,
-                                  autofocus: true,
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: _kOnSurface,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: 'Your name',
-                                    hintStyle: TextStyle(
-                                      color: _kOnSurfaceVariant.withValues(
-                                        alpha: 0.5,
-                                      ),
-                                    ),
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.zero,
-                                    border: InputBorder.none,
-                                  ),
-                                  onSubmitted: (_) => onSaveName(),
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: onSaveName,
-                                child: Icon(
-                                  Icons.check_rounded,
-                                  color: _kPrimaryDim,
-                                  size: 20,
-                                ),
-                              ),
-                            ],
-                          )
-                        else
-                          Text(
-                            effectiveName,
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: _kOnSurface,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                        const SizedBox(height: 6),
-                        GestureDetector(
-                          onTap: editingName ? null : onEditTap,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Edit Profile',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: _kPrimaryDim,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(
-                                Icons.north_east_rounded,
-                                size: 13,
-                                color: _kPrimaryDim,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: _kPrimary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.verified_rounded,
+                        size: 14,
+                        color: AppColors.onAccent,
+                      ),
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.actionTint,
+                        borderRadius: BorderRadius.circular(99),
+                        border: Border.all(
+                          color: _kPrimary.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Text(
+                        coachingStyle.displayName.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                          color: _kPrimary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Name / editor
+                    if (editingName)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              textCapitalization: TextCapitalization.words,
+                              controller: nameController,
+                              autofocus: true,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: _kOnSurface,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'Your name',
+                                hintStyle: TextStyle(
+                                  color: _kOnSurfaceVariant.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                ),
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                                border: InputBorder.none,
+                              ),
+                              onSubmitted: (_) => onSaveName(),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: onSaveName,
+                            child: Icon(
+                              Icons.check_rounded,
+                              color: _kPrimaryDim,
+                              size: 20,
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      Text(
+                        effectiveName,
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: _kOnSurface,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    const SizedBox(height: 6),
+                    GestureDetector(
+                      onTap: editingName ? null : onEditTap,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Edit profile',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: _kPrimary,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.north_east_rounded,
+                            size: 15,
+                            color: _kPrimary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
 
-        // Streak card
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: _kPrimaryContainer,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: _kPrimaryDim.withValues(alpha: 0.3),
-                blurRadius: 20,
-                spreadRadius: 0,
-              ),
-            ],
-          ),
+        // Stats card
+        AppCard(
+          color: _kPrimaryContainer,
+          padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
                 Icons.local_fire_department_rounded,
-                color: _kOnPrimaryContainer,
-                size: 28,
+                color: _kPrimary,
+                size: 26,
               ),
               const SizedBox(height: 10),
               // Streak stays the hero; today's tasks and this week's goals
               // sit beside it so progress is readable without a tap
               // (2026-08-23).
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: _HeroStat(
-                      value: streakCount.toString(),
-                      label: 'DAY STREAK',
-                      valueSize: 34,
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _HeroStat(
+                        value: streakCount.toString(),
+                        label: 'DAY STREAK',
+                        valueSize: 36,
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: _HeroStat(
-                      value: tasksLabel,
-                      label: 'TODAY',
-                      valueSize: 26,
+                    const _StatDivider(),
+                    Expanded(
+                      child: _HeroStat(
+                        value: tasksLabel,
+                        label: 'TODAY',
+                        valueSize: 36,
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: _HeroStat(
-                      value: goalsLabel,
-                      label: 'THIS WEEK',
-                      valueSize: 26,
+                    const _StatDivider(),
+                    Expanded(
+                      child: _HeroStat(
+                        value: goalsLabel,
+                        label: 'THIS WEEK',
+                        valueSize: 36,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -612,7 +550,22 @@ class _ProfileHero extends StatelessWidget {
   }
 }
 
-/// One number + caption inside the lime hero card. FittedBox keeps a long
+/// Hairline between the three stats.
+class _StatDivider extends StatelessWidget {
+  const _StatDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    AppColors.bindTheme(context);
+    return Container(
+      width: 1,
+      margin: const EdgeInsets.only(right: 16, top: 2, bottom: 2),
+      color: AppColors.divider,
+    );
+  }
+}
+
+/// One number + caption inside the stats card. FittedBox keeps a long
 /// value ("12/14") from overflowing its third of the row on narrow phones.
 class _HeroStat extends StatelessWidget {
   const _HeroStat({
@@ -654,10 +607,10 @@ class _HeroStat extends StatelessWidget {
             label,
             maxLines: 1,
             style: TextStyle(
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
-              letterSpacing: 1.4,
-              color: _kOnPrimaryContainer,
+              letterSpacing: 1.6,
+              color: _kOnSurfaceVariant,
             ),
           ),
         ),
@@ -675,10 +628,12 @@ class _ProfileHubList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+    return AppCard(
+      padding: EdgeInsets.zero,
+      radius: 20,
+      clipBehavior: Clip.antiAlias,
       child: Column(
-        children: [
+        children: _withDividers([
           // Direction (PRD/Direction, 2026-09-11): the page's real entry
           // point. Subtitle mirrors the month's text so Profile reads what
           // the user said matters without opening anything.
@@ -690,8 +645,8 @@ class _ProfileHubList extends StatelessWidget {
               return SettingRow(
                 icon: Icons.explore_outlined,
                 title: 'Direction',
-                subtitle: slot?.text ??
-                    "Where you're heading — year, quarter, month",
+                subtitle:
+                    slot?.text ?? "Where you're heading — year, quarter, month",
                 trailing: const SettingRowChevron(),
                 onTap: () =>
                     Navigator.pushNamed(context, DirectionScreen.routeName),
@@ -779,10 +734,19 @@ class _ProfileHubList extends StatelessWidget {
             onTap: () =>
                 Navigator.pushNamed(context, AboutSupportScreen.routeName),
           ),
-        ],
+        ]),
       ),
     );
   }
+
+  /// Hairlines between rows, indented past the icon column.
+  static List<Widget> _withDividers(List<Widget> rows) => [
+    for (var i = 0; i < rows.length; i++) ...[
+      if (i > 0)
+        Divider(height: 1, thickness: 1, indent: 52, color: AppColors.divider),
+      rows[i],
+    ],
+  ];
 }
 
 // ─── Log Out button ───────────────────────────────────────────────────────────
@@ -793,31 +757,38 @@ class _LogOutButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: _kSurfaceHighest,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        highlightColor: _kError.withValues(alpha: 0.08),
-        splashColor: _kError.withValues(alpha: 0.12),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.logout_rounded, color: _kError, size: 18),
-              const SizedBox(width: 8),
-              Text(
-                'Log Out',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: _kError,
+    return Container(
+      decoration: BoxDecoration(
+        color: _kSurfaceHigh,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: appCardShadow,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          highlightColor: _kError.withValues(alpha: 0.08),
+          splashColor: _kError.withValues(alpha: 0.12),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.logout_rounded, color: _kError, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'Log Out',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: _kError,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -835,15 +806,7 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Text(
-        label.toUpperCase(),
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 2,
-          color: _kOnSurfaceVariant,
-        ),
-      ),
+      child: AppSectionLabel(label.toUpperCase()),
     );
   }
 }
