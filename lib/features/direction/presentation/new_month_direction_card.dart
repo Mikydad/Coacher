@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/presentation/app_card.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../application/direction_providers.dart';
 import '../application/new_month_prompt.dart';
@@ -41,22 +42,23 @@ class NewMonthDirectionCard extends ConsumerWidget {
 
     if (!show) return const SizedBox.shrink();
 
-    Future<void> handle() =>
-        ref.read(newMonthPromptControllerProvider.notifier).markHandled(month.key);
+    Future<void> handle() => ref
+        .read(newMonthPromptControllerProvider.notifier)
+        .markHandled(month.key);
 
-    return Card(
+    return AppCard(
       key: const ValueKey('new_month_direction_card'),
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: AppColors.fg.withAlpha(12),
+      radius: 20,
+      padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          handle();
-          Navigator.pushNamed(context, DirectionScreen.routeName);
-        },
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 6, 8),
+      onTap: () {
+        handle();
+        Navigator.pushNamed(context, DirectionScreen.routeName);
+      },
+      child: Builder(
+        builder: (context) => Padding(
+          padding: EdgeInsets.zero,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

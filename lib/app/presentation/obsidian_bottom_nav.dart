@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../core/presentation/app_card.dart';
 import '../../core/presentation/app_colors.dart';
 
 /// Translucent “watermark” footer shared across main tabs.
@@ -28,73 +29,88 @@ class ObsidianBottomNav extends StatelessWidget {
     (icon: Icons.person_rounded, label: 'Profile'),
   ];
 
-  static Color get _kSurface => AppColors.ink;
+  // Light (redesign 2026-09-14): a near-solid white pill with the shared
+  // card shadow. Dark keeps its translucent ink watermark unchanged.
+  static Color get _kSurface =>
+      AppColors.isLight ? AppColors.surfacePanel : AppColors.ink;
+  static double get _kSurfaceAlpha => AppColors.isLight ? 0.94 : 0.62;
   static Color get _kVariant => AppColors.textSoft;
   static Color get _kActive => AppColors.accent;
+
+  static const double _kRadius = 28;
 
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(12, 0, 12, 8 + bottomPadding),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: _kSurface.withValues(alpha: 0.62),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppColors.fg.withValues(alpha: 0.08)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-              child: Row(
-                children: List.generate(_items.length, (i) {
-                  final item = _items[i];
-                  final selected = i == selectedIndex;
-                  final color = selected ? _kActive : _kVariant;
-                  final badge = badgeCounts[i] ?? 0;
+      padding: EdgeInsets.fromLTRB(16, 0, 16, 10 + bottomPadding),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(_kRadius),
+          boxShadow: appCardShadow,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(_kRadius),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: _kSurface.withValues(alpha: _kSurfaceAlpha),
+                borderRadius: BorderRadius.circular(_kRadius),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: List.generate(_items.length, (i) {
+                    final item = _items[i];
+                    final selected = i == selectedIndex;
+                    final color = selected ? _kActive : _kVariant;
+                    final badge = badgeCounts[i] ?? 0;
 
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => onTap(i),
-                      behavior: HitTestBehavior.opaque,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _BadgedIcon(
-                            icon: item.icon,
-                            color: color,
-                            count: badge,
-                          ),
-                          const SizedBox(height: 3),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                item.label,
-                                maxLines: 1,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  height: 1,
-                                  letterSpacing: 0.1,
-                                  fontWeight: selected
-                                      ? FontWeight.w600
-                                      : FontWeight.w500,
-                                  color: color,
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () => onTap(i),
+                        behavior: HitTestBehavior.opaque,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _BadgedIcon(
+                              icon: item.icon,
+                              color: color,
+                              count: badge,
+                            ),
+                            const SizedBox(height: 4),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  item.label,
+                                  maxLines: 1,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    height: 1,
+                                    letterSpacing: 0.1,
+                                    fontWeight: selected
+                                        ? FontWeight.w600
+                                        : FontWeight.w500,
+                                    color: color,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  }),
+                ),
               ),
             ),
           ),
@@ -118,7 +134,7 @@ class _BadgedIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconWidget = Icon(icon, size: 22, color: color);
+    final iconWidget = Icon(icon, size: 24, color: color);
     if (count <= 0) return iconWidget;
     return Stack(
       clipBehavior: Clip.none,

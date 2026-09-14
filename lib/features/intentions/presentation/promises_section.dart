@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/presentation/app_card.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../application/activity_moment_rules.dart';
 import '../application/intentions_providers.dart';
@@ -66,38 +67,30 @@ class _PromisesSectionState extends ConsumerState<PromisesSection> {
       children: [
         Row(
           children: [
-            Text(
-              'PROMISES',
-              style: TextStyle(
-                color: AppColors.fg54,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.2,
-              ),
-            ),
+            const AppSectionLabel('PROMISES'),
             const Spacer(),
-            InkWell(
-              borderRadius: BorderRadius.circular(999),
-              onTap: () => showIntentionQuickAddSheet(context),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Icon(Icons.add, size: 18, color: AppColors.fg70),
-              ),
+            AppCircleIconButton(
+              icon: Icons.add_rounded,
+              size: 40,
+              iconSize: 20,
+              tooltip: 'Add a promise',
+              onPressed: () => showIntentionQuickAddSheet(context),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         if (open.isEmpty)
-          Text(
-            'Nothing promised right now — say it to Coach or tap +.',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+          // Deliberate empty state (redesign 2026-09-14): a dashed box says
+          // this space is waiting for content, not that something is missing.
+          const AppDashedEmptyState(
+            message: 'Nothing promised right now — say it to Coach or tap +.',
           )
         else
           Container(
             decoration: BoxDecoration(
               color: AppColors.surfacePanel,
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppColors.fg12),
+              boxShadow: appCardShadow,
             ),
             child: Column(
               children: [

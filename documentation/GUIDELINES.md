@@ -3156,3 +3156,42 @@ not silent reversal.
   `taskIntegrity`) live on with rewritten copy on the rollup and split
   cards; (6) skeletons are per horizon so the cache-hit reveal never
   re-flows. Not yet verified on a device at the time of writing.
+
+- **2026-09-14 · Home light-mode redesign on `feat/home-light-redesign`
+  (PRD/The new Design screenshot + written spec).** Settled with Miko before
+  building: (1) **Global tokens, not Home-only** — the light palette itself
+  moved to the new system (page `#FAFAF7`, cards white, ink `#111511`,
+  olive `#547D0B` as `accent`, teal `#0788A6` as `cyan`/`coach`, secondary
+  `#6F727B`) and seven tokens were added to `AppPalette` (`textSecondary`,
+  `surfaceLight`, `divider`, `actionTint`, `coach`, `cardShadow`,
+  `coachShadow`), so every light screen shifts together. (2) **Dark mode
+  keeps its colors** — same layout and components, dark values of the new
+  tokens map onto the existing dark palette; no dark redesign in this PR.
+  (3) **Nothing left Home** — every section and conditional card stays,
+  restyled through the new shared surfaces in
+  `lib/core/presentation/app_card.dart` (`AppCard`, `AppCircleIconButton`,
+  `AppSoftPill`, `AppDashedEmptyState`, `AppSectionLabel`) — soft shadows
+  instead of borders, radii 28/24/22/20/18/999. (4) **Today's progress ring
+  = goals and habits active AND due today** (`goalHabitDay`: action days +
+  habit tasks), weighted so partial progress shows; the sub-line is
+  "N of M goals/habits completed" counting only fully completed items.
+  (5) **7-day bars** draw `blendedWeekSeries` Monday → today; zero days
+  are short filled stubs, future days short hollow stubs (visibly
+  different), today is teal. The two-line sparkline is gone. (6) The
+  **notifications bell stays non-interactive** (no ripple, TODO for a
+  notification center) — no destination exists yet. (7) **Platform font**,
+  no bundled Inter. (8) **20px side padding** (the spec's 28–32 cramps the
+  four tiles); spacious cards pad 20 inside. (9) `SectionHeader` gained a
+  `hero` flag (24px) for the one card that carries a headline — the
+  recovery card — so the type hierarchy still lives in `page_headers.dart`.
+  (10) The bottom nav is app-wide chrome: light is a near-solid white pill
+  with the card shadow and olive active state; dark keeps the translucent
+  ink watermark. (11) **Live theme toggle and `const` widgets** — found on
+  device: the toggle re-keys `MaterialApp`, but the Navigator's GlobalKey
+  retains the route tree, so identical `const` StatelessWidgets are never
+  rebuilt and keep the old palette's paint (the faint "PROFILE" title after
+  a toggle was this bug). Any const-constructible StatelessWidget that reads
+  `AppColors` must call `AppColors.bindTheme(context)` first thing in
+  `build` — the shared surfaces, `PageTitle`/`SectionHeader` and the
+  wordmark now do. Branched from `main`, not from the unmerged
+  `feat/alarm-mode` (no overlap).

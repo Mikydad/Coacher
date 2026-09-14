@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/presentation/app_card.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../application/recovery_triage_service.dart';
@@ -47,23 +48,27 @@ class RecoveryCard extends ConsumerWidget {
     final shown = ordered.take(RecoveryViewBuilder.maxRows).toList();
     final overflow = ordered.length - shown.length;
 
-    return Card(
+    // Redesign 2026-09-14: a clean white card — headline, muted subtitle,
+    // hairline, then the rows. No translucent gray fill, so it never reads
+    // as disabled.
+    return AppCard(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: AppColors.fg.withAlpha(12),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SectionHeader(
               shown.isEmpty ? 'Today' : _headline(view.rows.length),
+              hero: true,
               subtitle: shown.isEmpty
                   ? null
                   : (triage?.headline ??
                         'Still open — do one now, or move it.'),
             ),
-            if (shown.isNotEmpty) const SizedBox(height: 4),
+            if (shown.isNotEmpty)
+              Divider(height: 28, thickness: 1, color: AppColors.divider),
             for (final row in shown)
               _RecoveryRowTile(
                 row: row,
@@ -90,7 +95,7 @@ class RecoveryCard extends ConsumerWidget {
               ),
             if (view.routineDigestLine != null) ...[
               if (shown.isNotEmpty)
-                Divider(height: 16, color: AppColors.fg.withAlpha(20)),
+                Divider(height: 16, thickness: 1, color: AppColors.divider),
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
@@ -132,7 +137,7 @@ class _RecoveryRowTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
           if (row.isCritical)
@@ -153,22 +158,26 @@ class _RecoveryRowTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(
                   recoveryRowSubtitle(row),
-                  style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
           ),
           // One primary action per row (FR-R-50); everything else lives in
           // the task's own screen.
-          TextButton(onPressed: onDo, child: const Text('Do now')),
+          AppSoftPill(label: 'Do now', onPressed: onDo),
+          const SizedBox(width: 4),
           if (onDismiss != null)
             IconButton(
               tooltip: 'Not today',
@@ -212,7 +221,6 @@ class _RecoveryRowTile extends StatelessWidget {
       ),
     );
   }
-
 }
 
 /// How long a row has waited, plus — for the stricter modes — what it is

@@ -22,7 +22,11 @@ import '../ai_assistant_screen.dart';
 class CoachAiFab extends ConsumerWidget {
   const CoachAiFab({super.key});
 
-  static Color get _accent => AppColors.cyan;
+  static Color get _accent => AppColors.coach;
+
+  /// 64px (redesign 2026-09-14) — a touch larger than a stock FAB so the
+  /// coach reads as the page's floating companion, not another control.
+  static const double kSize = 64;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -40,7 +44,9 @@ class CoachAiFab extends ConsumerWidget {
     final hasSuggestions =
         ref
             .watch(proactiveSuggestionsProvider)
-            .whenOrNull(data: (s) => activeProactiveSuggestions(s).isNotEmpty) ??
+            .whenOrNull(
+              data: (s) => activeProactiveSuggestions(s).isNotEmpty,
+            ) ??
         false;
 
     // Long-press = straight into Voice Mode (2026-08-22): the same
@@ -56,13 +62,15 @@ class CoachAiFab extends ConsumerWidget {
       // Solid accent + a soft glow: the coach is the app's one primary
       // action, and the old ink-on-ink outline disappeared into the page.
       child: Container(
+        width: kSize,
+        height: kSize,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: _accent.withValues(alpha: 0.30),
-              blurRadius: 14,
-              offset: const Offset(0, 3),
+              color: AppColors.coachShadow,
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -85,7 +93,7 @@ class CoachAiFab extends ConsumerWidget {
           child: Icon(
             Icons.auto_awesome_rounded,
             color: AppColors.onAccent,
-            size: 26,
+            size: 28,
           ),
         ),
       ),
@@ -125,11 +133,7 @@ class CoachSatelliteFabs extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        const CoachAiFab(),
-        const SizedBox(height: 10),
-        pageFab,
-      ],
+      children: [const CoachAiFab(), const SizedBox(height: 10), pageFab],
     );
   }
 }

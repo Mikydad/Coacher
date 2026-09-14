@@ -63,7 +63,7 @@ class CoachForLifeApp extends ConsumerWidget {
       colorScheme: ColorScheme.fromSeed(
         seedColor: brightness == Brightness.dark
             ? const Color(0xFFB7FF00)
-            : const Color(0xFF4C6700),
+            : const Color(0xFF547D0B),
         brightness: brightness,
       ),
       useMaterial3: true,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/presentation/app_card.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../analytics/application/insight_generation_providers.dart';
@@ -30,8 +31,7 @@ class OnYourRadarSection extends ConsumerStatefulWidget {
   const OnYourRadarSection({super.key});
 
   @override
-  ConsumerState<OnYourRadarSection> createState() =>
-      _OnYourRadarSectionState();
+  ConsumerState<OnYourRadarSection> createState() => _OnYourRadarSectionState();
 }
 
 class _OnYourRadarSectionState extends ConsumerState<OnYourRadarSection> {
@@ -47,7 +47,7 @@ class _OnYourRadarSectionState extends ConsumerState<OnYourRadarSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 14),
+        const SizedBox(height: 20),
         InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: () => setState(() => _expanded = !_expanded),
@@ -55,23 +55,15 @@ class _OnYourRadarSectionState extends ConsumerState<OnYourRadarSection> {
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Row(
               children: [
-                Text(
-                  'ON YOUR RADAR · $count',
-                  style: TextStyle(
-                    color: AppColors.fg54,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(width: 4),
+                AppSectionLabel('ON YOUR RADAR · $count'),
+                const SizedBox(width: 6),
                 AnimatedRotation(
                   turns: _expanded ? 0.5 : 0,
                   duration: const Duration(milliseconds: 260),
                   child: Icon(
                     Icons.expand_more_rounded,
-                    size: 16,
-                    color: AppColors.fg54,
+                    size: 18,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -85,27 +77,27 @@ class _OnYourRadarSectionState extends ConsumerState<OnYourRadarSection> {
           child: !_expanded
               ? const SizedBox(width: double.infinity)
               : Padding(
-                  padding: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.only(top: 12),
                   child: Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
                       color: AppColors.surfacePanel,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: AppColors.fg12),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: appCardShadow,
                     ),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
+                      horizontal: 16,
+                      vertical: 8,
                     ),
                     child: Column(
                       children: [
                         if (observation != null)
                           _ObservationRow(observation: observation),
                         if (observation != null && radar.isNotEmpty)
-                          Divider(height: 1, color: AppColors.fg12),
+                          Divider(height: 1, color: AppColors.divider),
                         for (var i = 0; i < radar.length; i++) ...[
                           if (i > 0)
-                            Divider(height: 1, color: AppColors.fg12),
+                            Divider(height: 1, color: AppColors.divider),
                           _RadarRow(intention: radar[i]),
                         ],
                       ],

@@ -110,6 +110,13 @@ class AppPalette {
     required this.onActionTileActive,
     required this.actionTile,
     required this.onActionTile,
+    required this.textSecondary,
+    required this.surfaceLight,
+    required this.divider,
+    required this.actionTint,
+    required this.coach,
+    required this.cardShadow,
+    required this.coachShadow,
     required this.limeCream,
     required this.limeSoft,
     required this.limeOlive,
@@ -240,6 +247,29 @@ class AppPalette {
   final Color onActionTileActive;
   final Color actionTile;
   final Color onActionTile;
+
+  // Home redesign tokens (2026-09-14, PRD/The new Design): one calm system —
+  // warm off-white page, white cards, soft shadows instead of borders.
+  /// Secondary copy: metadata, sub-lines, micro-labels.
+  final Color textSecondary;
+
+  /// Light inset surface (icon discs, progress tracks, empty stubs).
+  final Color surfaceLight;
+
+  /// Hairline separators inside cards.
+  final Color divider;
+
+  /// Pale accent wash behind soft pills ("Do now", the track pill's +).
+  final Color actionTint;
+
+  /// The AI Coach's own color — the one non-olive accent on Home.
+  final Color coach;
+
+  /// Card drop shadow (already carries its alpha).
+  final Color cardShadow;
+
+  /// The Coach button's tinted glow.
+  final Color coachShadow;
   // One-off: lime tints (rebrand together with accent).
   /// Used as TEXT on dark → olive text on light.
   final Color limeCream;
@@ -378,6 +408,14 @@ class AppPalette {
     onActionTileActive: Color(0xFF0E0E0E),
     actionTile: Color(0xFF1A1C1F),
     onActionTile: Color(0xFFB7FF00),
+    // Home redesign tokens — dark keeps its existing colors (2026-09-14).
+    textSecondary: Color(0xFF8A8FA8),
+    surfaceLight: Color(0xFF1A1C1F),
+    divider: Color(0x1FFFFFFF),
+    actionTint: Color(0x24B7FF00),
+    coach: Color(0xFF00E3FD),
+    cardShadow: Color(0x66000000),
+    coachShadow: Color(0x4D00E3FD),
     // One-off: lime tints (rebrand together with accent).
     limeCream: Color(0xFFEAFFB8),
     limeSoft: Color(0xFFD4F08A),
@@ -473,15 +511,18 @@ class AppPalette {
     blackScrim50: Color(0x801A1A1A),
   );
 
+  // Light ("SidePal Light", PRD/The new Design, 2026-09-14): warm off-white
+  // page #FAFAF7, white cards, ink #111511, olive #547D0B for primary
+  // actions, teal #0788A6 reserved for the Coach.
   static const AppPalette light = AppPalette(
-    accent: Color(0xFF4C6700),
-    accentDim: Color(0xFF557300),
+    accent: Color(0xFF547D0B),
+    accentDim: Color(0xFF5F8C10),
     accentBright: Color(0xFFC0FF00),
     accentDeep: Color(0xFF384E00),
     onAccent: Color(0xFFFFFFFF),
-    homeHeroCard: Color(0xFFECEEF1),
-    cyan: Color(0xFF0E7490),
-    cyanDeep: Color(0xFF155E75),
+    homeHeroCard: Color(0xFFFFFFFF),
+    cyan: Color(0xFF0788A6),
+    cyanDeep: Color(0xFF066F88),
     mint: Color(0xFF047857),
     success: Color(0xFF15803D),
     violet: Color(0xFF5B45D6),
@@ -493,44 +534,52 @@ class AppPalette {
     amberDeep: Color(0xFF9A3412),
     yellow: Color(0xFFA16207),
     danger: Color(0xFFBA1A1A),
-    textPrimary: Color(0xFF1A1C1C),
-    textMuted: Color(0xFF5E5E5E),
+    textPrimary: Color(0xFF111511),
+    textMuted: Color(0xFF6F727B),
     textSoft: Color(0xFF646464),
-    textGray: Color(0xFF6B6B6B),
+    textGray: Color(0xFF6F727B),
     textFaint: Color(0xFF9E9E9E),
     textDim: Color(0xFFC6C6C6),
-    fg: Color(0xFF1A1C1C),
+    fg: Color(0xFF111511),
     fg70: Color(0xFF4A4A4A),
     fg60: Color(0xFF5E5E5E),
-    fg54: Color(0xFF6B6B6B),
+    fg54: Color(0xFF6F727B),
     fg38: Color(0xFF9E9E9E),
     fg24: Color(0x33000000),
     fg12: Color(0x14000000),
     fg10: Color(0x1A000000),
-    scaffold: Color(0xFFECEDEF),
+    scaffold: Color(0xFFFAFAF7),
     surfaceCard: Color(0xFFFFFFFF),
-    surfaceDark: Color(0xFFF4F5F7),
-    surfaceSlate: Color(0xFFE3E6EA),
-    surfaceMuted: Color(0xFFEDF0F3),
+    surfaceDark: Color(0xFFF4F5F2),
+    surfaceSlate: Color(0xFFE7E9E4),
+    surfaceMuted: Color(0xFFF4F5F2),
     surfacePanel: Color(0xFFFFFFFF),
-    surfaceDeep: Color(0xFFEDF0F3),
-    ink: Color(0xFFF9F9F9),
+    surfaceDeep: Color(0xFFF4F5F2),
+    ink: Color(0xFFFAFAF7),
     inkCard: Color(0xFFFFFFFF),
     inkWarm: Color(0xFFFFFFFF),
-    inkElevated: Color(0xFFE9EBEE),
-    inkSoft: Color(0xFFE3E6EA),
+    inkElevated: Color(0xFFF4F5F2),
+    inkSoft: Color(0xFFE7E9E4),
     inkDeep: Color(0xFFFFFFFF),
-    actionTileActive: Color(0xFF1A1C1C),
+    // Quick-action tiles: the one filled tile is olive; idle tiles are white.
+    actionTileActive: Color(0xFF547D0B),
     onActionTileActive: Color(0xFFFFFFFF),
-    actionTile: Color(0xFFE6E6E6),
-    onActionTile: Color(0xFF1A1C1C),
-    limeCream: Color(0xFF4C6700),
-    limeSoft: Color(0xFF557300),
+    actionTile: Color(0xFFFFFFFF),
+    onActionTile: Color(0xFF111511),
+    textSecondary: Color(0xFF6F727B),
+    surfaceLight: Color(0xFFF4F5F2),
+    divider: Color(0xFFE7E9E4),
+    actionTint: Color(0xFFEFF5E5),
+    coach: Color(0xFF0788A6),
+    cardShadow: Color(0x0F000000),
+    coachShadow: Color(0x590788A6),
+    limeCream: Color(0xFF547D0B),
+    limeSoft: Color(0xFF5F8C10),
     limeOlive: Color(0xFF4D7C0F),
     limeShadow: Color(0xFF354900),
-    limeInk: Color(0xFFEAF4CF),
-    limeInkDim: Color(0xFFEEF6DA),
-    limeInkDeep: Color(0xFFEAF4CF),
+    limeInk: Color(0xFFEFF5E5),
+    limeInkDim: Color(0xFFF4F8EC),
+    limeInkDeep: Color(0xFFEFF5E5),
     scoreAmber: Color(0xFFB45309),
     scoreCoral: Color(0xFFC2410C),
     statusGreen: Color(0xFF15803D),
@@ -575,7 +624,7 @@ class AppPalette {
     ),
     gold: Color(0xFFCA8A04),
     periwinkle: Color(0xFF4F6BD8),
-    white: Color(0xFF1A1C1C),
+    white: Color(0xFF111511),
     grayBright: Color(0xFF3F3F3F),
     grayLight: Color(0xFF4A4A4A),
     grayIos: Color(0xFF6D6D72),
@@ -586,15 +635,15 @@ class AppPalette {
     gray33: Color(0xFFDDE0E4),
     gray2A: Color(0xFFE4E6EA),
     grayWarm: Color(0xFF8A8686),
-    dark0B0D10: Color(0xFFECEDEF),
+    dark0B0D10: Color(0xFFFAFAF7),
     dark0D1117: Color(0xFFFFFFFF),
-    dark0F0F1A: Color(0xFFECEDEF),
+    dark0F0F1A: Color(0xFFFAFAF7),
     dark111111: Color(0xFFFFFFFF),
     dark121212: Color(0xFFFFFFFF),
     dark151718: Color(0xFFFFFFFF),
     dark181818: Color(0xFFFFFFFF),
     dark1A1919: Color(0xFFFFFFFF),
-    dark1A1D22: Color(0xFFECEDEF),
+    dark1A1D22: Color(0xFFF4F5F2),
     dark1A2535: Color(0xFFE7F0FA),
     dark1E1E1E: Color(0xFFDDE0E4),
     dark1E1E2E: Color(0xFFF4F5F7),
@@ -607,8 +656,8 @@ class AppPalette {
     dark2C2C2C: Color(0xFFE3E6EA),
     whiteBorder8: Color(0x14000000),
     whiteGlow20: Color(0x33000000),
-    cyanBorder20: Color(0x330E7490),
-    blackScrim50: Color(0x801A1A1A),
+    cyanBorder20: Color(0x330788A6),
+    blackScrim50: Color(0x80111511),
   );
 }
 
@@ -618,6 +667,18 @@ class AppPalette {
 /// pre-theme code see the classic palette.
 abstract final class AppColors {
   static AppPalette palette = AppPalette.dark;
+
+  /// Call first thing in the `build` of any **const-constructible
+  /// StatelessWidget** that reads `AppColors`.
+  ///
+  /// The dark/light toggle re-keys `MaterialApp`, but the Navigator is
+  /// retained through its GlobalKey, so the route tree is *updated*, not
+  /// re-inflated — and Flutter skips rebuilding a child whose widget is
+  /// identical to the last one, which every `const` widget is. Registering
+  /// a Theme dependency here makes such a widget rebuild on the toggle
+  /// (the retained subtree re-runs `didChangeDependencies` on activation),
+  /// so it repaints with the new palette instead of keeping stale colors.
+  static void bindTheme(BuildContext context) => Theme.of(context);
 
   // Brand limes.
   static Color get accent => palette.accent;
@@ -678,6 +739,14 @@ abstract final class AppColors {
   static Color get onActionTileActive => palette.onActionTileActive;
   static Color get actionTile => palette.actionTile;
   static Color get onActionTile => palette.onActionTile;
+  // Home redesign tokens (2026-09-14).
+  static Color get textSecondary => palette.textSecondary;
+  static Color get surfaceLight => palette.surfaceLight;
+  static Color get divider => palette.divider;
+  static Color get actionTint => palette.actionTint;
+  static Color get coach => palette.coach;
+  static Color get cardShadow => palette.cardShadow;
+  static Color get coachShadow => palette.coachShadow;
   // One-off: lime tints (rebrand together with accent).
   static Color get limeCream => palette.limeCream;
   static Color get limeSoft => palette.limeSoft;

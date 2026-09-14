@@ -6,6 +6,7 @@ import '../application/context_override_providers.dart';
 import '../domain/models/context_override.dart';
 import '../domain/models/post_override_review.dart';
 import '../domain/models/suppressed_item.dart';
+import '../../../core/presentation/app_card.dart';
 import '../../../core/presentation/app_colors.dart';
 
 const String _kPendingReviewKey = 'pending_override_review';
@@ -41,12 +42,12 @@ class PostOverrideReviewCard extends ConsumerWidget {
     final review = ref.watch(pendingRecoveryReviewProvider);
     if (review == null) return const SizedBox.shrink();
 
-    return Card(
+    return AppCard(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: AppColors.fg.withAlpha(12),
+      radius: 20,
+      padding: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -87,7 +88,7 @@ class PostOverrideReviewCard extends ConsumerWidget {
 
             if (review.hasSuppressedItems) ...[
               const SizedBox(height: 10),
-              Divider(height: 1, color: AppColors.fg12),
+              Divider(height: 1, color: AppColors.divider),
               const SizedBox(height: 8),
 
               // Items list (max 5 + "show more")

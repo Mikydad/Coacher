@@ -55,7 +55,7 @@ class _ActiveOverrideBannerState extends ConsumerState<ActiveOverrideBanner> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: _overrideColor(effective).withAlpha(30),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: _overrideColor(effective).withAlpha(80)),
         ),
         child: Row(
