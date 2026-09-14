@@ -3255,3 +3255,51 @@ not silent reversal.
   manual override still wins over the pause. *Rejected:* routing End to
   the sleep-window settings (asks the user to reconfigure a schedule to
   get one night off), and clearing the window (would silently disable it).
+
+- **2026-09-15 · Coaching insights honor the schedule: opportunity days,
+  current subjects, availability gate.** Two tester reports: a Mon–Fri goal
+  got a "streak at risk" insight on Sunday, and insights kept surfacing
+  built from long-finished tasks. Root causes: Layer 1 counted misses per
+  *calendar* day (Sat + Sun empty → `missedLast2Days`), seeded every task
+  planned anywhere in the 30-day window, never checked a goal's period end,
+  and nothing between Layer 1 and Layer 4 ever consulted `isActionDay`.
+  Settled with Miko (all four recommendations accepted): (1) **Opportunity
+  days** — `computeFeatureStreakMetrics` takes `opportunityDateKeys` (a
+  goal's loggable days via `GoalPeriodHelpers.allowsLoggingOnDateKey`, a
+  task's planned days); streak, "missed last 2" and `missedCount7d` count
+  those days only, and fewer than two prior opportunities is *no evidence*
+  (a task first planned today is not "missed"). "Missed last 2 days" now
+  reads "missed the last 2 **scheduled** days": a Mon/Wed/Fri goal skipped
+  Wed + Fri fires on Saturday. Goal opportunities per window are one per
+  action day for repeating goals (a Mon–Fri goal has 5 a week, not 7) and
+  one per window for passive goals (target accumulates over the period);
+  the pre-existing `horizon` shortcut is gone. (2) **Seeding**: goals must
+  be active, inside their period (period ended = no coaching, same as
+  paused) and have at least one loggable day in the window; tasks must have
+  been on the plan within the last 7 days (`kTaskCoachingRecencyDays`) —
+  older tasks drop out of the batch and the daily prune clears their cached
+  insights. (3) **Availability gate at delivery**:
+  `loadLayer3DeliveryInsightsForDay` takes the goals repository and drops
+  entity insights whose goal is paused/completed or does not accept a log
+  on that date — a Mon–Fri goal shows *nothing* on Sunday (matching Today's
+  goals; reinforcement-only on off-days was considered and rejected as
+  noise). Task-scoped rows and failed lookups pass through, so the surface
+  can never blank on an error. (4) Prior-cycle check-ins remain legitimate
+  streak history (clamped to the period only). *Known, unchanged:* a
+  monthly goal has zero opportunities in most 7-day windows, so its
+  `completionSignal7d` reads 0 between action days — same as before.
+  Tests: `feature_builder_opportunity_days_test`,
+  `feature_builder_seeding_test`, availability case in
+  `insight_generation_providers_test`.
+
+- **2026-09-15 · Notifications & Reminders page and Goal detail: light
+  style pass (same branch, style only, chrome unchanged).** Settings
+  sub-pages share `SettingsObsidianCard`, which now carries the card
+  shadow (radius 24) and a `divider` hairline under the app bar; the
+  coaching-insight toggle dropped its hard-coded neon-lime colours and
+  follows the theme switch colour (olive light / lime dark); the attention
+  and sleep-window boxes are `surfaceLight` fills without borders. Goal
+  detail: every `accentBright` (neon C0FF00 in light) became `accent`, the
+  "I DID IT TODAY" button and the done-milestone check are olive with
+  `onAccent` glyphs, the commitment / rest-day / empty / milestone cards
+  carry the shared shadow, and meta pills are pill-shaped.

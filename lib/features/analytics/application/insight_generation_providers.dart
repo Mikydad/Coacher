@@ -5,6 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/local_db/isar_collections/isar_generated_insight.dart';
 import '../../../core/utils/date_keys.dart';
+import '../../goals/application/goal_period_helpers.dart';
+import '../../goals/application/goals_providers.dart';
+import '../../goals/data/goals_repository.dart';
+import '../../goals/domain/models/goal_enums.dart';
 import '../data/insight_cache_repository.dart';
 import '../domain/models/generated_insight.dart';
 import 'insight_generation_policy.dart';
@@ -32,10 +36,34 @@ bool layer3InsightActiveOnDateKey(GeneratedInsight insight, String dateKey) {
 bool isDeliverySurfaceEligible(GeneratedInsight insight) =>
     insight.insightType != InsightType.reflectionObservation;
 
+/// Whether a goal-scoped insight may show on [dateKey]: the goal must be
+/// active and accept a log that day (any period day for a passive goal,
+/// action days only for a repeating one — the same availability Today's
+/// goals honors). A Mon–Fri goal shows no coaching on Sunday. Insights whose
+/// scope is not a goal, and lookups that fail, pass through unchanged.
+Future<bool> layer3InsightGoalAvailableOnDateKey(
+  GeneratedInsight insight,
+  String dateKey, {
+  required GoalsRepository goalsRepository,
+}) async {
+  final scopeId = insight.scopeId.trim();
+  if (scopeId.isEmpty) return true;
+  try {
+    final goal = await goalsRepository.getGoal(scopeId);
+    if (goal == null) return true;
+    if (goal.status != GoalStatus.active) return false;
+    return GoalPeriodHelpers.allowsLoggingOnDateKey(goal, dateKey);
+  } catch (_) {
+    // A failed lookup must never blank the surface — fall back to showing.
+    return true;
+  }
+}
+
 Future<List<GeneratedInsight>> loadLayer3DeliveryInsightsForDay(
   InsightCacheRepository repo,
-  String dateKey,
-) async {
+  String dateKey, {
+  GoalsRepository? goalsRepository,
+}) async {
   final trimmed = dateKey.trim();
   if (trimmed.isEmpty) return const <GeneratedInsight>[];
   final global = await repo.listByScope(
@@ -44,10 +72,20 @@ Future<List<GeneratedInsight>> loadLayer3DeliveryInsightsForDay(
   );
   final all = await repo.listAll();
   final entity = <GeneratedInsight>[];
+  final availabilityByScope = <String, bool>{};
   for (final insight in all) {
     if (insight.scopeType != InsightScopeType.entity) continue;
     if (!isDeliverySurfaceEligible(insight)) continue;
     if (!layer3InsightActiveOnDateKey(insight, trimmed)) continue;
+    if (goalsRepository != null) {
+      final available = availabilityByScope[insight.scopeId] ??=
+          await layer3InsightGoalAvailableOnDateKey(
+            insight,
+            trimmed,
+            goalsRepository: goalsRepository,
+          );
+      if (!available) continue;
+    }
     entity.add(insight);
   }
   final merged = <GeneratedInsight>[
@@ -201,6 +239,7 @@ final layer3DeliveryDayInsightsProvider =
         loader: () => loadLayer3DeliveryInsightsForDay(
           ref.read(insightCacheRepositoryProvider),
           key,
+          goalsRepository: ref.read(goalsRepositoryProvider),
         ),
       );
     });

@@ -3,8 +3,44 @@ import 'package:sidepal/core/utils/date_keys.dart';
 import 'package:sidepal/features/analytics/data/insight_cache_repository.dart';
 import 'package:sidepal/features/analytics/domain/models/generated_insight.dart';
 import 'package:sidepal/core/di/providers.dart';
+import 'package:sidepal/features/goals/domain/models/goal_enums.dart';
+import 'package:sidepal/features/goals/domain/models/user_goal.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../support/no_op_goals_repository.dart';
+
+class _GoalsRepo extends NoOpGoalsRepository {
+  _GoalsRepo(this.goals);
+  final Map<String, UserGoal> goals;
+
+  @override
+  Future<UserGoal?> getGoal(String goalId) async => goals[goalId];
+}
+
+UserGoal _goal({
+  required String id,
+  List<int>? weekdays,
+  GoalStatus status = GoalStatus.active,
+}) {
+  return UserGoal(
+    id: id,
+    title: id,
+    categoryId: 'study',
+    repeatCadence: weekdays == null
+        ? GoalRepeatCadence.off
+        : GoalRepeatCadence.weekly,
+    scheduledWeekdays: weekdays,
+    status: status,
+    measurementKind: MeasurementKind.sessions,
+    targetValue: 1,
+    intensity: 3,
+    periodStartMs: DateTime(2026, 8, 1).millisecondsSinceEpoch,
+    periodEndMs: DateTime(2026, 10, 31).millisecondsSinceEpoch,
+    createdAtMs: 0,
+    updatedAtMs: 0,
+  );
+}
 
 class _FakeInsightCacheRepository implements InsightCacheRepository {
   _FakeInsightCacheRepository(this._items);
@@ -136,8 +172,7 @@ void main() {
     expect(vm.primary!.insightId, 'high');
   });
 
-  test(
-      'reflection observations never enter the delivery surfaces — '
+  test('reflection observations never enter the delivery surfaces — '
       'radar-only (P1-08)', () async {
     final today = DateKeys.todayKey();
     final repo = _FakeInsightCacheRepository(<GeneratedInsight>[
@@ -208,6 +243,54 @@ void main() {
     final vm = vmAsync.requireValue;
     expect(vm.primary, isNotNull);
     expect(vm.primary!.insightId, 'entity-x');
+  });
+  test('goal insights show only on days the goal is available '
+      '(2026-09-15)', () async {
+    // 2026-09-13 is a Sunday, 2026-09-14 a Monday.
+    const sunday = '2026-09-13';
+    const monday = '2026-09-14';
+    final goals = _GoalsRepo({
+      'weekdays': _goal(id: 'weekdays', weekdays: const [1, 2, 3, 4, 5]),
+      'passive': _goal(id: 'passive'),
+      'paused': _goal(id: 'paused', status: GoalStatus.paused),
+    });
+    final repo = _FakeInsightCacheRepository(<GeneratedInsight>[
+      for (final scope in ['weekdays', 'passive', 'paused', 'task-1'])
+        _insight(
+          id: 'i-$scope',
+          scopeType: InsightScopeType.entity,
+          scopeId: scope,
+          detectedAtMs: 100,
+          sourceWindowStartDateKey: '2026-09-01',
+          sourceWindowEndDateKey: '2026-09-30',
+        ),
+    ]);
+
+    final onSunday = await loadLayer3DeliveryInsightsForDay(
+      repo,
+      sunday,
+      goalsRepository: goals,
+    );
+    expect(
+      onSunday.map((i) => i.insightId).toSet(),
+      {'i-passive', 'i-task-1'},
+      reason: 'a Mon–Fri goal is not coached on Sunday; paused never',
+    );
+
+    final onMonday = await loadLayer3DeliveryInsightsForDay(
+      repo,
+      monday,
+      goalsRepository: goals,
+    );
+    expect(onMonday.map((i) => i.insightId).toSet(), {
+      'i-weekdays',
+      'i-passive',
+      'i-task-1',
+    });
+
+    // No repository → no filtering (legacy callers / lookups unavailable).
+    final unfiltered = await loadLayer3DeliveryInsightsForDay(repo, sunday);
+    expect(unfiltered, hasLength(4));
   });
 }
 

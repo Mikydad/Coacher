@@ -205,11 +205,29 @@ int _avgLateDelayMinutes(List<CompletionTimingSample> samples) {
   return (total / n).round();
 }
 
+/// Streak / miss metrics over the entity's **opportunity days**.
+///
+/// [opportunityDateKeys] is the set of days the entity could actually have
+/// been done (a goal's action days in its period, a task's planned days).
+/// When given, days outside it are neither streak breaks nor misses — a
+/// Mon–Fri goal is not "missed" on Sunday, and a task first planned today
+/// has not "missed the last 2 days". `missedLast2Days` then means the last
+/// two opportunity days before today were both missed (false when fewer than
+/// two exist — no evidence, no alarm). When null every calendar day counts
+/// (legacy contract, kept for callers without a schedule).
 BehaviorStreakMetrics computeFeatureStreakMetrics({
   required Set<String> completionDateKeys,
   required DateTime nowLocal,
+  Set<String>? opportunityDateKeys,
 }) {
   final today = DateTime(nowLocal.year, nowLocal.month, nowLocal.day);
+  if (opportunityDateKeys != null) {
+    return _streakMetricsOverOpportunities(
+      completionDateKeys: completionDateKeys,
+      opportunityDateKeys: opportunityDateKeys,
+      today: today,
+    );
+  }
   final ordered = completionDateKeys.toList()..sort();
 
   var currentStreak = 0;
@@ -253,6 +271,62 @@ BehaviorStreakMetrics computeFeatureStreakMetrics({
     if (!completionDateKeys.contains(key)) {
       missedCount7d++;
     }
+  }
+
+  return BehaviorStreakMetrics(
+    currentStreak: currentStreak,
+    longestStreak: bestStreak,
+    missedLast2Days: missedLast2Days,
+    missedCount7d: missedCount7d,
+  );
+}
+
+BehaviorStreakMetrics _streakMetricsOverOpportunities({
+  required Set<String> completionDateKeys,
+  required Set<String> opportunityDateKeys,
+  required DateTime today,
+}) {
+  final todayKey = DateKeys.yyyymmdd(today);
+  // Only days up to today can be evidence; a future planned day is neither
+  // a hit nor a miss.
+  final ordered =
+      opportunityDateKeys
+          .map((k) => k.trim())
+          .where((k) => k.isNotEmpty && k.compareTo(todayKey) <= 0)
+          .toSet()
+          .toList()
+        ..sort();
+
+  var currentStreak = 0;
+  for (final key in ordered.reversed) {
+    if (!completionDateKeys.contains(key)) break;
+    currentStreak++;
+  }
+
+  var bestStreak = 0;
+  var running = 0;
+  for (final key in ordered) {
+    if (completionDateKeys.contains(key)) {
+      running++;
+      if (running > bestStreak) bestStreak = running;
+    } else {
+      running = 0;
+    }
+  }
+
+  final before = ordered.where((k) => k.compareTo(todayKey) < 0).toList();
+  final missedLast2Days =
+      before.length >= 2 &&
+      !completionDateKeys.contains(before[before.length - 1]) &&
+      !completionDateKeys.contains(before[before.length - 2]);
+
+  final sevenDayStartKey = DateKeys.yyyymmdd(
+    today.subtract(const Duration(days: 6)),
+  );
+  var missedCount7d = 0;
+  for (final key in ordered) {
+    if (key.compareTo(sevenDayStartKey) < 0) continue;
+    if (!completionDateKeys.contains(key)) missedCount7d++;
   }
 
   return BehaviorStreakMetrics(

@@ -106,6 +106,17 @@ layer1
   └── completionSignal7d     (0–1 composite)
 ```
 
+### Opportunity days (2026-09-15)
+
+Streak and miss metrics count **opportunity days** only — a goal's loggable
+days (`GoalPeriodHelpers.allowsLoggingOnDateKey`: action days for repeating
+goals, any period day for passive ones) and a task's planned days. A Mon–Fri
+goal is not "missed" on Sunday, and `missedLast2Days` means the last two
+*scheduled* days were missed (false with fewer than two prior opportunities).
+Seeding keeps only active in-period goals and tasks planned within the last
+`kTaskCoachingRecencyDays` (7). Layer 4's day loader additionally drops goal
+insights on days the goal is unavailable. See the GUIDELINES decision log.
+
 ### Recompute trigger
 
 `FeatureBuilderRecomputeService` is invoked by `layer34RecomputeNowProvider`
