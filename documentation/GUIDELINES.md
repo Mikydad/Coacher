@@ -3339,3 +3339,14 @@ not silent reversal.
   bold selected label. Accent-tinted highlight cards (my commitment,
   moderator) keep their tint borders on purpose — they are the one
   "special" card per tab. Chat and Challenges tabs untouched for now.
+
+- **2026-09-15 · Recovery card collapses to one row; Chat + Challenges
+  tabs restyled.** (1) The "N tasks need you" card now shows only the
+  top-ranked row by default with an "N MORE ⌄" toggle (same pattern as
+  Promises' "N MORE"); the headline keeps the full count so nothing is
+  hidden about what is owed, and the existing 5-row cap + "+N more waiting"
+  applies once expanded. (2) The trailing control (×, ⋯ or nothing) sits in
+  a fixed 36 px slot so every "Do now" pill lines up. (3) Circle Chat and
+  Challenges tabs got the same token-only light pass as the other four
+  tabs; the black scrim over chat images stays black by design (it is over
+  a photo, not a surface).

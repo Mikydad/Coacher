@@ -141,7 +141,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
   Future<String?> _showProofCategorySheet() {
     return showModalBottomSheet<String>(
       context: context,
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.surfacePanel,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -155,7 +155,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.fg.withOpacity(0.12),
+                  color: AppColors.divider,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -228,7 +228,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
                 Center(
                   child: Text(
                     'Could not load messages.',
-                    style: TextStyle(color: AppColors.textMuted),
+                    style: TextStyle(color: AppColors.textSecondary),
                   ),
                 ),
               ),
@@ -239,7 +239,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
                       'No messages yet.\nSay hello to your circle!',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: AppColors.textMuted,
+                        color: AppColors.textSecondary,
                         fontSize: 15,
                       ),
                     ),
@@ -329,7 +329,7 @@ class _TextMessageBubble extends StatelessWidget {
                       child: Text(
                         message.senderDisplayName,
                         style: TextStyle(
-                          color: AppColors.textMuted,
+                          color: AppColors.textSecondary,
                           fontSize: 11,
                         ),
                       ),
@@ -341,8 +341,8 @@ class _TextMessageBubble extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: isMe
-                          ? AppColors.accent.withOpacity(0.15)
-                          : AppColors.surfaceCard,
+                          ? AppColors.accent.withValues(alpha: 0.15)
+                          : AppColors.surfaceLight,
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(16),
                         topRight: const Radius.circular(16),
@@ -364,7 +364,7 @@ class _TextMessageBubble extends StatelessWidget {
                     child: Text(
                       _formatTime(message.createdAtMs),
                       style: TextStyle(
-                        color: AppColors.textMuted,
+                        color: AppColors.textSecondary,
                         fontSize: 10,
                       ),
                     ),
@@ -387,7 +387,7 @@ class _TextMessageBubble extends StatelessWidget {
   void _showEmojiBar(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.surfaceCard,
+      backgroundColor: AppColors.surfacePanel,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -412,7 +412,7 @@ class _ImageMessageBubble extends StatelessWidget {
       child: GestureDetector(
         onLongPress: () => showModalBottomSheet<void>(
           context: context,
-          backgroundColor: AppColors.surfaceCard,
+          backgroundColor: AppColors.surfacePanel,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
@@ -443,7 +443,7 @@ class _ImageMessageBubble extends StatelessWidget {
                       child: Text(
                         message.senderDisplayName,
                         style: TextStyle(
-                          color: AppColors.textMuted,
+                          color: AppColors.textSecondary,
                           fontSize: 11,
                         ),
                       ),
@@ -478,14 +478,14 @@ class _ImageMessageBubble extends StatelessWidget {
                                 placeholder: (_, _) => Container(
                                   width: 220,
                                   height: 140,
-                                  color: AppColors.surfaceCard,
+                                  color: AppColors.surfaceLight,
                                   child: Center(
                                     child: SizedBox(
                                       width: 20,
                                       height: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: AppColors.textMuted,
+                                        color: AppColors.textSecondary,
                                       ),
                                     ),
                                   ),
@@ -493,10 +493,10 @@ class _ImageMessageBubble extends StatelessWidget {
                                 errorWidget: (_, _, _) => Container(
                                   width: 220,
                                   height: 140,
-                                  color: AppColors.surfaceCard,
+                                  color: AppColors.surfaceLight,
                                   child: Icon(
                                     Icons.broken_image_rounded,
-                                    color: AppColors.textMuted,
+                                    color: AppColors.textSecondary,
                                   ),
                                 ),
                               ),
@@ -513,7 +513,7 @@ class _ImageMessageBubble extends StatelessWidget {
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.6),
+                                color: Colors.black.withValues(alpha: 0.6),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -535,7 +535,7 @@ class _ImageMessageBubble extends StatelessWidget {
                     child: Text(
                       _formatTime(message.createdAtMs),
                       style: TextStyle(
-                        color: AppColors.textMuted,
+                        color: AppColors.textSecondary,
                         fontSize: 10,
                       ),
                     ),
@@ -568,12 +568,12 @@ class _SystemEventPill extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
           decoration: BoxDecoration(
-            color: AppColors.surfaceCard,
+            color: AppColors.surfaceLight,
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
             text,
-            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
           ),
         ),
       ),
@@ -604,12 +604,12 @@ class _ReactionRow extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(
                 color: reacted
-                    ? AppColors.accent.withOpacity(0.2)
-                    : AppColors.surfaceCard,
+                    ? AppColors.accent.withValues(alpha: 0.2)
+                    : AppColors.surfaceLight,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: reacted
-                      ? AppColors.accent.withOpacity(0.4)
+                      ? AppColors.accent.withValues(alpha: 0.4)
                       : Colors.transparent,
                 ),
               ),
@@ -673,8 +673,10 @@ class _InputBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        border: Border(top: BorderSide(color: AppColors.fg.withOpacity(0.06))),
+        color: AppColors.surfacePanel,
+        border: Border(
+          top: BorderSide(color: AppColors.fg.withValues(alpha: 0.06)),
+        ),
       ),
       child: SafeArea(
         top: false,
@@ -683,7 +685,7 @@ class _InputBar extends StatelessWidget {
             // Image picker button
             IconButton(
               icon: const Icon(Icons.add_photo_alternate_outlined),
-              color: AppColors.textMuted,
+              color: AppColors.textSecondary,
               onPressed: sending ? null : onPickImage,
             ),
             // Text field
@@ -703,9 +705,9 @@ class _InputBar extends StatelessWidget {
                 },
                 decoration: InputDecoration(
                   hintText: 'Message your circle…',
-                  hintStyle: TextStyle(color: AppColors.textMuted),
+                  hintStyle: TextStyle(color: AppColors.textSecondary),
                   filled: true,
-                  fillColor: AppColors.surfaceCard,
+                  fillColor: AppColors.surfaceLight,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 10,
@@ -739,7 +741,7 @@ class _InputBar extends StatelessWidget {
                             Icons.send_rounded,
                             color: canSend
                                 ? AppColors.accent
-                                : AppColors.textMuted,
+                                : AppColors.textSecondary,
                           ),
                     onPressed: canSend ? onSend : null,
                   ),
@@ -778,7 +780,7 @@ class _AvatarInitial extends StatelessWidget {
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
     return CircleAvatar(
       radius: 16,
-      backgroundColor: _color.withOpacity(0.2),
+      backgroundColor: _color.withValues(alpha: 0.2),
       child: Text(
         initial,
         style: TextStyle(
