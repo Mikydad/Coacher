@@ -27,7 +27,7 @@ class OverrideSettingsSection extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Text(
         'Error loading override state',
-        style: TextStyle(color: Colors.red.shade300),
+        style: TextStyle(color: AppColors.danger),
       ),
       data: (state) {
         final s = state ?? UserAttentionState.empty();
@@ -69,9 +69,8 @@ class _CurrentOverrideRow extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.fg.withAlpha(10),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.fg12),
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
@@ -288,9 +287,8 @@ class _TimePicker extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.fg.withAlpha(10),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.fg12),
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

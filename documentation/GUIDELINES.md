@@ -3303,3 +3303,28 @@ not silent reversal.
   "I DID IT TODAY" button and the done-milestone check are olive with
   `onAccent` glyphs, the commitment / rest-day / empty / milestone cards
   carry the shared shadow, and meta pills are pill-shaped.
+
+- **2026-09-15 · A staked goal's card opens the challenge page; evidence
+  mirrors into the goal's check-in.** Miko found that marking a staked
+  goal done did nothing to its stake. Root fact (PRD CC-6, M-5): the stake
+  never reads the goal after creation — its verdict comes only from
+  evidence logged on the stake screens (timer / in-app camera / practice
+  "Record today"), and goal check-ins are self-report, which a money or
+  photo stake must not accept. So the two books were parallel and the
+  goal side was the trap: do the work on the goal card, forfeit the stake.
+  Settled: (1) `GoalCard` on a goal with a live stake
+  (`liveStakeForGoalProvider`) opens `StakeChallengeDetailScreen` instead
+  of the check-in sheet, and the quick-add + is replaced by a chevron — a
+  bare check-in is exactly the bypass the stake exists to prevent. (2)
+  Every evidence write (timer, camera, practice) also lands today's goal
+  check-in with the same amount via `StakeGoalCheckInBridge`, using the
+  card's own quick-add math (today's value on the check-in, "met" against
+  the evaluation-window total), so the goal's ring, streaks and coaching
+  stay true. Direction is evidence → check-in only. (3) The challenge page
+  grows a "View goal" link (goal details were previously reachable only
+  through the check-in sheet). *Rejected:* goal check-ins as stake
+  evidence — the server sums evidence regardless of `source`, so it would
+  technically pass, but it guts the commitment device; check-in-sourced
+  evidence stays practice-only. *Still open:* completing a staked goal
+  leaves the stake running silently — it should warn like delete does
+  (keep stake / surrender). Tests: `stake_goal_link_test`.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/presentation/app_card.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../../../core/runtime/mutation_request.dart';
@@ -209,7 +210,7 @@ class GoalDetailScreen extends ConsumerWidget {
                     if (g.hasRepeatSchedule) ...[
                       _MetaPill(
                         label: GoalPeriodHelpers.formatRepeatSummary(g),
-                        color: AppColors.accentBright,
+                        color: AppColors.accent,
                       ),
                       const SizedBox(width: 6),
                     ],
@@ -229,7 +230,7 @@ class GoalDetailScreen extends ConsumerWidget {
                         GoalStatus.completed => 'Completed',
                       },
                       color: g.status == GoalStatus.active
-                          ? AppColors.accentBright
+                          ? AppColors.accent
                           : AppColors.textSoft,
                     ),
                   ],
@@ -278,7 +279,7 @@ class GoalDetailScreen extends ConsumerWidget {
                       Text(
                         streak.toString().padLeft(2, '0'),
                         style: TextStyle(
-                          color: AppColors.accentBright,
+                          color: AppColors.accent,
                           fontSize: 34,
                           height: 1.1,
                           fontWeight: FontWeight.w800,
@@ -381,7 +382,7 @@ class GoalDetailScreen extends ConsumerWidget {
                 trailing: TextButton.icon(
                   onPressed: () => _addMilestoneDialog(context, ref, g.id),
                   style: TextButton.styleFrom(
-                    foregroundColor: AppColors.accentBright,
+                    foregroundColor: AppColors.accent,
                     padding: EdgeInsets.zero,
                   ),
                   icon: const Icon(Icons.add_circle_outline, size: 18),
@@ -632,7 +633,7 @@ class _HeroTitle extends StatelessWidget {
           if (lead != null) TextSpan(text: '$lead '),
           TextSpan(
             text: tail,
-            style: TextStyle(color: AppColors.accentBright),
+            style: TextStyle(color: AppColors.accent),
           ),
         ],
       ),
@@ -653,10 +654,10 @@ class _MetaPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = color;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: accent?.withValues(alpha: 0.14) ?? AppColors.inkElevated,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label.toUpperCase(),
@@ -761,6 +762,7 @@ class _TodayCommitmentCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.inkDeep,
         borderRadius: BorderRadius.circular(28),
+        boxShadow: appCardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -769,7 +771,7 @@ class _TodayCommitmentCard extends StatelessWidget {
             children: [
               Icon(
                 done ? Icons.verified_outlined : Icons.bolt_outlined,
-                color: done ? AppColors.accentBright : AppColors.cyan,
+                color: done ? AppColors.accent : AppColors.cyan,
                 size: 22,
               ),
               const SizedBox(width: 10),
@@ -822,8 +824,8 @@ class _TodayCommitmentCard extends StatelessWidget {
                 : FilledButton(
                     onPressed: onToggle,
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.accentBright,
-                      foregroundColor: AppColors.accentDeep,
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: AppColors.onAccent,
                       padding: const EdgeInsets.symmetric(vertical: 15),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -858,6 +860,7 @@ class _RestDayCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.inkDeep,
         borderRadius: BorderRadius.circular(28),
+        boxShadow: appCardShadow,
       ),
       child: Row(
         children: [
@@ -947,6 +950,7 @@ class _ChecklistTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.inkWarm,
         borderRadius: BorderRadius.circular(24),
+        boxShadow: appCardShadow,
       ),
       child: Material(
         type: MaterialType.transparency,
@@ -962,17 +966,13 @@ class _ChecklistTile extends StatelessWidget {
                   height: 40,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: completed ? AppColors.accentDeep : null,
+                    color: completed ? AppColors.accent : null,
                     border: completed
                         ? null
                         : Border.all(color: AppColors.textFaint, width: 1.5),
                   ),
                   child: completed
-                      ? Icon(
-                          Icons.check,
-                          color: AppColors.accentBright,
-                          size: 20,
-                        )
+                      ? Icon(Icons.check, color: AppColors.onAccent, size: 20)
                       : null,
                 ),
                 const SizedBox(width: 16),
@@ -1039,6 +1039,7 @@ class _EmptyStateCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.inkDeep,
         borderRadius: BorderRadius.circular(28),
+        boxShadow: appCardShadow,
       ),
       child: Column(
         children: [

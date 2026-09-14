@@ -77,8 +77,6 @@ class CoachingInsightNotificationSettingsSection extends ConsumerWidget {
             ),
             Switch.adaptive(
               value: enabled,
-              activeTrackColor: AppColors.accentBright.withValues(alpha: 0.5),
-              activeThumbColor: AppColors.accentBright,
               onChanged: prefAsync.isLoading
                   ? null
                   : (v) async {
