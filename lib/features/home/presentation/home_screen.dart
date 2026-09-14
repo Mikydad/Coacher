@@ -925,8 +925,10 @@ class _ProgressRingColumn extends StatelessWidget {
             child: Center(
               child: Text(
                 '$percent%',
+                // One px under the scaled size (Miko, 2026-09-15): "100%"
+                // sat a touch too close to the ring.
                 style: TextStyle(
-                  fontSize: diameter * 0.28,
+                  fontSize: diameter * 0.28 - 1,
                   height: 1,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5,

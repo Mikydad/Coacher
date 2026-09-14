@@ -65,38 +65,40 @@ class _PromisesSectionState extends ConsumerState<PromisesSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const AppSectionLabel('PROMISES'),
-            const Spacer(),
-            AppCircleIconButton(
-              icon: Icons.add_rounded,
-              size: 40,
-              iconSize: 20,
-              tooltip: 'Add a promise',
-              onPressed: () => showIntentionQuickAddSheet(context),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (open.isEmpty)
-          // Deliberate empty state (redesign 2026-09-14): a dashed box says
-          // this space is waiting for content, not that something is missing.
-          const AppDashedEmptyState(
-            message: 'Nothing promised right now — say it to Coach or tap +.',
-          )
-        else
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.surfacePanel,
-              borderRadius: BorderRadius.circular(22),
-              boxShadow: appCardShadow,
-            ),
-            child: Column(
-              children: [
+        // One white card (Miko, 2026-09-15): the header row lives inside
+        // it, so an empty section is a slim card rather than a bare label,
+        // and open promises stack under a hairline in the same card.
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surfacePanel,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: appCardShadow,
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 10, 10, 10),
+                child: Row(
+                  children: [
+                    const AppSectionLabel('PROMISES'),
+                    const Spacer(),
+                    AppCircleIconButton(
+                      icon: Icons.add_rounded,
+                      size: 36,
+                      iconSize: 20,
+                      shadow: false,
+                      background: AppColors.surfaceLight,
+                      tooltip: 'Add a promise',
+                      onPressed: () => showIntentionQuickAddSheet(context),
+                    ),
+                  ],
+                ),
+              ),
+              if (open.isNotEmpty) ...[
+                Divider(height: 1, thickness: 1, color: AppColors.divider),
                 _PromiseRow(intention: open.first, plan: plans[open.first.id]),
                 if (open.length > 1) ...[
-                  Divider(height: 1, color: AppColors.fg12, indent: 52),
+                  Divider(height: 1, color: AppColors.divider, indent: 52),
                   InkWell(
                     borderRadius: BorderRadius.circular(22),
                     onTap: () => setState(() => _expanded = !_expanded),
@@ -141,7 +143,7 @@ class _PromisesSectionState extends ConsumerState<PromisesSection> {
                               for (var i = 1; i < open.length; i++) ...[
                                 Divider(
                                   height: 1,
-                                  color: AppColors.fg12,
+                                  color: AppColors.divider,
                                   indent: 52,
                                 ),
                                 _PromiseRow(
@@ -154,8 +156,9 @@ class _PromisesSectionState extends ConsumerState<PromisesSection> {
                   ),
                 ],
               ],
-            ),
+            ],
           ),
+        ),
         // Just-in-time calendar ask (Phase 4b): first open promise is the
         // first moment calendar access has a nameable benefit.
         if (open.isNotEmpty) const CalendarAskCard(),

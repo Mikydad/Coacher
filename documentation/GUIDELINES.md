@@ -3230,3 +3230,13 @@ not silent reversal.
   override exists. Proposed fix (parked until Miko decides): a local
   `sleepWindowPausedUntilMs` on the attention state that End sets to the
   next wake time.
+
+- **2026-09-15 · Two Home tweaks from device testing.** (1) The ring
+  percentage is one px under its scaled size (`diameter × 0.28 − 1`) —
+  "100%" sat too close to the ring. (2) **Promises empty state is gone**
+  and the section is **one white card**: the "PROMISES" header row with its
+  + sits inside the card, so an empty section is a slim card and open
+  promises stack under a hairline in the same card (option A; option B,
+  hiding the whole section, was rejected because it also removed the +
+  entry point). `AppDashedEmptyState` stays in the design system for other
+  lists (Discover's "no circles").
