@@ -13,12 +13,14 @@ import '../../../core/presentation/page_headers.dart';
 import '../../community/application/circle_providers.dart';
 import '../application/points_providers.dart';
 import '../application/stake_create_replicator.dart';
+import '../application/stake_goal_check_in_bridge.dart';
 import '../application/stake_functions.dart';
 import '../application/stake_seen_store.dart';
 import '../application/stakes_providers.dart';
 import '../data/stakes_repository.dart';
 import '../domain/models/stake_challenge.dart';
 import '../domain/models/stake_evidence.dart';
+import '../../goals/presentation/goal_detail_screen.dart';
 import '../../profile/application/profile_providers.dart';
 import 'accountability_create_flow.dart';
 import 'cards/card_preview_screen.dart';
@@ -227,6 +229,29 @@ class _BodyState extends ConsumerState<_Body> {
           '${c.frozenGoal.totalUnits} days · ${c.mode ?? 'disciplined'}',
           style: TextStyle(color: AppColors.textSoft, fontSize: 13),
         ),
+        // A staked goal's card lands here instead of its check-in sheet
+        // (2026-09-15), so the way back to the goal itself lives here.
+        if (c.frozenGoal.linkedGoalId?.isNotEmpty ?? false) ...[
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                foregroundColor: AppColors.accent,
+              ),
+              onPressed: () => Navigator.pushNamed(
+                context,
+                GoalDetailScreen.routeName,
+                arguments: c.frozenGoal.linkedGoalId,
+              ),
+              icon: const Icon(Icons.flag_outlined, size: 16),
+              label: const Text('View goal', style: TextStyle(fontSize: 13)),
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         _statusBanner(),
         ..._pendingCreateSection(),
@@ -685,6 +710,9 @@ class _BodyState extends ConsumerState<_Body> {
           amount: amount,
           source: 'checkin',
         );
+    await ref
+        .read(stakeGoalCheckInBridgeProvider)
+        .mirrorEvidence(challenge: c, amount: amount);
     if (mounted) setState(() => _busy = false);
   }
 
@@ -709,6 +737,9 @@ class _BodyState extends ConsumerState<_Body> {
       amount: amount,
       source: 'camera',
     );
+    await ref
+        .read(stakeGoalCheckInBridgeProvider)
+        .mirrorEvidence(challenge: c, amount: amount);
     // Background upload — evidence stands locally either way; the photo is
     // the circle's dispute-review artifact, not the record itself.
     final uid = FirestorePaths.activeUid;
@@ -962,9 +993,7 @@ class _BodyState extends ConsumerState<_Body> {
       MaterialPageRoute(
         builder: (_) => CardPreviewScreen(
           data: data,
-          onRecommit: state == CommitmentCardState.failure
-              ? _recommit
-              : null,
+          onRecommit: state == CommitmentCardState.failure ? _recommit : null,
         ),
       ),
     );

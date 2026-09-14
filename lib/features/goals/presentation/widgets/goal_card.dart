@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/date_keys.dart';
 import '../../../accountability/application/stakes_providers.dart';
+import '../../../accountability/presentation/stake_challenge_detail_screen.dart';
 import '../../application/goal_period_helpers.dart';
 import '../../application/goals_providers.dart';
 import '../../domain/models/goal_check_in.dart';
@@ -18,10 +19,29 @@ import '../../../../core/presentation/async_value_ui.dart';
 ///
 /// Tapping the card opens [GoalCounterSheet].
 /// Tapping the + button increments the value by 1 directly.
+///
+/// A **staked** goal (live challenge attached, 2026-09-15) is different:
+/// tapping opens the challenge page, and the + is gone — the stake's own
+/// proof (timer / camera / practice record) is the only way to log it, and
+/// that proof mirrors into the goal's check-in so this card still fills.
 class GoalCard extends ConsumerWidget {
-  const GoalCard({super.key, required this.goal});
+  const GoalCard({super.key, required this.goal, this.onOpenStake});
 
   final UserGoal goal;
+
+  /// Test seam: what a staked card's tap does. Defaults to pushing the
+  /// challenge detail screen.
+  final void Function(BuildContext context, String challengeId)? onOpenStake;
+
+  void _openStake(BuildContext context, String challengeId) {
+    final custom = onOpenStake;
+    if (custom != null) return custom(context, challengeId);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => StakeChallengeDetailScreen(challengeId: challengeId),
+      ),
+    );
+  }
 
   /// Repeat summary when the goal has one ("Every week on Mon · Wed"),
   /// otherwise the evaluation period ("This month", "Entire goal").
@@ -107,8 +127,10 @@ class GoalCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final progressAsync = ref.watch(goalTodayProgressProvider(goal.id));
-    // CC-6 — a live challenge holds this goal hostage; say so.
-    final staked = ref.watch(stakedGoalIdsProvider).contains(goal.id);
+    // CC-6 — a live challenge holds this goal hostage; say so, and send
+    // the tap to the challenge page (proof lives there, not here).
+    final liveStake = ref.watch(liveStakeForGoalProvider(goal.id));
+    final staked = liveStake != null;
 
     return progressAsync.when(
       loading: () => _CardShell(
@@ -145,14 +167,20 @@ class GoalCard extends ConsumerWidget {
         // Done styling: today explicitly met, or the window target reached.
         metCommitment: p.metCommitment || p.periodTargetMet,
         staked: staked,
-        onTap: () => showModalBottomSheet<void>(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (_) => GoalCounterSheet(goal: goal, initialProgress: p),
-        ).then((_) => ref.invalidate(goalTodayProgressProvider(goal.id))),
-        // Repeating goals are dormant on off-days — nothing to log.
-        onQuickAdd: p.metCommitment || p.periodTargetMet || !_loggableToday
+        onTap: liveStake != null
+            ? () => _openStake(context, liveStake.id)
+            : () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) =>
+                    GoalCounterSheet(goal: goal, initialProgress: p),
+              ).then((_) => ref.invalidate(goalTodayProgressProvider(goal.id))),
+        // Repeating goals are dormant on off-days — nothing to log. A staked
+        // goal never quick-adds: a bare check-in is the bypass the stake
+        // exists to prevent.
+        onQuickAdd:
+            staked || p.metCommitment || p.periodTargetMet || !_loggableToday
             ? null
             : () => _quickIncrement(context, ref, p),
       ),
@@ -301,11 +329,20 @@ class _CardShell extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                       ],
-                      _ActionButton(
-                        tone: tone,
-                        done: metCommitment,
-                        onTap: onQuickAdd,
-                      ),
+                      // A staked goal has no quick-add at all: the tap goes
+                      // to the challenge page, where proof is logged.
+                      if (staked)
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.fg70,
+                          size: 22,
+                        )
+                      else
+                        _ActionButton(
+                          tone: tone,
+                          done: metCommitment,
+                          onTap: onQuickAdd,
+                        ),
                     ],
                   ),
                 ],

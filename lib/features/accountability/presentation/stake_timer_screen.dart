@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
+import '../application/stake_goal_check_in_bridge.dart';
 import '../application/stakes_providers.dart';
 import '../domain/models/stake_challenge.dart';
 
@@ -88,6 +89,9 @@ class _StakeTimerScreenState extends ConsumerState<StakeTimerScreen> {
           source: 'timer',
           recordedAtMs: _startedAt!.millisecondsSinceEpoch,
         );
+    await ref
+        .read(stakeGoalCheckInBridgeProvider)
+        .mirrorEvidence(challenge: widget.challenge, amount: minutes);
     if (mounted) Navigator.of(context).pop();
   }
 

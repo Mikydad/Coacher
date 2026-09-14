@@ -115,6 +115,20 @@ final stakedGoalIdsProvider = Provider<Set<String>>((ref) {
   };
 });
 
+/// The one NON-TERMINAL challenge staked on [goalId], or null. One active
+/// stake per goal (2026-08-23), so first match wins. Goal cards route a
+/// staked goal's tap here instead of the check-in sheet (2026-09-15).
+final liveStakeForGoalProvider = Provider.family<StakeChallenge?, String>((
+  ref,
+  goalId,
+) {
+  final list = ref.watch(stakeChallengesStreamProvider).value ?? const [];
+  for (final c in list) {
+    if (!c.status.isTerminal && c.frozenGoal.linkedGoalId == goalId) return c;
+  }
+  return null;
+});
+
 /// Challenges that still need something from the user (not terminal),
 /// newest deadline first — the Stakes hub's "active" list.
 final openStakeChallengesProvider = Provider<AsyncValue<List<StakeChallenge>>>((
