@@ -1,7 +1,11 @@
 import 'dart:io';
 
 import 'package:sidepal/core/firebase/firestore_client.dart';
+import 'package:sidepal/core/local_db/isar_collections/isar_deleted_entity.dart';
+import 'package:sidepal/core/local_db/isar_collections/isar_routine.dart';
 import 'package:sidepal/core/local_db/isar_collections/isar_task.dart';
+import 'package:sidepal/core/sync/deleted_entity.dart';
+import 'package:sidepal/core/session/session_scope.dart';
 import 'package:sidepal/core/sync/remote_isar_merge.dart';
 import 'package:sidepal/core/sync/sync_cursor_store.dart';
 import 'package:sidepal/features/planning/domain/models/block.dart';
@@ -128,14 +132,20 @@ void main() {
       expect(await const SyncCursorStore().read('tasks'), 200);
     });
 
-    test('second pull only sees docs newer than the cursor', () async {
-      await addRemoteTask('t1', 100);
-      await merge().run();
-      expect(await const SyncCursorStore().read('tasks'), 100);
+    // Timestamps are wall-clock ms: the cursor re-reads a 5-minute overlap
+    // window (audit M7), so "older than the cursor" means older than
+    // cursor − 5 min, and tombstones older than 30 days are purged.
+    final base = DateTime.now().millisecondsSinceEpoch - 60 * 60 * 1000;
+    int at(int minutes) => base + minutes * 60 * 1000;
 
-      // Newer doc → picked up; older-than-cursor doc → filtered out.
-      await addRemoteTask('t2', 400);
-      await addRemoteTask('t_stale', 50);
+    test('second pull only sees docs newer than the cursor', () async {
+      await addRemoteTask('t1', at(10));
+      await merge().run();
+      expect(await const SyncCursorStore().read('tasks'), at(10));
+
+      // Newer doc → picked up; older-than-overlap doc → filtered out.
+      await addRemoteTask('t2', at(20));
+      await addRemoteTask('t_stale', at(1));
 
       final applied = await merge().run();
 
@@ -144,13 +154,13 @@ void main() {
       final staleRow =
           await isar!.isarTasks.filter().taskIdEqualTo('t_stale').findFirst();
       expect(staleRow, isNull);
-      expect(await const SyncCursorStore().read('tasks'), 400);
+      expect(await const SyncCursorStore().read('tasks'), at(20));
     });
 
     test('force pull (ignoreCursors) reads everything again', () async {
-      await addRemoteTask('t1', 100);
+      await addRemoteTask('t1', at(10));
       await merge().run();
-      await addRemoteTask('t_stale', 50); // below cursor
+      await addRemoteTask('t_stale', at(1)); // below cursor − overlap
 
       await merge().run(); // normal pull skips it
       expect(
@@ -172,6 +182,116 @@ void main() {
 
       final applied = await merge().run();
       expect(applied, isFalse);
+    });
+
+    // Pre-launch audit H2: a pull that was started before logout must not
+    // write rows after the session ended — the wipe would otherwise be
+    // repopulated with the outgoing account's data.
+    test('a pull started before teardown aborts at its first write', () async {
+      await addRemoteTask('t1', 100);
+      final pull = merge(); // captures the current session generation
+      SessionScope.beginTeardown();
+      addTearDown(SessionScope.resetForTests);
+
+      await expectLater(pull.run(), throwsA(isA<StateError>()));
+      expect(await _taskCount(isar!), 0);
+      expect(await const SyncCursorStore().read('tasks'), 0,
+          reason: 'an aborted pull never advances cursors');
+    });
+
+    // Pre-launch audit H15 — tombstones.
+    test('a local tombstone blocks resurrection by an older remote row', () async {
+      await addRemoteTask('t1', at(10));
+      await isar!.writeTxn(() async {
+        await isar!.isarDeletedEntitys.putByEntityKey(
+          IsarDeletedEntity.fromDomain(
+            DeletedEntity(entityType: 'task', entityId: 't1', deletedAtMs: at(15)),
+          ),
+        );
+      });
+
+      await merge().run();
+
+      expect(await _taskCount(isar!), 0, reason: 'deleted after the last edit');
+    });
+
+    test('an edit made after the deletion wins (deliberate resurrection)', () async {
+      await addRemoteTask('t1', at(20));
+      await isar!.writeTxn(() async {
+        await isar!.isarDeletedEntitys.putByEntityKey(
+          IsarDeletedEntity.fromDomain(
+            DeletedEntity(entityType: 'task', entityId: 't1', deletedAtMs: at(15)),
+          ),
+        );
+      });
+
+      await merge().run();
+
+      expect(await _taskCount(isar!), 1);
+    });
+
+    test('a remote tombstone removes the local row and is kept locally', () async {
+      await addRemoteTask('t1', at(10));
+      await merge().run();
+      expect(await _taskCount(isar!), 1);
+
+      await fs
+          .collection('users')
+          .doc(_uid)
+          .collection('deletedEntities')
+          .doc('task_t1')
+          .set(DeletedEntity(entityType: 'task', entityId: 't1', deletedAtMs: at(30)).toMap());
+
+      final applied = await merge().run();
+
+      expect(applied, isTrue);
+      expect(await _taskCount(isar!), 0);
+      expect(
+        await isar!.isarDeletedEntitys.filter().entityKeyEqualTo('task:t1').findFirst(),
+        isNotNull,
+      );
+      // The task doc still exists remotely with its old updatedAtMs — a
+      // later pull must not bring it back either.
+      await merge(force: true).run();
+      expect(await _taskCount(isar!), 0);
+    });
+
+    test('a tombstoned routine is not descended into', () async {
+      await addRemoteTask('t1', at(10));
+      await fs
+          .collection('users')
+          .doc(_uid)
+          .collection('deletedEntities')
+          .doc('routine_r1')
+          .set(DeletedEntity(entityType: 'routine', entityId: 'r1', deletedAtMs: at(50)).toMap());
+
+      await merge().run();
+
+      expect(await _taskCount(isar!), 0);
+      expect(await isar!.isarRoutines.where().count(), 0);
+    });
+
+    test('cursor overlap re-reads a doc stamped just below the high-water mark', () async {
+      await addRemoteTask('t1', at(10));
+      await merge().run(); // cursor = at(10)
+      // A second device's clock ran 1 min behind: its edit is BELOW the
+      // cursor but inside the 5-min overlap window.
+      await addRemoteTask('t_skewed', at(9));
+
+      final applied = await merge().run();
+
+      expect(applied, isTrue);
+      expect(await _taskCount(isar!), 2);
+    });
+
+    test('a pull started after the teardown ends applies normally', () async {
+      await addRemoteTask('t1', 100);
+      SessionScope.beginTeardown();
+      SessionScope.endTeardown();
+      addTearDown(SessionScope.resetForTests);
+
+      expect(await merge().run(), isTrue);
+      expect(await _taskCount(isar!), 1);
     });
   });
 }

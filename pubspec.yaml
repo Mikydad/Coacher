@@ -65,6 +65,7 @@ dependencies:
   audio_session: ^0.2.4
   flutter_slidable: ^4.0.3
   gal: ^2.3.3
+  firebase_app_check: ^0.3.2+10
 
 dev_dependencies:
   flutter_test:

@@ -12,6 +12,7 @@ import 'isar_behavior_feature_cache.dart';
 import 'isar_block.dart';
 import 'isar_blocked_user.dart';
 import 'isar_coaching_focus.dart';
+import 'isar_deleted_entity.dart';
 import 'isar_delivery_decision_snapshot.dart';
 import 'isar_delivery_history_entry.dart';
 import 'isar_direction_entry.dart';
@@ -83,4 +84,5 @@ const isarSchemaList = [
   IsarDirectionEntrySchema,
   IsarActivityEventSchema,
   IsarActivityCategoryRuleSchema,
+  IsarDeletedEntitySchema,
 ];

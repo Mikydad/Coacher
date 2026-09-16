@@ -23,9 +23,14 @@ import {
   eventDoc,
   evidenceFromSnap,
 } from './firestore_layout';
+import { redrivePartialPurges } from './account_purge';
 import { escrowRef, markEscrow, processRefundQueue } from './escrows';
 import { balanceRef, writeLedgerTxn } from './ledger';
-import { applyVerdictToChallenge, PHOTO_SCREENS } from './nsfw_screen';
+import {
+  applyVerdictToChallenge,
+  PHOTO_RESERVATIONS,
+  PHOTO_SCREENS,
+} from './nsfw_screen';
 import { EscrowDoc } from './payments';
 import { BalanceDoc, EARN_AMOUNTS } from './points';
 import { assertTransition } from './state_machine';
@@ -44,6 +49,7 @@ export async function runSweepOnce(
     // may never come (bit us on day one: uploads during the trigger's
     // own deployment window were stuck in draft permanently).
     screensApplied: await applyPendingScreens(now),
+    reservationsExpired: await expirePhotoReservations(now),
     expired: await expireInvites(now),
     toVerification: await moveToVerification(now),
     decided: await decideDue(now),
@@ -51,6 +57,8 @@ export async function runSweepOnce(
     // Phase 2 of the two-phase money move: drive refund_pending →
     // refunded through the provider (crash-safe, idempotent).
     refunds: await processRefundQueue(now),
+    // H12 — account purges that hit a failed step are re-driven here.
+    purgesRedriven: await redrivePartialPurges(now),
   };
   logger.info('stakeSweep done', counts);
   return counts;
@@ -82,6 +90,11 @@ async function applyPendingScreens(now: number): Promise<number> {
     const screen = (await db.collection(PHOTO_SCREENS).doc(doc.id).get()).data();
     const status = screen?.status;
     if (status !== 'approved' && status !== 'rejected') continue;
+    // H1 — verdicts written before the binding existed carry no uid/path
+    // and are never applied; the owner re-uploads to get a bound verdict.
+    if (typeof screen?.uid !== 'string' || typeof screen?.path !== 'string') {
+      continue;
+    }
     await applyVerdictToChallenge(
       doc.id,
       {
@@ -89,10 +102,45 @@ async function applyPendingScreens(now: number): Promise<number> {
         reasons: (screen?.reasons as string[] | undefined) ?? [],
       },
       now,
+      { uid: screen.uid as string, path: screen.path as string },
     );
     applied += 1;
   }
   return applied;
+}
+
+/**
+ * M12 — reservations that never became a challenge: delete the doc and
+ * the orphan object so an abandoned create can't accumulate storage.
+ */
+async function expirePhotoReservations(now: number): Promise<number> {
+  const db = getFirestore();
+  const snap = await db
+    .collection(PHOTO_RESERVATIONS)
+    .where('expiresAtMs', '<=', now)
+    .limit(BATCH_LIMIT)
+    .get();
+  let expired = 0;
+  for (const doc of snap.docs) {
+    const challenge = await db.collection(CHALLENGES).doc(doc.id).get();
+    if (challenge.exists) {
+      // Consumed: the challenge pins the object; the reservation is done.
+      await doc.ref.delete();
+      continue;
+    }
+    const uid = doc.data().uid as string | undefined;
+    if (uid) {
+      await getStorage()
+        .bucket()
+        .file(`stake_photos/${doc.id}/${uid}.jpg`)
+        .delete({ ignoreNotFound: true })
+        .catch(() => undefined);
+    }
+    await db.collection(PHOTO_SCREENS).doc(doc.id).delete().catch(() => undefined);
+    await doc.ref.delete();
+    expired += 1;
+  }
+  return expired;
 }
 
 async function expireInvites(now: number): Promise<number> {
@@ -217,6 +265,11 @@ async function decideDue(now: number): Promise<number> {
         outcome: {
           decidedAtMs: decision.decidedAtMs,
           perParticipant: decision.perParticipant,
+          // Audit H8 / D1: evidence is client-asserted (unit window and
+          // per-row bounds enforced by rules; multi-party outcomes also go
+          // through dispute + vote). Recorded on the outcome so the policy
+          // is visible on every settled record.
+          evidenceSelfReported: true,
         },
       };
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/firebase/firestore_paths.dart';
@@ -47,11 +49,51 @@ class FirestoreCircleRepository implements CircleRepository {
     if (circleIds.isEmpty) {
       return Stream.value([]);
     }
-    // User belongs to at most 3 circles; whereIn limit is 10 on document IDs.
-    return _circles
-        .where(FieldPath.documentId, whereIn: circleIds)
-        .snapshots()
-        .map((s) => s.docs.map(_fromDoc).toList());
+    // One document listener per id (a user is in at most a handful of
+    // circles). A whereIn list query would be denied by the per-document
+    // read rule (private circles are member-only — audit C1), because
+    // Firestore cannot prove a list query against a resource-dependent
+    // rule; single-doc reads are evaluated per document.
+    final ids = List<String>.from(circleIds);
+    final latest = <String, AccountabilityCircle?>{};
+    late final StreamController<List<AccountabilityCircle>> controller;
+    final subs = <StreamSubscription<dynamic>>[];
+
+    void emit() {
+      if (controller.isClosed) return;
+      controller.add([
+        for (final id in ids)
+          if (latest[id] != null) latest[id]!,
+      ]);
+    }
+
+    controller = StreamController<List<AccountabilityCircle>>(
+      onListen: () {
+        for (final id in ids) {
+          subs.add(
+            _circles.doc(id).snapshots().listen(
+              (doc) {
+                latest[id] = doc.exists ? _fromDoc(doc) : null;
+                // Emit once every id has reported (missing docs count).
+                if (latest.length == ids.length) emit();
+              },
+              onError: (Object e, StackTrace st) {
+                // A single denied/missing circle must not kill the list:
+                // treat it as gone and keep the others live.
+                latest[id] = null;
+                if (latest.length == ids.length) emit();
+              },
+            ),
+          );
+        }
+      },
+      onCancel: () async {
+        for (final s in subs) {
+          await s.cancel();
+        }
+      },
+    );
+    return controller.stream;
   }
 
   @override

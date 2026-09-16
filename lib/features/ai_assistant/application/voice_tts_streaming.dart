@@ -15,6 +15,7 @@ import 'package:just_audio/just_audio.dart';
 import 'voice_mode_controller.dart'
     show VoiceTtsAdapter, VoiceTtsStreamCapable;
 import 'voice_speech_text.dart' show sanitizeForSpeech, splitIntoSentences;
+import '../../../core/firebase/app_check_token.dart';
 
 // OpenAI TTS over the aiSpeechStream endpoint (latency batch 4, 2026-08-19).
 //
@@ -165,12 +166,18 @@ class StreamingOpenAiTtsVoiceAdapter
     this.connectTimeout = const Duration(seconds: 8),
     this.clipTimeout = const Duration(seconds: 20),
     http.Client Function()? clientFactory,
-  }) : _clientFactory = clientFactory ?? http.Client.new;
+    Future<String?> Function()? appCheckToken,
+  }) : _clientFactory = clientFactory ?? http.Client.new,
+       _appCheckToken = appCheckToken ?? appCheckHeaderToken;
 
   final Uri endpoint;
 
   /// Fresh Firebase ID token per request (they expire hourly).
   final Future<String?> Function() idToken;
+
+  /// App Check token for the manual `X-Firebase-AppCheck` header (audit
+  /// H10); best-effort, omitted when unavailable.
+  final Future<String?> Function() _appCheckToken;
 
   /// Bounds token fetch + connect + response headers for the head clip.
   final Duration connectTimeout;
@@ -466,10 +473,14 @@ class StreamingOpenAiTtsVoiceAdapter
       throw StateError('No auth token for speech streaming');
     }
 
+    final attestation = await _appCheckToken();
     final request = http.Request('POST', endpoint)
       ..headers['authorization'] = 'Bearer $token'
       ..headers['content-type'] = 'application/json'
       ..body = jsonEncode({'text': text, 'turnId': turnId});
+    if (attestation != null && attestation.isNotEmpty) {
+      request.headers['x-firebase-appcheck'] = attestation;
+    }
 
     final response = await _client.send(request).timeout(connectTimeout);
     if (response.statusCode != 200) {
@@ -497,20 +508,63 @@ class StreamingOpenAiTtsVoiceAdapter
         done.complete();
       }
     });
+    // Audit M8: a playback error transitions to idle, never to completed,
+    // and used to hang the latch with the orb on SPEAKING; the play()
+    // rejection reached the zone handler and was recorded as a FATAL.
+    final errorSub = _player.errorStream.listen((e) {
+      if (!done.isCompleted) done.completeError(e, StackTrace.current);
+    });
     try {
       await _player.setAudioSource(GrowingBufferAudioSource.completed(bytes));
       if (generation != _generation) return;
-      final playFuture = _player.play();
-      await done.future;
-      await playFuture.catchError((_) {});
+      final duration = _player.duration;
+      await awaitClipPlayback(
+        play: _player.play(),
+        done: done,
+        deadline: playbackDeadlineFor(duration),
+      );
     } finally {
       await stateSub.cancel();
+      await errorSub.cancel();
       if (identical(_speaking, done)) _speaking = null;
       // Idle the player so the next setAudioSource starts clean.
       try {
         await _player.stop();
       } catch (_) {}
     }
+  }
+
+  /// Generous bound on one clip's playback: a stalled player (interrupted
+  /// audio session, route change mid-clip) must surface as a failure the
+  /// resilient wrapper can fall back from, not a permanent SPEAKING orb.
+  @visibleForTesting
+  static Duration playbackDeadlineFor(Duration? clipDuration) {
+    if (clipDuration == null) return const Duration(seconds: 90);
+    return clipDuration * 2 + const Duration(seconds: 10);
+  }
+
+  /// Waits for the playback latch with the play() rejection wired in
+  /// BEFORE the wait (so it can never escape as an unhandled error) and a
+  /// deadline. Completes normally when the clip finished or was stopped;
+  /// throws on a player error or a stall.
+  @visibleForTesting
+  static Future<void> awaitClipPlayback({
+    required Future<void> play,
+    required Completer<void> done,
+    required Duration deadline,
+  }) async {
+    unawaited(
+      play.then<void>(
+        (_) {},
+        onError: (Object e, StackTrace st) {
+          if (!done.isCompleted) done.completeError(e, st);
+        },
+      ),
+    );
+    await done.future.timeout(
+      deadline,
+      onTimeout: () => throw TimeoutException('playback stalled', deadline),
+    );
   }
 
   @override

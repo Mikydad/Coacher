@@ -19,13 +19,14 @@ abstract class ChallengeRepository {
     required int delta,
   });
 
-  /// Cast an approve/reject vote. Checks majority and flips status if reached.
+  /// Cast an approve/reject vote. The majority tally and the `status` flip
+  /// are server-side (`circleChallengeVoteTally` trigger — audit M1); a
+  /// client can only write its own vote doc.
   Future<void> vote({
     required String challengeId,
     required String circleId,
     required String userId,
     required bool approve,
-    required int memberCount,
   });
 
   Future<List<ChallengeVote>> getVotes(String circleId, String challengeId);
@@ -129,13 +130,12 @@ class FirestoreChallengeRepository implements ChallengeRepository {
     required String circleId,
     required String userId,
     required bool approve,
-    required int memberCount,
   }) async {
     final voteRef = _votes(circleId, challengeId).doc(userId);
-    final challengeRef = _challengeDoc(circleId, challengeId);
     final now = DateTime.now().millisecondsSinceEpoch;
 
-    // Write this user's vote.
+    // Own vote only — rules deny any client `status` change; the server
+    // recounts against ACTIVE members and flips the status.
     await voteRef.set(
       ChallengeVote(
         challengeId: challengeId,
@@ -144,24 +144,6 @@ class FirestoreChallengeRepository implements ChallengeRepository {
         createdAtMs: now,
       ).toMap(),
     );
-
-    // Check totals and flip status if majority reached.
-    final allVotes = await getVotes(circleId, challengeId);
-    final approvals = allVotes.where((v) => v.approve).length;
-    final rejections = allVotes.where((v) => !v.approve).length;
-    final majority = memberCount / 2;
-
-    if (approvals > majority) {
-      await challengeRef.update({
-        'status': ChallengeStatus.active.storageValue,
-        'updatedAtMs': now,
-      });
-    } else if (rejections > majority) {
-      await challengeRef.update({
-        'status': ChallengeStatus.rejected.storageValue,
-        'updatedAtMs': now,
-      });
-    }
   }
 
   @override

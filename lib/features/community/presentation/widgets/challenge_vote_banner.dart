@@ -57,7 +57,6 @@ class _ChallengeVoteBannerState extends ConsumerState<ChallengeVoteBanner> {
             circleId: widget.circleId,
             userId: uid,
             approve: approve,
-            memberCount: widget.challenge.memberProgress.length.clamp(1, 999),
           );
       setState(() => _hasVoted = true);
     } finally {

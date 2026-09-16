@@ -40,8 +40,13 @@ async function seed({ status = 'active', photoState = 'pending_screen' } = {}) {
       moderatorIds: [OWNER],
       memberCount: 2,
     });
-    await db.doc(docPath('circles', CIRCLE, 'members', OWNER)).set({ role: 'member' });
-    await db.doc(docPath('circles', CIRCLE, 'members', MEMBER)).set({ role: 'member' });
+    // Membership = status ACTIVE (audit C1); a status-less doc grants nothing.
+    await db
+      .doc(docPath('circles', CIRCLE, 'members', OWNER))
+      .set({ role: 'member', status: 'active' });
+    await db
+      .doc(docPath('circles', CIRCLE, 'members', MEMBER))
+      .set({ role: 'member', status: 'active' });
     await db.doc(docPath('stake_challenges', CH)).set({
       type: 'solo_photo',
       status,
@@ -49,7 +54,14 @@ async function seed({ status = 'active', photoState = 'pending_screen' } = {}) {
       circleId: CIRCLE,
       participants: [{ uid: OWNER, teamId: OWNER, stakeKind: 'photo', accepted: true }],
       participantUids: [OWNER],
-      frozenGoal: { title: 'Read', unitKind: 'minutes', unitTarget: 60, totalUnits: 7 },
+      frozenGoal: {
+        title: 'Read',
+        unitKind: 'minutes',
+        unitTarget: 60,
+        totalUnits: 7,
+        // Started two days ago → units 0..3 are loggable (2 elapsed + 1 grace).
+        startDateMs: Date.now() - 2 * 86400000,
+      },
       mode: 'disciplined',
       deadlineMs: Date.now() + 86400000,
       createdAtMs: Date.now(),
@@ -178,6 +190,49 @@ describe('stake_challenges — evidence (the one client-writable path)', () => {
     await assertSucceeds(asUser(OWNER).doc(path).set(goodDoc()));
     await assertFails(asUser(OWNER).doc(path).update({ amount: 999 }));
     await assertFails(asUser(OWNER).doc(path).delete());
+  });
+
+  // ── Audit H8 / D1 — self-report, bounded ──────────────────────────────
+  it('a unit whose day has arrived is loggable; a future unit is not', async () => {
+    await assertSucceeds(
+      asUser(OWNER)
+        .doc(docPath('stake_challenges', CH, 'evidence', `${OWNER}_2_ok`))
+        .set({ ...goodDoc(), id: `${OWNER}_2_ok`, unitIndex: 2 }),
+    );
+    // One day of grace for the user's local day boundary.
+    await assertSucceeds(
+      asUser(OWNER)
+        .doc(docPath('stake_challenges', CH, 'evidence', `${OWNER}_3_ok`))
+        .set({ ...goodDoc(), id: `${OWNER}_3_ok`, unitIndex: 3 }),
+    );
+    await assertFails(
+      asUser(OWNER)
+        .doc(docPath('stake_challenges', CH, 'evidence', `${OWNER}_5_future`))
+        .set({ ...goodDoc(), id: `${OWNER}_5_future`, unitIndex: 5 }),
+    );
+  });
+
+  it('a unit beyond the goal, an oversized amount, or a future timestamp is rejected', async () => {
+    await assertFails(
+      asUser(OWNER)
+        .doc(docPath('stake_challenges', CH, 'evidence', `${OWNER}_7_beyond`))
+        .set({ ...goodDoc(), id: `${OWNER}_7_beyond`, unitIndex: 7 }),
+    );
+    await assertFails(
+      asUser(OWNER)
+        .doc(docPath('stake_challenges', CH, 'evidence', `${OWNER}_0_big`))
+        .set({ ...goodDoc(), id: `${OWNER}_0_big`, amount: 121 }),
+    );
+    await assertSucceeds(
+      asUser(OWNER)
+        .doc(docPath('stake_challenges', CH, 'evidence', `${OWNER}_0_max`))
+        .set({ ...goodDoc(), id: `${OWNER}_0_max`, amount: 120 }),
+    );
+    await assertFails(
+      asUser(OWNER)
+        .doc(docPath('stake_challenges', CH, 'evidence', `${OWNER}_0_late`))
+        .set({ ...goodDoc(), id: `${OWNER}_0_late`, recordedAtMs: Date.now() + 3600000 }),
+    );
   });
 
   it('shape violations rejected: zero amount, bad source, spoofed uid', async () => {

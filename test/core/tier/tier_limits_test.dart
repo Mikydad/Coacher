@@ -61,4 +61,19 @@ void main() {
       expect(roundTripped.toJson(), original.toJson());
     });
   });
+
+  group('launch lock (audit H11 / D2)', () {
+    test('withLaunchLock forces enforced off while no paywall exists', () {
+      final remote = TierLimits.parse('{"enforced": true, "freeGoals": 2}');
+      expect(remote.enforced, isTrue, reason: 'the parser stays faithful');
+      final live = remote.withLaunchLock();
+      expect(live.enforced, kPaywallAvailable);
+      expect(live.freeGoals, 2, reason: 'only the switch is locked');
+    });
+
+    test('an already-off value passes through unchanged', () {
+      final off = TierLimits.parse('{"enforced": false}');
+      expect(identical(off.withLaunchLock(), off), isTrue);
+    });
+  });
 }

@@ -30,6 +30,10 @@ class AuthRepository implements AuthRepositoryInterface {
   /// choose to switch to that account ([signInWithPendingLinkConflict]).
   AuthCredential? _pendingLinkConflictCredential;
 
+  /// Fresh Apple authorization code captured by [reauthenticateWithProvider];
+  /// consumed by [deleteAccount] to revoke the Apple token (audit H13).
+  String? _appleAuthorizationCodeForRevocation;
+
   // ── Getters ──────────────────────────────────────────────────────────────────
 
   @override
@@ -403,10 +407,98 @@ class AuthRepository implements AuthRepositoryInterface {
   }
 
   @override
+  Future<AuthFailure?> reauthenticateWithProvider(String providerId) async {
+    final user = _auth.currentUser;
+    if (user == null) return const UnknownAuthFailure('Not signed in.');
+    try {
+      switch (providerId) {
+        case 'apple.com':
+          final rawNonce = generateAppleAuthNonce();
+          final appleCredential = await SignInWithApple.getAppleIDCredential(
+            scopes: const [],
+            nonce: sha256Nonce(rawNonce),
+          );
+          final idToken = appleCredential.identityToken;
+          if (idToken == null || idToken.isEmpty) {
+            return const UnknownAuthFailure(
+              'Apple sign-in did not return a token.',
+            );
+          }
+          await user.reauthenticateWithCredential(
+            OAuthProvider('apple.com').credential(
+              idToken: idToken,
+              rawNonce: rawNonce,
+            ),
+          );
+          // Kept for deleteAccount → revokeTokenWithAuthorizationCode.
+          _appleAuthorizationCodeForRevocation =
+              appleCredential.authorizationCode;
+          debugPrint('[Auth] reauthenticateWithProvider(apple) success');
+          return null;
+        case 'google.com':
+          await _ensureGoogleSignInInitialized();
+          final googleUser = await _googleSignIn.authenticate(
+            scopeHint: const ['email', 'profile'],
+          );
+          final idToken = googleUser.authentication.idToken;
+          if (idToken == null || idToken.isEmpty) {
+            return const UnknownAuthFailure(
+              'Google sign-in did not return a token.',
+            );
+          }
+          await user.reauthenticateWithCredential(
+            GoogleAuthProvider.credential(idToken: idToken),
+          );
+          debugPrint('[Auth] reauthenticateWithProvider(google) success');
+          return null;
+        default:
+          return UnknownAuthFailure('Unsupported provider $providerId.');
+      }
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        return const AuthSignInCanceled();
+      }
+      debugPrint('[Auth] reauthenticateWithProvider(apple) failed: ${e.code}');
+      return UnknownAuthFailure(e.message);
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled ||
+          e.code == GoogleSignInExceptionCode.interrupted) {
+        return const AuthSignInCanceled();
+      }
+      debugPrint('[Auth] reauthenticateWithProvider(google) failed: ${e.code}');
+      return UnknownAuthFailure(e.description ?? e.code.name);
+    } on FirebaseAuthException catch (e) {
+      debugPrint(
+        '[Auth] reauthenticateWithProvider($providerId) failed: code=${e.code}',
+      );
+      return _mapException(e);
+    } catch (e) {
+      debugPrint('[Auth] reauthenticateWithProvider($providerId) failed: $e');
+      return UnknownAuthFailure('$e');
+    }
+  }
+
+  @override
   Future<AuthFailure?> deleteAccount() async {
     final uid = _auth.currentUser?.uid;
     try {
       debugPrint('[Auth] deleteAccount uid_prefix=${_shortUid(uid)}');
+      // Apple's account-deletion requirement: revoke the Sign in with Apple
+      // authorization with the code captured at re-authentication. A revoke
+      // failure is logged but does not keep the user from deleting — the
+      // Firebase user must not outlive their decision because Apple's
+      // endpoint hiccupped.
+      final appleCode = _appleAuthorizationCodeForRevocation;
+      if (appleCode != null && appleCode.isNotEmpty) {
+        try {
+          await _auth.revokeTokenWithAuthorizationCode(appleCode);
+          debugPrint('[Auth] apple token revoked');
+        } on FirebaseAuthException catch (e) {
+          debugPrint('[Auth] apple token revoke failed: code=${e.code}');
+        } finally {
+          _appleAuthorizationCodeForRevocation = null;
+        }
+      }
       await _auth.currentUser?.delete();
       debugPrint('[Auth] deleteAccount success uid_prefix=${_shortUid(uid)}');
       return null;

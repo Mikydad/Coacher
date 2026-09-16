@@ -190,22 +190,18 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    final current = Map<String, List<String>>.from(
-      message.reactions.map((k, v) => MapEntry(k, List<String>.from(v))),
-    );
-
-    final users = current[emoji] ?? [];
-    if (users.contains(uid)) {
-      users.remove(uid);
-      if (users.isEmpty) current.remove(emoji);
+    // Own key only (audit L2): rules refuse any change to other members'
+    // reactions, so the toggle rewrites just `reactionsByUser.{me}`.
+    final mine = message.reactionsOf(uid);
+    if (mine.contains(emoji)) {
+      mine.remove(emoji);
     } else {
-      users.add(uid);
-      current[emoji] = users;
+      mine.add(emoji);
     }
 
     await ref
         .read(circleMessageRepositoryProvider)
-        .updateReactions(widget.circleId, message.id, current);
+        .setMyReactions(widget.circleId, message.id, uid, mine);
   }
 
   @override

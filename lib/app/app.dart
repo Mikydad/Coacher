@@ -47,6 +47,7 @@ import '../features/timer/presentation/timer_session_screen.dart';
 
 import '../core/presentation/app_colors.dart';
 import '../core/presentation/theme_brightness_controller.dart';
+import '../core/config/build_flags.dart';
 
 class CoachForLifeApp extends ConsumerWidget {
   const CoachForLifeApp({super.key});
@@ -196,7 +197,9 @@ class CoachForLifeApp extends ConsumerWidget {
         AboutSupportScreen.routeName: (_) => const AboutSupportScreen(),
         NotificationSettingsScreen.routeName: (_) =>
             const NotificationSettingsScreen(),
-        ReminderDebugScreen.routeName: (_) => const ReminderDebugScreen(),
+        // Development surface: tester builds only (audit M11).
+        if (kTesterBuild)
+          ReminderDebugScreen.routeName: (_) => const ReminderDebugScreen(),
         ReminderSettingsScreen.routeName: (_) => const ReminderSettingsScreen(),
         FeedbackScreen.routeName: (_) => const FeedbackScreen(),
         ProfileScreen.routeName: (_) => const ProfileScreen(),

@@ -7,6 +7,7 @@ import '../../profile/presentation/coaching_insight_notification_settings_sectio
 import '../../reminders/presentation/reminder_debug_screen.dart';
 import '../../reminders/presentation/reminder_health_section.dart';
 import 'settings_page_scaffold.dart';
+import '../../../core/config/build_flags.dart';
 
 /// Notifications & Reminders (Profile reorg 2026-08-23): the coaching-insight
 /// push preferences and the reminder/attention timing (sleep window,
@@ -30,7 +31,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
         const SettingsSectionHeader(label: 'Reminder health'),
         const SizedBox(height: 10),
         const SettingsObsidianCard(child: ReminderHealthSection()),
-        if (isTester) ...[
+        if (isTester && kTesterBuild) ...[
           const SizedBox(height: 10),
           SettingsObsidianCard(
             child: ListTile(

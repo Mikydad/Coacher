@@ -14,6 +14,16 @@ import 'dart:convert';
 /// logic: gates are creation-time count checks, so pre-existing over-limit
 /// data is untouched and the cap binds naturally once the user deletes
 /// down to it.
+/// Ship-free lock (pre-launch audit H11, decision log 2026-09-15 D2): no
+/// purchase, restore, or server-verified entitlement exists yet, so an
+/// `enforced: true` pushed to Remote Config would wall users in with no
+/// door. While this is false the LIVE limits ([TierLimitsController])
+/// are passed through [TierLimits.withLaunchLock], which forces
+/// `enforced: false`; the parser itself stays faithful so the gate
+/// mechanics remain testable. Flip it in the RevenueCat integration
+/// commit — nothing else in the tier layer changes.
+const bool kPaywallAvailable = false;
+
 class TierLimits {
   const TierLimits({
     required this.enforced,
@@ -99,6 +109,29 @@ class TierLimits {
     challengeFeeMinCents: 200,
     challengeFeePercent: 7,
   );
+
+  /// The launch lock: identical limits with `enforced` forced off while
+  /// [kPaywallAvailable] is false. Applied to every remotely fetched value.
+  TierLimits withLaunchLock() {
+    if (kPaywallAvailable || !enforced) return this;
+    return TierLimits(
+      enforced: false,
+      freeTasksPerDay: freeTasksPerDay,
+      freeGoals: freeGoals,
+      freeHabitAnchorsPerDay: freeHabitAnchorsPerDay,
+      freeReminders: freeReminders,
+      freeAiInstructionsPerDay: freeAiInstructionsPerDay,
+      freePhotoStakesPerMonth: freePhotoStakesPerMonth,
+      freeCircles: freeCircles,
+      proCircles: proCircles,
+      freeCircleMaxMembers: freeCircleMaxMembers,
+      proCircleMaxMembers: proCircleMaxMembers,
+      mercyVetoFreePerMonth: mercyVetoFreePerMonth,
+      mercyVetoProPerMonth: mercyVetoProPerMonth,
+      challengeFeeMinCents: challengeFeeMinCents,
+      challengeFeePercent: challengeFeePercent,
+    );
+  }
 
   /// Tolerant parse: any missing/mistyped field falls back to [defaults],
   /// unparseable input returns [defaults] wholesale. A bad console edit

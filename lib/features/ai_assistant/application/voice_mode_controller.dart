@@ -87,10 +87,24 @@ class VoiceModeController extends ChangeNotifier with WidgetsBindingObserver {
     this.continuationGap = const Duration(milliseconds: 1500),
     this.maxContinuations = 8,
     this.staleStatusWindow = const Duration(milliseconds: 600),
+    this.startupTimeout = const Duration(seconds: 8),
+    this.audioInterruptions,
   });
 
   final VoiceSpeechAdapter speech;
   final VoiceTtsAdapter tts;
+
+  /// Bound on TTS configure + STT initialise during [start] (audit M9): a
+  /// native configure that never resolves used to leave the orb on
+  /// "connecting" forever with the sync-deferral flag stuck on.
+  final Duration startupTimeout;
+
+  /// Platform audio-session interruptions (phone call, Siri, another app
+  /// taking the session): `true` = interruption began. The screen wires
+  /// the audio_session stream; VM tests leave it null. Parks the loop at
+  /// idle exactly like backgrounding (settled Q7: never auto-resume).
+  final Stream<bool>? audioInterruptions;
+  StreamSubscription<bool>? _interruptionSub;
 
   /// Sends the utterance through the normal Coach path and returns the
   /// assistant's textual reply (never throws; error copy is a reply too).
@@ -198,12 +212,22 @@ class VoiceModeController extends ChangeNotifier with WidgetsBindingObserver {
   /// still releasing; opening the mic into that session yields a dead
   /// recognizer (no results, no 'done', ever). An orb tap during the delay
   /// simply listens early.
-  Future<void> start({Duration? listenDelay}) async {
-    if (_active) return;
+  ///
+  /// Returns false when setup failed (permission denied, native configure
+  /// error or timeout): the loop is parked at idle with honest copy and the
+  /// caller clears any voice-related deferrals. Never throws (audit M9).
+  Future<bool> start({Duration? listenDelay}) async {
+    if (_active) return true;
     _active = true;
     _statusMessage = null;
     _silentListens = 0;
     _stallRestarts = 0;
+    // Startup owns a generation (audit M9): a pause during permission or
+    // native setup bumps it, and the tail of start() then stops instead of
+    // opening the mic into a backgrounded app.
+    final startGeneration = ++_generation;
+    bool stale() =>
+        _disposed || !_active || _generation != startGeneration;
     // Lifecycle honesty (fix-wave Phase 4, §8 V3): backgrounding, a phone
     // call, or Siri mid-turn used to strand the loop — just_audio pauses
     // and 'completed' never fires, so the orb claimed SPEAKING into a
@@ -212,32 +236,46 @@ class VoiceModeController extends ChangeNotifier with WidgetsBindingObserver {
     try {
       WidgetsBinding.instance.addObserver(this);
     } catch (_) {}
+    _interruptionSub ??= audioInterruptions?.listen((began) {
+      if (began) unawaited(pauseToIdle());
+    });
     // Honest from the first frame: TTS configure + STT initialize take
     // real time (worst on the first entry after launch).
     _setPhase(VoiceModePhase.connecting);
-    await tts.configure();
-    final ok = await speech.initialize(
-      onStatus: _onSpeechStatus,
-      onError: _onSpeechError,
-    );
-    if (_disposed) return;
+    bool ok;
+    try {
+      await tts.configure().timeout(startupTimeout);
+      if (stale()) return false;
+      ok = await speech
+          .initialize(onStatus: _onSpeechStatus, onError: _onSpeechError)
+          .timeout(startupTimeout);
+    } catch (e) {
+      debugPrint('[VoiceMode] startup failed: $e');
+      if (_disposed) return false;
+      _micAvailable = false;
+      _statusMessage = 'Voice setup failed — tap the orb to try again.';
+      _setPhase(VoiceModePhase.idle);
+      return false;
+    }
+    if (stale()) return false;
     if (!ok) {
       _micAvailable = false;
       _statusMessage =
           'Microphone unavailable — check mic and speech permissions '
           'in Settings.';
       _setPhase(VoiceModePhase.idle);
-      return;
+      return false;
     }
     if (listenDelay != null && listenDelay > Duration.zero) {
       await Future<void>.delayed(listenDelay);
-      if (_disposed || !_active) return;
+      if (stale()) return false;
       // The user woke the loop themselves mid-delay (orb tap) — don't
       // stack a second listen on top of theirs. (The resting phase here is
       // `connecting` since 2026-08-26, so test for an actual listen.)
-      if (_phase == VoiceModePhase.listening) return;
+      if (_phase == VoiceModePhase.listening) return true;
     }
     await _listen();
+    return true;
   }
 
   /// The app left the foreground mid-loop: park honestly at idle instead
@@ -262,7 +300,13 @@ class VoiceModeController extends ChangeNotifier with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) unawaited(pauseToIdle());
+    // `hidden` precedes `paused` on recent Flutter; `inactive` is left
+    // alone (Control Center, a banner) — audio interruptions cover the
+    // phone-call / Siri case through [audioInterruptions].
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      unawaited(pauseToIdle());
+    }
   }
 
   /// Leaves Voice Mode entirely (X button / sheet closed).
@@ -700,6 +744,8 @@ class VoiceModeController extends ChangeNotifier with WidgetsBindingObserver {
     _active = false;
     _generation++;
     _cancelListenStallWatchdog();
+    unawaited(_interruptionSub?.cancel());
+    _interruptionSub = null;
     try {
       WidgetsBinding.instance.removeObserver(this);
     } catch (_) {}

@@ -69,6 +69,9 @@ class _FakeAuthRepo implements AuthRepositoryInterface {
   }) async => null;
   @override
   Future<AuthFailure?> deleteAccount() async => null;
+  @override
+  Future<AuthFailure?> reauthenticateWithProvider(String providerId) async =>
+      null;
 }
 
 // ── Helper ────────────────────────────────────────────────────────────────────

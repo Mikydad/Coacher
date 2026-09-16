@@ -10,13 +10,15 @@ import '../../../core/local_db/isar_collections/isar_reminder.dart';
 import '../../../core/local_db/isar_collections/isar_task.dart';
 import '../../../core/offline/offline_store.dart';
 import '../../../features/auth/application/auth_providers.dart';
-import '../../../features/auth/application/auth_session_policy.dart';
+import '../../../features/auth/application/account_deletion_coordinator.dart';
+import '../../../features/auth/application/deletion_reauth_strategy.dart';
 import '../../../features/auth/domain/auth_failure.dart';
 import '../../../features/auth/presentation/change_password_screen.dart';
 import '../../../features/auth/presentation/forgot_password_screen.dart';
 import '../../../features/auth/presentation/widgets/auth_error_text.dart';
 import '../../../features/auth/presentation/widgets/auth_text_field.dart';
 import '../../../features/auth/presentation/widgets/connect_account_section.dart';
+import '../../../app/application/main_tab_navigation.dart';
 import 'settings_page_scaffold.dart';
 
 import '../../../core/presentation/app_colors.dart';
@@ -38,11 +40,6 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
   bool _deleteLoading = false;
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
-
-  bool get _hasEmailProvider {
-    final user = ref.read(authStateProvider).valueOrNull;
-    return user?.providerData.any((p) => p.providerId == 'password') ?? false;
-  }
 
   // ── Change password ───────────────────────────────────────────────────────────
 
@@ -148,23 +145,54 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
     final confirmed = await _showDeleteConfirmDialog();
     if (confirmed != true || !mounted) return;
 
-    // Step 2 — re-authenticate (email users only; skip for anonymous).
-    if (_hasEmailProvider) {
-      final reAuthOk = await _showReAuthDialog();
-      if (!reAuthOk || !mounted) return;
+    // Step 2 — re-authenticate with the account's ACTUAL provider (audit
+    // H13): Apple users get the native sheet (and their token revoked on
+    // delete), Google users the account picker, password users the dialog.
+    final providerIds =
+        ref.read(authStateProvider).valueOrNull?.providerData.map(
+          (p) => p.providerId,
+        ) ??
+        const <String>[];
+    switch (deletionReauthFor(providerIds)) {
+      case DeletionReauth.password:
+        final reAuthOk = await _showReAuthDialog();
+        if (!reAuthOk || !mounted) return;
+      case DeletionReauth.apple:
+      case DeletionReauth.google:
+        final providerId = deletionReauthFor(providerIds) == DeletionReauth.apple
+            ? 'apple.com'
+            : 'google.com';
+        final failure = await ref
+            .read(authRepositoryProvider)
+            .reauthenticateWithProvider(providerId);
+        if (!mounted) return;
+        if (failure is AuthSignInCanceled) return;
+        if (failure != null) {
+          _showSnackbar(failure.toUserMessage());
+          return;
+        }
+      case DeletionReauth.none:
+        break;
     }
 
     setState(() => _deleteLoading = true);
+    // The coordinator owns teardown order and does not depend on this
+    // widget staying mounted — AuthGate unmounts it as soon as auth turns
+    // null (audit H14). `mounted` below guards UI calls only.
+    final auth = ref.read(authRepositoryProvider);
     try {
-      final failure = await ref.read(authRepositoryProvider).deleteAccount();
+      final failure = await AccountDeletionCoordinator.run(
+        auth: auth,
+        container: appRootProviderContainer,
+      );
       if (!mounted) return;
       if (failure != null) {
         _showSnackbar(failure.toUserMessage());
         setState(() => _deleteLoading = false);
         return;
       }
-      // Wipe local data — AuthGate will show AuthLandingScreen automatically.
-      await AuthSessionPolicy.clearLocalSession();
+      // Signed out: AuthGate shows the landing screen (barrier set by the
+      // coordinator), never a silent guest re-sign-in.
     } catch (e) {
       if (mounted) {
         setState(() => _deleteLoading = false);
@@ -195,7 +223,11 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'This permanently deletes your account and all associated data. This cannot be undone.',
+                'This permanently deletes your account and your data: plans, '
+                'goals, reminders, coaching memory, circle memberships and '
+                'photos. Points ledger entries and finished stake records '
+                'are kept for the audit trail, without your profile. This '
+                'cannot be undone.',
                 style: TextStyle(color: AppColors.textGray, height: 1.5),
               ),
               const SizedBox(height: 16),

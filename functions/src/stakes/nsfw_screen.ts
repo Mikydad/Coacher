@@ -25,13 +25,36 @@ import { GoogleAuth } from 'google-auth-library';
 
 import { CHALLENGES, eventDoc } from './firestore_layout';
 import {
+  parseStakePhotoObject,
   SafeSearchAnnotation,
+  ScreenBinding,
   ScreenVerdict,
   screeningVerdict,
+  verdictBindsTo,
 } from './screen_verdict';
 import { assertTransition } from './state_machine';
 
 export const PHOTO_SCREENS = 'stake_photo_screens';
+
+/**
+ * M12 — upload reservations. `stakeReservePhotoUpload` writes
+ * `stake_photo_reservations/{challengeId}` = {uid, atMs, expiresAtMs}
+ * before the client uploads; storage.rules requires it for the create, and
+ * this trigger refuses to spend a Vision call on an object without one.
+ */
+export const PHOTO_RESERVATIONS = 'stake_photo_reservations';
+export const PHOTO_RESERVATION_TTL_MS = 6 * 3_600_000;
+
+function participantPhoto(
+  data: FirebaseFirestore.DocumentData,
+): { uid: string; photoPath: string | undefined } | undefined {
+  const participants = data.participants as
+    | Array<{ uid?: string; photo?: { storagePath?: string } }>
+    | undefined;
+  const p = participants?.find((x) => typeof x.photo?.storagePath === 'string');
+  if (!p || typeof p.uid !== 'string') return undefined;
+  return { uid: p.uid, photoPath: p.photo?.storagePath };
+}
 
 // ─── Vision REST call ────────────────────────────────────────────────────────
 
@@ -88,6 +111,7 @@ export async function applyVerdictToChallenge(
   challengeId: string,
   verdict: ScreenVerdict,
   nowMs: number,
+  binding: ScreenBinding | undefined,
 ): Promise<void> {
   const db = getFirestore();
   const ref = db.collection(CHALLENGES).doc(challengeId);
@@ -98,6 +122,15 @@ export async function applyVerdictToChallenge(
     if (!snap.exists) return;
     const data = snap.data()!;
     if (data.status !== 'draft' || data.photoState !== 'pending_screen') {
+      return;
+    }
+    // H1 — the verdict must be about THIS participant's photo object.
+    if (!verdictBindsTo(binding, participantPhoto(data))) {
+      logger.warn('stake photo verdict ignored: binding mismatch', {
+        challengeId,
+        verdictUid: binding?.uid,
+        verdictPath: binding?.path,
+      });
       return;
     }
     if (verdict.approved) {
@@ -126,10 +159,8 @@ export async function applyVerdictToChallenge(
           data: { screen: 'rejected', reasons: verdict.reasons.join(',') },
         }),
       );
-      const photo = (data.participants as Array<{ photo?: { storagePath?: string } }>)
-        ?.map((p) => p.photo?.storagePath)
-        .find((p) => typeof p === 'string');
-      deletePhotoPath = photo;
+      // Binding verified above: this is the participant's own object.
+      deletePhotoPath = binding?.path;
     }
   });
 
@@ -154,13 +185,45 @@ export const stakePhotoUploaded = onObjectFinalized(
   },
   async (event) => {
     const name = event.data.name ?? '';
-    if (!name.startsWith('stake_photos/')) return;
-    const challengeId = name.split('/')[1];
-    if (!challengeId) return;
+    const parsed = parseStakePhotoObject(name);
+    if (!parsed) return;
+    const { challengeId, uid } = parsed;
 
     const now = Date.now();
     const db = getFirestore();
     const screenRef = db.collection(PHOTO_SCREENS).doc(challengeId);
+    const binding: ScreenBinding = {
+      uid,
+      path: name,
+      generation: `${event.data.generation ?? ''}`,
+    };
+
+    // M12 — no reservation, no paid screening. storage.rules already
+    // requires the reservation for the create, so an object without one
+    // only exists via a rules gap or a stale deploy; drop it.
+    const reservation = (
+      await db.collection(PHOTO_RESERVATIONS).doc(challengeId).get()
+    ).data();
+    let solicited = reservation?.uid === uid;
+    if (!solicited) {
+      // Re-upload for an existing challenge (support re-run after a Vision
+      // error) — the challenge itself pins the object, so it is solicited.
+      const ch = await db.collection(CHALLENGES).doc(challengeId).get();
+      solicited = ch.exists && verdictBindsTo(binding, participantPhoto(ch.data()!));
+    }
+    if (!solicited) {
+      logger.warn('stake photo without a matching reservation — deleted', {
+        challengeId,
+        uid,
+        reservedBy: reservation?.uid,
+      });
+      await getStorage()
+        .bucket(event.data.bucket)
+        .file(name)
+        .delete({ ignoreNotFound: true })
+        .catch(() => undefined);
+      return;
+    }
 
     let verdict: ScreenVerdict;
     try {
@@ -177,6 +240,7 @@ export const stakePhotoUploaded = onObjectFinalized(
         status: 'error',
         error: `${error}`.slice(0, 500),
         atMs: now,
+        ...binding,
       });
       await db
         .collection(CHALLENGES)
@@ -194,8 +258,9 @@ export const stakePhotoUploaded = onObjectFinalized(
       status: verdict.approved ? 'approved' : 'rejected',
       reasons: verdict.reasons,
       atMs: now,
+      ...binding,
     });
-    await applyVerdictToChallenge(challengeId, verdict, now);
+    await applyVerdictToChallenge(challengeId, verdict, now, binding);
     logger.info('stake photo screened', {
       challengeId,
       approved: verdict.approved,

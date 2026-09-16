@@ -13,21 +13,51 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    // Uses exists() (cheaper than get()) to check circle membership
+    // Membership = an ACTIVE member doc (pre-launch audit C1, 2026-09-15).
+    // Member docs and the circleIds index are server-owned (circle
+    // callables); pending / removed docs grant nothing. exists() first so a
+    // missing doc is a clean false rather than a get() error.
     function isCircleMember(circleId) {
-      return isSignedIn() &&
-        exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid));
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid))
+        && get(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid))
+             .data.status == 'active';
     }
 
-    // Denormalized join index under the user doc (kept in sync on join/leave).
+    // Denormalized join index under the user doc — written ONLY by the
+    // circle callables (rules deny client writes below), so it is as
+    // trustworthy as the member doc and covers the account-switch race.
     function hasCircleIndex(circleId) {
       return isSignedIn() &&
         exists(/databases/$(database)/documents/users/$(request.auth.uid)/circleIds/$(circleId));
     }
 
+    function circleIsPublic(circleId) {
+      return get(/databases/$(database)/documents/circles/$(circleId)).data.visibility == 'public';
+    }
+
     // Chat/activity read: member doc OR circleIds index (covers account-switch races).
     function canAccessCircleContent(circleId) {
       return isCircleMember(circleId) || hasCircleIndex(circleId);
+    }
+
+    // Audit H16 — see the user wildcard. `request.resource.data` is the
+    // post-merge document for set(merge) writes, so a merge that omits
+    // updatedAtMs keeps the stored value and passes.
+    function lwwNotStale() {
+      return !('updatedAtMs' in resource.data)
+        || !(resource.data.updatedAtMs is int)
+        || !('updatedAtMs' in request.resource.data)
+        || !(request.resource.data.updatedAtMs is int)
+        || request.resource.data.updatedAtMs >= resource.data.updatedAtMs;
+    }
+
+    // For a map field keyed by uid: the update may add/change/remove only
+    // the caller's own entry. Missing maps count as empty.
+    function onlyOwnKeyChanged(field) {
+      let before = (field in resource.data) ? resource.data[field] : {};
+      let after = (field in request.resource.data) ? request.resource.data[field] : {};
+      return after.diff(before).affectedKeys().hasOnly([request.auth.uid]);
     }
 
     // Reads circle doc once to check moderatorIds list
@@ -36,38 +66,46 @@ service cloud.firestore {
         get(/databases/$(database)/documents/circles/$(circleId)).data.moderatorIds.hasAny([request.auth.uid]);
     }
 
-    // Join/leave only touch memberCount on the circle doc (see UserCircleMembershipService).
-    function circleMemberCountOnlyChange() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount']);
-    }
-
-    // Member doc is written in the same transaction; avoid exists() (ordering).
-    function isJoinIncrementingMemberCount() {
-      return isSignedIn()
-        && circleMemberCountOnlyChange()
-        && request.resource.data.memberCount == resource.data.memberCount + 1;
-    }
-
-    function isLeaveDecrementingMemberCount() {
-      return isSignedIn()
-        && circleMemberCountOnlyChange()
-        && request.resource.data.memberCount == resource.data.memberCount - 1;
-    }
-
     // ─── Users ─────────────────────────────────────────────────────────────
     // Users can read/write their own document and subcollections
-    // (routines, blocks, tasks, reminders, goals, analytics, circleIds, etc.)
-    // EXCEPT the server-owned bookkeeping trees below (P2-03): overlapping
-    // allow statements are OR'd in Firestore rules, so the exclusion must
-    // live inside the wildcard's condition — a separate `allow write: if
-    // false` match would NOT revoke what the wildcard grants.
+    // (routines, blocks, tasks, reminders, goals, analytics, etc.) EXCEPT
+    // the server-owned trees below (P2-03): overlapping allow statements
+    // are OR'd in Firestore rules, so the exclusion must live inside the
+    // wildcard's condition — a separate `allow write: if false` match would
+    // NOT revoke what the wildcard grants.
 
     match /users/{uid} {
       allow read, write: if isUser(uid);
 
       match /{collection}/{document=**} {
-        allow read, write: if isUser(uid)
-          && !(collection in ['rescueState', 'briefState', 'reminderRescue']);
+        allow read, create, delete: if isUser(uid)
+          && !(collection in ['rescueState', 'briefState', 'reminderRescue',
+                              'circleIds', 'entitlements']);
+        // Audit H16 — last-write-wins enforced server-side: an update may
+        // not carry an older `updatedAtMs` than the stored document (the
+        // outbox replays offline edits blindly; a stale op from device A
+        // must not overwrite device B's newer edit). Ties pass (retries of
+        // the same payload); documents without the field are unaffected.
+        allow update: if isUser(uid)
+          && !(collection in ['rescueState', 'briefState', 'reminderRescue',
+                              'circleIds', 'entitlements'])
+          && lwwNotStale();
+      }
+
+      // Circle membership index (audit C1): written ONLY by the circle
+      // callables. A client that could write here could self-grant access
+      // to any private circle's chat, feed, and stake material.
+      match /circleIds/{circleId} {
+        allow read: if isUser(uid);
+        allow write: if false;
+      }
+      // Server-owned entitlements (decision log 2026-07-20 / 2026-09-15 D2):
+      // the RevenueCat webhook writes `entitlements/pro`; callables and the
+      // client read it. Carved out now so the Pro tier lands on a trusted
+      // field — never on the owner-writable user doc.
+      match /entitlements/{docId} {
+        allow read: if isUser(uid);
+        allow write: if false;
       }
 
       // Rescue-net + morning-brief state (Phase 5): written ONLY by the
@@ -95,35 +133,32 @@ service cloud.firestore {
 
     match /circles/{circleId} {
 
-      // Any signed-in user can read circles (needed for search/browse)
-      allow read: if isSignedIn();
+      // Public circles are browsable by every signed-in user (discovery
+      // queries filter visibility == public); private circles are visible
+      // only to their members (audit C1: private metadata was enumerable).
+      allow read: if isSignedIn()
+        && (resource.data.visibility == 'public'
+            || canAccessCircleContent(circleId));
 
-      // Any signed-in user can create — creatorId must match their uid
-      allow create: if isSignedIn()
-        && request.resource.data.creatorId == request.auth.uid;
+      // Create / delete / memberCount / creatorId are server-owned
+      // (circleCreate, circleDelete, join/leave callables — audit C1/M2).
+      allow create, delete: if false;
 
-      // Moderators can update metadata; members can bump memberCount on join/leave.
+      // Moderators edit metadata only — never the count or the creator.
       allow update: if isCircleModerator(circleId)
-        || isJoinIncrementingMemberCount()
-        || isLeaveDecrementingMemberCount();
-
-      // Only the creator can delete
-      allow delete: if isCircleModerator(circleId)
-        && get(/databases/$(database)/documents/circles/$(circleId)).data.creatorId == request.auth.uid;
+        && !request.resource.data.diff(resource.data).affectedKeys()
+             .hasAny(['memberCount', 'creatorId']);
 
       // ── Members ──────────────────────────────────────────────────────────
+      // Every write is a circle callable (join, approve, decline, leave,
+      // remove). Reads: own doc always (join-state checks), the list for
+      // public circles and for members of private ones.
       match /members/{memberId} {
-        // Members can read the member list; anyone signed in can read for discovery
-        allow read: if isSignedIn();
-
-        // A user can create their own membership doc (join / creator self-add)
-        allow create: if isSignedIn() && memberId == request.auth.uid;
-
-        // Moderators can approve/update; the member themselves can update their own doc
-        allow update: if isCircleModerator(circleId) || isUser(memberId);
-
-        // Moderators or the member themselves can remove
-        allow delete: if isCircleModerator(circleId) || isUser(memberId);
+        allow read: if isSignedIn()
+          && (circleIsPublic(circleId)
+              || canAccessCircleContent(circleId)
+              || isUser(memberId));
+        allow write: if false;
       }
 
       // ── Messages ─────────────────────────────────────────────────────────
@@ -132,15 +167,18 @@ service cloud.firestore {
         allow create: if isCircleMember(circleId)
           && request.resource.data.senderId == request.auth.uid;
         // Sender edits their own message; ANY member may toggle reactions —
-        // but a reactions-only update may touch nothing except `reactions`.
-        // (Rules can't cheaply validate which uid changed inside the map;
-        // accepted residual risk — a member could alter others' reactions.)
+        // but only their OWN entry of `reactionsByUser` (uid → [emoji]).
+        // Audit L2: the legacy emoji → [uid] map let a member forge or
+        // erase others' reactions; it is now read-only (displayed, merged).
         allow update: if isCircleMember(circleId)
           && (
             (resource.data.senderId == request.auth.uid
-              && request.resource.data.senderId == resource.data.senderId)
-            || request.resource.data.diff(resource.data)
-                 .affectedKeys().hasOnly(['reactions'])
+              && request.resource.data.senderId == resource.data.senderId
+              && !request.resource.data.diff(resource.data)
+                   .affectedKeys().hasAny(['reactions', 'reactionsByUser']))
+            || (request.resource.data.diff(resource.data)
+                  .affectedKeys().hasOnly(['reactionsByUser'])
+                && onlyOwnKeyChanged('reactionsByUser'))
           );
         allow delete: if isCircleMember(circleId)
           && (resource.data.senderId == request.auth.uid || isCircleModerator(circleId));
@@ -177,16 +215,20 @@ service cloud.firestore {
         allow create: if isCircleMember(circleId)
           && request.resource.data.creatorId == request.auth.uid;
         // Creator/moderator may edit challenge metadata. Regular members may
-        // only touch the collaborative fields the app writes on their behalf:
-        // progress tallies (updateProgress) and the vote-driven status flip
-        // (vote). creatorId is immutable on every branch.
+        // only touch their OWN memberProgress entry (+ the derived
+        // teamTotal). `status` is server-written by the vote tally trigger
+        // (audit M1: any member could flip it or forge others' progress).
+        // creatorId is immutable on every branch.
         allow update: if isCircleMember(circleId)
           && request.resource.data.creatorId == resource.data.creatorId
+          && !request.resource.data.diff(resource.data).affectedKeys()
+               .hasAny(['status'])
           && (
             resource.data.creatorId == request.auth.uid
             || isCircleModerator(circleId)
-            || request.resource.data.diff(resource.data).affectedKeys()
-                 .hasOnly(['memberProgress', 'teamTotal', 'status', 'updatedAtMs'])
+            || (request.resource.data.diff(resource.data).affectedKeys()
+                  .hasOnly(['memberProgress', 'teamTotal', 'updatedAtMs'])
+                && onlyOwnKeyChanged('memberProgress'))
           );
         allow delete: if isCircleModerator(circleId);
 
@@ -249,6 +291,28 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Audit H8 / D1 — evidence is SELF-REPORTED by policy, but bounded:
+      // a unit cannot be logged before its day can have arrived (units are
+      // action days; one calendar day of grace covers the user's local day
+      // boundary), never beyond the goal's unit count, and one row cannot
+      // claim more than twice the unit target. Multi-party outcomes also
+      // pass dispute + vote. Challenges created before startDateMs existed
+      // skip the window check.
+      function evidenceUnitWindowOk() {
+        let goal = stakeChallenge().frozenGoal;
+        let unitIndex = request.resource.data.unitIndex;
+        return unitIndex < goal.totalUnits
+          && (!('startDateMs' in goal)
+              || unitIndex * 86400000
+                   <= request.time.toMillis() - goal.startDateMs + 86400000);
+      }
+      function evidenceAmountOk() {
+        let goal = stakeChallenge().frozenGoal;
+        return request.resource.data.amount <= goal.unitTarget * 2
+          && request.resource.data.recordedAtMs
+               <= request.time.toMillis() + 300000;
+      }
+
       // M-5/CC-5 — the ONE client-writable path: a participant appends own
       // evidence. Immutable once created; arrivedAtMs is server-stamped by
       // the stakeEvidenceArrived trigger and may never come from a client.
@@ -272,7 +336,9 @@ service cloud.firestore {
           && request.resource.data.amount <= 100000
           && request.resource.data.source in ['timer', 'camera', 'checkin']
           && request.resource.data.recordedAtMs is int
-          && request.resource.data.updatedAtMs is int;
+          && request.resource.data.updatedAtMs is int
+          && evidenceUnitWindowOk()
+          && evidenceAmountOk();
         allow update, delete: if false;
       }
 
@@ -323,6 +389,14 @@ service cloud.firestore {
     // that could touch these could move money — write-denied forever.
     match /stake_escrows/{escrowId} {
       allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    // ─── Tester allowlist (audit M11 / D5) ─────────────────────────────────
+    // `tester_allowlist/{uid}` exists ⇔ that account may enable tester mode.
+    // Written only from the console (Admin); the owner may read their own.
+    match /tester_allowlist/{uid} {
+      allow read: if isUser(uid);
       allow write: if false;
     }
 

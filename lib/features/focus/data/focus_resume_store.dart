@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:io';
 
+import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/storage/app_storage_dir.dart';
 import '../../../core/utils/date_keys.dart';
 
@@ -13,9 +14,20 @@ import '../../../core/utils/date_keys.dart';
 class FocusResumeStore {
   const FocusResumeStore();
 
-  Future<File> _file() async {
+  static const _ownerKey = '_ownerUid';
+
+  static Future<File> _storageFile() async {
     final dir = await getAppStorageDirectory();
     return File('${dir.path}/focus_resume.json');
+  }
+
+  Future<File> _file() => _storageFile();
+
+  /// Logout wipe (audit H4) — static so test fakes that `implement` the
+  /// store are unaffected.
+  static Future<void> deleteFile() async {
+    final file = await _storageFile();
+    if (await file.exists()) await file.delete();
   }
 
   Future<Map<String, dynamic>> _read() async {
@@ -25,12 +37,18 @@ class FocusResumeStore {
       final raw = await file.readAsString();
       if (raw.trim().isEmpty) return {};
       final decoded = jsonDecode(raw);
-      if (decoded is Map<String, dynamic>) return decoded;
-      return {};
+      if (decoded is! Map<String, dynamic>) return {};
+      // Owner-tagged: another account's resume points read as nothing.
+      final owner = decoded[_ownerKey];
+      if (owner is String && owner != FirestorePaths.activeUid) return {};
+      return decoded;
     } catch (_) {
       return {};
     }
   }
+
+  Map<String, dynamic> _payload(String todayKey, Map<String, dynamic> byTask) =>
+      {_ownerKey: FirestorePaths.activeUid, todayKey: byTask};
 
   /// Persists [elapsed] for [taskId] under today's date key. Older days are
   /// dropped so the file never grows unbounded.
@@ -43,7 +61,10 @@ class FocusResumeStore {
       };
       byTask[taskId] = elapsed.inSeconds;
       final file = await _file();
-      await file.writeAsString(jsonEncode({todayKey: byTask}), flush: true);
+      await file.writeAsString(
+        jsonEncode(_payload(todayKey, byTask)),
+        flush: true,
+      );
     } catch (_) {
       // Best-effort; resume is a convenience, never block the stop flow.
     }
@@ -71,7 +92,10 @@ class FocusResumeStore {
       if (!byTask.containsKey(taskId)) return;
       byTask.remove(taskId);
       final file = await _file();
-      await file.writeAsString(jsonEncode({todayKey: byTask}), flush: true);
+      await file.writeAsString(
+        jsonEncode(_payload(todayKey, byTask)),
+        flush: true,
+      );
     } catch (e) {
       debugPrint('focus_resume_store: swallowed error: $e');
     }

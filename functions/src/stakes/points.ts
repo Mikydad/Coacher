@@ -12,8 +12,13 @@
  *
  * Client-earnable sources ride on client-owned artifacts (tasks, goals),
  * so a determined cheater can inflate their own points — accepted at
- * launch: points never cash out (§1.1), caps bound the rate, and the only
- * "victim" of self-inflation is the cheater's own accountability.
+ * launch and made EXPLICIT POLICY by the pre-launch audit (H7, decision
+ * log 2026-09-15 D1): points never cash out (§1.1), caps bound the rate
+ * (110/day with invented ids), and every consequential sink is fenced.
+ * The one sink that could hurt someone else's stake — buying an early
+ * photo removal — is payable only from TRUSTED points (signup bonus and
+ * challenge wins, which the server awards), tracked per balance doc as
+ * `trusted`. H2H stakes stay symmetric self-report on both sides.
  */
 
 export type PointsSource =
@@ -56,6 +61,27 @@ export const CLIENT_GRANTABLE: ReadonlySet<PointsSource> = new Set([
 
 /** D9 — early photo removal price (~1–2 weeks of honest earning). */
 export const PHOTO_REMOVAL_PRICE = 300;
+
+/**
+ * Sources the SERVER decides (never a client-asserted artifact). Only
+ * points from these can pay for a photo removal (audit H7 / D1).
+ */
+export const TRUSTED_SOURCES: ReadonlySet<PointsSource> = new Set([
+  'signup_bonus',
+  'earn_challenge_win',
+]);
+
+/**
+ * Change to the balance doc's `trusted` counter for one txn: trusted
+ * earnings add, the removal spend subtracts (it is paid FROM trusted),
+ * everything else — self-reported earnings, stake locks/releases — leaves
+ * it alone. Never below zero (legacy balances start without the field).
+ */
+export function trustedDelta(source: PointsSource, amount: number): number {
+  if (TRUSTED_SOURCES.has(source)) return Math.max(0, amount);
+  if (source === 'spend_photo_removal') return Math.min(0, amount);
+  return 0;
+}
 
 /** H2H points stake bounds (PT-3 suggests 100–500; hard server bounds). */
 export const H2H_STAKE_MIN = 50;
@@ -105,6 +131,8 @@ export interface BalanceDoc {
   dayKey?: string;
   dayCounts?: Record<string, number>;
   updatedAtMs?: number;
+  /** Points from [TRUSTED_SOURCES] still unspent on removals (audit H7). */
+  trusted?: number;
 }
 
 /**

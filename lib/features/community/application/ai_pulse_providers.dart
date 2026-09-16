@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/auth_providers.dart';
 import '../data/ai_pulse_repository.dart';
 import '../domain/models/ai_pulse.dart';
 import 'circle_ai_pulse_service.dart';
@@ -27,10 +28,13 @@ final circleAiPulseServiceProvider = Provider<CircleAiPulseService>((ref) {
   );
 });
 
+// Both pulse streams are auth-scoped (audit H6).
 final latestDailyPulseProvider = StreamProvider.family<AiPulse?, String>((
   ref,
   circleId,
 ) {
+  final uid = ref.watch(authUidProvider);
+  if (uid == null || uid.isEmpty) return Stream.value(null);
   return ref
       .watch(aiPulseRepositoryProvider)
       .watchLatestPulse(circleId, AiPulseType.daily);
@@ -40,6 +44,8 @@ final latestWeeklyPulseProvider = StreamProvider.family<AiPulse?, String>((
   ref,
   circleId,
 ) {
+  final uid = ref.watch(authUidProvider);
+  if (uid == null || uid.isEmpty) return Stream.value(null);
   return ref
       .watch(aiPulseRepositoryProvider)
       .watchLatestPulse(circleId, AiPulseType.weekly);

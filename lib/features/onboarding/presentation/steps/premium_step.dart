@@ -6,7 +6,10 @@ import '../onboarding_ui.dart';
 
 /// Screen 13 — Premium SidePal. UI ONLY for now: no purchase infrastructure
 /// exists yet, so both CTAs advance the flow (decision log 2026-07-12).
-/// Sells outcomes, not features (PRD).
+/// Sells outcomes, not features (PRD). Launch is FREE (audit H11, decision
+/// 2026-09-15 D2): no trial, price, or subscription claim appears until
+/// RevenueCat ships — App Review treats an unbacked "Start Free Trial" as
+/// a misleading purchase flow.
 class PremiumStep extends ConsumerWidget {
   const PremiumStep({super.key, required this.onSkip});
 
@@ -29,7 +32,7 @@ class PremiumStep extends ConsumerWidget {
       progress: flow.progress,
       onBack: controller.back,
       onSkip: onSkip,
-      ctaLabel: 'Start Free Trial',
+      ctaLabel: 'Continue',
       onCta: controller.next,
       belowCta: Center(
         child: TextButton(
@@ -55,7 +58,7 @@ class PremiumStep extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
-                'PREMIUM',
+                'COMING SOON',
                 style: OnboardingType.label.copyWith(
                   color: OnboardingColors.primarySoft,
                   fontSize: 11,
@@ -65,13 +68,13 @@ class PremiumStep extends ConsumerWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'Unlock your full potential.',
+            'Everything is free at launch.',
             textAlign: TextAlign.center,
             style: OnboardingType.headline,
           ),
           const SizedBox(height: 10),
           Text(
-            'Shift from tracking tasks to achieving transformation.',
+            'Premium coaching is on the way — here is what it will add.',
             textAlign: TextAlign.center,
             style: OnboardingType.body,
           ),
@@ -118,7 +121,7 @@ class PremiumStep extends ConsumerWidget {
             ),
           ),
           Text(
-            '7-day free trial · Cancel anytime',
+            'No purchase needed today',
             textAlign: TextAlign.center,
             style: OnboardingType.cardBody,
           ),

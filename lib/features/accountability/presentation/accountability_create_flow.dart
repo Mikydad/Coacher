@@ -2855,6 +2855,9 @@ class _AccountabilityCreateFlowState
       replicate: () async {
         Map<String, dynamic>? photoPayload;
         if (photoFile != null) {
+          // Reserve → upload → create (audit M12/H1): the reservation is
+          // what storage.rules and the screening trigger key on.
+          await functions.reservePhotoUpload(id);
           await FirebaseStorage.instance
               .ref(storagePath)
               .putFile(photoFile, SettableMetadata(contentType: 'image/jpeg'));

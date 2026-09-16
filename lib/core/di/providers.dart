@@ -50,6 +50,7 @@ import '../../features/reminders/data/reminder_occurrence_repository.dart';
 import '../../features/reminders/data/reminder_repository.dart';
 import '../../features/reminders/domain/models/reminder_occurrence.dart';
 import '../../features/ai_assistant/data/ai_interaction_history_repository.dart';
+import '../../features/community/application/circle_functions.dart';
 import '../../features/community/application/circle_providers.dart';
 import '../../features/community/application/user_circle_membership_service.dart';
 
@@ -414,10 +415,8 @@ final userCircleMembershipServiceProvider =
     Provider<UserCircleMembershipService>((ref) {
       return UserCircleMembershipService(
         memberRepo: ref.read(circleMemberRepositoryProvider),
-        circleRepo: ref.read(circleRepositoryProvider),
+        functions: ref.read(circleFunctionsProvider),
         currentUserId: () => FirebaseAuth.instance.currentUser?.uid ?? '',
-        currentDisplayName: () =>
-            FirebaseAuth.instance.currentUser?.displayName ?? 'User',
         maxCirclesPerUser: () => ref
             .read(tierGateProvider)
             .maxJoinedCircles(

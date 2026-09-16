@@ -14,6 +14,9 @@ import {
   recordSpeechUsage,
   speechConfig,
   speechQuotaExhaustedUntil,
+  accountPolicyRejection,
+  appCheckHeaderOk,
+  speechClipCapReached,
 } from "./speech_shared";
 
 // Streaming TTS proxy for Voice Mode (latency batch 2, 2026-08-08).
@@ -63,15 +66,10 @@ export const aiSpeechStream = onRequest(
     }
 
     let uid: string;
+    let claims: Record<string, any>;
     try {
       const decoded = await getAuth().verifyIdToken(token);
-      // Same spend-control stance as the callable: anonymous uids are free
-      // to mint, so per-uid quotas don't bound cost for them.
-      const provider = (decoded as Record<string, any>)?.firebase?.sign_in_provider;
-      if (provider === "anonymous") {
-        res.status(403).json({ error: "Sign in with an account to use Coach AI." });
-        return;
-      }
+      claims = decoded as Record<string, any>;
       uid = decoded.uid;
     } catch (error) {
       logger.warn("aiSpeechStream token rejected", { error: `${error}` });
@@ -88,7 +86,20 @@ export const aiSpeechStream = onRequest(
     }
     const text = validated.text;
 
-    const { enabled, voice } = await speechConfig();
+    const { enabled, voice, enforceAppCheck, requireVerifiedEmail } =
+      await speechConfig();
+    // Same spend-control stance as the callable (audit H10): anonymous uids
+    // are free to mint; unverified password accounts when the flag says.
+    const rejection = accountPolicyRejection(claims, requireVerifiedEmail);
+    if (rejection !== null) {
+      res.status(403).json({ error: rejection });
+      return;
+    }
+    // App Check behind the shared flag — manual header check on onRequest.
+    if (!(await appCheckHeaderOk(req, enforceAppCheck))) {
+      res.status(403).json({ error: "App attestation required." });
+      return;
+    }
     if (!enabled) {
       // Kill switch: the client falls back to the on-device voice.
       res.status(503).json({ error: "Speech synthesis is disabled." });
@@ -96,10 +107,19 @@ export const aiSpeechStream = onRequest(
     }
     const tConfig = Date.now();
 
+    const turnId =
+      typeof req.body?.turnId === "string"
+        ? String(req.body.turnId).slice(0, 64)
+        : undefined;
+
     // Known-over-quota callers are rejected BEFORE the OpenAI leg fires:
     // the concurrent-quota optimization below must not turn repeated 429s
-    // into unbounded upstream spend (Tier-1 review fix).
-    if (speechQuotaExhaustedUntil(uid) !== undefined) {
+    // into unbounded upstream spend (Tier-1 review fix; audit H9 added the
+    // per-turn clip-cap marker).
+    if (
+      speechQuotaExhaustedUntil(uid) !== undefined ||
+      speechClipCapReached(uid, turnId)
+    ) {
       res.status(429).json({ error: "Speech request limit reached." });
       return;
     }
@@ -114,10 +134,6 @@ export const aiSpeechStream = onRequest(
     // over-quota caller pays OpenAI for at most one aborted synthesis per
     // instance per window (the marker above short-circuits the rest), and
     // latency is paid by every legitimate turn.
-    const turnId =
-      typeof req.body?.turnId === "string"
-        ? String(req.body.turnId).slice(0, 64)
-        : undefined;
     const quotaPromise = enforceSpeechRateLimit(uid, turnId);
     const fetchPromise = fetch(OPENAI_SPEECH_URL, {
       method: "POST",

@@ -20,6 +20,7 @@ import '../domain/models/ai_chat_message.dart';
 import '../domain/models/ai_planned_changes.dart';
 import '../../../core/ai/ai_proxy_client.dart';
 import '../application/voice_mode_adapters.dart';
+import '../application/voice_audio_interruptions.dart';
 import '../application/voice_mode_controller.dart';
 import '../application/voice_warmup.dart';
 import '../application/voice_tts_resilience.dart';
@@ -591,18 +592,29 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       ),
       sendAndGetReply: (text) => _voiceSendAndGetReply(service, text),
       tryStreamReply: _kStreamingChat ? service.tryStreamVoiceReply : null,
+      audioInterruptions: voiceAudioInterruptions(),
     );
     setState(() {
       _voiceController = controller;
       _voiceImmersive = true;
       _voiceReachedFull = false;
     });
-    controller.start(
-      listenDelay: externalLaunch ? const Duration(milliseconds: 900) : null,
-    );
     // Background sync stays off the network while voice is live — pulls
     // and outbox storms were competing with voice turns for bandwidth.
     SyncService.instance.voiceModeActive = true;
+    // start() never throws (audit M9); a failed setup releases the
+    // sync deferral so a dead voice session cannot park sync forever.
+    unawaited(
+      controller
+          .start(
+            listenDelay: externalLaunch
+                ? const Duration(milliseconds: 900)
+                : null,
+          )
+          .then((ok) {
+            if (!ok) SyncService.instance.voiceModeActive = false;
+          }),
+    );
     // Full-screen stage (ChatGPT-voice style): snap the sheet to full;
     // dragging down demotes to the compact card via the extent listener.
     widget.sheetController?.addListener(_onSheetExtentChangedForVoice);

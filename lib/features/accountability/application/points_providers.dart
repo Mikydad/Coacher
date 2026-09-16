@@ -8,12 +8,14 @@ import '../../../core/local_db/isar_collections/isar_goal_check_in.dart';
 import '../../../core/local_db/isar_collections/isar_points.dart';
 import '../../../core/local_db/isar_collections/isar_task.dart';
 import '../../../core/offline/offline_store.dart';
+import '../../auth/application/auth_providers.dart';
 import '../domain/models/points.dart';
 
 /// Offline points balance (read-only mirror; the ledger is server truth).
+/// Auth-scoped (audit M5): the uid is watched, not captured once.
 final pointsBalanceProvider = StreamProvider<int>((ref) {
   final isar = OfflineStore.instance.isar!;
-  final uid = FirestorePaths.activeUid;
+  final uid = ref.watch(authUidProvider) ?? FirestorePaths.activeUid;
   return isar.isarPointsBalances
       .filter()
       .uidEqualTo(uid)
@@ -49,11 +51,14 @@ final charitiesProvider = StreamProvider<List<Charity>>((ref) {
 class PointsEarnService {
   PointsEarnService();
 
-  bool _ranThisSession = false;
+  /// `uid:dayKey` of the last sweep — keyed so an account switch or a day
+  /// rollover sweeps again instead of a process-lifetime boolean (audit M5).
+  String? _lastSweepKey;
 
   Future<void> sweepToday({bool force = false}) async {
-    if (_ranThisSession && !force) return;
-    _ranThisSession = true;
+    final sweepKey = '${FirestorePaths.activeUid}:${_todayKey()}';
+    if (_lastSweepKey == sweepKey && !force) return;
+    _lastSweepKey = sweepKey;
 
     final isar = OfflineStore.instance.isar;
     if (isar == null) return;

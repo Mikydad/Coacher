@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../../../core/firebase/app_check_token.dart';
 import '../domain/models/ai_intent_kind.dart';
 import 'ai_operating_layer_client.dart';
 import 'ai_payload_assembler.dart';
@@ -58,6 +59,9 @@ Stream<String> streamCoachReply({
   Duration connectTimeout = const Duration(seconds: 10),
   Duration idleTimeout = const Duration(seconds: 30),
   http.Client Function()? clientFactory,
+  /// App Check token for the manual `X-Firebase-AppCheck` header (audit
+  /// H10). Defaults to the best-effort device token; tests pass a stub.
+  Future<String?> Function()? appCheckToken,
 }) {
   final controller = StreamController<String>();
   // The shared keep-alive client by default (§8 V4); a test-provided
@@ -73,6 +77,7 @@ Stream<String> streamCoachReply({
       if (token == null || token.isEmpty) {
         throw StateError('No auth token for chat streaming');
       }
+      final attestation = await (appCheckToken ?? appCheckHeaderToken)();
       final request = http.Request('POST', endpoint)
         ..headers['authorization'] = 'Bearer $token'
         ..headers['content-type'] = 'application/json'
@@ -82,6 +87,9 @@ Stream<String> streamCoachReply({
           // server-side (fix-wave Phase 7) — no spoken-prose word cap.
           if (typed) 'mode': 'typed',
         });
+      if (attestation != null && attestation.isNotEmpty) {
+        request.headers['x-firebase-appcheck'] = attestation;
+      }
       final response = await client.send(request).timeout(connectTimeout);
       if (response.statusCode != 200) {
         unawaited(response.stream.drain<void>().catchError((_) {}));

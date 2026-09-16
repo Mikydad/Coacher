@@ -3409,3 +3409,205 @@ not silent reversal.
   ring) and the cards/pill carry the shared shadow. Card text follows
   (`textPrimary`/`textSecondary` in light). Add Task's flat chip colours are
   unchanged — they invert to ink on select in both themes.
+
+- **2026-09-15 · Pre-launch audit: verified, nine decisions settled.** An
+  external audit (`AUDIT_PRELAUNCH_2026-09-15.md`, 32 findings) was
+  re-verified finding by finding against the code; the verdict table and
+  the eight fix batches live in `documentation/AUDIT_PRELAUNCH_FIX_PLAN.md`
+  (branch `fix/prelaunch-audit`). Settled: (D1) points earn sources and
+  stake evidence stay **self-reported** for launch — the 2026-07-16
+  softness is now explicit policy; the consequential sink (paid photo
+  removal) is neutralised and evidence gets a rules-level unit window;
+  a server evidence callable is post-launch. (D2) **Launch is free**:
+  the onboarding trial CTA goes, `TierLimits` cannot be enforced by RC
+  until a paywall exists, but the whole tier layer (`TierGate`,
+  `userTierProvider`, upgrade sheets) stays dormant and intact so the
+  RevenueCat design of 2026-07-20 drops in unchanged. (D3) Account
+  deletion retains only `points_ledger`, `stake_escrows`, and terminal
+  stake events (financial audit); everything else under and about the
+  uid is purged server-side with a durable job doc. (D4) Deleting an
+  account **cancels and refunds** every open stake for every participant
+  (points released, money escrows to refund_pending) — deletion is never
+  a forfeit. (D5) Tester mode becomes a server allowlist
+  (`tester_allowlist/{uid}`) and the crash trigger + Reminder Debug compile
+  in only under `SIDEPAL_TESTER_BUILD=true` (TestFlight); supersedes the
+  2026-09-12 entry's client-only gate. (D6) Session isolation for launch =
+  session generation + drain-before-wipe + cache/prefs clearing + the
+  provider list; per-UID Isar and the guarded-write funnel are the
+  post-launch structural follow-up. (D7) The unauthenticated waitlist
+  stays as is (no app code writes it; spam-only impact). (D8) Circle
+  create / join / request / approve / remove move to callables like
+  `circleJoinWithInvite`; membership is `status == 'active'` everywhere
+  (rules, storage, functions) and `users/{uid}/circleIds` becomes
+  server-owned. (D9) Work branches off `feat/home-light-redesign`; both
+  merge to main together.
+
+- **2026-09-15 · Audit Batch A built: circles are server-owned, verdicts are
+  bound, uploads are reserved.** Rules semantics now: membership = an
+  ACTIVE member doc (pending/removed grant nothing) in Firestore, Storage,
+  and the stakes callables; `users/{uid}/circleIds` and the new
+  `users/{uid}/entitlements` tree are carved out of the owner wildcard
+  (owner-read, server-write — the entitlements carve-out lands ahead of
+  RevenueCat so Pro never rides an owner-writable field); private circle
+  docs are readable by members only, so `watchCircles` listens per document
+  (a whereIn list query can't be proven against a resource-dependent rule);
+  member docs, memberCount, creatorId, circle create/delete are client-
+  write-denied — every mutation is a callable mirroring
+  `circleJoinWithInvite` (`circleCreate/Join/ApproveJoin/DeclineJoin/Leave/
+  RemoveMember/Delete/RepairIndex`), and approve is the one that could never
+  work client-side (cross-user index write). Legacy circle challenges: a
+  member may change only their own `memberProgress` key; `status` is
+  written only by the `circleChallengeVoteTally` trigger (majority of
+  ACTIVE members). Reactions: the write model is `reactionsByUser.{uid}`
+  (own key only, rules-checked with `diff().affectedKeys()`); the legacy
+  emoji→uids map is read-only and merged for display — *accepted:* a
+  pre-migration reaction can't be un-reacted. Stake photos: the client
+  calls `stakeReservePhotoUpload` before uploading; storage.rules requires
+  the caller's reservation, the trigger deletes unreserved objects without
+  screening, verdicts carry `{uid, path, generation}` and are applied only
+  when they match the participant's pinned photo (trigger, sweep, and the
+  create transaction all check) — a stranger's upload can no longer
+  activate or cancel someone else's draft. Evidence receipt time is the
+  Firestore createTime (trigger stamps it; sweep falls back to it), so a
+  delayed trigger can't void on-time evidence. Anonymous sessions can't
+  upload anywhere. *Rejected:* rules-only tightening without callables
+  (approve needs a cross-user write; count integrity needs one
+  transaction); a reactions subcollection (50 listeners per chat page);
+  kDebugMode-style client gating for uploads (rules are the boundary).
+  Tests: `rules-tests/circles.rules.test.js`, first Storage suite
+  (`test:storage` runs in its own emulator project — cross-service
+  lookups resolve against the emulator default project), Functions
+  `membership.test.ts` + binding tests. Deploy rules + storage + functions
+  with the client build.
+
+- **2026-09-15 · Audit Batch B built: the session generation is the client
+  account boundary.** `SessionScope` (lib/core/session) is bumped
+  synchronously the moment a logout / switch / deletion starts and stays
+  in "tearing down" until the wipe ends; long jobs capture a `SessionToken`
+  when they start and re-check it before every local write — the remote
+  pull funnels all 21 Isar transactions through one guarded `_write()`,
+  memory extraction drops the model's answer if its session ended and
+  refuses to start while tearing down (the logout path's AI-service dispose
+  used to fire an extraction that landed A's facts under B). The wipe now
+  DRAINS in-flight writers before clearing (a timeout was never a
+  cancellation) and clears the per-account files outside Isar (timer and
+  focus resume files, strategist proposals, announced insight, triage
+  counter); those files are also owner-tagged so a foreign copy reads as
+  nothing. The provider reset became a list (`userScopedProviders`) so a
+  widget-free coordinator can drive it; Plan Tomorrow, the four circle
+  families, the stake replicator, points balance, announced insight,
+  completions count and quick directives joined it and watch the uid.
+  Account deletion is an `AccountDeletionCoordinator` sequence: landing
+  barrier → reset → release push/geofence WHILE AUTHENTICATED (the token
+  doc delete was silently rejected after the Auth user was gone) → delete
+  → unconditional wipe; `mounted` guards UI only. *Deferred (post-launch,
+  logged as D6):* per-uid Isar directory + an architecture test banning
+  raw `writeTxn` outside the funnel, which retires the hand-maintained
+  list. *Rejected:* keying the timer file by uid hash (a tag + delete is
+  enough and keeps one file); cancelling the AI service's stash instead of
+  gating extraction on the teardown flag (the stash also serves restore).
+
+- **2026-09-15 · Audit Batch C built: deletion purges, refunds, and revokes.**
+  `stakeAccountPurge` now runs `purgeAccount`, an idempotent step inventory
+  recorded on `account_purges/{uid}` (stakes → memberships → user tree →
+  aiUsage → feedback → reservations); a failed step leaves the job
+  `partial` and the 15-minute sweep re-drives it — no more `.catch(warn)`
+  cleanup that "succeeds". Cancelling an open stake on deletion SETTLES it
+  (D4): every locked points side gets `stake_release_{id}`, every held
+  money escrow goes to refund_pending — the surviving opponent's stake was
+  previously stranded forever. Retained (D3): the points ledger, escrows,
+  and terminal stake records — financial audit rows that carry no profile;
+  `circle_invites` belong to the circle. The ledger helper is `tx.create`
+  now (a duplicate deterministic id fails loudly instead of overwriting the
+  audit row). Client: deletion re-authenticates with the account's actual
+  provider — Apple through the native sheet, whose fresh authorization
+  code is revoked via `revokeTokenWithAuthorizationCode` before `delete()`
+  (Apple's requirement); Google through the picker; password through the
+  existing dialog. A revoke failure is logged and deletion proceeds
+  (rejected: blocking deletion on Apple's endpoint). The delete dialog now
+  names what is kept. *Prerequisite (console, unverifiable from the repo):*
+  the Apple provider must carry Services ID / Team ID / Key ID / private
+  key, or revocation errors.
+
+- **2026-09-15 · Audit Batch D built: deletes converge, pushes can't
+  clobber, the queue is crash-safe.** Planning deletes leave a replicated
+  TOMBSTONE (`IsarDeletedEntity` ↔ `users/{uid}/deletedEntities/{type}_{id}`)
+  rather than a soft-delete field: fourteen files read the task/routine/
+  block collections directly, so rows stay hard-deleted and every reader is
+  untouched; the pull applies remote tombstones first (cascading, LWW
+  against the row's own updatedAtMs so an edit AFTER the delete is a
+  deliberate resurrection) and refuses to upsert a superseded row.
+  Firestore now enforces last-write-wins on the user tree (`updatedAtMs`
+  may not go backwards on update; ties pass) and the outbox drops a
+  denied upsert as "lost the race". The queue file is written
+  temp-then-rename and a corrupt file is set aside instead of breaking
+  boot; ops carry attempts + next-attempt with exponential back-off,
+  permanent errors are dropped, every write is bounded (15 s) so an
+  offline flush ENDS and the amber line finally shows on network loss
+  (Firestore's own offline persistence made `set()` hang silently), and
+  a flush superseded by logout discards its failures. Init and
+  reconnect push before they pull. Cursors re-read a 5-minute overlap,
+  clamp future-dated stamps, and a full reconcile pull runs daily.
+  *Rejected:* moving the outbox into Isar for entity+op atomicity (touches
+  ~15 write paths; the durable-enqueue window is milliseconds — logged as
+  a known gap); soft-delete `active` on planning models (reader blast
+  radius). Goals / reminders / time blocks should adopt the tombstone
+  helper next.
+
+- **2026-09-15 · Audit Batch E built: paid AI work is gated before
+  dispatch; attestation is wired; launch is free.** Every quota rejection
+  reason now sets the over-quota marker, the `loopIndex > 0` escape hatch
+  is closed (follow-ups of a turn THIS instance charged keep the concurrent
+  fast path; unknown turns clear the quota transaction first; known
+  over-quota callers never reach OpenAI), and speech clip caps mark the
+  turn. App Check: client activates App Attest (DeviceCheck fallback) in
+  release and the debug provider otherwise, the two manual HTTP streams
+  send the header, and all four paid endpoints honour the ONE
+  `ai_enforce_app_check` key — still OFF until an attested build has
+  shipped (flipping it earlier rejects every real user). A second key,
+  `ai_require_verified_email` (OFF), makes password accounts verify their
+  email before AI use, closing the disposable-account replenishment path
+  when announced. Tier: `kPaywallAvailable = false` locks `enforced` off
+  on every live limit fetch (the parser stays faithful so gate mechanics
+  remain tested), the placeholder `setEntitled` is inert, and the
+  onboarding premium screen makes no trial or price claim. RevenueCat
+  lands as its own PRD on the 2026-07-20 design, reading the server-owned
+  `users/{uid}/entitlements/pro` carved out in Batch A.
+
+- **2026-09-15 · Audit Batch F built: self-report is policy, and its one
+  dangerous sink is fenced.** Earn sources and stake evidence stay
+  client-asserted for launch (D1) — verifying a task doc the client wrote
+  proves nothing — so the guarantees are structural instead: the balance
+  doc carries a `trusted` share (signup bonus + challenge wins, the only
+  server-decided sources) and early photo removal is payable from that
+  share only; evidence rows must fall inside the unit's day window (units
+  are action days, +1 day of local-boundary grace), below the goal's unit
+  count, at most 2× the unit target, and not future-dated; every settled
+  outcome records `evidenceSelfReported: true`. *Rejected:* reading the
+  referenced artifact in `grantPoints` (client-writable → theatre);
+  disabling removals outright (the trusted fence keeps the feature for
+  honest winners); a `stakeAddEvidence` callable now (post-launch, with
+  session-bound timer proofs). Balances that predate the deploy have no
+  trusted share until they win or the bonus lands — expected.
+
+- **2026-09-15 · Audit Batch G built: voice can't strand, failures reach
+  Crashlytics, dev surfaces need a grant and a tester build.** TTS playback
+  wires the `play()` rejection and the player's error stream into the
+  latch before waiting and bounds each clip (2× duration + 10 s), so a lost
+  audio session fails over to the on-device voice instead of a permanent
+  SPEAKING orb (and is no longer recorded as a FATAL). Voice startup owns a
+  generation, is bounded (8 s), never throws, returns false so the screen
+  releases the sync deferral, and pauses on `hidden` and on audio-session
+  interruptions (phone call / Siri) — `inactive` deliberately not (Control
+  Center and banners would pause every turn). Handled failures now reach
+  Crashlytics as sanitized non-fatals (feature tag + error type + Firebase
+  code; never the message — task titles ride in messages), deduped per
+  site and capped per session; a failed Firebase init boots the app
+  local-only and retries later instead of white-screening. Tester mode is
+  granted per account via `tester_allowlist/{uid}` (console-written; the
+  seven taps are a request) and the crash trigger + Reminder Debug compile
+  in only with `--dart-define=SIDEPAL_TESTER_BUILD=true` — supersedes the
+  2026-09-12 client-only gate. *Process consequence:* one binary cannot be
+  both; internal TestFlight builds carry the define, the App Store
+  submission does not. *Rejected:* kDebugMode gating (collection is off in
+  debug); pausing on `inactive`.

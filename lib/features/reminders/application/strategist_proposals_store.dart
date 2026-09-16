@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/firebase/firestore_paths.dart';
 import '../../thinking/application/reflection_parser.dart';
 
 /// Day-scoped store for the strategist's reminder proposals (FR-R-61).
@@ -17,7 +18,9 @@ import '../../thinking/application/reflection_parser.dart';
 /// send themselves, at which point the coach's normal tool machinery — with
 /// its confirmation and its 30-minute undo — takes over.
 class StrategistProposalsStore {
-  static const _kPrefsKey = 'reminder_strategist_proposals_v1';
+  /// Cleared by the logout wipe (audit H4); reads also validate `owner`.
+  static const prefsKey = 'reminder_strategist_proposals_v1';
+  static const _kPrefsKey = prefsKey;
 
   Future<void> saveForDay(
     String dayKey,
@@ -29,6 +32,7 @@ class StrategistProposalsStore {
         _kPrefsKey,
         jsonEncode({
           'day': dayKey,
+          'owner': FirestorePaths.activeUid,
           'items': [for (final p in proposals) p.toMap()],
         }),
       );
@@ -46,6 +50,8 @@ class StrategistProposalsStore {
       final decoded = jsonDecode(raw);
       if (decoded is! Map<String, dynamic>) return const [];
       if (decoded['day'] != dayKey) return const [];
+      final owner = decoded['owner'];
+      if (owner is String && owner != FirestorePaths.activeUid) return const [];
       final items = decoded['items'];
       if (items is! List) return const [];
       return [

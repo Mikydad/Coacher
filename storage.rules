@@ -15,11 +15,21 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    // Anonymous (guest) sessions may browse but never upload (audit M12).
+    function isRegistered() {
+      return isSignedIn()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // Membership = ACTIVE member doc (audit C1) — mirrors firestore.rules.
     function isCircleMember(circleId) {
-      return isSignedIn() &&
-        firestore.exists(
+      return isSignedIn()
+        && firestore.exists(
           /databases/(default)/documents/circles/$(circleId)/members/$(request.auth.uid)
-        );
+        )
+        && firestore.get(
+          /databases/(default)/documents/circles/$(circleId)/members/$(request.auth.uid)
+        ).data.status == 'active';
     }
 
     function isValidImageUpload() {
@@ -32,37 +42,51 @@ service firebase.storage {
     // unprefixed names stay readable; only NEW uploads need the prefix.
     match /circles/{circleId}/proofs/{fileName} {
       allow read: if isCircleMember(circleId);
-      allow create: if isCircleMember(circleId)
+      allow create: if isRegistered()
+        && isCircleMember(circleId)
         && isValidImageUpload()
         && fileName.matches(request.auth.uid + '_.*');
     }
 
     // Challenge progress proof images — scoped to the circle; only members
     // can read, and writes must be uid-prefixed so uploads can't be spoofed
-    // or clobbered by other users.
+    // or clobbered by other users. Create-only: `write` also granted delete,
+    // which could never satisfy the image check anyway.
     match /circles/{circleId}/challenge_proofs/{challengeId}/{fileName} {
       allow read: if isCircleMember(circleId);
-      allow write: if isCircleMember(circleId)
+      allow create: if isRegistered()
+        && isCircleMember(circleId)
         && isValidImageUpload()
         && fileName.matches(request.auth.uid + '_.*');
     }
 
     // Stake photos (accountability PRD P-3, security-critical).
-    // Upload happens BEFORE the challenge doc exists (client uploads, then
-    // calls stakeCreateChallenge which validates the path), so create is
-    // gated on the uid-named filename, not the doc. Reads: the owner
-    // always; circle members ONLY while the server has flipped the
-    // challenge to photoState == 'revealed'. Deletion is server-side
-    // (Admin SDK bypasses rules) — clients can never delete or overwrite.
+    // Upload happens BEFORE the challenge doc exists (client reserves via
+    // stakeReservePhotoUpload, uploads, then calls stakeCreateChallenge
+    // which validates the path). Create is gated on the uid-named filename
+    // AND the caller's own reservation (audit M12: no unsolicited uploads,
+    // no paid screening for strangers). Reads: the owner always; circle
+    // members ONLY while the server has flipped the challenge to
+    // photoState == 'revealed'. Deletion is server-side (Admin SDK bypasses
+    // rules) — clients can never delete or overwrite.
     match /stake_photos/{challengeId}/{fileName} {
       function stakeDoc() {
         return firestore.get(
           /databases/(default)/documents/stake_challenges/$(challengeId)
         ).data;
       }
-      allow create: if isSignedIn()
+      function hasOwnReservation() {
+        return firestore.exists(
+            /databases/(default)/documents/stake_photo_reservations/$(challengeId)
+          )
+          && firestore.get(
+            /databases/(default)/documents/stake_photo_reservations/$(challengeId)
+          ).data.uid == request.auth.uid;
+      }
+      allow create: if isRegistered()
         && fileName == (request.auth.uid + '.jpg')
-        && isValidImageUpload();
+        && isValidImageUpload()
+        && hasOwnReservation();
       allow read: if isSignedIn() && (
         fileName == (request.auth.uid + '.jpg')
         || (stakeDoc().photoState == 'revealed'
@@ -73,16 +97,21 @@ service firebase.storage {
 
     // Stake evidence photos (M-5) — in-app camera captures. uid-scoped
     // folder, create-only, immutable; readable by the participant and, for
-    // dispute review, the challenge's circle.
+    // dispute review, the challenge's circle. Create requires an existing
+    // challenge the caller participates in (audit M12).
     match /stake_evidence/{challengeId}/{uid}/{fileName} {
       function evidenceStakeDoc() {
         return firestore.get(
           /databases/(default)/documents/stake_challenges/$(challengeId)
         ).data;
       }
-      allow create: if isSignedIn()
+      allow create: if isRegistered()
         && request.auth.uid == uid
-        && isValidImageUpload();
+        && isValidImageUpload()
+        && firestore.exists(
+          /databases/(default)/documents/stake_challenges/$(challengeId)
+        )
+        && request.auth.uid in evidenceStakeDoc().participantUids;
       allow read: if isSignedIn() && (
         request.auth.uid == uid
         || isCircleMember(evidenceStakeDoc().circleId)

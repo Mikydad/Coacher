@@ -8,6 +8,7 @@ import '../../feedback/presentation/feedback_screen.dart';
 import '../application/crashlytics_test_sink.dart';
 import 'setting_row.dart';
 import 'settings_page_scaffold.dart';
+import '../../../core/config/build_flags.dart';
 
 /// About & Support page (Profile reorg 2026-08-23): feedback entry plus the
 /// version footer, whose 7-tap tester-mode toggle moved here with it.
@@ -54,7 +55,11 @@ class AboutSupportScreen extends StatelessWidget {
 /// With tester mode ON, a long-press opens the Crashlytics smoke test
 /// (non-fatal event or forced crash) — see [CrashlyticsTestSink].
 class VersionFooter extends ConsumerStatefulWidget {
-  const VersionFooter({super.key});
+  const VersionFooter({super.key, this.crashTriggerEnabled = kTesterBuild});
+
+  /// The forced-crash smoke test exists only in tester builds (audit M11,
+  /// `SIDEPAL_TESTER_BUILD`); the App Store binary compiles it out.
+  final bool crashTriggerEnabled;
 
   @override
   ConsumerState<VersionFooter> createState() => _VersionFooterState();
@@ -78,6 +83,8 @@ class _VersionFooterState extends ConsumerState<VersionFooter> {
             TesterToggleOutcome.disabled => 'Tester mode disabled',
             TesterToggleOutcome.accountRequired =>
               'Sign in with an account to use tester mode',
+            TesterToggleOutcome.notAllowlisted =>
+              'Tester access is granted per account — ask the team',
           }),
         ),
       );
@@ -96,8 +103,9 @@ class _VersionFooterState extends ConsumerState<VersionFooter> {
   }
 
   Future<void> _onLongPress() async {
-    // Tester mode only, so a curious user never meets a "crash the app"
-    // dialog. Silent otherwise — the gesture stays hidden.
+    // Tester builds + tester mode only, so a curious user never meets a
+    // "crash the app" dialog. Silent otherwise — the gesture stays hidden.
+    if (!widget.crashTriggerEnabled) return;
     if (!ref.read(testerModeProvider)) return;
     final sink = ref.read(crashlyticsTestSinkProvider);
     final messenger = ScaffoldMessenger.of(context);

@@ -44,18 +44,24 @@ export function evidenceFromSnap(snap: DocumentSnapshot): EvidenceRecord | null 
     typeof d.uid !== 'string' ||
     typeof d.unitIndex !== 'number' ||
     typeof d.amount !== 'number' ||
-    typeof d.recordedAtMs !== 'number' ||
-    typeof d.arrivedAtMs !== 'number'
+    typeof d.recordedAtMs !== 'number'
   ) {
     return null;
   }
+  // M6 — receipt time is the immutable Firestore create time; the trigger's
+  // stamp is the same value materialized. Missing both = unreadable.
+  const arrivedAtMs =
+    typeof d.arrivedAtMs === 'number'
+      ? d.arrivedAtMs
+      : snap.createTime?.toMillis();
+  if (typeof arrivedAtMs !== 'number') return null;
   return {
     uid: d.uid,
     unitIndex: d.unitIndex,
     amount: d.amount,
     source: d.source === 'camera' || d.source === 'checkin' ? d.source : 'timer',
     recordedAtMs: d.recordedAtMs,
-    arrivedAtMs: d.arrivedAtMs,
+    arrivedAtMs,
   };
 }
 

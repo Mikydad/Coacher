@@ -56,6 +56,11 @@ class FirestorePaths {
   static String deviceTokenDocument(String deviceId) =>
       '$deviceTokens/$deviceId';
 
+  /// Deletion tombstones (audit H15) — see `core/sync/deleted_entity.dart`.
+  static String get deletedEntities => '$userRoot/deletedEntities';
+  static String deletedEntityDocument(String docId) =>
+      '$deletedEntities/$docId';
+
   static String get timeBlocks => '$userRoot/timeBlocks';
   static String timeBlockDocument(String blockId) => '$timeBlocks/$blockId';
 

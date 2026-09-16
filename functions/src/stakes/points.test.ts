@@ -7,6 +7,8 @@ import {
   dayKey,
   EARN_AMOUNTS,
   PHOTO_REMOVAL_PRICE,
+  TRUSTED_SOURCES,
+  trustedDelta,
   txnId,
   validRefId,
 } from './points';
@@ -106,3 +108,36 @@ describe('applyDailyCap', () => {
     assert.equal(r.allowed, true);
   });
 });
+
+describe('trusted points (audit H7 / D1 — the removal sink is fenced)', () => {
+  it('only server-awarded sources are trusted', () => {
+    assert.deepEqual([...TRUSTED_SOURCES].sort(), ['earn_challenge_win', 'signup_bonus']);
+  });
+
+  it('trusted earnings add, self-reported earnings do not', () => {
+    assert.equal(trustedDelta('signup_bonus', 50), 50);
+    assert.equal(trustedDelta('earn_challenge_win', 50), 50);
+    assert.equal(trustedDelta('earn_task', 2), 0);
+    assert.equal(trustedDelta('earn_goal', 5), 0);
+    assert.equal(trustedDelta('earn_checkin', 5), 0);
+    assert.equal(trustedDelta('earn_streak', 15), 0);
+  });
+
+  it('stake locks / releases leave the trusted share alone', () => {
+    assert.equal(trustedDelta('stake_lock', -200), 0);
+    assert.equal(trustedDelta('stake_release', 200), 0);
+    assert.equal(trustedDelta('stake_forfeit', 0), 0);
+  });
+
+  it('the removal spend is paid from the trusted share', () => {
+    assert.equal(trustedDelta('spend_photo_removal', -PHOTO_REMOVAL_PRICE), -PHOTO_REMOVAL_PRICE);
+  });
+
+  it('110 self-reported points a day never unlock a removal', () => {
+    // 20 tasks + 10 goals + checkin + streak with invented ids (audit H7).
+    const day = 20 * trustedDelta('earn_task', 2) + 10 * trustedDelta('earn_goal', 5)
+      + trustedDelta('earn_checkin', 5) + trustedDelta('earn_streak', 15);
+    assert.equal(day, 0);
+  });
+});
+

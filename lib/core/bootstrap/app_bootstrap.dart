@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/notification_response_handler.dart';
@@ -49,6 +50,11 @@ class AppBootstrap {
   }
 
   static Future<void> completeDeferred(ProviderContainer container) async {
+    // Audit M10: a failed pre-frame Firebase init is retried once here
+    // instead of leaving the session silently offline for its whole life.
+    if (Firebase.apps.isEmpty) {
+      unawaited(FirebaseInitializer.initialize());
+    }
     await LocalNotificationsService.instance.initialize(
       onDidReceiveNotificationResponse: (response) {
         unawaited(handleNotificationResponse(response, container));

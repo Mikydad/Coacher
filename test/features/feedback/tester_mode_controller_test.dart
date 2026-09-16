@@ -48,6 +48,25 @@ void main() {
       expect(prefs.getBool('tester_mode_enabled_v2_userA'), isFalse);
     });
 
+    test('enabling requires the server allowlist (audit M11 / D5)', () async {
+      final c = ProviderContainer(
+        overrides: [
+          authUidProvider.overrideWithValue('userA'),
+          isRegisteredProvider.overrideWithValue(true),
+          testerModeProvider.overrideWith(
+            (ref) => TesterModeController(ref, (_) async => false),
+          ),
+        ],
+      );
+      addTearDown(c.dispose);
+      final controller = c.read(testerModeProvider.notifier);
+      await _settle();
+      expect(await controller.toggle(), TesterToggleOutcome.notAllowlisted);
+      expect(c.read(testerModeProvider), isFalse);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('tester_mode_enabled_v2_userA'), isNull);
+    });
+
     test('a registered account loads its own persisted flag', () async {
       SharedPreferences.setMockInitialValues({
         'tester_mode_enabled_v2_userA': true,

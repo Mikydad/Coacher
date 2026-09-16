@@ -3,10 +3,12 @@ import 'package:isar_community/isar.dart';
 
 import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/local_db/isar_collections/isar_block.dart';
+import '../../../core/local_db/isar_collections/isar_deleted_entity.dart';
 import '../../../core/local_db/isar_collections/isar_routine.dart';
 import '../../../core/local_db/isar_collections/isar_scheduled_time_block.dart';
 import '../../../core/local_db/isar_collections/isar_task.dart';
 import '../../../core/offline/offline_store.dart';
+import '../../../core/sync/deleted_entity.dart';
 import '../../../core/sync/outbox_writer.dart';
 import '../../../core/utils/stable_id.dart';
 import '../domain/models/accountability_log.dart';
@@ -43,6 +45,28 @@ class IsarPlanningRepository implements PlanningRepository {
     required String path,
   }) async {
     await outboxDelete(entityType: entityType, documentPath: path);
+  }
+
+  /// Audit H15 — every hard delete leaves a replicated tombstone so a pull
+  /// racing the queued Firestore delete cannot resurrect the row and other
+  /// devices converge on the deletion. Local rows go inside the caller's
+  /// write transaction; the outbox upserts run after it.
+  Future<void> _putTombstones(List<DeletedEntity> tombstones) async {
+    for (final t in tombstones) {
+      await _isar.isarDeletedEntitys.putByEntityKey(
+        IsarDeletedEntity.fromDomain(t),
+      );
+    }
+  }
+
+  Future<void> _replicateTombstones(List<DeletedEntity> tombstones) async {
+    for (final t in tombstones) {
+      await _enqueueUpsert(
+        entityType: 'deletedEntity',
+        path: FirestorePaths.deletedEntityDocument(t.docId),
+        payload: t.toMap(),
+      );
+    }
   }
 
   @override
@@ -180,12 +204,19 @@ class IsarPlanningRepository implements PlanningRepository {
 
   @override
   Future<void> deleteRoutine(String routineId) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final tombstones = <DeletedEntity>[
+      DeletedEntity(entityType: 'routine', entityId: routineId, deletedAtMs: now),
+    ];
     await _isar.writeTxn(() async {
       final tasks = await _isar.isarTasks
           .filter()
           .routineIdEqualTo(routineId)
           .findAll();
       for (final t in tasks) {
+        tombstones.add(
+          DeletedEntity(entityType: 'task', entityId: t.taskId, deletedAtMs: now),
+        );
         await _isar.isarTasks.delete(t.id);
       }
       final blocks = await _isar.isarBlocks
@@ -193,10 +224,15 @@ class IsarPlanningRepository implements PlanningRepository {
           .routineIdEqualTo(routineId)
           .findAll();
       for (final b in blocks) {
+        tombstones.add(
+          DeletedEntity(entityType: 'block', entityId: b.blockId, deletedAtMs: now),
+        );
         await _isar.isarBlocks.delete(b.id);
       }
       await _isar.isarRoutines.deleteByRoutineId(routineId);
+      await _putTombstones(tombstones);
     });
+    await _replicateTombstones(tombstones);
     await _enqueueDelete(
       entityType: 'routine',
       path: '${FirestorePaths.routines}/$routineId',
@@ -237,6 +273,10 @@ class IsarPlanningRepository implements PlanningRepository {
     required String routineId,
     required String blockId,
   }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final tombstones = <DeletedEntity>[
+      DeletedEntity(entityType: 'block', entityId: blockId, deletedAtMs: now),
+    ];
     await _isar.writeTxn(() async {
       final tasks = await _isar.isarTasks
           .filter()
@@ -244,10 +284,15 @@ class IsarPlanningRepository implements PlanningRepository {
           .blockIdEqualTo(blockId)
           .findAll();
       for (final t in tasks) {
+        tombstones.add(
+          DeletedEntity(entityType: 'task', entityId: t.taskId, deletedAtMs: now),
+        );
         await _isar.isarTasks.delete(t.id);
       }
       await _isar.isarBlocks.deleteByBlockId(blockId);
+      await _putTombstones(tombstones);
     });
+    await _replicateTombstones(tombstones);
     final path = FirestorePaths.blocks(routineId);
     await _enqueueDelete(entityType: 'block', path: '$path/$blockId');
   }
@@ -296,6 +341,11 @@ class IsarPlanningRepository implements PlanningRepository {
     required String blockId,
     required String taskId,
   }) async {
+    final tombstone = DeletedEntity(
+      entityType: 'task',
+      entityId: taskId,
+      deletedAtMs: DateTime.now().millisecondsSinceEpoch,
+    );
     await _isar.writeTxn(() async {
       await _isar.isarTasks.deleteByTaskId(taskId);
       // Drop scheduling block so deleted tasks do not appear in conflict checks.
@@ -303,7 +353,9 @@ class IsarPlanningRepository implements PlanningRepository {
           .filter()
           .entityIdEqualTo(taskId)
           .deleteAll();
+      await _putTombstones([tombstone]);
     });
+    await _replicateTombstones([tombstone]);
     final path = FirestorePaths.tasks(routineId, blockId);
     await _enqueueDelete(entityType: 'task', path: '$path/$taskId');
   }

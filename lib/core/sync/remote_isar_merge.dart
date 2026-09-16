@@ -48,12 +48,16 @@ import '../local_db/isar_collections/isar_scheduled_time_block.dart';
 import '../local_db/isar_collections/isar_reminder.dart';
 import '../local_db/isar_collections/isar_reminder_occurrence.dart';
 import '../local_db/isar_collections/isar_blocked_user.dart';
+import '../local_db/isar_collections/isar_deleted_entity.dart';
 import '../local_db/isar_collections/isar_points.dart';
 import '../local_db/isar_collections/isar_routine.dart';
 import '../local_db/isar_collections/isar_stake_challenge.dart';
 import '../local_db/isar_collections/isar_stake_evidence.dart';
+import '../local_db/isar_collections/isar_task.dart';
+import 'deleted_entity.dart';
 import 'isar_lww_merge.dart';
 import 'lww_updated_at.dart';
+import '../session/session_scope.dart';
 import 'sync_cursor_store.dart';
 
 String _docFieldId(
@@ -104,6 +108,12 @@ class RemoteIsarMerge {
   final SyncCursorStore _cursors;
   final bool ignoreCursors;
 
+  /// The session this pull belongs to (audit H2). During logout the outgoing
+  /// user is still authenticated while the wipe runs, so a uid comparison
+  /// alone cannot see the boundary; the teardown bumps the generation
+  /// synchronously and every local write below re-checks it.
+  final SessionToken _session = SessionScope.capture();
+
   /// Max updatedAtMs seen per cursor key this pull; flushed on success only.
   final Map<String, int> _maxSeen = {};
 
@@ -120,18 +130,165 @@ class RemoteIsarMerge {
   Future<int> _cursorFor(String key) async =>
       ignoreCursors ? 0 : _cursors.read(key);
 
+  /// Audit M7 — cursors come from device clocks. A second device's edit
+  /// stamped just below this device's high-water mark (clock skew, or an
+  /// equal-millisecond write that landed after the query) would otherwise
+  /// never be fetched. The query re-reads a bounded overlap window; LWW
+  /// makes the replay a no-op, so the overlap is free.
+  static const Duration cursorOverlap = Duration(minutes: 5);
+
+  /// A future-dated document (skewed clock) must not run the cursor ahead
+  /// and hide everyone else's ordinary edits until wall time catches up.
+  static const Duration cursorFutureClamp = Duration(seconds: 60);
+
   Query<Map<String, dynamic>> _afterCursor(
     Query<Map<String, dynamic>> query,
     int cursor,
-  ) => cursor > 0 ? query.where('updatedAtMs', isGreaterThan: cursor) : query;
+  ) {
+    if (cursor <= 0) return query;
+    final from = cursor - cursorOverlap.inMilliseconds;
+    return query.where('updatedAtMs', isGreaterThanOrEqualTo: from);
+  }
 
   void _noteSeen(String key, int updatedAtMs) {
-    if (updatedAtMs > (_maxSeen[key] ?? 0)) _maxSeen[key] = updatedAtMs;
+    final cap =
+        DateTime.now().millisecondsSinceEpoch + cursorFutureClamp.inMilliseconds;
+    final seen = updatedAtMs > cap ? cap : updatedAtMs;
+    if (seen > (_maxSeen[key] ?? 0)) _maxSeen[key] = seen;
+  }
+
+  // ─── Deletion tombstones (audit H15) ─────────────────────────────────────
+
+  /// True when a local tombstone supersedes the incoming remote row — the
+  /// entity was deleted here (or on another device, pulled below) at or
+  /// after the row's last edit, so the pull must not resurrect it.
+  Future<bool> _tombstoned(
+    String entityType,
+    String entityId,
+    int incomingUpdatedAtMs,
+  ) async {
+    final row = await _isar.isarDeletedEntitys
+        .filter()
+        .entityKeyEqualTo('$entityType:$entityId')
+        .findFirst();
+    if (row == null) return false;
+    return row.toDomain().supersedes(incomingUpdatedAtMs);
+  }
+
+  /// First phase of every pull: remote tombstones → local tombstones, and
+  /// the deleted rows (with their children) are removed locally when the
+  /// tombstone is at least as new as the row. Runs BEFORE the upsert
+  /// phases so those see the tombstones.
+  Future<void> _pullDeletedEntities() async {
+    final cursor = await _cursorFor('deletedEntities');
+    final snap = await _afterCursor(
+      _client.userCollection('deletedEntities'),
+      cursor,
+    ).get();
+    for (final doc in snap.docs) {
+      try {
+        final tomb = DeletedEntity.fromMap(Map<String, dynamic>.from(doc.data()));
+        if (tomb == null) continue;
+        _noteSeen('deletedEntities', tomb.updatedAtMs);
+        final existing = await _isar.isarDeletedEntitys
+            .filter()
+            .entityKeyEqualTo(tomb.key)
+            .findFirst();
+        if (!shouldApplyRemoteUpdatedAt(
+          localUpdatedAtMs: existing?.updatedAtMs,
+          remoteUpdatedAtMs: tomb.updatedAtMs,
+        )) {
+          continue;
+        }
+        await _write(() async {
+          await _isar.isarDeletedEntitys.putByEntityKey(
+            IsarDeletedEntity.fromDomain(tomb),
+          );
+          await _applyTombstoneLocally(tomb);
+        });
+        _appliedCount++;
+      } catch (e, st) {
+        debugPrint('RemoteIsarMerge: skip tombstone ${doc.id}: $e\n$st');
+      }
+    }
+  }
+
+  /// Inside a write transaction: remove the tombstoned row (and children)
+  /// unless it was edited AFTER the deletion (deliberate resurrection).
+  Future<void> _applyTombstoneLocally(DeletedEntity tomb) async {
+    switch (tomb.entityType) {
+      case 'routine':
+        final routine = await _isar.isarRoutines
+            .filter()
+            .routineIdEqualTo(tomb.entityId)
+            .findFirst();
+        if (routine == null || !tomb.supersedes(routine.updatedAtMs)) return;
+        await _isar.isarTasks
+            .filter()
+            .routineIdEqualTo(tomb.entityId)
+            .deleteAll();
+        await _isar.isarBlocks
+            .filter()
+            .routineIdEqualTo(tomb.entityId)
+            .deleteAll();
+        await _isar.isarRoutines.delete(routine.id);
+      case 'block':
+        final block = await _isar.isarBlocks
+            .filter()
+            .blockIdEqualTo(tomb.entityId)
+            .findFirst();
+        if (block == null || !tomb.supersedes(block.updatedAtMs)) return;
+        await _isar.isarTasks
+            .filter()
+            .blockIdEqualTo(tomb.entityId)
+            .deleteAll();
+        await _isar.isarBlocks.delete(block.id);
+      case 'task':
+        final task = await _isar.isarTasks
+            .filter()
+            .taskIdEqualTo(tomb.entityId)
+            .findFirst();
+        if (task == null || !tomb.supersedes(task.updatedAtMs)) return;
+        await _isar.isarTasks.delete(task.id);
+        await _isar.isarScheduledTimeBlocks
+            .filter()
+            .entityIdEqualTo(tomb.entityId)
+            .deleteAll();
+      default:
+        // Unknown type (a newer client's tombstone): keep the record, the
+        // matching reader is not on this build.
+        return;
+    }
+  }
+
+  Future<void> _purgeOldTombstones() async {
+    final cutoff = DateTime.now().millisecondsSinceEpoch -
+        DeletedEntity.retention.inMilliseconds;
+    final stale = await _isar.isarDeletedEntitys
+        .filter()
+        .deletedAtMsLessThan(cutoff)
+        .count();
+    if (stale == 0) return;
+    await _write(() async {
+      await _isar.isarDeletedEntitys
+          .filter()
+          .deletedAtMsLessThan(cutoff)
+          .deleteAll();
+    });
   }
 
   bool get _uidStillCurrent {
+    if (!_session.isCurrent) return false;
     if (Firebase.apps.isEmpty) return true; // VM tests — no auth to compare
     return FirebaseAuth.instance.currentUser?.uid == _client.uid;
+  }
+
+  /// The ONE write funnel for this pull: every Isar transaction re-checks
+  /// the session right before committing, so rows fetched for the outgoing
+  /// account can never land in the store after the wipe.
+  Future<T> _write<T>(Future<T> Function() fn) {
+    _abortIfUidChanged();
+    return _isar.writeTxn(fn);
   }
 
   void _abortIfUidChanged() {
@@ -145,6 +302,9 @@ class RemoteIsarMerge {
 
   /// Returns true when at least one row was applied to Isar.
   Future<bool> run() async {
+    // Tombstones first (audit H15): every upsert phase below consults them.
+    await _pullDeletedEntities();
+    _abortIfUidChanged();
     await _pullRoutinesBlocksTasks();
     _abortIfUidChanged();
     await _pullReminders();
@@ -186,6 +346,7 @@ class RemoteIsarMerge {
         cursorKey: 'points_txns');
     _abortIfUidChanged();
     await _pullGuarded('charities', _pullCharities);
+    await _purgeOldTombstones();
     // Only reached when every phase succeeded — safe to advance cursors.
     for (final entry in _maxSeen.entries) {
       await _cursors.advance(entry.key, entry.value);
@@ -206,7 +367,8 @@ class RemoteIsarMerge {
         final m = Map<String, dynamic>.from(doc.data());
         m['id'] = _docFieldId(doc, m);
         final routine = Routine.fromMap(m);
-        await _mergeRoutine(routine);
+        // A tombstoned routine is neither merged nor descended into.
+        if (!await _mergeRoutine(routine)) continue;
         final routineId = routine.id;
         final blocksSnap = await routinesCol
             .doc(routineId)
@@ -221,7 +383,7 @@ class RemoteIsarMerge {
                 ? rid.trim()
                 : routineId;
             final block = TaskBlock.fromMap(bm);
-            await _mergeBlock(block);
+            if (!await _mergeBlock(block)) continue;
             final tasksSnap = await _afterCursor(
               routinesCol
                   .doc(routineId)
@@ -714,7 +876,7 @@ class RemoteIsarMerge {
           ..active = (m['active'] as bool?) ?? true
           ..createdAtMs = (m['createdAtMs'] as num?)?.toInt() ?? updatedAtMs
           ..updatedAtMs = updatedAtMs;
-        await _isar.writeTxn(() async {
+        await _write(() async {
           await _isar.isarBlockedUsers.putByBlockedUid(row);
         });
         _appliedCount++;
@@ -746,7 +908,7 @@ class RemoteIsarMerge {
           ..uid = uid
           ..balance = (balanceData['balance'] as num?)?.toInt() ?? 0
           ..updatedAtMs = updatedAtMs;
-        await _isar.writeTxn(() async {
+        await _write(() async {
           await _isar.isarPointsBalances.putByUid(row);
         });
         _appliedCount++;
@@ -769,7 +931,7 @@ class RemoteIsarMerge {
             .txnIdEqualTo(txn.id)
             .findFirst();
         if (existing != null) continue; // immutable — once is enough
-        await _isar.writeTxn(() async {
+        await _write(() async {
           await _isar.isarPointsTxns.putByTxnId(IsarPointsTxn.fromDomain(txn));
         });
         _appliedCount++;
@@ -798,7 +960,7 @@ class RemoteIsarMerge {
             .charityIdEqualTo(charity.id)
             .findFirst();
         if (existing != null && existing.name == charity.name) continue;
-        await _isar.writeTxn(() async {
+        await _write(() async {
           await _isar.isarCharitys.putByCharityId(
             IsarCharity.fromDomain(charity, updatedAtMs),
           );
@@ -821,7 +983,7 @@ class RemoteIsarMerge {
     )) {
       return;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarStakeChallenges.putByChallengeId(
         IsarStakeChallenge.fromDomain(incoming),
       );
@@ -840,7 +1002,7 @@ class RemoteIsarMerge {
     )) {
       return;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarStakeEvidences.putByEvidenceId(
         IsarStakeEvidence.fromDomain(incoming),
       );
@@ -859,7 +1021,7 @@ class RemoteIsarMerge {
     )) {
       return;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarOnboardingProfiles.putByProfileId(
         IsarOnboardingProfile.fromDomain(incoming),
       );
@@ -867,7 +1029,12 @@ class RemoteIsarMerge {
     _appliedCount++;
   }
 
-  Future<void> _mergeRoutine(Routine incoming) async {
+  /// Returns false when the routine is tombstoned (callers skip its
+  /// children); true otherwise, whether or not the row was applied.
+  Future<bool> _mergeRoutine(Routine incoming) async {
+    if (await _tombstoned('routine', incoming.id, incoming.updatedAtMs)) {
+      return false;
+    }
     final existing = await _isar.isarRoutines
         .filter()
         .routineIdEqualTo(incoming.id)
@@ -876,15 +1043,19 @@ class RemoteIsarMerge {
       localUpdatedAtMs: existing?.updatedAtMs,
       remoteUpdatedAtMs: incoming.updatedAtMs,
     )) {
-      return;
+      return true;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarRoutines.putByRoutineId(IsarRoutine.fromDomain(incoming));
     });
     _appliedCount++;
+    return true;
   }
 
-  Future<void> _mergeBlock(TaskBlock incoming) async {
+  Future<bool> _mergeBlock(TaskBlock incoming) async {
+    if (await _tombstoned('block', incoming.id, incoming.updatedAtMs)) {
+      return false;
+    }
     final existing = await _isar.isarBlocks
         .filter()
         .blockIdEqualTo(incoming.id)
@@ -893,15 +1064,18 @@ class RemoteIsarMerge {
       localUpdatedAtMs: existing?.updatedAtMs,
       remoteUpdatedAtMs: incoming.updatedAtMs,
     )) {
-      return;
+      return true;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarBlocks.putByBlockId(IsarBlock.fromDomain(incoming));
     });
     _appliedCount++;
+    return true;
   }
 
   Future<void> _mergeTask(PlannedTask incoming) async {
+    if (await _tombstoned('task', incoming.id, incoming.updatedAtMs)) return;
+    _abortIfUidChanged();
     if (await mergePlannedTaskLwwIntoIsar(_isar, incoming)) {
       _appliedCount++;
     }
@@ -918,7 +1092,7 @@ class RemoteIsarMerge {
     )) {
       return;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarReminders.putByReminderId(
         IsarReminder.fromDomain(incoming),
       );
@@ -940,7 +1114,7 @@ class RemoteIsarMerge {
     )) {
       return;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarReminderOccurrences.putByOccurrenceKey(
         IsarReminderOccurrence.fromDomain(incoming),
       );
@@ -960,7 +1134,7 @@ class RemoteIsarMerge {
     )) {
       return;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarGoals.putByGoalId(IsarGoal.fromDomain(incoming));
     });
     _appliedCount++;
@@ -977,7 +1151,7 @@ class RemoteIsarMerge {
     )) {
       return;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarIntentions.putByIntentionId(
         IsarIntention.fromDomain(incoming),
       );
@@ -996,7 +1170,7 @@ class RemoteIsarMerge {
     )) {
       return;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarScheduledTimeBlocks.putByBlockId(
         IsarScheduledTimeBlock.fromDomain(incoming),
       );
@@ -1015,7 +1189,7 @@ class RemoteIsarMerge {
     )) {
       return;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarMemoryFacts.putByFactId(
         IsarMemoryFact.fromDomain(incoming),
       );
@@ -1034,7 +1208,7 @@ class RemoteIsarMerge {
     )) {
       return;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarPersons.putByPersonId(IsarPerson.fromDomain(incoming));
     });
     _appliedCount++;
@@ -1051,7 +1225,7 @@ class RemoteIsarMerge {
     )) {
       return;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarGoalActions.putByActionId(
         IsarGoalAction.fromDomain(incoming),
       );
@@ -1070,7 +1244,7 @@ class RemoteIsarMerge {
     )) {
       return;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarGoalMilestones.putByMilestoneId(
         IsarGoalMilestone.fromDomain(incoming),
       );
@@ -1088,7 +1262,7 @@ class RemoteIsarMerge {
     )) {
       return;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarGoalCheckIns.putByCheckInKey(
         IsarGoalCheckIn.fromDomain(incoming),
       );
@@ -1107,7 +1281,7 @@ class RemoteIsarMerge {
     )) {
       return;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarAnalyticsEvents.putByEventId(
         IsarAnalyticsEvent.fromDomain(incoming),
       );
@@ -1126,7 +1300,7 @@ class RemoteIsarMerge {
     )) {
       return;
     }
-    await _isar.writeTxn(() async {
+    await _write(() async {
       await _isar.isarAnalyticsStats.putByStatsId(
         IsarAnalyticsStats.fromDomain(incoming),
       );

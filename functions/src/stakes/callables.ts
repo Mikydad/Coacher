@@ -44,6 +44,8 @@ import {
   eventDoc,
   evidenceFromSnap,
 } from './firestore_layout';
+import { PHOTO_RESERVATIONS, PHOTO_RESERVATION_TTL_MS, PHOTO_SCREENS } from './nsfw_screen';
+import { verdictBindsTo } from './screen_verdict';
 import { assertTransition } from './state_machine';
 import {
   ChallengeCadence,
@@ -121,11 +123,12 @@ function participantOf(ch: StakeChallenge, uid: string): Participant {
   return p;
 }
 
+/** C1 — membership means status ACTIVE (pending / removed docs don't count). */
 async function isCircleMember(circleId: string, uid: string): Promise<boolean> {
   const snap = await getFirestore()
     .doc(`circles/${circleId}/members/${uid}`)
     .get();
-  return snap.exists;
+  return snap.exists && snap.data()?.status === 'active';
 }
 
 function appendEvent(
@@ -464,8 +467,18 @@ export const stakeCreateChallenge = onCall(
       // Handshake with the NSFW trigger (see nsfw_screen.ts): the photo
       // uploads before this call, so its verdict may already be in.
       if (type === 'solo_photo') {
-        const screen = await tx.get(db.collection('stake_photo_screens').doc(id));
-        const screenStatus = screen.data()?.status;
+        const screen = await tx.get(db.collection(PHOTO_SCREENS).doc(id));
+        const photoPath = participants[0]?.photo?.storagePath;
+        // H1 — only a verdict bound to THIS uid + object counts; anything
+        // else (stranger's upload, pre-binding verdict) leaves the draft in
+        // pending_screen for the bound trigger/sweep to settle.
+        const bound = verdictBindsTo(
+          typeof screen.data()?.uid === 'string' && typeof screen.data()?.path === 'string'
+            ? { uid: screen.data()!.uid as string, path: screen.data()!.path as string }
+            : undefined,
+          { uid, photoPath },
+        );
+        const screenStatus = bound ? screen.data()?.status : undefined;
         if (screenStatus === 'rejected') {
           throw new HttpsError(
             'failed-precondition',
@@ -716,6 +729,16 @@ export const stakeRemovePhoto = onCall(
         throw new HttpsError(
           'failed-precondition',
           `Removing the photo costs ${PHOTO_REMOVAL_PRICE} points.`,
+        );
+      }
+      // Audit H7 / D1: self-reported earnings (tasks, goals, check-ins) can
+      // be inflated by a determined client, so the one sink that touches
+      // someone else's stake is payable only from server-awarded points.
+      if ((bal?.trusted ?? 0) < PHOTO_REMOVAL_PRICE) {
+        throw new HttpsError(
+          'failed-precondition',
+          `Removing the photo costs ${PHOTO_REMOVAL_PRICE} points earned from ` +
+            'challenge wins.',
         );
       }
 
@@ -1154,5 +1177,55 @@ export const stakeReportPhoto = onCall(
       appendEvent(tx, id, { type: 'photo_reported', uid, atMs: now });
     });
     return { ok: true };
+  },
+);
+
+// ─── stakeReservePhotoUpload (M12) ───────────────────────────────────────────
+
+/**
+ * Reserve `stake_photos/{challengeId}/{uid}.jpg` before uploading it.
+ * storage.rules requires the reservation for the create and the screening
+ * trigger refuses unreserved objects, so anonymous / unsolicited uploads
+ * never reach Vision. Idempotent for the same uid; another uid's
+ * reservation on the same id is refused (ids are client-generated
+ * StableIds, so a clash is an attack, not an accident).
+ */
+export const stakeReservePhotoUpload = onCall(
+  CALL_OPTS,
+  async (request: CallableRequest<{ challengeId?: unknown }>) => {
+    const uid = requireAuth(request);
+    requireRegistered(request);
+    const now = Date.now();
+    const challengeId = str(request.data?.challengeId, 'challengeId', 8, 64);
+    if (!/^[A-Za-z0-9_-]+$/.test(challengeId)) {
+      throw new HttpsError('invalid-argument', 'challengeId has invalid characters.');
+    }
+    const db = getFirestore();
+    const enforcement = (
+      await db.collection(ENFORCEMENT).doc(uid).get()
+    ).data() as EnforcementDoc | undefined;
+    if (isChallengeBanned(enforcement?.challengeBanUntilMs, now)) {
+      throw new HttpsError(
+        'permission-denied',
+        'You are temporarily banned from starting challenges.',
+      );
+    }
+    const ref = db.collection(PHOTO_RESERVATIONS).doc(challengeId);
+    await db.runTransaction(async (tx) => {
+      const existing = await tx.get(ref);
+      if (existing.exists && existing.data()?.uid !== uid) {
+        throw new HttpsError('already-exists', 'That challenge id is taken.');
+      }
+      if (await tx.get(db.collection(CHALLENGES).doc(challengeId)).then((s) => s.exists)) {
+        throw new HttpsError('already-exists', 'That challenge already exists.');
+      }
+      tx.set(ref, {
+        uid,
+        atMs: now,
+        expiresAtMs: now + PHOTO_RESERVATION_TTL_MS,
+        path: `stake_photos/${challengeId}/${uid}.jpg`,
+      });
+    });
+    return { challengeId, expiresAtMs: now + PHOTO_RESERVATION_TTL_MS };
   },
 );

@@ -1,7 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/session/session_scope.dart';
+import '../../accountability/application/points_providers.dart';
+import '../../accountability/application/stake_create_replicator.dart';
 import '../../ai_assistant/application/ai_assistant_providers.dart';
+import '../../ai_assistant/application/quick_directives_provider.dart';
+import '../../analytics/application/announced_insight_store.dart';
 import '../../community/application/circle_providers.dart';
 import '../../context_override/application/context_override_providers.dart';
 import '../../direction/application/direction_providers.dart';
@@ -9,6 +14,8 @@ import '../../direction/application/new_month_prompt.dart';
 import '../../time_tracker/application/time_tracker_providers.dart';
 import '../../education/application/getting_started_controller.dart';
 import '../../goals/application/goals_providers.dart';
+import '../../plan_tomorrow/application/plan_tomorrow_providers.dart';
+import '../../profile/application/profile_providers.dart';
 import '../../reminders/application/attention_orchestrator_providers.dart';
 import '../../scoring/application/scoring_controller.dart';
 import '../../ui_state/ui_state_providers.dart';
@@ -29,55 +36,91 @@ import '../../../app/application/main_tab_navigation.dart';
 ///
 /// Auth-control providers (e.g. `pendingAuthLandingProvider`, `authStateProvider`)
 /// are intentionally **not** invalidated here.
+///
+/// Also begins the [SessionScope] teardown synchronously (audit H2–H6), so
+/// any job that captured a session token before this call drops its result
+/// instead of persisting into the next account's store.
 void invalidateUserScopedProviders(WidgetRef ref) {
+  SessionScope.beginTeardown();
+  for (final provider in userScopedProviders) {
+    ref.invalidate(provider);
+  }
+}
+
+/// Same reset, driven from a [ProviderContainer] — for coordinators whose
+/// lifetime is independent of any widget (account deletion, H14).
+void invalidateUserScopedProvidersIn(ProviderContainer container) {
+  SessionScope.beginTeardown();
+  for (final provider in userScopedProviders) {
+    container.invalidate(provider);
+  }
+}
+
+/// The hand-maintained list. Post-launch this is retired by the guarded
+/// write funnel + per-uid Isar (fix plan Batch B follow-up); until then
+/// EVERY non-autoDispose provider that holds per-account state belongs here.
+List<ProviderOrFamily> get userScopedProviders => [
   // ── Community (circle) state ──────────────────────────────────────────────
-  invalidateCircleScopedProviders(ref);
-  ref.invalidate(circleActiveTabProvider);
+  ...circleScopedProviders,
+  circleActiveTabProvider,
 
   // ── AI assistant — most privacy-sensitive (in-memory conversation) ─────────
   // Invalidating the family clears every cached service instance, dropping the
   // in-memory message list that the Coach screen renders directly.
-  ref.invalidate(aiAssistantServiceProvider);
-  ref.invalidate(coachLastOpenedDateKeyProvider);
+  aiAssistantServiceProvider,
+  coachLastOpenedDateKeyProvider,
+  quickDirectivesProvider,
 
   // ── Execution / timer state ────────────────────────────────────────────────
-  ref.invalidate(executionControllerProvider);
-  ref.invalidate(activeExecutionTaskIdProvider);
-  ref.invalidate(activeExecutionTaskLabelProvider);
+  executionControllerProvider,
+  activeExecutionTaskIdProvider,
+  activeExecutionTaskLabelProvider,
 
   // ── Scoring ────────────────────────────────────────────────────────────────
-  ref.invalidate(scoredTaskStatusesProvider);
+  scoredTaskStatusesProvider,
 
   // ── Reminder / attention orchestration ──────────────────────────────────────
-  ref.invalidate(suppressedIntentQueueProvider);
-  ref.invalidate(recentDeliveriesProvider);
+  suppressedIntentQueueProvider,
+  recentDeliveriesProvider,
 
   // ── Context override ─────────────────────────────────────────────────────────
-  ref.invalidate(pendingRecoveryReviewProvider);
+  pendingRecoveryReviewProvider,
 
   // ── Direction ────────────────────────────────────────────────────────────
   // The month-card controller caches its prefs flag in memory; the wipe
   // removes the key, so the controller must reload (and re-seed) for the
   // new account, and the clock re-stamps so periods resolve fresh.
-  ref.invalidate(newMonthPromptControllerProvider);
-  ref.invalidate(directionClockProvider);
+  newMonthPromptControllerProvider,
+  directionClockProvider,
 
   // ── Time Tracker ─────────────────────────────────────────────────────────
-  ref.invalidate(timelineDayKeyProvider);
-  ref.invalidate(timelineModeProvider);
-  ref.invalidate(timelineWeekKeyProvider);
+  timelineDayKeyProvider,
+  timelineModeProvider,
+  timelineWeekKeyProvider,
+
+  // ── Plan Tomorrow (audit H5): one-shot reads of routines/tasks ───────────
+  tomorrowRoutineSlotsProvider,
+  tomorrowTasksForRoutineProvider,
+
+  // ── Accountability (audit H6/M5) ─────────────────────────────────────────
+  stakeCreateReplicatorProvider,
+  pointsBalanceProvider,
+
+  // ── Analytics / profile (audit H4/L1) ────────────────────────────────────
+  announcedInsightTodayProvider,
+  totalCompletionsCountProvider,
 
   // ── Education / onboarding ───────────────────────────────────────────────
   // The Getting Started controller decides new-vs-existing ONCE per
   // instance; without this, User A's 'hidden' controller survives in memory
   // and User B (a brand-new account) never gets onboarding.
-  ref.invalidate(gettingStartedControllerProvider);
+  gettingStartedControllerProvider,
 
   // ── Ephemeral UI / navigation state ──────────────────────────────────────────
-  ref.invalidate(selectedTaskProvider);
-  ref.invalidate(timerRunningProvider);
-  ref.invalidate(timerDisplayProvider);
-  ref.invalidate(selectedGoalCategoryFilterProvider);
-  ref.invalidate(mainTabIndexProvider);
-  ref.invalidate(coachTabArgsProvider);
-}
+  selectedTaskProvider,
+  timerRunningProvider,
+  timerDisplayProvider,
+  selectedGoalCategoryFilterProvider,
+  mainTabIndexProvider,
+  coachTabArgsProvider,
+];
