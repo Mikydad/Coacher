@@ -3767,3 +3767,12 @@ not silent reversal.
   Track button floating above it. *Rejected:* following the streamed tail
   (pushes the reply's start out of view); morphing the loading bubble
   into the reply in place (ids feed retry/undo bookkeeping).
+
+- **2026-09-19 · Deployed `stakeRemovePhoto` + `stakeSweep` to
+  `coach4life-afaaa`** (the only functions whose behaviour changed since
+  the 2026-09-16 audit deploy; `--only` those two). Live: the pre-reveal
+  takedown door, the post-reveal `stakePhotoRemoved` feed line, and the
+  pre-reveal notice push. Deploy output repeats a pre-existing warning:
+  `circleChallengeVoteTally`, `stakeEvidenceArrived` and
+  `stakeDisbursementReceipt` run in us-central1 while their triggers are
+  in africa-south1 — a latency nit, not an error.
