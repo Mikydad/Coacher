@@ -3727,3 +3727,16 @@ not silent reversal.
   for an empty box at small heights — the thread's scrollable carries the
   sheet controller, and the swap mid-animation detached it, so the sheet
   never grew (caught by the peek-layout tests).
+
+- **2026-09-19 · Home chrome: one action; the sync button is the light
+  pull.** The Home sync button ran `syncFromRemote(force: true)` — the
+  same cursor-less full reconcile sign-in uses (20 sequential pull phases,
+  60 s ceiling), which on a slow link spins for most of a minute and reads
+  as hung. `SyncService.syncFromRemote` gains `bypassThrottle` + `timeout`:
+  the button now skips the 30 s throttle only, keeps the cursors, never
+  promotes to the daily full pull, and caps at 20 s. `force` keeps its
+  heavy meaning for sign-in and first launch. The accountability-history
+  shortcut (clock) and the placeholder bell left the AppBar (Miko: "we
+  don't need them now"); the history screen keeps its route and the bell
+  returns with a notification center, superseding the 2026-09-14 "bell
+  stays non-interactive" note.

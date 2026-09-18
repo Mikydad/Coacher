@@ -128,8 +128,21 @@ class SyncService {
   /// resumes on the next trigger after voice mode ends.
   bool voiceModeActive = false;
 
-  Future<bool> syncFromRemote({bool force = false}) async {
-    if (voiceModeActive && !force) {
+  /// Pulls remote changes into Isar.
+  ///
+  /// [force] is the heavy path — bypass the 30 s throttle AND ignore the
+  /// sync cursors (full reconcile of every collection). Sign-in and first
+  /// launch need that. [bypassThrottle] is the light path (Home's sync
+  /// button, 2026-09-19): skip the throttle only, keep the cursors, never
+  /// promote to the daily full pull, and cap the wait at [timeout] — a
+  /// user-triggered pull should answer in seconds, not run a minute-long
+  /// reconcile on a slow link.
+  Future<bool> syncFromRemote({
+    bool force = false,
+    bool bypassThrottle = false,
+    Duration? timeout,
+  }) async {
+    if (voiceModeActive && !force && !bypassThrottle) {
       debugPrint('syncFromRemote: voice mode active, deferring');
       return false;
     }
@@ -154,15 +167,19 @@ class SyncService {
     }
 
     final now = debugClockForTests?.call() ?? DateTime.now();
-    if (!force) {
+    if (!force && !bypassThrottle) {
       if (_lastRemoteSyncStartedAt != null &&
           now.difference(_lastRemoteSyncStartedAt!).inSeconds < 30) {
         return false;
       }
     }
     // Daily full reconcile (audit M7) — promotes this pull to cursor-less.
+    // Never on the light path: the user asked for "what's new", not a
+    // reconcile, and the shorter cap would only make the full pull fail.
     var effectiveForce = force;
-    if (!effectiveForce && await _fullPullDue(now)) effectiveForce = true;
+    if (!effectiveForce && !bypassThrottle && await _fullPullDue(now)) {
+      effectiveForce = true;
+    }
 
     final isar = OfflineStore.instance.isar;
     if (isar == null) {
@@ -173,7 +190,11 @@ class SyncService {
     _lastRemoteSyncStartedAt = now;
 
     _activeRemotePullUid = uid;
-    _activeRemotePullFuture = _runRemotePull(isar, force: effectiveForce);
+    _activeRemotePullFuture = _runRemotePull(
+      isar,
+      force: effectiveForce,
+      timeout: timeout ?? remotePullTimeout,
+    );
     try {
       await _activeRemotePullFuture!;
       if (_lastRemotePullSucceeded && effectiveForce) {
@@ -206,7 +227,11 @@ class SyncService {
     }
   }
 
-  Future<void> _runRemotePull(Isar isar, {bool force = false}) async {
+  Future<void> _runRemotePull(
+    Isar isar, {
+    bool force = false,
+    Duration timeout = remotePullTimeout,
+  }) async {
     isSyncingFromRemote.value = true;
     _lastRemotePullSucceeded = false;
     // Conservative default for the test-override path, which can't report
@@ -220,10 +245,10 @@ class SyncService {
         appliedAny = await RemoteIsarMerge(isar, ignoreCursors: force)
             .run()
             .timeout(
-              remotePullTimeout,
+              timeout,
               onTimeout: () => throw TimeoutException(
-                'RemoteIsarMerge exceeded ${remotePullTimeout.inSeconds}s',
-                remotePullTimeout,
+                'RemoteIsarMerge exceeded ${timeout.inSeconds}s',
+                timeout,
               ),
             );
       }

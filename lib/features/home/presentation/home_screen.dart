@@ -40,7 +40,6 @@ import '../../planning/domain/models/flow_transition_event.dart';
 import '../../planning/domain/models/block.dart';
 import '../../planning/domain/models/routine.dart';
 import '../../planning/domain/models/task_item.dart';
-import '../../planning/presentation/accountability_history_screen.dart';
 import '../../scoring/application/scoring_controller.dart';
 import '../../scoring/presentation/score_task_dialog.dart';
 import '../../add_task/presentation/add_task_sheet.dart';
@@ -137,25 +136,11 @@ class HomeScreen extends ConsumerWidget {
         scrolledUnderElevation: 0,
         title: const SidePalAppBarTitle(),
         actions: [
+          // One action in the chrome (2026-09-19): the accountability
+          // history shortcut and the placeholder bell left — the history
+          // screen keeps its route, the bell returns with a notification
+          // center.
           const _SyncFromCloudAction(),
-          const SizedBox(width: 10),
-          AppCircleIconButton(
-            icon: Icons.history_rounded,
-            tooltip: 'Accountability history',
-            onPressed: () => Navigator.pushNamed(
-              context,
-              AccountabilityHistoryScreen.routeName,
-            ),
-          ),
-          const SizedBox(width: 10),
-          // TODO(notifications): wire to a notification center once one
-          // exists. Deliberately non-interactive until then — no ripple, so
-          // it never fakes a pressed state.
-          const AppCircleIconButton(
-            icon: Icons.notifications_none_rounded,
-            tooltip: 'Notifications',
-            onPressed: null,
-          ),
           const SizedBox(width: 20),
         ],
       ),
@@ -2415,7 +2400,12 @@ class _SyncFromCloudActionState extends State<_SyncFromCloudAction> {
     setState(() => _userSyncing = true);
     var ok = false;
     try {
-      ok = await SyncService.instance.syncFromRemote(force: true);
+      // Light path: what's new since the cursors, capped at 20 s — not the
+      // minute-long full reconcile (2026-09-19). Sign-in owns that one.
+      ok = await SyncService.instance.syncFromRemote(
+        bypassThrottle: true,
+        timeout: const Duration(seconds: 20),
+      );
     } finally {
       if (mounted) setState(() => _userSyncing = false);
     }

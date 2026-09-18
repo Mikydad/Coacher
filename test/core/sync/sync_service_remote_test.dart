@@ -91,6 +91,22 @@ void main() {
     expect(pulls, 2);
   });
 
+  test('bypassThrottle (Home sync button) skips the debounce, keeps cursors',
+      () async {
+    var calls = 0;
+    final t0 = DateTime(2026, 1, 1, 12);
+    SyncService.debugClockForTests = () => t0;
+    SyncService.debugRemotePullForTests = (_) async {
+      calls++;
+    };
+    await SyncService.instance.syncFromRemote(bypassThrottle: true);
+    await SyncService.instance.syncFromRemote(
+      bypassThrottle: true,
+      timeout: const Duration(seconds: 20),
+    );
+    expect(calls, 2);
+  });
+
   test('uid change supersedes an in-flight pull instead of joining it', () async {
     var pulls = 0;
     SyncService.debugRemotePullForTests = (_) async {
