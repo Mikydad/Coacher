@@ -3704,3 +3704,26 @@ not silent reversal.
   not to have it spent for them); hiding money types from the hub
   (existing docs must still render). Functions 309 green; needs a
   functions deploy (`stakeRemovePhoto`, `stakeSweep`).
+
+- **2026-09-19 · Coach sheet: the ask-bar peek exists only for an empty
+  thread; the thread never paints clipped.** On-device (Miko): after
+  sending from the FAB's ask-bar, the sheet sat at ask-bar height with the
+  reply out of sight and the last bubble clipped behind the composer.
+  Cause: the peek fraction is pixel-anchored, so it changes every frame
+  while the keyboard closes; `_repinPeek` re-pinned any sheet still within
+  4 % of the OLD peek — which a just-started grow animation always is —
+  and the jump cancelled the grow. Now: the screen publishes "thread has
+  messages" to the sheet (`sheetThreadNotifier`); with messages the re-pin
+  is replaced by "settle at the conversation stage" (animate to 60 % on
+  the keyboard path; on message events only OBSERVE — the screen's own
+  grow is in flight and a second animateTo would restart it and defeat
+  the overflow-to-full measurement), the header drag never targets the
+  peek, and the peek leaves the snap list — but only once the sheet
+  actually sits at 60 % (`_peekRetired`): DraggableScrollableSheet
+  re-settles on the nearest stage whenever `snapSizes` changes, and a
+  list without the peek while the sheet is still near it settles on the
+  dismiss floor. Under 96 px the thread area is hidden with `Visibility`
+  (size maintained) instead of clipping. *Rejected:* swapping the thread
+  for an empty box at small heights — the thread's scrollable carries the
+  sheet controller, and the swap mid-animation detached it, so the sheet
+  never grew (caught by the peek-layout tests).

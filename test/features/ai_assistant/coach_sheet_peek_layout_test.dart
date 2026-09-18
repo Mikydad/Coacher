@@ -100,7 +100,11 @@ AiAssistantService _fakeService() {
 
 /// Pumps the sheet-mode screen constrained to [height] px — the same
 /// budget the DraggableScrollableSheet gives it at that stage.
-Future<void> _pumpAtHeight(WidgetTester tester, double height) async {
+Future<AiAssistantService> _pumpAtHeight(
+  WidgetTester tester,
+  double height, {
+  ValueNotifier<bool>? threadNotifier,
+}) async {
   final service = _fakeService();
   await tester.pumpWidget(
     ProviderScope(
@@ -113,7 +117,10 @@ Future<void> _pumpAtHeight(WidgetTester tester, double height) async {
           child: SizedBox(
             width: 390,
             height: height,
-            child: const AiAssistantScreen(sheetMode: true),
+            child: AiAssistantScreen(
+              sheetMode: true,
+              sheetThreadNotifier: threadNotifier,
+            ),
           ),
         ),
       ),
@@ -121,7 +128,12 @@ Future<void> _pumpAtHeight(WidgetTester tester, double height) async {
   );
   await tester.pump(); // provider future resolves
   await tester.pump(const Duration(milliseconds: 50));
+  return service;
 }
+
+/// The empty-state line (with a period) — distinct from the composer's
+/// hint, which ends in an ellipsis.
+const _emptyStateLine = 'Ask about your schedule or tell me what to plan.';
 
 void main() {
   Future<double> openSheetAndMeasure(
@@ -261,5 +273,48 @@ void main() {
     await _pumpAtHeight(tester, 480);
     expect(tester.takeException(), isNull);
     expect(find.byType(TextField), findsOneWidget);
+  });
+
+  // 2026-09-18: the ask-bar strip is input-only. Below a useful height the
+  // thread paints nothing — never a clipped sliver behind the composer.
+  // The thread stays MOUNTED (its scrollable carries the sheet controller)
+  // but is not visible below the useful-height threshold.
+  Visibility threadVisibility(WidgetTester tester) => tester.widget<Visibility>(
+    find
+        .ancestor(
+          of: find.text(_emptyStateLine),
+          matching: find.byType(Visibility),
+        )
+        .first,
+  );
+
+  testWidgets('ask-bar peek paints no thread content', (tester) async {
+    await _pumpAtHeight(tester, 244);
+    expect(threadVisibility(tester).visible, isFalse);
+    expect(find.byType(TextField), findsOneWidget);
+  });
+
+  testWidgets('conversation stage paints the thread', (tester) async {
+    await _pumpAtHeight(tester, 480);
+    expect(threadVisibility(tester).visible, isTrue);
+  });
+
+  testWidgets('the sheet learns when the thread gains a message', (
+    tester,
+  ) async {
+    final notifier = ValueNotifier<bool>(false);
+    addTearDown(notifier.dispose);
+    final service = await _pumpAtHeight(
+      tester,
+      480,
+      threadNotifier: notifier,
+    );
+    expect(notifier.value, isFalse);
+
+    service.sendMessage('hi');
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(notifier.value, isTrue);
   });
 }

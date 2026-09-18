@@ -156,6 +156,21 @@ class _CoachAiSheetState extends State<_CoachAiSheet> {
   final _sheetController = DraggableScrollableController();
   bool _popped = false;
 
+  /// Whether the thread has messages (set by the screen). The ask-bar peek
+  /// is ONLY for an empty thread (2026-09-18): once a conversation exists
+  /// the peek stops being a snap stage, the keyboard re-pin leaves the
+  /// sheet alone, and the sheet is kept at the conversation stage or
+  /// above. Before this, the re-pin raced the grow animation while the
+  /// keyboard closed and parked a live conversation at ask-bar height —
+  /// the reply out of sight, the last bubble clipped behind the composer.
+  final _threadHasMessages = ValueNotifier<bool>(false);
+
+  /// Drives the snap list. Flipped only once the sheet actually SITS at
+  /// the conversation stage: the sheet's snap physics re-settle on the
+  /// nearest stage whenever the list changes, and a list without the peek
+  /// while the sheet is still near it would settle on the dismiss floor.
+  final _peekRetired = ValueNotifier<bool>(false);
+
   /// Ask-bar height in PIXELS (grabber header + input card + insets). The
   /// peek must be pixel-anchored: the sheet's fractions apply to the space
   /// LEFT OVER above the keyboard, so a fractional peek collapses to
@@ -165,9 +180,64 @@ class _CoachAiSheetState extends State<_CoachAiSheet> {
   double? _lastPeekFraction;
 
   @override
+  void initState() {
+    super.initState();
+    _threadHasMessages.addListener(_onThreadChanged);
+  }
+
+  @override
   void dispose() {
+    _threadHasMessages.removeListener(_onThreadChanged);
+    _threadHasMessages.dispose();
+    _peekRetired.dispose();
     _sheetController.dispose();
     super.dispose();
+  }
+
+  /// A message landed or left: the screen's own grow-on-message animation
+  /// is in flight, so only OBSERVE — retire the peek once the sheet sits at
+  /// the conversation stage. Animating here too would restart the screen's
+  /// animation and defeat its overflow-to-full measurement.
+  void _onThreadChanged() => _settleConversationStage(grow: false);
+
+  /// With messages, the sheet must rest at the conversation stage or
+  /// higher. [grow] animates it there (the keyboard path — nothing else is
+  /// moving the sheet then); otherwise it waits, bounded, for whoever is.
+  /// A sheet on its way out (at the dismiss floor) is left alone.
+  void _settleConversationStage({required bool grow, int attempt = 0}) {
+    if (!_threadHasMessages.value) {
+      _peekRetired.value = false;
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || _popped) return;
+      if (!_sheetController.isAttached) {
+        // The controller attaches once the thread's scrollable lays out;
+        // bounded retry so a detached sheet can never become a loop.
+        if (attempt < 30) {
+          _settleConversationStage(grow: grow, attempt: attempt + 1);
+        }
+        return;
+      }
+      if (_sheetController.size <= _CoachAiSheet.minSize + 0.005) return;
+      if (_sheetController.size < _CoachAiSheet.midSize - 0.05) {
+        if (!grow) {
+          if (attempt < 30) {
+            _settleConversationStage(grow: false, attempt: attempt + 1);
+          }
+          return;
+        }
+        await _sheetController.animateTo(
+          _CoachAiSheet.midSize,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+        );
+        if (!mounted || _popped || !_sheetController.isAttached) return;
+      }
+      if (_sheetController.size >= _CoachAiSheet.midSize - 0.05) {
+        _peekRetired.value = true;
+      }
+    });
   }
 
   void _popOnce() {
@@ -183,6 +253,12 @@ class _CoachAiSheetState extends State<_CoachAiSheet> {
     final old = _lastPeekFraction;
     _lastPeekFraction = peek;
     if (old == null || (peek - old).abs() < 0.005) return;
+    // A live conversation has no peek to pin to — keep it at the
+    // conversation stage instead (see _threadHasMessages).
+    if (_threadHasMessages.value) {
+      _settleConversationStage(grow: true);
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_sheetController.isAttached) return;
       if ((_sheetController.size - old).abs() < 0.04) {
@@ -218,38 +294,49 @@ class _CoachAiSheetState extends State<_CoachAiSheet> {
         if (n.extent <= n.minExtent + 0.005) _popOnce();
         return false;
       },
-      child: DraggableScrollableSheet(
-        controller: _sheetController,
-        expand: false,
-        initialChildSize: widget.askBar ? peek : _CoachAiSheet.midSize,
-        minChildSize: _CoachAiSheet.minSize,
-        maxChildSize: _CoachAiSheet.maxSize,
-        snap: true,
-        snapSizes: [peek, _CoachAiSheet.midSize],
-        builder: (context, scrollController) => AnimatedBuilder(
-          animation: _sheetController,
-          builder: (context, child) {
-            // Corners square off over the last stretch toward full page —
-            // the sheet reads as BECOMING a page, not covering one.
-            final extent = _sheetController.isAttached
-                ? _sheetController.size
-                : _CoachAiSheet.midSize;
-            final t = ((extent - 0.9) / 0.1).clamp(0.0, 1.0);
-            final radius = 28.0 * (1 - t);
-            return ClipRRect(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
-              child: child,
-            );
-          },
-          child: AiAssistantScreen(
-            sheetMode: true,
-            autofocusInput: widget.askBar,
-            sheetPeekFraction: peek,
-            sheetScrollController: scrollController,
-            sheetController: _sheetController,
-            onSheetDismiss: _popOnce,
-          ),
+      child: ValueListenableBuilder<bool>(
+        valueListenable: _peekRetired,
+        builder: (context, peekRetired, _) => DraggableScrollableSheet(
+          controller: _sheetController,
+          expand: false,
+          initialChildSize: widget.askBar ? peek : _CoachAiSheet.midSize,
+          minChildSize: _CoachAiSheet.minSize,
+          maxChildSize: _CoachAiSheet.maxSize,
+          snap: true,
+          // The peek is a stage only while the thread is empty.
+          snapSizes: peekRetired
+              ? const [_CoachAiSheet.midSize]
+              : [peek, _CoachAiSheet.midSize],
+          builder: (context, scrollController) => _sheetChild(scrollController),
         ),
+      ),
+    );
+  }
+
+  Widget _sheetChild(ScrollController scrollController) {
+    return AnimatedBuilder(
+      animation: _sheetController,
+      builder: (context, child) {
+        // Corners square off over the last stretch toward full page —
+        // the sheet reads as BECOMING a page, not covering one.
+        final extent = _sheetController.isAttached
+            ? _sheetController.size
+            : _CoachAiSheet.midSize;
+        final t = ((extent - 0.9) / 0.1).clamp(0.0, 1.0);
+        final radius = 28.0 * (1 - t);
+        return ClipRRect(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
+          child: child,
+        );
+      },
+      child: AiAssistantScreen(
+        sheetMode: true,
+        autofocusInput: widget.askBar,
+        sheetPeekFraction: _lastPeekFraction ?? _CoachAiSheet.peekSize,
+        sheetScrollController: scrollController,
+        sheetController: _sheetController,
+        sheetThreadNotifier: _threadHasMessages,
+        onSheetDismiss: _popOnce,
       ),
     );
   }
@@ -263,6 +350,7 @@ class AiAssistantScreen extends ConsumerStatefulWidget {
     this.sheetPeekFraction,
     this.sheetScrollController,
     this.sheetController,
+    this.sheetThreadNotifier,
     this.onSheetDismiss,
   });
 
@@ -286,12 +374,20 @@ class AiAssistantScreen extends ConsumerStatefulWidget {
   /// Lets the slim header translate its drags into sheet resizes.
   final DraggableScrollableController? sheetController;
 
+  /// Tells the sheet whether the thread has messages (sheet mode only),
+  /// so the ask-bar peek exists only for an empty thread (2026-09-18).
+  final ValueNotifier<bool>? sheetThreadNotifier;
+
   /// Closes the sheet (header drag past the dismiss threshold).
   final VoidCallback? onSheetDismiss;
 
   @override
   ConsumerState<AiAssistantScreen> createState() => _AiAssistantScreenState();
 }
+
+/// Under this many pixels the thread area shows nothing (see the body
+/// LayoutBuilder). One message row plus padding is about 96px.
+const double _kMinThreadHeight = 96;
 
 class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   final TextEditingController _inputController = TextEditingController();
@@ -411,6 +507,12 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     _seenMessageCount = service.messages.length;
     _seenLastMessageSignature = _lastMessageSignature(service);
     service.addListener(_onServiceMessagesChanged);
+    // Attach runs during build; the sheet rebuilds on this notifier, so
+    // publish after the frame.
+    final hasThread = service.messages.isNotEmpty;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.sheetThreadNotifier?.value = hasThread;
+    });
     if (service.messages.isNotEmpty) {
       if (widget.sheetMode) _growSheetForMessages();
       _scrollToBottom();
@@ -423,6 +525,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     final count = service.messages.length;
     final signature = _lastMessageSignature(service);
     final grew = count > _seenMessageCount;
+    widget.sheetThreadNotifier?.value = count > 0;
     // The count is NOT the whole story (2026-08-25 regression): a reply
     // replaces its loading bubble in place (remove + add, same count), and
     // streamed replies rewrite one bubble token by token — the sheet never
@@ -862,7 +965,9 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
               const mid = _CoachAiSheet.midSize;
               const full = _CoachAiSheet.maxSize;
               final size = sheet.size;
-              final target = size < (peek + mid) / 2
+              // A live conversation never settles on the peek.
+              final hasThread = widget.sheetThreadNotifier?.value ?? false;
+              final target = !hasThread && size < (peek + mid) / 2
                   ? peek
                   : size < (mid + full) / 2
                   ? mid
@@ -1007,6 +1112,14 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
               onTap: () => dismissKeyboard(context),
               child: LayoutBuilder(
                 builder: (context, constraints) {
+                  // Below a useful height the thread paints NOTHING rather
+                  // than a sliver of the last bubble clipped behind the
+                  // composer (2026-09-18). The ask-bar peek is input-only
+                  // by design; this makes the layout say so. Visibility
+                  // (not a swap): the thread's scrollable stays mounted and
+                  // attached, because the sheet controller — and every
+                  // grow animation — rides on it.
+                  final showThread = constraints.maxHeight >= _kMinThreadHeight;
                   // The extras block is capped so the thread always keeps
                   // ~160px: with the keyboard up (or a short sheet) the extras
                   // scroll inside their cap instead of overflowing the Column.
@@ -1014,38 +1127,45 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                     0.0,
                     double.infinity,
                   );
-                  return Column(
-                    children: [
-                      if (topExtras.isNotEmpty)
-                        ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxHeight: extrasMaxHeight,
-                          ),
-                          child: SingleChildScrollView(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: topExtras,
+                  return Visibility(
+                    visible: showThread,
+                    maintainState: true,
+                    maintainAnimation: true,
+                    maintainSize: true,
+                    maintainInteractivity: true,
+                    child: Column(
+                      children: [
+                        if (topExtras.isNotEmpty)
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxHeight: extrasMaxHeight,
+                            ),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: topExtras,
+                              ),
                             ),
                           ),
+                        // Conversation thread
+                        Expanded(
+                          child: hasMessages
+                              ? _MessageList(
+                                  messages: messages,
+                                  service: service,
+                                  scrollController: _activeScrollController,
+                                  isLoading: service.isLoading,
+                                  onSuggestedPrompt: (prompt) {
+                                    _inputController.text = prompt;
+                                    _inputFocusNode.requestFocus();
+                                  },
+                                  onEditPlan: () => _onEditPlanPressed(service),
+                                  onStop: service.cancelCurrentTurn,
+                                )
+                              : _buildEmptyState(),
                         ),
-                      // Conversation thread
-                      Expanded(
-                        child: hasMessages
-                            ? _MessageList(
-                                messages: messages,
-                                service: service,
-                                scrollController: _activeScrollController,
-                                isLoading: service.isLoading,
-                                onSuggestedPrompt: (prompt) {
-                                  _inputController.text = prompt;
-                                  _inputFocusNode.requestFocus();
-                                },
-                                onEditPlan: () => _onEditPlanPressed(service),
-                                onStop: service.cancelCurrentTurn,
-                              )
-                            : _buildEmptyState(),
-                      ),
-                    ],
+                      ],
+                    ),
                   );
                 },
               ),
