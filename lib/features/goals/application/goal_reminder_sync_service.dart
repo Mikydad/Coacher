@@ -65,6 +65,11 @@ class GoalReminderSyncService {
     }
     await _cancelLegacySlots(goalId);
     await _orchestrator.cancelForEntity(goalId);
+    // A goal that stops being eligible (paused, completed, period over,
+    // deleted) takes its open state-machine days with it — otherwise an
+    // overdue occurrence keeps the goal on the Recovery Card and "Do now"
+    // opens a paused goal or "Goal not found" (Miko, 2026-09-18).
+    await _occurrences?.resolveAllOpenForEntity(goalId);
   }
 
   /// The retired per-weekday/per-month-day slots from before the Phase 0

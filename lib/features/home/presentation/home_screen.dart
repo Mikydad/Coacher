@@ -226,10 +226,14 @@ class HomeScreen extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
           // Time Tracker (2026-09-12): capture is one tap from Home — a
-          // pill, not a card; it opens the sheet, never the timeline.
-          const TrackPill(),
+          // pill, not a card; it opens the sheet, never the timeline. The
+          // Time page's footer switch hides it (2026-09-18) — that switch
+          // decides this and nothing else.
+          if (ref.watch(homeTrackPillEnabledProvider)) ...[
+            const SizedBox(height: 16),
+            const TrackPill(),
+          ],
           const SizedBox(height: 24),
           // Humanizing Phase 1 — promises live near the top: seize-the-moment
           // (only when a free window fits an open promise right now), then
@@ -1132,6 +1136,9 @@ class _TrendBar extends StatelessWidget {
     }
     final minStub = isToday ? width * 1.25 : width;
     final height = math.max(minStub, maxHeight * v);
+    // Past days are the same teal as today, just softer — the slate grey
+    // they used to wear read as "unselected", as if six of the seven days
+    // were disabled (Miko, 2026-09-18). Today alone is full strength.
     return AnimatedContainer(
       duration: const Duration(milliseconds: 260),
       curve: Curves.easeOutCubic,
@@ -1139,7 +1146,9 @@ class _TrendBar extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         borderRadius: radius,
-        color: isToday ? AppColors.coach : AppColors.surfaceSlate,
+        color: isToday
+            ? AppColors.coach
+            : AppColors.coach.withValues(alpha: 0.42),
       ),
     );
   }

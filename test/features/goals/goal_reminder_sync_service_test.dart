@@ -4,6 +4,12 @@ import 'package:sidepal/features/goals/application/goal_reminder_sync_service.da
 import 'package:sidepal/features/goals/domain/models/goal_enums.dart';
 import 'package:sidepal/features/goals/domain/models/user_goal.dart';
 import 'package:sidepal/features/reminders/application/notification_route_resolver.dart';
+import 'package:sidepal/features/reminders/application/reminder_occurrence_service.dart';
+import 'package:sidepal/features/reminders/data/reminder_occurrence_repository.dart';
+import 'package:sidepal/features/reminders/data/reminder_repository.dart';
+import 'package:sidepal/features/reminders/domain/models/reminder_config.dart';
+import 'package:sidepal/features/reminders/domain/models/reminder_occurrence.dart';
+import 'package:sidepal/features/reminders/domain/models/reminder_occurrence_enums.dart';
 import 'package:sidepal/features/reminders/domain/models/reminder_type.dart';
 
 import '../../support/no_op_orchestrator_service.dart';
@@ -26,6 +32,76 @@ class _FakeGoalNotifications implements GoalNotificationsPort {
 
   @override
   Future<void> cancel(int id) async => cancelledIds.add(id);
+}
+
+class _MemoryOccurrences implements ReminderOccurrenceRepository {
+  final Map<String, ReminderOccurrence> rows = {};
+
+  @override
+  Future<ReminderOccurrence?> findByKey({
+    required String entityKind,
+    required String entityId,
+    required String dateKey,
+  }) async => rows[ReminderOccurrence.keyFor(entityKind, entityId, dateKey)];
+
+  @override
+  Future<List<ReminderOccurrence>> listForEntity(String entityId) async =>
+      rows.values.where((o) => o.entityId == entityId).toList()
+        ..sort((a, b) => b.scheduledAtMs.compareTo(a.scheduledAtMs));
+
+  @override
+  Future<List<ReminderOccurrence>> listUnresolved() async =>
+      rows.values.where((o) => !o.isResolved).toList();
+
+  @override
+  Future<List<ReminderOccurrence>> listInRange({
+    required int startMs,
+    required int endMs,
+  }) async => const [];
+
+  @override
+  Future<void> upsert(ReminderOccurrence o) async =>
+      rows[o.occurrenceKey] = o;
+
+  @override
+  Future<void> upsertAll(Iterable<ReminderOccurrence> os) async {
+    for (final o in os) {
+      rows[o.occurrenceKey] = o;
+    }
+  }
+
+  @override
+  Future<void> deleteForEntity(String entityId) async =>
+      rows.removeWhere((_, o) => o.entityId == entityId);
+
+  @override
+  Future<void> pruneResolvedOlderThan(Duration age) async {}
+
+  @override
+  Stream<List<ReminderOccurrence>> watchUnresolved() => const Stream.empty();
+
+  @override
+  Stream<List<ReminderOccurrence>> watchRecoveryPool({
+    required int todayStartMs,
+  }) => const Stream.empty();
+
+  @override
+  Stream<List<ReminderOccurrence>> watchForEntity(String entityId) =>
+      const Stream.empty();
+}
+
+class _NoReminders implements ReminderRepository {
+  @override
+  Future<List<ReminderConfig>> listAllReminders() async => const [];
+  @override
+  Future<List<ReminderConfig>> getRemindersForTasks(List<String> ids) async =>
+      const [];
+  @override
+  Future<void> hydrateFromRemoteForTasks(List<String> taskIds) async {}
+  @override
+  Future<void> deleteRemindersForTask(String taskId) async {}
+  @override
+  Future<void> upsertReminder(ReminderConfig r) async {}
 }
 
 UserGoal _goal({
@@ -248,5 +324,79 @@ void main() {
     expect(orchestrator.evaluated, hasLength(2));
     expect(orchestrator.evaluated[0].proposedAt, DateTime(2025, 3, 1, 9, 0));
     expect(orchestrator.evaluated[1].proposedAt, DateTime(2025, 3, 3, 9, 0));
+  });
+
+  group('cancelForGoal closes the open state-machine days (2026-09-18)', () {
+    test('a paused / completed / deleted goal leaves the Recovery Card',
+        () async {
+      final occurrences = _MemoryOccurrences();
+      final occurrenceService = ReminderOccurrenceService(
+        occurrences: occurrences,
+        reminders: _NoReminders(),
+        now: () => now,
+      );
+      final withMachine = GoalReminderSyncService(
+        notifications: notifications,
+        orchestrator: orchestrator,
+        occurrenceService: occurrenceService,
+        now: () => now,
+      );
+      // Yesterday's day went overdue; today's is still armed.
+      await occurrenceService.ensureForGoalOccurrence(
+        goalId: 'g1',
+        title: 'Goal: Read daily',
+        scheduledAt: DateTime(2025, 2, 28, 9, 0),
+        modeRefId: 'disciplined',
+      );
+      await occurrenceService.ensureForGoalOccurrence(
+        goalId: 'g1',
+        title: 'Goal: Read daily',
+        scheduledAt: DateTime(2025, 3, 1, 9, 0),
+        modeRefId: 'disciplined',
+      );
+      expect(
+        occurrences.rows.values.where((o) => o.isOverdue),
+        hasLength(1),
+      );
+
+      await withMachine.cancelForGoal('g1');
+
+      expect(occurrences.rows.values.every((o) => o.isResolved), isTrue);
+      expect(
+        occurrences.rows.values.map((o) => o.resolutionKind).toSet(),
+        {ReminderResolutionKind.expired},
+      );
+    });
+
+    test('pausing a goal goes through the same door (applyForGoal)', () async {
+      final occurrences = _MemoryOccurrences();
+      final occurrenceService = ReminderOccurrenceService(
+        occurrences: occurrences,
+        reminders: _NoReminders(),
+        now: () => now,
+      );
+      final withMachine = GoalReminderSyncService(
+        notifications: notifications,
+        orchestrator: orchestrator,
+        occurrenceService: occurrenceService,
+        now: () => now,
+      );
+      await occurrenceService.ensureForGoalOccurrence(
+        goalId: 'g1',
+        title: 'Goal: Read daily',
+        scheduledAt: DateTime(2025, 2, 28, 9, 0),
+        modeRefId: 'disciplined',
+      );
+
+      await withMachine.applyForGoal(
+        _goal(
+          status: GoalStatus.paused,
+          startMs: DateTime(2025, 3, 1).millisecondsSinceEpoch,
+          endMs: DateTime(2025, 3, 31).millisecondsSinceEpoch,
+        ),
+      );
+
+      expect(occurrences.rows.values.single.isResolved, isTrue);
+    });
   });
 }

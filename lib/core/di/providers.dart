@@ -21,6 +21,7 @@ import '../../features/focus/data/focus_resume_store.dart';
 import '../../features/scoring/application/scoring_controller.dart';
 import '../../features/scoring/data/scoring_repository.dart';
 import '../../features/goals/application/goal_reminder_sync_service.dart';
+import '../../features/goals/application/goals_providers.dart';
 import '../../features/analytics/data/ai_summary_repository.dart';
 import '../../features/analytics/data/analytics_repository.dart';
 import '../../features/analytics/data/delivery_repository.dart';
@@ -41,6 +42,7 @@ import '../../features/reminders/application/strategist_proposals_store.dart';
 import '../../features/reminders/application/ladder_compiler.dart';
 import '../../features/reminders/application/ladder_scheduler.dart';
 import '../../features/time_blocks/domain/models/scheduled_time_block.dart';
+import '../../features/reminders/application/recovery_liveness.dart';
 import '../../features/reminders/application/recovery_notification_scheduler.dart';
 import '../../features/reminders/application/recovery_triage_service.dart';
 import '../../features/reminders/application/recovery_view.dart';
@@ -335,10 +337,36 @@ final overdueEntityIdsProvider = Provider<Set<String>>((ref) {
 final recoveryViewProvider = StreamProvider<RecoveryView>((ref) {
   final now = DateTime.now();
   final todayStart = DateTime(now.year, now.month, now.day);
+  // Liveness (2026-09-18): a row is only worth showing when its entity
+  // still exists and still wants doing. Goals come off their watch stream
+  // (a status change re-filters the card at once); tasks are looked up per
+  // emission. While goals are still loading, show nothing rather than a
+  // ghost row that vanishes a frame later.
+  final goalsAsync = ref.watch(goalsStreamProvider);
+  if (goalsAsync.isLoading && goalsAsync.valueOrNull == null) {
+    return const Stream.empty();
+  }
+  final activeGoalIds = RecoveryLiveness.activeGoalIds(
+    goalsAsync.valueOrNull ?? const [],
+  );
+  final planning = ref.watch(planningRepositoryProvider);
   return ref
       .watch(reminderOccurrenceRepositoryProvider)
       .watchRecoveryPool(todayStartMs: todayStart.millisecondsSinceEpoch)
-      .map((rows) => RecoveryViewBuilder.build(rows, now: DateTime.now()));
+      .asyncMap((rows) async {
+        final liveTaskIds = await RecoveryLiveness.liveTaskIds(
+          rows,
+          taskById: planning.getTaskById,
+        );
+        return RecoveryViewBuilder.build(
+          rows,
+          now: DateTime.now(),
+          isLive: RecoveryLiveness.predicate(
+            activeGoalIds: activeGoalIds,
+            liveTaskIds: liveTaskIds,
+          ),
+        );
+      });
 });
 
 @Deprecated(

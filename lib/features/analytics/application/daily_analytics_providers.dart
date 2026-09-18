@@ -182,7 +182,10 @@ Future<DailyAnalyticsSnapshot> _computeGoalHabitDailyForDate(
   final planningRepo = ref.read(planningRepositoryProvider);
   final allGoals = await goalsRepo.fetchGoalsOnce();
   final inPeriodGoals = allGoals.where((goal) {
-    if (goal.status == GoalStatus.paused) return false;
+    // Only ACTIVE goals count. Paused and completed goals live on the
+    // "Paused & completed" page, and a completed goal whose period is still
+    // running was inflating "N of M goals/habits" on Home (Miko, 2026-09-18).
+    if (goal.status != GoalStatus.active) return false;
     return GoalPeriodHelpers.isDateKeyInPeriod(goal, dateKey);
   }).toList();
 

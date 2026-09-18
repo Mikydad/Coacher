@@ -62,6 +62,18 @@ final defaultEnforcementModeProvider = Provider<EnforcementMode>((ref) {
   );
 });
 
+/// Whether Home shows the Time tracker's capture pill. Defaults to shown,
+/// including while the preference is loading or unavailable, so a fresh
+/// install and a test harness both see the pill.
+final homeTrackPillEnabledProvider = Provider<bool>((ref) {
+  final async = ref.watch(userProfilePreferenceStreamProvider);
+  return async.when(
+    data: (pref) => pref?.homeTrackPillEnabled ?? true,
+    loading: () => true,
+    error: (e, _) => swallowedAsyncError('profile_providers', e, true),
+  );
+});
+
 // ─── Total completions ────────────────────────────────────────────────────────
 
 /// Count of all [AnalyticsEventType.habitCompleted] events stored locally.

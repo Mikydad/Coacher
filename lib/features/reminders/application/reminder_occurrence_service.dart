@@ -411,6 +411,28 @@ class ReminderOccurrenceService {
   Future<void> deleteForEntity(String entityId) =>
       _occurrences.deleteForEntity(entityId);
 
+  /// The entity stopped wanting attention without being done — a goal
+  /// paused, completed, or past its period. EVERY open occurrence closes
+  /// (a goal keeps two armed days at once, so [resolveForEntity]'s
+  /// most-recent-only contract would leave one behind). [kind] defaults to
+  /// expired: never nagged about, still on the record. Returns how many
+  /// closed.
+  Future<int> resolveAllOpenForEntity(
+    String entityId, {
+    ReminderResolutionKind kind = ReminderResolutionKind.expired,
+  }) async {
+    final rows = await _occurrences.listForEntity(entityId);
+    final now = _now();
+    final closed = <ReminderOccurrence>[
+      for (final row in rows)
+        if (!row.isResolved)
+          ReminderStateMachine.resolve(row, kind: kind, now: now),
+    ];
+    if (closed.isEmpty) return 0;
+    await _occurrences.upsertAll(closed);
+    return closed.length;
+  }
+
   /// The most recent unresolved occurrence for [entityId], if any.
   Future<ReminderOccurrence?> _openFor(String entityId) async {
     final rows = await _occurrences.listForEntity(entityId);

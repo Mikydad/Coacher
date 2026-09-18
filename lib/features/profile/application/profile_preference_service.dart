@@ -132,6 +132,18 @@ class ProfilePreferenceService {
     unawaited(PushMessagingService.instance.mirrorMorningBriefEnabled(enabled));
   }
 
+  /// Shows or hides the Time tracker's capture pill on Home. Local write
+  /// only — the pill reads the Isar watch stream, so Home updates at once.
+  Future<void> setHomeTrackPillEnabled(bool enabled) async {
+    final nowMs = _now().millisecondsSinceEpoch;
+    final existing = await _repository.getPreference();
+    final updated = (existing ?? _defaultPreference(nowMs)).copyWith(
+      homeTrackPillEnabled: enabled,
+      updatedAtMs: nowMs,
+    );
+    await _repository.upsertPreference(updated);
+  }
+
   /// Returns the persisted preference, or an in-memory default if none exists.
   Future<UserProfilePreference> getPreference() async {
     final nowMs = _now().millisecondsSinceEpoch;

@@ -111,8 +111,10 @@ final progressDayDetailProvider =
       final raw = await readCheckInsForDate(
         goalsRepo,
         dateKey,
+        // Active goals only — same rule as the day snapshot, so the Day
+        // detail never lists a check-in the ring did not count.
         goalIds: goals
-            .where((g) => g.status != GoalStatus.paused)
+            .where((g) => g.status == GoalStatus.active)
             .map((g) => g.id),
       );
       final checkIns = [

@@ -3611,3 +3611,59 @@ not silent reversal.
   both; internal TestFlight builds carry the define, the App Store
   submission does not. *Rejected:* kDebugMode gating (collection is off in
   debug); pausing on `inactive`.
+
+- **2026-09-18 · Recovery Card checks liveness; non-active goals leave
+  analytics; 7-day bars are one colour.** (1) The card's rows are
+  occurrences, and occurrences outlived their entities on several paths —
+  a goal deleted, paused or completed kept its overdue day (nothing ever
+  closed goal occurrences), a task tombstoned from another device kept its
+  row — so "Do now" opened "Goal not found" or dumped the user in the Hub.
+  `recoveryViewProvider` now filters through `RecoveryLiveness`: a goal row
+  needs an ACTIVE goal, a task row needs a task that exists and is not
+  completed; unknown kinds pass. Producers were fixed too:
+  `cancelForGoal` resolves every open goal occurrence as expired (pause,
+  period end, delete), `completeGoal` resolves them as completed first,
+  `confirmDeleteGoal` deletes them outright. "Do now" on an overdue task
+  from an earlier day opens that task's own detail via the new
+  `PlanningRepository.getTaskById` (Isar-only; the Firestore delegate
+  returns null — a collection-group lookup would need its own index).
+  *Rejected:* trusting producers alone (a remote tombstone has no local
+  hook); requiring today's plan (an older overdue task that still exists
+  is a real debt and stays). (2) The goal/habit day snapshot and the Day
+  detail counted every non-paused goal in period, so a COMPLETED goal
+  inflated "N of M goals/habits" on Home; both now count ACTIVE only, the
+  same rule as `todaysActiveGoalsProvider`. Cached past snapshots keep
+  their history. (3) The hero's 7-day bars: past days wore slate grey and
+  read as disabled next to today's teal; they are now the same teal at
+  42 % alpha, today full strength. Future days stay hollow.
+
+- **2026-09-18 · "If you miss it" moves into Advanced settings; Critical
+  for every class.** The chooser sat directly under the reminder card, and
+  its Critical switch appeared only for EXPIRES — which read as if a task
+  that "comes back" or "adds up" could never be important enough. The two
+  are different questions: the segments decide what a MISS means (taxonomy),
+  Critical decides how LOUD the reminder is (criticality 3 pierces the
+  interruption boundary, Focus Shield and sleep window; the ladder already
+  treats the two independently). Now: `AddTaskAdvancedSection` hosts the
+  chooser + Critical, rendered only while a reminder is on (classification
+  shapes the ladder, FR-R-23); Critical is offered for all three classes;
+  picking Critical still makes the current class the user's answer so
+  criticality 3 has a class to ride on. Sleep never shows Advanced and so
+  never sees the chooser (its alarm has its own contract). Editing a task
+  with a user classification opens Advanced. *Rejected:* keeping Critical
+  tied to EXPIRES; showing the chooser with the reminder off (a stored
+  class would be armed with nothing to arm). Item 4 of the same request
+  (time-tracker on/off switch) was withdrawn — the feature is optional
+  enough already.
+
+- **2026-09-18 · Time page footer switch: show the tracking pill on Home
+  or not.** Item 4 returns in its narrowest form: one `Show on Home`
+  switch at the bottom of the Time page, persisted as
+  `UserProfilePreference.homeTrackPillEnabled` (default true, so rows from
+  before the field and a fresh install both show the pill). It decides
+  ONLY whether Home renders `TrackPill`; the Time page, its history, the
+  Profile row, Siri, timer-sourced logging and the intended-duration
+  reminder are untouched — Miko: "nothing more". Local write, Isar watch
+  stream, Home updates on the same frame. *Rejected:* a Profile settings
+  row (the switch is about the pill, so it sits with the tracker); hiding
+  the Time page or its history when off.

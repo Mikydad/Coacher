@@ -233,6 +233,47 @@ void main() {
     });
   });
 
+  group('liveness guard (2026-09-18)', () {
+    test('a row whose entity is gone is dropped before ordering', () {
+      final view = RecoveryViewBuilder.build(
+        [occ(id: 'deleted-task'), occ(id: 'live-task')],
+        now: now,
+        isLive: (o) => o.entityId != 'deleted-task',
+      );
+
+      expect(view.rows.map((r) => r.occurrence.entityId), ['live-task']);
+    });
+
+    test('routine misses are guarded too — a deleted routine leaves the digest',
+        () {
+      final view = RecoveryViewBuilder.build(
+        [
+          occ(
+            id: 'water',
+            taxonomy: ReminderTaxonomy.routine,
+            state: ReminderOccurrenceState.resolved,
+            resolutionKind: ReminderResolutionKind.expired,
+          ),
+          occ(
+            id: 'stretch',
+            taxonomy: ReminderTaxonomy.routine,
+            state: ReminderOccurrenceState.resolved,
+            resolutionKind: ReminderResolutionKind.expired,
+          ),
+        ],
+        now: now,
+        isLive: (o) => o.entityId != 'water',
+      );
+
+      expect(view.routineMisses, ['stretch']);
+    });
+
+    test('no predicate means the pool is trusted (pure contract intact)', () {
+      final view = RecoveryViewBuilder.build([occ(id: 'a')], now: now);
+      expect(view.rows, hasLength(1));
+    });
+  });
+
   test('an empty pool renders nothing', () {
     expect(RecoveryViewBuilder.build(const [], now: now).isEmpty, isTrue);
   });

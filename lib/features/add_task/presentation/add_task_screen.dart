@@ -38,7 +38,6 @@ import 'sections/add_task_accountability_deep_work_row.dart';
 import 'sections/add_task_accountability_row.dart';
 import 'sections/add_task_advanced_section.dart';
 import 'sections/add_task_category_section.dart';
-import 'sections/add_task_classification_section.dart';
 import 'sections/add_task_duration_section.dart';
 import 'sections/add_task_reminder_section.dart';
 import 'sections/add_task_sleep_extras_section.dart';
@@ -377,7 +376,13 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         _isHabitAnchor = loaded.isHabitAnchor;
         // Phase A: _isRigid defaults to false; no field on PlannedTask yet.
         _modeUserCustomized = false;
-        _advancedExpanded = _isHabitAnchor || _strictModeRequired || _isRigid;
+        // Open Advanced when it holds something the user set — including a
+        // user classification, which lives there now.
+        _advancedExpanded =
+            _isHabitAnchor ||
+            _strictModeRequired ||
+            _isRigid ||
+            _userTaxonomy != null;
         _loaded = true;
       });
       _suppressDraftDirty = false;
@@ -845,30 +850,6 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                             onReminderTimeChanged: (time) =>
                                 setState(() => _reminderTime = time),
                           ),
-                          // Classification only matters when a reminder
-                          // exists — it selects the ladder's shape, not
-                          // whether one is armed (FR-R-23).
-                          if (_reminder) ...[
-                            const SizedBox(height: 12),
-                            AddTaskClassificationSection(
-                              taxonomy: _effectiveTaxonomy,
-                              isCritical: _userCritical,
-                              onTaxonomyChanged: (t) => setState(() {
-                                _userTaxonomy = t;
-                                // Critical is meaningless off the expiring
-                                // class; drop it rather than keep it hidden
-                                // and armed.
-                                if (t != ReminderTaxonomy.timeSensitive) {
-                                  _userCritical = false;
-                                }
-                              }),
-                              onCriticalChanged: (v) => setState(() {
-                                _userCritical = v;
-                                // Ticking Critical IS choosing the class.
-                                _userTaxonomy ??= _effectiveTaxonomy;
-                              }),
-                            ),
-                          ],
                           const SizedBox(height: 12),
                           AddTaskDurationSection(
                             category: _category,
@@ -927,6 +908,23 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                                   setState(() => _strictModeRequired = v),
                               onRigidChanged: (v) =>
                                   setState(() => _isRigid = v),
+                              // "If you miss it" lives here since
+                              // 2026-09-18, only while a reminder exists —
+                              // it selects the ladder's shape, not whether
+                              // one is armed (FR-R-23). Sleep never reaches
+                              // this branch, so it never sees the chooser.
+                              reminderEnabled: _reminder,
+                              taxonomy: _effectiveTaxonomy,
+                              isCritical: _userCritical,
+                              onTaxonomyChanged: (t) =>
+                                  setState(() => _userTaxonomy = t),
+                              onCriticalChanged: (v) => setState(() {
+                                _userCritical = v;
+                                // Ticking Critical IS choosing the class:
+                                // the current answer becomes the user's, so
+                                // criticality 3 has a class to ride on.
+                                _userTaxonomy ??= _effectiveTaxonomy;
+                              }),
                             ),
                           ],
                         ],

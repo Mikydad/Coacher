@@ -40,15 +40,35 @@ Future<void> openRecoveryTask(
   }
   final rows = ref.read(todayAllTasksRowsProvider).valueOrNull;
   final row = rows?.where((r) => r.task.id == entityId).firstOrNull;
+  if (row != null) {
+    await Navigator.pushNamed(
+      context,
+      TaskDetailScreen.routeName,
+      arguments: TaskDetailArgs.fromRow(row),
+    );
+    return;
+  }
 
-  if (row == null) {
+  // Not in today's plan — an overdue row from an earlier day whose task
+  // still exists. The task knows its own block and plan day, so open it
+  // directly (2026-09-18); the Hub is only the fallback for a task that is
+  // genuinely gone (which the card's liveness guard should already hide).
+  final task = await ref.read(planningRepositoryProvider).getTaskById(entityId);
+  if (!context.mounted) return;
+  final dateKey = task?.planDateKey;
+  if (task == null || dateKey == null || dateKey.isEmpty) {
     await Navigator.pushNamed(context, TasksHubScreen.routeName);
     return;
   }
   await Navigator.pushNamed(
     context,
     TaskDetailScreen.routeName,
-    arguments: TaskDetailArgs.fromRow(row),
+    arguments: TaskDetailArgs(
+      taskId: task.id,
+      routineId: task.routineId,
+      blockId: task.blockId,
+      dateKey: dateKey,
+    ),
   );
 }
 

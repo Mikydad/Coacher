@@ -61,6 +61,10 @@ class _FakePlanningRepo implements PlanningRepository {
   }) async => tasks;
 
   @override
+  Future<PlannedTask?> getTaskById(String taskId) async =>
+      tasks.where((t) => t.id == taskId).firstOrNull;
+
+  @override
   Future<List<RoutineModeConfig>> getRoutineModeConfigs({
     GetOptions? getOptions,
   }) async => [];

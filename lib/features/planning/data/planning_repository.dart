@@ -32,6 +32,11 @@ abstract class PlanningRepository {
     required String routineId,
     required String blockId,
   });
+
+  /// One task by id, wherever it lives (any day, any block) — or null when
+  /// it no longer exists. Served from Isar; reads never go remote.
+  Future<PlannedTask?> getTaskById(String taskId);
+
   Future<void> upsertTask(PlannedTask task);
   Future<void> deleteTask({
     required String routineId,
@@ -157,6 +162,12 @@ class FirestorePlanningRepository implements PlanningRepository {
     final snap = await q.get();
     return snap.docs.map((d) => PlannedTask.fromMap(d.data())).toList();
   }
+
+  /// Never served remotely: tasks nest under routine/block, so a lookup by
+  /// id alone would be a collection-group query needing its own index
+  /// (documentation/errors.md) — and every read goes through Isar anyway.
+  @override
+  Future<PlannedTask?> getTaskById(String taskId) async => null;
 
   @override
   Future<void> upsertBlock(TaskBlock block) async {

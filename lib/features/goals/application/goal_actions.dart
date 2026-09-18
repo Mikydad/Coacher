@@ -9,6 +9,7 @@ import '../../../core/presentation/app_colors.dart';
 import '../../accountability/application/stakes_providers.dart';
 import '../../accountability/domain/models/stake_challenge.dart';
 import '../../analytics/application/delivery_providers.dart';
+import '../../reminders/domain/models/reminder_occurrence_enums.dart';
 import '../domain/models/goal_enums.dart';
 import '../domain/models/user_goal.dart';
 import 'goals_providers.dart';
@@ -71,6 +72,9 @@ Future<bool> confirmDeleteGoal(
   final stakeToSurrender = surrender ? liveStake : null;
 
   await ref.read(goalReminderSyncServiceProvider).cancelForGoal(goal.id);
+  // The occurrences go with the goal, as a deleted task's do — a lingering
+  // overdue day would keep a ghost row on the Recovery Card.
+  await ref.read(reminderOccurrenceServiceProvider).deleteForEntity(goal.id);
   await ref.read(goalsRepositoryProvider).deleteGoal(goal.id);
   await clearEntityCoachingCachesForGoal(ref, goal.id);
   await ref.read(goalBlockSyncServiceProvider).removeBlockForGoal(goal.id);
@@ -117,6 +121,14 @@ Future<bool> completeGoal(
     updatedAtMs: DateTime.now().millisecondsSinceEpoch,
   );
   await ref.read(goalsRepositoryProvider).upsertGoal(done);
+  // Today's open day, if any, ends as "completed" on the record before the
+  // re-arm closes the rest as expired.
+  await ref
+      .read(reminderOccurrenceServiceProvider)
+      .resolveAllOpenForEntity(
+        done.id,
+        kind: ReminderResolutionKind.completed,
+      );
   await ref.read(goalReminderSyncServiceProvider).applyForGoal(done);
   await clearEntityCoachingCachesForGoal(ref, done.id);
   await ref.read(goalBlockSyncServiceProvider).removeBlockForGoal(goal.id);

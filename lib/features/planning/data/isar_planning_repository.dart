@@ -177,6 +177,12 @@ class IsarPlanningRepository implements PlanningRepository {
   }
 
   @override
+  Future<PlannedTask?> getTaskById(String taskId) async {
+    final row = await _isar.isarTasks.getByTaskId(taskId);
+    return row?.toDomain();
+  }
+
+  @override
   Future<void> upsertRoutine(Routine routine) async {
     routine.validate();
     final id = routine.id.isEmpty ? StableId.generate('routine') : routine.id;

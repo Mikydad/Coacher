@@ -21,6 +21,7 @@ class UserProfilePreference {
     this.coachingNotificationSentAtMs = const <int>[],
     this.lastSeenCoachingFocusId = '',
     this.lastNotifiedCoachingFocusId = '',
+    this.homeTrackPillEnabled = true,
     this.schemaVersion = kUserProfilePreferenceSchemaVersion,
   });
 
@@ -56,6 +57,11 @@ class UserProfilePreference {
   /// recompute that keeps the same focus never re-notifies.
   final String lastNotifiedCoachingFocusId;
 
+  /// Whether Home shows the Time tracker's capture pill. Flipped from the
+  /// switch in the Time page's footer (Miko, 2026-09-18). It decides ONLY
+  /// that: the Time page, its history, Siri and timer logging are untouched.
+  final bool homeTrackPillEnabled;
+
   final int updatedAtMs;
   final int schemaVersion;
 
@@ -81,6 +87,7 @@ class UserProfilePreference {
     'coachingNotificationSentAtMs': coachingNotificationSentAtMs,
     'lastSeenCoachingFocusId': lastSeenCoachingFocusId,
     'lastNotifiedCoachingFocusId': lastNotifiedCoachingFocusId,
+    'homeTrackPillEnabled': homeTrackPillEnabled,
     'updatedAtMs': updatedAtMs,
     'schemaVersion': schemaVersion,
   };
@@ -104,6 +111,7 @@ class UserProfilePreference {
             map['lastSeenCoachingFocusId'] as String? ?? '',
         lastNotifiedCoachingFocusId:
             map['lastNotifiedCoachingFocusId'] as String? ?? '',
+        homeTrackPillEnabled: map['homeTrackPillEnabled'] as bool? ?? true,
         updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
         schemaVersion:
             (map['schemaVersion'] as num?)?.toInt() ??
@@ -119,6 +127,7 @@ class UserProfilePreference {
     List<int>? coachingNotificationSentAtMs,
     String? lastSeenCoachingFocusId,
     String? lastNotifiedCoachingFocusId,
+    bool? homeTrackPillEnabled,
     int? updatedAtMs,
     int? schemaVersion,
   }) => UserProfilePreference(
@@ -139,6 +148,7 @@ class UserProfilePreference {
         lastSeenCoachingFocusId ?? this.lastSeenCoachingFocusId,
     lastNotifiedCoachingFocusId:
         lastNotifiedCoachingFocusId ?? this.lastNotifiedCoachingFocusId,
+    homeTrackPillEnabled: homeTrackPillEnabled ?? this.homeTrackPillEnabled,
     updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     schemaVersion: schemaVersion ?? this.schemaVersion,
   );

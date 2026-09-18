@@ -76,15 +76,24 @@ abstract final class RecoveryViewBuilder {
   /// Rows shown at once before the card starts counting the rest.
   static const int maxRows = 5;
 
+  /// [isLive] answers "does this occurrence's entity still exist and still
+  /// want doing?" — a task that is not deleted or completed, a goal that is
+  /// active. Occurrences outlive their entities on several paths (a goal
+  /// deleted, paused or completed; a task removed by another device's
+  /// tombstone), and a row whose "Do now" lands on "not found" is worse
+  /// than no row. Null means "trust the pool" — tests and the sheet keep
+  /// the pure ordering contract without a lookup.
   static RecoveryView build(
     Iterable<ReminderOccurrence> occurrences, {
     required DateTime now,
+    bool Function(ReminderOccurrence occurrence)? isLive,
   }) {
     final todayKey = DateKeys.todayKey(now);
     final rows = <RecoveryRow>[];
     final routineMisses = <String>[];
 
     for (final o in occurrences) {
+      if (isLive != null && !isLive(o)) continue;
       // Routine misses expire rather than going overdue, so they arrive here
       // already resolved. Today's are worth one line; older ones are gone.
       if (o.taxonomy == ReminderTaxonomy.routine) {

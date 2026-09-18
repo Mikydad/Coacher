@@ -67,6 +67,9 @@ class NoOpPlanningRepository implements PlanningRepository {
       const [];
 
   @override
+  Future<PlannedTask?> getTaskById(String taskId) async => null;
+
+  @override
   Future<void> logAccountability(AccountabilityLog log) async {}
 
   @override

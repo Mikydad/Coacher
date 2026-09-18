@@ -47,21 +47,17 @@ void main() {
     expect(find.textContaining('never nagged'), findsOneWidget);
   });
 
-  testWidgets('Critical is offered only for the expiring class', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_host(taxonomy: ReminderTaxonomy.flexible));
-    await tester.pumpAndSettle();
-    expect(find.text('Critical'), findsNothing);
-
-    await tester.pumpWidget(_host(taxonomy: ReminderTaxonomy.routine));
-    await tester.pumpAndSettle();
-    expect(find.text('Critical'), findsNothing);
-
-    await tester.pumpWidget(_host(taxonomy: ReminderTaxonomy.timeSensitive));
-    await tester.pumpAndSettle();
-    expect(find.text('Critical'), findsOneWidget);
-  });
+  testWidgets(
+    'Critical is offered for every class — loudness and miss-outcome are '
+    'two different questions (2026-09-18)',
+    (tester) async {
+      for (final t in ReminderTaxonomy.values) {
+        await tester.pumpWidget(_host(taxonomy: t));
+        await tester.pumpAndSettle();
+        expect(find.text('Critical'), findsOneWidget, reason: '$t');
+      }
+    },
+  );
 
   testWidgets('tapping a segment reports the taxonomy behind its label', (
     tester,

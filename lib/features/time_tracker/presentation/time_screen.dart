@@ -8,6 +8,7 @@ import '../../../core/presentation/swipe_actions.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../analytics/domain/models/generated_insight.dart';
 import '../../education/presentation/help_dot.dart';
+import '../../profile/application/profile_providers.dart';
 import '../application/time_tracker_providers.dart';
 import '../domain/day_summary.dart';
 import '../domain/duration_format.dart';
@@ -183,8 +184,49 @@ class _TimeScreenState extends ConsumerState<TimeScreen> {
               onNext: () => _shiftWeek(1),
               onDismissObservation: _dismissObservation,
             ),
+          const SizedBox(height: 32),
+          const _HomePillFooter(),
         ],
       ),
+    );
+  }
+}
+
+/// The page's one setting (Miko, 2026-09-18): whether Home shows the
+/// tracking pill. You don't track every day, so the pill is optional; the
+/// page itself, its history and every other way of logging stay as they
+/// are. Lives in the footer because it is about the pill, not the page.
+class _HomePillFooter extends ConsumerWidget {
+  const _HomePillFooter();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final enabled = ref.watch(homeTrackPillEnabledProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Divider(height: 1, thickness: 1, color: AppColors.divider),
+        SwitchListTile.adaptive(
+          key: const ValueKey('time_home_pill_switch'),
+          contentPadding: EdgeInsets.zero,
+          value: enabled,
+          onChanged: (v) => ref
+              .read(profilePreferenceServiceProvider)
+              .setHomeTrackPillEnabled(v),
+          title: Text(
+            'Show on Home',
+            style: TextStyle(
+              color: AppColors.fg,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: Text(
+            'The "Track what you\'re doing" pill under the action buttons.',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+          ),
+        ),
+      ],
     );
   }
 }

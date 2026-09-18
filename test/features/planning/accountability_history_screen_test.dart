@@ -81,6 +81,9 @@ class _FakePlanningRepository implements PlanningRepository {
   }) async => const [];
 
   @override
+  Future<PlannedTask?> getTaskById(String taskId) async => null;
+
+  @override
   Future<void> logAccountability(AccountabilityLog log) async {}
 
   @override

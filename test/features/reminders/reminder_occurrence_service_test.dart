@@ -552,4 +552,80 @@ void main() {
       expect(occ.rows.values.single.taxonomy, ReminderTaxonomy.flexible);
     });
   });
+
+  group('resolveAllOpenForEntity — entity stopped wanting attention', () {
+    test('closes EVERY open occurrence, not just the most recent', () async {
+      final occ = _FakeOccurrences();
+      final svc = service(occ, _FakeReminders());
+      // A goal keeps two days armed at once: yesterday's is overdue, today's
+      // is still upcoming.
+      await svc.ensureForGoalOccurrence(
+        goalId: 'g1',
+        title: 'Goal: Read',
+        scheduledAt: DateTime(2026, 8, 29, 9, 0),
+        modeRefId: 'disciplined',
+      );
+      await svc.ensureForGoalOccurrence(
+        goalId: 'g1',
+        title: 'Goal: Read',
+        scheduledAt: DateTime(2026, 8, 31, 9, 0),
+        modeRefId: 'disciplined',
+      );
+      expect(occ.rows.values.where((o) => !o.isResolved), hasLength(2));
+
+      final closed = await svc.resolveAllOpenForEntity('g1');
+
+      expect(closed, 2);
+      expect(occ.rows.values.every((o) => o.isResolved), isTrue);
+      expect(
+        occ.rows.values.map((o) => o.resolutionKind).toSet(),
+        {ReminderResolutionKind.expired},
+      );
+    });
+
+    test('an already-resolved day is left exactly as it was', () async {
+      final occ = _FakeOccurrences();
+      final svc = service(occ, _FakeReminders());
+      await svc.ensureForGoalOccurrence(
+        goalId: 'g1',
+        title: 'Goal: Read',
+        scheduledAt: DateTime(2026, 8, 29, 9, 0),
+        modeRefId: 'disciplined',
+      );
+      await svc.resolveForEntity(
+        'g1',
+        kind: ReminderResolutionKind.completed,
+      );
+
+      final closed = await svc.resolveAllOpenForEntity('g1');
+
+      expect(closed, 0);
+      expect(
+        occ.rows.values.single.resolutionKind,
+        ReminderResolutionKind.completed,
+      );
+    });
+
+    test('the kind is the caller\'s — completing a goal says completed',
+        () async {
+      final occ = _FakeOccurrences();
+      final svc = service(occ, _FakeReminders());
+      await svc.ensureForGoalOccurrence(
+        goalId: 'g1',
+        title: 'Goal: Read',
+        scheduledAt: DateTime(2026, 8, 29, 9, 0),
+        modeRefId: 'disciplined',
+      );
+
+      await svc.resolveAllOpenForEntity(
+        'g1',
+        kind: ReminderResolutionKind.completed,
+      );
+
+      expect(
+        occ.rows.values.single.resolutionKind,
+        ReminderResolutionKind.completed,
+      );
+    });
+  });
 }
