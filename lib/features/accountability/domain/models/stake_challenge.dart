@@ -435,6 +435,29 @@ class StakeChallenge {
   /// The 25% within-unit mercy bar (M-1), for display: "≥45 min counts".
   int get mercyUnitTarget => (frozenGoal.unitTarget * 3 + 3) ~/ 4;
 
+  /// Solo pass bar by mode (D3): Flexible ≥70 %, Disciplined ≥85 %,
+  /// Extreme 100 % of action days. Same rounding as the create flow.
+  int get requiredUnits {
+    final pct = switch (mode) {
+      'flexible' => 70,
+      'extreme' => 100,
+      _ => 85,
+    };
+    return ((frozenGoal.totalUnits * pct) + 99) ~/ 100;
+  }
+
+  /// What this device expects the solo outcome to be from the evidence it
+  /// holds: units at or above the mercy bar vs [requiredUnits]. A
+  /// PREDICTION — the server decides on its own evidence view — used only
+  /// to choose which pending-outcome copy to show (2026-09-18).
+  bool predictedSoloPass(Map<int, int> loggedByUnit) {
+    var passed = 0;
+    for (final amount in loggedByUnit.values) {
+      if (amount >= mercyUnitTarget) passed++;
+    }
+    return passed >= requiredUnits;
+  }
+
   factory StakeChallenge.fromMap(Map<String, dynamic> m) {
     final outcome = m['outcome'] as Map<String, dynamic>?;
     final rawResults = (outcome?['perParticipant'] as List?) ?? const [];

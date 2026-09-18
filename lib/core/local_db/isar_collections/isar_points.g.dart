@@ -1381,9 +1381,10 @@ const IsarPointsBalanceSchema = CollectionSchema(
   id: 35736518382135438,
   properties: {
     r'balance': PropertySchema(id: 0, name: r'balance', type: IsarType.long),
-    r'uid': PropertySchema(id: 1, name: r'uid', type: IsarType.string),
+    r'trusted': PropertySchema(id: 1, name: r'trusted', type: IsarType.long),
+    r'uid': PropertySchema(id: 2, name: r'uid', type: IsarType.string),
     r'updatedAtMs': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'updatedAtMs',
       type: IsarType.long,
     ),
@@ -1448,8 +1449,9 @@ void _isarPointsBalanceSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeLong(offsets[0], object.balance);
-  writer.writeString(offsets[1], object.uid);
-  writer.writeLong(offsets[2], object.updatedAtMs);
+  writer.writeLong(offsets[1], object.trusted);
+  writer.writeString(offsets[2], object.uid);
+  writer.writeLong(offsets[3], object.updatedAtMs);
 }
 
 IsarPointsBalance _isarPointsBalanceDeserialize(
@@ -1461,8 +1463,9 @@ IsarPointsBalance _isarPointsBalanceDeserialize(
   final object = IsarPointsBalance();
   object.balance = reader.readLong(offsets[0]);
   object.id = id;
-  object.uid = reader.readString(offsets[1]);
-  object.updatedAtMs = reader.readLong(offsets[2]);
+  object.trusted = reader.readLong(offsets[1]);
+  object.uid = reader.readString(offsets[2]);
+  object.updatedAtMs = reader.readLong(offsets[3]);
   return object;
 }
 
@@ -1476,8 +1479,10 @@ P _isarPointsBalanceDeserializeProp<P>(
     case 0:
       return (reader.readLong(offset)) as P;
     case 1:
-      return (reader.readString(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 2:
+      return (reader.readString(offset)) as P;
+    case 3:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1915,6 +1920,61 @@ extension IsarPointsBalanceQueryFilter
   }
 
   QueryBuilder<IsarPointsBalance, IsarPointsBalance, QAfterFilterCondition>
+  trustedEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'trusted', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<IsarPointsBalance, IsarPointsBalance, QAfterFilterCondition>
+  trustedGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'trusted',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarPointsBalance, IsarPointsBalance, QAfterFilterCondition>
+  trustedLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'trusted',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarPointsBalance, IsarPointsBalance, QAfterFilterCondition>
+  trustedBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'trusted',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarPointsBalance, IsarPointsBalance, QAfterFilterCondition>
   uidEqualTo(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -2129,6 +2189,20 @@ extension IsarPointsBalanceQuerySortBy
     });
   }
 
+  QueryBuilder<IsarPointsBalance, IsarPointsBalance, QAfterSortBy>
+  sortByTrusted() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'trusted', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarPointsBalance, IsarPointsBalance, QAfterSortBy>
+  sortByTrustedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'trusted', Sort.desc);
+    });
+  }
+
   QueryBuilder<IsarPointsBalance, IsarPointsBalance, QAfterSortBy> sortByUid() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'uid', Sort.asc);
@@ -2186,6 +2260,20 @@ extension IsarPointsBalanceQuerySortThenBy
     });
   }
 
+  QueryBuilder<IsarPointsBalance, IsarPointsBalance, QAfterSortBy>
+  thenByTrusted() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'trusted', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarPointsBalance, IsarPointsBalance, QAfterSortBy>
+  thenByTrustedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'trusted', Sort.desc);
+    });
+  }
+
   QueryBuilder<IsarPointsBalance, IsarPointsBalance, QAfterSortBy> thenByUid() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'uid', Sort.asc);
@@ -2223,6 +2311,13 @@ extension IsarPointsBalanceQueryWhereDistinct
     });
   }
 
+  QueryBuilder<IsarPointsBalance, IsarPointsBalance, QDistinct>
+  distinctByTrusted() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'trusted');
+    });
+  }
+
   QueryBuilder<IsarPointsBalance, IsarPointsBalance, QDistinct> distinctByUid({
     bool caseSensitive = true,
   }) {
@@ -2250,6 +2345,12 @@ extension IsarPointsBalanceQueryProperty
   QueryBuilder<IsarPointsBalance, int, QQueryOperations> balanceProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'balance');
+    });
+  }
+
+  QueryBuilder<IsarPointsBalance, int, QQueryOperations> trustedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'trusted');
     });
   }
 

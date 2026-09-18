@@ -315,6 +315,8 @@ class _EventIcon extends StatelessWidget {
         return (Icons.group_rounded, AppColors.textSecondary);
       case ActivityEventType.stakePhotoRevealed:
         return (Icons.local_fire_department_rounded, AppColors.danger);
+      case ActivityEventType.stakePhotoRemoved:
+        return (Icons.visibility_off_rounded, AppColors.textSecondary);
       case ActivityEventType.screenshotStrike:
         return (Icons.no_photography_rounded, AppColors.danger);
     }
@@ -406,6 +408,9 @@ String _activityCopy(ActivityFeedItem item) {
     case ActivityEventType.stakePhotoRevealed:
       return 'broke their promise "${item.entityTitle ?? 'a staked goal'}" — '
           'their stake photo is live. Tap to see it before it\'s gone. 💥';
+    case ActivityEventType.stakePhotoRemoved:
+      // Neutral on purpose (P-5): the fact, no shame copy.
+      return 'took their stake photo down early.';
     case ActivityEventType.screenshotStrike:
       return 'screenshotted a stake photo and is banned from challenges '
           'for ${_banLabel(item.value)} 🚫';

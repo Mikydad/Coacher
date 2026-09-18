@@ -80,7 +80,7 @@ export function activityFeedItemDoc(args: {
   circleId: string;
   userId: string;
   displayName: string;
-  eventType: 'stakePhotoRevealed' | 'screenshotStrike';
+  eventType: 'stakePhotoRevealed' | 'stakePhotoRemoved' | 'screenshotStrike';
   entityId: string;
   entityTitle?: string;
   value?: string;

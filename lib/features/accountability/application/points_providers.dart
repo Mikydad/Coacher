@@ -23,6 +23,20 @@ final pointsBalanceProvider = StreamProvider<int>((ref) {
       .map((rows) => rows.isEmpty ? 0 : rows.first.balance);
 });
 
+/// The trusted share of the balance — signup bonus + challenge wins, the
+/// only points a photo takedown can spend (audit H7). Mirrored with the
+/// balance so the detail screen can say "you have N" honestly instead of
+/// letting the server say no after the confirm dialog (2026-09-18).
+final pointsTrustedProvider = StreamProvider<int>((ref) {
+  final isar = OfflineStore.instance.isar!;
+  final uid = ref.watch(authUidProvider) ?? FirestorePaths.activeUid;
+  return isar.isarPointsBalances
+      .filter()
+      .uidEqualTo(uid)
+      .watch(fireImmediately: true)
+      .map((rows) => rows.isEmpty ? 0 : rows.first.trusted);
+});
+
 /// Ledger history, newest first (hub "points" sheet).
 final pointsTxnsProvider = StreamProvider<List<PointsTxn>>((ref) {
   final isar = OfflineStore.instance.isar!;

@@ -3667,3 +3667,40 @@ not silent reversal.
   stream, Home updates on the same frame. *Rejected:* a Profile settings
   row (the switch is about the pill, so it sits with the tracker); hiding
   the Time page or its history when off.
+
+- **2026-09-18 · Photo takedown: always offered, honest about points, and
+  available BEFORE the reveal; the mercy veto is announced; money stakes
+  parked.** (1) The client gated the "Remove" button on total balance
+  while the server checks the TRUSTED share (signup bonus + wins), so
+  people hit the server's refusal after confirming. Now the balance mirror
+  carries `trusted` (`IsarPointsBalance.trusted`, pulled with the
+  balance, `pointsTrustedProvider`), the button is ALWAYS visible while a
+  takedown exists, and a tap explains itself: before the floor → when it
+  unlocks; short on trusted points → what counts and how to earn it
+  (`photoRemovalShortfallCopy`). (2) **Pre-reveal door (Miko: "if you can
+  remove it, do it before it's posted")**: between the deadline and the
+  server's decision, a screened-but-unposted photo can be taken down for
+  the same 300 trusted points; it then never posts — `stakeRemovePhoto`
+  accepts `pending_verification` + `photoState: approved`
+  (`photoRemovalDoor`), the sweep leaves a `removed` photo alone on
+  decide (no reveal, no feed line, veto not burned). No floor applies:
+  nothing was exposed. This deliberately narrows D9's "no amount of points
+  shortcuts the floor" to the post-reveal case. The client offers it only
+  when the device predicts a loss (`predictedSoloPass`, mode thresholds
+  from D3), with the veto alongside. (3) A post-reveal takedown posts one
+  neutral feed line (`stakePhotoRemoved`, "took their stake photo down
+  early") per P-5; pre-reveal has nothing to announce. (4) **Pre-reveal
+  notice**: the stake sweep pushes once, ~1 h before a solo photo decision
+  that would reveal (`preRevealNoticeDue`, dry-run `decideChallenge`),
+  naming the veto and the takedown; stamped `preRevealNoticeAtMs` only
+  when FCM accepted a send (P2-02), skips stamped with a reason. A tap
+  opens the Accountability tab. The veto rule ("one free mercy veto every
+  30 days") is now stated at commit time and on the pending-outcome card,
+  with availability read from `enforcement/{uid}`. (5) `kMoneyStakesEnabled
+  = false` replaces the debug-only money gate: no build offers a money
+  stake; server rails untouched. *Rejected:* a local notification for the
+  notice (the server's evidence view decides; a client-side guess could
+  warn a winner); auto-applying the first veto (the user asked to be TOLD,
+  not to have it spent for them); hiding money types from the hub
+  (existing docs must still render). Functions 309 green; needs a
+  functions deploy (`stakeRemovePhoto`, `stakeSweep`).

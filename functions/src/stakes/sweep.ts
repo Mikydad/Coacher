@@ -14,7 +14,15 @@ import { logger } from 'firebase-functions/v2';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 
-import { decideChallenge, DecisionInputs, revealExpiresAtMs, sweepAction } from './decisions';
+import {
+  decideChallenge,
+  DecisionInputs,
+  decisionDueAtMs,
+  preRevealNoticeDue,
+  revealExpiresAtMs,
+  sweepAction,
+} from './decisions';
+import { DeviceToken, sendToTokens } from '../intentions/push_send';
 import {
   activityFeedItemDoc,
   CHALLENGES,
@@ -52,6 +60,9 @@ export async function runSweepOnce(
     reservationsExpired: await expirePhotoReservations(now),
     expired: await expireInvites(now),
     toVerification: await moveToVerification(now),
+    // 2026-09-18: an hour before a photo would post, the staker hears
+    // about it — and about the veto and the paid takedown — once.
+    preRevealNotices: await sendPreRevealNotices(now),
     decided: await decideDue(now),
     reveals: await expireReveals(now),
     // Phase 2 of the two-phase money move: drive refund_pending →
@@ -183,6 +194,87 @@ async function moveToVerification(now: number): Promise<number> {
   return snap.size;
 }
 
+/**
+ * The pre-reveal notice (2026-09-18): for a solo photo stake whose decision
+ * is due within the hour and would reveal, one push telling the staker
+ * they can still use the monthly mercy veto or take the photo down for
+ * points. Stamped on the doc so it goes once; a push nobody could receive
+ * (no device tokens) is stamped too, so the pass never spins on it.
+ */
+async function sendPreRevealNotices(now: number): Promise<number> {
+  const db = getFirestore();
+  // Solo decisions land at deadline + 12h; the notice window opens 1h
+  // before. `deadlineMs <= now - 11h` is the cheap pre-filter.
+  const snap = await db
+    .collection(CHALLENGES)
+    .where('status', '==', 'pending_verification')
+    .where('deadlineMs', '<=', now - 11 * 3_600_000)
+    .limit(BATCH_LIMIT)
+    .get();
+
+  let sent = 0;
+  for (const doc of snap.docs) {
+    const data = doc.data();
+    if (data.preRevealNoticeAtMs !== undefined) continue;
+    if (data.photoState !== 'approved') continue; // removed / never a photo
+    const ch = challengeFromSnap(doc);
+    if (ch.type !== 'solo_photo') continue;
+    if (!preRevealNoticeDue(ch, now)) continue;
+
+    // Dry-run the decision as it would land: only a reveal is worth a push.
+    const inputs = await loadDecisionInputs(ch);
+    let wouldReveal = false;
+    try {
+      const preview = decideChallenge(ch, inputs, decisionDueAtMs(ch));
+      wouldReveal = preview.perParticipant.some(
+        (r) => r.uid === ch.creatorUid && r.resolution.kind === 'reveal_photo',
+      );
+    } catch (e) {
+      logger.warn('preRevealNotice preview failed', { id: ch.id, e: String(e) });
+      continue;
+    }
+    if (!wouldReveal) {
+      await doc.ref.update({ preRevealNoticeAtMs: now, preRevealNoticeSkipped: 'would_not_reveal' });
+      continue;
+    }
+
+    const tokens = await deviceTokensFor(ch.creatorUid);
+    if (tokens.length === 0) {
+      await doc.ref.update({ preRevealNoticeAtMs: now, preRevealNoticeSkipped: 'no_devices' });
+      continue;
+    }
+    const minutesLeft = Math.max(1, Math.round((decisionDueAtMs(ch) - now) / 60_000));
+    const result = await sendToTokens(ch.creatorUid, tokens, (token) => ({
+      token,
+      notification: {
+        title: 'Your stake photo posts soon',
+        body:
+          `"${ch.frozenGoal.title}" didn't make it. In about ${minutesLeft} min ` +
+          'your photo goes to the circle — unless you use your monthly mercy ' +
+          'veto or take it down for points. Open the challenge.',
+      },
+      data: { type: 'stake_pre_reveal', challengeId: ch.id },
+      apns: { headers: { 'apns-collapse-id': `stake_pre_reveal_${ch.id}` } },
+    }));
+    // Honest bookkeeping (P2-02): stamp only when FCM took at least one.
+    if (result.delivered > 0) {
+      await doc.ref.update({ preRevealNoticeAtMs: now });
+      sent += 1;
+    }
+  }
+  return sent;
+}
+
+async function deviceTokensFor(uid: string): Promise<DeviceToken[]> {
+  const snap = await getFirestore().collection(`users/${uid}/deviceTokens`).get();
+  const tokens: DeviceToken[] = [];
+  for (const d of snap.docs) {
+    const token = d.data().token as string | undefined;
+    if (token) tokens.push({ docId: d.id, token });
+  }
+  return tokens;
+}
+
 async function decideDue(now: number): Promise<number> {
   const db = getFirestore();
   // deadlineMs <= now - 12h is a cheap pre-filter (the earliest any solo
@@ -274,9 +366,14 @@ async function decideDue(now: number): Promise<number> {
       };
 
       // Photo lifecycle (P-3/P-4): reveal on forfeit, delete otherwise.
+      // A photo taken down BEFORE the reveal (stakeRemovePhoto's pre-reveal
+      // door, 2026-09-18) stays 'removed': the loss is decided as usual,
+      // nothing posts, no feed line, the veto is not burned for it.
+      const alreadyRemoved = fresh.data()?.photoState === 'removed';
       for (const r of decision.perParticipant) {
         const photo = ch.participants.find((p) => p.uid === r.uid)?.photo;
         if (!photo) continue;
+        if (alreadyRemoved) continue;
         if (r.resolution.kind === 'reveal_photo') {
           update.photoState = 'revealed';
           update.revealedAtMs = now; // window counts from the actual post

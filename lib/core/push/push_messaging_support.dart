@@ -78,3 +78,9 @@ bool isReminderRescue(Map<String, dynamic> data) =>
 
 bool isMorningBrief(Map<String, dynamic> data) =>
     data['type'] == 'morning_brief';
+
+/// The pre-reveal notice (2026-09-18): "your stake photo posts in an hour".
+/// A tap lands on the Accountability tab, where the pending challenge and
+/// its veto / takedown actions live.
+bool isStakePreReveal(Map<String, dynamic> data) =>
+    data['type'] == 'stake_pre_reveal';

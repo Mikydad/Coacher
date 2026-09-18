@@ -17,7 +17,7 @@ import { logger } from 'firebase-functions/v2';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 
-import { canRemoveRevealedPhoto, vetoEligible } from './decisions';
+import { photoRemovalDoor, PhotoRemovalDoor, vetoEligible } from './decisions';
 import { escrowRef, markEscrow, newEscrowDoc } from './escrows';
 import { measureParticipant } from './measurement';
 import { balanceRef, txnRef, writeLedgerTxn } from './ledger';
@@ -684,8 +684,12 @@ export const stakeDeclineChallenge = onCall(
 );
 
 // ─── stakeRemovePhoto (P-5/D9) ───────────────────────────────────────────────
-// Early takedown of a live reveal: only after the 30% exposure floor, only
-// for the price. The loss stays on the record either way.
+// Early takedown, for the price, payable only from trusted points. Two doors
+// (2026-09-18): BEFORE the reveal — deadline passed, outcome pending, photo
+// screened but not posted — the staker can make sure it never posts (no
+// floor: nothing was exposed). AFTER the reveal — only past the 30%
+// exposure floor. The loss stays on the record either way, and a
+// post-reveal takedown leaves one neutral line in the circle feed (P-5).
 
 export const stakeRemovePhoto = onCall(
   CALL_OPTS,
@@ -695,7 +699,26 @@ export const stakeRemovePhoto = onCall(
     const now = Date.now();
     const db = getFirestore();
 
+    // Feed-note inputs, read before the transaction (same shape as the
+    // sweep's reveal post): the circle may be gone, and a bare create into
+    // a deleted circle would abort the takedown.
+    const pre = await loadChallenge(id);
+    const preMe = pre.participants.find((p) => p.uid === uid);
+    if (!preMe?.photo) {
+      throw new HttpsError('permission-denied', 'Not your stake photo.');
+    }
+    let circleExists = false;
+    let displayName = 'A member';
+    if (pre.circleId) {
+      circleExists = (await db.doc(`circles/${pre.circleId}`).get()).exists;
+      if (circleExists) {
+        const member = await db.doc(`circles/${pre.circleId}/members/${uid}`).get();
+        displayName = (member.data()?.displayName as string | undefined) ?? displayName;
+      }
+    }
+
     let photoPath: string | undefined;
+    let door: PhotoRemovalDoor = 'none';
     await db.runTransaction(async (tx) => {
       const ref = db.collection(CHALLENGES).doc(id);
       const snap = await tx.get(ref);
@@ -706,18 +729,21 @@ export const stakeRemovePhoto = onCall(
         throw new HttpsError('permission-denied', 'Not your stake photo.');
       }
       const data = snap.data()!;
-      if (data.photoState !== 'revealed') {
-        throw new HttpsError('failed-precondition', 'No live reveal to remove.');
-      }
-      const revealedAtMs = data.revealedAtMs as number | undefined;
-      if (
-        revealedAtMs === undefined ||
-        !canRemoveRevealedPhoto(revealedAtMs, me.photo.revealWindowMins, now)
-      ) {
+      door = photoRemovalDoor({
+        status: ch.status,
+        photoState: data.photoState as string | undefined,
+        revealedAtMs: data.revealedAtMs as number | undefined,
+        revealWindowMins: me.photo.revealWindowMins,
+        nowMs: now,
+      });
+      if (door === 'floor') {
         throw new HttpsError(
           'failed-precondition',
           'The photo must stay up for at least 30% of its window first.',
         );
+      }
+      if (door === 'none') {
+        throw new HttpsError('failed-precondition', 'No photo to take down right now.');
       }
 
       // Dedupe + balance (reads before writes).
@@ -749,15 +775,39 @@ export const stakeRemovePhoto = onCall(
         atMs: now,
       });
       tx.update(ref, { photoState: 'removed', updatedAtMs: now });
-      appendEvent(tx, id, { type: 'photo_removed', uid, atMs: now });
+      appendEvent(tx, id, {
+        type: 'photo_removed',
+        uid,
+        atMs: now,
+        data: { preReveal: door === 'pre_reveal' },
+      });
+      // P-5: a photo the circle already saw gets one neutral line saying it
+      // came down early. A pre-reveal takedown was never public — nothing
+      // to announce.
+      if (door === 'post_reveal' && ch.circleId && circleExists) {
+        const feedRef = db.collection(`circles/${ch.circleId}/activityFeed`).doc();
+        tx.create(
+          feedRef,
+          activityFeedItemDoc({
+            id: feedRef.id,
+            circleId: ch.circleId,
+            userId: uid,
+            displayName,
+            eventType: 'stakePhotoRemoved',
+            entityId: ch.id,
+            entityTitle: ch.frozenGoal.title,
+            nowMs: now,
+          }),
+        );
+      }
       photoPath = me.photo.storagePath;
     });
 
     if (photoPath) {
       await getStorage().bucket().file(photoPath).delete({ ignoreNotFound: true });
     }
-    logger.info('stakeRemovePhoto ok', { uid, id });
-    return { ok: true };
+    logger.info('stakeRemovePhoto ok', { uid, id, door });
+    return { ok: true, door };
   },
 );
 

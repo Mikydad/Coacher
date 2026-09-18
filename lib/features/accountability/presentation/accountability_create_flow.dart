@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,6 +31,7 @@ import '../application/stake_functions.dart';
 import '../application/stakes_providers.dart';
 import '../domain/models/points.dart';
 import '../domain/models/stake_challenge.dart';
+import '../domain/stake_feature_flags.dart';
 import '../../profile/application/profile_providers.dart';
 import 'cards/card_preview_screen.dart';
 import 'cards/commitment_card.dart';
@@ -1060,12 +1060,12 @@ class _AccountabilityCreateFlowState
     ),
   };
 
-  // $ — money is debug-only until Stripe activates (Phase 3 runbook);
-  // the server rail is the SIMULATED provider either way.
+  // $ — money is parked behind [kMoneyStakesEnabled] (2026-09-18); the
+  // server rail is the SIMULATED provider either way.
   List<_StakeChoice> get _availableStakes => [
     _StakeChoice.photo,
     _StakeChoice.h2h,
-    if (kDebugMode) _StakeChoice.money,
+    if (kMoneyStakesEnabled) _StakeChoice.money,
     _StakeChoice.public,
     _StakeChoice.practice,
   ];
@@ -1979,6 +1979,15 @@ class _AccountabilityCreateFlowState
             height: 1.55,
           ),
         ),
+      ),
+      const SizedBox(height: 12),
+      // 2026-09-18: say the escape hatches out loud at commit time, so a
+      // veto nobody knew about is never the reason a photo posted.
+      Text(
+        'If you fail, you get a heads-up about an hour before it posts. You '
+        'have one free mercy veto every 30 days, and you can take a photo '
+        'down for 300 points earned from challenge wins.',
+        style: TextStyle(color: AppColors.textSoft, fontSize: 13, height: 1.45),
       ),
       const SizedBox(height: 20),
       _bigCheck(

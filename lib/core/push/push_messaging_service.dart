@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/notification_response_handler.dart'
     show requestCoachBriefNavigation;
+import '../../app/application/main_tab_navigation.dart';
 import '../../features/intentions/application/intentions_providers.dart';
 import '../../features/profile/application/profile_providers.dart';
 import '../firebase/firestore_paths.dart';
@@ -229,6 +230,16 @@ class PushMessagingService {
   void _onRescueInteraction(RemoteMessage message) {
     if (isMorningBrief(message.data)) {
       requestCoachBriefNavigation();
+      return;
+    }
+    if (isStakePreReveal(message.data)) {
+      final container = _container;
+      if (container != null) {
+        navigateToMainTabWithContainer(
+          container,
+          index: MainTabIndex.accountability,
+        );
+      }
       return;
     }
     if (!isRescueNotification(message.data) &&

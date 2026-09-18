@@ -20,6 +20,7 @@ import {
   Participant,
   ParticipantResult,
   REVEAL_FLOOR_PERCENT,
+  ChallengeStatus,
   StakeChallenge,
   StakeResolution,
   VETO_COOLDOWN_MS,
@@ -244,6 +245,49 @@ export function canRemoveRevealedPhoto(
 ): boolean {
   const floorMs = (revealWindowMins * 60_000 * REVEAL_FLOOR_PERCENT) / 100;
   return nowMs >= revealedAtMs + floorMs;
+}
+
+/**
+ * Where a photo takedown stands right now (2026-09-18). Two doors:
+ *  - `pre_reveal`: the deadline passed, the outcome is pending, the photo
+ *    is screened but NOT yet posted — the staker may pay to make sure it
+ *    never posts. Nothing has been exposed, so the D9 floor does not apply.
+ *  - `post_reveal`: the photo is live; the 30% floor (D9) gates it.
+ * Anything else is `none`. The price and the trusted-points fence are the
+ * callable's concern; this is only "is there a photo to take down".
+ */
+export type PhotoRemovalDoor = 'pre_reveal' | 'post_reveal' | 'floor' | 'none';
+
+export function photoRemovalDoor(args: {
+  status: ChallengeStatus;
+  photoState: string | undefined;
+  revealedAtMs: number | undefined;
+  revealWindowMins: number;
+  nowMs: number;
+}): PhotoRemovalDoor {
+  if (args.status === 'pending_verification' && args.photoState === 'approved') {
+    return 'pre_reveal';
+  }
+  if (args.photoState !== 'revealed' || args.revealedAtMs === undefined) {
+    return 'none';
+  }
+  return canRemoveRevealedPhoto(args.revealedAtMs, args.revealWindowMins, args.nowMs)
+    ? 'post_reveal'
+    : 'floor';
+}
+
+/** How long before the decision the "your photo posts soon" notice goes out. */
+export const PRE_REVEAL_NOTICE_LEAD_MS = 60 * 60_000;
+
+/**
+ * Whether the pre-reveal notice is due for [challenge] at [nowMs]: the
+ * decision lands within the lead window and has not yet happened. Pure
+ * timing; the caller decides whether the outcome would actually reveal.
+ */
+export function preRevealNoticeDue(challenge: StakeChallenge, nowMs: number): boolean {
+  if (challenge.status !== 'pending_verification') return false;
+  const dueAt = decisionDueAtMs(challenge);
+  return nowMs >= dueAt - PRE_REVEAL_NOTICE_LEAD_MS && nowMs < dueAt;
 }
 
 // ─── The decision ────────────────────────────────────────────────────────────

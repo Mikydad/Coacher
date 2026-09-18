@@ -907,6 +907,7 @@ class RemoteIsarMerge {
         final row = IsarPointsBalance()
           ..uid = uid
           ..balance = (balanceData['balance'] as num?)?.toInt() ?? 0
+          ..trusted = (balanceData['trusted'] as num?)?.toInt() ?? 0
           ..updatedAtMs = updatedAtMs;
         await _write(() async {
           await _isar.isarPointsBalances.putByUid(row);

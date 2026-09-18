@@ -12,6 +12,7 @@ import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../../community/application/circle_providers.dart';
 import '../application/points_providers.dart';
+import '../application/stake_photo_removal.dart';
 import '../application/stake_create_replicator.dart';
 import '../application/stake_goal_check_in_bridge.dart';
 import '../application/stake_functions.dart';
@@ -297,7 +298,7 @@ class _BodyState extends ConsumerState<_Body> {
           _todayActions(logged[today] ?? 0, unitLabel),
         if (c.status == StakeChallengeStatus.pendingVerification &&
             c.type == StakeChallengeType.soloPhoto)
-          _vetoAction(),
+          _pendingPhotoCard(logged),
         if (c.status == StakeChallengeStatus.pendingVerification &&
             c.type.isMultiParty)
           _confirmDisputeActions(),
@@ -1282,50 +1283,83 @@ class _BodyState extends ConsumerState<_Body> {
     );
   }
 
-  /// D9 — early takedown: 30% floor, 300 points, loss stays recorded.
+  /// D9 — early takedown. The button is ALWAYS there while a takedown
+  /// exists (Miko, 2026-09-18): a tap before the floor says when it
+  /// unlocks, a tap without enough trusted points says what counts and
+  /// how to earn it. Nobody should learn the option exists by never
+  /// seeing it.
   Widget _removalAction() {
-    const price = 300;
-    final balance = ref.watch(pointsBalanceProvider).valueOrNull ?? 0;
-    final me = c.participant(FirestorePaths.activeUid);
-    final revealedAt = c.revealedAtMs;
-    final windowMins = me?.revealWindowMins;
-    final floorPassed =
-        revealedAt != null &&
-        windowMins != null &&
-        DateTime.now().millisecondsSinceEpoch >=
-            revealedAt + (windowMins * 60000 * 30) ~/ 100;
-
-    if (!floorPassed) {
-      return Text(
-        'Removal unlocks after 30% of the window.',
-        style: TextStyle(color: AppColors.textFaint, fontSize: 11.5),
-      );
-    }
-    if (balance < price) {
-      return Text(
-        'Remove early: $price pts (you have $balance).',
-        style: TextStyle(color: AppColors.textFaint, fontSize: 11.5),
-      );
-    }
     return OutlinedButton(
-      onPressed: _busy ? null : _removePhoto,
-      child: Text('Remove — $price pts'),
+      onPressed: _busy ? null : () => _removePhoto(preReveal: false),
+      child: const Text('Take it down — $kPhotoRemovalPrice pts'),
     );
   }
 
-  Future<void> _removePhoto() async {
+  String _clock(int ms) {
+    final loc = MaterialLocalizations.of(context);
+    final at = DateTime.fromMillisecondsSinceEpoch(ms);
+    final now = DateTime.now();
+    final sameDay =
+        at.year == now.year && at.month == now.month && at.day == now.day;
+    final time = loc.formatTimeOfDay(
+      TimeOfDay.fromDateTime(at),
+      alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+    );
+    return sameDay ? time : '${loc.formatMediumDate(at)}, $time';
+  }
+
+  Future<void> _explain(String title, String body) => showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(title),
+      content: Text(body),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('OK'),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _removePhoto({required bool preReveal}) async {
+    final gate = photoRemovalGate(c);
+    if (gate == PhotoRemovalGate.floor) {
+      final me = c.participant(FirestorePaths.activeUid);
+      final unlockAt = photoRemovalFloorAtMs(
+        c.revealedAtMs ?? 0,
+        me?.revealWindowMins ?? 0,
+      );
+      await _explain(
+        'Not yet',
+        'A revealed photo stays up for 30% of its window first. You can '
+            'take it down from ${_clock(unlockAt)}.',
+      );
+      return;
+    }
+    if (gate == PhotoRemovalGate.none) return;
+
+    final trusted = ref.read(pointsTrustedProvider).valueOrNull ?? 0;
+    if (trusted < kPhotoRemovalPrice) {
+      await _explain('Not enough points', photoRemovalShortfallCopy(trusted));
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Take the photo down?'),
-        content: const Text(
-          'This burns 300 points. The loss stays on your record — only the '
-          'photo goes.',
+        title: Text(preReveal ? 'Keep the photo off?' : 'Take the photo down?'),
+        content: Text(
+          preReveal
+              ? 'This burns $kPhotoRemovalPrice points and the photo never '
+                    'posts. The loss still goes on your record.'
+              : 'This burns $kPhotoRemovalPrice points. The loss stays on '
+                    'your record — only the photo goes.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Leave it up'),
+            child: Text(preReveal ? 'Not now' : 'Leave it up'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
@@ -1349,17 +1383,46 @@ class _BodyState extends ConsumerState<_Body> {
     }
   }
 
-  // ─── Veto (M-6) ────────────────────────────────────────────────────────────
+  /// Deadline passed, outcome pending, photo not yet posted (2026-09-18).
+  /// Says what this device expects, when the server decides, and — when a
+  /// loss looks likely — the two ways out: the free monthly veto and the
+  /// paid takedown BEFORE anything is public. The veto line is always
+  /// there, so people learn they have one before they ever need it.
+  Widget _pendingPhotoCard(Map<int, int> logged) {
+    final passLikely = c.predictedSoloPass(logged);
+    final decidesAt = _clock(soloDecisionAtMs(c));
+    final veto = ref.watch(vetoAvailabilityProvider).valueOrNull;
+    final vetoLine = switch (veto) {
+      VetoAvailable() => 'Your mercy veto is available.',
+      VetoOnCooldown(:final nextAtMs) =>
+        'You used your veto recently — the next one is ready on '
+            '${_clock(nextAtMs)}.',
+      _ => '',
+    };
+    final gate = photoRemovalGate(c);
 
-  Widget _vetoAction() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader('Mercy veto'),
+        SectionHeader(passLikely ? 'While the server decides' : 'Before it posts'),
         const SizedBox(height: 8),
         Text(
-          'If this decides against you, your one monthly veto can stop the '
-          'photo from posting. The loss still goes on your record.',
+          passLikely
+              ? 'On this phone it looks like you made it. The server decides '
+                    'at $decidesAt; evidence synced late still counts until then.'
+              : "It looks like this didn't make it. Your photo posts to the "
+                    'circle at $decidesAt unless you act first.',
+          style: TextStyle(
+            color: AppColors.textSoft,
+            fontSize: 13,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'You get one free mercy veto every 30 days — it stops the photo '
+          'from posting; the loss still goes on your record. $vetoLine',
+          key: const ValueKey('stake_veto_rule'),
           style: TextStyle(
             color: AppColors.textSoft,
             fontSize: 13,
@@ -1375,6 +1438,20 @@ class _BodyState extends ConsumerState<_Body> {
             label: const Text('Use my mercy veto'),
           ),
         ),
+        if (!passLikely && gate == PhotoRemovalGate.preReveal) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              key: const ValueKey('stake_pre_reveal_takedown'),
+              onPressed: _busy ? null : () => _removePhoto(preReveal: true),
+              icon: const Icon(Icons.visibility_off_rounded),
+              label: const Text(
+                'Keep it off — $kPhotoRemovalPrice pts, never posts',
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
