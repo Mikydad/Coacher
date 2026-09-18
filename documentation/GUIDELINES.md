@@ -3740,3 +3740,30 @@ not silent reversal.
   don't need them now"); the history screen keeps its route and the bell
   returns with a notification center, superseding the 2026-09-14 "bell
   stays non-interactive" note.
+
+- **2026-09-19 · Coach thread: newest message anchored to the TOP; no
+  frame without the reply; Time footer pinned.** (1) The thread scrolled
+  "to the bottom" once per message, computed against a viewport still
+  changing (sheet growing, keyboard moving), so from the second reply on
+  the newest text sat below the fold. Now the latest exchange is anchored
+  ChatGPT-style — the user's newest question at the top of the thread
+  viewport, the reply flowing beneath it; anchoring the reply itself
+  scrolled a one-line question out of view (`_anchorLatestToTop`,
+  `threadAnchorIndex`,
+  `Scrollable.ensureVisible` alignment 0, a GlobalKey on that item, and
+  trailing space under the list so any last message can sit at the top);
+  a viewport change re-pins it frame by frame without animation; a user
+  who scrolled the thread themselves is not yanked until the next message;
+  a streamed reply grows downward from its anchor, so there is no tail to
+  follow. The overflow-to-full check subtracts the trailing space.
+  (2) Every bubble flickered as a typed reply landed: `_setLoading(false)`
+  notified listeners between "thinking bubble removed" and "reply added",
+  painting one frame with neither. The flip is silent now; one notify at
+  the end of the turn carries both, then the queue drains. Bubbles are
+  keyed by message id so list mutations keep their elements, and the body
+  skips the loading state on provider reloads. (3) The Time page's
+  "Show on Home" switch moved from the end of the list to a pinned
+  footer (`bottomNavigationBar`), above the home indicator, with the
+  Track button floating above it. *Rejected:* following the streamed tail
+  (pushes the reply's start out of view); morphing the loading bubble
+  into the reply in place (ids feed retry/undo bookkeeping).

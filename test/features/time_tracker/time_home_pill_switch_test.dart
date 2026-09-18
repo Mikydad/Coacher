@@ -83,7 +83,6 @@ void main() {
     await tester.pumpWidget(_app(const TimeScreen(), prefs));
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(_switch, 200);
     expect(tester.widget<SwitchListTile>(_switch).value, isFalse);
   });
 
@@ -92,7 +91,6 @@ void main() {
     await tester.pumpWidget(_app(const TimeScreen(), prefs));
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(_switch, 200);
     await tester.tap(_switch);
     await tester.pumpAndSettle();
 

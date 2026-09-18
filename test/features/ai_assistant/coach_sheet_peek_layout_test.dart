@@ -104,8 +104,10 @@ Future<AiAssistantService> _pumpAtHeight(
   WidgetTester tester,
   double height, {
   ValueNotifier<bool>? threadNotifier,
+  Future<void> Function(AiAssistantService service)? seed,
 }) async {
   final service = _fakeService();
+  if (seed != null) await seed(service);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -297,6 +299,48 @@ void main() {
   testWidgets('conversation stage paints the thread', (tester) async {
     await _pumpAtHeight(tester, 480);
     expect(threadVisibility(tester).visible, isTrue);
+  });
+
+  // Newest-on-top (2026-09-19): the latest message sits at the top of the
+  // thread viewport, not below the fold.
+  testWidgets('the newest message is anchored to the top of the thread', (
+    tester,
+  ) async {
+    final notifier = ValueNotifier<bool>(false);
+    addTearDown(notifier.dispose);
+    await _pumpAtHeight(
+      tester,
+      480,
+      threadNotifier: notifier,
+      seed: (service) async {
+        for (var i = 0; i < 6; i++) {
+          await service.sendMessage(
+            'Question number $i, long enough to matter',
+          );
+        }
+      },
+    );
+    for (var i = 0; i < 12; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    final listTop = tester.getTopLeft(find.byType(ListView)).dy;
+    // The latest question sits at the top (one bubble inset below it)…
+    final questionTop = tester
+        .getTopLeft(find.text('Question number 5, long enough to matter'))
+        .dy;
+    expect(questionTop - listTop, lessThan(80),
+        reason: 'the latest question should sit at the top of the thread');
+    // …its reply directly beneath, visible…
+    final replyTop = tester.getTopLeft(find.text('ok').last).dy;
+    expect(replyTop, greaterThan(questionTop));
+    expect(replyTop - listTop, lessThan(200));
+    // …and the exchange before it has scrolled above the fold (lazy list:
+    // it is not even built).
+    expect(
+      find.text('Question number 4, long enough to matter'),
+      findsNothing,
+    );
   });
 
   testWidgets('the sheet learns when the thread gains a message', (

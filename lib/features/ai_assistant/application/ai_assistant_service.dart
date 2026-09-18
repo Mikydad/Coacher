@@ -150,8 +150,7 @@ class AiAssistantService extends ChangeNotifier {
       final latestSession = recent.first.sessionId;
       final rows = recent
           .where(
-            (r) =>
-                r.sessionId == latestSession && r.timestampMs >= dayFloorMs,
+            (r) => r.sessionId == latestSession && r.timestampMs >= dayFloorMs,
           )
           .toList()
           .reversed
@@ -398,7 +397,8 @@ class AiAssistantService extends ChangeNotifier {
       } else {
         var message = AiInformationalOutputGuard.sanitize(full);
         if (truncated) {
-          message = '$message …\n\n(That reply got cut off — ask again '
+          message =
+              '$message …\n\n(That reply got cut off — ask again '
               'for the rest.)';
         }
         _replaceLoadingMessage(bubbleId, message);
@@ -547,15 +547,12 @@ class AiAssistantService extends ChangeNotifier {
       if (heuristicParams != null) {
         _removeMessage(loadingId);
         _setLoading(false);
-        await _autoCommitIntentionActions(
-          [
-            AiAction(
-              actionType: ActionType.createIntention,
-              parameters: heuristicParams,
-            ),
-          ],
-          modelMessage: null,
-        );
+        await _autoCommitIntentionActions([
+          AiAction(
+            actionType: ActionType.createIntention,
+            parameters: heuristicParams,
+          ),
+        ], modelMessage: null);
         return;
       }
       if (generation != _turnGeneration) return;
@@ -593,15 +590,12 @@ class AiAssistantService extends ChangeNotifier {
         userInput.trim(),
       );
       if (heuristicParams != null) {
-        await _autoCommitIntentionActions(
-          [
-            AiAction(
-              actionType: ActionType.createIntention,
-              parameters: heuristicParams,
-            ),
-          ],
-          modelMessage: null,
-        );
+        await _autoCommitIntentionActions([
+          AiAction(
+            actionType: ActionType.createIntention,
+            parameters: heuristicParams,
+          ),
+        ], modelMessage: null);
         return;
       }
       _addMessage(
@@ -620,9 +614,14 @@ class AiAssistantService extends ChangeNotifier {
       return;
     }
 
-    // 5. Remove loading message, add real response
+    // 5. Remove loading message, add real response.
+    // The loading flip is SILENT here (2026-09-19): _setLoading notified
+    // listeners between "thinking bubble gone" and "reply added", so the
+    // thread painted one frame shorter — every bubble shifted and snapped
+    // back, the flicker Miko saw as each reply landed. One notify at the
+    // end of this turn carries both changes; the queue drains after it.
     _removeMessage(loadingId);
-    _setLoading(false);
+    _isLoading = false;
 
     // Intentions AUTO-COMMIT with inline undo — the one deliberate
     // relaxation of the confirm-gate (decision log 2026-07-23): stating a
@@ -780,6 +779,7 @@ class AiAssistantService extends ChangeNotifier {
     }
 
     notifyListeners();
+    _drainQueuedTurn();
   }
 
   // ─── Streamed voice turns (voice Level 2) ─────────────────────────────────
@@ -892,7 +892,8 @@ class AiAssistantService extends ChangeNotifier {
       } else {
         var message = AiInformationalOutputGuard.sanitize(full);
         if (truncated) {
-          message = '$message …\n\n(That reply got cut off — ask again '
+          message =
+              '$message …\n\n(That reply got cut off — ask again '
               'for the rest.)';
         }
         _replaceLoadingMessage(bubbleId, message);
@@ -937,36 +938,37 @@ class AiAssistantService extends ChangeNotifier {
 
     out = StreamController<String>(
       onListen: () {
-        sub = _voiceReplyStreamer!(
-          text,
-          _sessionId,
-          route: route,
-          proactiveContext: _proactiveContextForPayload,
-        ).listen(
-          (delta) {
-            buffer.write(delta);
-            _replaceLoadingMessage(bubbleId, buffer.toString());
-            notifyListeners();
-            if (!out.isClosed) out.add(delta);
-          },
-          onError: (Object e) {
-            if (buffer.isEmpty && !settled) {
-              unawaited(fallBackToAgentPath());
-              return;
-            }
-            if (e is AiVoiceStreamTruncated) truncated = true;
-            settle();
-            if (!out.isClosed) {
-              out.addError(e);
-              unawaited(out.close());
-            }
-          },
-          onDone: () {
-            if (fallingBack) return;
-            settle();
-            if (!out.isClosed) unawaited(out.close());
-          },
-        );
+        sub =
+            _voiceReplyStreamer!(
+              text,
+              _sessionId,
+              route: route,
+              proactiveContext: _proactiveContextForPayload,
+            ).listen(
+              (delta) {
+                buffer.write(delta);
+                _replaceLoadingMessage(bubbleId, buffer.toString());
+                notifyListeners();
+                if (!out.isClosed) out.add(delta);
+              },
+              onError: (Object e) {
+                if (buffer.isEmpty && !settled) {
+                  unawaited(fallBackToAgentPath());
+                  return;
+                }
+                if (e is AiVoiceStreamTruncated) truncated = true;
+                settle();
+                if (!out.isClosed) {
+                  out.addError(e);
+                  unawaited(out.close());
+                }
+              },
+              onDone: () {
+                if (fallingBack) return;
+                settle();
+                if (!out.isClosed) unawaited(out.close());
+              },
+            );
       },
       onCancel: () {
         // Interrupt: the voice pipeline dropped the stream — abort the HTTP
@@ -999,8 +1001,7 @@ class AiAssistantService extends ChangeNotifier {
         final plan = message.plannedChanges!;
         final summary = formatPlanForSpeech(plan);
         return [
-          if (content.isNotEmpty && content != "Here's what I'll do:")
-            content,
+          if (content.isNotEmpty && content != "Here's what I'll do:") content,
           if (summary.isNotEmpty) summary,
           // Hard blocks require the stronger phrase (settled Q3): spoken
           // "confirm" is informed consent only when the warning tier was
@@ -1068,7 +1069,9 @@ class AiAssistantService extends ChangeNotifier {
       AiChatMessage(
         id: StableId.generate('msg'),
         role: ChatRole.assistant,
-        content: content.isEmpty ? 'Got it — consider it on my radar.' : content,
+        content: content.isEmpty
+            ? 'Got it — consider it on my radar.'
+            : content,
         timestamp: DateTime.now(),
         autoCommittedBatchId: exec.hasFailures ? null : exec.batchId,
         isExecuted: !exec.hasFailures,
@@ -1197,92 +1200,92 @@ class AiAssistantService extends ChangeNotifier {
     // only recovery wiped the conversation. Now: honest bubble, the card
     // stays confirmable, and loading ALWAYS resets.
     try {
-    final result = await _actionExecutor.execute(plan.actions);
+      final result = await _actionExecutor.execute(plan.actions);
 
-    // History marking is truthful (fix-wave Phase 2, §8 M1/G8): only the
-    // latest entry — the confirmed plan's own — and only when something
-    // actually applied. A fully-failed confirm marks nothing, so the next
-    // turn's prompt never claims "already applied" for work that never
-    // happened.
-    if (result.successes.isNotEmpty) {
-      await _historyRepository.markConfirmed(_sessionId);
-      await _historyRepository.markExecuted(_sessionId);
-    }
-
-    // Store assistant summary for multi-turn conversationHistory (Phase 3)
-    final executionSummary = result.successes.isEmpty
-        ? 'Nothing was applied. Issues: ${result.failures.take(2).join("; ")}'
-        : result.hasFailures
-        ? 'Already applied (do not repeat): ${result.successes.join("; ")}. Issues: ${result.failures.take(2).join("; ")}'
-        : 'Already applied (do not repeat): ${result.successes.join("; ")}';
-    unawaited(
-      _historyRepository.saveAssistantSummary(_sessionId, executionSummary),
-    );
-
-    // Seed resolvedCategory from the primary action for the Assumption Engine
-    final primary = plan.actions.isNotEmpty ? plan.actions.first : null;
-    if (primary != null) {
-      final rawTitle =
-          primary.parameters['title']?.toString() ??
-          primary.parameters['taskTitle']?.toString() ??
-          '';
-      if (rawTitle.isNotEmpty) {
-        final category = _normaliser.normalise(rawTitle);
-        unawaited(
-          _historyRepository.updateResolvedCategory(_sessionId, category),
-        );
+      // History marking is truthful (fix-wave Phase 2, §8 M1/G8): only the
+      // latest entry — the confirmed plan's own — and only when something
+      // actually applied. A fully-failed confirm marks nothing, so the next
+      // turn's prompt never claims "already applied" for work that never
+      // happened.
+      if (result.successes.isNotEmpty) {
+        await _historyRepository.markConfirmed(_sessionId);
+        await _historyRepository.markExecuted(_sessionId);
       }
-    }
 
-    _pendingPlan = null;
-    _markPlanExecuted(previewMessageId, plan.sessionId);
-    _demoteCurrentPlan();
+      // Store assistant summary for multi-turn conversationHistory (Phase 3)
+      final executionSummary = result.successes.isEmpty
+          ? 'Nothing was applied. Issues: ${result.failures.take(2).join("; ")}'
+          : result.hasFailures
+          ? 'Already applied (do not repeat): ${result.successes.join("; ")}. Issues: ${result.failures.take(2).join("; ")}'
+          : 'Already applied (do not repeat): ${result.successes.join("; ")}';
+      unawaited(
+        _historyRepository.saveAssistantSummary(_sessionId, executionSummary),
+      );
 
-    // Per-item outcomes (fix-wave Phase 2, settled Q4): successes stay
-    // applied, failures are named individually — never the old
-    // all-or-nothing "I've restored your schedule" (which wasn't true).
-    final summary = result.successes.isEmpty && result.hasFailures
-        ? "I couldn't apply that:\n${result.toSummaryMessage()}"
-        : result.hasFailures
-        ? 'Done with some issues:\n${result.toSummaryMessage()}'
-        : result.successes.isNotEmpty
-        ? result.toSummaryMessage()
-        : 'No changes were applied. Try describing a specific task to add or update.';
-
-    _addMessage(
-      AiChatMessage(
-        id: StableId.generate('msg'),
-        role: ChatRole.assistant,
-        content: summary,
-        timestamp: DateTime.now(),
-      ),
-    );
-
-    _logEvent('aiCommandExecuted', {
-      'sessionId': _sessionId,
-      'actionCount': plan.actions.length,
-      'actionTypes': plan.actions.map((a) => a.actionType.name).toList(),
-    });
-    _recordProactiveChatConversion();
-    _onScheduleMutated?.call(_sessionId);
-
-    // Log aiSuggestionAccepted for every action that had a reason label
-    for (final action in plan.actions) {
-      if (action.reasonLabel != null) {
+      // Seed resolvedCategory from the primary action for the Assumption Engine
+      final primary = plan.actions.isNotEmpty ? plan.actions.first : null;
+      if (primary != null) {
         final rawTitle =
-            action.parameters['title']?.toString() ??
-            action.parameters['taskTitle']?.toString() ??
+            primary.parameters['title']?.toString() ??
+            primary.parameters['taskTitle']?.toString() ??
             '';
-        final category = rawTitle.isNotEmpty
-            ? _normaliser.normalise(rawTitle)
-            : 'unknown';
-        _logEvent('aiSuggestionAccepted', {
-          'sessionId': _sessionId,
-          'category': category,
-          'confidence': action.confidence,
-        });
+        if (rawTitle.isNotEmpty) {
+          final category = _normaliser.normalise(rawTitle);
+          unawaited(
+            _historyRepository.updateResolvedCategory(_sessionId, category),
+          );
+        }
       }
-    }
+
+      _pendingPlan = null;
+      _markPlanExecuted(previewMessageId, plan.sessionId);
+      _demoteCurrentPlan();
+
+      // Per-item outcomes (fix-wave Phase 2, settled Q4): successes stay
+      // applied, failures are named individually — never the old
+      // all-or-nothing "I've restored your schedule" (which wasn't true).
+      final summary = result.successes.isEmpty && result.hasFailures
+          ? "I couldn't apply that:\n${result.toSummaryMessage()}"
+          : result.hasFailures
+          ? 'Done with some issues:\n${result.toSummaryMessage()}'
+          : result.successes.isNotEmpty
+          ? result.toSummaryMessage()
+          : 'No changes were applied. Try describing a specific task to add or update.';
+
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content: summary,
+          timestamp: DateTime.now(),
+        ),
+      );
+
+      _logEvent('aiCommandExecuted', {
+        'sessionId': _sessionId,
+        'actionCount': plan.actions.length,
+        'actionTypes': plan.actions.map((a) => a.actionType.name).toList(),
+      });
+      _recordProactiveChatConversion();
+      _onScheduleMutated?.call(_sessionId);
+
+      // Log aiSuggestionAccepted for every action that had a reason label
+      for (final action in plan.actions) {
+        if (action.reasonLabel != null) {
+          final rawTitle =
+              action.parameters['title']?.toString() ??
+              action.parameters['taskTitle']?.toString() ??
+              '';
+          final category = rawTitle.isNotEmpty
+              ? _normaliser.normalise(rawTitle)
+              : 'unknown';
+          _logEvent('aiSuggestionAccepted', {
+            'sessionId': _sessionId,
+            'category': category,
+            'confidence': action.confidence,
+          });
+        }
+      }
     } catch (e) {
       debugPrint('confirmPlan failed: $e');
       _addMessage(

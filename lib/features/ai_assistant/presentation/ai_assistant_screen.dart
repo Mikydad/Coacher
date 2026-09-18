@@ -472,7 +472,8 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       final scroll = _activeScrollController;
       if (scroll.hasClients &&
           // Small tolerance: a few overflowing pixels aren't "a long chat".
-          scroll.position.maxScrollExtent > 32) {
+          // The trailing anchor space is not content.
+          scroll.position.maxScrollExtent - _threadTrailingSpace > 32) {
         sheet.animateTo(
           _CoachAiSheet.maxSize,
           duration: const Duration(milliseconds: 300),
@@ -515,7 +516,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     });
     if (service.messages.isNotEmpty) {
       if (widget.sheetMode) _growSheetForMessages();
-      _scrollToBottom();
+      _anchorLatestToTop();
     }
   }
 
@@ -537,13 +538,14 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       // A new message resets any deliberate park — the user asked for more.
       _userParkedSheet = false;
       _growSheetForMessages();
-      _scrollToBottom();
+      _anchorLatestToTop();
       return;
     }
     if (contentChanged) {
-      // Streaming follows the tail only if the reader is already there
-      // (§8 U3) — never yank someone who scrolled up to reread.
-      _scrollToBottom(onlyIfNearBottom: true);
+      // Newest-on-top (2026-09-19): a streamed reply grows DOWN from its
+      // anchored top, so there is no tail to follow; a typed reply that
+      // replaced its loading bubble is a new id and anchors itself.
+      _anchorLatestToTop();
       // A manual drag mid-stream is a deliberate park (§8 U9): content
       // ticks stop resizing the sheet until the next real message.
       if (_userParkedSheet) return;
@@ -861,22 +863,70 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   ScrollController get _activeScrollController =>
       widget.sheetScrollController ?? _scrollController;
 
-  /// Scrolls the thread to its end. [onlyIfNearBottom] is the streaming
-  /// case (fix-wave Phase 7, §8 U3): content ticks must not yank a reader
-  /// who deliberately scrolled up — only follow the tail when they are
-  /// already at it.
-  void _scrollToBottom({bool onlyIfNearBottom = false}) {
+  /// Newest-on-top (Miko, 2026-09-19). The latest message is anchored to
+  /// the TOP of the thread viewport — like ChatGPT — instead of the thread
+  /// scrolling "to the bottom": the bottom target was computed against a
+  /// viewport still changing (sheet growing, keyboard moving), so from the
+  /// second reply on, the newest text sat below the fold. A top anchor is
+  /// stable under both, and a streamed reply grows downward from it.
+  ///
+  /// Anchors the latest exchange the way ChatGPT does: the user's newest
+  /// question pins to the top and the reply flows beneath it (anchoring
+  /// the reply itself scrolled a one-line question out of view). With no
+  /// user message in the thread, the latest non-loading message anchors.
+  /// [force] re-applies the current anchor after a viewport change; a user
+  /// who scrolled the thread themselves is not yanked until the next
+  /// message lands.
+  final GlobalKey _latestMessageKey = GlobalKey();
+  String? _anchoredMessageId;
+  bool _userScrolledThread = false;
+
+  /// Bottom padding under the thread so the last message can sit at the
+  /// top of the viewport with empty space beneath it.
+  double _threadTrailingSpace = 0;
+  double? _lastThreadHeight;
+
+  void _anchorLatestToTop({
+    bool force = false,
+    bool animate = true,
+    int attempt = 0,
+  }) {
+    final service = _listenedService;
+    if (service == null) return;
+    final index = threadAnchorIndex(service.messages);
+    if (index < 0) return;
+    final latest = service.messages[index];
+    if (!force) {
+      if (latest.id == _anchoredMessageId) return;
+      // A new message resets any deliberate scroll-away.
+      _userScrolledThread = false;
+    } else if (_userScrolledThread) {
+      return;
+    }
+    final targetId = latest.id;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final controller = _activeScrollController;
       if (!controller.hasClients) return;
-      final position = controller.position;
-      if (onlyIfNearBottom &&
-          position.maxScrollExtent - position.pixels > 220) {
+      final ctx = _latestMessageKey.currentContext;
+      if (ctx == null) {
+        // Not laid out yet (lazy list, far below): jump to the end so it
+        // builds, then anchor on the next frame. Bounded.
+        controller.jumpTo(controller.position.maxScrollExtent);
+        if (attempt < 3) {
+          _anchorLatestToTop(
+            force: true,
+            animate: animate,
+            attempt: attempt + 1,
+          );
+        }
         return;
       }
-      controller.animateTo(
-        position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
+      _anchoredMessageId = targetId;
+      Scrollable.ensureVisible(
+        ctx,
+        alignment: 0.0,
+        duration: animate ? const Duration(milliseconds: 300) : Duration.zero,
         curve: Curves.easeOut,
       );
     });
@@ -893,6 +943,10 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     final serviceAsync = ref.watch(resolvedAiAssistantProvider);
 
     final body = serviceAsync.when(
+      // A provider reload must never swap a live thread for the loading
+      // body — that blanks every bubble for a frame (2026-09-19).
+      skipLoadingOnReload: true,
+      skipLoadingOnRefresh: true,
       data: (service) {
         _attachServiceListener(service);
         return _buildBody(service);
@@ -1120,6 +1174,22 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                   // attached, because the sheet controller — and every
                   // grow animation — rides on it.
                   final showThread = constraints.maxHeight >= _kMinThreadHeight;
+                  // Viewport changed (sheet growing, keyboard moving): keep
+                  // the anchored message pinned, frame by frame, no
+                  // animation. Trailing space lets any last message sit at
+                  // the top with room beneath it.
+                  // Nearly a full viewport: a one-line reply must be able
+                  // to reach the top too, or ensureVisible clamps short.
+                  _threadTrailingSpace = (constraints.maxHeight - 40).clamp(
+                    0.0,
+                    double.infinity,
+                  );
+                  if (_lastThreadHeight != constraints.maxHeight) {
+                    _lastThreadHeight = constraints.maxHeight;
+                    if (_anchoredMessageId != null) {
+                      _anchorLatestToTop(force: true, animate: false);
+                    }
+                  }
                   // The extras block is capped so the thread always keeps
                   // ~160px: with the keyboard up (or a short sheet) the extras
                   // scroll inside their cap instead of overflowing the Column.
@@ -1150,17 +1220,28 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                         // Conversation thread
                         Expanded(
                           child: hasMessages
-                              ? _MessageList(
-                                  messages: messages,
-                                  service: service,
-                                  scrollController: _activeScrollController,
-                                  isLoading: service.isLoading,
-                                  onSuggestedPrompt: (prompt) {
-                                    _inputController.text = prompt;
-                                    _inputFocusNode.requestFocus();
+                              ? NotificationListener<ScrollStartNotification>(
+                                  onNotification: (n) {
+                                    if (n.dragDetails != null) {
+                                      _userScrolledThread = true;
+                                    }
+                                    return false;
                                   },
-                                  onEditPlan: () => _onEditPlanPressed(service),
-                                  onStop: service.cancelCurrentTurn,
+                                  child: _MessageList(
+                                    messages: messages,
+                                    service: service,
+                                    scrollController: _activeScrollController,
+                                    latestMessageKey: _latestMessageKey,
+                                    trailingSpace: _threadTrailingSpace,
+                                    isLoading: service.isLoading,
+                                    onSuggestedPrompt: (prompt) {
+                                      _inputController.text = prompt;
+                                      _inputFocusNode.requestFocus();
+                                    },
+                                    onEditPlan: () =>
+                                        _onEditPlanPressed(service),
+                                    onStop: service.cancelCurrentTurn,
+                                  ),
                                 )
                               : _buildEmptyState(),
                         ),
@@ -1468,11 +1549,25 @@ class _EmptyState extends StatelessWidget {
 
 // ─── Message list ─────────────────────────────────────────────────────────────
 
+/// Which message the thread anchors to the top (newest-on-top,
+/// 2026-09-19): the latest user message, else the latest non-loading one.
+/// Shared by the screen (what to scroll to) and the list (where the key
+/// goes) so the two can never disagree.
+int threadAnchorIndex(List<AiChatMessage> messages) {
+  for (var i = messages.length - 1; i >= 0; i--) {
+    final m = messages[i];
+    if (!m.isLoading && m.role == ChatRole.user) return i;
+  }
+  return messages.lastIndexWhere((m) => !m.isLoading);
+}
+
 class _MessageList extends StatelessWidget {
   const _MessageList({
     required this.messages,
     required this.service,
     required this.scrollController,
+    required this.latestMessageKey,
+    required this.trailingSpace,
     required this.isLoading,
     required this.onSuggestedPrompt,
     required this.onEditPlan,
@@ -1482,6 +1577,13 @@ class _MessageList extends StatelessWidget {
   final List<AiChatMessage> messages;
   final AiAssistantService service;
   final ScrollController scrollController;
+
+  /// Attached to the latest non-loading message so the screen can anchor
+  /// it to the top of the viewport (newest-on-top, 2026-09-19).
+  final GlobalKey latestMessageKey;
+
+  /// Empty space under the last message so it can sit at the top.
+  final double trailingSpace;
   final bool isLoading;
   final void Function(String prompt) onSuggestedPrompt;
 
@@ -1498,9 +1600,10 @@ class _MessageList extends StatelessWidget {
       child: ListView.builder(
         controller: scrollController,
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: EdgeInsets.fromLTRB(0, 8, 0, 8 + trailingSpace),
         itemCount: messages.length + (isLoading ? 1 : 0),
         itemBuilder: (context, i) {
+          final anchorIndex = threadAnchorIndex(messages);
           if (i == messages.length) {
             // While a turn is in flight the thread ends with a Stop chip —
             // NOT a second ThinkingIndicator: the loading bubble already
@@ -1539,18 +1642,26 @@ class _MessageList extends StatelessWidget {
           if (msg.isHistorical) {
             item = Opacity(opacity: 0.7, child: item);
           }
+          if (i == anchorIndex) {
+            item = KeyedSubtree(key: latestMessageKey, child: item);
+          }
           final earlierDivider = i == 0 && msg.isHistorical;
           final freshDivider =
               i > 0 && messages[i - 1].isHistorical && !msg.isHistorical;
-          if (!earlierDivider && !freshDivider) return item;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (earlierDivider) const _ThreadDivider(label: 'EARLIER TODAY'),
-              if (freshDivider) const _ThreadDivider(),
-              item,
-            ],
-          );
+          // Keyed by id: list mutations (loading bubble out, reply in)
+          // keep every other bubble's element — no re-registration churn.
+          final keyed = !earlierDivider && !freshDivider
+              ? item
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (earlierDivider)
+                      const _ThreadDivider(label: 'EARLIER TODAY'),
+                    if (freshDivider) const _ThreadDivider(),
+                    item,
+                  ],
+                );
+          return KeyedSubtree(key: ValueKey('msg-${msg.id}'), child: keyed);
         },
       ),
     );

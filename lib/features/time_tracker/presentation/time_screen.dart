@@ -45,8 +45,9 @@ class _TimeScreenState extends ConsumerState<TimeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(timelineDayKeyProvider.notifier).state = DateKeys.todayKey();
-      ref.read(timelineWeekKeyProvider.notifier).state =
-          WeekPeriods.of(DateTime.now()).key;
+      ref.read(timelineWeekKeyProvider.notifier).state = WeekPeriods.of(
+        DateTime.now(),
+      ).key;
     });
   }
 
@@ -184,10 +185,11 @@ class _TimeScreenState extends ConsumerState<TimeScreen> {
               onNext: () => _shiftWeek(1),
               onDismissObservation: _dismissObservation,
             ),
-          const SizedBox(height: 32),
-          const _HomePillFooter(),
         ],
       ),
+      // Pinned under the content (Miko, 2026-09-19) — a footer, like a
+      // page's own bottom button — not an item at the end of the list.
+      bottomNavigationBar: const _HomePillFooter(),
     );
   }
 }
@@ -195,38 +197,49 @@ class _TimeScreenState extends ConsumerState<TimeScreen> {
 /// The page's one setting (Miko, 2026-09-18): whether Home shows the
 /// tracking pill. You don't track every day, so the pill is optional; the
 /// page itself, its history and every other way of logging stay as they
-/// are. Lives in the footer because it is about the pill, not the page.
+/// are. A pinned footer (2026-09-19): always at the bottom of the page,
+/// above the home indicator, with the Track button floating above it.
 class _HomePillFooter extends ConsumerWidget {
   const _HomePillFooter();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final enabled = ref.watch(homeTrackPillEnabledProvider);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Divider(height: 1, thickness: 1, color: AppColors.divider),
-        SwitchListTile.adaptive(
-          key: const ValueKey('time_home_pill_switch'),
-          contentPadding: EdgeInsets.zero,
-          value: enabled,
-          onChanged: (v) => ref
-              .read(profilePreferenceServiceProvider)
-              .setHomeTrackPillEnabled(v),
-          title: Text(
-            'Show on Home',
-            style: TextStyle(
-              color: AppColors.fg,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          subtitle: Text(
-            'The "Track what you\'re doing" pill under the action buttons.',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+    return Material(
+      color: AppColors.ink,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Divider(height: 1, thickness: 1, color: AppColors.divider),
+              SwitchListTile.adaptive(
+                key: const ValueKey('time_home_pill_switch'),
+                contentPadding: EdgeInsets.zero,
+                value: enabled,
+                onChanged: (v) => ref
+                    .read(profilePreferenceServiceProvider)
+                    .setHomeTrackPillEnabled(v),
+                title: Text(
+                  'Show on Home',
+                  style: TextStyle(
+                    color: AppColors.fg,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  'The "Track what you\'re doing" pill under the action buttons.',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                ),
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -602,7 +615,9 @@ class _ActivityTile extends ConsumerWidget {
     // V1.2 planned-vs-actual: timer-sourced rows only (exact task link).
     final entityId = e.sourceEntityId ?? '';
     if (e.isTimerSourced && entityId.isNotEmpty) {
-      final block = ref.watch(plannedBlockForEntityProvider(entityId)).valueOrNull;
+      final block = ref
+          .watch(plannedBlockForEntityProvider(entityId))
+          .valueOrNull;
       if (block != null && DateKeys.todayKey(block.startAt) == e.dateKey) {
         final line = StringBuffer(
           'Planned ${_clock(context, block.startAt.millisecondsSinceEpoch)}'
