@@ -496,10 +496,13 @@ class _ProfileHero extends StatelessWidget {
 
         const SizedBox(height: 16),
 
-        // Stats card
+        // Stats card — the whole card opens Progress (Miko, 2026-09-19):
+        // the numbers invite the tap, the row below is the labelled route.
         AppCard(
           color: _kPrimaryContainer,
           padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+          onTap: () =>
+              Navigator.pushNamed(context, AnalyticsProgressScreen.routeName),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

@@ -16,6 +16,7 @@ import '../notifications/notification_reconciliation_service.dart';
 import '../offline/offline_store.dart';
 import '../push/push_messaging_service.dart';
 import '../sync/sync_service.dart';
+import '../../features/direction/application/direction_providers.dart';
 import '../../features/goals/application/goals_providers.dart';
 import '../../features/planning/application/accountability_retention_worker.dart';
 import '../../features/planning/data/planning_repository.dart';
@@ -121,9 +122,11 @@ class AppBootstrap {
     // the newest 20 (pruneOld had shipped with zero callers, so snapshots
     // of personal data accumulated forever).
     unawaited(
-      container.read(aiActionExecutorProvider).sweepStrandedBatches().then(
-            (_) =>
-                container.read(aiActionBatchRepositoryProvider).pruneOld(),
+      container
+          .read(aiActionExecutorProvider)
+          .sweepStrandedBatches()
+          .then(
+            (_) => container.read(aiActionBatchRepositoryProvider).pruneOld(),
           ),
     );
 
@@ -148,6 +151,14 @@ class AppBootstrap {
         await container
             .read(goalReminderSyncServiceProvider)
             .applyForGoals(goals);
+        // Direction close-out notices (2026-09-19): one per written,
+        // unanswered period whose end is ahead.
+        final directions = await container
+            .read(directionRepositoryProvider)
+            .fetchAllOnce();
+        await container
+            .read(directionCloseoutSchedulerProvider)
+            .rearm(directions);
         final planningRepo = FirestorePlanningRepository(FirestoreClient());
         await AccountabilityRetentionWorker(
           planningRepo.pruneOldAccountabilityLogs,

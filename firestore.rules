@@ -227,8 +227,10 @@ service cloud.firestore {
             resource.data.creatorId == request.auth.uid
             || isCircleModerator(circleId)
             || (request.resource.data.diff(resource.data).affectedKeys()
-                  .hasOnly(['memberProgress', 'teamTotal', 'updatedAtMs'])
-                && onlyOwnKeyChanged('memberProgress'))
+                  .hasOnly(['memberProgress', 'memberProofs', 'teamTotal', 'updatedAtMs'])
+                && onlyOwnKeyChanged('memberProgress')
+                // 2026-09-19: a member may attach their OWN proof photo.
+                && onlyOwnKeyChanged('memberProofs'))
           );
         allow delete: if isCircleModerator(circleId);
 

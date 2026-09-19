@@ -41,7 +41,10 @@ class DirectionRepository {
     return rows.map((e) => e.toDomain()).toList(growable: false);
   }
 
-  Future<DirectionEntry?> get(DirectionHorizon horizon, String periodKey) async {
+  Future<DirectionEntry?> get(
+    DirectionHorizon horizon,
+    String periodKey,
+  ) async {
     final row = await _isar.isarDirectionEntrys
         .filter()
         .entryIdEqualTo(directionEntryId(horizon, periodKey))
@@ -83,5 +86,34 @@ class DirectionRepository {
       payload: entry.toMap(),
     );
     return entry;
+  }
+
+  /// The close-out answer for an ended period (2026-09-19). One write,
+  /// LWW-stamped like every other, so two devices answering converge on
+  /// the later answer. No-op when the answer is unchanged.
+  Future<DirectionEntry?> setOutcome(
+    DirectionEntry entry,
+    DirectionOutcome outcome,
+  ) async {
+    final existing = await get(entry.horizon, entry.periodKey) ?? entry;
+    if (existing.outcome == outcome) return existing;
+    final now = _now();
+    final updated = existing.copyWith(
+      outcome: outcome,
+      outcomeAtMs: now,
+      updatedAtMs: now,
+    );
+    updated.validate();
+    await _isar.writeTxn(() async {
+      await _isar.isarDirectionEntrys.putByEntryId(
+        IsarDirectionEntry.fromDomain(updated),
+      );
+    });
+    await outboxUpsert(
+      entityType: 'direction',
+      documentPath: FirestorePaths.directionDocument(updated.id),
+      payload: updated.toMap(),
+    );
+    return updated;
   }
 }

@@ -138,12 +138,27 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                 SliverAppBar(
                   backgroundColor: AppColors.surfacePanel,
                   foregroundColor: AppColors.textPrimary,
-                  expandedHeight: 200,
+                  // The name lives in the toolbar so it survives the
+                  // collapse; the header below holds only what fades.
+                  // Height = toolbar + member line + avatars + tab strip
+                  // (2026-09-19): the old 200 was ~30px short of its own
+                  // content, so the avatar row sat on the tab strip.
+                  title: Text(
+                    circle.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  centerTitle: false,
+                  expandedHeight: _CircleHeader.expandedHeight,
                   pinned: true,
                   floating: false,
                   flexibleSpace: FlexibleSpaceBar(
                     background: _CircleHeader(
-                      circleName: circle.name,
                       streak: circle.currentStreak,
                       memberCount: circle.memberCount,
                       members: activeMembers,
@@ -151,20 +166,27 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                   ),
                   bottom: PreferredSize(
                     preferredSize: const Size.fromHeight(48),
-                    child: TabBar(
-                      controller: _tabController,
-                      isScrollable: true,
-                      labelColor: AppColors.accent,
-                      unselectedLabelColor: AppColors.textSecondary,
-                      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
-                      unselectedLabelStyle: const TextStyle(
-                        fontWeight: FontWeight.w500,
+                    // Opaque: nothing from the header may show through the
+                    // tab strip, whatever the scroll offset.
+                    child: ColoredBox(
+                      color: AppColors.surfacePanel,
+                      child: TabBar(
+                        controller: _tabController,
+                        isScrollable: true,
+                        labelColor: AppColors.accent,
+                        unselectedLabelColor: AppColors.textSecondary,
+                        labelStyle: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                        ),
+                        unselectedLabelStyle: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                        ),
+                        indicatorColor: AppColors.accent,
+                        indicatorSize: TabBarIndicatorSize.label,
+                        dividerColor: AppColors.divider,
+                        tabAlignment: TabAlignment.start,
+                        tabs: _tabs.map((t) => Tab(text: t)).toList(),
                       ),
-                      indicatorColor: AppColors.accent,
-                      indicatorSize: TabBarIndicatorSize.label,
-                      dividerColor: AppColors.divider,
-                      tabAlignment: TabAlignment.start,
-                      tabs: _tabs.map((t) => Tab(text: t)).toList(),
                     ),
                   ),
                 ),
@@ -198,13 +220,15 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
 
 class _CircleHeader extends StatelessWidget {
   const _CircleHeader({
-    required this.circleName,
     required this.streak,
     required this.memberCount,
     required this.members,
   });
 
-  final String circleName;
+  /// Toolbar (56) + member line (18) + gap (12) + avatars (36) + paddings
+  /// (4 + 12) + tab strip (48). Excludes the status bar (SafeArea adds it).
+  static const double expandedHeight = 186;
+
   final int streak;
   final int memberCount;
   final List<CircleMember> members;
@@ -227,7 +251,8 @@ class _CircleHeader extends StatelessWidget {
         ),
         SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 56, 20, 12),
+            // Clears the toolbar above and the tab strip below.
+            padding: const EdgeInsets.fromLTRB(20, kToolbarHeight + 4, 20, 60),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -235,26 +260,15 @@ class _CircleHeader extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        circleName,
+                        '$memberCount / ${AccountabilityCircleConst.kMaxMembers} members',
                         style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (streak > 0) _StreakBadge(streak),
                   ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '$memberCount / ${AccountabilityCircleConst.kMaxMembers} members',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                  ),
                 ),
                 const SizedBox(height: 12),
                 if (members.isNotEmpty) _MemberAvatarRow(members: members),

@@ -20,3 +20,12 @@ final circleWeeklyCommitmentsProvider =
           .watch(weeklyCommitmentRepositoryProvider)
           .watchCommitments(circleId, weekKey: weekKey);
     });
+
+/// Optimistic ticks (2026-09-19): commitment id → the completed count the
+/// user has just confirmed, shown at once while the Firestore transaction
+/// runs. The row displays max(stored, expected); an entry is dropped on
+/// failure, and once the stream has caught up. Only ever raises a count —
+/// never a phantom tick the server did not accept for long.
+final commitmentExpectedCountProvider = StateProvider<Map<String, int>>(
+  (ref) => const {},
+);

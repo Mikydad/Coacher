@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,10 +9,10 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/presentation/keyboard_dismiss.dart';
 import '../../../accountability/presentation/accountability_create_flow.dart';
+import '../../application/challenge_proof_upload_controller.dart';
 import '../../application/challenge_providers.dart';
-import '../../application/circle_providers.dart';
-import '../../data/circle_proof_storage.dart';
 import '../../domain/models/challenge.dart';
+import '../widgets/challenge_proof_thumbnail.dart';
 import '../sheets/challenge_create_sheet.dart';
 import '../widgets/challenge_vote_banner.dart';
 
@@ -235,12 +236,21 @@ class _CompetitionChallengeCard extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
 
-          // Ranked list
+          // Ranked list. The member's own row carries the optimistic
+          // delta and the upload status while a submission is in flight.
           ...sortedEntries.asMap().entries.map((entry) {
             final rank = entry.key + 1;
             final userId = entry.value.key;
-            final progress = entry.value.value;
             final isMe = userId == uid;
+            final upload = isMe
+                ? ref.watch(
+                    challengeProofUploadsProvider.select(
+                      (m) => m[challenge.id],
+                    ),
+                  )
+                : null;
+            final progress = entry.value.value + (upload?.pendingDelta ?? 0);
+            final proof = challenge.memberProofs[userId];
             return _RankRow(
               rank: rank,
               userId: userId,
@@ -248,6 +258,13 @@ class _CompetitionChallengeCard extends ConsumerWidget {
               target: challenge.targetValue,
               unit: challenge.unit,
               isMe: isMe,
+              proofUrl: proof != null && (isMe || proof.isPublic)
+                  ? proof.url
+                  : null,
+              upload: upload,
+              onRetry: () => ref
+                  .read(challengeProofUploadsProvider.notifier)
+                  .retry(challenge.id),
             );
           }),
 
@@ -281,6 +298,41 @@ class _CompetitionChallengeCard extends ConsumerWidget {
         challenge: challenge,
         circleId: circleId,
         userId: uid,
+      ),
+    );
+  }
+}
+
+/// The submission's honest status on the member's own row: quiet while it
+/// works, one line with a retry when it genuinely fails.
+class _UploadStatusLine extends StatelessWidget {
+  const _UploadStatusLine(this.upload, this.onRetry);
+
+  final ProofUploadState upload;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final failed = upload.phase == ProofUploadPhase.failed;
+    final text = switch (upload.phase) {
+      ProofUploadPhase.logging => 'Logging…',
+      ProofUploadPhase.uploading =>
+        upload.file == null ? 'Posting…' : 'Uploading photo…',
+      ProofUploadPhase.failed => upload.error ?? 'Failed. Tap to retry.',
+    };
+    return GestureDetector(
+      onTap: failed ? onRetry : null,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Text(
+          text,
+          key: const ValueKey('challenge_upload_status'),
+          style: TextStyle(
+            color: failed ? AppColors.danger : AppColors.textMuted,
+            fontSize: 11,
+            fontWeight: failed ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }
@@ -381,6 +433,18 @@ class _TeamChallengeCard extends ConsumerWidget {
             runSpacing: 4,
             children: challenge.memberProgress.entries.map((e) {
               final isMe = e.key == uid;
+              final upload = isMe
+                  ? ref.watch(
+                      challengeProofUploadsProvider.select(
+                        (m) => m[challenge.id],
+                      ),
+                    )
+                  : null;
+              final shown = e.value + (upload?.pendingDelta ?? 0);
+              final proof = challenge.memberProofs[e.key];
+              final proofUrl = proof != null && (isMe || proof.isPublic)
+                  ? proof.url
+                  : null;
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -394,12 +458,23 @@ class _TeamChallengeCard extends ConsumerWidget {
                         )
                       : null,
                 ),
-                child: Text(
-                  '${isMe ? "You" : e.key.substring(0, 4)}  ${e.value}',
-                  style: TextStyle(
-                    color: isMe ? AppColors.accent : AppColors.textSecondary,
-                    fontSize: 11,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (proofUrl != null) ...[
+                      ChallengeProofThumbnail(url: proofUrl, size: 18),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      '${isMe ? "You" : e.key.substring(0, 4)}  $shown',
+                      style: TextStyle(
+                        color: isMe
+                            ? AppColors.accent
+                            : AppColors.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
                 ),
               );
             }).toList(),
@@ -444,6 +519,9 @@ class _RankRow extends StatelessWidget {
     required this.target,
     required this.unit,
     required this.isMe,
+    this.proofUrl,
+    this.upload,
+    this.onRetry,
   });
 
   final int rank;
@@ -452,6 +530,13 @@ class _RankRow extends StatelessWidget {
   final int target;
   final String unit;
   final bool isMe;
+
+  /// Latest proof to show: own, or a public one.
+  final String? proofUrl;
+
+  /// Own row only: the in-flight submission, if any.
+  final ProofUploadState? upload;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -481,15 +566,26 @@ class _RankRow extends StatelessWidget {
             child: Text(medal, style: const TextStyle(fontSize: 14)),
           ),
           Expanded(
-            child: Text(
-              isMe ? 'You' : userId.substring(0, 6),
-              style: TextStyle(
-                color: isMe ? AppColors.accent : AppColors.textPrimary,
-                fontSize: 13,
-                fontWeight: isMe ? FontWeight.w600 : FontWeight.normal,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isMe ? 'You' : userId.substring(0, 6),
+                  style: TextStyle(
+                    color: isMe ? AppColors.accent : AppColors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: isMe ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+                if (upload != null) _UploadStatusLine(upload!, onRetry),
+              ],
             ),
           ),
+          if (proofUrl != null) ...[
+            ChallengeProofThumbnail(url: proofUrl!),
+            const SizedBox(width: 8),
+          ],
           Text(
             '$progress/$target $unit',
             style: TextStyle(
@@ -620,7 +716,11 @@ class _ManualProgressSheet extends ConsumerStatefulWidget {
 class _ManualProgressSheetState extends ConsumerState<_ManualProgressSheet> {
   final _valueController = TextEditingController();
   File? _proofImage;
-  bool _uploading = false;
+
+  /// The member's call (Miko, 2026-09-19): public → the circle sees the
+  /// photo in the feed and on the row; private → only they do, and the
+  /// circle sees a progress line.
+  bool _shareWithCircle = true;
 
   @override
   void dispose() {
@@ -642,33 +742,25 @@ class _ManualProgressSheetState extends ConsumerState<_ManualProgressSheet> {
     setState(() => _proofImage = File(xFile.path));
   }
 
-  Future<void> _submit() async {
+  /// Optimistic-then-honest (2026-09-19): the sheet closes now; the
+  /// transaction and the upload run in [ChallengeProofUploads], and the
+  /// member's row shows the number at once and the status honestly.
+  void _submit() {
     final delta = int.tryParse(_valueController.text.trim());
     if (delta == null || delta <= 0) return;
-    setState(() => _uploading = true);
-    try {
-      if (_proofImage != null) {
-        await ref
-            .read(circleProofStorageProvider)
-            .uploadChallengeProof(
-              circleId: widget.circleId,
-              challengeId: widget.challenge.id,
-              userId: widget.userId,
-              file: _proofImage!,
-            );
-      }
-      await ref
-          .read(challengeRepositoryProvider)
-          .updateProgress(
+    unawaited(
+      ref
+          .read(challengeProofUploadsProvider.notifier)
+          .submit(
             circleId: widget.circleId,
-            challengeId: widget.challenge.id,
+            challenge: widget.challenge,
             userId: widget.userId,
             delta: delta,
-          );
-      if (mounted) Navigator.pop(context);
-    } finally {
-      if (mounted) setState(() => _uploading = false);
-    }
+            file: _proofImage,
+            isPublic: _shareWithCircle,
+          ),
+    );
+    Navigator.pop(context);
   }
 
   @override
@@ -773,11 +865,36 @@ class _ManualProgressSheetState extends ConsumerState<_ManualProgressSheet> {
                     ),
                   ),
                 ),
+                if (_proofImage != null) ...[
+                  const SizedBox(height: 4),
+                  SwitchListTile.adaptive(
+                    key: const ValueKey('challenge_proof_share_switch'),
+                    contentPadding: EdgeInsets.zero,
+                    value: _shareWithCircle,
+                    onChanged: (v) => setState(() => _shareWithCircle = v),
+                    title: Text(
+                      'Share the photo with the circle',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                      ),
+                    ),
+                    subtitle: Text(
+                      _shareWithCircle
+                          ? 'Everyone sees it in the feed and on your row.'
+                          : 'Only you see it. The circle sees a progress line.',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: _uploading ? null : _submit,
+                    onPressed: _submit,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.accent,
                       foregroundColor: AppColors.onAccent,
@@ -786,16 +903,7 @@ class _ManualProgressSheetState extends ConsumerState<_ManualProgressSheet> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: _uploading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.black,
-                            ),
-                          )
-                        : const Text('Submit'),
+                    child: const Text('Submit'),
                   ),
                 ),
               ],

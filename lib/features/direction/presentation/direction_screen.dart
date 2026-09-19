@@ -8,6 +8,7 @@ import '../../../core/presentation/page_headers.dart';
 import '../../education/presentation/help_dot.dart';
 import '../../goals/presentation/widgets/goal_editor_widgets.dart';
 import '../../settings/presentation/settings_page_scaffold.dart';
+import '../application/direction_closeout.dart';
 import '../application/direction_providers.dart';
 import '../data/direction_repository.dart';
 import '../domain/direction_context_lines.dart';
@@ -46,6 +47,7 @@ class _DirectionScreenState extends ConsumerState<DirectionScreen>
   // Cached so the save path never touches `ref` — the safety net runs from
   // dispose() and after an await, where a ConsumerState's ref is invalid.
   late final DirectionRepository _repo;
+  DirectionCloseoutScheduler? _scheduler;
   Map<DirectionHorizon, DirectionSlot> _slots = const {};
 
   /// Open editors only; a horizon without one is in view mode.
@@ -55,6 +57,12 @@ class _DirectionScreenState extends ConsumerState<DirectionScreen>
   void initState() {
     super.initState();
     _repo = ref.read(directionRepositoryProvider);
+    try {
+      _scheduler = ref.read(directionCloseoutSchedulerProvider);
+    } catch (e) {
+      // Tests without the notifications plugin: the page still works.
+      debugPrint('[DirectionScreen] close-out scheduler unavailable: $e');
+    }
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -92,9 +100,28 @@ class _DirectionScreenState extends ConsumerState<DirectionScreen>
   Future<void> _write(DirectionSlot slot, String text) async {
     try {
       await _repo.setText(slot.period, text);
+      await _rearmCloseouts();
     } catch (e) {
       debugPrint('[DirectionScreen] save failed for ${slot.period.key}: $e');
     }
+  }
+
+  /// The close-out answer for the previous period (2026-09-19).
+  Future<void> _setOutcome(DirectionEntry entry, DirectionOutcome o) async {
+    try {
+      await _repo.setOutcome(entry, o);
+      await _rearmCloseouts();
+    } catch (e) {
+      debugPrint('[DirectionScreen] outcome failed for ${entry.id}: $e');
+    }
+  }
+
+  /// Keeps the end-of-period notices in step with what was just written.
+  /// Cached scheduler: this runs after awaits and from dispose paths.
+  Future<void> _rearmCloseouts() async {
+    final scheduler = _scheduler;
+    if (scheduler == null) return;
+    await scheduler.rearm(await _repo.fetchAllOnce());
   }
 
   void _openEditor(DirectionHorizon horizon) {
@@ -159,6 +186,7 @@ class _DirectionScreenState extends ConsumerState<DirectionScreen>
             onSave: () => _save(horizon),
             onCancel: () => _cancel(horizon),
             onKeep: (text) => _keep(horizon, text),
+            onOutcome: (entry, o) => _setOutcome(entry, o),
           ),
           const SizedBox(height: 30),
         ],
@@ -195,6 +223,7 @@ class _HorizonSection extends StatelessWidget {
     required this.onSave,
     required this.onCancel,
     required this.onKeep,
+    required this.onOutcome,
   });
 
   final DirectionHorizon horizon;
@@ -204,6 +233,7 @@ class _HorizonSection extends StatelessWidget {
   final VoidCallback onSave;
   final VoidCallback onCancel;
   final ValueChanged<String> onKeep;
+  final void Function(DirectionEntry entry, DirectionOutcome outcome) onOutcome;
 
   String get _label => switch (horizon) {
     DirectionHorizon.year => 'This year',
@@ -246,11 +276,25 @@ class _HorizonSection extends StatelessWidget {
         if (slot.suggestion != null)
           _SuggestionRow(
             horizon: horizon,
-            label: _previousLabel,
+            label: slot.previous?.outcome == null
+                ? _previousLabel
+                : '$_previousLabel (${slot.previous!.outcome!.label.toLowerCase()})',
             text: slot.suggestion!,
             onKeep: () => onKeep(slot.suggestion!),
             // Inside an open editor, hide once the user types their own words.
             listenable: e?.controller,
+          ),
+        // The previous period's close-out waits here until answered
+        // (2026-09-19) — the notification only points at it. Sits under
+        // the suggestion line, which already carries the text; it repeats
+        // the text only when that line is absent.
+        if (slot.closeout != null)
+          _CloseoutRow(
+            horizon: horizon,
+            label: _previousLabel,
+            entry: slot.closeout!,
+            showText: slot.suggestion == null,
+            onOutcome: (o) => onOutcome(slot.closeout!, o),
           ),
       ],
     );
@@ -504,6 +548,81 @@ class _SuggestionRow extends StatelessWidget {
       valueListenable: l,
       builder: (context, value, _) =>
           value.text.trim().isNotEmpty ? const SizedBox.shrink() : row,
+    );
+  }
+}
+
+/// "Last month: <text> — did you get there?" with the three answers.
+/// Stays until answered; answering is one tap and the row leaves.
+class _CloseoutRow extends StatelessWidget {
+  const _CloseoutRow({
+    required this.horizon,
+    required this.label,
+    required this.entry,
+    required this.showText,
+    required this.onOutcome,
+  });
+
+  final DirectionHorizon horizon;
+  final String label;
+  final DirectionEntry entry;
+
+  /// False when the suggestion line above already shows the text.
+  final bool showText;
+  final ValueChanged<DirectionOutcome> onOutcome;
+
+  @override
+  Widget build(BuildContext context) {
+    // The period by name ("August"), never "Last month": that wording is
+    // the suggestion line's, and the two must read as different things.
+    final periodLabel = entry.period?.label ?? label;
+    return Container(
+      key: ValueKey('direction_closeout_${horizon.name}'),
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      decoration: BoxDecoration(
+        color: AppColors.fg.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (showText) ...[
+            Text(
+              '$periodLabel: ${entry.text}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.fg,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
+          Text(
+            showText
+                ? 'Did you get there?'
+                : '$periodLabel — did you get there?',
+            style: TextStyle(color: AppColors.textSoft, fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final o in DirectionOutcome.values)
+                ActionChip(
+                  key: ValueKey(
+                    'direction_outcome_${horizon.name}_${o.storageValue}',
+                  ),
+                  label: Text(o.label, style: const TextStyle(fontSize: 12)),
+                  onPressed: () => onOutcome(o),
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

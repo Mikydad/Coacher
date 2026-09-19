@@ -3776,3 +3776,37 @@ not silent reversal.
   `circleChallengeVoteTally`, `stakeEvidenceArrived` and
   `stakeDisbursementReceipt` run in us-central1 while their triggers are
   in africa-south1 — a latency nit, not an error.
+
+- **2026-09-19 · Six fixes from Miko's device pass: Direction close-out,
+  commitment confirm + optimistic tick, challenge proofs that go
+  somewhere, circle header fit, Explore "+ Circle", profile stats card.**
+  (1) **Direction close-out** — supersedes decision 7's "no notification"
+  for one moment: when a period with a written direction ends, one quiet
+  local notice on the last day at 19:00 (month, quarter and year alike)
+  asks how it went; a tap opens the Direction page, where the previous
+  period's row shows three chips — Achieved / Partly / Not yet — until
+  answered. The answer is `DirectionEntry.outcome` (+ `outcomeAtMs`),
+  synced like the text (Isar + outbox, LWW). The rollover suggestion then
+  reads "Last month (partly): …". `DirectionCloseoutScheduler` re-arms on
+  bootstrap and after page writes; pure timing in `DirectionCloseout`.
+  *Rejected:* auto-carrying a "not yet" into the new period (the user
+  decides what next); a server push (the timing is a local calendar
+  fact). (2) **Weekly commitment "+"** now asks ("Mark progress? 2 of 3")
+  and shows the tick at once; `commitmentExpectedCountProvider` carries
+  the expected count over the Firestore transaction and drops it on
+  failure or once the stream catches up. (3) **Challenge proof photos**:
+  the sheet closes at once; `ChallengeProofUploads` runs the progress
+  transaction, then the upload, then attaches the proof to the challenge
+  doc (`memberProofs.<uid>` — rules now allow a member's own key) and
+  posts a feed line: with the photo when the member chose to share
+  (`challengeProofPosted`, value = URL), a plain "logged progress" line
+  otherwise. The member's row shows the optimistic delta and an honest
+  status with retry. Private proofs show only on the uploader's own row;
+  storage reads stay member-wide (privacy is a display rule for now).
+  Before this the photo was stored and never referenced. **Rules deploy
+  needed** (`memberProofs`). (4) **Circle header** was ~30px shorter than
+  its own content (expandedHeight included the tab strip), so the avatar
+  row overlapped the tabs; the name moved into the toolbar, the header
+  is sized to its content, and the tab strip is opaque. (5) Discover
+  circles gets the same "+ Circle" FAB as the tab. (6) The profile stats
+  card opens Progress.

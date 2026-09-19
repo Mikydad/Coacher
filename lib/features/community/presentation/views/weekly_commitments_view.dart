@@ -39,7 +39,30 @@ class WeeklyCommitmentsView extends ConsumerWidget {
         ),
       ),
       data: (all) {
-        final mine = all.where((c) => c.userId == uid).toList();
+        // Optimistic ticks ride on top of the stream; drop the ones the
+        // stream has caught up with (post-frame — never during build).
+        final expected = ref.watch(commitmentExpectedCountProvider);
+        final caughtUp = <String>[
+          for (final c in all)
+            if (expected[c.id] != null && c.completedCount >= expected[c.id]!)
+              c.id,
+        ];
+        if (caughtUp.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final n = ref.read(commitmentExpectedCountProvider.notifier);
+            n.state = {...n.state}..removeWhere((k, _) => caughtUp.contains(k));
+          });
+        }
+        WeeklyCommitment withExpected(WeeklyCommitment c) {
+          final e = expected[c.id];
+          if (e == null || e <= c.completedCount) return c;
+          return c.copyWith(completedCount: e.clamp(0, c.targetCount));
+        }
+
+        final mine = all
+            .where((c) => c.userId == uid)
+            .map(withExpected)
+            .toList();
         final others = all.where((c) => c.userId != uid).toList();
         final weekKey = DateKeys.isoWeekKey(DateTime.now());
         final isEndOfWeek = _isEndOfWeek();
@@ -80,9 +103,8 @@ class WeeklyCommitmentsView extends ConsumerWidget {
                 (c) => _CommitmentRow(
                   commitment: c,
                   isOwn: true,
-                  onMarkProgress: () => ref
-                      .read(weeklyCommitmentRepositoryProvider)
-                      .markProgress(circleId, c.id),
+                  onMarkProgress: () =>
+                      _confirmAndMarkProgress(context, ref, c),
                 ),
               ),
 
@@ -122,6 +144,50 @@ class WeeklyCommitmentsView extends ConsumerWidget {
     final now = DateTime.now();
     // ISO weekday: 1=Mon ... 7=Sun; show banner on Thu(4), Fri(5), Sat(6), Sun(7)
     return now.weekday >= DateTime.thursday;
+  }
+
+  /// One tap used to log a commitment as done with no question asked and
+  /// a network wait before the tick (Miko, 2026-09-19). Now: a confirm,
+  /// then the tick at once and the write in the background — a failure
+  /// takes the tick back with one quiet line.
+  Future<void> _confirmAndMarkProgress(
+    BuildContext context,
+    WidgetRef ref,
+    WeeklyCommitment c,
+  ) async {
+    final next = (c.completedCount + 1).clamp(0, c.targetCount);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Mark progress?'),
+        content: Text('"${c.title}" — $next of ${c.targetCount} this week.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Not yet'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Mark done'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final notifier = ref.read(commitmentExpectedCountProvider.notifier);
+    notifier.state = {...notifier.state, c.id: next};
+    try {
+      await ref
+          .read(weeklyCommitmentRepositoryProvider)
+          .markProgress(circleId, c.id);
+    } catch (e) {
+      notifier.state = {...notifier.state}..remove(c.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Couldn't save that. Try again.")),
+        );
+      }
+    }
   }
 
   Future<void> _showEditSheet(

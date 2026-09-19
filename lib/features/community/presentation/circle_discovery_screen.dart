@@ -14,6 +14,7 @@ import '../application/user_circle_membership_service.dart';
 import '../domain/models/accountability_circle.dart';
 import '../domain/models/circle_enums.dart';
 import 'circle_auth_guard.dart';
+import 'circle_create_screen.dart';
 import 'circle_detail_screen.dart';
 import 'sheets/circle_join_code_sheet.dart';
 
@@ -265,6 +266,18 @@ class _CircleDiscoveryScreenState extends ConsumerState<CircleDiscoveryScreen>
   Future<void> _joinOrRequest(AccountabilityCircle circle) =>
       joinOrRequestCircle(context: context, ref: ref, circle: circle);
 
+  Future<void> _createCircle() async {
+    // Creating a circle requires a real identity (same guard as the tab).
+    if (!await ensureRegisteredForCircleAction(
+      context,
+      ref,
+      actionLabel: 'create a circle',
+    )) {
+      return;
+    }
+    if (mounted) Navigator.pushNamed(context, CircleCreateScreen.routeName);
+  }
+
   @override
   Widget build(BuildContext context) {
     // Always read live from Riverpod — no local copy needed.
@@ -281,6 +294,20 @@ class _CircleDiscoveryScreenState extends ConsumerState<CircleDiscoveryScreen>
 
     return Scaffold(
       backgroundColor: AppColors.scaffold,
+      // Same "+ Circle" as the Community tab (Miko, 2026-09-19): someone
+      // browsing and not finding their circle should be one tap from
+      // starting it.
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'discover_circle_fab',
+        onPressed: _createCircle,
+        backgroundColor: AppColors.accent,
+        foregroundColor: AppColors.onAccent,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text(
+          'Circle',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
       appBar: AppBar(
         backgroundColor: AppColors.scaffold,
         foregroundColor: AppColors.textPrimary,

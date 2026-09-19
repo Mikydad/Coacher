@@ -14,6 +14,8 @@ import '../features/time_tracker/presentation/track_sheet_host_screen.dart';
 import '../features/community/presentation/circle_detail_screen.dart';
 import '../features/focus/presentation/focus_selection_screen.dart';
 import '../features/goals/application/goals_providers.dart';
+import '../features/direction/application/direction_closeout.dart';
+import '../features/direction/presentation/direction_screen.dart';
 import '../features/goals/presentation/goal_detail_screen.dart';
 import '../features/planning/application/planned_task_collect.dart';
 import '../features/reminders/application/attention_orchestrator_providers.dart';
@@ -367,6 +369,15 @@ Future<void> handleNotificationResponse(
 
   if (raw.startsWith(_layer4PayloadPrefix)) {
     await _handleLayer4InsightTap(raw, container);
+    return;
+  }
+
+  // Direction close-out (2026-09-19): the page holds the three answers.
+  if (raw.startsWith(DirectionCloseout.payloadPrefix)) {
+    debugPrint('[NotifTap] direction close-out tap');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pushNowIfReady(DirectionScreen.routeName);
+    });
     return;
   }
 

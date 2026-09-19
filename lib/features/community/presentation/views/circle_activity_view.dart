@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../accountability/application/blocked_users.dart';
 import '../../application/circle_providers.dart';
 import '../../../accountability/presentation/stake_reveal_viewer_screen.dart';
+import '../widgets/challenge_proof_thumbnail.dart';
 import '../../domain/models/activity_feed_item.dart';
 import '../../domain/models/circle_enums.dart';
 import '../widgets/ai_pulse_banner.dart';
@@ -231,6 +232,12 @@ class _ActivityCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                // A public proof photo rides along (2026-09-19).
+                if (item.eventType == ActivityEventType.challengeProofPosted &&
+                    (item.value ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  ChallengeProofThumbnail(url: item.value!, size: 120),
+                ],
                 const SizedBox(height: 4),
                 Text(
                   _relativeTime(item.createdAtMs),
@@ -310,6 +317,8 @@ class _EventIcon extends StatelessWidget {
         return (Icons.calendar_today_rounded, AppColors.violet);
       case ActivityEventType.challengeProgressUpdated:
         return (Icons.bar_chart_rounded, AppColors.mint);
+      case ActivityEventType.challengeProofPosted:
+        return (Icons.photo_camera_rounded, AppColors.mint);
       case ActivityEventType.memberJoined:
       case ActivityEventType.memberLeft:
         return (Icons.group_rounded, AppColors.textSecondary);
@@ -400,7 +409,10 @@ String _activityCopy(ActivityFeedItem item) {
     case ActivityEventType.weeklyCommitmentMet:
       return 'met their weekly commitment 🏆';
     case ActivityEventType.challengeProgressUpdated:
-      return 'updated challenge progress';
+      return 'logged progress on "${item.entityTitle ?? 'a challenge'}"';
+    case ActivityEventType.challengeProofPosted:
+      return 'logged progress on "${item.entityTitle ?? 'a challenge'}" '
+          'with a photo 📸';
     case ActivityEventType.memberJoined:
       return 'joined the circle 👋';
     case ActivityEventType.memberLeft:

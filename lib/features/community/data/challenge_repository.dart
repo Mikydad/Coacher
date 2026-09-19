@@ -19,6 +19,16 @@ abstract class ChallengeRepository {
     required int delta,
   });
 
+  /// Attach (or replace) the caller's proof photo on a challenge
+  /// (2026-09-19). Own key only — rules allow a member to touch just their
+  /// own entry of `memberProofs`.
+  Future<void> attachProof({
+    required String circleId,
+    required String challengeId,
+    required String userId,
+    required ChallengeProof proof,
+  });
+
   /// Cast an approve/reject vote. The majority tally and the `status` flip
   /// are server-side (`circleChallengeVoteTally` trigger — audit M1); a
   /// client can only write its own vote doc.
@@ -121,6 +131,19 @@ class FirestoreChallengeRepository implements ChallengeRepository {
         'teamTotal': newTeamTotal,
         'updatedAtMs': DateTime.now().millisecondsSinceEpoch,
       });
+    });
+  }
+
+  @override
+  Future<void> attachProof({
+    required String circleId,
+    required String challengeId,
+    required String userId,
+    required ChallengeProof proof,
+  }) async {
+    await _challengeDoc(circleId, challengeId).update({
+      'memberProofs.$userId': proof.toMap(),
+      'updatedAtMs': DateTime.now().millisecondsSinceEpoch,
     });
   }
 

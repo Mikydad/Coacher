@@ -95,7 +95,10 @@ class CircleProofStorage {
     return objectRef.getDownloadURL();
   }
 
-  Future<void> uploadChallengeProof({
+  /// Uploads a challenge proof and returns its download URL, which the
+  /// challenge doc and the feed keep (2026-09-19) — before this the object
+  /// was stored and never referenced again.
+  Future<String> uploadChallengeProof({
     required String circleId,
     required String challengeId,
     required String userId,
@@ -110,6 +113,7 @@ class CircleProofStorage {
       file,
       SettableMetadata(contentType: contentTypeForImageExtension(ext)),
     );
+    return objectRef.getDownloadURL();
   }
 }
 

@@ -80,6 +80,10 @@ enum ActivityEventType {
   habitStreakReached,
   taskFinished,
   challengeProgressUpdated,
+
+  /// A member logged challenge progress with a PUBLIC proof photo
+  /// (2026-09-19). entityId = challengeId, value = the photo's URL.
+  challengeProofPosted,
   milestoneReached,
   weeklyCommitmentMet,
   memberJoined,

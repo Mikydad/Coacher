@@ -29,24 +29,34 @@ const IsarDirectionEntrySchema = CollectionSchema(
       name: r'horizonStorage',
       type: IsarType.string,
     ),
-    r'periodEndMs': PropertySchema(
+    r'outcomeAtMs': PropertySchema(
       id: 3,
+      name: r'outcomeAtMs',
+      type: IsarType.long,
+    ),
+    r'outcomeStorage': PropertySchema(
+      id: 4,
+      name: r'outcomeStorage',
+      type: IsarType.string,
+    ),
+    r'periodEndMs': PropertySchema(
+      id: 5,
       name: r'periodEndMs',
       type: IsarType.long,
     ),
     r'periodKey': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'periodKey',
       type: IsarType.string,
     ),
     r'periodStartMs': PropertySchema(
-      id: 5,
+      id: 7,
       name: r'periodStartMs',
       type: IsarType.long,
     ),
-    r'text': PropertySchema(id: 6, name: r'text', type: IsarType.string),
+    r'text': PropertySchema(id: 8, name: r'text', type: IsarType.string),
     r'updatedAtMs': PropertySchema(
-      id: 7,
+      id: 9,
       name: r'updatedAtMs',
       type: IsarType.long,
     ),
@@ -128,6 +138,12 @@ int _isarDirectionEntryEstimateSize(
   var bytesCount = offsets.last;
   bytesCount += 3 + object.entryId.length * 3;
   bytesCount += 3 + object.horizonStorage.length * 3;
+  {
+    final value = object.outcomeStorage;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.periodKey.length * 3;
   bytesCount += 3 + object.text.length * 3;
   return bytesCount;
@@ -142,11 +158,13 @@ void _isarDirectionEntrySerialize(
   writer.writeLong(offsets[0], object.createdAtMs);
   writer.writeString(offsets[1], object.entryId);
   writer.writeString(offsets[2], object.horizonStorage);
-  writer.writeLong(offsets[3], object.periodEndMs);
-  writer.writeString(offsets[4], object.periodKey);
-  writer.writeLong(offsets[5], object.periodStartMs);
-  writer.writeString(offsets[6], object.text);
-  writer.writeLong(offsets[7], object.updatedAtMs);
+  writer.writeLong(offsets[3], object.outcomeAtMs);
+  writer.writeString(offsets[4], object.outcomeStorage);
+  writer.writeLong(offsets[5], object.periodEndMs);
+  writer.writeString(offsets[6], object.periodKey);
+  writer.writeLong(offsets[7], object.periodStartMs);
+  writer.writeString(offsets[8], object.text);
+  writer.writeLong(offsets[9], object.updatedAtMs);
 }
 
 IsarDirectionEntry _isarDirectionEntryDeserialize(
@@ -160,11 +178,13 @@ IsarDirectionEntry _isarDirectionEntryDeserialize(
   object.entryId = reader.readString(offsets[1]);
   object.horizonStorage = reader.readString(offsets[2]);
   object.id = id;
-  object.periodEndMs = reader.readLong(offsets[3]);
-  object.periodKey = reader.readString(offsets[4]);
-  object.periodStartMs = reader.readLong(offsets[5]);
-  object.text = reader.readString(offsets[6]);
-  object.updatedAtMs = reader.readLong(offsets[7]);
+  object.outcomeAtMs = reader.readLongOrNull(offsets[3]);
+  object.outcomeStorage = reader.readStringOrNull(offsets[4]);
+  object.periodEndMs = reader.readLong(offsets[5]);
+  object.periodKey = reader.readString(offsets[6]);
+  object.periodStartMs = reader.readLong(offsets[7]);
+  object.text = reader.readString(offsets[8]);
+  object.updatedAtMs = reader.readLong(offsets[9]);
   return object;
 }
 
@@ -182,14 +202,18 @@ P _isarDirectionEntryDeserializeProp<P>(
     case 2:
       return (reader.readString(offset)) as P;
     case 3:
-      return (reader.readLong(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 4:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 5:
       return (reader.readLong(offset)) as P;
     case 6:
       return (reader.readString(offset)) as P;
     case 7:
+      return (reader.readLong(offset)) as P;
+    case 8:
+      return (reader.readString(offset)) as P;
+    case 9:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1018,6 +1042,238 @@ extension IsarDirectionEntryQueryFilter
   }
 
   QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeAtMsIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'outcomeAtMs'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeAtMsIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'outcomeAtMs'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeAtMsEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'outcomeAtMs', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeAtMsGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'outcomeAtMs',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeAtMsLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'outcomeAtMs',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeAtMsBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'outcomeAtMs',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeStorageIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'outcomeStorage'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeStorageIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'outcomeStorage'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeStorageEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'outcomeStorage',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeStorageGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'outcomeStorage',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeStorageLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'outcomeStorage',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeStorageBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'outcomeStorage',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeStorageStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'outcomeStorage',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeStorageEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'outcomeStorage',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeStorageContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'outcomeStorage',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeStorageMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'outcomeStorage',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeStorageIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'outcomeStorage', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
+  outcomeStorageIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'outcomeStorage', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterFilterCondition>
   periodEndMsEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -1516,6 +1772,34 @@ extension IsarDirectionEntryQuerySortBy
   }
 
   QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterSortBy>
+  sortByOutcomeAtMs() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'outcomeAtMs', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterSortBy>
+  sortByOutcomeAtMsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'outcomeAtMs', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterSortBy>
+  sortByOutcomeStorage() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'outcomeStorage', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterSortBy>
+  sortByOutcomeStorageDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'outcomeStorage', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterSortBy>
   sortByPeriodEndMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'periodEndMs', Sort.asc);
@@ -1645,6 +1929,34 @@ extension IsarDirectionEntryQuerySortThenBy
   }
 
   QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterSortBy>
+  thenByOutcomeAtMs() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'outcomeAtMs', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterSortBy>
+  thenByOutcomeAtMsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'outcomeAtMs', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterSortBy>
+  thenByOutcomeStorage() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'outcomeStorage', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterSortBy>
+  thenByOutcomeStorageDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'outcomeStorage', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QAfterSortBy>
   thenByPeriodEndMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'periodEndMs', Sort.asc);
@@ -1742,6 +2054,23 @@ extension IsarDirectionEntryQueryWhereDistinct
   }
 
   QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QDistinct>
+  distinctByOutcomeAtMs() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'outcomeAtMs');
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QDistinct>
+  distinctByOutcomeStorage({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'outcomeStorage',
+        caseSensitive: caseSensitive,
+      );
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, IsarDirectionEntry, QDistinct>
   distinctByPeriodEndMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'periodEndMs');
@@ -1802,6 +2131,20 @@ extension IsarDirectionEntryQueryProperty
   horizonStorageProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'horizonStorage');
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, int?, QQueryOperations>
+  outcomeAtMsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'outcomeAtMs');
+    });
+  }
+
+  QueryBuilder<IsarDirectionEntry, String?, QQueryOperations>
+  outcomeStorageProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'outcomeStorage');
     });
   }
 

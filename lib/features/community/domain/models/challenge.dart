@@ -30,6 +30,38 @@ extension ChallengeStatusStorage on ChallengeStatus {
 
 // ─── Challenge ────────────────────────────────────────────────────────────────
 
+/// A member's latest proof photo for a challenge (2026-09-19). [isPublic]
+/// is the member's choice at upload: public proofs show to the circle,
+/// private ones only to the uploader (the circle sees a progress line).
+class ChallengeProof {
+  const ChallengeProof({
+    required this.url,
+    required this.isPublic,
+    required this.atMs,
+  });
+
+  final String url;
+  final bool isPublic;
+  final int atMs;
+
+  Map<String, dynamic> toMap() => {
+    'url': url,
+    'isPublic': isPublic,
+    'atMs': atMs,
+  };
+
+  static ChallengeProof? fromMap(Object? raw) {
+    if (raw is! Map) return null;
+    final url = raw['url'] as String?;
+    if (url == null || url.isEmpty) return null;
+    return ChallengeProof(
+      url: url,
+      isPublic: raw['isPublic'] as bool? ?? true,
+      atMs: (raw['atMs'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class Challenge {
   const Challenge({
     required this.id,
@@ -41,6 +73,7 @@ class Challenge {
     required this.targetValue,
     required this.unit,
     this.memberProgress = const {},
+    this.memberProofs = const {},
     this.teamTotal = 0,
     required this.startsAtMs,
     required this.endsAtMs,
@@ -63,6 +96,9 @@ class Challenge {
 
   /// userId → current progress count.
   final Map<String, int> memberProgress;
+
+  /// uid → latest proof photo. Absent for members who never attached one.
+  final Map<String, ChallengeProof> memberProofs;
 
   /// Denormalized sum of all member progress (team mode only).
   final int teamTotal;
@@ -94,6 +130,8 @@ class Challenge {
     'targetValue': targetValue,
     'unit': unit,
     'memberProgress': memberProgress,
+    if (memberProofs.isNotEmpty)
+      'memberProofs': memberProofs.map((k, v) => MapEntry(k, v.toMap())),
     'teamTotal': teamTotal,
     'startsAtMs': startsAtMs,
     'endsAtMs': endsAtMs,
@@ -104,6 +142,12 @@ class Challenge {
   static Challenge fromMap(Map<String, dynamic> map) {
     final rawProgress = (map['memberProgress'] as Map<String, dynamic>?) ?? {};
     final progress = rawProgress.map((k, v) => MapEntry(k, (v as num).toInt()));
+    final rawProofs = (map['memberProofs'] as Map<String, dynamic>?) ?? {};
+    final proofs = <String, ChallengeProof>{
+      for (final e in rawProofs.entries)
+        if (ChallengeProof.fromMap(e.value) != null)
+          e.key: ChallengeProof.fromMap(e.value)!,
+    };
 
     return Challenge(
       id: map['id'] as String? ?? '',
@@ -115,6 +159,7 @@ class Challenge {
       targetValue: (map['targetValue'] as num?)?.toInt() ?? 0,
       unit: map['unit'] as String? ?? '',
       memberProgress: progress,
+      memberProofs: proofs,
       teamTotal: (map['teamTotal'] as num?)?.toInt() ?? 0,
       startsAtMs: (map['startsAtMs'] as num?)?.toInt() ?? 0,
       endsAtMs: (map['endsAtMs'] as num?)?.toInt() ?? 0,
@@ -133,6 +178,7 @@ class Challenge {
     int? targetValue,
     String? unit,
     Map<String, int>? memberProgress,
+    Map<String, ChallengeProof>? memberProofs,
     int? teamTotal,
     int? startsAtMs,
     int? endsAtMs,
@@ -149,6 +195,7 @@ class Challenge {
       targetValue: targetValue ?? this.targetValue,
       unit: unit ?? this.unit,
       memberProgress: memberProgress ?? this.memberProgress,
+      memberProofs: memberProofs ?? this.memberProofs,
       teamTotal: teamTotal ?? this.teamTotal,
       startsAtMs: startsAtMs ?? this.startsAtMs,
       endsAtMs: endsAtMs ?? this.endsAtMs,
