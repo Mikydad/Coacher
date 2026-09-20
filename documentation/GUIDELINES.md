@@ -3782,7 +3782,10 @@ not silent reversal.
   SDK (Apple now rejects anything older); `ITSAppUsesNonExemptEncryption`
   = false added to Info.plist; Elaris-team APNs key (Sandbox & Production)
   replaced the Sandbox-only one in Firebase Cloud Messaging. Apple warns
-  that from spring 2027 MinimumOSVersion must be ≥ 15.0 (ours is 13.0).
+  that from spring 2027 MinimumOSVersion must be ≥ 15.0 — so the same day
+  the iOS deployment target was raised 13.0 → 15.0 (Podfile + all three
+  pbxproj configs; every plugin already required ≤ 15). Takes effect on
+  the next upload; build 1.0.2 (3) stays valid as-is.
 
 - **2026-09-19 · Six fixes from Miko's device pass: Direction close-out,
   commitment confirm + optimistic tick, challenge proofs that go

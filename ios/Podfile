@@ -1,5 +1,5 @@
 # Match Firebase / gRPC expectations; static linkage avoids unsigned grpcpp.framework on device.
-platform :ios, '13.0'
+platform :ios, '15.0'
 # If Xcode "Clean Build Folder" still errors on `build/ios/iphoneos`, run once: `flutter clean` (from repo root).
 # If install fails with "not a valid bundle" / missing CFBundleIdentifier: `flutter clean && rm -rf build/ios` then
 # `flutter run` to device (or wait for a full Xcode build to finish). A half-built Runner.app has no Info.plist.
