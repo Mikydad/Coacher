@@ -3786,6 +3786,21 @@ not silent reversal.
   the iOS deployment target was raised 13.0 → 15.0 (Podfile + all three
   pbxproj configs; every plugin already required ≤ 15). Takes effect on
   the next upload; build 1.0.2 (3) stays valid as-is.
+- **2026-09-20 · TestFlight build 3 white-screened on launch: `IsarError:
+  Could not initialize IsarCore library for ios_arm64`** (read off the
+  device syslog via the `[boot]` breadcrumbs). Root cause: the archive
+  step runs `strip` with STRIP_STYLE=all, which removes the export-trie
+  entries dart:ffi's `DynamicLibrary.process()` resolves at runtime —
+  verified by stripping a working Runner both ways (all → 0 isar_*
+  exports, non-global → 108). `flutter run/build --release` never strip,
+  so every device pass was green and only the App Store archive broke.
+  Not Xcode-26-specific; last night's 16.4 archive would have failed too.
+  Fix in `ios/Flutter/Release.xcconfig`: `STRIP_STYLE = non-global` plus a
+  belt-and-braces `-force_load` of the plugin's own libisar.a slice (the
+  CocoaPods-copied intermediate can't be referenced — Xcode 26 validates
+  linker inputs before script phases run). Build 1.0.2 (4) verified on
+  device via USB install before upload. Rule: after any archive, check
+  `xcrun dyld_info -exports Runner | grep -c isar_` is non-zero.
 
 - **2026-09-19 · Six fixes from Miko's device pass: Direction close-out,
   commitment confirm + optimistic tick, challenge proofs that go

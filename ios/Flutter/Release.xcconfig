@@ -6,3 +6,19 @@
 // stripping removes them, making Isar.open throw "Could not initialize
 // IsarCore library for ios_arm64" (debug builds don't strip → worked).
 DEAD_CODE_STRIPPING = NO
+
+// Archive builds (flutter build ipa / Xcode Archive) also run `strip` on the
+// installed product with STRIP_STYLE=all, which removes the export-trie
+// entries dart:ffi's DynamicLibrary.process() resolves at runtime — verified:
+// strip(all) on a working Runner drops all 108 isar_* exports, strip -x keeps
+// them. Non-global keeps exported symbols and still strips locals/debug.
+// (flutter run/build --release never strip, which is why device passes were
+// fine and only the TestFlight build hit the IsarError white screen.)
+STRIP_STYLE = non-global
+
+// Belt and braces: force-load the whole libisar.a so no linker heuristic can
+// drop unreferenced objects. Reference the plugin's own xcframework slice, not
+// the CocoaPods-copied intermediate: Xcode 26 validates linker inputs before
+// script phases run and the copy isn't a declared output.
+OTHER_LDFLAGS[sdk=iphoneos*] = $(inherited) -force_load "${SRCROOT}/.symlinks/plugins/isar_community_flutter_libs/ios/isar.xcframework/ios-arm64/libisar.a"
+OTHER_LDFLAGS[sdk=iphonesimulator*] = $(inherited) -force_load "${SRCROOT}/.symlinks/plugins/isar_community_flutter_libs/ios/isar.xcframework/ios-arm64_x86_64-simulator/libisar.a"
