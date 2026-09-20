@@ -3776,6 +3776,13 @@ not silent reversal.
   `circleChallengeVoteTally`, `stakeEvidenceArrived` and
   `stakeDisbursementReceipt` run in us-central1 while their triggers are
   in africa-south1 — a latency nit, not an error.
+- **2026-09-20 · Deployed `firestore.rules` to `coach4life-afaaa`** —
+  the `memberProofs` rules from d0b0ddc are live. Same day: first
+  TestFlight upload, SidePal 1.0.2 (3), built with Xcode 26.3 / iOS 26.2
+  SDK (Apple now rejects anything older); `ITSAppUsesNonExemptEncryption`
+  = false added to Info.plist; Elaris-team APNs key (Sandbox & Production)
+  replaced the Sandbox-only one in Firebase Cloud Messaging. Apple warns
+  that from spring 2027 MinimumOSVersion must be ≥ 15.0 (ours is 13.0).
 
 - **2026-09-19 · Six fixes from Miko's device pass: Direction close-out,
   commitment confirm + optimistic tick, challenge proofs that go
