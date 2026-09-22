@@ -187,4 +187,39 @@ void main() {
       },
     );
   }
+
+  testWidgets('Send drops the keyboard; a tap on the input brings it back '
+      '(coach only, 2026-09-22)', (tester) async {
+    final (:service, :client) = _gatedService();
+    await _openAskBar(tester, service);
+
+    // The ask-bar opens focused — the keyboard comes up on its own.
+    EditableText editable() =>
+        tester.widget<EditableText>(find.byType(EditableText).first);
+    expect(editable().focusNode.hasFocus, isTrue);
+
+    await tester.enterText(find.byType(EditableText).first, 'What is my plan?');
+    await tester.pump();
+    await tester.tap(find.text('SEND'));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(tester.takeException(), isNull);
+    expect(service.isLoading, isTrue);
+    // Sent: focus gone (keyboard down), input still there and empty.
+    expect(editable().focusNode.hasFocus, isFalse);
+    expect(editable().controller.text, isEmpty);
+
+    // Reply lands: still no focus on its own.
+    client.gate.complete();
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(editable().focusNode.hasFocus, isFalse);
+
+    // Only a tap on the field brings the keyboard back.
+    await tester.tap(find.byType(EditableText).first);
+    await tester.pump();
+    expect(editable().focusNode.hasFocus, isTrue);
+  });
 }

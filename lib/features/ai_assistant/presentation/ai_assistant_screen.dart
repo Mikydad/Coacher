@@ -1323,6 +1323,12 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                             final text = _inputController.text.trim();
                             if (text.isEmpty) return;
                             _inputController.clear();
+                            // Send drops the keyboard (2026-09-22, Miko):
+                            // the thread gets the screen; a tap on the
+                            // input brings the keyboard back. Coach only —
+                            // nothing else re-focuses on its own after
+                            // this (chips and prompts are user taps).
+                            _inputFocusNode.unfocus();
                             service.sendMessage(text);
                           },
                           onVoiceModeRequested: () => _enterVoiceMode(service),

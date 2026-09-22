@@ -3985,3 +3985,14 @@ not silent reversal.
   — that promise is a conversation, not the list. Test:
   `day_suggestions_card_test` (collapsed default, expand/collapse, empty
   renders nothing).
+
+- **2026-09-22 · Coach composer: Send drops the keyboard.** Miko's call,
+  superseding the "keep the keyboard up on send" note in today's
+  pixel-anchored-stage entry: the ask-bar still opens focused (keyboard
+  up by itself the first time), tapping Send unfocuses the input so the
+  keyboard slides down and the thread gets the screen, and nothing brings
+  it back on its own — not the reply landing, not the sheet growing; a
+  tap on the field does. Coach chat only; sheet growth unchanged. The
+  remaining programmatic focus requests are all user taps (prompt chips,
+  quick directives, "Edit plan", leaving Voice Mode for typing) and stay.
+  Test in `coach_sheet_in_flight_grow_test`.
