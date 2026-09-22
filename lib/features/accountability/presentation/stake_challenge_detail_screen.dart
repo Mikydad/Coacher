@@ -21,6 +21,7 @@ import '../application/stakes_providers.dart';
 import '../data/stakes_repository.dart';
 import '../domain/models/stake_challenge.dart';
 import '../domain/models/stake_evidence.dart';
+import '../../goals/application/goals_providers.dart';
 import '../../goals/presentation/goal_detail_screen.dart';
 import '../../profile/application/profile_providers.dart';
 import 'accountability_create_flow.dart';
@@ -231,8 +232,13 @@ class _BodyState extends ConsumerState<_Body> {
           style: TextStyle(color: AppColors.textSoft, fontSize: 13),
         ),
         // A staked goal's card lands here instead of its check-in sheet
-        // (2026-09-15), so the way back to the goal itself lives here.
-        if (c.frozenGoal.linkedGoalId?.isNotEmpty ?? false) ...[
+        // (2026-09-15). While the stake is LIVE this page is the goal's only
+        // face (2026-09-22, Miko): the goal page's "mark done" language read
+        // as the place to log, and edit/pause/complete would alter a frozen
+        // commitment — so no link out until the stake resolves. The goal's
+        // operational checklist is mirrored read-only below instead.
+        if ((c.frozenGoal.linkedGoalId?.isNotEmpty ?? false) &&
+            c.status.isTerminal) ...[
           const SizedBox(height: 4),
           Align(
             alignment: Alignment.centerLeft,
@@ -256,6 +262,9 @@ class _BodyState extends ConsumerState<_Body> {
         const SizedBox(height: 16),
         _statusBanner(),
         ..._pendingCreateSection(),
+        if ((c.frozenGoal.linkedGoalId?.isNotEmpty ?? false) &&
+            !c.status.isTerminal)
+          _LinkedGoalActions(goalId: c.frozenGoal.linkedGoalId!),
         if (_stakePhotoBytes != null || _stakePhotoLoading) ...[
           const SizedBox(height: 12),
           _stakePhotoCard(),
@@ -1535,6 +1544,74 @@ class _BodyState extends ConsumerState<_Body> {
 /// Owner-only full-size view of the staked photo (tap target of the
 /// preview card). Plain viewer — the SECURE viewer with screenshot
 /// enforcement is for circle reveals; your own photo is your business.
+/// The staked goal's operational checklist, read-only, for a live stake:
+/// the steps stay visible without opening the goal page (whose logging
+/// affordances don't apply while the stake decides progress).
+class _LinkedGoalActions extends ConsumerWidget {
+  const _LinkedGoalActions({required this.goalId});
+
+  final String goalId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final actions = ref.watch(goalActionsStreamProvider(goalId)).value ?? [];
+    if (actions.isEmpty) return const SizedBox.shrink();
+    final sorted = [...actions]
+      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader('Goal steps'),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.inkCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Column(
+              children: [
+                for (final a in sorted)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          a.completed
+                              ? Icons.check_circle_rounded
+                              : Icons.radio_button_unchecked_rounded,
+                          size: 18,
+                          color: a.completed
+                              ? AppColors.accent
+                              : AppColors.textSoft,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            a.title,
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 14,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _StakePhotoFullscreen extends StatelessWidget {
   const _StakePhotoFullscreen({required this.bytes});
 

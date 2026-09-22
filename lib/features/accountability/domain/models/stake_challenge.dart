@@ -515,6 +515,27 @@ class StakeChallenge {
       jsonEncode(list.map((p) => p.toMap()).toList());
 }
 
+/// A challenge's target is PER ACTION DAY; a goal's target is per repeat
+/// cycle. When a commitment mints its goal, convert so the goal page reads
+/// the same commitment (2026-09-22): "60 min a day" on Mon/Wed/Fri/Sat/Sun
+/// is "300 minutes (per week)", not 60. Weekly → × scheduled weekdays,
+/// monthly → × month days, daily / every-N-days → unchanged (one action
+/// day per cycle). An empty schedule never zeroes the target.
+int goalCycleTargetForChallenge({
+  required int unitTarget,
+  required String cadence,
+  int interval = 1,
+  Set<int> scheduledWeekdays = const {},
+  Set<int> repeatDaysOfMonth = const {},
+}) {
+  final actionDaysPerCycle = switch (cadence) {
+    'weekly' => scheduledWeekdays.length,
+    'monthly' => repeatDaysOfMonth.length,
+    _ => 1,
+  };
+  return unitTarget * (actionDaysPerCycle < 1 ? 1 : actionDaysPerCycle);
+}
+
 /// Pure schedule math for a PROSPECTIVE challenge (create flow): how many
 /// action days a date range + rhythm produces. Must agree with
 /// [StakeChallenge.isActionDate] — the created challenge's `totalUnits`

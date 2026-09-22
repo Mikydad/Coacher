@@ -3911,3 +3911,27 @@ not silent reversal.
   which now sets `fg12` explicitly because the theme would have made it
   primary), the goal counter's goal-tinted button, and the Apple sign-in
   button (Apple's branding rules).
+
+- **2026-09-22 · Live stake: the challenge page is the goal's only face.**
+  A staked goal's card already opened the challenge, not the goal
+  (2026-09-15), and the challenge's "View goal" link was the only door to
+  the goal page — where "0 of 1 elapsed day marked done" read as the
+  place to log, and edit/pause/complete would alter a frozen commitment.
+  Miko: hide it. `stake_challenge_detail_screen`: "View goal" shows only
+  once the challenge is terminal; while live, the goal's operational
+  checklist is mirrored read-only ("Goal steps", `_LinkedGoalActions`,
+  Isar watch) so nothing useful is lost. *Rejected:* keeping the link and
+  making the goal page stake-aware (two places to explain one rule).
+  Follow-up: the frozen goal said "60min a day · 5 days" while the live
+  goal said "60 minutes (per week)" — the minute mismatch is next.
+
+- **2026-09-22 · Stake target is per action day; the minted goal's target is
+  per cycle.** The challenge said "60min a day · 5 days", the goal it
+  minted said "60 minutes (per week)": the create flow copied the per-day
+  `unitTarget` into `UserGoal.targetValue`, which the goal page reads per
+  repeat cycle. `goalCycleTargetForChallenge` (domain, pure, tested)
+  converts at the mint — weekly × scheduled weekdays, monthly × month
+  days, daily/every-N unchanged, empty schedule never zeroes. The
+  challenge is unchanged; linking an existing goal mints nothing. Miko:
+  new goals only — goals already minted with the per-day number are left
+  for the user to edit (pre-launch data, no repair sweep).

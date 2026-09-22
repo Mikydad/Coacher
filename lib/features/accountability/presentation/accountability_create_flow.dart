@@ -2694,7 +2694,14 @@ class _AccountabilityCreateFlowState
       categoryId: GoalCategories.habits,
       status: GoalStatus.active,
       measurementKind: _measurement,
-      targetValue: _unitTarget.toDouble(),
+      // Per-day stake target → the goal's per-cycle target (2026-09-22).
+      targetValue: goalCycleTargetForChallenge(
+        unitTarget: _unitTarget,
+        cadence: _cadenceStorage,
+        interval: _interval,
+        scheduledWeekdays: _weekdays,
+        repeatDaysOfMonth: _monthDays,
+      ).toDouble(),
       // Strictness maps to intensity so analytics weighting follows it.
       intensity: switch (_mode) {
         'flexible' => 2,
