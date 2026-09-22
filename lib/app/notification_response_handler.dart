@@ -258,7 +258,6 @@ void requestCoachVoiceEntryNavigation() {
 /// identical to the Home snackbar's "Open" action, so push and fallback
 /// land in the same place.
 const _coachBriefArgs = CoachRouteArgs(
-  openSuggestionsPanel: true,
   preDraftedText: 'Give me a quick plan for today',
 );
 

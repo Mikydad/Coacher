@@ -9,7 +9,6 @@ import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../ai_assistant/application/ai_assistant_providers.dart';
-import '../../ai_assistant/presentation/ai_assistant_screen.dart';
 import '../../profile/application/profile_providers.dart';
 import '../../../core/sync/sync_service.dart';
 import '../../../core/utils/stable_id.dart';
@@ -23,6 +22,8 @@ import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
 import '../../planning/application/task_schedule_display.dart';
 import '../../analytics/application/analytics_event_logger.dart';
+import '../../analytics/application/progress_selection.dart';
+import '../../analytics/domain/progress_period.dart';
 import '../../analytics/application/analytics_period_bundle_notifier.dart';
 import '../../analytics/application/discipline_score.dart';
 import '../../analytics/application/announced_insight_store.dart';
@@ -573,19 +574,19 @@ void _maybeTriggerMorningBrief(BuildContext context, WidgetRef ref) {
         backgroundColor: AppColors.inkWarm,
         behavior: SnackBarBehavior.floating,
         content: Text(
-          'Coach AI has suggestions for today — tap to review.',
+          'Suggestions for today are ready — tap to review.',
           style: TextStyle(color: AppColors.fg),
         ),
         action: SnackBarAction(
           label: 'Open',
           textColor: AppColors.accentDim,
-          onPressed: () => showCoachAiSheet(
-            context,
-            args: const CoachRouteArgs(
-              openSuggestionsPanel: true,
-              preDraftedText: 'Give me a quick plan for today',
-            ),
-          ),
+          // Suggestions live on the Progress DAY view now (2026-09-22).
+          onPressed: () {
+            ref
+                .read(progressSelectionProvider.notifier)
+                .setHorizon(ProgressHorizon.day);
+            Navigator.of(context).pushNamed(AnalyticsProgressScreen.routeName);
+          },
         ),
         duration: const Duration(seconds: 5),
       ),

@@ -3968,3 +3968,20 @@ not silent reversal.
   the count). An empty chat keeps the open inline list, where the
   suggestions are the content. Test: compact renders no inline cards and
   the tap opens the sheet.
+
+- **2026-09-22 · Suggestions leave the coach for the Progress DAY view,
+  collapsed.** Supersedes today's earlier "little card in the coach"
+  entry (Miko: "just remove the insight in the AI chat and only put it in
+  Progress with a collapsible card"; Day view only; collapsed by
+  default). `DaySuggestionsCard` (progress/) sits under the day hero for
+  today only: one line with the count, tap to expand the same
+  `ProactiveSuggestionCard`s in place, nothing when nothing is active.
+  Removed from the coach: the panel widget and its test,
+  `CoachRouteArgs.openSuggestionsPanel`, the show rule, and the FAB's
+  suggestions dot (the blocked-plan red dot stays). Entry points
+  re-pointed: Home's morning snackbar now reads "Suggestions for today
+  are ready" and opens Progress (horizon set to day); the morning-brief
+  push still opens the coach with its pre-drafted "quick plan for today"
+  — that promise is a conversation, not the list. Test:
+  `day_suggestions_card_test` (collapsed default, expand/collapse, empty
+  renders nothing).

@@ -29,11 +29,9 @@ import 'widgets/ai_input_card.dart';
 import 'widgets/chat_bubbles.dart';
 import 'widgets/voice_mode_card.dart';
 import 'widgets/planned_changes_card.dart';
-import 'widgets/proactive_suggestions_coach_panel.dart';
 import 'widgets/quick_directives_row.dart';
 import '../../../app/application/main_tab_navigation.dart';
 import '../../../app/presentation/main_tab_bar_inset.dart';
-import '../application/proactive_suggestion_display.dart';
 
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/sync/sync_service.dart';
@@ -43,7 +41,6 @@ import '../../../core/sync/sync_service.dart';
 class CoachRouteArgs {
   const CoachRouteArgs({
     this.preDraftedText,
-    this.openSuggestionsPanel = false,
     this.proactiveSuggestionId,
     this.proactiveSuggestionType,
     this.autoSendMessage = false,
@@ -54,7 +51,6 @@ class CoachRouteArgs {
 
   /// When true, shows the full proactive suggestions list at the top of Coach
   /// (e.g. from Home "See all in Coach").
-  final bool openSuggestionsPanel;
 
   /// Proactive card the user tapped — passed into AI session context.
   final String? proactiveSuggestionId;
@@ -433,7 +429,6 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   final TextEditingController _inputController = TextEditingController();
   final FocusNode _inputFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
-  bool _openSuggestionsPanel = false;
   String? _pendingAutoSendMessage;
   ({String id, String? type})? _pendingProactiveContext;
   bool _autoSendHandled = false;
@@ -611,7 +606,6 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         DateKeys.todayKey();
     if (args is! CoachRouteArgs) return;
     setState(() {
-      _openSuggestionsPanel = args.openSuggestionsPanel;
     });
     if (args.preDraftedText != null) {
       _inputController.text = args.preDraftedText!;
@@ -1157,7 +1151,6 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     // Auto-scroll moved off the build path (§8 U3): the service listener
     // scrolls on real message events; a rebuild alone never yanks the list.
 
-    final showSuggestionsPanel = _shouldShowSuggestionsPanel();
 
     // Discoverability chrome above the thread. Rendered in the sheet too
     // (fix-wave Phase 7, §8 U2): the old `!sheetMode` gate left the
@@ -1175,16 +1168,6 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
           padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: FirstTimeFeatureCard(guideId: 'coachAi'),
         ),
-        // Expanded while the chat is empty (suggestions are the
-        // content); collapses to the slim header once a conversation
-        // is underway so the transcript gets the space.
-        if (showSuggestionsPanel)
-          ProactiveSuggestionsCoachPanel(
-            initiallyExpanded: _openSuggestionsPanel || !hasMessages,
-            // A live thread gets the little card; the list opens as a
-            // sheet (2026-09-22) instead of squeezing above the bubbles.
-            compact: hasMessages,
-          ),
       ],
       // Accidental-close recovery (fix-wave Phase 7, §8 U1/U10): within
       // 10 minutes of the sheet closing, the stashed thread can come back
@@ -1391,13 +1374,6 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         _inputFocusNode.requestFocus();
       },
     );
-  }
-
-  bool _shouldShowSuggestionsPanel() {
-    if (_openSuggestionsPanel) return true;
-    final suggestions = ref.watch(proactiveSuggestionsProvider).valueOrNull;
-    if (suggestions == null) return false;
-    return activeProactiveSuggestions(suggestions).length > 1;
   }
 
   Widget _buildLoadingBody() {
