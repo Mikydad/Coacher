@@ -179,6 +179,37 @@ class _CoachAiSheetState extends State<_CoachAiSheet> {
 
   double? _lastPeekFraction;
 
+  /// The conversation stage, pixel-anchored like the peek (2026-09-22):
+  /// [_CoachAiSheet.midSize] of the SURFACE, re-expressed against the
+  /// space left above the keyboard. A plain 0.6 fraction was 0.6 of that
+  /// leftover — 305pt with a phone keyboard up, barely taller than the
+  /// 244pt input-only peek — so the first send from the peek "grew" to a
+  /// stage that showed ~60pt of thread and read as nothing happening.
+  double? _lastMidFraction;
+  double get _midFraction => _lastMidFraction ?? _CoachAiSheet.midSize;
+
+  static double _conversationFraction(double available, double surface) {
+    if (available <= 0 || surface <= 0) return _CoachAiSheet.midSize;
+    final px = _CoachAiSheet.midSize * surface;
+    return (px / available).clamp(_CoachAiSheet.midSize, _CoachAiSheet.maxSize);
+  }
+
+  /// Keyboard toggles change the conversation FRACTION (same pixels). A
+  /// sheet sitting at the old fraction follows to the new one, so the
+  /// thread keeps its height instead of ballooning to a full page when
+  /// the keyboard closes, or shrinking under it when it opens.
+  void _repinMid(double mid) {
+    final old = _lastMidFraction;
+    _lastMidFraction = mid;
+    if (old == null || (mid - old).abs() < 0.005) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _popped || !_sheetController.isAttached) return;
+      if ((_sheetController.size - old).abs() < 0.04) {
+        _sheetController.jumpTo(mid);
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -220,7 +251,7 @@ class _CoachAiSheetState extends State<_CoachAiSheet> {
         return;
       }
       if (_sheetController.size <= _CoachAiSheet.minSize + 0.005) return;
-      if (_sheetController.size < _CoachAiSheet.midSize - 0.05) {
+      if (_sheetController.size < _midFraction - 0.05) {
         if (!grow) {
           if (attempt < 30) {
             _settleConversationStage(grow: false, attempt: attempt + 1);
@@ -228,13 +259,13 @@ class _CoachAiSheetState extends State<_CoachAiSheet> {
           return;
         }
         await _sheetController.animateTo(
-          _CoachAiSheet.midSize,
+          _midFraction,
           duration: const Duration(milliseconds: 260),
           curve: Curves.easeOutCubic,
         );
         if (!mounted || _popped || !_sheetController.isAttached) return;
       }
-      if (_sheetController.size >= _CoachAiSheet.midSize - 0.05) {
+      if (_sheetController.size >= _midFraction - 0.05) {
         _peekRetired.value = true;
       }
     });
@@ -281,14 +312,19 @@ class _CoachAiSheetState extends State<_CoachAiSheet> {
               ? _CoachAiSheet
                     .maxSize // pathological; let content flex
               : (_peekPx / available).clamp(_CoachAiSheet.peekSize, 0.5);
+          final mid = _conversationFraction(
+            available,
+            MediaQuery.sizeOf(context).height,
+          );
           _repinPeek(peek);
-          return _buildSheet(context, peek);
+          _repinMid(mid);
+          return _buildSheet(context, peek, mid);
         },
       ),
     );
   }
 
-  Widget _buildSheet(BuildContext context, double peek) {
+  Widget _buildSheet(BuildContext context, double peek, double mid) {
     return NotificationListener<DraggableScrollableNotification>(
       onNotification: (n) {
         if (n.extent <= n.minExtent + 0.005) _popOnce();
@@ -299,14 +335,12 @@ class _CoachAiSheetState extends State<_CoachAiSheet> {
         builder: (context, peekRetired, _) => DraggableScrollableSheet(
           controller: _sheetController,
           expand: false,
-          initialChildSize: widget.askBar ? peek : _CoachAiSheet.midSize,
+          initialChildSize: widget.askBar ? peek : mid,
           minChildSize: _CoachAiSheet.minSize,
           maxChildSize: _CoachAiSheet.maxSize,
           snap: true,
           // The peek is a stage only while the thread is empty.
-          snapSizes: peekRetired
-              ? const [_CoachAiSheet.midSize]
-              : [peek, _CoachAiSheet.midSize],
+          snapSizes: peekRetired ? [mid] : [peek, mid],
           builder: (context, scrollController) => _sheetChild(scrollController),
         ),
       ),
@@ -333,6 +367,7 @@ class _CoachAiSheetState extends State<_CoachAiSheet> {
         sheetMode: true,
         autofocusInput: widget.askBar,
         sheetPeekFraction: _lastPeekFraction ?? _CoachAiSheet.peekSize,
+        sheetMidFraction: _midFraction,
         sheetScrollController: scrollController,
         sheetController: _sheetController,
         sheetThreadNotifier: _threadHasMessages,
@@ -348,6 +383,7 @@ class AiAssistantScreen extends ConsumerStatefulWidget {
     this.sheetMode = false,
     this.autofocusInput = false,
     this.sheetPeekFraction,
+    this.sheetMidFraction,
     this.sheetScrollController,
     this.sheetController,
     this.sheetThreadNotifier,
@@ -367,6 +403,10 @@ class AiAssistantScreen extends ConsumerStatefulWidget {
   /// The CURRENT peek fraction (pixel-anchored, so it changes with the
   /// keyboard). Stage-snapping in the grabber uses this, not a constant.
   final double? sheetPeekFraction;
+
+  /// The conversation stage as a fraction of the sheet's current space
+  /// (pixel-anchored by the sheet; see `_CoachAiSheetState._midFraction`).
+  final double? sheetMidFraction;
 
   /// The [DraggableScrollableSheet]-provided controller (sheet mode only).
   final ScrollController? sheetScrollController;
@@ -444,9 +484,9 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       });
       return;
     }
-    if (sheet.size < _CoachAiSheet.midSize - 0.05) {
+    if (sheet.size < _mid - 0.05) {
       await sheet.animateTo(
-        _CoachAiSheet.midSize,
+        _mid,
         duration: const Duration(milliseconds: 260),
         curve: Curves.easeOutCubic,
       );
@@ -468,7 +508,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       if (sheet.size >= _CoachAiSheet.maxSize - 0.05) return; // already full
       // The user dragged down while we animated — their position wins
       // until the next message event.
-      if (sheet.size < _CoachAiSheet.midSize - 0.06) return;
+      if (sheet.size < _mid - 0.06) return;
       final scroll = _activeScrollController;
       if (scroll.hasClients &&
           // Small tolerance: a few overflowing pixels aren't "a long chat".
@@ -484,6 +524,8 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       if (attempt < 4) _expandToFullIfOverflowing(attempt + 1);
     });
   }
+
+  double get _mid => widget.sheetMidFraction ?? _CoachAiSheet.midSize;
 
   AiAssistantService? _listenedService;
   int _seenMessageCount = 0;
@@ -776,7 +818,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     final sheet = widget.sheetController;
     if (sheet != null && sheet.isAttached) {
       sheet.animateTo(
-        _CoachAiSheet.midSize,
+        _mid,
         duration: const Duration(milliseconds: 260),
         curve: Curves.easeOutCubic,
       );
@@ -1016,7 +1058,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                 return;
               }
               final peek = widget.sheetPeekFraction ?? _CoachAiSheet.peekSize;
-              const mid = _CoachAiSheet.midSize;
+              final mid = _mid;
               const full = _CoachAiSheet.maxSize;
               final size = sheet.size;
               // A live conversation never settles on the peek.

@@ -3935,3 +3935,23 @@ not silent reversal.
   challenge is unchanged; linking an existing goal mints nothing. Miko:
   new goals only — goals already minted with the per-day number are left
   for the user to edit (pre-launch data, no repair sweep).
+
+- **2026-09-22 · Coach sheet: the conversation stage is pixel-anchored,
+  like the peek.** Miko, on device: sending the first message from the
+  ask-bar peek showed nothing until the reply landed. Reproduced in a
+  widget test with a simulated keyboard: the sheet DID grow to its "60%"
+  stage, but 60% of the space left above a phone keyboard is 305pt against
+  a 244pt input-only peek — ~60pt of thread, invisible in practice. The
+  peek had already solved this for itself by anchoring to pixels
+  (2026-07-16); the conversation stage now does the same:
+  `_conversationFraction` = 0.6 of the SURFACE re-expressed against the
+  available space (→ ~1.0 with a keyboard up, 0.6 without), threaded to
+  the screen as `sheetMidFraction` and used by every grow/snap/settle
+  path; `_repinMid` keeps a sheet sitting at the stage on the same pixel
+  height when the keyboard toggles (no balloon to full page on close, no
+  shrink on open). Regression test:
+  `coach_sheet_in_flight_grow_test` (gated client keeps the turn in
+  flight; with and without keyboard the user bubble + thinking dots must
+  be visible and the sheet must leave the peek). *Rejected:* dismissing
+  the keyboard on send (the user may want to type again) and jumping to
+  full page on send (the 2026-07-17 "fits 60% → 60%" rule still holds).
