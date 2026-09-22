@@ -14,8 +14,7 @@ class _NoOpDismissedRepo implements DismissedSuggestionRepository {
   Future<int> countDismissals(
     ProactiveSuggestionType type, {
     int withinDays = 7,
-  }) async =>
-      0;
+  }) async => 0;
 
   @override
   Future<Set<ProactiveSuggestionType>> suppressedTypes() async => {};
@@ -53,8 +52,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          dismissedSuggestionRepositoryProvider
-              .overrideWithValue(_NoOpDismissedRepo()),
+          dismissedSuggestionRepositoryProvider.overrideWithValue(
+            _NoOpDismissedRepo(),
+          ),
           proactiveSuggestionsProvider.overrideWith((ref) async => suggestions),
         ],
         child: const MaterialApp(
@@ -71,8 +71,56 @@ void main() {
   });
 
   testWidgets(
-      'collapsed panel shows only the header; tapping it expands the cards',
-      (tester) async {
+    'collapsed panel shows only the header; tapping it expands the cards',
+    (tester) async {
+      final suggestions = [
+        ProactiveSuggestion(
+          id: 'a',
+          type: ProactiveSuggestionType.scheduleGap,
+          title: 'Gap A',
+          description: 'Desc A',
+          preDraftedInput: 'input A',
+          confidence: 0.9,
+          generatedAt: DateTime(2026, 7, 6),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dismissedSuggestionRepositoryProvider.overrideWithValue(
+              _NoOpDismissedRepo(),
+            ),
+            proactiveSuggestionsProvider.overrideWith(
+              (ref) async => suggestions,
+            ),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: ProactiveSuggestionsCoachPanel(initiallyExpanded: false),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Collapsed: header row only, no cards.
+      expect(find.text('SUGGESTIONS FOR TODAY'), findsOneWidget);
+      expect(find.text('Gap A'), findsNothing);
+
+      await tester.tap(find.text('SUGGESTIONS FOR TODAY'));
+      await tester.pumpAndSettle();
+      expect(find.text('Gap A'), findsOneWidget);
+
+      // And collapses again on a second tap.
+      await tester.tap(find.text('SUGGESTIONS FOR TODAY'));
+      await tester.pumpAndSettle();
+      expect(find.text('Gap A'), findsNothing);
+    },
+  );
+
+  testWidgets('compact (conversation underway): a little card, no inline list; '
+      'tapping opens the list as a sheet', (tester) async {
     final suggestions = [
       ProactiveSuggestion(
         id: 'a',
@@ -81,37 +129,53 @@ void main() {
         description: 'Desc A',
         preDraftedInput: 'input A',
         confidence: 0.9,
-        generatedAt: DateTime(2026, 7, 6),
+        generatedAt: DateTime(2026, 5, 23),
+      ),
+      ProactiveSuggestion(
+        id: 'b',
+        type: ProactiveSuggestionType.goalBehindPace,
+        title: 'Gap B',
+        description: 'Desc B',
+        preDraftedInput: 'input B',
+        confidence: 0.8,
+        generatedAt: DateTime(2026, 5, 23),
       ),
     ];
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          dismissedSuggestionRepositoryProvider
-              .overrideWithValue(_NoOpDismissedRepo()),
+          dismissedSuggestionRepositoryProvider.overrideWithValue(
+            _NoOpDismissedRepo(),
+          ),
           proactiveSuggestionsProvider.overrideWith((ref) async => suggestions),
         ],
         child: const MaterialApp(
           home: Scaffold(
-            body: ProactiveSuggestionsCoachPanel(initiallyExpanded: false),
+            body: ProactiveSuggestionsCoachPanel(
+              initiallyExpanded: false,
+              compact: true,
+            ),
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    // Collapsed: header row only, no cards.
-    expect(find.text('SUGGESTIONS FOR TODAY'), findsOneWidget);
+    // The little card, and nothing inline.
+    expect(
+      find.byKey(const ValueKey('coach_suggestions_compact_card')),
+      findsOneWidget,
+    );
+    expect(find.text('2'), findsOneWidget);
     expect(find.text('Gap A'), findsNothing);
+    expect(find.text('Gap B'), findsNothing);
 
     await tester.tap(find.text('SUGGESTIONS FOR TODAY'));
     await tester.pumpAndSettle();
+
+    // The list opened as its own sheet.
     expect(find.text('Gap A'), findsOneWidget);
-
-    // And collapses again on a second tap.
-    await tester.tap(find.text('SUGGESTIONS FOR TODAY'));
-    await tester.pumpAndSettle();
-    expect(find.text('Gap A'), findsNothing);
+    expect(find.text('Gap B'), findsOneWidget);
   });
 }

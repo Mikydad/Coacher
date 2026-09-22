@@ -9,19 +9,26 @@ import 'proactive_suggestion_card.dart';
 import '../../../../core/presentation/app_colors.dart';
 import '../../../../core/presentation/async_value_ui.dart';
 
-/// Collapsible list of proactive suggestions at the top of the Coach screen.
+/// Proactive suggestions at the top of the Coach screen.
 ///
-/// Starts expanded when [initiallyExpanded] (the chat is empty, so the
-/// suggestions ARE the content) and collapses to a single header row once a
-/// conversation is underway — the transcript gets the space back. Tapping the
-/// header toggles it any time.
+/// Empty chat: the suggestions ARE the content — an expandable list, open
+/// by default ([initiallyExpanded]). Conversation underway ([compact],
+/// 2026-09-22, Miko): a small card only, never an inline list — the list
+/// and the thread fought for the sheet's height and the cards were
+/// clipped. Tapping the card (or the "see all in Coach" intent) opens the
+/// list as its own sheet over the coach.
 class ProactiveSuggestionsCoachPanel extends ConsumerStatefulWidget {
   const ProactiveSuggestionsCoachPanel({
     super.key,
     this.initiallyExpanded = true,
+    this.compact = false,
   });
 
   final bool initiallyExpanded;
+
+  /// True once the thread has messages: render the little card and open
+  /// the list in a sheet instead of expanding inline.
+  final bool compact;
 
   @override
   ConsumerState<ProactiveSuggestionsCoachPanel> createState() =>
@@ -34,6 +41,13 @@ class _ProactiveSuggestionsCoachPanelState
   static Color get _kVariant => AppColors.textSoft;
 
   late bool _expanded = widget.initiallyExpanded;
+  bool _sheetOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _honourOpenIntent();
+  }
 
   @override
   void didUpdateWidget(ProactiveSuggestionsCoachPanel oldWidget) {
@@ -42,6 +56,26 @@ class _ProactiveSuggestionsCoachPanelState
     // Coach" → expand) while still letting the user toggle manually.
     if (oldWidget.initiallyExpanded != widget.initiallyExpanded) {
       _expanded = widget.initiallyExpanded;
+      _honourOpenIntent();
+    }
+  }
+
+  /// "See all in Coach" while a conversation is underway: the list opens
+  /// as a sheet (never inline). After the frame — this runs from build.
+  void _honourOpenIntent() {
+    if (!widget.compact || !widget.initiallyExpanded) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openSheet();
+    });
+  }
+
+  Future<void> _openSheet() async {
+    if (_sheetOpen) return;
+    _sheetOpen = true;
+    try {
+      await showProactiveSuggestionsSheet(context);
+    } finally {
+      _sheetOpen = false;
     }
   }
 
@@ -59,6 +93,8 @@ class _ProactiveSuggestionsCoachPanelState
       data: (all) {
         final active = activeProactiveSuggestions(all);
         if (active.isEmpty) return const SizedBox.shrink();
+
+        if (widget.compact) return _compactCard(active.length);
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(0, 8, 0, 4),
@@ -139,6 +175,151 @@ class _ProactiveSuggestionsCoachPanelState
           ),
         );
       },
+    );
+  }
+
+  /// The little card a live conversation shows instead of the list.
+  Widget _compactCard(int count) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+      child: Material(
+        color: AppColors.inkCard,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          key: const ValueKey('coach_suggestions_compact_card'),
+          borderRadius: BorderRadius.circular(14),
+          onTap: _openSheet,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.auto_awesome_rounded, size: 16, color: _kAccent),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'SUGGESTIONS FOR TODAY',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.9,
+                      color: _kVariant,
+                    ),
+                  ),
+                ),
+                Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _kAccent,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(Icons.chevron_right_rounded, size: 18, color: _kVariant),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The suggestions list as its own sheet over the coach (a live thread
+/// never hosts it inline). Watches the provider so a dismissal inside the
+/// sheet updates the list — and the compact card's count — at once.
+Future<void> showProactiveSuggestionsSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => const _SuggestionsListSheet(),
+  );
+}
+
+class _SuggestionsListSheet extends ConsumerWidget {
+  const _SuggestionsListSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final active = ref
+        .watch(proactiveSuggestionsProvider)
+        .maybeWhen(data: activeProactiveSuggestions, orElse: () => const []);
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.55,
+      minChildSize: 0.3,
+      maxChildSize: 0.92,
+      builder: (context, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: AppColors.scaffold,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.textSoft.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+              child: Row(
+                children: [
+                  Text(
+                    'SUGGESTIONS FOR TODAY',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.9,
+                      color: AppColors.textSoft,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${active.length}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.accentDim,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: active.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Nothing left for today.',
+                        style: TextStyle(color: AppColors.textSoft),
+                      ),
+                    )
+                  : ListView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.only(bottom: 24),
+                      children: [
+                        for (final s in active)
+                          ProactiveSuggestionCard(
+                            key: ValueKey('coach_sheet_${s.id}'),
+                            suggestion: s,
+                            onDismiss: () {},
+                          ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

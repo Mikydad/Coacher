@@ -1181,6 +1181,9 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         if (showSuggestionsPanel)
           ProactiveSuggestionsCoachPanel(
             initiallyExpanded: _openSuggestionsPanel || !hasMessages,
+            // A live thread gets the little card; the list opens as a
+            // sheet (2026-09-22) instead of squeezing above the bubbles.
+            compact: hasMessages,
           ),
       ],
       // Accidental-close recovery (fix-wave Phase 7, §8 U1/U10): within

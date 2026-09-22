@@ -3955,3 +3955,16 @@ not silent reversal.
   be visible and the sheet must leave the peek). *Rejected:* dismissing
   the keyboard on send (the user may want to type again) and jumping to
   full page on send (the 2026-07-17 "fits 60% → 60%" rule still holds).
+
+- **2026-09-22 · Coach suggestions: a live thread gets a little card, never
+  the inline list.** Miko, on device: with a conversation underway the
+  "Suggestions for today" list sat above the bubbles, clipped, fighting
+  the thread for the sheet's height. Option A of three (Home-only and
+  Home+coach were the others): `ProactiveSuggestionsCoachPanel(compact:
+  hasMessages)` renders a tappable card (title, count, chevron) whenever
+  the thread has messages; tapping it — or Home's "see all in Coach"
+  intent — opens the list as its own sheet over the coach
+  (`showProactiveSuggestionsSheet`, provider-watched so dismissals update
+  the count). An empty chat keeps the open inline list, where the
+  suggestions are the content. Test: compact renders no inline cards and
+  the tap opens the sheet.
