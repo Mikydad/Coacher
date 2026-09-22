@@ -1,23 +1,54 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'notification_response_handler.dart';
-import '../core/sync/sync_service.dart';
-
+import '../core/bootstrap/first_screen_ready.dart';
 import '../core/presentation/app_colors.dart';
+import '../core/sync/sync_service.dart';
+import '../features/auth/application/auth_session_policy.dart';
+import 'notification_response_handler.dart';
 
-/// Set to `true` after the first successful [SyncService.syncFromRemote] seed (PRD §4.6).
+/// Set to `true` once a first-launch seed pull has fully succeeded (PRD
+/// §4.6) — or at once for an account created on this device, which has
+/// nothing to pull. [AuthSessionPolicy.clearLocalSession] removes it, so a
+/// uid change leads to exactly one new seed.
 const String kIsarSeededV1PrefsKey = 'isar_seeded_v1';
 
-/// On first install / pre-migration, blocks on a one-time Firestore → Isar pull so the UI is not empty.
+/// Longest the gate holds the app for a seed (2026-09-22): network speed
+/// no longer decides perceived startup. Most launches reveal earlier, when
+/// the pull's critical phases land.
+const Duration kFirstLaunchRevealCap = Duration(seconds: 5);
+
+/// A seed a test can substitute for [SyncService.syncFromRemote]: resolves
+/// with the pull's success and may complete `firstScreenReady` early.
+typedef FirstLaunchSeed =
+    Future<bool> Function(Completer<void> firstScreenReady);
+
+/// First-launch seed gate — the ONE owner of the Firestore → Isar seed.
 ///
-/// If the pull throws (e.g. offline), shows [child] anyway and retries in the background without setting the flag.
+/// Reveals the app on the first of:
+///  * the seeded flag is already set (every later launch);
+///  * the signed-in account was created on this device moments ago
+///    ([AuthSessionPolicy.consumeAccountCreated], with the metadata
+///    fallback) — a brand-new uid has no remote data, so twenty empty
+///    queries are skipped;
+///  * the seed pull's critical phases have merged (what Home paints first);
+///  * [kFirstLaunchRevealCap].
+///
+/// The pull keeps running behind the live UI — Isar watch streams fill the
+/// screens as rows land — and the seeded flag is written only when the pull
+/// succeeds, so a failed seed is simply tried again on the next launch.
 class FirstLaunchGate extends StatefulWidget {
   const FirstLaunchGate({super.key, required this.child});
 
   final Widget child;
+
+  /// Widget tests: replaces the SyncService pull.
+  @visibleForTesting
+  static FirstLaunchSeed? debugSeedForTests;
 
   @override
   State<FirstLaunchGate> createState() => _FirstLaunchGateState();
@@ -25,24 +56,7 @@ class FirstLaunchGate extends StatefulWidget {
 
 class _FirstLaunchGateState extends State<FirstLaunchGate> {
   var _ready = false;
-
-  void _markReadyAndFlushIntent() {
-    if (!mounted) return;
-    setState(() => _ready = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      flushPendingNotificationNavigationIntent();
-    });
-  }
-
-  Future<void> _retrySeedInBackground() async {
-    try {
-      await SyncService.instance.syncFromRemote(force: true);
-      final p = await SharedPreferences.getInstance();
-      await p.setBool(kIsarSeededV1PrefsKey, true);
-    } catch (e2, st2) {
-      debugPrint('FirstLaunchGate: background seed retry failed: $e2\n$st2');
-    }
-  }
+  Timer? _capTimer;
 
   @override
   void initState() {
@@ -50,25 +64,91 @@ class _FirstLaunchGateState extends State<FirstLaunchGate> {
     unawaited(_bootstrap());
   }
 
+  @override
+  void dispose() {
+    _capTimer?.cancel();
+    super.dispose();
+  }
+
+  void _reveal(String reason, Stopwatch since) {
+    FirstScreenReady.mark('$reason (${since.elapsedMilliseconds}ms)');
+    if (!mounted) return;
+    setState(() => _ready = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      flushPendingNotificationNavigationIntent();
+    });
+  }
+
   Future<void> _bootstrap() async {
+    final since = Stopwatch()..start();
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
     if (prefs.getBool(kIsarSeededV1PrefsKey) == true) {
-      _markReadyAndFlushIntent();
+      _reveal('already seeded', since);
       return;
     }
 
-    try {
-      await SyncService.instance.syncFromRemote(force: true);
+    if (await _isFreshAccount()) {
       await prefs.setBool(kIsarSeededV1PrefsKey, true);
-    } catch (e, st) {
-      debugPrint(
-        'FirstLaunchGate: initial seed failed (showing app anyway): $e\n$st',
-      );
-      unawaited(_retrySeedInBackground());
+      _reveal('fresh account, nothing to pull', since);
+      return;
     }
 
-    _markReadyAndFlushIntent();
+    final firstScreen = Completer<void>();
+    final pull = _seed(firstScreen);
+    // Belt and braces: a pull that ends (success, failure, skip) releases
+    // the gate even if nothing signalled the critical phases.
+    unawaited(
+      pull.whenComplete(() {
+        if (!firstScreen.isCompleted) firstScreen.complete();
+      }),
+    );
+
+    final reveal = Completer<String>();
+    _capTimer = Timer(kFirstLaunchRevealCap, () {
+      if (!reveal.isCompleted) reveal.complete('reveal cap');
+    });
+    unawaited(
+      firstScreen.future.then((_) {
+        if (!reveal.isCompleted) reveal.complete('critical phases merged');
+      }),
+    );
+    final reason = await reveal.future;
+    _capTimer?.cancel();
+    _reveal(reason, since);
+
+    // Honest flag: only a pull that finished counts as seeded.
+    var ok = false;
+    try {
+      ok = await pull;
+    } catch (e, st) {
+      debugPrint('FirstLaunchGate: seed pull threw: $e\n$st');
+    }
+    if (ok) await prefs.setBool(kIsarSeededV1PrefsKey, true);
+  }
+
+  Future<bool> _seed(Completer<void> firstScreen) {
+    final override = FirstLaunchGate.debugSeedForTests;
+    if (override != null) return override(firstScreen);
+    return SyncService.instance.syncFromRemote(
+      force: true,
+      firstScreenReady: firstScreen,
+    );
+  }
+
+  /// An account created on this device moments ago: the sign-in marked it
+  /// (`isNewUser`), or — for paths that don't surface that — Firebase's
+  /// creation and last-sign-in stamps coincide.
+  Future<bool> _isFreshAccount() async {
+    final uid = SyncService.currentUid();
+    if (uid == null) return false;
+    if (await AuthSessionPolicy.consumeAccountCreated(uid)) return true;
+    if (Firebase.apps.isEmpty) return false;
+    final meta = FirebaseAuth.instance.currentUser?.metadata;
+    return AuthSessionPolicy.looksFreshlyCreated(
+      creationTime: meta?.creationTime,
+      lastSignInTime: meta?.lastSignInTime,
+    );
   }
 
   @override

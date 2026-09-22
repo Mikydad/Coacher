@@ -37,6 +37,13 @@ const bool kRequireRegisteredAuth = bool.fromEnvironment(
 
 const String kLastSignedInUidPrefsKey = 'last_signed_in_uid';
 
+/// Set by [AuthRepository] the moment a sign-in CREATES a Firebase account
+/// (`additionalUserInfo.isNewUser`); holds that uid. The first-launch gate
+/// consumes it: a uid minted seconds ago has no remote data, so the seed
+/// pull is skipped and the app reveals at once (2026-09-22). Keyed by uid
+/// so a stale marker can never apply to another account.
+const String kAccountCreatedUidPrefsKey = 'account_created_uid_v1';
+
 // ── Policy ────────────────────────────────────────────────────────────────────
 
 /// Static helpers that manage the local-session lifecycle:
@@ -67,6 +74,38 @@ abstract final class AuthSessionPolicy {
     final stored = await getLastSignedInUid();
     if (stored == null) return false; // first install — no prior uid
     return stored != newUid;
+  }
+
+  // ── Fresh account (nothing to pull) ──────────────────────────────────────────
+
+  static Future<void> markAccountCreated(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(kAccountCreatedUidPrefsKey, uid);
+  }
+
+  /// True — and clears the marker — when [uid] is the account the last
+  /// sign-in created. A marker for a different uid is dropped as stale.
+  static Future<bool> consumeAccountCreated(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    final marked = prefs.getString(kAccountCreatedUidPrefsKey);
+    if (marked == null) return false;
+    await prefs.remove(kAccountCreatedUidPrefsKey);
+    return marked == uid;
+  }
+
+  /// Fallback for sign-in paths that don't surface `isNewUser`: Firebase
+  /// stamps creation and last-sign-in at the same instant for a brand-new
+  /// account, and a later sign-in on another device moves only the second.
+  /// An anonymous session restored from the iOS keychain after a reinstall
+  /// also matches — its old data then arrives through the background pull
+  /// a few seconds after reveal instead of before it (accepted 2026-09-22).
+  static bool looksFreshlyCreated({
+    required DateTime? creationTime,
+    required DateTime? lastSignInTime,
+    Duration tolerance = const Duration(seconds: 2),
+  }) {
+    if (creationTime == null || lastSignInTime == null) return false;
+    return lastSignInTime.difference(creationTime).abs() <= tolerance;
   }
 
   // ── Wipe ─────────────────────────────────────────────────────────────────────

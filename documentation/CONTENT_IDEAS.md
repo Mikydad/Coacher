@@ -109,6 +109,43 @@ bites anyone using dart:ffi packages in archived builds).
 
 ---
 
+## 2026-09-22 · "Loading your plan… for a full minute"
+
+**Hook:** "The app's first screen took up to a minute to appear. The data it
+was waiting for didn't exist."
+
+**What happened:** Testers reported that the first launch, guest or a fresh
+sign-in, sat on "Loading your plan…" for ages. The gate behind that spinner
+waited for a full Firestore → local reconcile: about twenty collections,
+queried one after another, with a 60-second ceiling. On a slow connection
+each round trip is seconds, so twenty of them IS the minute. And for a
+brand-new guest account the answer to every one of those queries was
+"nothing here": a uid minted two seconds earlier has no data to pull.
+Switching from guest to an existing account ran the whole thing twice, back
+to back.
+
+**The turn:** Reading the code as a timeline instead of as features. Every
+piece had a good reason (tombstones first, cursors, a timeout so the app
+can't hang forever), but nobody had added up the wait. Once the spinner was
+a sum of round trips, the fix wrote itself: skip the pull for accounts that
+were just created, reveal the app as soon as the first screen's data has
+landed (or after five seconds, whichever comes first), run the rest of the
+sync in parallel behind the live UI, and hold the other startup chores
+(push registration, streak checks) until the user can already see
+something. A "cancel" that couldn't cancel, the timeout threw and the sync
+kept running, got a real checkpoint too.
+
+**Takeaway:** Perceived startup should never be a function of network
+speed. Local-first means the screen comes from the device; the network
+fills in behind it. And when a loading screen is slow, count the round
+trips before you optimise any single one.
+
+**Formats:** a short before/after screen recording on a throttled
+connection; a thread on "why your loading screen is a sum, not a max"; a
+Flutter post on cooperative cancellation of long async pipelines.
+
+---
+
 ## Backlog of earlier beats (expand when needed)
 
 - 2026-09-12 · Moving the app from a personal Apple account to the LLC's

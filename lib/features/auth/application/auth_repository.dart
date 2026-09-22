@@ -6,6 +6,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../../core/config/google_auth_config.dart';
 import '../domain/auth_failure.dart';
 import 'apple_auth_nonce.dart';
+import 'auth_session_policy.dart';
 import 'auth_repository_interface.dart';
 
 /// Wraps [FirebaseAuth] and maps all exceptions to typed [AuthFailure] values.
@@ -62,6 +63,7 @@ class AuthRepository implements AuthRepositoryInterface {
   Future<(AuthFailure?, User?)> signInAnonymously() async {
     try {
       final result = await _auth.signInAnonymously();
+      await _noteNewAccount(result);
       debugPrint('[Auth] signInAnonymously uid=${_shortUid(result.user?.uid)}');
       return (null, result.user);
     } on FirebaseAuthException catch (e) {
@@ -138,6 +140,7 @@ class AuthRepository implements AuthRepositoryInterface {
         result = await _auth.signInWithCredential(credential);
         _lastSignInUsedExistingAccount =
             result.additionalUserInfo?.isNewUser == false;
+        await _noteNewAccount(result);
         debugPrint(
           '[Auth] signInWithGoogle uid=${_shortUid(result.user?.uid)} '
           'existingAccount=$_lastSignInUsedExistingAccount',
@@ -230,6 +233,7 @@ class AuthRepository implements AuthRepositoryInterface {
         result = await _auth.signInWithCredential(credential);
         _lastSignInUsedExistingAccount =
             result.additionalUserInfo?.isNewUser == false;
+        await _noteNewAccount(result);
         debugPrint(
           '[Auth] signInWithApple uid=${_shortUid(result.user?.uid)} '
           'existingAccount=$_lastSignInUsedExistingAccount',
@@ -305,6 +309,7 @@ class AuthRepository implements AuthRepositoryInterface {
         password: password,
       );
       _lastSignInUsedExistingAccount = false;
+      await _noteNewAccount(result);
       if (displayName != null && displayName.isNotEmpty) {
         await result.user?.updateDisplayName(displayName.trim());
       }
@@ -560,6 +565,21 @@ class AuthRepository implements AuthRepositoryInterface {
       _pendingLinkConflictCredential = null;
       debugPrint('[Auth] pending-conflict sign-in failed: code=${e.code}');
       return (_mapException(e), null);
+    }
+  }
+
+  // ── Fresh account marker ──────────────────────────────────────────────────────
+
+  /// A sign-in that CREATED the account has nothing to pull yet: the
+  /// first-launch gate skips the seed for it (2026-09-22). Best-effort —
+  /// the gate has a metadata fallback and, failing that, a capped pull.
+  Future<void> _noteNewAccount(UserCredential result) async {
+    final uid = result.user?.uid;
+    if (uid == null || result.additionalUserInfo?.isNewUser != true) return;
+    try {
+      await AuthSessionPolicy.markAccountCreated(uid);
+    } catch (e) {
+      debugPrint('[Auth] markAccountCreated failed: $e');
     }
   }
 

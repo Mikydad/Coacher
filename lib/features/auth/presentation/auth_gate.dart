@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/application/main_tab_navigation.dart';
-import '../../../core/sync/sync_service.dart';
 import '../../community/application/community_bridge_coordinator.dart';
 import '../../profile/application/profile_providers.dart';
 import '../application/auth_providers.dart';
@@ -28,7 +27,10 @@ import '../../../core/presentation/app_colors.dart';
 ///
 /// When a user signs in, [AuthGate] also:
 /// 1. Detects uid changes and wipes local state before showing the app.
-/// 2. Runs a forced remote sync after a uid change.
+/// 2. Leaves the seed pull to [FirstLaunchGate]: the wipe removes the
+///    seeded flag, so the remounted gate runs exactly one capped seed
+///    (2026-09-22 — before this the gate and this handler each ran a full
+///    reconcile back to back, up to two minutes on a slow link).
 /// 3. Always persists the current uid for future uid-change detection.
 class AuthGate extends ConsumerStatefulWidget {
   const AuthGate({super.key, required this.child});
@@ -81,7 +83,6 @@ class _AuthGateState extends ConsumerState<AuthGate> {
         if (container != null) {
           CommunityBridgeCoordinator.instance.restart(container);
         }
-        await SyncService.instance.syncFromRemote(force: true);
       } finally {
         if (mounted) setState(() => _handlingUidChange = false);
       }

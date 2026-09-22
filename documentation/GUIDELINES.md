@@ -3835,3 +3835,51 @@ not silent reversal.
   is sized to its content, and the tab strip is opaque. (5) Discover
   circles gets the same "+ Circle" FAB as the tab. (6) The profile stats
   card opens Progress.
+
+- **2026-09-22 · First launch: the seed gate holds five seconds at most,
+  the pull runs in waves, a new account skips it.** "Loading your plan…"
+  took up to a minute on a first sign-in or guest start. `FirstLaunchGate`
+  awaited `syncFromRemote(force: true)` — a cursor-less `RemoteIsarMerge`
+  of ~20 Firestore round trips run one after another under a 60 s cap —
+  even for a uid minted seconds earlier with nothing to pull, and twice on
+  a guest → existing-account switch (AuthGate's wipe pull, then the
+  remounted gate's). Now: (1) the gate reveals on the first of already
+  seeded / account created on this device / critical phases merged / a
+  5 s cap (`kFirstLaunchRevealCap`), and writes `isar_seeded_v1` only for
+  a pull that succeeded; the pull keeps running behind the live UI and the
+  Isar watches fill the screens. (2) The merge runs tombstones, then a
+  critical wave (routines + tasks, active goals with their subcollections,
+  reminders, analytics stats) that completes `firstScreenReady`, then
+  everything else — the phases of a wave concurrent, per-parent fan-outs
+  capped at `fanOutLimit` (6) in flight. (3) "Account created on this
+  device" is `additionalUserInfo.isNewUser` captured in `AuthRepository`
+  (`account_created_uid_v1`, uid-keyed, consumed once by the gate), with
+  Firebase's creation ≈ last-sign-in stamps as the fallback; a keychain-
+  restored anonymous session matches the fallback and its old data lands
+  through the background pull seconds after reveal (accepted). (4)
+  AuthGate's uid-change handler keeps the blocking wipe and drops its own
+  pull — one seed owner, one code path. (5) The 60 s timeout now calls
+  `RemoteIsarMerge.cancel()`, cooperative on purpose: later phases,
+  fan-out items and Isar writes stop at the next checkpoint; a Firestore
+  query already in flight cannot be recalled, it finishes and is dropped.
+  Before this the abandoned merge kept spending the link after the gate
+  moved on. (6) After a failed full pull the daily promotion backs off
+  `fullPullRetryBackoff` (5 min); `force` callers and the Home button's
+  light path are unaffected — the button stays the 2026-09-19 light pull.
+  (7) `completeDeferred` holds its non-essential tail (push registration,
+  circle streaks, memory extraction, thinking loop, per-user maintenance)
+  on `FirstScreenReady`, released the moment the gate reveals, 20 s
+  ceiling for boots where the gate never mounts. (8) `[sync]` per-phase
+  timing breadcrumbs and a `[boot] first screen ready` line, `print` so
+  they survive release. *Rejected:* keeping AuthGate's pull and deduping
+  the gate's (two owners coordinating); blocking on analytics events (the
+  history streams in, the progress ring may tick up after reveal);
+  waiting for the whole background pull before releasing the deferred
+  tail. Failure story: an offline existing account on a fresh install
+  gets Firestore's empty cache and an instant reveal, cursors at 0 fill
+  in when the link returns; a timed-out seed reveals at the cap, stops
+  at its next checkpoint, and retries on the next trigger without thrash.
+  Tests: `first_launch_gate_test` (reveal reasons, honest flag),
+  `remote_isar_merge_waves_test` (first-screen ordering, cancel, teardown
+  abort), `sync_service_remote_test` (signal forwarding, backoff),
+  `auth_session_policy_fresh_account_test`, `first_screen_ready_test`.

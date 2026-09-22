@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -71,6 +73,14 @@ String _docFieldId(
   return doc.id;
 }
 
+/// Thrown at a checkpoint once [RemoteIsarMerge.cancel] has been called:
+/// later phases, fan-out items and Isar writes stop; queries already in
+/// flight finish on their own and their results are dropped. A [StateError]
+/// so the guarded phases rethrow it like the uid-changed abort.
+class SyncCancelled extends StateError {
+  SyncCancelled() : super('RemoteIsarMerge: cancelled');
+}
+
 /// Pulls Firestore planning, reminders, and goals into Isar using last-write-wins on [updatedAtMs].
 ///
 /// The uid is pinned once at construction (via [FirestoreClient]) so every
@@ -94,6 +104,18 @@ String _docFieldId(
 /// and a force pull remains the reconcile escape hatch. Known edge: a second
 /// device with a skewed-back clock can write updatedAtMs below the cursor;
 /// such a doc is only picked up by a force pull.
+///
+/// ## Waves and the first screen (2026-09-22)
+///
+/// Phases run in three steps — tombstones, the critical wave (routines and
+/// tasks, active goals with their subcollections, reminders, analytics
+/// stats), then everything else — with the phases of a wave concurrent and
+/// per-parent fan-outs bounded by [fanOutLimit]. [firstScreenReady]
+/// completes after the critical wave so the first-launch gate can reveal
+/// the app while the rest streams in. [cancel] is cooperative: it stops
+/// the pull at the next checkpoint (between phases, before each fan-out
+/// item, inside the write funnel); a query already in flight finishes on
+/// its own and is dropped.
 class RemoteIsarMerge {
   RemoteIsarMerge(
     this._isar, {
@@ -126,6 +148,23 @@ class RemoteIsarMerge {
   /// subcollections are hydrated without cursors — see
   /// [_pullGoalSubcollections].
   final Set<String> _newLocalGoalIds = {};
+
+  /// Completes once the critical wave has merged (what Home paints first),
+  /// or when the pull ends for any reason. The first-launch gate reveals
+  /// on it.
+  final Completer<void> _firstScreen = Completer<void>();
+  Future<void> get firstScreenReady => _firstScreen.future;
+
+  bool _cancelled = false;
+
+  /// Cooperative cancel: the next checkpoint throws [SyncCancelled], so no
+  /// later phase, fan-out item or Isar write runs. Firestore queries already
+  /// in flight cannot be recalled — their results are simply dropped.
+  void cancel() => _cancelled = true;
+
+  /// Max concurrent queries in a per-parent fan-out (routines → blocks,
+  /// goals → subcollections, challenges → evidence).
+  static const int fanOutLimit = 6;
 
   Future<int> _cursorFor(String key) async =>
       ignoreCursors ? 0 : _cursors.read(key);
@@ -207,6 +246,8 @@ class RemoteIsarMerge {
           await _applyTombstoneLocally(tomb);
         });
         _appliedCount++;
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip tombstone ${doc.id}: $e\n$st');
       }
@@ -287,72 +328,166 @@ class RemoteIsarMerge {
   /// the session right before committing, so rows fetched for the outgoing
   /// account can never land in the store after the wipe.
   Future<T> _write<T>(Future<T> Function() fn) {
-    _abortIfUidChanged();
+    _checkpoint();
     return _isar.writeTxn(fn);
   }
 
-  void _abortIfUidChanged() {
+  /// Between phases, before every fan-out item and inside the write funnel:
+  /// aborts when the signed-in uid changed (account isolation) or after
+  /// [cancel] (cooperative stop — an in-flight query cannot be recalled,
+  /// but nothing after it runs).
+  void _checkpoint() {
     if (!_uidStillCurrent) {
       throw StateError(
         'RemoteIsarMerge: signed-in uid changed mid-pull — aborting to avoid '
         'writing another account\'s data into local Isar.',
       );
     }
+    if (_cancelled) throw SyncCancelled();
+  }
+
+  /// Runs one pull phase with a release-visible timing breadcrumb. A phase
+  /// that escapes with an error cancels the siblings still running in the
+  /// same wave (they stop at their next checkpoint), so the pull never
+  /// keeps spending the link on a result it is going to discard.
+  Future<void> _phase(String name, Future<void> Function() fn) async {
+    final sw = Stopwatch()..start();
+    try {
+      await fn();
+      _log('$name ${sw.elapsedMilliseconds}ms');
+    } on SyncCancelled {
+      _log('$name cancelled at ${sw.elapsedMilliseconds}ms');
+      rethrow;
+    } catch (e) {
+      _cancelled = true;
+      _log('$name FAILED at ${sw.elapsedMilliseconds}ms: $e');
+      rethrow;
+    }
+  }
+
+  /// Phases of one wave run concurrently; the wave waits for ALL of them
+  /// before surfacing the first error, so a failed wave leaves no straggler
+  /// still writing when the caller moves on.
+  Future<void> _wave(List<Future<void>> phases) async {
+    await Future.wait(phases);
+  }
+
+  /// Runs [fn] over [items] with at most [fanOutLimit] in flight — enough to
+  /// collapse a per-parent fan-out into a few round trips without opening
+  /// one query per document on a heavy account.
+  Future<void> _forEachLimited<T>(
+    Iterable<T> items,
+    Future<void> Function(T item) fn,
+  ) async {
+    final queue = items.toList();
+    if (queue.isEmpty) return;
+    var next = 0;
+    Future<void> worker() async {
+      while (next < queue.length) {
+        final item = queue[next++];
+        _checkpoint();
+        await fn(item);
+      }
+    }
+
+    final width = queue.length < fanOutLimit ? queue.length : fanOutLimit;
+    await Future.wait(List.generate(width, (_) => worker()));
+  }
+
+  void _signalFirstScreen(String why) {
+    if (_firstScreen.isCompleted) return;
+    _firstScreen.complete();
+    _log('first screen ready: $why');
+  }
+
+  static void _log(String message) {
+    // Survives release builds (debugPrint is silenced there) — the boot
+    // breadcrumbs that localised the white-screen hang, applied to sync.
+    // ignore: avoid_print
+    print('[sync] $message');
   }
 
   /// Returns true when at least one row was applied to Isar.
+  ///
+  /// Three steps (2026-09-22): tombstones, then the critical wave (what Home
+  /// paints first), then everything else. Phases inside a wave run
+  /// concurrently — the pull used to be ~20 sequential round trips.
   Future<bool> run() async {
-    // Tombstones first (audit H15): every upsert phase below consults them.
-    await _pullDeletedEntities();
-    _abortIfUidChanged();
-    await _pullRoutinesBlocksTasks();
-    _abortIfUidChanged();
-    await _pullReminders();
+    final total = Stopwatch()..start();
+    try {
+      // Tombstones first (audit H15): every upsert phase below consults them.
+      await _phase('tombstones', _pullDeletedEntities);
+      _checkpoint();
 
-    await _pullReminderOccurrences();
-    _abortIfUidChanged();
-    await _pullGoals();
-    _abortIfUidChanged();
-    await _pullGoalSubcollections();
-    _abortIfUidChanged();
-    await _pullIntentions();
-    _abortIfUidChanged();
-    await _pullDirections();
-    _abortIfUidChanged();
-    await _pullActivityEvents();
-    _abortIfUidChanged();
-    await _pullActivityCategoryRules();
-    _abortIfUidChanged();
-    await _pullTimeBlocks();
-    _abortIfUidChanged();
-    await _pullMemoryFacts();
-    _abortIfUidChanged();
-    await _pullPeople();
-    _abortIfUidChanged();
-    await _pullAnalytics();
-    _abortIfUidChanged();
-    await _pullOnboardingProfile();
-    _abortIfUidChanged();
-    // Stakes-era phases are individually fault-tolerant: until the stakes
-    // backend is deployed (rules + functions — see PHASE3/deploy notes),
-    // these queries come back permission-denied on the live project, and
-    // one denied mirror must NOT abort the whole account sync. A failed
-    // phase discards its own cursor advancement and is retried next pull.
-    await _pullGuarded('stake challenges', _pullStakeChallenges);
-    _abortIfUidChanged();
-    await _pullGuarded('blocked users', _pullBlockedUsers);
-    _abortIfUidChanged();
-    await _pullGuarded('points ledger', _pullPointsLedger,
-        cursorKey: 'points_txns');
-    _abortIfUidChanged();
-    await _pullGuarded('charities', _pullCharities);
-    await _purgeOldTombstones();
-    // Only reached when every phase succeeded — safe to advance cursors.
-    for (final entry in _maxSeen.entries) {
-      await _cursors.advance(entry.key, entry.value);
+      // Critical wave — the first-launch gate reveals when this lands (or
+      // at its cap), so it stays small: today's plan, active goals with the
+      // subcollections Home reads, reminders, the analytics summary.
+      await _wave([
+        _phase('routines', _pullRoutinesBlocksTasks),
+        _phase('goals', () async {
+          await _pullGoals();
+          _checkpoint();
+          await _pullGoalSubcollections(activeOnly: true);
+        }),
+        _phase('reminders', _pullReminders),
+        _phase('analytics_stats', _pullAnalyticsStats),
+      ]);
+      _signalFirstScreen('critical wave merged');
+
+      // The rest streams in behind the live UI. Stakes-era phases are
+      // individually fault-tolerant: until the stakes backend is deployed
+      // (rules + functions — see PHASE3/deploy notes), these queries come
+      // back permission-denied on the live project, and one denied mirror
+      // must NOT abort the whole account sync. A failed phase discards its
+      // own cursor advancement and is retried next pull.
+      await _wave([
+        _phase(
+          'goal_archive',
+          () => _pullGoalSubcollections(activeOnly: false),
+        ),
+        _phase('reminder_occurrences', _pullReminderOccurrences),
+        _phase('intentions', _pullIntentions),
+        _phase('directions', _pullDirections),
+        _phase('activity_events', _pullActivityEvents),
+        _phase('activity_category_rules', _pullActivityCategoryRules),
+        _phase('time_blocks', _pullTimeBlocks),
+        _phase('memory_facts', _pullMemoryFacts),
+        _phase('people', _pullPeople),
+        _phase('analytics_events', _pullAnalyticsEvents),
+        _phase('onboarding', _pullOnboardingProfile),
+        _phase(
+          'stake_challenges',
+          () => _pullGuarded('stake challenges', _pullStakeChallenges),
+        ),
+        _phase(
+          'blocked',
+          () => _pullGuarded('blocked users', _pullBlockedUsers),
+        ),
+        _phase(
+          'points',
+          () => _pullGuarded(
+            'points ledger',
+            _pullPointsLedger,
+            cursorKey: 'points_txns',
+          ),
+        ),
+        _phase('charities', () => _pullGuarded('charities', _pullCharities)),
+      ]);
+      _checkpoint();
+      await _purgeOldTombstones();
+      // Only reached when every phase succeeded — safe to advance cursors.
+      for (final entry in _maxSeen.entries) {
+        await _cursors.advance(entry.key, entry.value);
+      }
+      _log(
+        'pull finished in ${total.elapsedMilliseconds}ms '
+        '($_appliedCount rows applied)',
+      );
+      return _appliedCount > 0;
+    } finally {
+      // A failed or cancelled pull must still release the gate.
+      _signalFirstScreen('pull ended after ${total.elapsedMilliseconds}ms');
     }
-    debugPrint('RemoteIsarMerge: pull finished ($_appliedCount rows applied)');
-    return _appliedCount > 0;
   }
 
   Future<void> _pullRoutinesBlocksTasks() async {
@@ -362,19 +497,19 @@ class RemoteIsarMerge {
     // edits underneath. Only the leaf task queries use the cursor.
     final tasksCursor = await _cursorFor('tasks');
     final routinesSnap = await routinesCol.get();
-    for (final doc in routinesSnap.docs) {
+    await _forEachLimited(routinesSnap.docs, (doc) async {
       try {
         final m = Map<String, dynamic>.from(doc.data());
         m['id'] = _docFieldId(doc, m);
         final routine = Routine.fromMap(m);
         // A tombstoned routine is neither merged nor descended into.
-        if (!await _mergeRoutine(routine)) continue;
+        if (!await _mergeRoutine(routine)) return;
         final routineId = routine.id;
         final blocksSnap = await routinesCol
             .doc(routineId)
             .collection('blocks')
             .get();
-        for (final bDoc in blocksSnap.docs) {
+        await _forEachLimited(blocksSnap.docs, (bDoc) async {
           try {
             final bm = Map<String, dynamic>.from(bDoc.data());
             bm['id'] = _docFieldId(bDoc, bm);
@@ -383,7 +518,7 @@ class RemoteIsarMerge {
                 ? rid.trim()
                 : routineId;
             final block = TaskBlock.fromMap(bm);
-            if (!await _mergeBlock(block)) continue;
+            if (!await _mergeBlock(block)) return;
             final tasksSnap = await _afterCursor(
               routinesCol
                   .doc(routineId)
@@ -407,18 +542,24 @@ class RemoteIsarMerge {
                 final task = PlannedTask.fromMap(tm);
                 _noteSeen('tasks', task.updatedAtMs);
                 await _mergeTask(task);
+              } on StateError {
+                rethrow;
               } catch (e, st) {
                 debugPrint('RemoteIsarMerge: skip task ${tDoc.id}: $e\n$st');
               }
             }
+          } on StateError {
+            rethrow;
           } catch (e, st) {
             debugPrint('RemoteIsarMerge: skip block ${bDoc.id}: $e\n$st');
           }
-        }
+        });
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip routine ${doc.id}: $e\n$st');
       }
-    }
+    });
   }
 
   Future<void> _pullReminders() async {
@@ -434,6 +575,8 @@ class RemoteIsarMerge {
         final r = reminderConfigFromFirestoreDoc(doc);
         _noteSeen('reminders', r.updatedAtMs);
         await _mergeReminder(r);
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip reminder ${doc.id}: $e\n$st');
       }
@@ -451,9 +594,10 @@ class RemoteIsarMerge {
         final o = reminderOccurrenceFromFirestoreDoc(doc);
         _noteSeen('reminderOccurrences', o.updatedAtMs);
         await _mergeReminderOccurrence(o);
+      } on StateError {
+        rethrow;
       } catch (e, st) {
-        debugPrint(
-          'RemoteIsarMerge: skip reminderOccurrence ${doc.id}: $e\n$st',
+        debugPrint('RemoteIsarMerge: skip reminderOccurrence ${doc.id}: $e\n$st',
         );
       }
     }
@@ -472,6 +616,8 @@ class RemoteIsarMerge {
         final g = UserGoal.fromMap(m);
         _noteSeen('goals', g.updatedAtMs);
         await _mergeGoal(g);
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip goal ${doc.id}: $e\n$st');
       }
@@ -486,19 +632,25 @@ class RemoteIsarMerge {
   /// pull ([_newLocalGoalIds]) are read without cursors — their historical
   /// subdocuments predate any cursor watermark; everything else uses the
   /// shared per-collection cursor.
-  Future<void> _pullGoalSubcollections() async {
-    // Active goals only, plus anything that just appeared this pull — paused
-    // and completed goals were hydrated while they were live, and walking
-    // them every periodic pull would grow with archive size. A force pull
-    // (ignoreCursors) walks everything as the reconcile escape hatch.
-    final activeIds = await _isar.isarGoals
-        .filter()
-        .statusStorageEqualTo('active')
-        .goalIdProperty()
-        .findAll();
-    final goalIds = ignoreCursors
-        ? await _isar.isarGoals.where().goalIdProperty().findAll()
-        : {...activeIds, ..._newLocalGoalIds}.toList();
+  /// Hydrates goal subcollections. [activeOnly] selects the active goals
+  /// (the critical wave — Home reads their check-ins); the second call
+  /// takes the remainder: every other goal on a force pull (the reconcile
+  /// escape hatch), otherwise only goals that first appeared this pull.
+  /// Paused and completed goals were hydrated while they were live, and
+  /// walking them every periodic pull would grow with archive size.
+  Future<void> _pullGoalSubcollections({required bool activeOnly}) async {
+    final activeIds = (await _isar.isarGoals
+            .filter()
+            .statusStorageEqualTo('active')
+            .goalIdProperty()
+            .findAll())
+        .toSet();
+    final candidates = ignoreCursors
+        ? (await _isar.isarGoals.where().goalIdProperty().findAll()).toSet()
+        : {...activeIds, ..._newLocalGoalIds};
+    final goalIds = activeOnly
+        ? candidates.where(activeIds.contains).toList()
+        : candidates.where((id) => !activeIds.contains(id)).toList();
     if (goalIds.isEmpty) return;
 
     final actionsCursor = await _cursorFor('goal_actions');
@@ -506,77 +658,114 @@ class RemoteIsarMerge {
     final checkInsCursor = await _cursorFor('goal_check_ins');
     final goalsCol = _client.userCollection('goals');
 
-    for (final goalId in goalIds) {
-      _abortIfUidChanged();
+    await _forEachLimited(goalIds, (goalId) async {
       final isNewLocally = _newLocalGoalIds.contains(goalId);
       final goalDoc = goalsCol.doc(goalId);
-
-      try {
-        final snap = await _afterCursor(
-          goalDoc.collection('actions'),
-          isNewLocally ? 0 : actionsCursor,
-        ).get();
-        for (final doc in snap.docs) {
-          try {
-            final m = Map<String, dynamic>.from(doc.data());
-            m['id'] = _docFieldId(doc, m);
-            m['goalId'] = goalId;
-            final a = GoalAction.fromMap(m);
-            _noteSeen('goal_actions', a.updatedAtMs);
-            await _mergeGoalAction(a);
-          } catch (e, st) {
-            debugPrint('RemoteIsarMerge: skip goal action ${doc.id}: $e\n$st');
-          }
-        }
-      } catch (e, st) {
-        debugPrint('RemoteIsarMerge: skip actions of $goalId: $e\n$st');
-      }
-
-      try {
-        final snap = await _afterCursor(
-          goalDoc.collection('milestones'),
+      // One goal's three subcollections go out together.
+      await Future.wait([
+        _pullGoalActions(goalDoc, goalId, isNewLocally ? 0 : actionsCursor),
+        _pullGoalMilestones(
+          goalDoc,
+          goalId,
           isNewLocally ? 0 : milestonesCursor,
-        ).get();
-        for (final doc in snap.docs) {
-          try {
-            final m = Map<String, dynamic>.from(doc.data());
-            m['id'] = _docFieldId(doc, m);
-            m['goalId'] = goalId;
-            final ms = GoalMilestone.fromMap(m);
-            _noteSeen('goal_milestones', ms.updatedAtMs);
-            await _mergeGoalMilestone(ms);
-          } catch (e, st) {
-            debugPrint(
-              'RemoteIsarMerge: skip goal milestone ${doc.id}: $e\n$st',
-            );
-          }
-        }
-      } catch (e, st) {
-        debugPrint('RemoteIsarMerge: skip milestones of $goalId: $e\n$st');
-      }
+        ),
+        _pullGoalCheckIns(goalDoc, goalId, isNewLocally ? 0 : checkInsCursor),
+      ]);
+    });
+  }
 
-      try {
-        final snap = await _afterCursor(
-          goalDoc.collection('checkIns'),
-          isNewLocally ? 0 : checkInsCursor,
-        ).get();
-        for (final doc in snap.docs) {
-          try {
-            final m = Map<String, dynamic>.from(doc.data());
-            m['goalId'] = goalId;
-            m['dateKey'] = (m['dateKey'] as String?) ?? doc.id;
-            final c = GoalCheckIn.fromMap(m);
-            _noteSeen('goal_check_ins', c.updatedAtMs);
-            await _mergeGoalCheckIn(c);
-          } catch (e, st) {
-            debugPrint(
-              'RemoteIsarMerge: skip goal check-in ${doc.id}: $e\n$st',
-            );
-          }
+  Future<void> _pullGoalActions(
+    DocumentReference<Map<String, dynamic>> goalDoc,
+    String goalId,
+    int cursor,
+  ) async {
+    try {
+      final snap = await _afterCursor(
+        goalDoc.collection('actions'),
+        cursor,
+      ).get();
+      for (final doc in snap.docs) {
+        try {
+          final m = Map<String, dynamic>.from(doc.data());
+          m['id'] = _docFieldId(doc, m);
+          m['goalId'] = goalId;
+          final a = GoalAction.fromMap(m);
+          _noteSeen('goal_actions', a.updatedAtMs);
+          await _mergeGoalAction(a);
+        } on StateError {
+          rethrow;
+        } catch (e, st) {
+          debugPrint('RemoteIsarMerge: skip goal action ${doc.id}: $e\n$st');
         }
-      } catch (e, st) {
-        debugPrint('RemoteIsarMerge: skip check-ins of $goalId: $e\n$st');
       }
+    } on StateError {
+      rethrow;
+    } catch (e, st) {
+      debugPrint('RemoteIsarMerge: skip actions of $goalId: $e\n$st');
+    }
+  }
+
+  Future<void> _pullGoalMilestones(
+    DocumentReference<Map<String, dynamic>> goalDoc,
+    String goalId,
+    int cursor,
+  ) async {
+    try {
+      final snap = await _afterCursor(
+        goalDoc.collection('milestones'),
+        cursor,
+      ).get();
+      for (final doc in snap.docs) {
+        try {
+          final m = Map<String, dynamic>.from(doc.data());
+          m['id'] = _docFieldId(doc, m);
+          m['goalId'] = goalId;
+          final ms = GoalMilestone.fromMap(m);
+          _noteSeen('goal_milestones', ms.updatedAtMs);
+          await _mergeGoalMilestone(ms);
+        } on StateError {
+          rethrow;
+        } catch (e, st) {
+          debugPrint('RemoteIsarMerge: skip goal milestone ${doc.id}: $e\n$st',
+          );
+        }
+      }
+    } on StateError {
+      rethrow;
+    } catch (e, st) {
+      debugPrint('RemoteIsarMerge: skip milestones of $goalId: $e\n$st');
+    }
+  }
+
+  Future<void> _pullGoalCheckIns(
+    DocumentReference<Map<String, dynamic>> goalDoc,
+    String goalId,
+    int cursor,
+  ) async {
+    try {
+      final snap = await _afterCursor(
+        goalDoc.collection('checkIns'),
+        cursor,
+      ).get();
+      for (final doc in snap.docs) {
+        try {
+          final m = Map<String, dynamic>.from(doc.data());
+          m['goalId'] = goalId;
+          m['dateKey'] = (m['dateKey'] as String?) ?? doc.id;
+          final c = GoalCheckIn.fromMap(m);
+          _noteSeen('goal_check_ins', c.updatedAtMs);
+          await _mergeGoalCheckIn(c);
+        } on StateError {
+          rethrow;
+        } catch (e, st) {
+          debugPrint('RemoteIsarMerge: skip goal check-in ${doc.id}: $e\n$st',
+          );
+        }
+      }
+    } on StateError {
+      rethrow;
+    } catch (e, st) {
+      debugPrint('RemoteIsarMerge: skip check-ins of $goalId: $e\n$st');
     }
   }
 
@@ -596,6 +785,8 @@ class RemoteIsarMerge {
         final intention = Intention.fromMap(m);
         _noteSeen('intentions', intention.updatedAtMs);
         await _mergeIntention(intention);
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip intention ${doc.id}: $e\n$st');
       }
@@ -621,6 +812,8 @@ class RemoteIsarMerge {
         if (await mergeDirectionEntryLwwIntoIsar(_isar, entry)) {
           _appliedCount++;
         }
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip direction ${doc.id}: $e\n$st');
       }
@@ -644,6 +837,8 @@ class RemoteIsarMerge {
         if (await mergeActivityEventLwwIntoIsar(_isar, event)) {
           _appliedCount++;
         }
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip activity event ${doc.id}: $e\n$st');
       }
@@ -667,6 +862,8 @@ class RemoteIsarMerge {
         if (await mergeActivityCategoryRuleLwwIntoIsar(_isar, rule)) {
           _appliedCount++;
         }
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip category rule ${doc.id}: $e\n$st');
       }
@@ -690,6 +887,8 @@ class RemoteIsarMerge {
         final block = ScheduledTimeBlock.fromMap(m);
         _noteSeen('time_blocks', block.updatedAtMs);
         await _mergeTimeBlock(block);
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip time block ${doc.id}: $e\n$st');
       }
@@ -711,6 +910,8 @@ class RemoteIsarMerge {
         final fact = MemoryFact.fromMap(m);
         _noteSeen('memory_facts', fact.updatedAtMs);
         await _mergeMemoryFact(fact);
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip memory fact ${doc.id}: $e\n$st');
       }
@@ -732,13 +933,15 @@ class RemoteIsarMerge {
         final person = Person.fromMap(m);
         _noteSeen('people', person.updatedAtMs);
         await _mergePerson(person);
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip person ${doc.id}: $e\n$st');
       }
     }
   }
 
-  Future<void> _pullAnalytics() async {
+  Future<void> _pullAnalyticsEvents() async {
     final eventsCursor = await _cursorFor('analytics_events');
     final eventsSnap = await _afterCursor(
       _client.userCollection('analytics_events'),
@@ -751,11 +954,17 @@ class RemoteIsarMerge {
         final event = AnalyticsEvent.fromMap(m);
         _noteSeen('analytics_events', event.updatedAtMs);
         await _mergeAnalyticsEvent(event);
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip analytics event ${doc.id}: $e\n$st');
       }
     }
+  }
 
+  /// The small per-period summary Home's daily analytics read — critical
+  /// wave; the event history above streams in afterwards.
+  Future<void> _pullAnalyticsStats() async {
     final statsCursor = await _cursorFor('analytics_stats');
     final statsSnap = await _afterCursor(
       _client.userCollection('analytics_stats'),
@@ -768,6 +977,8 @@ class RemoteIsarMerge {
         final stats = AnalyticsStatsCache.fromMap(m);
         _noteSeen('analytics_stats', stats.updatedAtMs);
         await _mergeAnalyticsStats(stats);
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip analytics stats ${doc.id}: $e\n$st');
       }
@@ -782,9 +993,10 @@ class RemoteIsarMerge {
         final m = Map<String, dynamic>.from(doc.data());
         final profile = OnboardingProfile.fromMap(m);
         await _mergeOnboardingProfile(profile);
+      } on StateError {
+        rethrow;
       } catch (e, st) {
-        debugPrint(
-          'RemoteIsarMerge: skip onboarding profile ${doc.id}: $e\n$st',
+        debugPrint('RemoteIsarMerge: skip onboarding profile ${doc.id}: $e\n$st',
         );
       }
     }
@@ -829,12 +1041,13 @@ class RemoteIsarMerge {
         final challenge = StakeChallenge.fromMap(m);
         await _mergeStakeChallenge(challenge);
         if (!challenge.status.isTerminal) openChallengeIds.add(challenge.id);
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip stake challenge ${doc.id}: $e\n$st');
       }
     }
-    for (final challengeId in openChallengeIds) {
-      _abortIfUidChanged();
+    await _forEachLimited(openChallengeIds, (challengeId) async {
       final evidenceSnap = await _client
           .topCollection('stake_challenges')
           .doc(challengeId)
@@ -846,11 +1059,13 @@ class RemoteIsarMerge {
           m['id'] = doc.id;
           m['challengeId'] = challengeId;
           await _mergeStakeEvidence(StakeEvidence.fromMap(m));
+        } on StateError {
+          rethrow;
         } catch (e, st) {
           debugPrint('RemoteIsarMerge: skip stake evidence ${doc.id}: $e\n$st');
         }
       }
-    }
+    });
   }
 
   /// Block list (`users/{uid}/blocked`) — tiny, full pull, LWW.
@@ -880,6 +1095,8 @@ class RemoteIsarMerge {
           await _isar.isarBlockedUsers.putByBlockedUid(row);
         });
         _appliedCount++;
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip blocked user ${doc.id}: $e\n$st');
       }
@@ -936,6 +1153,8 @@ class RemoteIsarMerge {
           await _isar.isarPointsTxns.putByTxnId(IsarPointsTxn.fromDomain(txn));
         });
         _appliedCount++;
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip points txn ${doc.id}: $e\n$st');
       }
@@ -967,6 +1186,8 @@ class RemoteIsarMerge {
           );
         });
         _appliedCount++;
+      } on StateError {
+        rethrow;
       } catch (e, st) {
         debugPrint('RemoteIsarMerge: skip charity ${doc.id}: $e\n$st');
       }
@@ -1076,7 +1297,7 @@ class RemoteIsarMerge {
 
   Future<void> _mergeTask(PlannedTask incoming) async {
     if (await _tombstoned('task', incoming.id, incoming.updatedAtMs)) return;
-    _abortIfUidChanged();
+    _checkpoint();
     if (await mergePlannedTaskLwwIntoIsar(_isar, incoming)) {
       _appliedCount++;
     }

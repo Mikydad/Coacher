@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:sidepal/core/offline/offline_store.dart';
@@ -137,5 +138,103 @@ void main() {
 
     expect(result, isFalse);
     expect(pulls, 0);
+  });
+
+  // ── First-screen signal (2026-09-22) ────────────────────────────────────────
+
+  test('firstScreenReady settles when the pull is skipped (no user)', () async {
+    SyncService.debugRemotePullForTests = (_) async {};
+    SyncService.debugUidForTests = null;
+    final ready = Completer<void>();
+
+    final result = await SyncService.instance.syncFromRemote(
+      force: true,
+      firstScreenReady: ready,
+    );
+
+    expect(result, isFalse);
+    expect(ready.isCompleted, isTrue);
+  });
+
+  test('firstScreenReady settles when the override pull finishes', () async {
+    final gate = Completer<void>();
+    SyncService.debugRemotePullForTests = (_) => gate.future;
+    final ready = Completer<void>();
+
+    final pull = SyncService.instance.syncFromRemote(
+      force: true,
+      firstScreenReady: ready,
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(ready.isCompleted, isFalse);
+
+    gate.complete();
+    expect(await pull, isTrue);
+    expect(ready.isCompleted, isTrue);
+  });
+
+  test("a joiner is wired to the in-flight pull's first-screen signal",
+      () async {
+    final gate = Completer<void>();
+    SyncService.debugRemotePullForTests = (_) => gate.future;
+
+    final first = SyncService.instance.syncFromRemote(force: true);
+    final joinerReady = Completer<void>();
+    final joiner = SyncService.instance.syncFromRemote(
+      force: true,
+      firstScreenReady: joinerReady,
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(joinerReady.isCompleted, isFalse);
+
+    gate.complete();
+    await Future.wait([first, joiner]);
+    expect(joinerReady.isCompleted, isTrue);
+  });
+
+  // ── Full-pull promotion backoff (2026-09-22) ────────────────────────────────
+
+  test('a failed forced pull records the failure; a later success clears it',
+      () async {
+    final t0 = DateTime.utc(2026, 1, 1, 12);
+    SyncService.debugClockForTests = () => t0;
+    SyncService.debugRemotePullForTests = (_) async => throw StateError('boom');
+
+    expect(await SyncService.instance.syncFromRemote(force: true), isFalse);
+    expect(SyncService.instance.lastFullPullFailedAtForTests, t0);
+
+    SyncService.debugRemotePullForTests = (_) async {};
+    expect(await SyncService.instance.syncFromRemote(force: true), isTrue);
+    expect(SyncService.instance.lastFullPullFailedAtForTests, isNull);
+  });
+
+  test('isFullPullDue: daily, held back for 5 minutes after a failure', () {
+    final now = DateTime.utc(2026, 1, 2, 12);
+    final dayAgo =
+        now.subtract(const Duration(hours: 25)).millisecondsSinceEpoch;
+    final hourAgo =
+        now.subtract(const Duration(hours: 1)).millisecondsSinceEpoch;
+
+    expect(SyncService.isFullPullDue(now: now, lastFullPullMs: dayAgo), isTrue);
+    expect(
+      SyncService.isFullPullDue(now: now, lastFullPullMs: hourAgo),
+      isFalse,
+    );
+    expect(
+      SyncService.isFullPullDue(
+        now: now,
+        lastFullPullMs: dayAgo,
+        lastFailedAt: now.subtract(const Duration(minutes: 2)),
+      ),
+      isFalse,
+    );
+    expect(
+      SyncService.isFullPullDue(
+        now: now,
+        lastFullPullMs: dayAgo,
+        lastFailedAt: now.subtract(const Duration(minutes: 6)),
+      ),
+      isTrue,
+    );
   });
 }

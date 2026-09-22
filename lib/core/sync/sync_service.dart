@@ -72,6 +72,13 @@ class SyncService {
   /// Audit M7 — a full (cursor-less) reconcile pull at least once a day, so
   /// convergence does not depend on the user pressing the sync button.
   static const Duration fullPullEvery = Duration(hours: 24);
+
+  /// After a FAILED full pull, routine pulls are not promoted to another
+  /// one for this long (2026-09-22) — a slow link used to re-run the whole
+  /// reconcile on every connectivity blip. Explicit `force` callers
+  /// (sign-in, first launch) and the Home button's light path are not
+  /// subject to it.
+  static const Duration fullPullRetryBackoff = Duration(minutes: 5);
   static const String _lastFullPullPrefsKey = 'sync_cursor_v1_last_full_pull';
 
   /// `true` when the last queue flush left pending writes that failed to reach
@@ -85,11 +92,13 @@ class SyncService {
   DateTime? _lastRemoteSyncStartedAt;
   Future<void>? _activeRemotePullFuture;
   String? _activeRemotePullUid;
+  Future<void>? _activeFirstScreenReady;
+  DateTime? _lastFullPullFailedAt;
   bool _lastRemotePullSucceeded = false;
   final ValueNotifier<bool> isSyncingFromRemote = ValueNotifier<bool>(false);
 
   /// Current uid, or null when signed out / Firebase unavailable (VM tests).
-  static String? _currentUid() {
+  static String? currentUid() {
     if (debugUidForTests != null) return debugUidForTests;
     if (Firebase.apps.isEmpty) return null;
     return FirebaseAuth.instance.currentUser?.uid;
@@ -137,20 +146,29 @@ class SyncService {
   /// promote to the daily full pull, and cap the wait at [timeout] — a
   /// user-triggered pull should answer in seconds, not run a minute-long
   /// reconcile on a slow link.
+  ///
+  /// [firstScreenReady] (2026-09-22) completes once the pull's critical
+  /// phases have merged — what Home paints first — or when the pull ends
+  /// or is skipped, whichever comes first. The first-launch gate reveals
+  /// on it instead of waiting for the whole reconcile. A caller that joins
+  /// an in-flight pull for the same uid is wired to that pull's signal.
   Future<bool> syncFromRemote({
     bool force = false,
     bool bypassThrottle = false,
     Duration? timeout,
+    Completer<void>? firstScreenReady,
   }) async {
     if (voiceModeActive && !force && !bypassThrottle) {
       debugPrint('syncFromRemote: voice mode active, deferring');
+      _settle(firstScreenReady);
       return false;
     }
     // No authenticated user → there is no user-scoped data to pull, and any
     // Firestore query would fail with permission-denied. Skip silently.
-    final uid = _currentUid();
+    final uid = currentUid();
     if (uid == null) {
       debugPrint('syncFromRemote: no signed-in user, skip');
+      _settle(firstScreenReady);
       return false;
     }
 
@@ -160,6 +178,7 @@ class SyncService {
       // it would leave the new account with stale/mixed data, so wait for it
       // to settle and start a fresh pull below.
       if (_activeRemotePullUid == uid) {
+        _forwardFirstScreen(firstScreenReady);
         await _activeRemotePullFuture!;
         return _lastRemotePullSucceeded;
       }
@@ -170,6 +189,7 @@ class SyncService {
     if (!force && !bypassThrottle) {
       if (_lastRemoteSyncStartedAt != null &&
           now.difference(_lastRemoteSyncStartedAt!).inSeconds < 30) {
+        _settle(firstScreenReady);
         return false;
       }
     }
@@ -184,6 +204,7 @@ class SyncService {
     final isar = OfflineStore.instance.isar;
     if (isar == null) {
       debugPrint('syncFromRemote: Isar not open, skip');
+      _settle(firstScreenReady);
       return false;
     }
 
@@ -194,11 +215,18 @@ class SyncService {
       isar,
       force: effectiveForce,
       timeout: timeout ?? remotePullTimeout,
+      firstScreenReady: firstScreenReady,
     );
     try {
       await _activeRemotePullFuture!;
-      if (_lastRemotePullSucceeded && effectiveForce) {
-        await _stampFullPull(now);
+      if (effectiveForce) {
+        if (_lastRemotePullSucceeded) {
+          _lastFullPullFailedAt = null;
+          await _stampFullPull(now);
+        } else {
+          // Hold the daily promotion back for [fullPullRetryBackoff].
+          _lastFullPullFailedAt = now;
+        }
       }
       return _lastRemotePullSucceeded;
     } finally {
@@ -207,16 +235,55 @@ class SyncService {
     }
   }
 
+  static void _settle(Completer<void>? c) {
+    if (c != null && !c.isCompleted) c.complete();
+  }
+
+  /// Wires a caller's completer to the active pull's first-screen signal,
+  /// or settles it at once when no pull is running.
+  void _forwardFirstScreen(Completer<void>? c) {
+    if (c == null) return;
+    final active = _activeFirstScreenReady;
+    if (active == null) {
+      _settle(c);
+      return;
+    }
+    unawaited(active.whenComplete(() => _settle(c)));
+  }
+
   Future<bool> _fullPullDue(DateTime now) async {
     if (debugRemotePullForTests != null) return false; // VM tests
     try {
       final prefs = await SharedPreferences.getInstance();
       final last = prefs.getInt(_lastFullPullPrefsKey) ?? 0;
-      return now.millisecondsSinceEpoch - last >= fullPullEvery.inMilliseconds;
+      return isFullPullDue(
+        now: now,
+        lastFullPullMs: last,
+        lastFailedAt: _lastFullPullFailedAt,
+      );
     } catch (_) {
       return false;
     }
   }
+
+  /// Pure promotion rule: a full reconcile is due [fullPullEvery] after the
+  /// last successful one, unless one failed within [fullPullRetryBackoff].
+  @visibleForTesting
+  static bool isFullPullDue({
+    required DateTime now,
+    required int lastFullPullMs,
+    DateTime? lastFailedAt,
+  }) {
+    if (lastFailedAt != null &&
+        now.difference(lastFailedAt) < fullPullRetryBackoff) {
+      return false;
+    }
+    return now.millisecondsSinceEpoch - lastFullPullMs >=
+        fullPullEvery.inMilliseconds;
+  }
+
+  @visibleForTesting
+  DateTime? get lastFullPullFailedAtForTests => _lastFullPullFailedAt;
 
   Future<void> _stampFullPull(DateTime now) async {
     try {
@@ -231,6 +298,7 @@ class SyncService {
     Isar isar, {
     bool force = false,
     Duration timeout = remotePullTimeout,
+    Completer<void>? firstScreenReady,
   }) async {
     isSyncingFromRemote.value = true;
     _lastRemotePullSucceeded = false;
@@ -239,18 +307,34 @@ class SyncService {
     var appliedAny = true;
     try {
       if (debugRemotePullForTests != null) {
-        await debugRemotePullForTests!(isar);
+        // The override has no phases: the whole pull is "critical".
+        final whole = Completer<void>();
+        _activeFirstScreenReady = whole.future;
+        _forwardFirstScreen(firstScreenReady);
+        try {
+          await debugRemotePullForTests!(isar);
+        } finally {
+          whole.complete();
+        }
       } else {
         // force → ignore sync cursors: full reconcile pull.
-        appliedAny = await RemoteIsarMerge(isar, ignoreCursors: force)
-            .run()
-            .timeout(
+        final merge = RemoteIsarMerge(isar, ignoreCursors: force);
+        _activeFirstScreenReady = merge.firstScreenReady;
+        _forwardFirstScreen(firstScreenReady);
+        appliedAny = await merge.run().timeout(
+          timeout,
+          onTimeout: () {
+            // Cooperative stop (2026-09-22): later phases, fan-out items
+            // and Isar writes end at their next checkpoint; queries already
+            // in flight finish on their own and are dropped. Before this
+            // the abandoned merge kept spending the link after the timeout.
+            merge.cancel();
+            throw TimeoutException(
+              'RemoteIsarMerge exceeded ${timeout.inSeconds}s',
               timeout,
-              onTimeout: () => throw TimeoutException(
-                'RemoteIsarMerge exceeded ${timeout.inSeconds}s',
-                timeout,
-              ),
             );
+          },
+        );
       }
       _lastRemotePullSucceeded = true;
     } catch (e, st) {
@@ -260,6 +344,8 @@ class SyncService {
       debugPrint('syncFromRemote failed: $e\n$st');
       reportNonfatal('sync.remotePull', e, st);
     } finally {
+      _activeFirstScreenReady = null;
+      _settle(firstScreenReady);
       isSyncingFromRemote.value = false;
       // A pull that changed no local rows (the common case for the periodic
       // 30s pull) does not invalidate providers or schedule a full
@@ -291,6 +377,8 @@ class SyncService {
     _lastRemoteSyncStartedAt = null;
     _activeRemotePullFuture = null;
     _activeRemotePullUid = null;
+    _activeFirstScreenReady = null;
+    _lastFullPullFailedAt = null;
     _lastRemotePullSucceeded = false;
     isSyncingFromRemote.value = false;
   }
@@ -347,7 +435,7 @@ class SyncService {
         documentPath: documentPath,
         payload: payload,
         updatedAtMs: DateTime.now().millisecondsSinceEpoch,
-        uid: _currentUid(),
+        uid: currentUid(),
       ),
     );
   }
@@ -364,7 +452,7 @@ class SyncService {
         documentPath: documentPath,
         payload: null,
         updatedAtMs: DateTime.now().millisecondsSinceEpoch,
-        uid: _currentUid(),
+        uid: currentUid(),
       ),
     );
   }
@@ -417,8 +505,8 @@ class SyncService {
       return;
     }
     if (_isSyncing || _queue.isEmpty) return;
-    final currentUid = _currentUid();
-    if (currentUid == null && Firebase.apps.isNotEmpty) {
+    final uid = currentUid();
+    if (uid == null && Firebase.apps.isNotEmpty) {
       // Signed out (e.g. brief window during startup/auth restore): keep the
       // queue untouched — writes would fail rules anyway, and dropping here
       // could lose a legitimate user's pending ops.
@@ -440,7 +528,7 @@ class SyncService {
         // Drop ops that belong to a different account (or legacy ops with no
         // uid when someone is signed in) — replaying them would write one
         // user's data into another user's Firestore tree.
-        if (op.uid != currentUid) {
+        if (op.uid != uid) {
           handledIds.add(op.id);
           debugPrint(
             'Sync queue: dropped ${op.operationType} for foreign uid '
