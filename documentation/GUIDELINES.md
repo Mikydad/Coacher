@@ -3883,3 +3883,31 @@ not silent reversal.
   `remote_isar_merge_waves_test` (first-screen ordering, cancel, teardown
   abort), `sync_service_remote_test` (signal forwarding, backoff),
   `auth_session_policy_fresh_account_test`, `first_screen_ready_test`.
+
+- **2026-09-22 · Onboarding primary button is the app's lime, not the
+  Aether gradient.** Miko, from a device recording of the register step:
+  "Create my account" was the only violet button in the product. Every
+  onboarding step's `AetherButton` now renders flat neon lime with dark
+  text and a soft lime glow (`OnboardingColors.cta` / `ctaText` /
+  `ctaLimeGlow`), the same button as everywhere else. Scope is buttons
+  only, on Miko's call: the journey progress line and the AI-demo card
+  keep the violet gradient as accents.
+
+- **2026-09-22 · One lime primary button, set at the theme.** Miko: the
+  accountability hub's "New Challenge" FAB didn't match the other buttons,
+  "find any that don't". Cause: `ColorScheme.fromSeed` derives a TONAL
+  primary from the lime seed, so every theme-default `FilledButton` (~50
+  call sites) and FAB rendered a washed-out lime next to the explicit
+  `AppColors.accent` buttons. Fix in `app.dart`: `filledButtonTheme` and
+  `floatingActionButtonTheme` carry `accent` / `onAccent` (disabled states
+  keep the Material defaults), so call sites need no colors. Normalised
+  the explicit outliers: `AuthPrimaryButton` (`accentDim` + black →
+  accent/onAccent), the scheduling-conflict "Continue & save"
+  (`Colors.green.shade700` override removed — the default is the lime
+  now), the AI "apply plan" and planned-changes confirm
+  (`accentBright`/`accentDeep` → accent/onAccent). Left alone on purpose:
+  destructive red buttons (leave circle, delete), secondary/soft buttons
+  (`fg12`, `inkElevated`, `surfaceLight`, the Plans-changed "Skip" tonal,
+  which now sets `fg12` explicitly because the theme would have made it
+  primary), the goal counter's goal-tinted button, and the Apple sign-in
+  button (Apple's branding rules).

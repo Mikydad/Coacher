@@ -2114,6 +2114,11 @@ Future<void> _openPlansChangedFlow(
           child: const Text('Defer'),
         ),
         FilledButton.tonal(
+          // The filled-button theme is the lime primary; keep this one soft.
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.fg12,
+            foregroundColor: AppColors.fg,
+          ),
           onPressed: () => Navigator.pop(ctx, _PlansChangedAction.skip),
           child: const Text('Skip'),
         ),

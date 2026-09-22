@@ -2044,8 +2044,8 @@ class _MessageItem extends StatelessWidget {
                     ? null
                     : () => service.applySuggestedPlan(message.id),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accentBright,
-                  foregroundColor: AppColors.accentDeep,
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: AppColors.onAccent,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(999),

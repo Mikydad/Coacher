@@ -408,8 +408,8 @@ class _ActionButtons extends StatelessWidget {
 
     final confirmBg = isBlocked
         ? AppColors.danger.withValues(alpha: 0.85)
-        : AppColors.accentBright;
-    final confirmFg = isBlocked ? AppColors.fg : AppColors.accentDeep;
+        : AppColors.accent;
+    final confirmFg = isBlocked ? AppColors.fg : AppColors.onAccent;
 
     return Column(
       children: [

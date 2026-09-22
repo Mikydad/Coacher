@@ -85,8 +85,22 @@ class CoachForLifeApp extends ConsumerWidget {
         backgroundColor: AppColors.scaffold,
         foregroundColor: AppColors.textPrimary,
       ),
+      // One primary button (2026-09-22, Miko): the neon lime with dark text.
+      // ColorScheme.fromSeed derives a TONAL primary from the seed, so every
+      // theme-default FilledButton and FAB was a washed-out lime that did not
+      // match the explicit accent buttons next to it (the accountability
+      // "New Challenge" FAB was the visible case). Disabled states keep the
+      // Material defaults.
       filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(shape: buttonShape),
+        style: FilledButton.styleFrom(
+          shape: buttonShape,
+          backgroundColor: AppColors.accent,
+          foregroundColor: AppColors.onAccent,
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: AppColors.accent,
+        foregroundColor: AppColors.onAccent,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(shape: buttonShape),

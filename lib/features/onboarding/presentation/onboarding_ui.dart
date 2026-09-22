@@ -38,8 +38,16 @@ abstract final class OnboardingColors {
   static Color get textMuted => _dark.fg54;
   static Color get textFaint => _dark.fg38;
 
-  /// Soft outer glow behind the primary CTA (10% of primary per DESIGN.md).
+  /// Soft outer glow behind the progress head (10% of primary per DESIGN.md).
   static Color get ctaGlow => _dark.violet.withValues(alpha: 0.28);
+
+  /// Primary CTA (2026-09-22, Miko): the app's neon lime, flat, dark text —
+  /// the same button as everywhere else, not the violet gradient. The
+  /// gradient stays for the journey line and the AI demo card (accents,
+  /// not buttons).
+  static Color get cta => _dark.accent;
+  static Color get ctaText => _dark.onAccent;
+  static Color get ctaLimeGlow => _dark.accent.withValues(alpha: 0.22);
 
   /// The signature "Aether Gradient" — always bottom-left → top-right.
   static LinearGradient get aetherGradient => LinearGradient(
@@ -97,7 +105,8 @@ abstract final class OnboardingType {
   );
 }
 
-/// Primary pill CTA with the Aether gradient and a soft glow.
+/// Primary pill CTA — flat lime with a soft glow (matches the app's
+/// primary buttons; the violet gradient was retired for buttons only).
 class AetherButton extends StatefulWidget {
   const AetherButton({
     super.key,
@@ -133,19 +142,12 @@ class _AetherButtonState extends State<AetherButton> {
           height: 56,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            gradient: enabled
-                ? OnboardingColors.aetherGradient
-                : LinearGradient(
-                    colors: [
-                      OnboardingColors.cardHigh,
-                      OnboardingColors.cardHigh,
-                    ],
-                  ),
+            color: enabled ? OnboardingColors.cta : OnboardingColors.cardHigh,
             borderRadius: BorderRadius.circular(28),
             boxShadow: enabled
                 ? [
                     BoxShadow(
-                      color: OnboardingColors.ctaGlow,
+                      color: OnboardingColors.ctaLimeGlow,
                       blurRadius: 20,
                       spreadRadius: 1,
                     ),
@@ -158,14 +160,14 @@ class _AetherButtonState extends State<AetherButton> {
                   height: 22,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: OnboardingColors.textPrimary,
+                    color: OnboardingColors.ctaText,
                   ),
                 )
               : Text(
                   widget.label,
                   style: TextStyle(
                     color: enabled
-                        ? OnboardingColors.textPrimary
+                        ? OnboardingColors.ctaText
                         : OnboardingColors.textFaint,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,

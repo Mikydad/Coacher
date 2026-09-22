@@ -571,11 +571,6 @@ class _SchedulingConflictSheetState extends State<SchedulingConflictSheet> {
                 key: _continueSaveKey,
                 child: FilledButton(
                   onPressed: _canProceed && !_busy ? _continueSave : null,
-                  style: _promptContinueSave && _canProceed
-                      ? FilledButton.styleFrom(
-                          backgroundColor: Colors.green.shade700,
-                        )
-                      : null,
                   child: const Text('Continue & save'),
                 ),
               ),
