@@ -17,17 +17,24 @@ class _MemoryRepo extends ActivityEventRepository {
   }
 }
 
+/// The test clock — shared by the logged event AND the reminder service.
+/// The service refuses to arm a reminder whose fire time is already past
+/// against ITS clock; left on the wall clock, this test passed on the
+/// evening it was written (2026-09-12) and failed forever after.
+final _now = DateTime(2026, 9, 12, 19, 42);
+
 TimeTrackerActions _actions(_MemoryRepo repo, List<String> reminders) =>
     TimeTrackerActions(
       repository: repo,
       reminders: ActivityReminderService(
         evaluate: (i) async => reminders.add('schedule:${i.entityId}'),
         cancel: (id) async => reminders.add('cancel:$id'),
+        now: () => _now,
       ),
     );
 
 void main() {
-  final now = DateTime(2026, 9, 12, 19, 42);
+  final now = _now;
 
   test('logs the text at now with a manual source', () async {
     final repo = _MemoryRepo();
