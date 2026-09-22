@@ -1622,75 +1622,76 @@ class _MessageList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // SelectionArea: bubbles are copyable (§8 U8) — long-press selects.
-    return SelectionArea(
-      child: ListView.builder(
-        controller: scrollController,
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: EdgeInsets.fromLTRB(0, 8, 0, 8 + trailingSpace),
-        itemCount: messages.length + (isLoading ? 1 : 0),
-        itemBuilder: (context, i) {
-          final anchorIndex = threadAnchorIndex(messages);
-          if (i == messages.length) {
-            // While a turn is in flight the thread ends with a Stop chip —
-            // NOT a second ThinkingIndicator: the loading bubble already
-            // draws the dots, and the trailing copy was the §8 U4
-            // double-indicator.
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: ActionChip(
-                  avatar: Icon(
-                    Icons.stop_rounded,
-                    size: 14,
-                    color: AppColors.textSoft,
-                  ),
-                  label: const Text('Stop', style: TextStyle(fontSize: 12)),
-                  backgroundColor: AppColors.inkCard,
-                  side: BorderSide(
-                    color: AppColors.textSoft.withValues(alpha: 0.25),
-                  ),
-                  onPressed: onStop,
+    // Bubbles are copyable (§8 U8) — each bubble carries its OWN
+    // SelectionArea (chat_bubbles.dart, 2026-09-22). One area around the
+    // whole list tripped Flutter's `!_selectionStartsInScrollable`
+    // assertion on a long-press drag inside the scrollable.
+    return ListView.builder(
+      controller: scrollController,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: EdgeInsets.fromLTRB(0, 8, 0, 8 + trailingSpace),
+      itemCount: messages.length + (isLoading ? 1 : 0),
+      itemBuilder: (context, i) {
+        final anchorIndex = threadAnchorIndex(messages);
+        if (i == messages.length) {
+          // While a turn is in flight the thread ends with a Stop chip —
+          // NOT a second ThinkingIndicator: the loading bubble already
+          // draws the dots, and the trailing copy was the §8 U4
+          // double-indicator.
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: ActionChip(
+                avatar: Icon(
+                  Icons.stop_rounded,
+                  size: 14,
+                  color: AppColors.textSoft,
                 ),
+                label: const Text('Stop', style: TextStyle(fontSize: 12)),
+                backgroundColor: AppColors.inkCard,
+                side: BorderSide(
+                  color: AppColors.textSoft.withValues(alpha: 0.25),
+                ),
+                onPressed: onStop,
               ),
-            );
-          }
-          final msg = messages[i];
-          Widget item = _MessageItem(
-            message: msg,
-            service: service,
-            onSuggestedPrompt: onSuggestedPrompt,
-            onEditPlan: onEditPlan,
+            ),
           );
-          // Rehydrated turns read as context, not conversation (§8 U10):
-          // dimmed, with a labelled divider before the block and a plain
-          // rule where the live conversation resumes.
-          if (msg.isHistorical) {
-            item = Opacity(opacity: 0.7, child: item);
-          }
-          if (i == anchorIndex) {
-            item = KeyedSubtree(key: latestMessageKey, child: item);
-          }
-          final earlierDivider = i == 0 && msg.isHistorical;
-          final freshDivider =
-              i > 0 && messages[i - 1].isHistorical && !msg.isHistorical;
-          // Keyed by id: list mutations (loading bubble out, reply in)
-          // keep every other bubble's element — no re-registration churn.
-          final keyed = !earlierDivider && !freshDivider
-              ? item
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (earlierDivider)
-                      const _ThreadDivider(label: 'EARLIER TODAY'),
-                    if (freshDivider) const _ThreadDivider(),
-                    item,
-                  ],
-                );
-          return KeyedSubtree(key: ValueKey('msg-${msg.id}'), child: keyed);
-        },
-      ),
+        }
+        final msg = messages[i];
+        Widget item = _MessageItem(
+          message: msg,
+          service: service,
+          onSuggestedPrompt: onSuggestedPrompt,
+          onEditPlan: onEditPlan,
+        );
+        // Rehydrated turns read as context, not conversation (§8 U10):
+        // dimmed, with a labelled divider before the block and a plain
+        // rule where the live conversation resumes.
+        if (msg.isHistorical) {
+          item = Opacity(opacity: 0.7, child: item);
+        }
+        if (i == anchorIndex) {
+          item = KeyedSubtree(key: latestMessageKey, child: item);
+        }
+        final earlierDivider = i == 0 && msg.isHistorical;
+        final freshDivider =
+            i > 0 && messages[i - 1].isHistorical && !msg.isHistorical;
+        // Keyed by id: list mutations (loading bubble out, reply in)
+        // keep every other bubble's element — no re-registration churn.
+        final keyed = !earlierDivider && !freshDivider
+            ? item
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (earlierDivider)
+                    const _ThreadDivider(label: 'EARLIER TODAY'),
+                  if (freshDivider) const _ThreadDivider(),
+                  item,
+                ],
+              );
+        return KeyedSubtree(key: ValueKey('msg-${msg.id}'), child: keyed);
+      },
     );
   }
 }

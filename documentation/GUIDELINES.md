@@ -3996,3 +3996,14 @@ not silent reversal.
   remaining programmatic focus requests are all user taps (prompt chips,
   quick directives, "Edit plan", leaving Voice Mode for typing) and stay.
   Test in `coach_sheet_in_flight_grow_test`.
+
+- **2026-09-22 · Coach bubbles: one SelectionArea per bubble, not one
+  around the thread.** Miko's device log showed five
+  `'!_selectionStartsInScrollable': is not true` assertions from
+  `onLongPressMoveUpdate`: the copyable-bubbles feature (§8 U8) wrapped
+  the whole scrolling thread in a single `SelectionArea`, and a
+  long-press drag that starts inside a scrollable trips that Flutter
+  framework assertion (debug-only, but long-press-to-copy was fragile).
+  Each bubble's text now carries its own `SelectionArea` in
+  `chat_bubbles.dart`; the list-wide one is gone. Long-press still
+  selects and copies, scoped to the bubble under the finger.
