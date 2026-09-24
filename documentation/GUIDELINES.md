@@ -4187,3 +4187,16 @@ not silent reversal.
   by Miko: A ends when B starts (the PRD's design). Tests:
   `activity_overlap_test`, `activity_reminder_and_actions_test` (log ends
   previous group).
+
+- **2026-09-24 · Circle members: tappable dots, moderators remove
+  directly, header fits.** Miko's screenshot. (1) The ⋮ on a member row
+  was decorative — the menu only opened on a long-press; a tap opens it
+  now (long-press still works). (2) Any moderator can "Remove <name>"
+  directly; the Phase-1 PRD limited direct removal to the creator and
+  gave other moderators only "Vote to remove", but `circleRemoveMember`
+  on the server already requires just moderator. The vote stays as a
+  second, softer option; the creator's row never shows the menu (the
+  server refuses to remove the creator). (3) The circle header's
+  `expandedHeight` went 186 → 196 with an explicit text height: it
+  overflowed by 1 px on iOS without a streak badge and by ~8 px with
+  one.

@@ -42,7 +42,6 @@ class CircleMembersView extends ConsumerWidget {
       data: (members) {
         final circle = circleAsync.valueOrNull;
         final isModerator = circle != null && circle.moderatorIds.contains(uid);
-        final isCreator = circle?.creatorId == uid;
 
         final pending = members
             .where((m) => m.status == CircleMemberStatus.pending)
@@ -113,8 +112,18 @@ class CircleMembersView extends ConsumerWidget {
                 (m) => _ActiveMemberTile(
                   member: m,
                   isMe: m.userId == uid,
-                  canRemove: isCreator && m.userId != uid,
-                  canVoteRemove: isModerator && !isCreator && m.userId != uid,
+                  // Any moderator removes directly (Miko, 2026-09-24; the
+                  // server's circleRemoveMember already requires only
+                  // moderator). The vote stays as a softer second option.
+                  // Nobody removes the creator — the server refuses it.
+                  canRemove:
+                      isModerator &&
+                      m.userId != uid &&
+                      m.userId != circle.creatorId,
+                  canVoteRemove:
+                      isModerator &&
+                      m.userId != uid &&
+                      m.userId != circle.creatorId,
                   onRemove: () => _remove(context, ref, m),
                   onVoteRemove: () => _initiateVoteRemove(context, ref, m),
                 ),
@@ -444,11 +453,19 @@ class _ActiveMemberTile extends StatelessWidget {
                 ],
               ),
             ),
+            // The dots were decorative — the menu only opened on a
+            // long-press of the row (2026-09-24). Now a tap opens it too.
             if (canRemove || canVoteRemove)
-              Icon(
-                Icons.more_vert_rounded,
-                color: AppColors.textSecondary,
-                size: 18,
+              IconButton(
+                key: ValueKey('member_actions_${member.userId}'),
+                tooltip: 'Member actions',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _showRemoveMenu(context),
+                icon: Icon(
+                  Icons.more_vert_rounded,
+                  color: AppColors.textSecondary,
+                  size: 18,
+                ),
               ),
           ],
         ),

@@ -231,9 +231,13 @@ class _CircleHeader extends StatelessWidget {
     required this.members,
   });
 
-  /// Toolbar (56) + member line (18) + gap (12) + avatars (36) + paddings
-  /// (4 + 12) + tab strip (48). Excludes the status bar (SafeArea adds it).
-  static const double expandedHeight = 186;
+  /// Toolbar (56) + top pad (4) + member line (26 with the streak badge,
+  /// 18 without) + gap (12) + avatars (36) + bottom pad (12) + tab strip
+  /// (48) = 194; +2 slack for font metrics. Excludes the status bar
+  /// (SafeArea adds it). Was 186, sized for the no-badge line: it
+  /// overflowed by 1 px on iOS and by 8 px once a streak showed
+  /// (2026-09-24).
+  static const double expandedHeight = 196;
 
   final int streak;
   final int memberCount;
@@ -270,6 +274,7 @@ class _CircleHeader extends StatelessWidget {
                         style: TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 13,
+                          height: 1.3,
                         ),
                       ),
                     ),
