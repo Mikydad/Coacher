@@ -113,7 +113,10 @@ List<ProviderOrFamily> get userScopedProviders => [
   // ── Education / onboarding ───────────────────────────────────────────────
   // The Getting Started controller decides new-vs-existing ONCE per
   // instance; without this, User A's 'hidden' controller survives in memory
-  // and User B (a brand-new account) never gets onboarding.
+  // and User B (a brand-new account) never gets onboarding. The provider
+  // also watches the uid itself and its probe waits for the wipe to end
+  // (SessionScope.whenIdle), so the rebuild this triggers cannot judge B by
+  // A's rows.
   gettingStartedControllerProvider,
 
   // ── Ephemeral UI / navigation state ──────────────────────────────────────────

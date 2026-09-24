@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 /// The client-side account boundary (pre-launch audit H2–H6, 2026-09-15).
@@ -16,6 +18,7 @@ import 'package:flutter/foundation.dart';
 abstract final class SessionScope {
   static int _generation = 0;
   static bool _tearingDown = false;
+  static Completer<void>? _idle;
 
   /// Current session generation. Captured by jobs via [capture].
   static int get generation => _generation;
@@ -24,6 +27,14 @@ abstract final class SessionScope {
   /// being wiped and nothing may start new user-scoped work (a stash
   /// finalization triggered by provider disposal, for instance).
   static bool get isTearingDown => _tearingDown;
+
+  /// Resolves once no teardown is running — at once outside one. For work
+  /// that must judge the INCOMING account (the Getting Started tour's
+  /// new-vs-existing probe, 2026-09-23): a provider invalidated at the start
+  /// of an account switch is rebuilt while the outgoing account's rows are
+  /// still in Isar, so it awaits this before reading anything.
+  static Future<void> get whenIdle =>
+      _tearingDown ? (_idle ??= Completer<void>()).future : Future.value();
 
   /// Marks the start of a logout / account switch / deletion. Idempotent
   /// within one teardown (calling it twice bumps twice, which is harmless:
@@ -36,6 +47,8 @@ abstract final class SessionScope {
   /// The wipe finished; the next account's jobs may capture fresh tokens.
   static void endTeardown() {
     _tearingDown = false;
+    _idle?.complete();
+    _idle = null;
   }
 
   static bool isCurrent(int generation) =>
@@ -47,6 +60,7 @@ abstract final class SessionScope {
   static void resetForTests() {
     _generation = 0;
     _tearingDown = false;
+    _idle = null;
   }
 }
 

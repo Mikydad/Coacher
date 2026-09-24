@@ -25,6 +25,7 @@ void main() {
     FirstLaunchGate.debugSeedForTests = null;
     SyncService.debugUidForTests = null;
     FirstScreenReady.resetForTests();
+    FirstLaunchGate.resetSeedSignals();
   });
 
   Widget gate() => const FirstLaunchGate(
@@ -142,4 +143,78 @@ void main() {
       expect(await seededFlag(), isNull);
     },
   );
+
+  group('seedSettledFor (2026-09-23)', () {
+    testWidgets('settles after the pull ends, even when revealed by the cap', (
+      tester,
+    ) async {
+      final pull = Completer<bool>();
+      FirstLaunchGate.debugSeedForTests = (_) => pull.future;
+      var settled = false;
+      unawaited(FirstLaunchGate.seedSettledFor(uid).then((_) => settled = true));
+
+      await tester.pumpWidget(gate());
+      await tester.pump(kFirstLaunchRevealCap + const Duration(seconds: 1));
+      expect(find.text('HOME'), findsOneWidget, reason: 'cap revealed');
+      expect(settled, isFalse, reason: 'rows may still be landing');
+
+      pull.complete(false);
+      await tester.pump();
+      expect(settled, isTrue);
+    });
+
+    testWidgets('a pending signal asked for before the mount is honoured', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({kIsarSeededV1PrefsKey: true});
+      var settled = false;
+      unawaited(FirstLaunchGate.seedSettledFor(uid).then((_) => settled = true));
+      await tester.pumpWidget(gate());
+      await tester.pump();
+      expect(settled, isTrue);
+    });
+
+    testWidgets('asking again after it settled does not reopen it', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({kIsarSeededV1PrefsKey: true});
+      await tester.pumpWidget(gate());
+      await tester.pump();
+      var first = false;
+      var second = false;
+      unawaited(FirstLaunchGate.seedSettledFor(uid).then((_) => first = true));
+      unawaited(FirstLaunchGate.seedSettledFor(uid).then((_) => second = true));
+      await tester.pump();
+      expect(first, isTrue);
+      expect(second, isTrue);
+    });
+
+    testWidgets('a settled signal is replaced by the next mount for that uid', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({kIsarSeededV1PrefsKey: true});
+      await tester.pumpWidget(gate());
+      await tester.pump();
+      var settledOnce = false;
+      unawaited(
+        FirstLaunchGate.seedSettledFor(uid).then((_) => settledOnce = true),
+      );
+      await tester.pump();
+      expect(settledOnce, isTrue, reason: 'first mount settled');
+
+      // Remount (account switched away and back): a new question.
+      await tester.pumpWidget(const SizedBox());
+      final pull = Completer<bool>();
+      SharedPreferences.setMockInitialValues({});
+      FirstLaunchGate.debugSeedForTests = (_) => pull.future;
+      await tester.pumpWidget(gate());
+      var settled = false;
+      unawaited(FirstLaunchGate.seedSettledFor(uid).then((_) => settled = true));
+      await tester.pump();
+      expect(settled, isFalse);
+      pull.complete(true);
+      await tester.pump();
+      expect(settled, isTrue);
+    });
+  });
 }

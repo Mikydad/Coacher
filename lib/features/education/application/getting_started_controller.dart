@@ -1,12 +1,17 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
 
+import '../../../app/first_launch_gate.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/local_db/isar_collections/isar_task.dart';
 import '../../../core/offline/offline_store.dart';
+import '../../../core/session/session_scope.dart';
 import '../../analytics/application/analytics_period_bundle_notifier.dart';
 import '../../analytics/application/discipline_score.dart';
+import '../../auth/application/auth_providers.dart';
 import '../../feedback/application/feedback_route_tracker.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
@@ -59,32 +64,54 @@ class GettingStartedState {
 /// real action (route opened, title typed, task saved/completed) — signals
 /// are fed by the provider below and by small hooks in the screens.
 ///
-/// Lifecycle pref is tri-state ('active'/'done'/absent): the new-vs-existing
-/// judgement is made exactly once, so creating your first task doesn't make
-/// you look like an existing user on the next launch. Invalidated on account
-/// switch (user_scoped_invalidation.dart).
+/// Lifecycle pref is tri-state ('active'/'done'/absent) and PER ACCOUNT:
+/// the new-vs-existing judgement is made exactly once per uid, so creating
+/// your first task doesn't make you look like an existing user on the next
+/// launch, and no account inherits another's verdict.
+///
+/// The judgement is made only for a signed-in [uid], and only once the
+/// account's local rows are trustworthy (2026-09-23): an account switch
+/// invalidates this provider BEFORE the outgoing account's Isar rows are
+/// wiped, and Riverpod rebuilds it at once (the tour layer is still
+/// listening), so the probe waits for [SessionScope.whenIdle]; and since the
+/// first-launch reveal is capped, an existing account's tasks may still be
+/// landing when Home paints, so it also waits for
+/// [FirstLaunchGate.seedSettledFor]. Signals that arrive meanwhile are
+/// buffered, exactly as they were during the prefs read.
 class GettingStartedController extends StateNotifier<GettingStartedState> {
   GettingStartedController(
     this._prefs, {
+    required String? uid,
     Future<bool> Function()? hasExistingDataProbe,
     int Function()? streakReader,
+    Future<void> Function(String uid)? awaitReady,
     Duration celebrateFor = const Duration(milliseconds: 3500),
     Duration titleSettleFor = const Duration(milliseconds: 1800),
-  }) : _hasExistingDataProbe = hasExistingDataProbe ?? _defaultProbe,
+  }) : _uid = uid,
+       _hasExistingDataProbe = hasExistingDataProbe ?? _defaultProbe,
        _streakReader = streakReader,
+       _awaitReady = awaitReady ?? _defaultAwaitReady,
        _celebrateFor = celebrateFor,
        _titleSettleFor = titleSettleFor,
        super(const GettingStartedState.loading()) {
     _init();
   }
 
+  /// Longest the probe waits for readiness. A tree without a
+  /// [FirstLaunchGate] (tests, odd hosts) must still decide. The timer is
+  /// owned here and cancelled on dispose, like the other two.
+  static const Duration kSeedSettleCap = Duration(seconds: 30);
+
   final EducationPrefs _prefs;
+  final String? _uid;
   final Future<bool> Function() _hasExistingDataProbe;
+  final Future<void> Function(String uid) _awaitReady;
   final int Function()? _streakReader;
   final Duration _celebrateFor;
   final Duration _titleSettleFor;
   Timer? _celebrateTimer;
   Timer? _titleSettleTimer;
+  Timer? _readyCapTimer;
 
   // Latest signals, buffered even before init resolves.
   bool _seenTaskCreated = false;
@@ -93,17 +120,49 @@ class GettingStartedController extends StateNotifier<GettingStartedState> {
   bool _titleTyped = false;
   String? _topRoute;
 
-  /// Existing-user signal: any task ever stored locally. Safe because
-  /// FirstLaunchGate blocks the UI on the remote→local seed, so an existing
-  /// account has rows before home builds.
+  /// Existing-user signal: any task ever stored locally. Trustworthy only
+  /// after [_defaultAwaitReady]: the rows must belong to this account (no
+  /// wipe in flight) and the seed must have had its chance to land.
   static Future<bool> _defaultProbe() async {
     final isar = OfflineStore.instance.isar;
     if (isar == null) return false;
     return await isar.isarTasks.where().count() > 0;
   }
 
+  /// Rows are trustworthy once no wipe is running and the account's seed
+  /// question is settled. Uncapped here; [_awaitReadyCapped] bounds it.
+  static Future<void> _defaultAwaitReady(String uid) async {
+    await SessionScope.whenIdle;
+    await FirstLaunchGate.seedSettledFor(uid);
+  }
+
+  /// Readiness or [kSeedSettleCap], whichever first; a failure counts as
+  /// ready. Disposal cancels the cap and leaves the wait dangling, which is
+  /// harmless — nothing after it runs once unmounted.
+  Future<void> _awaitReadyCapped(String uid) {
+    final done = Completer<void>();
+    void finish() {
+      if (!done.isCompleted) done.complete();
+    }
+
+    _readyCapTimer = Timer(kSeedSettleCap, finish);
+    _awaitReady(uid).then((_) => finish(), onError: (_) => finish());
+    return done.future.whenComplete(() => _readyCapTimer?.cancel());
+  }
+
   Future<void> _init() async {
-    final stored = await _prefs.onboardingState();
+    final uid = _uid;
+    // Signed out: nothing to judge, nothing to persist. The provider
+    // rebuilds with the uid once someone signs in.
+    if (uid == null) {
+      state = state.copyWith(status: TourStatus.hidden);
+      return;
+    }
+
+    await _awaitReadyCapped(uid);
+    if (!mounted) return;
+
+    final stored = await _prefs.onboardingState(uid);
     if (!mounted) return;
 
     if (stored == 'done') {
@@ -121,11 +180,11 @@ class GettingStartedController extends StateNotifier<GettingStartedState> {
       }
       if (!mounted) return;
       if (existing) {
-        await _prefs.setOnboardingState('done');
+        await _prefs.setOnboardingState(uid, 'done');
         if (mounted) state = state.copyWith(status: TourStatus.hidden);
         return;
       }
-      await _prefs.setOnboardingState('active');
+      await _prefs.setOnboardingState(uid, 'active');
       if (!mounted) return;
     }
 
@@ -218,23 +277,30 @@ class GettingStartedController extends StateNotifier<GettingStartedState> {
   void _startCelebrationTimer() {
     _celebrateTimer?.cancel();
     _celebrateTimer = Timer(_celebrateFor, () async {
-      await _prefs.setOnboardingState('done');
+      await _markDone();
       if (mounted) state = state.copyWith(status: TourStatus.hidden);
     });
   }
 
-  /// Skip button — dismiss forever.
+  /// Skip button — dismiss forever (for this account).
   Future<void> skip() async {
     _celebrateTimer?.cancel();
     _titleSettleTimer?.cancel();
-    await _prefs.setOnboardingState('done');
+    await _markDone();
     if (mounted) state = state.copyWith(status: TourStatus.hidden);
+  }
+
+  Future<void> _markDone() async {
+    final uid = _uid;
+    if (uid == null) return;
+    await _prefs.setOnboardingState(uid, 'done');
   }
 
   @override
   void dispose() {
     _celebrateTimer?.cancel();
     _titleSettleTimer?.cancel();
+    _readyCapTimer?.cancel();
     super.dispose();
   }
 }
@@ -243,8 +309,15 @@ final gettingStartedControllerProvider =
     StateNotifierProvider<GettingStartedController, GettingStartedState>((
       ref,
     ) {
+      // Bound to the signed-in account: a uid change rebuilds the controller
+      // (on top of the manual invalidation list). A local-only boot (no
+      // Firebase) has one implicit account.
+      final uid =
+          ref.watch(authUidProvider) ??
+          (Firebase.apps.isEmpty ? AppConfig.localUserId : null);
       final controller = GettingStartedController(
         ref.watch(educationPrefsProvider),
+        uid: uid,
         streakReader: () => ref.read(homeDisplayStreakDaysProvider),
       );
 

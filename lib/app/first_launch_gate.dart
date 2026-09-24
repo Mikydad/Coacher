@@ -50,6 +50,34 @@ class FirstLaunchGate extends StatefulWidget {
   @visibleForTesting
   static FirstLaunchSeed? debugSeedForTests;
 
+  /// Per-account "the seed question is settled" signal (2026-09-23): the
+  /// gate mounted for [uid] has finished deciding — already seeded, fresh
+  /// account, or the pull ended (success or not). Consumers that judge an
+  /// account by its local rows (the Getting Started tour's new-vs-existing
+  /// probe) await this instead of the reveal, because the reveal cap can
+  /// show Home before an existing account's tasks have landed.
+  ///
+  /// A pending entry is shared: whoever asks first creates it, the mount
+  /// for that uid completes it. Asking never reopens a settled question;
+  /// only a new mount for that uid does — and
+  /// [AuthSessionPolicy.clearLocalSession] forgets every answer along with
+  /// the seeded flag, so an account that returns after a switch is seeded,
+  /// and judged, afresh.
+  static Future<void> seedSettledFor(String uid) =>
+      (_seedSettled[uid] ??= Completer<void>()).future;
+
+  static final Map<String, Completer<void>> _seedSettled = {};
+
+  /// Gate mount for [uid]: adopts a pending question, replaces a settled one.
+  static Completer<void> _beginFor(String uid) {
+    final existing = _seedSettled[uid];
+    if (existing != null && !existing.isCompleted) return existing;
+    return _seedSettled[uid] = Completer<void>();
+  }
+
+  /// Every account's seed question is open again (account boundary).
+  static void resetSeedSignals() => _seedSettled.clear();
+
   @override
   State<FirstLaunchGate> createState() => _FirstLaunchGateState();
 }
@@ -57,10 +85,13 @@ class FirstLaunchGate extends StatefulWidget {
 class _FirstLaunchGateState extends State<FirstLaunchGate> {
   var _ready = false;
   Timer? _capTimer;
+  Completer<void>? _seedSettled;
 
   @override
   void initState() {
     super.initState();
+    final uid = SyncService.currentUid();
+    if (uid != null) _seedSettled = FirstLaunchGate._beginFor(uid);
     unawaited(_bootstrap());
   }
 
@@ -80,6 +111,17 @@ class _FirstLaunchGateState extends State<FirstLaunchGate> {
   }
 
   Future<void> _bootstrap() async {
+    try {
+      await _decideAndReveal();
+    } finally {
+      // Every exit — seeded, fresh, pull done, pull threw — settles the
+      // account's seed question for [FirstLaunchGate.seedSettledFor].
+      final settled = _seedSettled;
+      if (settled != null && !settled.isCompleted) settled.complete();
+    }
+  }
+
+  Future<void> _decideAndReveal() async {
     final since = Stopwatch()..start();
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;

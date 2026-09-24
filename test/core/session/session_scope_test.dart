@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sidepal/core/session/session_scope.dart';
 
@@ -23,6 +25,24 @@ void main() {
     // Same generation, teardown over → current again (the next account's
     // first jobs capture after endTeardown, so this is the expected state).
     expect(duringTeardown.isCurrent, isTrue);
+  });
+
+  test('whenIdle resolves at once outside a teardown', () async {
+    var resolved = false;
+    unawaited(SessionScope.whenIdle.then((_) => resolved = true));
+    await Future<void>.delayed(Duration.zero);
+    expect(resolved, isTrue);
+  });
+
+  test('whenIdle waits for endTeardown during a wipe', () async {
+    SessionScope.beginTeardown();
+    var resolved = false;
+    unawaited(SessionScope.whenIdle.then((_) => resolved = true));
+    await Future<void>.delayed(Duration.zero);
+    expect(resolved, isFalse, reason: 'wipe still running');
+    SessionScope.endTeardown();
+    await Future<void>.delayed(Duration.zero);
+    expect(resolved, isTrue);
   });
 
   test('ensureCurrent throws a StaleSessionError once the session ended', () {

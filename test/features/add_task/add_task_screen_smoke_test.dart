@@ -96,7 +96,11 @@ Widget _app({
       // Onboarding pref is seeded 'done' (setUp) → tour hidden, no timers, and
       // the real provider's Isar/Firestore listener chains are bypassed.
       gettingStartedControllerProvider.overrideWith(
-        (ref) => GettingStartedController(EducationPrefs()),
+        (ref) => GettingStartedController(
+          EducationPrefs(),
+          uid: 'smoke-user',
+          awaitReady: (_) async {},
+        ),
       ),
       analyticsRepositoryProvider.overrideWithValue(_NoOpAnalyticsRepository()),
       featureBuilderRecomputeServiceProvider.overrideWithValue(

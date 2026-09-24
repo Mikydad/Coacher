@@ -8,13 +8,27 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   group('EducationPrefs', () {
-    test('onboarding state round-trips', () async {
+    test('onboarding state round-trips per account', () async {
       final prefs = EducationPrefs();
-      expect(await prefs.onboardingState(), isNull);
-      await prefs.setOnboardingState('active');
-      expect(await prefs.onboardingState(), 'active');
-      await prefs.setOnboardingState('done');
-      expect(await prefs.onboardingState(), 'done');
+      expect(await prefs.onboardingState('a'), isNull);
+      await prefs.setOnboardingState('a', 'active');
+      expect(await prefs.onboardingState('a'), 'active');
+      await prefs.setOnboardingState('a', 'done');
+      expect(await prefs.onboardingState('a'), 'done');
+      expect(await prefs.onboardingState('b'), isNull, reason: 'scoped');
+    });
+
+    test('legacy device-level key migrates to the first account that reads it',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        kLegacyOnboardingStatePrefsKey: 'done',
+      });
+      final prefs = EducationPrefs();
+      expect(await prefs.onboardingState('a'), 'done');
+      final raw = await SharedPreferences.getInstance();
+      expect(raw.getString(onboardingStatePrefsKeyFor('a')), 'done');
+      expect(raw.getString(kLegacyOnboardingStatePrefsKey), isNull);
+      expect(await prefs.onboardingState('b'), isNull);
     });
 
     test('markCardSeen accumulates and is idempotent', () async {

@@ -1,23 +1,37 @@
+import 'dart:async';
+
 import 'package:sidepal/features/education/application/education_prefs.dart';
 import 'package:sidepal/features/education/application/getting_started_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+const _uid = 'u1';
+const _key = 'education_onboarding_state_v1:u1';
+
+Future<void> _ready(String _) async {}
+
 GettingStartedController _controller({
+  String? uid = _uid,
   bool existingData = false,
   int streak = 0,
+  Future<void> Function(String uid) awaitReady = _ready,
   Duration celebrateFor = const Duration(minutes: 1),
   Duration titleSettleFor = const Duration(milliseconds: 5),
 }) => GettingStartedController(
   EducationPrefs(),
+  uid: uid,
   hasExistingDataProbe: () async => existingData,
   streakReader: () => streak,
+  awaitReady: awaitReady,
   celebrateFor: celebrateFor,
   titleSettleFor: titleSettleFor,
 );
 
 Future<void> _settle() =>
     Future<void>.delayed(const Duration(milliseconds: 20));
+
+Future<String?> _stored([String uid = _uid]) =>
+    EducationPrefs().onboardingState(uid);
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -29,14 +43,16 @@ void main() {
       await _settle();
       expect(c.state.status, TourStatus.active);
       expect(c.state.step, TourStep.tapAddTask);
-      expect(await EducationPrefs().onboardingState(), 'active');
+      expect(await _stored(), 'active');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(_key), 'active', reason: 'keyed per account');
     });
 
     test('user with existing tasks → silently done and hidden', () async {
       final c = _controller(existingData: true);
       await _settle();
       expect(c.state.status, TourStatus.hidden);
-      expect(await EducationPrefs().onboardingState(), 'done');
+      expect(await _stored(), 'done');
     });
 
     test('user with a streak → silently done', () async {
@@ -46,17 +62,17 @@ void main() {
     });
 
     test("stored 'done' → hidden without probing", () async {
-      SharedPreferences.setMockInitialValues({
-        'education_onboarding_state_v1': 'done',
-      });
+      SharedPreferences.setMockInitialValues({_key: 'done'});
       var probed = false;
       final c = GettingStartedController(
         EducationPrefs(),
+        uid: _uid,
         hasExistingDataProbe: () async {
           probed = true;
           return false;
         },
         streakReader: () => 0,
+        awaitReady: _ready,
       );
       await _settle();
       expect(c.state.status, TourStatus.hidden);
@@ -67,9 +83,7 @@ void main() {
       "stored 'active' resumes even though the user now has data "
       '(first-task bug guard)',
       () async {
-        SharedPreferences.setMockInitialValues({
-          'education_onboarding_state_v1': 'active',
-        });
+        SharedPreferences.setMockInitialValues({_key: 'active'});
         final c = _controller(existingData: true, streak: 9);
         await _settle();
         expect(c.state.status, TourStatus.active);
@@ -79,11 +93,108 @@ void main() {
     test('probe failure still onboards the new user', () async {
       final c = GettingStartedController(
         EducationPrefs(),
+        uid: _uid,
         hasExistingDataProbe: () async => throw Exception('probe broke'),
         streakReader: () => 0,
+        awaitReady: _ready,
       );
       await _settle();
       expect(c.state.status, TourStatus.active);
+    });
+  });
+
+  group('account boundary (2026-09-23)', () {
+    test("another account's 'done' is not inherited", () async {
+      SharedPreferences.setMockInitialValues({
+        'education_onboarding_state_v1:someone-else': 'done',
+      });
+      final c = _controller();
+      await _settle();
+      expect(c.state.status, TourStatus.active);
+      expect(await _stored(), 'active');
+      expect(await _stored('someone-else'), 'done', reason: 'untouched');
+    });
+
+    test('signed out → hidden, nothing probed, nothing persisted', () async {
+      var probed = false;
+      final c = GettingStartedController(
+        EducationPrefs(),
+        uid: null,
+        hasExistingDataProbe: () async {
+          probed = true;
+          return false;
+        },
+        streakReader: () => 0,
+        awaitReady: _ready,
+      );
+      await _settle();
+      expect(c.state.status, TourStatus.hidden);
+      expect(probed, isFalse);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getKeys(), isEmpty);
+    });
+
+    test('legacy device-level verdict migrates to the signed-in account once',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        'education_onboarding_state_v1': 'done',
+      });
+      final c = _controller();
+      await _settle();
+      expect(c.state.status, TourStatus.hidden);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(_key), 'done');
+      expect(prefs.getString('education_onboarding_state_v1'), isNull);
+      // The next account on this device does not see it.
+      final other = _controller(uid: 'u2');
+      await _settle();
+      expect(other.state.status, TourStatus.active);
+    });
+
+    test(
+      'the verdict waits for readiness: probe runs on the post-wipe rows, '
+      'not the outgoing account\'s',
+      () async {
+        // Simulates an in-session account switch: the provider is rebuilt
+        // while User A's rows are still in Isar; the wipe empties them later.
+        final wipeDone = Completer<void>();
+        var rowsPresent = true;
+        final c = GettingStartedController(
+          EducationPrefs(),
+          uid: 'user-b',
+          hasExistingDataProbe: () async => rowsPresent,
+          streakReader: () => 0,
+          awaitReady: (_) => wipeDone.future,
+        );
+        await _settle();
+        expect(c.state.status, TourStatus.loading, reason: 'undecided');
+        expect(await _stored('user-b'), isNull);
+
+        rowsPresent = false; // the wipe landed
+        wipeDone.complete();
+        await _settle();
+        expect(c.state.status, TourStatus.active);
+        expect(await _stored('user-b'), 'active');
+      },
+    );
+
+    test('a readiness failure never stalls the decision', () async {
+      final c = _controller(
+        awaitReady: (_) async => throw StateError('gate missing'),
+      );
+      await _settle();
+      expect(c.state.status, TourStatus.active);
+    });
+
+    test('signals buffered while waiting for readiness still resume the step',
+        () async {
+      SharedPreferences.setMockInitialValues({_key: 'active'});
+      final ready = Completer<void>();
+      final c = _controller(awaitReady: (_) => ready.future);
+      c.onTaskRows(anyTask: true, anyCompleted: false);
+      ready.complete();
+      await _settle();
+      expect(c.state.step, TourStep.completeTask);
     });
   });
 
@@ -114,7 +225,7 @@ void main() {
 
       await _settle();
       expect(c.state.status, TourStatus.hidden);
-      expect(await EducationPrefs().onboardingState(), 'done');
+      expect(await _stored(), 'done');
     });
 
     test('leaving Add Task without saving rewinds to tapAddTask', () async {
@@ -163,9 +274,7 @@ void main() {
     });
 
     test('resume: task already created → completeTask hint', () async {
-      SharedPreferences.setMockInitialValues({
-        'education_onboarding_state_v1': 'active',
-      });
+      SharedPreferences.setMockInitialValues({_key: 'active'});
       final c = _controller();
       // Signal arrives before init resolves (buffered).
       c.onTaskRows(anyTask: true, anyCompleted: false);
@@ -176,13 +285,11 @@ void main() {
 
     test('resume: task already completed → straight to celebration → done',
         () async {
-      SharedPreferences.setMockInitialValues({
-        'education_onboarding_state_v1': 'active',
-      });
+      SharedPreferences.setMockInitialValues({_key: 'active'});
       final c = _controller(celebrateFor: const Duration(milliseconds: 5));
       c.onTaskRows(anyTask: true, anyCompleted: true);
       await _settle();
-      expect(await EducationPrefs().onboardingState(), 'done');
+      expect(await _stored(), 'done');
     });
   });
 
@@ -193,6 +300,6 @@ void main() {
 
     await c.skip();
     expect(c.state.status, TourStatus.hidden);
-    expect(await EducationPrefs().onboardingState(), 'done');
+    expect(await _stored(), 'done');
   });
 }

@@ -19,6 +19,7 @@ import '../../memory/application/memory_extraction_service.dart';
 import '../../reminders/application/recovery_triage_service.dart';
 import '../../reminders/application/strategist_proposals_store.dart';
 import '../../thinking/application/thinking_loop_service.dart';
+import '../../../app/first_launch_gate.dart';
 
 // ── Feature flag ──────────────────────────────────────────────────────────────
 
@@ -163,6 +164,10 @@ abstract final class AuthSessionPolicy {
       // 3b. Drop sync cursors so the next account's first pull is a FULL pull
       //     (cursors describe the previous account's merge progress).
       await SyncCursorStore.clearAll();
+      // 3c. Every account's "seed settled" answer is void with the rows gone
+      //     (2026-09-23): an account returning to this device is seeded and
+      //     judged afresh by the gate that remounts for it.
+      FirstLaunchGate.resetSeedSignals();
 
       // 4. Clear the relevant SharedPreferences keys.
       //    NOTE: kLastSignedInUidPrefsKey is intentionally kept so that the next
@@ -173,8 +178,11 @@ abstract final class AuthSessionPolicy {
       await Future.wait([
         prefs.remove('isar_seeded_v1'),
         prefs.remove('notification_task_id_index_v1'),
-        // Onboarding is per-account (a different sign-in re-evaluates new vs
-        // existing); seen feature cards stay device-level on purpose.
+        // The Getting Started verdict is stored per uid since 2026-09-23
+        // (`education_onboarding_state_v1:<uid>`) and is deliberately kept:
+        // an account that returns to this device keeps its own answer. This
+        // removes only the pre-migration device-level key. Seen feature
+        // cards stay device-level on purpose.
         prefs.remove('education_onboarding_state_v1'),
         // Thinking Loop cadence is per-account (P2-10): without this, user
         // A's morning reflection would make user B silently skip theirs for
