@@ -29,8 +29,9 @@ import {
 //
 // Production-hardened after the spike gate passed on device: shares the
 // hourly quota pool, Remote Config voice pin and kill switch, and usage
-// telemetry with the callable (speech_shared.ts), and carries the warm
-// instance for the spoken-turn critical path.
+// telemetry with the callable (speech_shared.ts). It carried the warm
+// instance for the spoken-turn critical path until the 2026-09-24 cost
+// audit (see aiChat in index.ts).
 
 const OPENAI_SPEECH_URL = "https://api.openai.com/v1/audio/speech";
 
@@ -41,9 +42,10 @@ export const aiSpeechStream = onRequest(
     timeoutSeconds: 60,
     memory: "256MiB",
     maxInstances: 10,
-    // The warm instance moved here from aiSpeech (Phase 1): this is the
-    // spoken-turn critical path now, and we only pay for one.
-    minInstances: 1,
+    // No warm instance (cost audit 2026-09-24, see aiChat in index.ts):
+    // the Voice Mode entry GET ping spins this instance before the first
+    // spoken turn needs it.
+    minInstances: 0,
   },
   async (req, res) => {
     // Warmup ping from the client when Voice Mode opens: warms the TLS

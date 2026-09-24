@@ -204,3 +204,31 @@ Flutter post on cooperative cancellation of long async pipelines.
 - **Formats:** short post ("your crash-free rate is lying"), thread on
   reading Crashlytics via CLI when the console won't let you in, code-walk
   of the four one-line fixes.
+
+
+## 2026-09-24 · Five testers, a $25 bill, and the "few dollars" that weren't
+
+- **Hook:** Five testers. Twenty-five dollars a month. Firestore: zero.
+  Something was awake all night.
+- **What happened:** ChatGPT had already pointed at `minInstances: 1` on
+  three AI functions. True — but our own decision log had priced those at
+  "a few $/month", and I wanted to know why reality was four times that.
+  The answer was in the Firebase CLI's own table: a 2nd-gen function gets a
+  full vCPU no matter how little memory you give it (256MiB → 1 vCPU,
+  concurrency 80). Idle CPU at that size is ~$6.60 a month per instance,
+  memory ~$1.60. Three of them: ~$25. The bill's CPU-to-memory ratio was
+  exactly 4:1 — one vCPU to a quarter gig.
+- **The turn:** The "contradiction" in the console (service says min 0,
+  revision says minScale 1) wasn't one: Firebase sets the revision-level
+  knob; the service-level one is a newer Cloud Run setting it never
+  touches. The fix had a subtlety worth checking before trusting it: does
+  deleting the option line reset the live value, or silently keep it? The
+  SDK marks unset options as RESET_VALUE, so either works — I wrote 0
+  explicitly anyway. gcloud isn't installed here, so verification came from
+  `firebase functions:list --debug`, which prints the whole serviceConfig.
+- **Takeaway:** Price every warm instance at one full vCPU. And the client
+  warmup ping we added for latency is what makes zero warm instances
+  survivable: the cold start now overlaps the user raising the phone.
+- **Formats:** short post ("the cheapest-looking line in your functions
+  config costs $8/month"), thread on reading Cloud Functions config without
+  gcloud, decision-log excerpt with the 4:1 ratio as the reveal.

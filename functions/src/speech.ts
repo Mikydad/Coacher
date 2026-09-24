@@ -32,10 +32,11 @@ export const aiSpeech = onCall(
     timeoutSeconds: 30,
     memory: "256MiB",
     maxInstances: 10,
-    // No warm instance here anymore: the streaming endpoint took over the
-    // spoken-turn critical path (Phase 1, 2026-08-08) and carries the
-    // minInstances budget. This callable stays as the buffered fallback
-    // path for older builds and the _kStreamingTts=false A/B setting.
+    // No warm instance here: the streaming endpoint took over the
+    // spoken-turn critical path (Phase 1, 2026-08-08); its own warm
+    // instance went too in the 2026-09-24 cost audit (see aiChat in
+    // index.ts). This callable stays as the buffered fallback path for
+    // older builds and the _kStreamingTts=false A/B setting.
   },
   async (request: CallableRequest<AiSpeechData>) => {
     if (!request.auth) {

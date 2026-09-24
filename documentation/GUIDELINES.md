@@ -4200,3 +4200,33 @@ not silent reversal.
   `expandedHeight` went 186 → 196 with an explicit text height: it
   overflowed by 1 px on iOS without a streak badge and by ~8 px with
   one.
+
+- **2026-09-24 · Warm function instances off: `minInstances` 1 → 0 on
+  `aiChat`, `aiChatStream`, `aiSpeechStream` (cost audit).** Miko: ~5
+  testers, yet the Firebase bill sat around $25/month. Root cause: the
+  three warm instances kept for voice latency (batches of
+  2026-08-07/08/22) were logged as "a few $/month", which assumed
+  1st-gen fractional CPU. A gen2 function gets a FULL vCPU regardless
+  of memory (firebase-functions v2 + CLI default: 256MiB → `cpu` 1,
+  `concurrency` 80), so each idle instance bills ~1 vCPU × $0.0000025/s
+  + 0.25 GiB × $0.0000025/s ≈ $8.2/month; three ≈ $24.6/month. The
+  bill's min-instance CPU (~$26.70) to memory (~$6.67) ratio is 4:1 —
+  exactly one vCPU to a quarter GiB. Everything else is near zero: the
+  four every-15-min sweeps are bounded collectionGroup queries (~11.5k
+  invocations/month), Firestore ~$0, no trigger loops. Decision: 0 on
+  all three (Option A); deployed 2026-09-24 and verified through the
+  Cloud Functions v2 API (`serviceConfig.minInstanceCount: 0` on the
+  new revisions; gcloud is not installed on this Mac —
+  `firebase functions:list --debug` exposes the full serviceConfig).
+  Cost of the decision: the first text turn after ~15 idle minutes pays
+  the 2-3 s cold start; voice is mostly covered because Voice Mode
+  entry already fires `warmVoiceEndpoints` GET pings, which now double
+  as the cold-start trigger. *Considered:* keeping them warm at
+  `cpu: 'gcf_gen1'` + `concurrency: 1` (~$2.7/instance/month) —
+  deferred to launch, when traffic justifies any warm instance. Rule
+  going forward: price any `minInstances` at 1 vCPU unless `cpu` is set
+  explicitly; the CLI's deploy-time "minimum bill" warning is the
+  number to trust. Reversal is one line per function + a redeploy of
+  the three. Future scaling flag (not a cost today): `morningBrief`
+  reads every opted-in deviceToken + 2 docs per user every 15 min —
+  gate it by a next-due timestamp before launch.

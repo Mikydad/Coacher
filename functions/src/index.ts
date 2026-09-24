@@ -600,9 +600,14 @@ export const aiChat = onCall(
     timeoutSeconds: 60,
     memory: "256MiB",
     maxInstances: 10,
-    // One warm instance kills the 2-3s cold start on the conversational
-    // path (latency batch 2026-08-07) — a few $/month, felt every turn.
-    minInstances: 1,
+    // No warm instance (cost audit 2026-09-24). The 2026-08-07 latency
+    // batch kept one here as "a few $/month", but a gen2 function idles as
+    // a FULL vCPU whatever its memory, so the three warm instances came to
+    // ~$25/month for ~5 testers. The first text turn after ~15 idle
+    // minutes now pays the 2-3s cold start. To flip back, set 1 and
+    // redeploy — and add `cpu: 'gcf_gen1'` + `concurrency: 1` so the idle
+    // instance costs ~$3/month instead of ~$8.
+    minInstances: 0,
   },
   async (request: CallableRequest<AiChatData>) => {
     if (!request.auth) {
@@ -842,11 +847,11 @@ export const aiChatStream = onRequest(
     timeoutSeconds: 120,
     memory: "256MiB",
     maxInstances: 10,
-    // Voice Level 2 made this the spoken-turn critical path — the first
-    // conversational turn after idle was paying its full cold start
-    // (first-turn latency fix 2026-08-22). Same one-warm-instance trade as
-    // aiChat and aiSpeechStream.
-    minInstances: 1,
+    // No warm instance (cost audit 2026-09-24, see aiChat). The client's
+    // GET warmup ping at Voice Mode entry now doubles as the cold-start
+    // trigger, so the boot overlaps the user raising the phone instead of
+    // the first spoken turn.
+    minInstances: 0,
   },
   async (req, res) => {
     const tStart = Date.now();
