@@ -44,8 +44,13 @@ class GoalsHomeScreen extends ConsumerWidget {
       floatingActionButton: CoachSatelliteFabs(
         pageFab: FloatingActionButton.extended(
           heroTag: 'goals_tab_fab',
-          onPressed: () =>
-              Navigator.pushNamed(context, GoalTemplatePickerScreen.routeName),
+          // The active filter rides along so the new goal lands in it
+          // (2026-09-24); "All" passes nothing.
+          onPressed: () => Navigator.pushNamed(
+            context,
+            GoalTemplatePickerScreen.routeName,
+            arguments: ref.read(selectedGoalCategoryFilterProvider),
+          ),
           backgroundColor: AppColors.accent,
           foregroundColor: AppColors.onAccent,
           icon: const Icon(Icons.add),

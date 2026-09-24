@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../features/time_blocks/application/time_block_providers.dart';
 import 'goal_block_sync_service.dart';
+import 'goal_category_options.dart';
 import 'goal_period_helpers.dart';
 import '../data/goals_repository.dart';
 import '../data/isar_goals_repository.dart';
@@ -67,6 +68,13 @@ final activeGoalsProvider = Provider<AsyncValue<List<UserGoal>>>((ref) {
     loading: () => const AsyncValue.loading(),
     error: AsyncValue.error,
   );
+});
+
+/// Every category the user can file a goal under: built-ins plus custom
+/// ones from all their goals (see `goal_category_options.dart`).
+final goalCategoryOptionsProvider = Provider<List<String>>((ref) {
+  final list = ref.watch(goalsStreamProvider).valueOrNull ?? const [];
+  return goalCategoryOptions(list.map((g) => g.categoryId));
 });
 
 /// Active goals that are NOT planned for today: a future start, a repeat

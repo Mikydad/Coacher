@@ -1,29 +1,36 @@
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../add_task/presentation/add_task_custom_category_dialog.dart';
 import '../application/goal_templates.dart';
+import '../application/goals_providers.dart';
 import '../domain/models/goal_categories.dart';
 import '../domain/models/goal_enums.dart';
 import '../domain/models/goal_template.dart';
 import 'goal_editor_screen.dart';
+import 'widgets/goal_category_pill_row.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../../../core/presentation/bento_category_card.dart';
 
 /// Entry point for creating a goal — pick a popular template (bento mosaic)
 /// or start from a blank Custom Goal.
-class GoalTemplatePickerScreen extends StatefulWidget {
-  const GoalTemplatePickerScreen({super.key});
+class GoalTemplatePickerScreen extends ConsumerStatefulWidget {
+  const GoalTemplatePickerScreen({super.key, this.initialCategoryId});
 
   static const routeName = '/goals/templates';
 
+  /// The Goals tab's active category filter, carried in so a goal started
+  /// from a filtered list lands in that category (2026-09-24).
+  final String? initialCategoryId;
+
   @override
-  State<GoalTemplatePickerScreen> createState() =>
+  ConsumerState<GoalTemplatePickerScreen> createState() =>
       _GoalTemplatePickerScreenState();
 }
 
-class _GoalTemplatePickerScreenState extends State<GoalTemplatePickerScreen> {
+class _GoalTemplatePickerScreenState
+    extends ConsumerState<GoalTemplatePickerScreen> {
   /// The highlighted template: tinted + check chip (and the others softly
   /// dimmed) so the mosaic reads as a choice, and still marks the pick when
   /// the user backs out of the editor to re-choose. Starts on Study — a
@@ -34,17 +41,35 @@ class _GoalTemplatePickerScreenState extends State<GoalTemplatePickerScreen> {
   /// template. After a successful save the editor pops with `true` and this
   /// picker pops itself too — the user lands where they started, not on a
   /// stale picker.
-  Future<void> _openEditor(BuildContext context, GoalTemplate template) async {
+  Future<void> _openEditor(
+    BuildContext context,
+    GoalTemplate template, {
+    String? categoryId,
+  }) async {
     setState(() => _selectedId = template.id);
     final saved = await Navigator.pushNamed(
       context,
       GoalEditorScreen.routeName,
-      arguments: GoalEditorArgs(template: template),
+      arguments: GoalEditorArgs(
+        template: template,
+        initialCategoryId: categoryId ?? widget.initialCategoryId,
+      ),
     );
     if (saved == true && context.mounted) {
       Navigator.pop(context, saved);
     }
   }
+
+  /// Categories the bento cards already stand for; the pill row skips them.
+  static const Set<String> _onMosaic = {'study', 'fitness', 'focus'};
+
+  static GoalTemplate _customWith(GoalTemplate custom, String categoryId) =>
+      GoalTemplate(
+        id: custom.id,
+        label: custom.label,
+        emoji: custom.emoji,
+        categoryId: categoryId,
+      );
 
   static IconData _iconFor(String id) => switch (id) {
     'study' => CupertinoIcons.book_fill,
@@ -143,31 +168,35 @@ class _GoalTemplatePickerScreenState extends State<GoalTemplatePickerScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            // Custom = name your own CATEGORY first (2026-08-25): the old
+            // Categories not already on the mosaic, then the user's own
+            // (2026-09-24). "+ New" names a category first — the old
             // "Custom Goal" silently filed the goal under Study, making it
-            // unfindable behind the category filter. The named category
-            // rides into the editor and joins the Goals-page filter chips.
-            BentoPillButton(
-              label: 'Custom category',
-              onTap: () async {
-                final name = await showCustomCategoryDialog(context);
-                if (name == null || name.trim().isEmpty || !context.mounted) {
-                  return;
-                }
-                await _openEditor(
-                  context,
-                  GoalTemplate(
-                    id: custom.id,
-                    label: custom.label,
-                    emoji: custom.emoji,
-                    categoryId: name.trim(),
-                  ),
-                );
-              },
-              color: AppColors.surfacePanel,
-              textColor: AppColors.textPrimary,
-              ringColor: AppColors.accent,
-              active: _selectedId == custom.id,
+            // unfindable behind the category filter. A pill opens the
+            // editor with that category set; the editor's own row can
+            // still change it.
+            Text(
+              'OR PICK A CATEGORY',
+              style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
+              ),
+            ),
+            const SizedBox(height: 8),
+            GoalCategoryPillRow(
+              categories: [
+                for (final id in ref.watch(goalCategoryOptionsProvider))
+                  if (!_onMosaic.contains(id)) id,
+              ],
+              selectedId: widget.initialCategoryId,
+              onSelected: (id) =>
+                  _openEditor(context, _customWith(custom, id), categoryId: id),
+              onCreated: (name) => _openEditor(
+                context,
+                _customWith(custom, name),
+                categoryId: name,
+              ),
             ),
           ],
         ),

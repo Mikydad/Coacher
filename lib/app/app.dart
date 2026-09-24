@@ -157,14 +157,19 @@ class CoachForLifeApp extends ConsumerWidget {
         ChangePasswordScreen.routeName: (_) => const ChangePasswordScreen(),
         MainTabShell.routeName: (_) => const MainTabShell(),
         GoalSelectionScreen.routeName: (_) => const GoalSelectionScreen(),
-        GoalTemplatePickerScreen.routeName: (_) =>
-            const GoalTemplatePickerScreen(),
+        GoalTemplatePickerScreen.routeName: (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          return GoalTemplatePickerScreen(
+            initialCategoryId: args is String ? args : null,
+          );
+        },
         GoalEditorScreen.routeName: (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
           if (args is GoalEditorArgs) {
             return GoalEditorScreen(
               goalId: args.goalId,
               template: args.template,
+              initialCategoryId: args.initialCategoryId,
             );
           }
           return const GoalEditorScreen();

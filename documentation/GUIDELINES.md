@@ -4108,11 +4108,25 @@ not silent reversal.
   today", the Goals hub is everything). Test:
   `other_day_goals_count_test`.
 
-- **2026-09-24 · Known gap, parked: goal category picker.** A custom goal
-  category can only be typed once from the template picker; the editor
-  has no category picker, so a second goal cannot join an existing custom
-  category except by retyping the exact name. Miko: plug new categories
-  into the category picker when creating goals — later, not now.
+- **2026-09-24 · Goal category picker (was parked earlier the same day).**
+  A custom goal category could only be typed once; the editor had no
+  picker, so a second goal could not join an existing custom category
+  except by retyping the exact name. Now: (1) `goalCategoryOptions`
+  derives the list from ALL the user's goals — built-ins first, then
+  custom names trimmed, deduped case-insensitively, A–Z (no category
+  entity; Miko chose derivation over a synced store). (2) One shared
+  `GoalCategoryPillRow` ("+ New" first) sits at the bottom of the New-goal
+  picker, listing the built-ins the bento mosaic doesn't already stand
+  for (Productivity, Habits, Mental Clarity) plus the user's own; a pill
+  opens the editor with that category set. The mosaic keeps its
+  fill-the-screen layout; nothing scrolls vertically. (3) The editor gets
+  a Category section with the full row, so any goal's category can be
+  changed, including existing ones. (4) The Goals tab FAB passes the
+  active filter to the picker, which passes it to the editor as
+  `initialCategoryId`; "All" passes nothing. *Considered:* a scrollable
+  picker page with a wrapped chip section (rejected: forces fixed bento
+  heights and hides the section below the fold). Tests:
+  `goal_category_options_test` (options + pill row).
 
 - **2026-09-24 · Advanced settings keep one toggle: Habit anchor.** Miko
   asked whether Habit anchor, Strict for this task and Fixed time slot

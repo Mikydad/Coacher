@@ -23,7 +23,9 @@ import '../../time_blocks/domain/models/conflict_resolution_outcome.dart';
 import '../../time_blocks/presentation/scheduling_conflict_sheet.dart';
 import '../../../core/utils/date_keys.dart';
 import '../application/goal_period_helpers.dart';
+import '../application/goal_category_options.dart';
 import '../application/goals_providers.dart';
+import 'widgets/goal_category_pill_row.dart';
 import '../domain/models/goal_action.dart';
 import '../domain/models/goal_categories.dart';
 import '../domain/models/goal_enums.dart';
@@ -34,17 +36,27 @@ import 'widgets/goal_editor_widgets.dart';
 import '../../../core/presentation/app_colors.dart';
 
 class GoalEditorArgs {
-  const GoalEditorArgs({this.goalId, this.template});
+  const GoalEditorArgs({this.goalId, this.template, this.initialCategoryId});
 
   final String? goalId;
   final GoalTemplate? template;
+
+  /// Overrides the template's category — the picker passes the Goals
+  /// tab's active filter or a tapped category pill (2026-09-24).
+  final String? initialCategoryId;
 }
 
 class GoalEditorScreen extends ConsumerStatefulWidget {
-  const GoalEditorScreen({super.key, this.goalId, this.template});
+  const GoalEditorScreen({
+    super.key,
+    this.goalId,
+    this.template,
+    this.initialCategoryId,
+  });
 
   final String? goalId;
   final GoalTemplate? template;
+  final String? initialCategoryId;
 
   static const routeName = '/goals/edit';
 
@@ -291,6 +303,8 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
         _suggestedTitle = template.suggestedTitle;
       }
       if (template.categoryId != null) _categoryId = template.categoryId!;
+      final picked = widget.initialCategoryId;
+      if (picked != null && picked.trim().isNotEmpty) _categoryId = picked;
       if (template.repeatCadence != null) {
         _repeatCadence = template.repeatCadence!;
       }
@@ -1231,6 +1245,21 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
                         }
                         return 'Required';
                       },
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ── 1b. Category (2026-09-24) — the editor had no
+                    // picker at all: a template locked its category in and
+                    // a custom category could only be typed, never reused.
+                    const GoalEditorSectionLabel('Category'),
+                    GoalCategoryPillRow(
+                      categories: goalCategoryOptions(
+                        ref.watch(goalCategoryOptionsProvider),
+                        extra: _categoryId,
+                      ),
+                      selectedId: _categoryId,
+                      onSelected: (id) => setState(() => _categoryId = id),
+                      onCreated: (name) => setState(() => _categoryId = name),
                     ),
                     const SizedBox(height: 24),
 
