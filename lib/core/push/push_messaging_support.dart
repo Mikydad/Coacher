@@ -84,3 +84,21 @@ bool isMorningBrief(Map<String, dynamic> data) =>
 /// its veto / takedown actions live.
 bool isStakePreReveal(Map<String, dynamic> data) =>
     data['type'] == 'stake_pre_reveal';
+
+/// Back-off between FCM token attempts (2026-09-23). On iOS `getToken()`
+/// throws `apns-token-not-set` until the APNs token has arrived, which on a
+/// slow LTE link can be well after `requestPermission()` returns; the
+/// service used to try once and swallow the error, leaving the device
+/// unregistered for the whole process. Short first, then patient.
+const List<Duration> kPushTokenRetryDelays = [
+  Duration(seconds: 2),
+  Duration(seconds: 5),
+  Duration(seconds: 15),
+  Duration(seconds: 30),
+];
+
+/// How long to wait for the APNs token before each FCM attempt: one poll per
+/// [kApnsTokenPollInterval], at most [kApnsTokenPolls] polls.
+const Duration kApnsTokenPollInterval = Duration(milliseconds: 500);
+const int kApnsTokenPolls = 10;
+

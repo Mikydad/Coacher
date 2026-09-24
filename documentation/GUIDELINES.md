@@ -4007,3 +4007,59 @@ not silent reversal.
   Each bubble's text now carries its own `SelectionArea` in
   `chat_bubbles.dart`; the list-wide one is gone. Long-press still
   selects and copies, scoped to the bubble under the finger.
+
+- **2026-09-23 · Getting Started tour: the verdict is per account and waits
+  for trustworthy rows.** Trigger: an external QA report (iOS, build 4)
+  said a brand-new email account landed on Home with no guided tour. The
+  fresh-install path in code was correct; the real holes were at the
+  account boundary. (1) The new-vs-existing verdict lived under one
+  device-level prefs key and relied on the wipe's clearing order. (2) On an
+  in-session switch, `invalidateUserScopedProviders` runs BEFORE
+  `clearLocalSession`, and Riverpod rebuilds the invalidated controller at
+  once because the tour layer is still listening for that frame — so the
+  new instance judged the incoming account by the OUTGOING account's prefs
+  and Isar rows, and that instance survives the remount. (3) Since the
+  capped reveal (2026-09-22), an existing account's tasks can still be
+  landing when Home paints, so the probe could call a veteran "new".
+  Fix: the key is `education_onboarding_state_v1:<uid>` (legacy key
+  migrates once to the signed-in account, then is deleted; the wipe keeps
+  removing only the legacy key, so a returning account keeps its own
+  answer); the provider watches `authUidProvider` and a signed-out
+  controller decides nothing; before probing, the controller awaits
+  `SessionScope.whenIdle` (new) and `FirstLaunchGate.seedSettledFor(uid)`
+  (new per-uid signal: already seeded / fresh account / pull ended; a
+  pending entry is shared, asking never reopens a settled one, a new mount
+  for that uid replaces it, and `clearLocalSession` forgets them all with
+  the seeded flag), capped at 30 s so a tree without the gate still
+  decides. A guest who registers
+  keeps the same uid (anonymous link), so their tour carries over on
+  purpose. *Considered:* invalidating after the wipe instead (rejected:
+  the synchronous teardown start is what makes stale session tokens drop
+  their results). Tests: `getting_started_controller_test` (account
+  boundary group), `education_prefs_test`, `session_scope_test`,
+  `first_launch_gate_test` (seedSettledFor group).
+
+- **2026-09-23 · QA report follow-ups: honest diagnostics copy, APNs retry,
+  Terms hint, hollow zero days.** From the same external iOS report. (1)
+  Reminder Health (`reminder_health_section.dart`) is now written for the
+  person: "Armed right now" with a line explaining that later days hold one
+  slot and that 56 is the safe share of the 64 limit; "Last check: Not yet
+  since the app opened" with what the check does; "Server backup" renamed
+  "Push backup: Connected / Not connected yet" with a line saying reminders
+  work without it. The section invalidates `reminderHealthProvider` on
+  mount, because the non-autoDispose provider otherwise served the first
+  visit's snapshot for the life of the process (the tester's 6:31 PM visit
+  showed stale numbers). No severity changes: push stays context, never a
+  fault. (2) `PushMessagingService` fetches the FCM token through
+  `_tokenWithRetry`: on iOS it polls `getAPNSToken()` first (10 × 500 ms),
+  then retries `getToken()` on `kPushTokenRetryDelays` (2/5/15/30 s) —
+  `getToken()` throws `apns-token-not-set` until APNs arrives, and the old
+  single try left the device unregistered all session on a slow link.
+  (3) Sign-up shows "Tick the Terms box above to create your account."
+  under the dimmed button until the box is ticked (the 40 % opacity read
+  as broken). (4) Home's 7-day bars draw a past zero day hollow, like a
+  future day; today alone stays a solid stub at zero. *Considered:* making
+  the health provider autoDispose (rejected: the Home hint keeps it alive,
+  so Settings would still get Home's snapshot); showing the individual
+  armed reminders to everyone (deferred: the tester build already has the
+  "Armed reminders" page).

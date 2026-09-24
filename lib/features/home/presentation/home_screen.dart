@@ -1109,8 +1109,10 @@ class _TrendBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(width / 2);
     final v = value;
-    if (v == null) {
-      // Future: hollow stub — clearly "not yet", never "scored zero".
+    // Future days, and past days that scored nothing, are hollow: a solid
+    // minimum stub read as "something happened" on days with zero tasks
+    // (QA, 2026-09-23). Today stays solid at zero — it is in progress.
+    if (v == null || (v <= 0 && !isToday)) {
       return Container(
         width: width,
         height: width,

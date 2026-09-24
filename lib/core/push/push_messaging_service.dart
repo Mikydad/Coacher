@@ -95,10 +95,36 @@ class PushMessagingService {
       FirebaseAuth.instance.authStateChanges().listen((user) {
         unawaited(_onAuthChanged(user?.uid));
       });
-      final token = await messaging.getToken();
+      final token = await _tokenWithRetry(messaging);
       if (token != null) await _registerToken(token);
     } catch (e) {
       debugPrint('[Push] initialize skipped: $e');
+    }
+  }
+
+  /// FCM token, retried on the [kPushTokenRetryDelays] schedule. On iOS the
+  /// APNs token is awaited first (polled), because asking FCM before it has
+  /// arrived throws rather than waits. Returns null only after every attempt
+  /// failed; the reminder health panel then reads "Not connected yet" and
+  /// `onTokenRefresh` still registers a token that arrives later.
+  Future<String?> _tokenWithRetry(FirebaseMessaging messaging) async {
+    for (var attempt = 0; ; attempt++) {
+      try {
+        if (!kIsWeb && Platform.isIOS) await _awaitApnsToken(messaging);
+        final token = await messaging.getToken();
+        if (token != null) return token;
+      } catch (e) {
+        debugPrint('[Push] token attempt ${attempt + 1} failed: $e');
+      }
+      if (attempt >= kPushTokenRetryDelays.length) return null;
+      await Future<void>.delayed(kPushTokenRetryDelays[attempt]);
+    }
+  }
+
+  Future<void> _awaitApnsToken(FirebaseMessaging messaging) async {
+    for (var i = 0; i < kApnsTokenPolls; i++) {
+      if (await messaging.getAPNSToken() != null) return;
+      await Future<void>.delayed(kApnsTokenPollInterval);
     }
   }
 
@@ -110,7 +136,7 @@ class PushMessagingService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_lastHeartbeatDayKey);
-      final token = await FirebaseMessaging.instance.getToken();
+      final token = await _tokenWithRetry(FirebaseMessaging.instance);
       if (token != null) await _registerToken(token);
       await recordHeartbeat();
     } catch (e) {

@@ -81,4 +81,23 @@ void main() {
       expect(isMorningBrief(const {}), isFalse);
     });
   });
+
+  group('token retry schedule (2026-09-23)', () {
+    test('is short first, then patient, and bounded', () {
+      expect(kPushTokenRetryDelays.first, lessThanOrEqualTo(const Duration(seconds: 2)));
+      for (var i = 1; i < kPushTokenRetryDelays.length; i++) {
+        expect(kPushTokenRetryDelays[i], greaterThan(kPushTokenRetryDelays[i - 1]));
+      }
+      final total = kPushTokenRetryDelays.fold(Duration.zero, (a, b) => a + b);
+      expect(total, lessThanOrEqualTo(const Duration(minutes: 1)));
+    });
+
+    test('the APNs wait per attempt stays under the first retry delay', () {
+      expect(
+        kApnsTokenPollInterval * kApnsTokenPolls,
+        lessThanOrEqualTo(const Duration(seconds: 5)),
+      );
+    });
+  });
 }
+

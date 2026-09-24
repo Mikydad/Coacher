@@ -159,3 +159,26 @@ Flutter post on cooperative cancellation of long async pipelines.
 - Reminder system V2, Direction, Time Tracker, Progress Periods, Public
   Commitment Cards: each shipped as a PRD → build → deploy cycle. Good for
   "how I plan a feature" content.
+
+## 2026-09-23 · The QA report that was right about everything except what mattered
+
+- **Hook:** An external tester's PDF called our reminder "Server backup: Not
+  registered" row a Blocker. It wasn't. The Minor they buried was the real bug.
+- **What happened:** First job was authenticity: every string, cap ("of 56"),
+  weight (60/40) and label in the report exists in the codebase, so the tester
+  had a real build. Then the ranking fell apart: all three top findings were
+  one honest-but-unreadable diagnostics panel. The "no onboarding tour" note
+  was the one worth chasing.
+- **The turn:** The obvious diagnosis ("the pref is never cleared") was wrong;
+  the wipe clears it. The real holes were at the account boundary: a
+  device-level verdict, a provider rebuilt by Riverpod one frame before the
+  wipe (judging the new account by the old one's rows), and a capped first
+  reveal that lets the probe run before an existing account's tasks land.
+  Then my own fix hung a test: the consumer of a "settled" signal reopened it.
+- **Takeaway:** Verify the report, then re-rank it. And the second diagnosis
+  is often the right one; write the first one down so you can retract it
+  cleanly.
+- **Formats:** thread ("how I audited a QA report"), short post on
+  severity inflation from diagnostics copy, code-walk of the account
+  boundary fix.
+

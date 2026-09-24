@@ -291,6 +291,17 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 onPressed: _canSubmit ? _submit : null,
                 isLoading: _loading,
               ),
+              // The button dims until the Terms box is ticked; without this
+              // line a filled-in form looks broken (QA, 2026-09-23).
+              if (!_tosAccepted && !_loading)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    'Tick the Terms box above to create your account.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12.5, color: AppColors.textDim),
+                  ),
+                ),
 
               if (_formError != null) ...[
                 const SizedBox(height: 14),

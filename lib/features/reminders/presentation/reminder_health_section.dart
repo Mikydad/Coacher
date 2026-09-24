@@ -11,11 +11,33 @@ import '../domain/models/reminder_health.dart';
 /// A user whose notification permission was revoked, or whose timezone failed
 /// to resolve, had no way to find out why SidePal had gone quiet. This is the
 /// page that answers "why didn't it fire?".
-class ReminderHealthSection extends ConsumerWidget {
+///
+/// Written for the person, not the engineer (2026-09-23): an external tester
+/// read "Server backup: Not registered" as a lost-data blocker and "Last
+/// check: Not run yet" as a dead job. Each row that describes internal state
+/// now says what it means and whether it matters, and the snapshot is taken
+/// afresh every time this panel opens — the provider is otherwise cached for
+/// the life of the process, so a second visit hours later showed the first
+/// visit's numbers.
+class ReminderHealthSection extends ConsumerStatefulWidget {
   const ReminderHealthSection({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReminderHealthSection> createState() =>
+      _ReminderHealthSectionState();
+}
+
+class _ReminderHealthSectionState extends ConsumerState<ReminderHealthSection> {
+  @override
+  void initState() {
+    super.initState();
+    // Fresh reading on every open; the Home hint shares the same provider
+    // and simply picks up the newer snapshot.
+    ref.invalidate(reminderHealthProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final async = ref.watch(reminderHealthProvider);
 
     return async.when(
@@ -40,11 +62,17 @@ class ReminderHealthSection extends ConsumerWidget {
             tone: health.permitted == false ? _Tone.warn : _Tone.neutral,
           ),
           _HealthRow(
-            label: 'Scheduled now',
+            label: 'Armed right now',
             value: health.pendingCount == null
                 ? 'Unknown'
                 : '${health.pendingCount} of ${health.pendingCap}',
             tone: health.pendingNearCap ? _Tone.warn : _Tone.neutral,
+          ),
+          _Explainer(
+            "Today's reminders are armed in full; later days hold one slot "
+            'each until they arrive, so a low number is normal. '
+            "${health.pendingCap} is SidePal's safe share of the system's "
+            '64-notification limit.',
           ),
           _HealthRow(
             label: 'Time zone',
@@ -55,12 +83,24 @@ class ReminderHealthSection extends ConsumerWidget {
           ),
           _HealthRow(
             label: 'Last check',
-            value: health.lastReconciliationSummary ?? 'Not run yet',
+            value:
+                health.lastReconciliationSummary ??
+                'Not yet since the app opened',
+          ),
+          const _Explainer(
+            'Runs each time the app opens or comes back. It confirms what '
+            'fired and re-arms anything the system dropped.',
           ),
           _HealthRow(
-            label: 'Server backup',
-            value: health.pushRegistered ? 'Registered' : 'Not registered',
+            label: 'Push backup',
+            value: health.pushRegistered ? 'Connected' : 'Not connected yet',
           ),
+          if (!health.pushRegistered)
+            const _Explainer(
+              'A server nudge that can wake SidePal after it has been closed '
+              'for days. Reminders work without it; it connects by itself '
+              'once notifications and a network are available.',
+            ),
           for (final issue in health.issues) _IssueNote(issue: issue),
           Padding(
             padding: const EdgeInsets.only(top: 10),
@@ -76,6 +116,28 @@ class ReminderHealthSection extends ConsumerWidget {
 }
 
 enum _Tone { neutral, good, warn }
+
+/// One quiet sentence under a row whose value is internal state.
+class _Explainer extends StatelessWidget {
+  const _Explainer(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          height: 1.35,
+          color: AppColors.textMuted,
+        ),
+      ),
+    );
+  }
+}
 
 class _HealthRow extends StatelessWidget {
   const _HealthRow({
