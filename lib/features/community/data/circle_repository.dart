@@ -12,6 +12,13 @@ abstract class CircleRepository {
   Future<AccountabilityCircle?> getCircle(String circleId);
   Future<void> createCircle(AccountabilityCircle circle);
   Future<void> updateCircle(AccountabilityCircle circle);
+
+  /// Writes only [changes] (2026-09-24, the Edit circle sheet). A whole-doc
+  /// merge would carry a stale `memberCount`, which the rules reject.
+  Future<void> updateCircleFields(
+    String circleId,
+    Map<String, dynamic> changes,
+  );
   Future<void> deleteCircle(String circleId);
   Future<List<AccountabilityCircle>> searchCircles({
     String? query,
@@ -71,19 +78,22 @@ class FirestoreCircleRepository implements CircleRepository {
       onListen: () {
         for (final id in ids) {
           subs.add(
-            _circles.doc(id).snapshots().listen(
-              (doc) {
-                latest[id] = doc.exists ? _fromDoc(doc) : null;
-                // Emit once every id has reported (missing docs count).
-                if (latest.length == ids.length) emit();
-              },
-              onError: (Object e, StackTrace st) {
-                // A single denied/missing circle must not kill the list:
-                // treat it as gone and keep the others live.
-                latest[id] = null;
-                if (latest.length == ids.length) emit();
-              },
-            ),
+            _circles
+                .doc(id)
+                .snapshots()
+                .listen(
+                  (doc) {
+                    latest[id] = doc.exists ? _fromDoc(doc) : null;
+                    // Emit once every id has reported (missing docs count).
+                    if (latest.length == ids.length) emit();
+                  },
+                  onError: (Object e, StackTrace st) {
+                    // A single denied/missing circle must not kill the list:
+                    // treat it as gone and keep the others live.
+                    latest[id] = null;
+                    if (latest.length == ids.length) emit();
+                  },
+                ),
           );
         }
       },
@@ -115,6 +125,18 @@ class FirestoreCircleRepository implements CircleRepository {
   Future<void> updateCircle(AccountabilityCircle circle) async {
     circle.validate();
     await _circles.doc(circle.id).set(circle.toMap(), SetOptions(merge: true));
+  }
+
+  @override
+  Future<void> updateCircleFields(
+    String circleId,
+    Map<String, dynamic> changes,
+  ) async {
+    if (changes.isEmpty) return;
+    await _circles.doc(circleId).update({
+      ...changes,
+      'updatedAtMs': DateTime.now().millisecondsSinceEpoch,
+    });
   }
 
   @override

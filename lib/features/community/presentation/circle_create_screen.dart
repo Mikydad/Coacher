@@ -14,15 +14,6 @@ import 'circle_detail_screen.dart';
 
 import '../../../core/presentation/app_colors.dart';
 
-const _kCategories = [
-  'fitness',
-  'learning',
-  'business',
-  'reading',
-  'productivity',
-  'other',
-];
-
 class CircleCreateScreen extends ConsumerStatefulWidget {
   const CircleCreateScreen({super.key});
 
@@ -196,7 +187,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: _kCategories.map((cat) {
+      children: kCircleCategories.map((cat) {
         final selected = _selectedCategory == cat;
         return ChoiceChip(
           label: Text(

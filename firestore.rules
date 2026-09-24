@@ -179,6 +179,12 @@ service cloud.firestore {
             || (request.resource.data.diff(resource.data)
                   .affectedKeys().hasOnly(['reactionsByUser'])
                 && onlyOwnKeyChanged('reactionsByUser'))
+            // A moderator may tombstone any message (2026-09-24): strip
+            // content/image and stamp who deleted it — nothing else.
+            || (isCircleModerator(circleId)
+                && request.resource.data.diff(resource.data).affectedKeys()
+                     .hasOnly(['content', 'imageUrl', 'deletedAtMs', 'deletedByUid'])
+                && request.resource.data.deletedByUid == request.auth.uid)
           );
         allow delete: if isCircleMember(circleId)
           && (resource.data.senderId == request.auth.uid || isCircleModerator(circleId));

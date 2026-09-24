@@ -6,6 +6,7 @@ import '../domain/models/circle_message.dart';
 abstract class CircleMessageRepository {
   Stream<List<CircleMessage>> watchMessages(String circleId, {int limit = 50});
   Future<void> sendMessage(CircleMessage message);
+
   /// Replaces the caller's OWN reaction list on a message
   /// (`reactionsByUser.{uid}` — the only key rules let a member touch).
   Future<void> setMyReactions(
@@ -14,6 +15,16 @@ abstract class CircleMessageRepository {
     String uid,
     List<String> emojis,
   );
+
+  /// Tombstones a message (2026-09-24): content and image go, the row stays
+  /// so the thread shows the deletion in place. [byUid] is the sender or a
+  /// moderator; the rules check which fields each may touch.
+  Future<void> deleteMessage(
+    String circleId,
+    String messageId, {
+    required String byUid,
+    int? nowMs,
+  });
 }
 
 class FirestoreCircleMessageRepository implements CircleMessageRepository {
@@ -55,6 +66,21 @@ class FirestoreCircleMessageRepository implements CircleMessageRepository {
   ) async {
     await _messages(circleId).doc(messageId).update({
       'reactionsByUser.$uid': List<String>.from(emojis),
+    });
+  }
+
+  @override
+  Future<void> deleteMessage(
+    String circleId,
+    String messageId, {
+    required String byUid,
+    int? nowMs,
+  }) async {
+    await _messages(circleId).doc(messageId).update({
+      'content': FieldValue.delete(),
+      'imageUrl': FieldValue.delete(),
+      'deletedAtMs': nowMs ?? DateTime.now().millisecondsSinceEpoch,
+      'deletedByUid': byUid,
     });
   }
 }

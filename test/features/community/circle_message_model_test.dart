@@ -181,4 +181,25 @@ void _reactionsByUserTests() {
       });
     });
   });
+
+  test('tombstone fields round-trip and are absent when not deleted', () {
+    final live = CircleMessage(
+      id: 'm',
+      circleId: 'c',
+      senderId: 's',
+      senderDisplayName: 'S',
+      type: MessageType.text,
+      content: 'hi',
+      createdAtMs: 1,
+    );
+    expect(live.isDeleted, isFalse);
+    expect(live.toMap().containsKey('deletedAtMs'), isFalse);
+    final gone = CircleMessage.fromMap(
+      live.copyWith(deletedAtMs: 9, deletedByUid: 's').toMap(),
+    );
+    expect(gone.isDeleted, isTrue);
+    expect(gone.deletedByModerator, isFalse);
+    expect(gone.deletedAtMs, 9);
+  });
 }
+

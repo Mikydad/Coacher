@@ -93,4 +93,26 @@ void main() {
       expect(list.first.reactionsOf('user-1'), isEmpty);
     });
   });
+
+  group('deleteMessage (2026-09-24 tombstone)', () {
+    test('strips content and image, keeps the row, stamps who', () async {
+      final msg = _makeMessage().copyWith(imageUrl: 'https://x/y.jpg');
+      await repo.sendMessage(msg);
+      await repo.deleteMessage(
+        msg.circleId,
+        msg.id,
+        byUid: 'moderator-9',
+        nowMs: 5_000_000,
+      );
+      final list = await repo.watchMessages(msg.circleId).first;
+      expect(list, hasLength(1), reason: 'the row stays');
+      final m = list.single;
+      expect(m.isDeleted, isTrue);
+      expect(m.deletedByModerator, isTrue);
+      expect(m.deletedAtMs, 5_000_000);
+      expect(m.content, isNull);
+      expect(m.imageUrl, isNull);
+    });
+  });
 }
+

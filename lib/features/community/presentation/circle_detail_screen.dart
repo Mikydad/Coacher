@@ -85,18 +85,21 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
       );
     }
 
-    // When the circle document is deleted (stream emits null), go back
+    // When the circle document is deleted (stream emits null) — or our read
+    // of it is revoked (permission-denied: we left, were removed, or the
+    // delete sweep took the member docs first, 2026-09-24) — go back
     // immediately instead of showing a "not found" placeholder.
     ref.listen<AsyncValue<dynamic>>(circleDetailProvider(widget.circleId), (
       _,
       next,
     ) {
-      if (next is AsyncData && next.value == null) {
-        if (context.mounted) {
-          Navigator.of(context).popUntil((r) {
-            return r.settings.name == '/community' || r.isFirst;
-          });
-        }
+      final gone =
+          (next is AsyncData && next.value == null) ||
+          (next is AsyncError && isPermissionDenied(next.error));
+      if (gone && context.mounted) {
+        Navigator.of(context).popUntil((r) {
+          return r.settings.name == '/community' || r.isFirst;
+        });
       }
     });
 
@@ -108,13 +111,16 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(
-              kDebugMode
-                  ? 'Could not load circle.\n$e'
-                  : 'Could not load circle.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
+            child: isPermissionDenied(e)
+                // The listener above is popping us; no error to show.
+                ? CircularProgressIndicator(color: AppColors.accent)
+                : Text(
+                    kDebugMode
+                        ? 'Could not load circle.\n$e'
+                        : 'Could not load circle.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
           ),
         ),
         data: (circle) {
@@ -389,3 +395,8 @@ class _PlaceholderTab extends StatelessWidget {
 class AccountabilityCircleConst {
   static const int kMaxMembers = 8;
 }
+
+/// Firestore refused the read: the account is no longer allowed to see this
+/// circle (left, removed, or deleted underneath it).
+bool isPermissionDenied(Object? error) =>
+    error is FirebaseException && error.code == 'permission-denied';

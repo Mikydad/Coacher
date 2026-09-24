@@ -7,6 +7,8 @@ import '../../../accountability/application/stakes_providers.dart';
 import '../../application/circle_providers.dart';
 import '../../domain/models/accountability_circle.dart';
 import '../../domain/models/circle_enums.dart';
+import '../community_screen.dart';
+import '../sheets/circle_edit_sheet.dart';
 import '../sheets/circle_invite_sheet.dart';
 import '../sheets/circle_notif_prefs_sheet.dart';
 
@@ -14,13 +16,26 @@ import '../../../../core/presentation/app_card.dart';
 import '../../../../core/presentation/app_colors.dart';
 import '../../../../core/presentation/async_value_ui.dart';
 
-class CircleInfoView extends ConsumerWidget {
+class CircleInfoView extends ConsumerStatefulWidget {
   const CircleInfoView({super.key, required this.circleId});
 
   final String circleId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CircleInfoView> createState() => _CircleInfoViewState();
+}
+
+class _CircleInfoViewState extends ConsumerState<CircleInfoView> {
+  String get circleId => widget.circleId;
+
+  /// 'leave' | 'delete' while the server call runs (2026-09-24): the
+  /// button shows it, and nothing else on the page is tappable. Both calls
+  /// are Cloud Functions with a cold start, so "nothing happened" was the
+  /// old experience.
+  String? _busy;
+
+  @override
+  Widget build(BuildContext context) {
     final circleAsync = ref.watch(circleDetailProvider(circleId));
     final membersAsync = ref.watch(circleMembersProvider(circleId));
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -185,14 +200,7 @@ class CircleInfoView extends ConsumerWidget {
               _SettingsTile(
                 icon: Icons.edit_outlined,
                 title: 'Edit circle',
-                onTap: () {
-                  // Phase 5+: circle settings editor
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Circle settings coming soon'),
-                    ),
-                  );
-                },
+                onTap: () => CircleEditSheet.show(context, circle),
               ),
             const SizedBox(height: 16),
 
@@ -201,13 +209,17 @@ class CircleInfoView extends ConsumerWidget {
             const SizedBox(height: 8),
             if (isCreator)
               OutlinedButton.icon(
-                onPressed: () => _confirmDelete(context, ref, circle.name),
-                icon: Icon(
-                  Icons.delete_forever_rounded,
-                  color: AppColors.danger,
-                ),
+                onPressed: _busy != null
+                    ? null
+                    : () => _confirmDelete(context, ref, circle.name),
+                icon: _busy == 'delete'
+                    ? _ButtonSpinner()
+                    : Icon(
+                        Icons.delete_forever_rounded,
+                        color: AppColors.danger,
+                      ),
                 label: Text(
-                  'Delete circle',
+                  _busy == 'delete' ? 'Deleting…' : 'Delete circle',
                   style: TextStyle(color: AppColors.danger),
                 ),
                 style: OutlinedButton.styleFrom(
@@ -220,10 +232,14 @@ class CircleInfoView extends ConsumerWidget {
               )
             else
               OutlinedButton.icon(
-                onPressed: () => _confirmLeave(context, ref, uid),
-                icon: Icon(Icons.exit_to_app_rounded, color: AppColors.danger),
+                onPressed: _busy != null
+                    ? null
+                    : () => _confirmLeave(context, ref, circle.name),
+                icon: _busy == 'leave'
+                    ? _ButtonSpinner()
+                    : Icon(Icons.exit_to_app_rounded, color: AppColors.danger),
                 label: Text(
-                  'Leave circle',
+                  _busy == 'leave' ? 'Leaving…' : 'Leave circle',
                   style: TextStyle(color: AppColors.danger),
                 ),
                 style: OutlinedButton.styleFrom(
@@ -278,26 +294,63 @@ class CircleInfoView extends ConsumerWidget {
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true || !mounted) return;
+    await _runExit(
+      kind: 'delete',
+      action: () =>
+          ref.read(userCircleMembershipServiceProvider).deleteCircle(circleId),
+      success: '"$circleName" deleted.',
+      failure: 'Could not delete the circle.',
+    );
+  }
+
+  /// Leave / delete share one shape (2026-09-24): busy state on the button,
+  /// then straight back to the Community list with a snackbar. The
+  /// navigator and messenger are captured BEFORE the call — the server
+  /// revokes our read of the circle before the call returns, which used to
+  /// swap this screen for "Could not load circle" and skip the pop.
+  Future<void> _runExit({
+    required String kind,
+    required Future<void> Function() action,
+    required String success,
+    required String failure,
+  }) async {
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = kind);
     try {
-      await ref
-          .read(userCircleMembershipServiceProvider)
-          .deleteCircle(circleId);
-      // Navigation is handled automatically by the CircleDetailScreen listener
-      // which pops back when the circle document disappears from Firestore.
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Could not delete circle: $e')));
-      }
+      await action();
+      nav.popUntil(
+        (r) => r.settings.name == CommunityScreen.routeName || r.isFirst,
+      );
+      messenger.showSnackBar(SnackBar(content: Text(success)));
+    } catch (_) {
+      if (mounted) setState(() => _busy = null);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(failure),
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () {
+              if (mounted) {
+                _runExit(
+                  kind: kind,
+                  action: action,
+                  success: success,
+                  failure: failure,
+                );
+              }
+            },
+          ),
+        ),
+      );
     }
   }
 
   Future<void> _confirmLeave(
     BuildContext context,
     WidgetRef ref,
-    String _,
+    String circleName,
   ) async {
     // A live stake in this circle blocks leaving (2026-08-25): the stake
     // would keep running — and a photo stake would still reveal here —
@@ -363,17 +416,25 @@ class CircleInfoView extends ConsumerWidget {
         ],
       ),
     );
-    if (confirmed != true) return;
-    try {
-      await ref.read(userCircleMembershipServiceProvider).leaveCircle(circleId);
-      if (context.mounted) Navigator.pop(context);
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Could not leave: $e')));
-      }
-    }
+    if (confirmed != true || !mounted) return;
+    await _runExit(
+      kind: 'leave',
+      action: () =>
+          ref.read(userCircleMembershipServiceProvider).leaveCircle(circleId),
+      success: 'You left "$circleName".',
+      failure: 'Could not leave the circle.',
+    );
+  }
+}
+
+class _ButtonSpinner extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 16,
+      height: 16,
+      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.danger),
+    );
   }
 }
 

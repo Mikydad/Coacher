@@ -14,6 +14,8 @@ class CircleMessage {
     this.reactions = const {},
     this.reactionsByUser = const {},
     required this.createdAtMs,
+    this.deletedAtMs,
+    this.deletedByUid,
   });
 
   final String id;
@@ -75,6 +77,19 @@ class CircleMessage {
 
   final int createdAtMs;
 
+  /// Tombstone (2026-09-24, WhatsApp model): a deleted message keeps its
+  /// row so the thread shows "This message was deleted" in place, with
+  /// content and image stripped. [deletedByUid] is the sender for a
+  /// self-delete or a moderator otherwise.
+  final int? deletedAtMs;
+  final String? deletedByUid;
+
+  bool get isDeleted => deletedAtMs != null;
+
+  /// Deleted by someone other than the sender — a moderator.
+  bool get deletedByModerator =>
+      isDeleted && deletedByUid != null && deletedByUid != senderId;
+
   Map<String, dynamic> toMap() => {
     'id': id,
     'circleId': circleId,
@@ -91,6 +106,8 @@ class CircleMessage {
       (uid, emojis) => MapEntry(uid, List<String>.from(emojis)),
     ),
     'createdAtMs': createdAtMs,
+    if (deletedAtMs != null) 'deletedAtMs': deletedAtMs,
+    if (deletedByUid != null) 'deletedByUid': deletedByUid,
   };
 
   static Map<String, List<String>> _stringListMap(Object? raw) {
@@ -116,6 +133,8 @@ class CircleMessage {
       reactions: reactions,
       reactionsByUser: byUser,
       createdAtMs: (map['createdAtMs'] as num?)?.toInt() ?? 0,
+      deletedAtMs: (map['deletedAtMs'] as num?)?.toInt(),
+      deletedByUid: map['deletedByUid'] as String?,
     );
   }
 
@@ -131,6 +150,8 @@ class CircleMessage {
     Map<String, List<String>>? reactions,
     Map<String, List<String>>? reactionsByUser,
     int? createdAtMs,
+    int? deletedAtMs,
+    String? deletedByUid,
   }) {
     return CircleMessage(
       id: id ?? this.id,
@@ -144,6 +165,8 @@ class CircleMessage {
       reactions: reactions ?? this.reactions,
       reactionsByUser: reactionsByUser ?? this.reactionsByUser,
       createdAtMs: createdAtMs ?? this.createdAtMs,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
+      deletedByUid: deletedByUid ?? this.deletedByUid,
     );
   }
 }

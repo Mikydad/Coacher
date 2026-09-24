@@ -113,3 +113,14 @@ extension ActivityEventTypeStorage on ActivityEventType {
     );
   }
 }
+
+/// Category slugs a circle can carry (create screen and edit sheet).
+const List<String> kCircleCategories = [
+  'fitness',
+  'learning',
+  'business',
+  'reading',
+  'productivity',
+  'other',
+];
+

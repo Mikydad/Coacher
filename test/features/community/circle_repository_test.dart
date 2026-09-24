@@ -147,4 +147,30 @@ void main() {
       expect(results, isEmpty);
     });
   });
+
+  group('updateCircleFields (2026-09-24 edit sheet)', () {
+    test('writes only the given fields plus updatedAtMs', () async {
+      final circle = _makeCircle();
+      await repo.createCircle(circle);
+      await repo.updateCircleFields(circle.id, {
+        'name': 'Renamed',
+        'visibility': CircleVisibility.private.storageValue,
+      });
+      final stored = await repo.getCircle(circle.id);
+      expect(stored?.name, 'Renamed');
+      expect(stored?.visibility, CircleVisibility.private);
+      expect(stored?.memberCount, circle.memberCount, reason: 'untouched');
+      expect(stored?.creatorId, circle.creatorId, reason: 'untouched');
+      expect(stored!.updatedAtMs, greaterThan(circle.updatedAtMs));
+    });
+
+    test('an empty change set writes nothing', () async {
+      final circle = _makeCircle();
+      await repo.createCircle(circle);
+      await repo.updateCircleFields(circle.id, const {});
+      final stored = await repo.getCircle(circle.id);
+      expect(stored?.updatedAtMs, circle.updatedAtMs);
+    });
+  });
 }
+

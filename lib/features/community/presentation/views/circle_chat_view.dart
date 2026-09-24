@@ -9,7 +9,10 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/presentation/keyboard_dismiss.dart';
 import '../../../../core/utils/stable_id.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+
 import '../../application/circle_providers.dart';
+import '../../application/message_delete_policy.dart';
 import '../../data/circle_proof_storage.dart';
 import '../../domain/models/circle_enums.dart';
 import '../../domain/models/circle_message.dart';
@@ -186,6 +189,72 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
     );
   }
 
+  /// Tombstone the message (Miko, 2026-09-24): own messages within
+  /// [kOwnMessageDeleteWindow], any message for a moderator. Optimistic like
+  /// send — the snapshot listener echoes the local write at once; a rules
+  /// rejection surfaces as a snackbar. The image file is cleaned up best
+  /// effort; the tombstone is what matters to the thread.
+  Future<void> _deleteMessage(CircleMessage message) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfacePanel,
+        title: Text(
+          'Delete message?',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          message.senderId == uid
+              ? 'It will be removed for everyone in the circle.'
+              : 'It will show as deleted by admin for everyone in the circle.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: AppColors.fg,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final imageUrl = message.imageUrl;
+    unawaited(
+      ref
+          .read(circleMessageRepositoryProvider)
+          .deleteMessage(widget.circleId, message.id, byUid: uid)
+          .then((_) {
+            if (imageUrl != null && imageUrl.isNotEmpty) {
+              unawaited(
+                FirebaseStorage.instance
+                    .refFromURL(imageUrl)
+                    .delete()
+                    .catchError((Object _) {}),
+              );
+            }
+          })
+          .catchError((Object e) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Could not delete the message.')),
+            );
+          }),
+    );
+  }
+
   Future<void> _toggleReaction(CircleMessage message, String emoji) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -207,6 +276,14 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
   @override
   Widget build(BuildContext context) {
     final messagesAsync = ref.watch(circleMessagesProvider(widget.circleId));
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final isModerator =
+        ref
+            .watch(circleDetailProvider(widget.circleId))
+            .valueOrNull
+            ?.moderatorIds
+            .contains(uid) ??
+        false;
 
     return Column(
       children: [
@@ -256,15 +333,33 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
                     if (msg.type == MessageType.systemEvent) {
                       return _SystemEventPill(msg.content ?? '');
                     }
+                    if (msg.isDeleted) {
+                      return _DeletedMessageBubble(
+                        message: msg,
+                        label: deletedMessageLabel(msg, uid: uid),
+                        isMe: msg.senderId == uid,
+                      );
+                    }
+                    final canDelete = canDeleteMessage(
+                      msg,
+                      uid: uid,
+                      isModerator: isModerator,
+                      now: DateTime.now(),
+                    );
+                    final onDelete = canDelete
+                        ? () => _deleteMessage(msg)
+                        : null;
                     if (msg.type == MessageType.image) {
                       return _ImageMessageBubble(
                         message: msg,
                         onReaction: (emoji) => _toggleReaction(msg, emoji),
+                        onDelete: onDelete,
                       );
                     }
                     return _TextMessageBubble(
                       message: msg,
                       onReaction: (emoji) => _toggleReaction(msg, emoji),
+                      onDelete: onDelete,
                     );
                   },
                 );
@@ -286,10 +381,17 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
 // ── Message bubbles ───────────────────────────────────────────────────────────
 
 class _TextMessageBubble extends StatelessWidget {
-  const _TextMessageBubble({required this.message, required this.onReaction});
+  const _TextMessageBubble({
+    required this.message,
+    required this.onReaction,
+    this.onDelete,
+  });
 
   final CircleMessage message;
   final ValueChanged<String> onReaction;
+
+  /// Null when this user may not delete the message.
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -380,23 +482,107 @@ class _TextMessageBubble extends StatelessWidget {
     );
   }
 
-  void _showEmojiBar(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppColors.surfacePanel,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+  void _showEmojiBar(BuildContext context) =>
+      _showMessageActions(context, onReaction: onReaction, onDelete: onDelete);
+}
+
+/// Long-press sheet: the reaction bar, plus "Delete message" when allowed.
+void _showMessageActions(
+  BuildContext context, {
+  required ValueChanged<String> onReaction,
+  VoidCallback? onDelete,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: AppColors.surfacePanel,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _EmojiReactionBar(onReaction: onReaction),
+          if (onDelete != null)
+            ListTile(
+              leading: Icon(
+                Icons.delete_outline_rounded,
+                color: AppColors.danger,
+              ),
+              title: Text(
+                'Delete message',
+                style: TextStyle(color: AppColors.danger),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                onDelete();
+              },
+            ),
+        ],
       ),
-      builder: (_) => _EmojiReactionBar(onReaction: onReaction),
+    ),
+  );
+}
+
+/// In-place tombstone (WhatsApp model): the row stays, the words say who.
+class _DeletedMessageBubble extends StatelessWidget {
+  const _DeletedMessageBubble({
+    required this.message,
+    required this.label,
+    required this.isMe,
+  });
+
+  final CircleMessage message;
+  final String label;
+  final bool isMe;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: isMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.divider),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.block_rounded, size: 14, color: AppColors.textMuted),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _ImageMessageBubble extends StatelessWidget {
-  const _ImageMessageBubble({required this.message, required this.onReaction});
+  const _ImageMessageBubble({
+    required this.message,
+    required this.onReaction,
+    this.onDelete,
+  });
 
   final CircleMessage message;
   final ValueChanged<String> onReaction;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -406,13 +592,10 @@ class _ImageMessageBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: GestureDetector(
-        onLongPress: () => showModalBottomSheet<void>(
-          context: context,
-          backgroundColor: AppColors.surfacePanel,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          builder: (_) => _EmojiReactionBar(onReaction: onReaction),
+        onLongPress: () => _showMessageActions(
+          context,
+          onReaction: onReaction,
+          onDelete: onDelete,
         ),
         child: Row(
           mainAxisAlignment: isMe
