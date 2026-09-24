@@ -21,6 +21,7 @@ import '../../time_blocks/application/time_block_providers.dart';
 import '../../time_blocks/domain/models/time_conflict.dart';
 import '../../time_blocks/domain/models/conflict_resolution_outcome.dart';
 import '../../time_blocks/presentation/scheduling_conflict_sheet.dart';
+import '../../../core/utils/date_keys.dart';
 import '../application/goal_period_helpers.dart';
 import '../application/goals_providers.dart';
 import '../domain/models/goal_action.dart';
@@ -848,9 +849,25 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
         ref.read(selectedGoalCategoryFilterProvider.notifier).state =
             _categoryId;
       }
+      // A goal that isn't planned for today never appears on Home's
+      // "Today's goals" card, which read as "lost" (QA, 2026-09-24). Say
+      // where it went. The messenger is captured before the pop so the
+      // snackbar lands on the screen beneath.
+      final dueToday = GoalPeriodHelpers.isGoalActiveOnDateKey(
+        goal,
+        DateKeys.todayKey(),
+      );
+      final messenger = ScaffoldMessenger.of(context);
       // `true` = saved: the template picker beneath pops itself as well, so
       // back after saving doesn't land on a stale picker.
       Navigator.pop(context, true);
+      if (!dueToday && goal.status == GoalStatus.active) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Saved for another day. Find it in the Goals tab.'),
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(

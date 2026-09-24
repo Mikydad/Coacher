@@ -69,6 +69,22 @@ final activeGoalsProvider = Provider<AsyncValue<List<UserGoal>>>((ref) {
   );
 });
 
+/// Active goals that are NOT planned for today: a future start, a repeat
+/// day that isn't today, or a one-time goal. Home's empty state names them
+/// (2026-09-24) so a goal "saved for another day" isn't mistaken for lost.
+final otherDayGoalsCountProvider = Provider<int>((ref) {
+  final list = ref.watch(goalsStreamProvider).valueOrNull;
+  if (list == null) return 0;
+  final todayKey = DateKeys.todayKey();
+  return list
+      .where(
+        (g) =>
+            g.status == GoalStatus.active &&
+            !GoalPeriodHelpers.isGoalActiveOnDateKey(g, todayKey),
+      )
+      .length;
+});
+
 /// Active goals for which **today** is a planned action day. Passive goals
 /// (repeat off) and repeating goals on an off-day stay out — this list is
 /// "what's planned today", not "every active goal" (that's the Goals hub).

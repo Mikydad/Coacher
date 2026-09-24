@@ -401,11 +401,15 @@ class HomeScreen extends ConsumerWidget {
                 todaysGoalsAsync.when(
                   data: (goals) {
                     if (goals.isEmpty) {
+                      final otherDays = ref.watch(otherDayGoalsCountProvider);
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'No goals in progress for today.',
+                            otherDays == 0
+                                ? 'No goals in progress for today.'
+                                : 'No goals due today. $otherDays saved for '
+                                      'other days in the Goals tab.',
                             style: TextStyle(color: AppColors.textSecondary),
                           ),
                           const SizedBox(height: 8),
