@@ -7,6 +7,7 @@ import '../../../core/presentation/page_headers.dart';
 import '../../ai_assistant/presentation/widgets/coach_ai_fab.dart';
 import '../application/points_providers.dart';
 import '../application/stake_action_items.dart';
+import '../application/stake_seen_store.dart';
 import '../application/stakes_providers.dart';
 import '../domain/models/points.dart';
 import '../domain/models/stake_challenge.dart';
@@ -41,8 +42,15 @@ class AccountabilityHubScreen extends ConsumerWidget {
         ),
         data: (all) {
           // Cards that need the user float to the top (2026-09-24), so the
-          // tab badge always points at something visible.
-          final actions = ref.watch(stakeActionItemsProvider);
+          // tab badge always points at something visible. Same seen rule
+          // as the badge (Miko): opening the stake clears its line — the
+          // line is a notification, not a to-do — and it re-arms when
+          // something genuinely new happens (a new day's log, a verdict).
+          final seen = ref.watch(stakeSeenProvider);
+          final actions = {
+            for (final e in ref.watch(stakeActionItemsProvider).entries)
+              if (!seen.contains(e.value.seenKey)) e.key: e.value,
+          };
           final open = all.where((c) => !c.status.isTerminal).toList()
             ..sort((a, b) {
               final na = actions.containsKey(a.id) ? 0 : 1;

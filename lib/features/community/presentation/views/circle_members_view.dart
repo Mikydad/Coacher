@@ -252,23 +252,39 @@ class CircleMembersView extends ConsumerWidget {
       ),
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true || !context.mounted) return;
 
+    // Server callable with a cold start: say it's happening, then say how
+    // it went (Miko, 2026-09-24). The messenger is captured up front so
+    // the result lands even if this view has since rebuilt or gone.
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Removing ${member.displayName}…'),
+        duration: const Duration(seconds: 30),
+      ),
+    );
     try {
       await ref
           .read(userCircleMembershipServiceProvider)
           .removeMember(circleId, member.userId);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${member.displayName} removed.')),
-        );
-      }
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(content: Text('${member.displayName} removed.')),
+      );
     } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not remove member. Try again.')),
-        );
-      }
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Could not remove ${member.displayName}.'),
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () {
+              if (context.mounted) _remove(context, ref, member);
+            },
+          ),
+        ),
+      );
     }
   }
 }

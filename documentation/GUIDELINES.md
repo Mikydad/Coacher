@@ -4242,3 +4242,18 @@ not silent reversal.
   320-pt SE (240) keeps the stacked layout. Verified on the iPhone 16
   simulator (which also confirmed the Getting Started tour fires on a
   fresh install).
+
+- **2026-09-24 · Tasks saved for another day say so; stake lines follow
+  the badge; member removal reports.** Miko's second list. (1) A task's
+  plan day is the reminder's date when a reminder is on, else a
+  Plan-Tomorrow slot, else today — so a reminder dated tomorrow files the
+  task under tomorrow and off Home's Today's Tasks. After saving such a
+  task the Add Task sheet shows "Saved for tomorrow / <Mon 28 Sep>. Find
+  it in Tasks under 'Open on other days'" with a View action
+  (`saved_for_another_day.dart`). (2) The hub card's reason line now uses
+  the badge's seen rule: opening the stake clears it, and it re-arms on
+  genuinely new state (next day's log, a verdict). Earlier today the line
+  stayed until the action was done; Miko wants it to read as a
+  notification, so the two never disagree. (3) Removing a member shows
+  "Removing <name>…" at once (the callable cold-starts), then "removed" or
+  a failure with Retry, on a messenger captured up front.

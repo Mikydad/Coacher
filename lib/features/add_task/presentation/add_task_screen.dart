@@ -9,6 +9,8 @@ import '../../../core/di/providers.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
+import '../../tasks_hub/presentation/tasks_hub_screen.dart';
+import '../application/saved_for_another_day.dart';
 import '../../planning/domain/models/routine.dart';
 import '../../planning/application/form_draft_autosave.dart';
 import '../../planning/application/form_draft_providers.dart';
@@ -605,7 +607,29 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
       _draftAutosave?.cancel();
       await ref.read(formDraftRepositoryProvider).delete(_draftKey);
 
-      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
+      // A task filed under another day never shows in Home's Today's
+      // Tasks (QA, 2026-09-24): say where it went. The messenger is
+      // captured before the pop so the snackbar lands on the screen
+      // beneath; the action opens the Tasks hub.
+      final otherDay = savedForAnotherDayMessage(
+        planDateKey: planKey,
+        todayKey: DateKeys.todayKey(),
+      );
+      final messenger = ScaffoldMessenger.of(context);
+      final navigator = Navigator.of(context);
+      navigator.pop();
+      if (otherDay != null) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(otherDay),
+            action: SnackBarAction(
+              label: 'View',
+              onPressed: () => navigator.pushNamed(TasksHubScreen.routeName),
+            ),
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
