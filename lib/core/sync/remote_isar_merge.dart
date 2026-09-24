@@ -81,6 +81,20 @@ class SyncCancelled extends StateError {
   SyncCancelled() : super('RemoteIsarMerge: cancelled');
 }
 
+/// Thrown at a checkpoint once the signed-in uid no longer matches the uid
+/// this pull was built for (sign-out or account switch mid-pull). The guard
+/// doing its job is not a failure: [SyncService] logs it and does NOT file
+/// a non-fatal (2026-09-24 — every teardown used to show up in Crashlytics
+/// as `sync.remotePull: StateError`). A [StateError] so the guarded phases
+/// rethrow it like [SyncCancelled].
+class SyncAbortedUidChanged extends StateError {
+  SyncAbortedUidChanged()
+    : super(
+        'RemoteIsarMerge: signed-in uid changed mid-pull — aborting to avoid '
+        'writing another account\'s data into local Isar.',
+      );
+}
+
 /// Pulls Firestore planning, reminders, and goals into Isar using last-write-wins on [updatedAtMs].
 ///
 /// The uid is pinned once at construction (via [FirestoreClient]) so every
@@ -191,7 +205,8 @@ class RemoteIsarMerge {
 
   void _noteSeen(String key, int updatedAtMs) {
     final cap =
-        DateTime.now().millisecondsSinceEpoch + cursorFutureClamp.inMilliseconds;
+        DateTime.now().millisecondsSinceEpoch +
+        cursorFutureClamp.inMilliseconds;
     final seen = updatedAtMs > cap ? cap : updatedAtMs;
     if (seen > (_maxSeen[key] ?? 0)) _maxSeen[key] = seen;
   }
@@ -226,7 +241,9 @@ class RemoteIsarMerge {
     ).get();
     for (final doc in snap.docs) {
       try {
-        final tomb = DeletedEntity.fromMap(Map<String, dynamic>.from(doc.data()));
+        final tomb = DeletedEntity.fromMap(
+          Map<String, dynamic>.from(doc.data()),
+        );
         if (tomb == null) continue;
         _noteSeen('deletedEntities', tomb.updatedAtMs);
         final existing = await _isar.isarDeletedEntitys
@@ -303,7 +320,8 @@ class RemoteIsarMerge {
   }
 
   Future<void> _purgeOldTombstones() async {
-    final cutoff = DateTime.now().millisecondsSinceEpoch -
+    final cutoff =
+        DateTime.now().millisecondsSinceEpoch -
         DeletedEntity.retention.inMilliseconds;
     final stale = await _isar.isarDeletedEntitys
         .filter()
@@ -337,12 +355,7 @@ class RemoteIsarMerge {
   /// [cancel] (cooperative stop — an in-flight query cannot be recalled,
   /// but nothing after it runs).
   void _checkpoint() {
-    if (!_uidStillCurrent) {
-      throw StateError(
-        'RemoteIsarMerge: signed-in uid changed mid-pull — aborting to avoid '
-        'writing another account\'s data into local Isar.',
-      );
-    }
+    if (!_uidStillCurrent) throw SyncAbortedUidChanged();
     if (_cancelled) throw SyncCancelled();
   }
 
@@ -597,7 +610,8 @@ class RemoteIsarMerge {
       } on StateError {
         rethrow;
       } catch (e, st) {
-        debugPrint('RemoteIsarMerge: skip reminderOccurrence ${doc.id}: $e\n$st',
+        debugPrint(
+          'RemoteIsarMerge: skip reminderOccurrence ${doc.id}: $e\n$st',
         );
       }
     }
@@ -639,12 +653,13 @@ class RemoteIsarMerge {
   /// Paused and completed goals were hydrated while they were live, and
   /// walking them every periodic pull would grow with archive size.
   Future<void> _pullGoalSubcollections({required bool activeOnly}) async {
-    final activeIds = (await _isar.isarGoals
-            .filter()
-            .statusStorageEqualTo('active')
-            .goalIdProperty()
-            .findAll())
-        .toSet();
+    final activeIds =
+        (await _isar.isarGoals
+                .filter()
+                .statusStorageEqualTo('active')
+                .goalIdProperty()
+                .findAll())
+            .toSet();
     final candidates = ignoreCursors
         ? (await _isar.isarGoals.where().goalIdProperty().findAll()).toSet()
         : {...activeIds, ..._newLocalGoalIds};
@@ -726,8 +741,7 @@ class RemoteIsarMerge {
         } on StateError {
           rethrow;
         } catch (e, st) {
-          debugPrint('RemoteIsarMerge: skip goal milestone ${doc.id}: $e\n$st',
-          );
+          debugPrint('RemoteIsarMerge: skip goal milestone ${doc.id}: $e\n$st');
         }
       }
     } on StateError {
@@ -758,8 +772,7 @@ class RemoteIsarMerge {
         } on StateError {
           rethrow;
         } catch (e, st) {
-          debugPrint('RemoteIsarMerge: skip goal check-in ${doc.id}: $e\n$st',
-          );
+          debugPrint('RemoteIsarMerge: skip goal check-in ${doc.id}: $e\n$st');
         }
       }
     } on StateError {
@@ -996,7 +1009,8 @@ class RemoteIsarMerge {
       } on StateError {
         rethrow;
       } catch (e, st) {
-        debugPrint('RemoteIsarMerge: skip onboarding profile ${doc.id}: $e\n$st',
+        debugPrint(
+          'RemoteIsarMerge: skip onboarding profile ${doc.id}: $e\n$st',
         );
       }
     }
@@ -1108,8 +1122,10 @@ class RemoteIsarMerge {
   /// needs no composite index — errors.md #16/#18).
   Future<void> _pullPointsLedger() async {
     final uid = _client.uid;
-    final balanceSnap =
-        await _client.topCollection('points_ledger').doc(uid).get();
+    final balanceSnap = await _client
+        .topCollection('points_ledger')
+        .doc(uid)
+        .get();
     final balanceData = balanceSnap.data();
     if (balanceData != null) {
       final updatedAtMs = (balanceData['updatedAtMs'] as num?)?.toInt() ?? 0;
@@ -1173,7 +1189,8 @@ class RemoteIsarMerge {
         final m = Map<String, dynamic>.from(doc.data());
         m['id'] = doc.id;
         final charity = Charity.fromMap(m);
-        final updatedAtMs = (m['updatedAtMs'] as num?)?.toInt() ??
+        final updatedAtMs =
+            (m['updatedAtMs'] as num?)?.toInt() ??
             DateTime.now().millisecondsSinceEpoch;
         final existing = await _isar.isarCharitys
             .filter()

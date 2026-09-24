@@ -4063,3 +4063,36 @@ not silent reversal.
   so Settings would still get Home's snapshot); showing the individual
   armed reminders to everyone (deferred: the tester build already has the
   "Armed reminders" page).
+
+- **2026-09-24 · First Crashlytics pass on the TestFlight build: handled
+  cases stop being fatals.** Build 1.0.2 (4) showed 12.5 % crash-free
+  users, but three of the four "crashes" were Dart exceptions the app
+  survived, filed as fatal by the `PlatformDispatcher.onError` handler
+  (`main.dart`), and the fourth was the build-3 strip regression already
+  fixed. Fixes, in the order of user impact: (1) the stake detail screen's
+  two live listeners (`hydrateChallengeLive`, `stakes_repository.dart`)
+  get an `onError` — a denied read (viewer not a participant, or signed
+  out with the screen mounted) ends the stream quietly and files a
+  non-fatal `stakes.liveHydration.*`; (2) `AuthGate._onAuthStateChanged`
+  checks `mounted` after its awaits before touching `ref` — the wipe can
+  remount the tree mid-handler; (3) the uid-changed abort in
+  `RemoteIsarMerge` is a typed `SyncAbortedUidChanged` and
+  `SyncService._runRemotePull` logs it without reporting — the guard
+  working is not a failure; (4) `ensureCircleIndex` never throws: network
+  conditions (`unavailable`, `deadline-exceeded`, `unknown`) are logged
+  only, real defects go to the non-fatal funnel as `circles.repairIndex`,
+  and the discovery screen no longer awaits the repair before opening a
+  circle the user is already in (access rests on the member doc, and the
+  callable can take a minute on a weak link); (5) dSYMs for builds 3 and 4
+  uploaded by hand from the local archives. *Rule going forward:* a
+  fire-and-forget call site must own its failure — catch, log, decide
+  what is worth a non-fatal. A background callable that can time out on a
+  slow link is never a Crashlytics fatal. *Left open:* 134
+  `sync.outboxDropped.analyticsStats` permission-denied drops on one
+  device (the LWW rule is the only rule that can reject an own-user
+  update; a future-stamped stored doc is the leading theory, unverified —
+  read one of that user's `analytics_stats` docs in the console); the
+  `sync.remotePull` TimeoutException non-fatal (66 events, 5 users) is
+  slow-network reality and may deserve to be demoted to a log line.
+  Tests: `user_circle_membership_service_test` (ensureCircleIndex never
+  throws group), `sync_service_remote_test` (non-fatal funnel group).

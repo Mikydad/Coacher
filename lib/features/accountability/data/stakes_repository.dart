@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:isar_community/isar.dart';
 
 import '../../../core/firebase/firestore_paths.dart';
@@ -9,6 +10,7 @@ import '../../../core/local_db/isar_collections/isar_stake_evidence.dart';
 import '../../../core/offline/offline_store.dart';
 import '../../../core/sync/lww_updated_at.dart';
 import '../../../core/sync/outbox_writer.dart';
+import '../../../core/telemetry/nonfatal.dart';
 import '../../../core/utils/stable_id.dart';
 import '../domain/models/stake_challenge.dart';
 import '../domain/models/stake_evidence.dart';
@@ -114,16 +116,31 @@ class StakesRepository {
               IsarStakeChallenge.fromDomain(incoming),
             );
           });
-        });
+        }, onError: (Object e, StackTrace st) => _onLiveError('doc', e, st));
     final evidenceSub = FirebaseFirestore.instance
         .collection('stake_challenges/$challengeId/evidence')
         .snapshots()
-        .listen((snap) async {
-          for (final doc in snap.docs) {
-            await _mergeServerEvidence(doc.data(), doc.id, challengeId);
-          }
-        });
+        .listen(
+          (snap) async {
+            for (final doc in snap.docs) {
+              await _mergeServerEvidence(doc.data(), doc.id, challengeId);
+            }
+          },
+          onError: (Object e, StackTrace st) => _onLiveError('evidence', e, st),
+        );
     return StakeLiveHydration([docSub, evidenceSub]);
+  }
+
+  /// A live listener that errors ends its own stream — permission-denied
+  /// once the viewer is no longer allowed to read the challenge (not a
+  /// participant, signed out with the screen still mounted). Without a
+  /// handler the error escaped the stream as an unhandled zone error and
+  /// Crashlytics filed it as a FATAL (2026-09-24, five events). The Isar
+  /// mirror keeps rendering what it has; the background pull stays the
+  /// source of truth.
+  static void _onLiveError(String which, Object e, StackTrace st) {
+    debugPrint('[Stakes] live $which listener ended: $e');
+    reportNonfatal('stakes.liveHydration.$which', e, st);
   }
 
   /// One-shot server refresh of a challenge + its evidence — called right

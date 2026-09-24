@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/firebase/firestore_paths.dart';
+import '../../../core/telemetry/nonfatal.dart';
 import '../data/circle_member_repository.dart';
 import '../domain/models/accountability_circle.dart';
 import '../domain/models/circle_enums.dart';
@@ -99,11 +101,28 @@ class UserCircleMembershipService {
 
   /// Repairs `users/{uid}/circleIds/{circleId}` to match the member doc
   /// (index present ⇔ active). Server-side now that the index is
-  /// server-owned; safe to fire and forget.
+  /// server-owned; genuinely safe to fire and forget: it NEVER throws.
+  ///
+  /// The callable is network-inherent — on a weak link it times out or the
+  /// connection drops — and callers do not await it, so an escaped error
+  /// became an unhandled zone error that Crashlytics filed as a FATAL
+  /// (2026-09-24). Network failures are logged only (the next open repairs
+  /// again); anything else is a real defect and goes to the non-fatal
+  /// funnel.
   Future<void> ensureCircleIndex(String circleId) async {
     final uid = _currentUserId();
     if (uid.isEmpty) return;
-    await _run(() => _functions.repairIndex(circleId));
+    try {
+      await _run(() => _functions.repairIndex(circleId));
+    } on CircleActionException catch (e, st) {
+      debugPrint('[Circles] repairIndex($circleId) failed: $e');
+      if (!e.isRetryable && e.code != 'unknown') {
+        reportNonfatal('circles.repairIndex', e, st);
+      }
+    } catch (e, st) {
+      debugPrint('[Circles] repairIndex($circleId) failed: $e');
+      reportNonfatal('circles.repairIndex', e, st);
+    }
   }
 
   /// Join an open circle immediately. For a request-approval circle this

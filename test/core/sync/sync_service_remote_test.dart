@@ -3,7 +3,9 @@ import 'dart:io';
 
 import 'package:sidepal/core/offline/offline_store.dart';
 import 'package:sidepal/core/sync/post_sync_refresh_coordinator.dart';
+import 'package:sidepal/core/sync/remote_isar_merge.dart';
 import 'package:sidepal/core/sync/sync_service.dart';
+import 'package:sidepal/core/telemetry/nonfatal.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isar_community/isar.dart';
 
@@ -92,38 +94,43 @@ void main() {
     expect(pulls, 2);
   });
 
-  test('bypassThrottle (Home sync button) skips the debounce, keeps cursors',
-      () async {
-    var calls = 0;
-    final t0 = DateTime(2026, 1, 1, 12);
-    SyncService.debugClockForTests = () => t0;
-    SyncService.debugRemotePullForTests = (_) async {
-      calls++;
-    };
-    await SyncService.instance.syncFromRemote(bypassThrottle: true);
-    await SyncService.instance.syncFromRemote(
-      bypassThrottle: true,
-      timeout: const Duration(seconds: 20),
-    );
-    expect(calls, 2);
-  });
+  test(
+    'bypassThrottle (Home sync button) skips the debounce, keeps cursors',
+    () async {
+      var calls = 0;
+      final t0 = DateTime(2026, 1, 1, 12);
+      SyncService.debugClockForTests = () => t0;
+      SyncService.debugRemotePullForTests = (_) async {
+        calls++;
+      };
+      await SyncService.instance.syncFromRemote(bypassThrottle: true);
+      await SyncService.instance.syncFromRemote(
+        bypassThrottle: true,
+        timeout: const Duration(seconds: 20),
+      );
+      expect(calls, 2);
+    },
+  );
 
-  test('uid change supersedes an in-flight pull instead of joining it', () async {
-    var pulls = 0;
-    SyncService.debugRemotePullForTests = (_) async {
-      pulls++;
-      await Future<void>.delayed(const Duration(milliseconds: 40));
-    };
+  test(
+    'uid change supersedes an in-flight pull instead of joining it',
+    () async {
+      var pulls = 0;
+      SyncService.debugRemotePullForTests = (_) async {
+        pulls++;
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+      };
 
-    // User A's pull starts, then user B signs in and forces a sync while
-    // A's pull is still running. B must get its own pull, not A's result.
-    final pullA = SyncService.instance.syncFromRemote(force: true);
-    SyncService.debugUidForTests = 'test-user-b';
-    final pullB = SyncService.instance.syncFromRemote(force: true);
-    await Future.wait([pullA, pullB]);
+      // User A's pull starts, then user B signs in and forces a sync while
+      // A's pull is still running. B must get its own pull, not A's result.
+      final pullA = SyncService.instance.syncFromRemote(force: true);
+      SyncService.debugUidForTests = 'test-user-b';
+      final pullB = SyncService.instance.syncFromRemote(force: true);
+      await Future.wait([pullA, pullB]);
 
-    expect(pulls, 2);
-  });
+      expect(pulls, 2);
+    },
+  );
 
   test('no signed-in user skips the pull', () async {
     var pulls = 0;
@@ -173,47 +180,84 @@ void main() {
     expect(ready.isCompleted, isTrue);
   });
 
-  test("a joiner is wired to the in-flight pull's first-screen signal",
-      () async {
-    final gate = Completer<void>();
-    SyncService.debugRemotePullForTests = (_) => gate.future;
+  test(
+    "a joiner is wired to the in-flight pull's first-screen signal",
+    () async {
+      final gate = Completer<void>();
+      SyncService.debugRemotePullForTests = (_) => gate.future;
 
-    final first = SyncService.instance.syncFromRemote(force: true);
-    final joinerReady = Completer<void>();
-    final joiner = SyncService.instance.syncFromRemote(
-      force: true,
-      firstScreenReady: joinerReady,
-    );
-    await Future<void>.delayed(Duration.zero);
-    expect(joinerReady.isCompleted, isFalse);
+      final first = SyncService.instance.syncFromRemote(force: true);
+      final joinerReady = Completer<void>();
+      final joiner = SyncService.instance.syncFromRemote(
+        force: true,
+        firstScreenReady: joinerReady,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(joinerReady.isCompleted, isFalse);
 
-    gate.complete();
-    await Future.wait([first, joiner]);
-    expect(joinerReady.isCompleted, isTrue);
-  });
+      gate.complete();
+      await Future.wait([first, joiner]);
+      expect(joinerReady.isCompleted, isTrue);
+    },
+  );
 
   // ── Full-pull promotion backoff (2026-09-22) ────────────────────────────────
 
-  test('a failed forced pull records the failure; a later success clears it',
-      () async {
-    final t0 = DateTime.utc(2026, 1, 1, 12);
-    SyncService.debugClockForTests = () => t0;
-    SyncService.debugRemotePullForTests = (_) async => throw StateError('boom');
+  test(
+    'a failed forced pull records the failure; a later success clears it',
+    () async {
+      final t0 = DateTime.utc(2026, 1, 1, 12);
+      SyncService.debugClockForTests = () => t0;
+      SyncService.debugRemotePullForTests = (_) async =>
+          throw StateError('boom');
 
-    expect(await SyncService.instance.syncFromRemote(force: true), isFalse);
-    expect(SyncService.instance.lastFullPullFailedAtForTests, t0);
+      expect(await SyncService.instance.syncFromRemote(force: true), isFalse);
+      expect(SyncService.instance.lastFullPullFailedAtForTests, t0);
 
-    SyncService.debugRemotePullForTests = (_) async {};
-    expect(await SyncService.instance.syncFromRemote(force: true), isTrue);
-    expect(SyncService.instance.lastFullPullFailedAtForTests, isNull);
+      SyncService.debugRemotePullForTests = (_) async {};
+      expect(await SyncService.instance.syncFromRemote(force: true), isTrue);
+      expect(SyncService.instance.lastFullPullFailedAtForTests, isNull);
+    },
+  );
+
+  // ── Failure reporting (2026-09-24) ──────────────────────────────────────────
+
+  group('pull failures and the non-fatal funnel', () {
+    late List<String> reported;
+
+    setUp(() {
+      reported = [];
+      NonfatalReporter.debugOverride = NonfatalReporter(
+        sink: (error, stack, reason) async => reported.add('$reason|$error'),
+      );
+    });
+
+    tearDown(() => NonfatalReporter.debugOverride = null);
+
+    test('a genuine failure is reported once under sync.remotePull', () async {
+      SyncService.debugRemotePullForTests = (_) async =>
+          throw StateError('boom');
+      expect(await SyncService.instance.syncFromRemote(force: true), isFalse);
+      expect(reported, hasLength(1));
+      expect(reported.single, startsWith('sync.remotePull|'));
+    });
+
+    test('the uid-changed abort is swallowed and NOT reported', () async {
+      SyncService.debugRemotePullForTests = (_) async =>
+          throw SyncAbortedUidChanged();
+      expect(await SyncService.instance.syncFromRemote(force: true), isFalse);
+      expect(reported, isEmpty);
+    });
   });
 
   test('isFullPullDue: daily, held back for 5 minutes after a failure', () {
     final now = DateTime.utc(2026, 1, 2, 12);
-    final dayAgo =
-        now.subtract(const Duration(hours: 25)).millisecondsSinceEpoch;
-    final hourAgo =
-        now.subtract(const Duration(hours: 1)).millisecondsSinceEpoch;
+    final dayAgo = now
+        .subtract(const Duration(hours: 25))
+        .millisecondsSinceEpoch;
+    final hourAgo = now
+        .subtract(const Duration(hours: 1))
+        .millisecondsSinceEpoch;
 
     expect(SyncService.isFullPullDue(now: now, lastFullPullMs: dayAgo), isTrue);
     expect(

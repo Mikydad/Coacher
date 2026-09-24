@@ -72,11 +72,14 @@ Future<void> joinOrRequestCircle({
   final service = ref.read(userCircleMembershipServiceProvider);
 
   // Creator or indexed member — open circle detail (repair index if needed).
+  // The repair is a background callable (up to a minute on a weak link);
+  // access to the circle rests on the member doc, so navigation never waits
+  // on it (2026-09-24).
   if (joinedIds.contains(circle.id) ||
       (uid.isNotEmpty && circle.creatorId == uid)) {
     _logDiscoveryJoin('Already joined (index or creator) — opening circle');
     if (!joinedIds.contains(circle.id)) {
-      await service.ensureCircleIndex(circle.id);
+      unawaited(service.ensureCircleIndex(circle.id));
     }
     if (context.mounted) {
       Navigator.pushNamed(
@@ -93,7 +96,7 @@ Future<void> joinOrRequestCircle({
       : false;
   if (existingMember) {
     _logDiscoveryJoin('Already active member — repairing index');
-    await service.ensureCircleIndex(circle.id);
+    unawaited(service.ensureCircleIndex(circle.id));
     if (context.mounted) {
       Navigator.pushNamed(
         context,

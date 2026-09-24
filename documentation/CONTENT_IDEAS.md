@@ -182,3 +182,25 @@ Flutter post on cooperative cancellation of long async pipelines.
   severity inflation from diagnostics copy, code-walk of the account
   boundary fix.
 
+
+## 2026-09-24 · 12.5 % crash-free, zero real crashes
+
+- **Hook:** The first week of TestFlight data said one in eight users
+  crashed. Not one of them had.
+- **What happened:** Couldn't open the console (the in-app browser isn't
+  signed in), so I read the reports through the Firebase CLI's MCP server
+  over stdio. Every "crash" was a Dart exception the app walked away from:
+  a background circle-index repair timing out on a weak link, a Firestore
+  listener denied after sign-out, a widget reading `ref` after it was
+  gone. The global handler marks every unhandled async error fatal, so the
+  dashboard counted survivable hiccups as deaths.
+- **The turn:** The fix was not "stop marking things fatal". It was making
+  each fire-and-forget site own its failure: catch, decide, log or report.
+  The sync abort guard was reporting itself as a failure every time it did
+  its job. And the one genuine crash in the list was the build-3 strip
+  regression, already dead.
+- **Takeaway:** Crash-free users measures your error handling discipline
+  before it measures your stability. Read the stack under the number.
+- **Formats:** short post ("your crash-free rate is lying"), thread on
+  reading Crashlytics via CLI when the console won't let you in, code-walk
+  of the four one-line fixes.

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sidepal/core/telemetry/nonfatal.dart';
 import 'package:sidepal/features/community/application/circle_functions.dart';
 import 'package:sidepal/features/community/application/user_circle_membership_service.dart';
 import 'package:sidepal/features/community/data/circle_member_repository.dart';
@@ -27,7 +28,11 @@ class _FakeCircleFunctions implements CircleFunctions {
   @override
   Future<CircleJoinResult> join(String circleId) => _answer(
     'join:$circleId',
-    CircleJoinResult(circleId: circleId, status: 'active', alreadyMember: false),
+    CircleJoinResult(
+      circleId: circleId,
+      status: 'active',
+      alreadyMember: false,
+    ),
   );
 
   @override
@@ -131,7 +136,10 @@ void main() {
   group('instant client-side limit pre-check', () {
     test('blocks a join at the cap without a round-trip', () async {
       final s = service(count: 3);
-      await expectLater(s.joinCircle('c9'), throwsA(isA<CircleLimitException>()));
+      await expectLater(
+        s.joinCircle('c9'),
+        throwsA(isA<CircleLimitException>()),
+      );
       expect(fn.calls, isEmpty);
     });
 
@@ -141,20 +149,23 @@ void main() {
       expect(fn.calls, ['join:c9']);
     });
 
-    test('an existing active member re-opens without hitting the cap', () async {
-      repo.members['c1/me'] = CircleMember(
-        userId: 'me',
-        circleId: 'c1',
-        displayName: 'Me',
-        role: CircleMemberRole.member,
-        status: CircleMemberStatus.active,
-        joinedAtMs: 1,
-        updatedAtMs: 1,
-      );
-      final s = service(count: 3);
-      await s.joinCircle('c1');
-      expect(fn.calls, ['join:c1']);
-    });
+    test(
+      'an existing active member re-opens without hitting the cap',
+      () async {
+        repo.members['c1/me'] = CircleMember(
+          userId: 'me',
+          circleId: 'c1',
+          displayName: 'Me',
+          role: CircleMemberRole.member,
+          status: CircleMemberStatus.active,
+          joinedAtMs: 1,
+          updatedAtMs: 1,
+        );
+        final s = service(count: 3);
+        await s.joinCircle('c1');
+        expect(fn.calls, ['join:c1']);
+      },
+    );
   });
 
   group('server reasons map to typed exceptions', () {
@@ -164,15 +175,67 @@ void main() {
       await expectLater(s.joinCircle('c1'), throwsA(matcher));
     }
 
-    test('circle_full → CircleFullException', () =>
-        expectReason('circle_full', isA<CircleFullException>()));
-    test('circle_limit → CircleLimitException', () =>
-        expectReason('circle_limit', isA<CircleLimitException>()));
-    test('invite_only → CirclePrivateException', () =>
-        expectReason('invite_only', isA<CirclePrivateException>()));
-    test('not_moderator → NotModeratorException', () =>
-        expectReason('not_moderator', isA<NotModeratorException>()));
-    test('unknown reasons surface as the raw exception', () =>
-        expectReason('something_else', isA<CircleActionException>()));
+    test(
+      'circle_full → CircleFullException',
+      () => expectReason('circle_full', isA<CircleFullException>()),
+    );
+    test(
+      'circle_limit → CircleLimitException',
+      () => expectReason('circle_limit', isA<CircleLimitException>()),
+    );
+    test(
+      'invite_only → CirclePrivateException',
+      () => expectReason('invite_only', isA<CirclePrivateException>()),
+    );
+    test(
+      'not_moderator → NotModeratorException',
+      () => expectReason('not_moderator', isA<NotModeratorException>()),
+    );
+    test(
+      'unknown reasons surface as the raw exception',
+      () => expectReason('something_else', isA<CircleActionException>()),
+    );
+  });
+
+  // Crashlytics 2026-09-24: the detail screen fires the repair without
+  // awaiting it, so an escaped timeout was filed as a FATAL on every open
+  // over a weak link. The repair must swallow — and only report what is
+  // NOT a network condition.
+  group('ensureCircleIndex never throws', () {
+    late List<String> reported;
+
+    setUp(() {
+      reported = [];
+      NonfatalReporter.debugOverride = NonfatalReporter(
+        sink: (error, stack, reason) async => reported.add(reason),
+      );
+    });
+
+    tearDown(() => NonfatalReporter.debugOverride = null);
+
+    test('a timeout is swallowed and not reported', () async {
+      fn.fail = CircleActionException('deadline-exceeded', 'DEADLINE EXCEEDED');
+      await service().ensureCircleIndex('c1');
+      expect(fn.calls, ['repair:c1']);
+      expect(reported, isEmpty);
+    });
+
+    test(
+      'a dropped connection (unknown) is swallowed and not reported',
+      () async {
+        fn.fail = CircleActionException(
+          'unknown',
+          'The network connection was lost.',
+        );
+        await service().ensureCircleIndex('c1');
+        expect(reported, isEmpty);
+      },
+    );
+
+    test('a server-side defect is swallowed but reported', () async {
+      fn.fail = CircleActionException('internal', 'boom');
+      await service().ensureCircleIndex('c1');
+      expect(reported, ['circles.repairIndex']);
+    });
   });
 }

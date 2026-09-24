@@ -101,6 +101,14 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       }
     }
 
+    // The awaits above (uid check, session wipe, persist) can outlive this
+    // gate — a sign-out or account switch remounts the tree while the
+    // handler is mid-flight, and `ref` on a disposed element throws
+    // (Crashlytics 2026-09-24: "Cannot use ref after the widget was
+    // disposed", filed as a fatal). Nothing below matters for a gate that
+    // is gone: the remounted gate re-runs this for the current user.
+    if (!mounted) return;
+
     // Use the latest Firebase user (displayName may be set after Google profile sync).
     final fresh = ref.read(authRepositoryProvider).currentUser;
     await _syncLocalDisplayNameFromAuth(fresh ?? user);
@@ -111,6 +119,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   Future<void> _syncLocalDisplayNameFromAuth(dynamic user) async {
     final name = (user as dynamic).displayName as String?;
     if (name == null || name.trim().isEmpty) return;
+    if (!mounted) return;
     try {
       await ref
           .read(profilePreferenceServiceProvider)

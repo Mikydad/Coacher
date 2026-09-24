@@ -67,7 +67,8 @@ class SyncService {
   @visibleForTesting
   static Duration? debugWriteTimeoutForTests;
 
-  static Duration get _writeTimeout => debugWriteTimeoutForTests ?? writeTimeout;
+  static Duration get _writeTimeout =>
+      debugWriteTimeoutForTests ?? writeTimeout;
 
   /// Audit M7 — a full (cursor-less) reconcile pull at least once a day, so
   /// convergence does not depend on the user pressing the sync button.
@@ -337,6 +338,11 @@ class SyncService {
         );
       }
       _lastRemotePullSucceeded = true;
+    } on SyncAbortedUidChanged catch (e) {
+      // Session teardown / account switch while the pull was in flight: the
+      // isolation guard did its job. Expected, so no Crashlytics event —
+      // the caller still gets `false` and the next account pulls afresh.
+      debugPrint('syncFromRemote aborted: $e');
     } catch (e, st) {
       // Do not rethrow: many callers are fire-and-forget (connectivity
       // listener, bootstrap) and an escaped exception would surface as an
@@ -404,11 +410,11 @@ class SyncService {
   /// Serialised, atomic persistence of the current queue snapshot.
   Future<void> _persistQueue() {
     final snapshot = List<OfflineOperation>.of(_queue);
-    _saveChain = _saveChain
-        .then((_) => _queueStore.save(snapshot))
-        .catchError((Object e) {
-          debugPrint('SyncService: queue persist failed: $e');
-        });
+    _saveChain = _saveChain.then((_) => _queueStore.save(snapshot)).catchError((
+      Object e,
+    ) {
+      debugPrint('SyncService: queue persist failed: $e');
+    });
     return _saveChain;
   }
 
@@ -493,9 +499,11 @@ class SyncService {
     final capped = base > const Duration(minutes: 10)
         ? const Duration(minutes: 10)
         : base;
-    final jitterMs = (capped.inMilliseconds * 0.2 *
-            ((DateTime.now().microsecondsSinceEpoch % 1000) / 1000))
-        .round();
+    final jitterMs =
+        (capped.inMilliseconds *
+                0.2 *
+                ((DateTime.now().microsecondsSinceEpoch % 1000) / 1000))
+            .round();
     return capped + Duration(milliseconds: jitterMs);
   }
 
