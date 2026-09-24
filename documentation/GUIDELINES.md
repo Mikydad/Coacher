@@ -4096,3 +4096,80 @@ not silent reversal.
   slow-network reality and may deserve to be demoted to a log line.
   Tests: `user_circle_membership_service_test` (ensureCircleIndex never
   throws group), `sync_service_remote_test` (non-fatal funnel group).
+
+- **2026-09-24 · Goals saved for another day say so.** Miko's tester
+  feedback: a goal with a future start, an off-day repeat, or one-time
+  schedule never appears on Home's "Today's goals" and read as lost. Now
+  the editor shows "Saved for another day. Find it in the Goals tab." after
+  saving such a goal (`goal_editor_screen.dart`, messenger captured before
+  the pop), and Home's empty state reads "No goals due today. N saved for
+  other days in the Goals tab." via `otherDayGoalsCountProvider`. The
+  Home filter itself is unchanged (decision 2026-08: Home is "planned
+  today", the Goals hub is everything). Test:
+  `other_day_goals_count_test`.
+
+- **2026-09-24 · Known gap, parked: goal category picker.** A custom goal
+  category can only be typed once from the template picker; the editor
+  has no category picker, so a second goal cannot join an existing custom
+  category except by retyping the exact name. Miko: plug new categories
+  into the category picker when creating goals — later, not now.
+
+- **2026-09-24 · Advanced settings keep one toggle: Habit anchor.** Miko
+  asked whether Habit anchor, Strict for this task and Fixed time slot
+  were all needed; the rule is "as few user actions as possible". Audit:
+  Habit anchor is load-bearing (the only `routine` reminder signal, task
+  ordering, the habit tier count). Strict duplicated per-task Extreme from
+  the Accountability picker one card up. Fixed time slot only added +0.3
+  to conflict severity and, having no `PlannedTask` field, was silently
+  lost on every edit. The two toggles are gone from
+  `add_task_advanced_section.dart`; `strictModeRequired` stays on the
+  model and every consumer (mandatory timer, CONFIRM, extension cap,
+  notification Done) still honours tasks that already carry it, and Sleep
+  still forces its block rigid internally. Nothing migrates.
+
+- **2026-09-24 · Accountability badge and hub share one predicate.** Tester
+  feedback: the tab badge lit with no card saying which stake lit it.
+  `stakeActionItemFor` (`stake_action_items.dart`) is now the single
+  source for "what does this stake need from me" — respond to invite, log
+  today's progress, confirm the result. The badge counts the items not yet
+  seen; the hub floats those cards to the top and shows a dot plus the
+  reason line (the line stays until the action is done, not merely seen).
+  Invite fix folded in: a stake I already accepted no longer counts while
+  the other side is pending (the card already said "waiting for your
+  opponent"). Test: `stake_action_items_test`.
+
+- **2026-09-24 · Circles: leave/delete feedback, message delete, edit
+  sheet, privacy toggle.** Tester + Miko. (1) Leave and Delete show a busy
+  state on the button, then pop to the Community list with a snackbar;
+  errors get a Retry. The navigator and messenger are captured before the
+  call because the server revokes our read of the circle before the
+  callable returns, which used to swap the screen for "Could not load
+  circle" and skip the pop. The detail screen now treats
+  permission-denied like a deleted document and pops. (2) Message delete
+  is a TOMBSTONE (WhatsApp model): the row stays with content/image
+  stripped, `deletedAtMs` + `deletedByUid`. Policy in
+  `message_delete_policy.dart`: sender within 30 min (client-enforced;
+  rules already let a sender edit their own message), moderator any
+  message any time, shown as "Message deleted by admin". Rules gained a
+  moderator clause limited to the tombstone fields — **rules deploy
+  pending**. Image files are removed best-effort. (3) "Edit circle" is a
+  sheet (name, description, category, join policy, Public/Private) that
+  writes only changed fields via `updateCircleFields`; a whole-doc merge
+  carried a stale `memberCount`, which the rules reject. Creator-only, as
+  before. Tests: `message_delete_policy_test`, message model/repository,
+  `circle_repository_test` (update fields).
+
+- **2026-09-24 · Time tracker: one thing at a time, said out loud.** Miko:
+  tracking A at 9:00 and then logging B at 9:00 showed no overlap and the
+  Home pill went blank. The tracker was already one-activity-at-a-time
+  (the timeline cuts an entry at the next start) but nothing said so.
+  Now the capture sheet checks the day's entries
+  (`overlappingActivities`, `activity_overlap.dart`) and asks "Already
+  tracking 'A' … one thing at a time: 'B' will end it at 9:00" with Log
+  anyway / Cancel; and `TimeTrackerActions.log` writes the previous open
+  entry's end at the new start (a backfilled entry that starts earlier
+  leaves it alone), so the pill's "latest start, no explicit end" rule can
+  no longer be fooled by an earlier open entry. Assumed, not re-confirmed
+  by Miko: A ends when B starts (the PRD's design). Tests:
+  `activity_overlap_test`, `activity_reminder_and_actions_test` (log ends
+  previous group).

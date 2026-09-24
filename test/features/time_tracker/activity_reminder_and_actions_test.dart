@@ -191,4 +191,45 @@ void main() {
       expect(repo.rows[e.id]!.active, isFalse);
     });
   });
+
+  group('log ends the running previous entry (2026-09-24)', () {
+    test('the previous open entry gets an explicit end at the new start',
+        () async {
+      final repo = _MemoryRepo();
+      final rec = _Recorder();
+      final actions = TimeTrackerActions(
+        repository: repo,
+        reminders: rec.service(),
+      );
+      final a = await actions.log(
+        _event(text: 'A', startMs: _now.millisecondsSinceEpoch),
+      );
+      final bStart = _now.add(const Duration(minutes: 20)).millisecondsSinceEpoch;
+      await actions.log(_event(text: 'B', startMs: bStart));
+      expect(repo.rows[a.id]!.endedAtMs, bStart);
+    });
+
+    test('a backfilled entry that starts earlier leaves the running one open',
+        () async {
+      final repo = _MemoryRepo();
+      final rec = _Recorder();
+      final actions = TimeTrackerActions(
+        repository: repo,
+        reminders: rec.service(),
+      );
+      final a = await actions.log(
+        _event(text: 'A', startMs: _now.millisecondsSinceEpoch),
+      );
+      final earlier = _now.subtract(const Duration(hours: 1)).millisecondsSinceEpoch;
+      await actions.log(
+        _event(
+          text: 'Earlier',
+          startMs: earlier,
+          endMs: _now.subtract(const Duration(minutes: 30)).millisecondsSinceEpoch,
+        ),
+      );
+      expect(repo.rows[a.id]!.endedAtMs, isNull);
+    });
+  });
 }
+
