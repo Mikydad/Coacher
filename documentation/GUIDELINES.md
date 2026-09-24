@@ -4230,3 +4230,15 @@ not silent reversal.
   the three. Future scaling flag (not a cost today): `morningBrief`
   reads every opted-in deviceToken + 2 docs per user every 15 min —
   gate it by a next-due timestamp before launch.
+
+- **2026-09-24 · Home dashboard: three columns on every standard iPhone.**
+  Miko: the card was "bigger" on an iPhone 16 than on his other phone.
+  Cause: `_kWideDashboard = 330` compared against the card's inner width
+  (screen − 80), which only Plus / Pro Max phones (430 → 350) reach; a
+  393-pt iPhone 16 (313) and even a 402-pt 16 Pro (322) fell to the
+  stacked layout with the 116-pt ring and the trend on its own row. Now
+  300: at 313 the ring column is ~125 pt for the 104-pt ring and each
+  trend cell ~14 pt (compact labels 9 pt so Sa/Su don't touch). The
+  320-pt SE (240) keeps the stacked layout. Verified on the iPhone 16
+  simulator (which also confirmed the Getting Started tour fires on a
+  fresh install).

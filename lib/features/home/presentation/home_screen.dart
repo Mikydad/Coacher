@@ -768,7 +768,15 @@ class _HeroDashboard extends StatelessWidget {
   final List<double> weekValues;
   final double barsProgress;
 
-  static const double _kWideDashboard = 330;
+  /// Inner card width (screen − 20 page pad − 20 card pad, each side) at
+  /// which the three columns sit side by side. Was 330, which only Plus /
+  /// Pro Max phones (430 pt → 350) reached: an iPhone 16 (393 → 313) and
+  /// even a 16 Pro (402 → 322) got the stacked layout with the bigger ring
+  /// and the trend on its own row, so the card looked "bigger" there
+  /// (Miko, 2026-09-24). At 300 every current iPhone but the 320-pt SE
+  /// gets the row: at 313 the ring column is ~125 pt for a 104-pt ring
+  /// and each trend cell ~14 pt for an 8-pt bar and a 10-pt label.
+  static const double _kWideDashboard = 300;
 
   @override
   Widget build(BuildContext context) {
@@ -1078,7 +1086,9 @@ class _WeekTrend extends StatelessWidget {
                   _labels[i],
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: compact ? 10 : 11.5,
+                    // 9 in the compact column: at a 393-pt phone each of
+                    // the seven cells is ~14 pt and "Sa"/"Su" touched at 10.
+                    fontSize: compact ? 9 : 11.5,
                     fontWeight: i == todayIndex
                         ? FontWeight.w700
                         : FontWeight.w500,
