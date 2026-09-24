@@ -378,11 +378,7 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         _modeUserCustomized = false;
         // Open Advanced when it holds something the user set — including a
         // user classification, which lives there now.
-        _advancedExpanded =
-            _isHabitAnchor ||
-            _strictModeRequired ||
-            _isRigid ||
-            _userTaxonomy != null;
+        _advancedExpanded = _isHabitAnchor || _userTaxonomy != null;
         _loaded = true;
       });
       _suppressDraftDirty = false;
@@ -899,15 +895,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                               sectionKey: _advancedSectionKey,
                               expanded: _advancedExpanded,
                               isHabitAnchor: _isHabitAnchor,
-                              strictModeRequired: _strictModeRequired,
-                              isRigid: _isRigid,
                               onToggleExpanded: _toggleAdvancedExpanded,
                               onHabitAnchorChanged: (v) =>
                                   setState(() => _isHabitAnchor = v),
-                              onStrictChanged: (v) =>
-                                  setState(() => _strictModeRequired = v),
-                              onRigidChanged: (v) =>
-                                  setState(() => _isRigid = v),
                               // "If you miss it" lives here since
                               // 2026-09-18, only while a reminder exists —
                               // it selects the ladder's shape, not whether

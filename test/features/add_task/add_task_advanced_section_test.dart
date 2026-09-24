@@ -19,12 +19,8 @@ Widget _host({
         sectionKey: GlobalKey(),
         expanded: expanded,
         isHabitAnchor: isHabitAnchor,
-        strictModeRequired: false,
-        isRigid: false,
         onToggleExpanded: () {},
         onHabitAnchorChanged: (_) {},
-        onStrictChanged: (_) {},
-        onRigidChanged: (_) {},
         reminderEnabled: reminderEnabled,
         taxonomy: ReminderTaxonomy.flexible,
         isCritical: isCritical,
@@ -45,9 +41,11 @@ void main() {
     expect(find.text('If you miss it'), findsOneWidget);
     expect(find.text('COMES BACK'), findsOneWidget);
     expect(find.text('Critical'), findsOneWidget);
-    // The existing toggles are still there.
+    // Habit anchor is the one toggle left; Strict and Fixed time went
+    // (2026-09-24, fewer user actions).
     expect(find.text('Habit anchor'), findsOneWidget);
-    expect(find.text('Fixed time slot'), findsOneWidget);
+    expect(find.text('Strict for this task'), findsNothing);
+    expect(find.text('Fixed time slot'), findsNothing);
   });
 
   testWidgets('with no reminder, the chooser is absent — nothing to shape', (
@@ -79,10 +77,7 @@ void main() {
 
     await tester.pumpWidget(_host(reminderEnabled: true, expanded: false));
     await tester.pumpAndSettle();
-    expect(
-      find.text('Habit, strict rules, fixed time, if you miss it'),
-      findsOneWidget,
-    );
+    expect(find.text('Habit anchor, if you miss it'), findsOneWidget);
   });
 
   testWidgets('changes flow out through the callbacks', (tester) async {
