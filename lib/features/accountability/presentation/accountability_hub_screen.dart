@@ -6,6 +6,7 @@ import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../../ai_assistant/presentation/widgets/coach_ai_fab.dart';
 import '../application/points_providers.dart';
+import '../application/stake_action_items.dart';
 import '../application/stakes_providers.dart';
 import '../domain/models/points.dart';
 import '../domain/models/stake_challenge.dart';
@@ -39,8 +40,16 @@ class AccountabilityHubScreen extends ConsumerWidget {
           ),
         ),
         data: (all) {
+          // Cards that need the user float to the top (2026-09-24), so the
+          // tab badge always points at something visible.
+          final actions = ref.watch(stakeActionItemsProvider);
           final open = all.where((c) => !c.status.isTerminal).toList()
-            ..sort((a, b) => a.deadlineMs.compareTo(b.deadlineMs));
+            ..sort((a, b) {
+              final na = actions.containsKey(a.id) ? 0 : 1;
+              final nb = actions.containsKey(b.id) ? 0 : 1;
+              if (na != nb) return na - nb;
+              return a.deadlineMs.compareTo(b.deadlineMs);
+            });
           final done = all.where((c) => c.status.isTerminal).toList()
             ..sort((a, b) => b.updatedAtMs.compareTo(a.updatedAtMs));
 
@@ -75,7 +84,8 @@ class AccountabilityHubScreen extends ConsumerWidget {
               if (open.isNotEmpty) ...[
                 const SectionHeader('On the line'),
                 const SizedBox(height: 8),
-                for (final c in open) _ChallengeCard(challenge: c),
+                for (final c in open)
+                  _ChallengeCard(challenge: c, action: actions[c.id]),
               ],
               if (done.isNotEmpty) ...[
                 const SizedBox(height: 20),
@@ -255,9 +265,13 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _ChallengeCard extends StatelessWidget {
-  const _ChallengeCard({required this.challenge});
+  const _ChallengeCard({required this.challenge, this.action});
 
   final StakeChallenge challenge;
+
+  /// Why this card needs the user, when it does — the same predicate that
+  /// lights the tab badge.
+  final StakeActionItem? action;
 
   @override
   Widget build(BuildContext context) {
@@ -294,6 +308,30 @@ class _ChallengeCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 3),
+                      if (action != null) ...[
+                        Row(
+                          children: [
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: BoxDecoration(
+                                color: AppColors.accent,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              action!.reason.label,
+                              style: TextStyle(
+                                color: AppColors.accent,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                      ],
                       Text(
                         _subtitle(c),
                         maxLines: 1,

@@ -4,6 +4,7 @@ import '../../../core/firebase/firestore_paths.dart';
 import '../data/stakes_repository.dart';
 import '../domain/models/stake_challenge.dart';
 import '../domain/models/stake_evidence.dart';
+import 'stake_action_items.dart';
 import 'stake_functions.dart';
 import 'stake_seen_store.dart';
 
@@ -55,6 +56,20 @@ final stakePendingInvitesProvider = Provider<List<StakeChallenge>>((ref) {
       .toList();
 });
 
+/// Per challenge, the action it needs from the user right now — shared by
+/// the tab badge and the hub cards (`stake_action_items.dart`).
+final stakeActionItemsProvider = Provider<Map<String, StakeActionItem>>((ref) {
+  final uid = FirestorePaths.activeUid;
+  final challenges = ref.watch(stakeChallengesStreamProvider).value ?? const [];
+  final evidence = ref.watch(allStakeEvidenceStreamProvider).value ?? const [];
+  final out = <String, StakeActionItem>{};
+  for (final c in challenges) {
+    final item = stakeActionItemFor(c, uid: uid, evidence: evidence);
+    if (item != null) out[c.id] = item;
+  }
+  return out;
+});
+
 /// The Accountability tab badge: how many badge-worthy items the user has
 /// NOT yet looked at —
 ///  * an invite to accept/decline,
@@ -66,42 +81,9 @@ final stakePendingInvitesProvider = Provider<List<StakeChallenge>>((ref) {
 /// re-arms when something genuinely new happens (including each new day's
 /// due evidence). Doing the action removes the item outright.
 final stakeActionsNeededProvider = Provider<int>((ref) {
-  final uid = FirestorePaths.activeUid;
-  final challenges = ref.watch(stakeChallengesStreamProvider).value ?? const [];
-  final evidence = ref.watch(allStakeEvidenceStreamProvider).value ?? const [];
+  final items = ref.watch(stakeActionItemsProvider);
   final seen = ref.watch(stakeSeenProvider);
-
-  var count = 0;
-  for (final c in challenges) {
-    if (c.participant(uid) == null) continue;
-    switch (c.status) {
-      case StakeChallengeStatus.pendingAccept:
-        if (c.creatorUid != uid && !seen.contains(StakeSeenKeys.invite(c.id))) {
-          count++;
-        }
-      case StakeChallengeStatus.active:
-        final today = c.todayUnitIndex;
-        if (today >= 0 &&
-            today < c.frozenGoal.totalUnits &&
-            !seen.contains(StakeSeenKeys.evidence(c.id, today))) {
-          var logged = 0;
-          for (final e in evidence) {
-            if (e.challengeId == c.id && e.uid == uid && e.unitIndex == today) {
-              logged += e.amount;
-            }
-          }
-          if (logged < c.mercyUnitTarget) count++;
-        }
-      case StakeChallengeStatus.pendingVerification:
-        if (c.type.isMultiParty &&
-            !seen.contains(StakeSeenKeys.confirm(c.id))) {
-          count++;
-        }
-      default:
-        break;
-    }
-  }
-  return count;
+  return items.values.where((i) => !seen.contains(i.seenKey)).length;
 });
 
 /// Goal ids currently staked by a NON-TERMINAL challenge — the Goals hub
