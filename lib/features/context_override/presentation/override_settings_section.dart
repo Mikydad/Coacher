@@ -8,13 +8,29 @@ import '../domain/models/user_attention_state.dart';
 import 'post_override_review_card.dart';
 import '../../../core/presentation/app_colors.dart';
 
-/// Settings section for managing context overrides and sleep window.
+/// Settings section for managing context overrides and the sleep window —
+/// "Status" and "Quiet hours" to the user (plain-language pass, 2026-09-25).
 ///
 /// Designed to be embedded inside a settings screen or used as a standalone
 /// screen. Provides:
-///   - Current override status + "End now" button
-///   - Sleep window configuration
+///   - Current status + "End now" button
+///   - Quiet hours (sleep window) configuration
 ///   - Recent override history (in-memory stub in Phase B)
+
+/// "23:00" → "11:00 PM": the stored HH:mm strings shown the way the rest of
+/// the app shows times. Falls back to the raw string if it does not parse.
+String formatSleepWindowTime(BuildContext context, String hhmm) {
+  final parts = hhmm.trim().split(':');
+  if (parts.length != 2) return hhmm;
+  final h = int.tryParse(parts[0]);
+  final m = int.tryParse(parts[1]);
+  if (h == null || m == null || h < 0 || h > 23 || m < 0 || m > 59) {
+    return hhmm;
+  }
+  return MaterialLocalizations.of(
+    context,
+  ).formatTimeOfDay(TimeOfDay(hour: h, minute: m), alwaysUse24HourFormat: false);
+}
 class OverrideSettingsSection extends ConsumerWidget {
   const OverrideSettingsSection({super.key});
 
@@ -34,11 +50,11 @@ class OverrideSettingsSection extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionLabel(context, 'ATTENTION MODE'),
+            _sectionLabel(context, 'STATUS'),
             const SizedBox(height: 8),
             _CurrentOverrideRow(state: s, effective: effective),
             const SizedBox(height: 20),
-            _sectionLabel(context, 'SLEEP WINDOW'),
+            _sectionLabel(context, 'QUIET HOURS'),
             const SizedBox(height: 8),
             _SleepWindowConfig(state: s),
           ],
@@ -84,9 +100,7 @@ class _CurrentOverrideRow extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  hasOverride
-                      ? '${effective.displayName} mode active'
-                      : 'No active override',
+                  hasOverride ? effective.displayName : 'No status set',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 if (hasOverride && state.overrideExpiresAt != null)
@@ -96,12 +110,13 @@ class _CurrentOverrideRow extends ConsumerWidget {
                   ),
                 if (hasOverride && state.overrideExpiresAt == null)
                   Text(
-                    // The automatic sleep window ends at its wake time;
-                    // "End now" pauses it until then (2026-09-15).
+                    // The automatic quiet hours end at their wake time;
+                    // "End now" pauses them until then (2026-09-15).
                     state.activeOverride == ContextOverride.none &&
                             effective == ContextOverride.sleep &&
                             (state.sleepWindowEnd?.isNotEmpty ?? false)
-                        ? 'Sleep window · until ${state.sleepWindowEnd}'
+                        ? 'Quiet hours · until '
+                              '${formatSleepWindowTime(context, state.sleepWindowEnd!)}'
                         : 'Until manually ended',
                     style: TextStyle(fontSize: 12, color: AppColors.fg54),
                   ),
@@ -135,7 +150,7 @@ class _CurrentOverrideRow extends ConsumerWidget {
   }
 }
 
-// ─── Sleep window configuration ───────────────────────────────────────────────
+// ─── Quiet hours (sleep window) configuration ────────────────────────────────
 
 class _SleepWindowConfig extends ConsumerStatefulWidget {
   const _SleepWindowConfig({required this.state});
@@ -175,8 +190,15 @@ class _SleepWindowConfigState extends ConsumerState<_SleepWindowConfig> {
     }
   }
 
+  /// Storage form (HH:mm) — what the service persists and compares.
   String _fmt(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  /// Display form ("10:30 PM").
+  String _fmt12(BuildContext context, TimeOfDay t) =>
+      MaterialLocalizations.of(
+        context,
+      ).formatTimeOfDay(t, alwaysUse24HourFormat: false);
 
   @override
   Widget build(BuildContext context) {
@@ -185,12 +207,23 @@ class _SleepWindowConfigState extends ConsumerState<_SleepWindowConfig> {
       children: [
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('Daily sleep window'),
-          subtitle: Text(
-            _enabled
-                ? 'Reminders suppressed from ${_fmt(_start)} to ${_fmt(_end)}'
-                : 'Off — all reminders active overnight',
-            style: TextStyle(fontSize: 12, color: AppColors.fg54),
+          title: const Text('Quiet hours'),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Pause non-urgent reminders while you sleep.',
+                style: TextStyle(fontSize: 12, color: AppColors.fg54),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _enabled
+                    ? 'Non-urgent reminders paused from '
+                          '${_fmt12(context, _start)} to ${_fmt12(context, _end)}'
+                    : 'Off — reminders active overnight',
+                style: TextStyle(fontSize: 12, color: AppColors.fg54),
+              ),
+            ],
           ),
           value: _enabled,
           onChanged: (v) async {
@@ -245,7 +278,7 @@ class _SleepWindowConfigState extends ConsumerState<_SleepWindowConfig> {
               final active = isWithinSleepWindow(now, _fmt(_start), _fmt(_end));
               if (!active) return const SizedBox.shrink();
               return Text(
-                '🌙 Sleep window is currently active',
+                '🌙 Quiet hours are active now',
                 style: TextStyle(fontSize: 12, color: AppColors.fg54),
               );
             },
@@ -273,13 +306,11 @@ class _TimePicker extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () async {
+        // Device format (12-hour on a US phone) so the dial matches the
+        // "10:30 PM" the tile shows (2026-09-25).
         final picked = await showTimePicker(
           context: context,
           initialTime: value,
-          builder: (ctx, child) => MediaQuery(
-            data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
-            child: child!,
-          ),
         );
         if (picked != null) onChanged(picked);
       },
@@ -296,7 +327,9 @@ class _TimePicker extends StatelessWidget {
             Text(label, style: TextStyle(fontSize: 11, color: AppColors.fg54)),
             const SizedBox(height: 2),
             Text(
-              '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}',
+              MaterialLocalizations.of(
+                context,
+              ).formatTimeOfDay(value, alwaysUse24HourFormat: false),
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ],

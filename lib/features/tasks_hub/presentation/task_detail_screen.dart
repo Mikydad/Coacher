@@ -326,7 +326,7 @@ class TaskDetailScreen extends ConsumerWidget {
                 rows: [
                   _DetailRow(
                     icon: Icons.shield_outlined,
-                    label: 'Discipline mode',
+                    label: 'Strictness',
                     value: _modeLabel(task, bundle.routine),
                     valueColor: _modeColor(task, bundle.routine),
                   ),

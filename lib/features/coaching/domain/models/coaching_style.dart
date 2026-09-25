@@ -29,7 +29,8 @@ enum CoachingStyle {
 
   // ── Display helpers ───────────────────────────────────────────────────────
 
-  /// User-facing label shown in selection UI.
+  /// User-facing label shown in selection UI. Storage ids are unchanged;
+  /// `disciplined` reads as Direct and `intense` as Tough (2026-09-25).
   String get displayName {
     switch (this) {
       case CoachingStyle.supportive:
@@ -37,9 +38,9 @@ enum CoachingStyle {
       case CoachingStyle.balanced:
         return 'Balanced';
       case CoachingStyle.disciplined:
-        return 'Disciplined';
+        return 'Direct';
       case CoachingStyle.intense:
-        return 'Intense';
+        return 'Tough';
     }
   }
 
@@ -51,9 +52,9 @@ enum CoachingStyle {
       case CoachingStyle.balanced:
         return 'Clear and friendly. Facts, suggestions, and steady accountability.';
       case CoachingStyle.disciplined:
-        return 'Direct and accountable. You committed to this — the app holds you to it.';
+        return 'Straight to the point. Less encouragement, more action.';
       case CoachingStyle.intense:
-        return 'High standards, no excuses. The app pushes hard until you act.';
+        return 'Very direct. Challenges excuses and tells you what you may not want to hear.';
     }
   }
 
@@ -63,9 +64,9 @@ enum CoachingStyle {
       case CoachingStyle.supportive:
         return '"Hey, you missed your workout — that\'s okay. Want to fit in something shorter today?"';
       case CoachingStyle.balanced:
-        return '"You missed your workout. You\'re 2 days into your streak — here\'s how to get back on track."';
+        return '"You missed your workout. Here\'s how to get back on track today."';
       case CoachingStyle.disciplined:
-        return '"You committed to this workout and skipped it. Streaks matter. Act now to recover."';
+        return '"You skipped the workout you committed to. Do it now — a shorter one still counts."';
       case CoachingStyle.intense:
         return '"No workout. No excuses. You said this matters — prove it. Go now."';
     }

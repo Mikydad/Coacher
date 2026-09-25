@@ -250,7 +250,7 @@ async function sendPreRevealNotices(now: number): Promise<number> {
         title: 'Your stake photo posts soon',
         body:
           `"${ch.frozenGoal.title}" didn't make it. In about ${minutesLeft} min ` +
-          'your photo goes to the circle — unless you use your monthly mercy ' +
+          'your photo goes to the group — unless you use your monthly mercy ' +
           'veto or take it down for points. Open the challenge.',
       },
       data: { type: 'stake_pre_reveal', challengeId: ch.id },

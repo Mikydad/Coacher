@@ -7,6 +7,7 @@ import '../application/context_override_providers.dart';
 import '../domain/models/context_override.dart';
 import '../domain/models/user_attention_state.dart';
 import 'context_override_quick_activate_sheet.dart';
+import 'override_settings_section.dart' show formatSleepWindowTime;
 import '../../../core/presentation/app_colors.dart';
 
 /// Persistent home screen banner shown while any override is active.
@@ -68,14 +69,14 @@ class _ActiveOverrideBannerState extends ConsumerState<ActiveOverrideBanner> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '${effective.displayName} mode active',
+                    effective.displayName,
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),
                   ),
                   Text(
-                    _subtitleText(state, effective),
+                    _subtitleText(context, state, effective),
                     style: TextStyle(fontSize: 12, color: AppColors.fg54),
                   ),
                 ],
@@ -100,15 +101,20 @@ class _ActiveOverrideBannerState extends ConsumerState<ActiveOverrideBanner> {
     );
   }
 
-  String _subtitleText(UserAttentionState? state, ContextOverride effective) {
-    // Automatic sleep window — "End" pauses it until this wake time.
+  String _subtitleText(
+    BuildContext context,
+    UserAttentionState? state,
+    ContextOverride effective,
+  ) {
+    // Automatic quiet hours (the sleep window) — "End" pauses them until
+    // this wake time.
     if (state != null &&
         effective == ContextOverride.sleep &&
         state.activeOverride == ContextOverride.none) {
       final end = state.sleepWindowEnd;
       return end == null || end.isEmpty
-          ? 'Sleep window active'
-          : 'Sleep window · until $end';
+          ? 'Quiet hours'
+          : 'Quiet hours · until ${formatSleepWindowTime(context, end)}';
     }
     final expires = state?.overrideExpiresAt;
     if (expires == null) return 'Until you end it';

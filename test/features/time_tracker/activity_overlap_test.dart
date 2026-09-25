@@ -79,7 +79,7 @@ void main() {
           '${DateTime.fromMillisecondsSinceEpoch(ms).hour}:'
           '${DateTime.fromMillisecondsSinceEpoch(ms).minute.toString().padLeft(2, '0')}',
     );
-    expect(n.title, "Already tracking 'Deep work'");
+    expect(n.title, "Already logging 'Deep work'");
     expect(n.body, contains('from 9:00'));
     expect(n.body, contains("'Reading' will end it at 9:15"));
   });

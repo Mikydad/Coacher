@@ -14,7 +14,7 @@ import '../../../core/config/build_flags.dart';
 /// overrides) on one page. ReminderSettingsScreen still exists for callers
 /// that deep-link the reminder half alone.
 ///
-/// Reminder health (FR-R-80) leads: when reminders are not working, that is
+/// Reminder status (FR-R-80) leads: when reminders are not working, that is
 /// the first thing this page owes the user.
 class NotificationSettingsScreen extends ConsumerWidget {
   const NotificationSettingsScreen({super.key});
@@ -28,7 +28,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
     return SettingsPageScaffold(
       title: 'Notifications & Reminders',
       children: [
-        const SettingsSectionHeader(label: 'Reminder health'),
+        const SettingsSectionHeader(label: 'Reminder status'),
         const SizedBox(height: 10),
         const SettingsObsidianCard(child: ReminderHealthSection()),
         if (isTester && kTesterBuild) ...[
@@ -53,7 +53,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
           child: CoachingInsightNotificationSettingsSection(),
         ),
         const SizedBox(height: 32),
-        const SettingsSectionHeader(label: 'Attention & Sleep'),
+        const SettingsSectionHeader(label: 'Status & quiet hours'),
         const SizedBox(height: 10),
         const SettingsObsidianCard(child: OverrideSettingsSection()),
         const SizedBox(height: 40),

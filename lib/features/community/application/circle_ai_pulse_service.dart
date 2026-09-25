@@ -88,7 +88,15 @@ class CircleAiPulseService {
           .subtract(const Duration(hours: 24))
           .millisecondsSinceEpoch;
       final feedItems = await _feedRepo.watchFeed(circleId).first;
-      final recent = feedItems.where((f) => f.createdAtMs >= cutoff).toList();
+      // Streak posts are not a SidePal success metric: keep them out of
+      // what the summary is asked to talk about (2026-09-25).
+      final recent = feedItems
+          .where(
+            (f) =>
+                f.createdAtMs >= cutoff &&
+                f.eventType != ActivityEventType.habitStreakReached,
+          )
+          .toList();
 
       if (recent.isEmpty) return const PulseNoActivity();
 
@@ -132,7 +140,15 @@ class CircleAiPulseService {
           .subtract(const Duration(days: 7))
           .millisecondsSinceEpoch;
       final feedItems = await _feedRepo.watchFeed(circleId, limit: 100).first;
-      final recent = feedItems.where((f) => f.createdAtMs >= cutoff).toList();
+      // Streak posts are not a SidePal success metric: keep them out of
+      // what the summary is asked to talk about (2026-09-25).
+      final recent = feedItems
+          .where(
+            (f) =>
+                f.createdAtMs >= cutoff &&
+                f.eventType != ActivityEventType.habitStreakReached,
+          )
+          .toList();
 
       final challenges = await _challengeRepo.watchChallenges(circleId).first;
       final activeChallenges = challenges

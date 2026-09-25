@@ -139,7 +139,7 @@ class _TimeScreenState extends ConsumerState<TimeScreen> {
           ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const PageTitle('Time'),
+        title: const PageTitle('Your Time'),
         centerTitle: true,
         actions: [
           IconButton(
@@ -159,7 +159,7 @@ class _TimeScreenState extends ConsumerState<TimeScreen> {
               backgroundColor: AppColors.accent,
               foregroundColor: AppColors.onAccent,
               icon: const Icon(Icons.add),
-              label: const Text('Track'),
+              label: const Text('Log activity'),
             )
           : null,
       body: ListView(
@@ -232,7 +232,7 @@ class _HomePillFooter extends ConsumerWidget {
                   ),
                 ),
                 subtitle: Text(
-                  'The "Track what you\'re doing" pill under the action buttons.',
+                  'The "Track your time" pill under the action buttons.',
                   style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                 ),
               ),
@@ -315,9 +315,9 @@ class _DayBody extends ConsumerWidget {
           onPrevious: onPrevious,
           onNext: onNext,
         ),
-        const SizedBox(height: 20),
-        const SectionHeader('Timeline'),
-        const SizedBox(height: 10),
+        // No "Timeline" header (2026-09-25): the pager already names the
+        // day, so the entries follow it directly.
+        const SizedBox(height: 12),
         if (loaded && rows.isEmpty)
           _EmptyTimeline(isToday: isToday)
         else
@@ -774,7 +774,9 @@ class _EmptyTimeline extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Text(
-        isToday ? 'Nothing logged yet.' : 'Nothing logged.',
+        isToday
+            ? "No time logged yet.\nLog what you're doing to see where your day goes."
+            : 'Nothing logged.',
         key: const ValueKey('time_empty'),
         style: TextStyle(color: AppColors.textMuted, fontSize: 14),
       ),
@@ -910,7 +912,7 @@ class _ObservationBlock extends StatelessWidget {
                     Flexible(child: _MicroLabel(heading)),
                     const SizedBox(width: 8),
                     Text(
-                      'INFERRED',
+                      "SIDEPAL'S GUESS",
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w800,

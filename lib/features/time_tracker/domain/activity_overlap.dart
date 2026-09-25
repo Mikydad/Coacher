@@ -41,7 +41,7 @@ List<ActivityEvent> overlappingActivities(
       : formatTime(existing.startedAtMs);
   final label = newText.trim().isEmpty ? 'This entry' : "'${newText.trim()}'";
   return (
-    title: "Already tracking '${existing.text}'",
+    title: "Already logging '${existing.text}'",
     body:
         "'${existing.text}' is logged $existingRange. One thing at a time: "
         '$label will end it at $cutAt.',

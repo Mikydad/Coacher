@@ -199,7 +199,7 @@ class AiConflictDetector {
         final endStr = attentionState.sleepWindowEnd!;
         return _ContextConflict(
           message:
-              '"$title" is scheduled during your sleep window ($startStr–$endStr).',
+              '"$title" is scheduled during your quiet hours ($startStr–$endStr).',
           isHard:
               false, // sleep window is advisory unless active sleep override
         );

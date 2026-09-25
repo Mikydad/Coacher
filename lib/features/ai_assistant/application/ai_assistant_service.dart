@@ -1059,7 +1059,7 @@ class AiAssistantService extends ChangeNotifier {
     final content = exec.hasFailures
         ? (isMemoryBatch
               ? exec.toSummaryMessage()
-              : "I couldn't save that promise — please try again.")
+              : "I couldn't save that for later — please try again.")
         : (isMemoryBatch
               ? exec.toSummaryMessage()
               : trimmedModel?.isNotEmpty == true

@@ -1229,7 +1229,7 @@ class _AddAccountabilityCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Add accountability — stake something on this goal',
+                  'Add accountability — put something at stake on this goal',
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 13,

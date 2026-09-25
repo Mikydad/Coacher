@@ -48,3 +48,10 @@ final completedChallengesProvider =
                 .toList(),
           );
     });
+
+/// Challenge id → whether the signed-in member has already voted on it,
+/// per group. Each vote banner fills it as it loads or casts, so the
+/// Challenges tab can head the pending section honestly ('Needs your vote'
+/// vs 'Waiting for votes') without a second votes read per row.
+final challengeVoteStateProvider =
+    StateProvider.family<Map<String, bool>, String>((ref, circleId) => {});

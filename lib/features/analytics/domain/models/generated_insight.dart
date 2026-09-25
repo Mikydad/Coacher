@@ -188,6 +188,43 @@ const Set<InsightType> kLayer3V4InsightTypes = <InsightType>{
   InsightType.reflectionObservation,
 };
 
+/// Retired 2026-09-25: the app-wide day streak left every user-facing
+/// surface, and the coaching family that talks about streaks went with it.
+/// The enum members stay because insights of these types are persisted in
+/// the Layer 3 cache; they are never generated, selected, notified, or
+/// rendered again — see [isRetiredInsightType].
+const Set<InsightType> kRetiredInsightTypes = <InsightType>{
+  InsightType.streakRiskWarning,
+  InsightType.strongStreakPraise,
+  InsightType.fragileStreakAlert,
+};
+
+/// V5 = V4 minus the retired streak family — the catalog the mapping
+/// policy actually produces today.
+const Set<InsightType> kLayer3V5InsightTypes = <InsightType>{
+  InsightType.habitTooHard,
+  InsightType.timingMisalignment,
+  InsightType.goalAtRisk,
+  InsightType.latePattern,
+  InsightType.inconsistencyNotice,
+  InsightType.lowEngagementNotice,
+  InsightType.consistentBehaviorPraise,
+  InsightType.goalProgressSuccess,
+  InsightType.highestMomentumLeverage,
+  InsightType.bestRecoveryOpportunity,
+  InsightType.overloadTrend,
+  InsightType.improvingConsistency,
+  InsightType.unstableRoutinePattern,
+  InsightType.relationshipCareNudge,
+  InsightType.reflectionObservation,
+};
+
+/// True for insight kinds whose copy is about streaks. Callers that read the
+/// persisted cache (delivery, focus, Progress cards) drop these so a row
+/// written before the retirement never resurfaces.
+bool isRetiredInsightType(InsightType type) =>
+    kRetiredInsightTypes.contains(type);
+
 class GeneratedInsight {
   const GeneratedInsight({
     required this.insightId,

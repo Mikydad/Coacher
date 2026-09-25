@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/challenge_providers.dart';
+import '../../application/circle_providers.dart';
 import '../../domain/models/challenge.dart';
 
 import '../../../../core/presentation/app_colors.dart';
@@ -38,11 +39,21 @@ class _ChallengeVoteBannerState extends ConsumerState<ChallengeVoteBanner> {
     final repo = ref.read(challengeRepositoryProvider);
     final votes = await repo.getVotes(widget.circleId, widget.challenge.id);
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (!mounted) return;
+    final hasVoted = votes.any((v) => v.userId == uid);
     setState(() {
       _voteCount = votes.length;
-      _hasVoted = votes.any((v) => v.userId == uid);
+      _hasVoted = hasVoted;
       _loading = false;
     });
+    _publishVoteState(hasVoted);
+  }
+
+  /// Feeds the tab-level 'Needs your vote' / 'Waiting for votes' header.
+  void _publishVoteState(bool hasVoted) {
+    ref
+        .read(challengeVoteStateProvider(widget.circleId).notifier)
+        .update((s) => {...s, widget.challenge.id: hasVoted});
   }
 
   Future<void> _castVote(bool approve) async {
@@ -58,7 +69,9 @@ class _ChallengeVoteBannerState extends ConsumerState<ChallengeVoteBanner> {
             userId: uid,
             approve: approve,
           );
+      if (!mounted) return;
       setState(() => _hasVoted = true);
+      _publishVoteState(true);
     } finally {
       if (mounted) setState(() => _casting = false);
     }
@@ -69,6 +82,20 @@ class _ChallengeVoteBannerState extends ConsumerState<ChallengeVoteBanner> {
     if (widget.challenge.status != ChallengeStatus.pending) {
       return const SizedBox.shrink();
     }
+
+    // Truthful heading: this is a proposal awaiting the group's say-so,
+    // not a completion claim. The proposer's name comes from the member
+    // list the detail screen already watches.
+    final proposer = ref
+        .watch(circleMembersProvider(widget.circleId))
+        .valueOrNull
+        ?.where((m) => m.userId == widget.challenge.creatorId)
+        .firstOrNull
+        ?.displayName
+        .trim();
+    final heading = proposer == null || proposer.isEmpty
+        ? 'Proposed challenge'
+        : '$proposer proposed a challenge';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -89,16 +116,20 @@ class _ChallengeVoteBannerState extends ConsumerState<ChallengeVoteBanner> {
                 size: 16,
               ),
               const SizedBox(width: 6),
-              Text(
-                'Vote to approve',
-                style: TextStyle(
-                  color: AppColors.accent,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.4,
+              Expanded(
+                child: Text(
+                  heading,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.accent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.4,
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Text(
                 '$_voteCount voted',
                 style: TextStyle(color: AppColors.textMuted, fontSize: 11),

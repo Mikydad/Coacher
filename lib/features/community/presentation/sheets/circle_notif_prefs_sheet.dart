@@ -111,7 +111,7 @@ class _CircleNotifPrefsSheetState extends ConsumerState<CircleNotifPrefsSheet> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Choose what you hear about from this circle.',
+                      'Choose what you hear about from this group.',
                       style: TextStyle(
                         color: AppColors.textMuted,
                         fontSize: 13,
@@ -136,17 +136,12 @@ class _CircleNotifPrefsSheetState extends ConsumerState<CircleNotifPrefsSheet> {
                           () => _prefs = _prefs!.copyWith(challengeUpdates: v),
                         ),
                       ),
-                      _ToggleRow(
-                        label: 'Weekly summary',
-                        subtitle: 'Your circle\'s weekly pulse',
-                        value: _prefs!.weeklySummary,
-                        onChanged: (v) => setState(
-                          () => _prefs = _prefs!.copyWith(weeklySummary: v),
-                        ),
-                      ),
+                      // 'Weekly summary' (weeklySummary) is hidden: nothing
+                      // sends it yet (its router has no callers, 2026-09-25).
+                      // The preference field stays in the model.
                       _ToggleRow(
                         label: 'Accomplishments',
-                        subtitle: 'Streaks and milestones',
+                        subtitle: 'Milestones',
                         value: _prefs!.accomplishments,
                         onChanged: (v) => setState(
                           () => _prefs = _prefs!.copyWith(accomplishments: v),
@@ -168,7 +163,7 @@ class _CircleNotifPrefsSheetState extends ConsumerState<CircleNotifPrefsSheet> {
                       Row(
                         children: [
                           Text(
-                            'Mute circle',
+                            'Mute group',
                             style: TextStyle(
                               color: AppColors.textPrimary,
                               fontSize: 15,

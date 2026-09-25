@@ -140,7 +140,7 @@ void main() {
     // the small-caps AppBar PageTitle reads ADD TASK (2026-08-25).
     expect(find.text('ADD TASK'), findsOneWidget);
     expect(find.text('NAME THE TASK FIRST'), findsOneWidget);
-    expect(find.text('Sleep window & quiet mode'), findsNothing);
+    expect(find.text('Quiet hours & status'), findsNothing);
 
     // Typing a title arms the save button (the title field is the first
     // TextField on the sheet).
@@ -158,7 +158,7 @@ void main() {
 
     // Sleep-specific chrome appears…
     expect(find.text('Sleep length'), findsOneWidget);
-    expect(find.text('Sleep window & quiet mode'), findsOneWidget);
+    expect(find.text('Quiet hours & status'), findsOneWidget);
     expect(find.byType(SegmentedButton<String>), findsOneWidget);
     // …the paired accountability/deep-work row becomes the full-width row…
     expect(find.text('CHANGE'), findsOneWidget);

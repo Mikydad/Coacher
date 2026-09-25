@@ -81,8 +81,8 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
         const AttentionModeSheetHandle(),
         const AttentionModeSheetHeader(
           subtitle:
-              'Tell the app what you\'re doing so it knows when to hold '
-              'reminders. These modes quiet SidePal only — your phone\'s own '
+              'Tell SidePal what you\'re doing so it knows when to hold '
+              'reminders. This only quiets SidePal — your phone\'s own '
               'notifications are untouched.',
         ),
         const SizedBox(height: 20),
@@ -208,7 +208,7 @@ class _QuickActivateSheetState extends ConsumerState<_QuickActivateSheet> {
     if (preset.label == 'Custom') {
       expiresAt = DateTime.now().add(Duration(minutes: _customMinutes));
     } else if (preset.label == 'Until morning') {
-      // Ends at the configured sleep window's wake time (07:00 default).
+      // Ends at the configured quiet hours' wake time (07:00 default).
       final state = ref.read(attentionStateProvider).valueOrNull;
       expiresAt = nextMorningAfter(DateTime.now(), state?.sleepWindowEnd);
     } else if (preset.duration != null) {

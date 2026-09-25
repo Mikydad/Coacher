@@ -48,7 +48,7 @@ class _CircleInfoViewState extends ConsumerState<CircleInfoView> {
         e,
         Center(
           child: Text(
-            'Could not load circle info.',
+            'Could not load group info.',
             style: TextStyle(color: AppColors.textSecondary),
           ),
         ),
@@ -125,32 +125,6 @@ class _CircleInfoViewState extends ConsumerState<CircleInfoView> {
             ),
             const SizedBox(height: 16),
 
-            // ── Streak stats ─────────────────────────────────────────────────
-            Row(
-              children: [
-                Expanded(
-                  child: _StatCard(
-                    label: 'Current streak',
-                    value: '${circle.currentStreak}',
-                    suffix: 'days',
-                    icon: Icons.local_fire_department_rounded,
-                    color: AppColors.orange,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _StatCard(
-                    label: 'Longest streak',
-                    value: '${circle.longestStreak}',
-                    suffix: 'days',
-                    icon: Icons.emoji_events_rounded,
-                    color: AppColors.gold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
             // ── Moderators ───────────────────────────────────────────────────
             _SectionLabel('Moderators'),
             const SizedBox(height: 8),
@@ -199,7 +173,7 @@ class _CircleInfoViewState extends ConsumerState<CircleInfoView> {
             if (isModerator && isCreator)
               _SettingsTile(
                 icon: Icons.edit_outlined,
-                title: 'Edit circle',
+                title: 'Edit group',
                 onTap: () => CircleEditSheet.show(context, circle),
               ),
             const SizedBox(height: 16),
@@ -219,7 +193,7 @@ class _CircleInfoViewState extends ConsumerState<CircleInfoView> {
                         color: AppColors.danger,
                       ),
                 label: Text(
-                  _busy == 'delete' ? 'Deleting…' : 'Delete circle',
+                  _busy == 'delete' ? 'Deleting…' : 'Delete group',
                   style: TextStyle(color: AppColors.danger),
                 ),
                 style: OutlinedButton.styleFrom(
@@ -239,7 +213,7 @@ class _CircleInfoViewState extends ConsumerState<CircleInfoView> {
                     ? _ButtonSpinner()
                     : Icon(Icons.exit_to_app_rounded, color: AppColors.danger),
                 label: Text(
-                  _busy == 'leave' ? 'Leaving…' : 'Leave circle',
+                  _busy == 'leave' ? 'Leaving…' : 'Leave group',
                   style: TextStyle(color: AppColors.danger),
                 ),
                 style: OutlinedButton.styleFrom(
@@ -267,7 +241,7 @@ class _CircleInfoViewState extends ConsumerState<CircleInfoView> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surfacePanel,
         title: Text(
-          'Delete circle?',
+          'Delete group?',
           style: TextStyle(color: AppColors.textPrimary),
         ),
         content: Text(
@@ -300,7 +274,7 @@ class _CircleInfoViewState extends ConsumerState<CircleInfoView> {
       action: () =>
           ref.read(userCircleMembershipServiceProvider).deleteCircle(circleId),
       success: '"$circleName" deleted.',
-      failure: 'Could not delete the circle.',
+      failure: 'Could not delete the group.',
     );
   }
 
@@ -370,7 +344,7 @@ class _CircleInfoViewState extends ConsumerState<CircleInfoView> {
             style: TextStyle(color: AppColors.textPrimary),
           ),
           content: Text(
-            'You have a live stake in this circle ("$title"). Finish it or '
+            'You have a live stake in this group ("$title"). Finish it or '
             'surrender it in Accountability first — leaving wouldn\'t stop '
             'it, and its consequence would still land here.',
             style: TextStyle(color: AppColors.textSecondary),
@@ -390,7 +364,7 @@ class _CircleInfoViewState extends ConsumerState<CircleInfoView> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surfacePanel,
         title: Text(
-          'Leave circle?',
+          'Leave group?',
           style: TextStyle(color: AppColors.textPrimary),
         ),
         content: Text(
@@ -422,7 +396,7 @@ class _CircleInfoViewState extends ConsumerState<CircleInfoView> {
       action: () =>
           ref.read(userCircleMembershipServiceProvider).leaveCircle(circleId),
       success: 'You left "$circleName".',
-      failure: 'Could not leave the circle.',
+      failure: 'Could not leave the group.',
     );
   }
 }
@@ -552,66 +526,3 @@ class _SettingsTile extends StatelessWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.suffix,
-    required this.icon,
-    required this.color,
-  });
-  final String label;
-  final String value;
-  final String suffix;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surfacePanel,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: appCardShadow,
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
-              ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    value,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      height: 1,
-                    ),
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    suffix,
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}

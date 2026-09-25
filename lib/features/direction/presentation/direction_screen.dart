@@ -172,8 +172,8 @@ class _DirectionScreenState extends ConsumerState<DirectionScreen>
         const SectionHeader(
           'Your Direction',
           subtitle:
-              'Give SidePal some context about where you want your life '
-              'to go.',
+              'Set what you want to focus on this year, quarter, and month. '
+              'SidePal uses it to help guide your plans and suggestions.',
           trailing: HelpDot('direction'),
         ),
         const SizedBox(height: 28),
@@ -191,8 +191,8 @@ class _DirectionScreenState extends ConsumerState<DirectionScreen>
           const SizedBox(height: 30),
         ],
         Text(
-          "Direction isn't a to-do. SidePal keeps it in mind while helping "
-          'you.',
+          "Direction isn't a task or a goal. It simply helps SidePal "
+          'understand what matters to you.',
           style: TextStyle(color: AppColors.fg38, fontSize: 12, height: 1.4),
         ),
       ],

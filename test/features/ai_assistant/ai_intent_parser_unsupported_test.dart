@@ -66,6 +66,6 @@ void main() {
 
     expect(result.isUnsupported, isTrue);
     expect(result.responseType, AiResponseType.unsupported);
-    expect(result.informationalMessage, contains('Circles'));
+    expect(result.informationalMessage, contains('Groups'));
   });
 }

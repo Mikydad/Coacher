@@ -44,7 +44,7 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
           _updatedLabel = switch (result) {
             PulseGenerated() => 'Updated just now',
             PulseOnCooldown() =>
-              'A fresh pulse already ran — try again in a bit.',
+              'A summary already ran recently — try again in a bit.',
             PulseNoActivity() => 'Nothing new yet — no activity today.',
             PulseAiUnavailable(isNetwork: true) =>
               "You're offline — try again when connected.",
@@ -96,7 +96,11 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          pulse?.summary ?? 'No pulse yet — generate one below',
+                          pulse?.summary ??
+                              (widget.isModerator
+                                  ? 'No group summary yet'
+                                  : 'No group summary yet — your moderator '
+                                        'can generate one.'),
                           style: TextStyle(
                             color: pulse != null
                                 ? AppColors.textPrimary
@@ -106,7 +110,11 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                                 ? FontWeight.w500
                                 : FontWeight.normal,
                           ),
-                          maxLines: _expanded ? null : 1,
+                          maxLines: pulse == null
+                              ? 2
+                              : _expanded
+                              ? null
+                              : 1,
                           overflow: _expanded
                               ? TextOverflow.visible
                               : TextOverflow.ellipsis,
@@ -115,7 +123,7 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                       if (pulse != null) ...[
                         const SizedBox(width: 6),
                         Text(
-                          _expanded ? '↑ Pulse' : '↓ Pulse',
+                          _expanded ? '↑ Summary' : '↓ Summary',
                           style: TextStyle(
                             color: AppColors.accent,
                             fontSize: 12,
@@ -266,7 +274,7 @@ class _AiPulseBannerState extends ConsumerState<AiPulseBanner> {
                                 color: AppColors.accent,
                               ),
                               label: Text(
-                                'Generate now',
+                                'Generate summary',
                                 style: TextStyle(
                                   color: AppColors.accent,
                                   fontSize: 12,

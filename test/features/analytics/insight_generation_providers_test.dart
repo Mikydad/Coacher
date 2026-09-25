@@ -303,7 +303,7 @@ GeneratedInsight _insight({
   double confidence = 0.9,
   String? sourceWindowStartDateKey,
   String? sourceWindowEndDateKey,
-  InsightType insightType = InsightType.streakRiskWarning,
+  InsightType insightType = InsightType.habitTooHard,
 }) {
   return GeneratedInsight(
     insightId: id,
@@ -312,10 +312,10 @@ GeneratedInsight _insight({
     insightType: insightType,
     insightBucket: InsightBucket.risk,
     priority: priority,
-    messageKey: 'streak_risk_1',
+    messageKey: 'habit_too_hard_1',
     message: 'fallback',
     action: InsightAction.doNow,
-    linkedPatternCodes: const <String>['streakRisk'],
+    linkedPatternCodes: const <String>['tooHard'],
     confidence: confidence,
     detectedAtMs: detectedAtMs,
     sourceWindowStartDateKey: sourceWindowStartDateKey ?? '2026-05-01',

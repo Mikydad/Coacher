@@ -19,19 +19,6 @@ class CoachingInsightNotificationSettingsSection extends ConsumerWidget {
           data: (p) => p?.coachingInsightNotificationsEnabled,
         ) ??
         true;
-    final sentToday =
-        prefAsync.whenOrNull(
-          data: (p) {
-            if (p == null) return 0;
-            final normalized = coachingNotificationBudgetForDay(
-              p,
-              DateTime.now(),
-            );
-            return normalized.coachingNotificationSentAtMs.length;
-          },
-        ) ??
-        0;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -42,7 +29,7 @@ class CoachingInsightNotificationSettingsSection extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Coaching insight notifications',
+                    'Coaching insights',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -52,26 +39,15 @@ class CoachingInsightNotificationSettingsSection extends ConsumerWidget {
                   const SizedBox(height: 4),
                   Text(
                     enabled
-                        ? 'Up to $kMaxCoachingInsightNotificationsPerDay per day, '
-                              'at least ${kMinGapBetweenCoachingInsightNotifications.inHours}h apart. '
-                              'Insights still show in Progress and on Home.'
-                        : 'Push notifications off. Open the app to see coaching insights.',
+                        ? 'Get occasional observations and suggestions based '
+                              'on how your days are going. A few a day at most.'
+                        : 'Off. Coaching insights still show in the app.',
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.35,
                       color: AppColors.textSoft,
                     ),
                   ),
-                  if (enabled && sentToday > 0) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      'Sent today: $sentToday / $kMaxCoachingInsightNotificationsPerDay',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.accentDim,
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),

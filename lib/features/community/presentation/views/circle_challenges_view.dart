@@ -60,11 +60,15 @@ class CircleChallengesView extends ConsumerWidget {
           pendingAsync.when(
             data: (list) {
               if (list.isEmpty) return const SizedBox.shrink();
+              // A vote decides whether a PROPOSED challenge starts; the
+              // header says so from the viewer's side.
+              final voteState = ref.watch(challengeVoteStateProvider(circleId));
+              final needsMyVote = list.any((c) => voteState[c.id] == false);
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _SectionHeader(
-                    'Waiting for votes',
+                  _SectionHeader(
+                    needsMyVote ? 'Needs your vote' : 'Waiting for votes',
                     helpId: 'challengeVoting',
                   ),
                   ...list.map(
@@ -873,7 +877,7 @@ class _ManualProgressSheetState extends ConsumerState<_ManualProgressSheet> {
                     value: _shareWithCircle,
                     onChanged: (v) => setState(() => _shareWithCircle = v),
                     title: Text(
-                      'Share the photo with the circle',
+                      'Share the photo with the group',
                       style: TextStyle(
                         color: AppColors.textPrimary,
                         fontSize: 14,
@@ -882,7 +886,7 @@ class _ManualProgressSheetState extends ConsumerState<_ManualProgressSheet> {
                     subtitle: Text(
                       _shareWithCircle
                           ? 'Everyone sees it in the feed and on your row.'
-                          : 'Only you see it. The circle sees a progress line.',
+                          : 'Only you see it. The group sees a progress line.',
                       style: TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 12,
@@ -944,7 +948,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Create a challenge to motivate your circle',
+              'Create a challenge to motivate your group',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 20),
@@ -995,7 +999,7 @@ class _StakeEntryCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Stake something real',
+                      'Start an accountability challenge',
                       style: TextStyle(
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w700,
@@ -1003,8 +1007,8 @@ class _StakeEntryCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Put an embarrassing photo on the line — this circle '
-                      'sees it if you fail.',
+                      'Put something at stake, challenge a friend, or make a '
+                      'public commitment.',
                       style: TextStyle(
                         color: AppColors.textSoft,
                         fontSize: 12.5,

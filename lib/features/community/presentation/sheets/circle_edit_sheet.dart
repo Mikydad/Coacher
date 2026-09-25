@@ -92,13 +92,13 @@ class _CircleEditSheetState extends ConsumerState<CircleEditSheet> {
           .updateCircleFields(widget.circle.id, changes)
           .then((_) {
             messenger.showSnackBar(
-              const SnackBar(content: Text('Circle updated.')),
+              const SnackBar(content: Text('Group updated.')),
             );
           })
           .catchError((Object _) {
             messenger.showSnackBar(
               const SnackBar(
-                content: Text('Could not update the circle. Try again.'),
+                content: Text('Could not update the group. Try again.'),
               ),
             );
           }),
@@ -116,7 +116,7 @@ class _CircleEditSheetState extends ConsumerState<CircleEditSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Edit circle',
+              'Edit group',
               style: TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 18,
@@ -197,7 +197,7 @@ class _CircleEditSheetState extends ConsumerState<CircleEditSheet> {
             const SizedBox(height: 6),
             Text(
               _visibility == CircleVisibility.public
-                  ? 'Anyone can find this circle in Discover.'
+                  ? 'Anyone can find this group in Discover.'
                   : 'Only people with an invite key can find and join.',
               style: TextStyle(color: AppColors.textMuted, fontSize: 12),
             ),

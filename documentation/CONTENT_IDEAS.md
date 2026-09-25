@@ -232,3 +232,37 @@ Flutter post on cooperative cancellation of long async pipelines.
 - **Formats:** short post ("the cheapest-looking line in your functions
   config costs $8/month"), thread on reading Cloud Functions config without
   gcloud, decision-log excerpt with the 4:1 ratio as the reveal.
+
+
+## 2026-09-25 · The tester who couldn't find the button that wasn't there
+
+- **Hook:** A tester asked me how to generate the group summary. The
+  screen told him to "generate one below". There was nothing below.
+- **What happened:** Testers sent back fourteen pages of "I don't
+  understand what this means" — Flow now, On the line, Decided, Pulse,
+  Inferred, Reminder health, Attention mode, Sleep window. Before renaming
+  anything I checked each screen against the code, and a third of the
+  suggestions rested on a wrong idea of what the feature did. The
+  "7-day trend" wasn't seven days (it had been Monday-to-today for two
+  weeks). The stake flow promised "you'll see these words every time you
+  log a day" — the words were shown nowhere. The vote the doc described as
+  "Miko says he completed his challenge" was actually a vote on whether a
+  challenge should start. And the pulse: the empty state said "generate
+  one below" to everyone, but only moderators had the button. The tester
+  wasn't confused. He was right.
+- **The turn:** Reading the whole document as one pattern instead of
+  forty edits: every confusing label named the system (what the code does)
+  instead of the benefit (what you get). "Reminder health" → "Reminder
+  status". "Inferred" → "SidePal's guess". "Attention mode" → "Status".
+  Once the rule was clear, half the decisions made themselves — and the
+  other half were product calls: kill the streak everywhere (it broke on
+  rest days and nobody could explain it), keep "Strictness" away from the
+  word "Accountability" that a whole tab already owns.
+- **Takeaway:** A rename pass is a truth audit in disguise. Before you fix
+  the tone, check whether the sentence is even true — and when a tester
+  says "I don't get it", assume the screen is wrong before you assume the
+  tester is.
+- **Formats:** thread ("5 sentences in my app that were lying"), short
+  post on the pulse button, a before/after carousel of the stake commit
+  page, a build-in-public video on turning tester feedback into a rule
+  instead of forty edits.

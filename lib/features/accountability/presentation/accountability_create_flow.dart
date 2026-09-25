@@ -402,11 +402,11 @@ class _AccountabilityCreateFlowState
         ),
         ...switch (_stake) {
           _StakeChoice.photo => [
-            ('Circle', _circleId != null, _keyPhotoCircle),
+            ('Group', _circleId != null, _keyPhotoCircle),
             ('The photo', _photo != null, _keyPhotoUpload),
           ],
           _StakeChoice.h2h => [
-            ('Circle', _circleId != null, _keyH2hCircle),
+            ('Group', _circleId != null, _keyH2hCircle),
             ('Opponent', _opponentUid != null, _keyOpponent),
             ('Your cause', _charityId != null, _keyYourCause),
             ('Both-lose cause', _bothLoseCharityId != null, _keyBothLose),
@@ -1031,7 +1031,7 @@ class _AccountabilityCreateFlowState
       Icons.photo_camera_rounded,
       AppColors.coral,
       'Photo stake',
-      'An embarrassing photo of you. Fail and it posts to your circle.',
+      'Put a photo at stake. If you fail, it gets shared with your group.',
     ),
     _StakeChoice.h2h => (
       Icons.sports_kabaddi_rounded,
@@ -1049,8 +1049,9 @@ class _AccountabilityCreateFlowState
     _StakeChoice.public => (
       Icons.campaign_rounded,
       AppColors.amber,
-      'Public commitment',
-      'Post your promise. A result card follows — win or lose.',
+      'Commit publicly',
+      'Post your commitment when you start, then share the result — '
+          'completed or not.',
     ),
     _StakeChoice.practice => (
       Icons.school_rounded,
@@ -1097,7 +1098,7 @@ class _AccountabilityCreateFlowState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader('Choose your accountability'),
+        const SectionHeader('How do you want to stay accountable?'),
         const SizedBox(height: 12),
         // All four cards stay in the tree; hiding via AnimatedSize makes
         // the chosen card glide up as the ones above it collapse.
@@ -1224,7 +1225,7 @@ class _AccountabilityCreateFlowState
   /// explained up front so the user knows what they're signing up for
   /// (FR-7): pledge card now, crown or missed card at the deadline.
   List<Widget> _publicExplainerFields() {
-    Widget row(IconData icon, Color color, String title, String sub) {
+    Widget row(IconData icon, Color color, String text) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 7),
         child: Row(
@@ -1233,27 +1234,13 @@ class _AccountabilityCreateFlowState
             Icon(icon, color: color, size: 20),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    sub,
-                    style: TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 12.5,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
+              child: Text(
+                text,
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                  height: 1.45,
+                ),
               ),
             ),
           ],
@@ -1277,22 +1264,14 @@ class _AccountabilityCreateFlowState
             row(
               Icons.ios_share_rounded,
               AppColors.amber,
-              'Pledge card — now',
-              'You get a shareable card with your promise and the date. '
-                  'Post it where people will see it.',
+              'After you start, SidePal creates a commitment card you can '
+              'share on Instagram, X, WhatsApp, or anywhere else.',
             ),
             row(
               Icons.emoji_events_rounded,
               AppColors.statusGreen,
-              'Crown card — if you finish',
-              'Proof you called your shot. Made to be shared.',
-            ),
-            row(
-              Icons.replay_rounded,
-              AppColors.coral,
-              'Missed card — if you don\'t',
-              'Your progress, the miss, and a recommit. It goes on the '
-                  'record either way.',
+              'When the challenge ends, you get a result card to share how '
+              'it went.',
             ),
           ],
         ),
@@ -1319,7 +1298,7 @@ class _AccountabilityCreateFlowState
     final autoDeleteTag = Align(
       alignment: Alignment.centerRight,
       child: Text(
-        'THEN IT AUTO-DELETES',
+        'THEN REMOVED AUTOMATICALLY',
         style: TextStyle(
           color: AppColors.cyan,
           fontSize: 10,
@@ -1336,10 +1315,10 @@ class _AccountabilityCreateFlowState
       return [
         _noCirclesNotice(
           scrollKey: _keyPhotoCircle,
-          needLine: 'a photo stake posts its proof there.',
+          needLine: 'a photo stake is shared there if you fail.',
         ),
         const SizedBox(height: 16),
-        _microLabel('REVEAL WINDOW'),
+        _microLabel('VISIBLE FOR'),
         const SizedBox(height: 8),
         revealDropdown,
         const SizedBox(height: 6),
@@ -1358,11 +1337,11 @@ class _AccountabilityCreateFlowState
               children: [
                 KeyedSubtree(
                   key: _keyPhotoCircle,
-                  child: _microLabelReq('POSTS TO', _circleId != null),
+                  child: _microLabelReq('SHARED WITH', _circleId != null),
                 ),
                 const SizedBox(height: 8),
                 _dropdown<String>(
-                  hint: 'Pick a circle',
+                  hint: 'Pick a group',
                   value: _circleId,
                   items: [for (final c in circles) (c.id, c.name)],
                   onChanged: (v) => setState(() => _circleId = v),
@@ -1376,7 +1355,7 @@ class _AccountabilityCreateFlowState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _microLabel('REVEAL'),
+                _microLabel('VISIBLE FOR'),
                 const SizedBox(height: 8),
                 revealDropdown,
               ],
@@ -1424,7 +1403,7 @@ class _AccountabilityCreateFlowState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'No circles yet',
+            'No groups yet',
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 13.5,
@@ -1490,27 +1469,22 @@ class _AccountabilityCreateFlowState
   /// The collateral, last (2026-07-22): a compact coral tile that only
   /// grows once a photo is attached.
   Widget _photoUploadTile() {
+    final circles = ref.watch(myCirclesProvider).value ?? const [];
+    final groupName =
+        circles.where((c) => c.id == _circleId).firstOrNull?.name ??
+        'your group';
+    final window = _revealWindowLabel(_revealWindowMins);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Text(
-              'THE PHOTO',
+              'PHOTO STAKE',
               style: TextStyle(
                 color: AppColors.coral,
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
-                letterSpacing: 1.6,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              '— HIGH RISK',
-              style: TextStyle(
-                color: AppColors.coral.withValues(alpha: 0.7),
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
                 letterSpacing: 1.6,
               ),
             ),
@@ -1539,38 +1513,57 @@ class _AccountabilityCreateFlowState
               ),
             ),
             child: _photo == null
-                ? InkWell(
-                    onTap: _pickPhoto,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 10,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.add_photo_alternate_rounded,
-                            color: AppColors.textSoft,
-                            size: 24,
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      InkWell(
+                        onTap: _pickPhoto,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 10,
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Choose the photo you\'d hate them to see',
-                              style: TextStyle(
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.add_photo_alternate_rounded,
                                 color: AppColors.textSoft,
-                                fontSize: 13,
+                                size: 24,
                               ),
-                            ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Choose your stake photo',
+                                  style: TextStyle(
+                                    color: AppColors.textSoft,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                color: AppColors.textFaint,
+                                size: 20,
+                              ),
+                            ],
                           ),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            color: AppColors.textFaint,
-                            size: 20,
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          'Choose a photo that will be shared with your '
+                          'group if you fail.',
+                          style: TextStyle(
+                            color: AppColors.textSoft,
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
                   )
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1613,8 +1606,8 @@ class _AccountabilityCreateFlowState
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'This photo posts to your selected circle '
-                        'automatically if you fail.',
+                        'If you fail, your photo will be visible to '
+                        '$groupName for $window, then automatically removed.',
                         style: TextStyle(
                           color: AppColors.textSoft,
                           fontSize: 12,
@@ -1659,11 +1652,11 @@ class _AccountabilityCreateFlowState
                 children: [
                   KeyedSubtree(
                     key: _keyH2hCircle,
-                    child: _microLabelReq('CIRCLE', _circleId != null),
+                    child: _microLabelReq('GROUP', _circleId != null),
                   ),
                   const SizedBox(height: 8),
                   _dropdown<String>(
-                    hint: 'Pick a circle',
+                    hint: 'Pick a group',
                     value: _circleId,
                     items: [for (final c in circles) (c.id, c.name)],
                     onChanged: (v) => setState(() {
@@ -1725,7 +1718,7 @@ class _AccountabilityCreateFlowState
                 final others = members.where((m) => m.userId != myUid).toList();
                 if (others.isEmpty) {
                   return Text(
-                    'Nobody else in this circle yet.',
+                    'Nobody else in this group yet.',
                     style: TextStyle(color: AppColors.textSoft, fontSize: 12.5),
                   );
                 }
@@ -1902,7 +1895,7 @@ class _AccountabilityCreateFlowState
       return [
         KeyedSubtree(
           key: _keyConsent,
-          child: const SectionHeader('Before you commit'),
+          child: const SectionHeader('What happens if you fail'),
         ),
         const SizedBox(height: 12),
         _consentWarningCard(
@@ -1946,47 +1939,62 @@ class _AccountabilityCreateFlowState
     }
     final circles = ref.watch(myCirclesProvider).value ?? const [];
     final circle = circles.where((c) => c.id == _circleId).firstOrNull;
-    final circleName = circle?.name ?? 'your circle';
+    final circleName = circle?.name ?? 'your group';
     final members = circle?.memberCount ?? 0;
     final window = _revealWindowLabel(_revealWindowMins);
     return [
       KeyedSubtree(
         key: _keyConsent,
-        child: const SectionHeader('Before you commit'),
+        child: const SectionHeader('What happens if you fail'),
       ),
       const SizedBox(height: 12),
       _consentWarningCard(
-        headerLabel: 'STAKE — NO UNDO',
-        body: Text.rich(
-          TextSpan(
-            children: [
-              const TextSpan(text: 'If you fail '),
-              _consentStrong(_title.text.trim()),
-              const TextSpan(
-                text: ' by the deadline, this photo will be posted to ',
+        headerLabel: 'YOUR PHOTO WILL BE SHARED',
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text.rich(
+              TextSpan(
+                children: [
+                  const TextSpan(text: 'If you don\'t complete '),
+                  _consentStrong(_title.text.trim()),
+                  const TextSpan(
+                    text: ' by the deadline, your photo will be shared with ',
+                  ),
+                  _consentStrong(circleName),
+                  const TextSpan(text: ' and its '),
+                  _consentStrong('$members members'),
+                  const TextSpan(text: ' for '),
+                  _consentStrong(window),
+                  const TextSpan(text: '.'),
+                ],
               ),
-              _consentStrong(circleName),
-              const TextSpan(text: ' and visible to its '),
-              _consentStrong('$members members'),
-              const TextSpan(text: ' for '),
-              _consentStrong(window),
-              const TextSpan(text: '.'),
-            ],
-          ),
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 15.5,
-            height: 1.55,
-          ),
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 15.5,
+                height: 1.55,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You can\'t cancel the stake after you commit.',
+              style: TextStyle(
+                color: AppColors.textSoft,
+                fontSize: 12.5,
+                height: 1.4,
+              ),
+            ),
+          ],
         ),
       ),
       const SizedBox(height: 12),
       // 2026-09-18: say the escape hatches out loud at commit time, so a
       // veto nobody knew about is never the reason a photo posted.
       Text(
-        'If you fail, you get a heads-up about an hour before it posts. You '
-        'have one free mercy veto every 30 days, and you can take a photo '
-        'down for 300 points earned from challenge wins.',
+        'If you fail, SidePal will warn you about an hour before the photo '
+        'is shared. Your one free mercy veto every 30 days is the only way '
+        'out, and you can take a photo down afterwards for 300 points earned '
+        'from challenge wins.',
         style: TextStyle(color: AppColors.textSoft, fontSize: 13, height: 1.45),
       ),
       const SizedBox(height: 20),
@@ -2117,7 +2125,7 @@ class _AccountabilityCreateFlowState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'THE SERVER DECIDES — ALWAYS',
+                  'IT HAPPENS AUTOMATICALLY',
                   style: TextStyle(
                     color: AppColors.coral,
                     fontSize: 10.5,
@@ -2127,8 +2135,8 @@ class _AccountabilityCreateFlowState
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Going offline, deleting the app, or missing the moment '
-                  'does not stop it.',
+                  'SidePal checks the result at the deadline. Going offline '
+                  'or deleting the app won\'t cancel the stake.',
                   style: TextStyle(
                     color: AppColors.textSoft,
                     fontSize: 12.5,
@@ -2154,7 +2162,7 @@ class _AccountabilityCreateFlowState
         const SizedBox(height: 28),
         Center(
           child: Text(
-            'THE PLEDGE',
+            'YOUR WHY',
             style: TextStyle(
               color: AppColors.cyan,
               fontSize: 11,
@@ -2172,8 +2180,10 @@ class _AccountabilityCreateFlowState
         ),
         const SizedBox(height: 14),
         Text(
-          'You\'ll see these words every time you log a day.\n'
-          'Make them yours.',
+          _isPublic
+              ? 'Write why this matters to you, in your own words.\n'
+                    'It goes on your commitment card.'
+              : 'Write why this matters to you, in your own words.',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: AppColors.textMuted,
@@ -2205,7 +2215,7 @@ class _AccountabilityCreateFlowState
                   height: 1.5,
                 ),
                 decoration: const InputDecoration(
-                  hintText: 'So I stop failing exams I could pass…',
+                  hintText: 'I want to pass my exams…',
                   counterText: '',
                   border: InputBorder.none,
                 ),
@@ -2309,7 +2319,7 @@ class _AccountabilityCreateFlowState
         const SizedBox(height: 14),
         Center(
           child: Text(
-            'Hold the button to give your word.',
+            'Hold the button to commit.',
             style: TextStyle(color: AppColors.textSoft, fontSize: 12.5),
           ),
         ),
@@ -2323,10 +2333,10 @@ class _AccountabilityCreateFlowState
     // Stake card content per type: (header label, headline, sub-line, tint).
     final (stakeLabel, stakeHeadline, stakeSub, stakeTint) = switch (_stake) {
       _StakeChoice.photo => (
-        'STAKE — CRITICAL RISK',
-        'Embarrassing photo',
-        '${_revealWindowLabel(_revealWindowMins).toUpperCase()} PUBLIC '
-            'REVEAL',
+        'STAKE — YOUR PHOTO',
+        'Photo stake',
+        'SHARED WITH YOUR GROUP FOR '
+            '${_revealWindowLabel(_revealWindowMins).toUpperCase()} IF YOU FAIL',
         AppColors.coral,
       ),
       _StakeChoice.h2h => (
@@ -2342,9 +2352,9 @@ class _AccountabilityCreateFlowState
         AppColors.coral,
       ),
       _StakeChoice.public => (
-        'STAKE — YOUR WORD',
-        'Your word, in public',
-        'PLEDGE CARD NOW · RESULT CARD AT THE DEADLINE',
+        'PUBLIC COMMITMENT',
+        'Share what you\'re committing to',
+        'A shareable card when you start, another when the challenge ends',
         AppColors.amber,
       ),
       _StakeChoice.practice => (
@@ -2359,10 +2369,10 @@ class _AccountabilityCreateFlowState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _stepHeadline(
-          lead: 'LOOK IT IN',
-          emphasis: 'THE EYE',
+          lead: 'FINAL',
+          emphasis: 'CHECK',
           emphasisColor: AppColors.textPrimary,
-          subline: 'Final check of what you\'re signing',
+          subline: 'Here\'s what you\'re committing to.',
         ),
         const SizedBox(height: 18),
         _reviewCard(
@@ -2500,7 +2510,7 @@ class _AccountabilityCreateFlowState
         ),
         const SizedBox(height: 12),
         _reviewCard(
-          label: 'YOUR WORD',
+          label: 'YOUR WHY',
           child: Text(
             '"${_why.text.trim()}"',
             style: TextStyle(
@@ -3343,9 +3353,7 @@ class _HoldToCommitButtonState extends State<_HoldToCommitButton>
                 ),
                 Center(
                   child: Text(
-                    _progress.value > 0
-                        ? 'Keep holding…'
-                        : 'Hold to give your word',
+                    _progress.value > 0 ? 'Keep holding…' : 'Hold to commit',
                     style: TextStyle(
                       color: widget.enabled
                           ? AppColors.onAccent

@@ -154,7 +154,7 @@ class MainTabShell extends ConsumerWidget {
           enforcementMode: 'flexible',
           sourceReason: 'stake_card_ready',
           bodyOverride: won
-              ? '"${c.frozenGoal.title}" — your victory card is ready to '
+              ? '"${c.frozenGoal.title}" — your result card is ready to '
                     'share.'
               : '"${c.frozenGoal.title}" — your result card is ready. '
                     'A setback, not the end.',

@@ -20,7 +20,7 @@ import 'time_screen.dart';
 /// [ Scrolling                ]
 /// RECENT   (Gym) (Scrolling) …   ← the user's own, tap fills the field
 /// DURATION · OPTIONAL  (15m) (30m) (45m) (1h) (Custom…)
-/// [        TRACK ▸        ]
+/// [         LOG ▸         ]
 /// ```
 ///
 /// Edit mode (`edit != null`) is the same sheet with an End row and a
@@ -75,6 +75,10 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
   int? _intended;
   bool _saving = false;
   String? _note;
+
+  /// True once the user has moved the start earlier than now: the sheet is
+  /// then backfilling ("What were you doing?"), not logging the present.
+  bool _startMoved = false;
 
   @override
   void initState() {
@@ -133,6 +137,7 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
     }
     setState(() {
       _startMs = candidate;
+      _startMoved = candidate < now;
       _note = note;
     });
   }
@@ -326,6 +331,7 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
     );
     final viewInsets = MediaQuery.of(context).viewInsets;
     final isEdit = widget.isEdit;
+    final isFreshNow = !isEdit && widget.presetStartMs == null && !_startMoved;
 
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(20, 4, 20, 20 + viewInsets.bottom),
@@ -426,14 +432,23 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
           const SizedBox(height: 14),
 
           // ── Activity ─────────────────────────────────────────────────
+          // Present tense only for a fresh log that starts now; editing an
+          // entry or backfilling a gap asks about the past (2026-09-25).
           Text(
-            'What are you doing?',
+            isFreshNow ? 'What are you doing right now?' : 'What were you doing?',
             style: TextStyle(
               color: AppColors.textMuted,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
           ),
+          if (isFreshNow) ...[
+            const SizedBox(height: 4),
+            Text(
+              "Log what you're doing to see how you use your time.",
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            ),
+          ],
           const SizedBox(height: 8),
           TextField(
             key: const ValueKey('track_text'),
@@ -642,7 +657,7 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
                 ),
               ),
               child: Text(
-                isEdit ? 'SAVE' : 'TRACK  ▸',
+                isEdit ? 'SAVE' : 'LOG  ▸',
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,

@@ -90,14 +90,14 @@ class AccountabilityHubScreen extends ConsumerWidget {
                   ),
                 ),
               if (open.isNotEmpty) ...[
-                const SectionHeader('On the line'),
+                const SectionHeader('In progress'),
                 const SizedBox(height: 8),
                 for (final c in open)
                   _ChallengeCard(challenge: c, action: actions[c.id]),
               ],
               if (done.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const SectionHeader('Decided'),
+                const SectionHeader('Finished'),
                 const SizedBox(height: 8),
                 for (final c in done) _ChallengeCard(challenge: c),
               ],
@@ -250,7 +250,7 @@ class _EmptyState extends StatelessWidget {
             Icon(Icons.handshake_rounded, size: 56, color: AppColors.fg24),
             const SizedBox(height: 16),
             Text(
-              'Put something on the line',
+              'Put something at stake',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.textPrimary,
@@ -260,8 +260,8 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Stake a photo you\'d hate your circle to see. '
-              'Keep your word and it dies unseen — break it and it posts.',
+              'Hold yourself accountable by putting something at stake, '
+              'or by making your commitment public.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textMuted, height: 1.4),
             ),
@@ -445,8 +445,14 @@ class _StatusChip extends StatelessWidget {
       StakeChallengeStatus.draft => ('checking', AppColors.amber),
       StakeChallengeStatus.pendingAccept => ('invited', AppColors.amber),
       StakeChallengeStatus.active => ('live', AppColors.statusGreen),
-      StakeChallengeStatus.pendingVerification => ('deciding', AppColors.amber),
-      StakeChallengeStatus.completedSuccess => ('kept', AppColors.statusGreen),
+      StakeChallengeStatus.pendingVerification => (
+        'checking result',
+        AppColors.amber,
+      ),
+      StakeChallengeStatus.completedSuccess => (
+        'completed',
+        AppColors.statusGreen,
+      ),
       StakeChallengeStatus.completedForfeit => ('forfeited', AppColors.danger),
       StakeChallengeStatus.completedSurrendered => (
         'surrendered',

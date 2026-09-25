@@ -277,7 +277,7 @@ String describePlannedAction(AiAction action) {
     // Normally auto-committed and never previewed; described anyway in
     // case an intention rides along in a mixed batch.
     case ActionType.createIntention:
-      return 'Remember "${p['title'] ?? 'promise'}"';
+      return 'For later: "${p['title'] ?? 'something'}"';
 
     case ActionType.logActivity:
       final t = p['time'];

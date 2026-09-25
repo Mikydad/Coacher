@@ -229,7 +229,7 @@ class CircleMembersView extends ConsumerWidget {
           style: TextStyle(color: AppColors.textPrimary),
         ),
         content: Text(
-          'Are you sure you want to remove ${member.displayName} from this circle?',
+          'Are you sure you want to remove ${member.displayName} from this group?',
           style: TextStyle(color: AppColors.textSecondary),
         ),
         actions: [

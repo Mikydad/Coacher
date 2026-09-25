@@ -35,15 +35,15 @@ class _CardPreviewScreenState extends State<CardPreviewScreen> {
 
   (String, String) get _copy => switch (widget.data.state) {
     CommitmentCardState.pledge => (
-      'Your pledge card',
-      'Share it. Show how much you care about your goals.',
+      'Your commitment is ready',
+      'Share it so other people know what you\'re committing to.',
     ),
     CommitmentCardState.success => (
-      'Your victory card',
+      'Your result card',
       'You called your shot and hit it. Let them see.',
     ),
     CommitmentCardState.failure => (
-      'Your card',
+      'Your result card',
       'Own it, share it, and come back stronger.',
     ),
   };
@@ -246,7 +246,7 @@ class _CardPreviewScreenState extends State<CardPreviewScreen> {
                                 ),
                               )
                             : const Icon(Icons.ios_share_rounded, size: 20),
-                        label: Text(_sharing ? 'Preparing…' : 'Share'),
+                        label: Text(_sharing ? 'Preparing…' : 'Share card'),
                       ),
                     ),
                   ),

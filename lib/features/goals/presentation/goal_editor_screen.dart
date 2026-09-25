@@ -1177,7 +1177,7 @@ class _GoalEditorScreenState extends ConsumerState<GoalEditorScreen>
           ),
         ],
         const SizedBox(height: 20),
-        const GoalEditorSectionLabel('Discipline level'),
+        const GoalEditorSectionLabel('Strictness'),
         GoalEditorDisciplineSection(
           intensity: _intensity,
           onChanged: (v) => setState(() => _intensity = v),

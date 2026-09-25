@@ -71,7 +71,7 @@ function requireRegistered(request: CallableRequest): void {
   if (provider === 'anonymous') {
     throw new HttpsError(
       'permission-denied',
-      'Sign in with an account to use circles.',
+      'Sign in with an account to use groups.',
     );
   }
 }
@@ -122,7 +122,7 @@ export const circleInvite = onCall(
     if (!memberSnap.exists || memberSnap.data()?.status !== 'active') {
       throw new HttpsError(
         'permission-denied',
-        'Only circle members can see the invite key.',
+        'Only group members can see the invite key.',
       );
     }
     if (regenerate) {
@@ -225,7 +225,7 @@ export const circleJoinWithInvite = onCall(
         throw reasoned(
           'resource-exhausted',
           'circle_full',
-          `This circle is full (${MAX_MEMBERS} members).`,
+          `This group is full (${MAX_MEMBERS} members).`,
         );
       }
       // The key bypasses approval, not the per-account cap.
@@ -287,8 +287,8 @@ function reasoned(
 
 function limitMessage(max: number): string {
   return max === 1
-    ? 'Free accounts can be in 1 circle at a time.'
-    : `You can only be in ${max} circles at a time.`;
+    ? 'Free accounts can be in 1 group at a time.'
+    : `You can only be in ${max} groups at a time.`;
 }
 
 function displayNameOf(request: CallableRequest): string {
@@ -329,7 +329,7 @@ async function requireModerator(
   uid: string,
 ): Promise<FirebaseFirestore.DocumentData> {
   const snap = await tx.get(circleRef);
-  if (!snap.exists) throw reasoned('not-found', 'not_found', 'Circle not found.');
+  if (!snap.exists) throw reasoned('not-found', 'not_found', 'Group not found.');
   const data = snap.data()!;
   const moderatorIds = (data.moderatorIds as string[] | undefined) ?? [];
   if (!moderatorIds.includes(uid)) {
@@ -478,18 +478,18 @@ export const circleJoin = onCall(
         case 'reject':
           switch (decision.reason) {
             case 'not_found':
-              throw reasoned('not-found', 'not_found', 'Circle not found.');
+              throw reasoned('not-found', 'not_found', 'Group not found.');
             case 'invite_only':
               throw reasoned(
                 'permission-denied',
                 'invite_only',
-                'This circle is private — ask a member for the invite key.',
+                'This group is private — ask a member for the invite key.',
               );
             case 'circle_full':
               throw reasoned(
                 'resource-exhausted',
                 'circle_full',
-                `This circle is full (${MAX_MEMBERS} members).`,
+                `This group is full (${MAX_MEMBERS} members).`,
               );
             case 'circle_limit':
               throw reasoned(
@@ -579,7 +579,7 @@ export const circleApproveJoin = onCall(
           throw reasoned(
             'resource-exhausted',
             'circle_full',
-            `This circle is full (${MAX_MEMBERS} members).`,
+            `This group is full (${MAX_MEMBERS} members).`,
           );
         }
         throw reasoned('failed-precondition', 'not_pending', 'No pending request.');
@@ -669,7 +669,7 @@ export const circleRemoveMember = onCall(
         throw reasoned(
           'permission-denied',
           'cannot_remove_creator',
-          'The circle creator cannot be removed.',
+          'The group creator cannot be removed.',
         );
       }
       const memberSnap = await tx.get(refs.memberRef);
@@ -703,7 +703,7 @@ export const circleDelete = onCall(
       throw reasoned(
         'permission-denied',
         'not_creator',
-        'Only the creator can delete a circle.',
+        'Only the creator can delete a group.',
       );
     }
 

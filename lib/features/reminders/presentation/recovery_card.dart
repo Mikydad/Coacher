@@ -48,8 +48,10 @@ class _RecoveryCardState extends ConsumerState<RecoveryCard> {
     if (view == null || view.isEmpty) return const SizedBox.shrink();
 
     // FR-R-62: the deterministic order renders NOW; if the one bounded
-    // triage call has answered, its ranking and headline enhance in place.
-    // valueOrNull means a pending or failed call changes nothing.
+    // triage call has answered, its ranking enhances in place. valueOrNull
+    // means a pending or failed call changes nothing. The call's headline
+    // is no longer shown (plain-language pass, 2026-09-25): the subtitle
+    // stays fixed so the card always says the same plain thing.
     final triage = ref.watch(recoveryTriageProvider).valueOrNull;
     final ordered = triage == null
         ? view.rows
@@ -76,8 +78,7 @@ class _RecoveryCardState extends ConsumerState<RecoveryCard> {
               hero: true,
               subtitle: shown.isEmpty
                   ? null
-                  : (triage?.headline ??
-                        'Still open — do one now, or move it.'),
+                  : "Tasks you didn't complete or reschedule.",
             ),
             if (shown.isNotEmpty)
               Divider(height: 28, thickness: 1, color: AppColors.divider),
@@ -165,7 +166,7 @@ class _RecoveryCardState extends ConsumerState<RecoveryCard> {
 }
 
 String _headline(int count) =>
-    count == 1 ? '1 task needs you' : '$count tasks need you';
+    count == 1 ? '1 unfinished task' : '$count unfinished tasks';
 
 class _RecoveryRowTile extends StatelessWidget {
   const _RecoveryRowTile({

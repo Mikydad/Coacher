@@ -19,14 +19,14 @@ class CircleLimitException implements Exception {
 
   @override
   String toString() => limit == 1
-      ? 'Free accounts can be in 1 circle at a time.'
-      : 'You can only be in $limit circles at a time.';
+      ? 'Free accounts can be in 1 group at a time.'
+      : 'You can only be in $limit groups at a time.';
 }
 
 /// Thrown when the target circle already has 8 members.
 class CircleFullException implements Exception {
   @override
-  String toString() => 'This circle is full (8/8 members).';
+  String toString() => 'This group is full (8/8 members).';
 }
 
 /// Thrown when the caller is not a moderator of the circle.
@@ -39,7 +39,7 @@ class NotModeratorException implements Exception {
 class CirclePrivateException implements Exception {
   @override
   String toString() =>
-      'This circle is private — ask a member for the invite key.';
+      'This group is private — ask a member for the invite key.';
 }
 
 /// Manages all circle join / leave / approval flows.

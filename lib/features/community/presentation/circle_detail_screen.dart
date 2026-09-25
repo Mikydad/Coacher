@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/presentation/keyboard_dismiss.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../education/application/education_providers.dart';
 import '../application/circle_providers.dart';
 import '../domain/models/circle_enums.dart';
 import '../domain/models/circle_member.dart';
@@ -37,8 +38,8 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
 
   static const _tabs = [
     'Chat',
-    'Activity',
-    'Commitments',
+    'Updates',
+    'Weekly commitments',
     'Challenges',
     'Members',
     'Info',
@@ -72,11 +73,17 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
     super.dispose();
   }
 
+  /// Optimistic: the line goes at once, the preference persists behind.
+  void _dismissIntro() {
+    ref.read(educationSeenCardsProvider.notifier).markSeen(_kGroupIntroKey);
+  }
+
   @override
   Widget build(BuildContext context) {
     final authAsync = ref.watch(authStateProvider);
     final circleAsync = ref.watch(circleDetailProvider(widget.circleId));
     final membersAsync = ref.watch(circleMembersProvider(widget.circleId));
+    final showIntro = ref.watch(showFeatureCardProvider(_kGroupIntroKey));
 
     if (authAsync.isLoading && !authAsync.hasValue) {
       return Scaffold(
@@ -116,8 +123,8 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                 ? CircularProgressIndicator(color: AppColors.accent)
                 : Text(
                     kDebugMode
-                        ? 'Could not load circle.\n$e'
-                        : 'Could not load circle.',
+                        ? 'Could not load group.\n$e'
+                        : 'Could not load group.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: AppColors.textSecondary),
                   ),
@@ -160,14 +167,17 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                     ),
                   ),
                   centerTitle: false,
-                  expandedHeight: _CircleHeader.expandedHeight,
+                  expandedHeight: _CircleHeader.heightFor(
+                    showIntro: showIntro,
+                  ),
                   pinned: true,
                   floating: false,
                   flexibleSpace: FlexibleSpaceBar(
                     background: _CircleHeader(
-                      streak: circle.currentStreak,
                       memberCount: circle.memberCount,
                       members: activeMembers,
+                      showIntro: showIntro,
+                      onDismissIntro: _dismissIntro,
                     ),
                   ),
                   bottom: PreferredSize(
@@ -202,9 +212,9 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                 children: [
                   // Chat
                   CircleChatView(circleId: widget.circleId),
-                  // Activity
+                  // Updates
                   CircleActivityView(circleId: widget.circleId),
-                  // Commitments
+                  // Weekly commitments
                   WeeklyCommitmentsView(circleId: widget.circleId),
                   // Challenges
                   CircleChallengesView(circleId: widget.circleId),
@@ -224,24 +234,34 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
 
 // ── Header ────────────────────────────────────────────────────────────────────
 
+/// Per-device dismissal key for the one-line group explainer. It lives in
+/// the education "seen cards" set (a plain string key, no registered guide).
+const _kGroupIntroKey = 'group_intro_dismissed';
+
 class _CircleHeader extends StatelessWidget {
   const _CircleHeader({
-    required this.streak,
     required this.memberCount,
     required this.members,
+    required this.showIntro,
+    required this.onDismissIntro,
   });
 
-  /// Toolbar (56) + top pad (4) + member line (26 with the streak badge,
-  /// 18 without) + gap (12) + avatars (36) + bottom pad (12) + tab strip
-  /// (48) = 194; +2 slack for font metrics. Excludes the status bar
-  /// (SafeArea adds it). Was 186, sized for the no-badge line: it
-  /// overflowed by 1 px on iOS and by 8 px once a streak showed
-  /// (2026-09-24).
-  static const double expandedHeight = 196;
+  /// Toolbar (56) + top pad (4) + member line (18) + gap (12) + avatars
+  /// (36) + bottom pad (12) + tab strip (48) = 186; +2 slack for font
+  /// metrics. Excludes the status bar (SafeArea adds it). The streak badge
+  /// that used to widen the member line is gone (2026-09-25).
+  static const double _baseHeight = 188;
 
-  final int streak;
+  /// Gap (8) + the intro line's fixed box (48: up to three 12px lines).
+  static const double _introHeight = 56;
+
+  static double heightFor({required bool showIntro}) =>
+      showIntro ? _baseHeight + _introHeight : _baseHeight;
+
   final int memberCount;
   final List<CircleMember> members;
+  final bool showIntro;
+  final VoidCallback onDismissIntro;
 
   @override
   Widget build(BuildContext context) {
@@ -266,23 +286,20 @@ class _CircleHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '$memberCount / ${AccountabilityCircleConst.kMaxMembers} members',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 13,
-                          height: 1.3,
-                        ),
-                      ),
-                    ),
-                    if (streak > 0) _StreakBadge(streak),
-                  ],
+                Text(
+                  '$memberCount / ${AccountabilityCircleConst.kMaxMembers} members',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                    height: 1.3,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 if (members.isNotEmpty) _MemberAvatarRow(members: members),
+                if (showIntro) ...[
+                  const SizedBox(height: 8),
+                  _GroupIntroLine(onDismiss: onDismissIntro),
+                ],
               ],
             ),
           ),
@@ -292,30 +309,38 @@ class _CircleHeader extends StatelessWidget {
   }
 }
 
-class _StreakBadge extends StatelessWidget {
-  const _StreakBadge(this.streak);
-  final int streak;
+/// One-line explainer under the header, shown until dismissed. Fixed
+/// height so the collapsing header never has to measure it.
+class _GroupIntroLine extends StatelessWidget {
+  const _GroupIntroLine({required this.onDismiss});
+  final VoidCallback onDismiss;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.accent.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
-      ),
+    return SizedBox(
+      height: 48,
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('🔥', style: TextStyle(fontSize: 13)),
-          const SizedBox(width: 4),
-          Text(
-            '$streak day${streak == 1 ? '' : 's'}',
-            style: TextStyle(
-              color: AppColors.accent,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+          Expanded(
+            child: Text(
+              'Keep each other accountable — talk, share progress, make '
+              'commitments, and take on challenges.',
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                height: 1.3,
+              ),
+            ),
+          ),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onDismiss,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 0, 8),
+              child: Icon(Icons.close, size: 16, color: AppColors.textSoft),
             ),
           ),
         ],

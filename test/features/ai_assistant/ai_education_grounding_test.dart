@@ -78,13 +78,13 @@ void main() {
     final result = await parser.parse('What is Discipline Mode?', 's1');
 
     expect(client.lastPayload, isNotNull);
-    expect(client.lastPayload!.featureGuide, contains('Discipline Modes'));
+    expect(client.lastPayload!.featureGuide, contains('Strictness'));
     expect(result.isInformational, isTrue);
     // The guide's own follow-up prompts lead the suggestions.
     expect(result.suggestedPrompts, isNotEmpty);
     expect(
       result.suggestedPrompts.first,
-      'Which discipline mode fits a busy week?',
+      'Which strictness fits a busy week?',
     );
   });
 
@@ -92,7 +92,7 @@ void main() {
     final result = await parser.parse('What are Circles?', 's1');
 
     expect(result.responseType, isNot(AiResponseType.unsupported));
-    expect(client.lastPayload!.featureGuide, contains('Circles'));
+    expect(client.lastPayload!.featureGuide, contains('Groups'));
   });
 
   test('circle COMMANDS still hit the unsupported fast-path', () async {

@@ -292,7 +292,7 @@ export const stakeCreateChallenge = onCall(
     if (type === 'solo_photo') {
       circleId = str(request.data?.circleId, 'circleId', 1, 64);
       if (!(await isCircleMember(circleId, uid))) {
-        throw new HttpsError('permission-denied', 'Not a member of that circle.');
+        throw new HttpsError('permission-denied', 'Not a member of that group.');
       }
       const rawPhoto = (request.data?.photo ?? {}) as Record<string, unknown>;
       const storagePath = str(rawPhoto.storagePath, 'photo.storagePath', 1, 256);
@@ -329,7 +329,7 @@ export const stakeCreateChallenge = onCall(
       }
       if (!(await isCircleMember(circleId, uid)) ||
           !(await isCircleMember(circleId, opponentUid))) {
-        throw new HttpsError('permission-denied', 'Both players must be members of that circle.');
+        throw new HttpsError('permission-denied', 'Both players must be members of that group.');
       }
       const stakeAmount = int(
         request.data?.stakeAmount,
@@ -385,7 +385,7 @@ export const stakeCreateChallenge = onCall(
       if (typeof rawCircle === 'string' && rawCircle.length > 0) {
         circleId = str(rawCircle, 'circleId', 1, 64);
         if (!(await isCircleMember(circleId, uid))) {
-          throw new HttpsError('permission-denied', 'Not a member of that circle.');
+          throw new HttpsError('permission-denied', 'Not a member of that group.');
         }
       }
 
@@ -1102,7 +1102,7 @@ export const stakeCastVote = onCall(
       throw new HttpsError('permission-denied', 'Participants cannot vote.');
     }
     if (!ch.circleId || !(await isCircleMember(ch.circleId, uid))) {
-      throw new HttpsError('permission-denied', 'Only circle members can vote.');
+      throw new HttpsError('permission-denied', 'Only group members can vote.');
     }
     // A dispute about aboutUid must exist with its 48h window still open.
     const disputes = await db
@@ -1145,7 +1145,7 @@ export const stakeReportScreenshot = onCall(
 
     const ch = await loadChallenge(id);
     if (!ch.circleId || !(await isCircleMember(ch.circleId, uid))) {
-      throw new HttpsError('permission-denied', 'Not a member of that circle.');
+      throw new HttpsError('permission-denied', 'Not a member of that group.');
     }
 
     // Offender's display name for the public naming (D11); the member doc
@@ -1213,7 +1213,7 @@ export const stakeReportPhoto = onCall(
 
     const ch = await loadChallenge(id);
     if (!ch.circleId || !(await isCircleMember(ch.circleId, uid))) {
-      throw new HttpsError('permission-denied', 'Not a member of that circle.');
+      throw new HttpsError('permission-denied', 'Not a member of that group.');
     }
 
     await db.runTransaction(async (tx) => {

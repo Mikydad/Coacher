@@ -57,7 +57,7 @@ Future<void> joinOrRequestCircle({
   if (!await ensureRegisteredForCircleAction(
     context,
     ref,
-    actionLabel: 'join a circle',
+    actionLabel: 'join a group',
   )) {
     _logDiscoveryJoin('Aborted: account required');
     return;
@@ -274,7 +274,7 @@ class _CircleDiscoveryScreenState extends ConsumerState<CircleDiscoveryScreen>
     if (!await ensureRegisteredForCircleAction(
       context,
       ref,
-      actionLabel: 'create a circle',
+      actionLabel: 'create a group',
     )) {
       return;
     }
@@ -307,14 +307,14 @@ class _CircleDiscoveryScreenState extends ConsumerState<CircleDiscoveryScreen>
         foregroundColor: AppColors.onAccent,
         icon: const Icon(Icons.add_rounded),
         label: const Text(
-          'Circle',
+          'Group',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
       appBar: AppBar(
         backgroundColor: AppColors.scaffold,
         foregroundColor: AppColors.textPrimary,
-        title: const PageTitle('Discover circles'),
+        title: const PageTitle('Discover groups'),
         centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -436,15 +436,15 @@ class _BrowseTab extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      const AppSectionLabel('ALL CIRCLES'),
+                      const AppSectionLabel('ALL GROUPS'),
                       const SizedBox(height: 12),
                     ],
                     // All circles list
                     if (circles == null || circles!.isEmpty)
                       _EmptyState(
                         message: selectedCategory == 'all'
-                            ? 'No circles yet. Create the first one!'
-                            : 'No $selectedCategory circles yet.',
+                            ? 'No groups yet. Create the first one!'
+                            : 'No $selectedCategory groups yet.',
                       )
                     else
                       ...circles!.map(
@@ -663,7 +663,7 @@ class _SearchTab extends StatelessWidget {
               onTapOutside: (_) => dismissKeyboard(context),
               style: TextStyle(color: AppColors.textPrimary),
               decoration: InputDecoration(
-                hintText: 'Search circles…',
+                hintText: 'Search groups…',
                 hintStyle: TextStyle(color: AppColors.textSecondary),
                 prefixIcon: Icon(
                   Icons.search_rounded,
@@ -700,7 +700,7 @@ class _SearchTab extends StatelessWidget {
               ? const _EmptyState(message: 'Start typing to search…')
               : results.isEmpty
               ? _EmptyState(
-                  message: 'No circles found for "${controller.text}"',
+                  message: 'No groups found for "${controller.text}"',
                 )
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
@@ -823,7 +823,7 @@ class _CircleCardState extends State<CircleCard> {
                       if (isFull) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('This circle is full (8/8 members).'),
+                            content: Text('This group is full (8/8 members).'),
                           ),
                         );
                         return;

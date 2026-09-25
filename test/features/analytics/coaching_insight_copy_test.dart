@@ -82,7 +82,7 @@ void main() {
     test('mapPatternsToInsights emits lifecycleState=active with urgency + coachingImportance', () {
       final insights = mapPatternsToInsights(
         patterns: <DetectedPattern>[
-          _p(PatternCode.streakRisk, PatternGroup.streakConsistency, 0.9),
+          _p(PatternCode.tooHard, PatternGroup.effortDifficulty, 0.9),
         ],
         context: const InsightMappingContext(
           scopeType: InsightScopeType.entity,
@@ -178,7 +178,7 @@ void main() {
     test('supporting metrics serialise and deserialise via toMap/fromMap', () {
       final original = mapPatternsToInsights(
         patterns: <DetectedPattern>[
-          _p(PatternCode.streakRisk, PatternGroup.streakConsistency, 0.9),
+          _p(PatternCode.tooHard, PatternGroup.effortDifficulty, 0.9),
         ],
         context: const InsightMappingContext(
           scopeType: InsightScopeType.entity,
@@ -202,7 +202,7 @@ void main() {
   group('Phase 3 — determinism', () {
     test('same patterns always produce same insights in same order', () {
       final patterns = <DetectedPattern>[
-        _p(PatternCode.streakRisk, PatternGroup.streakConsistency, 0.9),
+        _p(PatternCode.tooHard, PatternGroup.effortDifficulty, 0.9),
         _p(PatternCode.lateBehavior, PatternGroup.timeBehavior, 0.7),
       ];
       const context = InsightMappingContext(
@@ -229,7 +229,7 @@ void main() {
       final insights = mapPatternsToInsights(
         patterns: <DetectedPattern>[
           _p(PatternCode.strongStreak, PatternGroup.streakConsistency, 0.9),
-          _p(PatternCode.streakRisk, PatternGroup.streakConsistency, 0.9),
+          _p(PatternCode.tooHard, PatternGroup.effortDifficulty, 0.9),
           _p(PatternCode.lowEngagement, PatternGroup.effortDifficulty, 0.9),
         ],
         context: const InsightMappingContext(
@@ -240,7 +240,7 @@ void main() {
         ),
       );
 
-      // First insight should be high-priority (streakRisk → streakRiskWarning)
+      // First insight should be high-priority (tooHard → habitTooHard)
       expect(insights.first.priority, equals(InsightPriority.high));
     });
   });
@@ -265,7 +265,7 @@ void main() {
       );
     });
 
-    test('fragileStreakAlert fires for streakRisk entity without strongStreak', () {
+    test('streak family is never generated for a streakRisk-only entity', () {
       final insights = mapPatternsToInsights(
         patterns: <DetectedPattern>[
           _p(PatternCode.streakRisk, PatternGroup.streakConsistency, 0.85),
@@ -278,13 +278,12 @@ void main() {
         ),
       );
 
-      expect(
-        insights.any((i) => i.insightType == InsightType.fragileStreakAlert),
-        isTrue,
-      );
+      // streakRisk alone maps to nothing now: no fragileStreakAlert, no
+      // streakRiskWarning, and no other rule requires it on its own.
+      expect(insights, isEmpty);
     });
 
-    test('fragileStreakAlert is blocked when strongStreak is also present', () {
+    test('streak family is never generated when strongStreak is present', () {
       final insights = mapPatternsToInsights(
         patterns: <DetectedPattern>[
           _p(PatternCode.streakRisk, PatternGroup.streakConsistency, 0.85),
@@ -299,7 +298,7 @@ void main() {
       );
 
       expect(
-        insights.any((i) => i.insightType == InsightType.fragileStreakAlert),
+        insights.any((i) => isRetiredInsightType(i.insightType)),
         isFalse,
       );
     });

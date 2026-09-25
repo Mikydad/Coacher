@@ -65,7 +65,7 @@ class CalendarSignalRow extends ConsumerWidget {
     return SettingRow(
       icon: Icons.calendar_month_rounded,
       title: 'Calendar-aware timing',
-      subtitle: 'Plan promises around your real meetings — read-only',
+      subtitle: 'Time your for-later items around your real meetings — read-only',
       trailing: Switch.adaptive(
         value: enabled,
         onChanged: (v) => _toggle(context, ref, v),
@@ -158,7 +158,7 @@ class GeofenceSignalRow extends ConsumerWidget {
     final enabled = state?.choice == GeofenceSignalChoice.enabled;
     final subtitle = enabled && state?.hasHome != true
         ? 'Home not set yet — tap to set it while you’re there'
-        : 'Nudge chosen promises when you leave home — one area, '
+        : 'Nudge chosen for-later items when you leave home — one area, '
               'on-device only';
     return SettingRow(
       icon: Icons.near_me_outlined,

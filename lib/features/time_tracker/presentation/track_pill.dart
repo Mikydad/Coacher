@@ -7,7 +7,7 @@ import '../application/time_tracker_providers.dart';
 import 'track_activity_sheet.dart';
 
 /// Home's capture entry (decision 9 + F3): one thin pill under the action
-/// circles — `◷ Track what you're doing +` — that opens the capture sheet
+/// circles — `◷ Track your time +` — that opens the capture sheet
 /// and nothing else. When something is ongoing it reads
 /// `◷ Scrolling · since 10:03 PM +`, so the pill doubles as the
 /// "what am I doing" reminder without a card or a notification.
@@ -19,7 +19,7 @@ class TrackPill extends ConsumerWidget {
     final ongoing = ref.watch(ongoingActivityProvider);
     final String label;
     if (ongoing == null) {
-      label = "Track what you're doing";
+      label = 'Track your time';
     } else {
       final loc = MaterialLocalizations.of(context);
       final since = loc.formatTimeOfDay(
@@ -87,7 +87,7 @@ class TrackPill extends ConsumerWidget {
                   iconColor: AppColors.accent,
                   background: AppColors.actionTint,
                   shadow: false,
-                  tooltip: 'Track an activity',
+                  tooltip: 'Log an activity',
                   onPressed: () => showTrackActivitySheet(context),
                 ),
               ],

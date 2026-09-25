@@ -9,8 +9,8 @@ void main() {
     test('maps risk, neutral, and reinforcement insights deterministically', () {
       final patterns = <DetectedPattern>[
         _pattern(
-          code: PatternCode.streakRisk,
-          group: PatternGroup.streakConsistency,
+          code: PatternCode.tooHard,
+          group: PatternGroup.effortDifficulty,
           confidence: 0.9,
         ),
         _pattern(
@@ -39,8 +39,10 @@ void main() {
       expect(
         insights.map((insight) => insight.insightType).toList(),
         <InsightType>[
-          InsightType.streakRiskWarning,
+          InsightType.habitTooHard,
+          InsightType.highestMomentumLeverage,
           InsightType.latePattern,
+          InsightType.goalProgressSuccess,
         ],
       );
     });
@@ -106,8 +108,8 @@ void main() {
       final mixed = <DetectedPattern>[
         onlyDeferred.first,
         _pattern(
-          code: PatternCode.streakRisk,
-          group: PatternGroup.streakConsistency,
+          code: PatternCode.tooHard,
+          group: PatternGroup.effortDifficulty,
           confidence: 0.9,
         ),
       ];
@@ -125,7 +127,7 @@ void main() {
         false,
       );
       expect(
-        out.any((i) => i.linkedPatternCodes.contains('streakRisk')),
+        out.any((i) => i.linkedPatternCodes.contains('tooHard')),
         true,
       );
     });

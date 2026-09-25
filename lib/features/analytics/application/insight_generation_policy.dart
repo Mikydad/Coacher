@@ -5,7 +5,11 @@ import '../domain/models/generated_insight.dart';
 // (canonical evidence + taxonomy) instead of legacy [DetectedPattern]. Until then,
 // [kDeferredLayer2PatternCodesForInsightMapping] gates subtle new codes from user-facing copy.
 
-const int kLayer3InsightPolicyConfigVersion = 4;
+// v5 (2026-09-25): the streak insight family (risk_streak_warning,
+// positive_strong_streak, focus_fragile_streak_alert) is retired — the day
+// streak is no longer a user-facing concept. PatternCode.streakRisk /
+// strongStreak stay as silent inputs to the remaining rules.
+const int kLayer3InsightPolicyConfigVersion = 5;
 
 class InsightOutputCaps {
   const InsightOutputCaps({
@@ -82,18 +86,6 @@ kLayer3InsightPolicyConfig = Layer3InsightPolicyConfig(
   mergePolicy: InsightMergePolicy(),
   rules: <InsightMappingRule>[
     // Risk insights
-    InsightMappingRule(
-      ruleId: 'risk_streak_warning',
-      insightType: InsightType.streakRiskWarning,
-      insightBucket: InsightBucket.risk,
-      priority: InsightPriority.high,
-      action: InsightAction.doNow,
-      messageKey: 'streak_risk_1',
-      fallbackMessage:
-          'You are close to breaking momentum. Do one small action now.',
-      scopeType: InsightScopeType.entity,
-      requiredAllPatterns: <PatternCode>{PatternCode.streakRisk},
-    ),
     InsightMappingRule(
       ruleId: 'risk_habit_too_hard',
       insightType: InsightType.habitTooHard,
@@ -175,19 +167,6 @@ kLayer3InsightPolicyConfig = Layer3InsightPolicyConfig(
 
     // Reinforcement insights
     InsightMappingRule(
-      ruleId: 'positive_strong_streak',
-      insightType: InsightType.strongStreakPraise,
-      insightBucket: InsightBucket.reinforcement,
-      priority: InsightPriority.low,
-      action: InsightAction.keepGoing,
-      messageKey: 'strong_streak_praise_1',
-      fallbackMessage:
-          'Great momentum. Keep your streak alive with one deliberate action.',
-      scopeType: InsightScopeType.entity,
-      requiredAllPatterns: <PatternCode>{PatternCode.strongStreak},
-      blockedPatterns: <PatternCode>{PatternCode.streakRisk},
-    ),
-    InsightMappingRule(
       ruleId: 'positive_consistent_behavior',
       insightType: InsightType.consistentBehaviorPraise,
       insightBucket: InsightBucket.reinforcement,
@@ -235,18 +214,6 @@ kLayer3InsightPolicyConfig = Layer3InsightPolicyConfig(
       scopeType: InsightScopeType.entity,
       requiredAllPatterns: <PatternCode>{PatternCode.strongStreak},
       blockedPatterns: <PatternCode>{PatternCode.streakRisk},
-    ),
-    InsightMappingRule(
-      ruleId: 'focus_fragile_streak_alert',
-      insightType: InsightType.fragileStreakAlert,
-      insightBucket: InsightBucket.risk,
-      priority: InsightPriority.high,
-      action: InsightAction.doNow,
-      messageKey: 'focus_fragile_streak_1',
-      fallbackMessage: 'Streak at risk. One action now prevents a reset.',
-      scopeType: InsightScopeType.entity,
-      requiredAllPatterns: <PatternCode>{PatternCode.streakRisk},
-      blockedPatterns: <PatternCode>{PatternCode.strongStreak},
     ),
     InsightMappingRule(
       ruleId: 'focus_best_recovery_opportunity',

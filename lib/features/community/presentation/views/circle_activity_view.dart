@@ -15,7 +15,7 @@ import '../../../../core/presentation/app_colors.dart';
 import '../../../../core/presentation/async_value_ui.dart';
 
 // Filter categories shown in the chip row.
-enum _FeedFilter { all, goals, habits, tasks }
+enum _FeedFilter { all, goals, tasks }
 
 class CircleActivityView extends ConsumerStatefulWidget {
   const CircleActivityView({super.key, required this.circleId});
@@ -62,14 +62,22 @@ class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
               final blocked =
                   ref.watch(blockedUidsProvider).valueOrNull ??
                   const <String>{};
-              final visible = blocked.isEmpty
-                  ? items
-                  : items.where((i) => !blocked.contains(i.userId)).toList();
+              // Streak posts stay in the data but never render: streaks
+              // are not a SidePal success metric (2026-09-25).
+              final visible = items
+                  .where(
+                    (i) =>
+                        i.eventType != ActivityEventType.habitStreakReached &&
+                        !blocked.contains(i.userId),
+                  )
+                  .toList();
               final filtered = _applyFilter(visible);
 
+              // The summary banner is always index 0; the empty state
+              // follows it (the old `_EmptyState` was never reachable).
               return ListView.separated(
                 padding: const EdgeInsets.all(16),
-                itemCount: filtered.length + 1,
+                itemCount: filtered.isEmpty ? 2 : filtered.length + 1,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (_, i) {
                   if (i == 0) {
@@ -78,6 +86,7 @@ class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
                       isModerator: isModerator,
                     );
                   }
+                  if (filtered.isEmpty) return const _EmptyState();
                   final item = filtered[i - 1];
                   if (item.eventType == ActivityEventType.memberJoined ||
                       item.eventType == ActivityEventType.memberLeft) {
@@ -105,10 +114,6 @@ class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
                   i.eventType == ActivityEventType.milestoneReached ||
                   i.eventType == ActivityEventType.weeklyCommitmentMet,
             )
-            .toList();
-      case _FeedFilter.habits:
-        return items
-            .where((i) => i.eventType == ActivityEventType.habitStreakReached)
             .toList();
       case _FeedFilter.tasks:
         return items
@@ -167,8 +172,6 @@ class _FilterChipRow extends StatelessWidget {
         return 'All';
       case _FeedFilter.goals:
         return 'Goals';
-      case _FeedFilter.habits:
-        return 'Habits';
       case _FeedFilter.tasks:
         return 'Tasks';
     }
@@ -264,8 +267,8 @@ class _SystemActivityPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final copy = item.eventType == ActivityEventType.memberJoined
-        ? '${item.displayName} joined the circle 👋'
-        : '${item.displayName} left the circle';
+        ? '${item.displayName} joined the group 👋'
+        : '${item.displayName} left the group';
 
     return Center(
       child: Container(
@@ -377,18 +380,31 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Text(
-          'No activity yet.\nComplete a goal or task to see progress here.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 15,
-            height: 1.5,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+      child: Column(
+        children: [
+          Text(
+            'See what everyone in the group has been getting done.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              height: 1.4,
+            ),
           ),
-        ),
+          const SizedBox(height: 6),
+          Text(
+            'Nothing yet. Complete a goal or task and it shows up here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+              height: 1.4,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -414,9 +430,9 @@ String _activityCopy(ActivityFeedItem item) {
       return 'logged progress on "${item.entityTitle ?? 'a challenge'}" '
           'with a photo 📸';
     case ActivityEventType.memberJoined:
-      return 'joined the circle 👋';
+      return 'joined the group 👋';
     case ActivityEventType.memberLeft:
-      return 'left the circle';
+      return 'left the group';
     case ActivityEventType.stakePhotoRevealed:
       return 'broke their promise "${item.entityTitle ?? 'a staked goal'}" — '
           'their stake photo is live. Tap to see it before it\'s gone. 💥';

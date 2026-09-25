@@ -47,7 +47,7 @@ class _DefaultEnforcementModeSelectionScreenState
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const PageTitle('Enforcement Mode'),
+        title: const PageTitle('Strictness'),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -56,8 +56,8 @@ class _DefaultEnforcementModeSelectionScreenState
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
               child: Text(
-                'How strictly should the app enforce your commitments '
-                'on new tasks and habits by default?',
+                "How strict should SidePal be when you don't follow your "
+                'plan?',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),

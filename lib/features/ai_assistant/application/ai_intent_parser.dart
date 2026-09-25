@@ -417,8 +417,8 @@ class AiIntentParser {
       responseType: AiResponseType.informational,
       informationalMessage:
           "$lead I didn't change anything.\n\nWhat I can do from here: add "
-          'new tasks or goals, set or reschedule reminders, start focus or '
-          'sleep windows, and answer questions about your schedule.',
+          'new tasks or goals, set or reschedule reminders, set a focus or '
+          'sleep status, and answer questions about your schedule.',
     );
   }
 

@@ -7,7 +7,6 @@ import 'package:sidepal/features/context_override/application/context_override_p
 import 'package:sidepal/features/context_override/domain/models/user_attention_state.dart';
 import 'package:sidepal/features/goals/application/goals_providers.dart';
 import 'package:sidepal/features/goals/domain/models/user_goal.dart';
-import 'package:sidepal/features/analytics/application/discipline_score.dart';
 import 'package:sidepal/features/feedback/application/tester_mode_controller.dart';
 import 'package:sidepal/features/profile/application/profile_providers.dart';
 import 'package:sidepal/features/profile/domain/models/user_profile_preference.dart';
@@ -68,7 +67,6 @@ Widget _buildScreen({
       ),
       // Active goals
       goalsStreamProvider.overrideWith((ref) => Stream.value(activeGoals)),
-      homeDisplayStreakDaysProvider.overrideWithValue(12),
       // Signed-in registered account — tester mode requires one, and this
       // keeps the auth providers off real Firebase in tests.
       authUidProvider.overrideWithValue('test-uid'),
@@ -79,7 +77,7 @@ Widget _buildScreen({
 }
 
 /// The default 800x600 test surface is shorter than any real phone, so the
-/// Coach Tone section falls outside it once Progress sits above the knobs —
+/// Coach style section falls outside it once Progress sits above the knobs —
 /// and unbuilt slivers can't be asserted on. Give those tests a phone-shaped
 /// viewport instead of scrolling past the frosted top bar.
 void _useTallViewport(WidgetTester tester) {
@@ -127,9 +125,9 @@ void main() {
       _useTallViewport(tester);
       await tester.pumpWidget(_buildScreen());
       await tester.pump();
-      // Discipline Mode and Coach Tone sit above the list, not inside it.
-      expect(find.text('DISCIPLINE MODE'), findsOneWidget);
-      expect(find.text('COACH TONE'), findsOneWidget);
+      // Strictness and Coach style sit above the list, not inside it.
+      expect(find.text('STRICTNESS'), findsOneWidget);
+      expect(find.text('COACH STYLE'), findsOneWidget);
       // Progress sits above the knobs, not inside the settings list.
       expect(find.text('Progress'), findsOneWidget);
       await tester.scrollUntilVisible(
@@ -153,7 +151,7 @@ void main() {
     });
 
     testWidgets(
-      'Discipline Mode collapses to the active value and expands in place',
+      'Strictness collapses to the active value and expands in place',
       (tester) async {
         _useTallViewport(tester);
         await tester.pumpWidget(_buildScreen());
@@ -175,14 +173,17 @@ void main() {
       },
     );
 
-    testWidgets('renders streak card', (tester) async {
+    testWidgets('stats card shows today and this week, no streak', (
+      tester,
+    ) async {
       await tester.pumpWidget(_buildScreen());
       await tester.pump();
-      expect(find.text('DAY STREAK'), findsOneWidget);
-      expect(find.text('12'), findsOneWidget);
+      expect(find.text('TODAY'), findsOneWidget);
+      expect(find.text('THIS WEEK'), findsOneWidget);
+      expect(find.text('DAY STREAK'), findsNothing);
     });
 
-    testWidgets('Coach Tone shows only the active style until expanded', (
+    testWidgets('Coach style shows only the active style until expanded', (
       tester,
     ) async {
       _useTallViewport(tester);

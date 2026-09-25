@@ -125,7 +125,7 @@ class _CoachingStyleSelectionScreenState
           ? null
           : AppBar(
               backgroundColor: Colors.transparent,
-              title: const Text('Coaching Style'),
+              title: const Text('Coach style'),
             ),
       body: SafeArea(
         child: Column(

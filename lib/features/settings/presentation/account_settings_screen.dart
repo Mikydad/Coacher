@@ -224,7 +224,7 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
             children: [
               Text(
                 'This permanently deletes your account and your data: plans, '
-                'goals, reminders, coaching memory, circle memberships and '
+                'goals, reminders, coaching memory, group memberships and '
                 'photos. Points ledger entries and finished stake records '
                 'are kept for the audit trail, without your profile. This '
                 'cannot be undone.',

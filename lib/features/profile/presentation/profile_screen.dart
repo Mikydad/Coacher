@@ -24,7 +24,6 @@ import '../../settings/presentation/coach_ai_settings_screen.dart';
 import '../../settings/presentation/notification_settings_screen.dart';
 import '../../settings/presentation/setting_row.dart';
 import '../../settings/presentation/smart_timing_settings_screen.dart';
-import '../../analytics/application/discipline_score.dart';
 import '../../analytics/application/focus_providers.dart';
 import '../application/profile_hero_stats.dart';
 import '../application/profile_providers.dart';
@@ -123,7 +122,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final displayName = ref.watch(displayNameProvider);
     final coachingStyle = ref.watch(activeCoachingStyleProvider);
     final attentionAsync = ref.watch(attentionStateProvider);
-    final streakDays = ref.watch(homeDisplayStreakDaysProvider);
     final heroStats = ref.watch(profileHeroStatsProvider);
 
     if (!_editingName && _nameController.text != displayName) {
@@ -137,7 +135,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final hasQuietHours = attentionState?.hasSleepWindow ?? false;
     final quietLabel = hasQuietHours
         ? '${attentionState!.sleepWindowStart}–${attentionState.sleepWindowEnd}'
-        : '8:00 AM';
+        : 'Off';
 
     return Scaffold(
       backgroundColor: _kSurface,
@@ -175,7 +173,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 editingName: _editingName,
                 nameController: _nameController,
                 coachingStyle: coachingStyle,
-                streakCount: streakDays,
                 tasksLabel: heroStats.tasksLabel,
                 goalsLabel: heroStats.goalsLabel,
                 onEditTap: () => setState(() => _editingName = true),
@@ -186,7 +183,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-          // ── Progress (2026-08-23): sits directly under the streak
+          // ── Progress (2026-08-23): sits directly under the stats
           // card so checking progress is the first thing available,
           // not a row buried in the settings list.
           SliverToBoxAdapter(
@@ -199,7 +196,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: SettingRow(
                   icon: Icons.leaderboard_rounded,
                   title: 'Progress',
-                  subtitle: 'Score trends, streaks & analytics',
+                  subtitle: 'Score trends & analytics',
                   // Dot while a coaching focus is waiting unseen —
                   // clears once the focus card renders on Progress.
                   trailing: ref.watch(hasUnseenCoachingFocusProvider)
@@ -313,7 +310,6 @@ class _ProfileHero extends StatelessWidget {
     required this.editingName,
     required this.nameController,
     required this.coachingStyle,
-    required this.streakCount,
     required this.tasksLabel,
     required this.goalsLabel,
     required this.onEditTap,
@@ -325,7 +321,6 @@ class _ProfileHero extends StatelessWidget {
   final bool editingName;
   final TextEditingController nameController;
   final CoachingStyle coachingStyle;
-  final int streakCount;
 
   /// Preformatted so the card stays a dumb view: "3/5" or an em dash.
   final String tasksLabel;
@@ -506,27 +501,16 @@ class _ProfileHero extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                Icons.local_fire_department_rounded,
-                color: _kPrimary,
-                size: 26,
-              ),
+              Icon(Icons.insights_rounded, color: _kPrimary, size: 26),
               const SizedBox(height: 10),
-              // Streak stays the hero; today's tasks and this week's goals
-              // sit beside it so progress is readable without a tap
-              // (2026-08-23).
+              // Today's tasks and this week's goals sit side by side so
+              // progress is readable without a tap (2026-08-23). The day
+              // streak left this card in the plain-language pass
+              // (2026-09-25): testers read it as a score to protect.
               IntrinsicHeight(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      child: _HeroStat(
-                        value: streakCount.toString(),
-                        label: 'DAY STREAK',
-                        valueSize: 36,
-                      ),
-                    ),
-                    const _StatDivider(),
                     Expanded(
                       child: _HeroStat(
                         value: tasksLabel,
@@ -553,7 +537,7 @@ class _ProfileHero extends StatelessWidget {
   }
 }
 
-/// Hairline between the three stats.
+/// Hairline between the two stats.
 class _StatDivider extends StatelessWidget {
   const _StatDivider();
 
@@ -569,7 +553,7 @@ class _StatDivider extends StatelessWidget {
 }
 
 /// One number + caption inside the stats card. FittedBox keeps a long
-/// value ("12/14") from overflowing its third of the row on narrow phones.
+/// value ("12/14") from overflowing its half of the row on narrow phones.
 class _HeroStat extends StatelessWidget {
   const _HeroStat({
     required this.value,
@@ -658,8 +642,8 @@ class _ProfileHubList extends StatelessWidget {
           ),
           SettingRow(
             icon: Icons.timeline_outlined,
-            title: 'Time',
-            subtitle: 'Record your day, see where your time went',
+            title: 'Your Time',
+            subtitle: 'See how you spent your time today or this week.',
             trailing: const SettingRowChevron(),
             onTap: () => Navigator.pushNamed(context, TimeScreen.routeName),
           ),
@@ -676,7 +660,7 @@ class _ProfileHubList extends StatelessWidget {
           SettingRow(
             icon: Icons.auto_awesome_rounded,
             title: 'Coach & AI',
-            subtitle: 'Coach AI & what SidePal knows',
+            subtitle: 'Your coach & what SidePal knows about you',
             trailing: const SettingRowChevron(),
             onTap: () =>
                 Navigator.pushNamed(context, CoachAiSettingsScreen.routeName),
@@ -684,7 +668,7 @@ class _ProfileHubList extends StatelessWidget {
           SettingRow(
             icon: Icons.notifications_active_outlined,
             title: 'Notifications & Reminders',
-            subtitle: 'Coaching insights, sleep window & modes',
+            subtitle: 'Coaching insights, quiet hours & status',
             trailing: Text(
               quietLabel,
               style: TextStyle(

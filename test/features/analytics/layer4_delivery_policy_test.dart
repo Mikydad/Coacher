@@ -31,6 +31,28 @@ void main() {
       expect(passesNotificationGate(low), isFalse);
     });
 
+    test('retired streak-family insights never pass the notification gate', () {
+      for (final type in kRetiredInsightTypes) {
+        final insight = GeneratedInsight(
+          insightId: 'retired-${type.name}',
+          scopeType: InsightScopeType.global,
+          scopeId: '2026-05-07',
+          insightType: type,
+          insightBucket: InsightBucket.risk,
+          priority: InsightPriority.high,
+          messageKey: 'k',
+          message: 'Streak at risk.',
+          action: InsightAction.doNow,
+          linkedPatternCodes: const <String>['streakRisk'],
+          confidence: 1.0,
+          detectedAtMs: 1,
+          sourceWindowStartDateKey: '2026-05-01',
+          sourceWindowEndDateKey: '2026-05-07',
+        );
+        expect(passesNotificationGate(insight), isFalse, reason: type.name);
+      }
+    });
+
     test('candidate comparator is deterministic', () {
       final a = _insight(
         id: 'a',
@@ -64,13 +86,13 @@ GeneratedInsight _insight({
     insightId: id,
     scopeType: InsightScopeType.global,
     scopeId: '2026-05-07',
-    insightType: InsightType.streakRiskWarning,
+    insightType: InsightType.habitTooHard,
     insightBucket: InsightBucket.risk,
     priority: priority,
-    messageKey: 'streak_risk_1',
+    messageKey: 'habit_too_hard_1',
     message: 'fallback',
     action: action,
-    linkedPatternCodes: const <String>['streakRisk'],
+    linkedPatternCodes: const <String>['tooHard'],
     confidence: confidence,
     detectedAtMs: 1,
     sourceWindowStartDateKey: '2026-05-01',

@@ -207,8 +207,8 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
         ),
         content: Text(
           message.senderId == uid
-              ? 'It will be removed for everyone in the circle.'
-              : 'It will show as deleted by admin for everyone in the circle.',
+              ? 'It will be removed for everyone in the group.'
+              : 'It will show as deleted by admin for everyone in the group.',
           style: TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
@@ -309,7 +309,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
                 if (messages.isEmpty) {
                   return Center(
                     child: Text(
-                      'No messages yet.\nSay hello to your circle!',
+                      'No messages yet.\nSay hello to the group!',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: AppColors.textSecondary,
@@ -883,7 +883,7 @@ class _InputBar extends StatelessWidget {
                   }
                 },
                 decoration: InputDecoration(
-                  hintText: 'Message your circle…',
+                  hintText: 'Message the group…',
                   hintStyle: TextStyle(color: AppColors.textSecondary),
                   filled: true,
                   fillColor: AppColors.surfaceLight,

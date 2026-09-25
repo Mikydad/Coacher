@@ -599,24 +599,45 @@ void main() {
       }
     });
 
-    test('imminentStreakRisk+protection produces protection framing text', () {
-      final response = renderer.render(
-        payload: _payload(
-          reason: FocusReason.imminentStreakRisk,
-          framing: CoachingFraming.protection,
-        ),
-      );
-      expect(response.dailySummary.toLowerCase(), contains('streak'));
+    test('retired streak reasons fall back to the generic template', () {
+      // Streaks retired 2026-09-25: a stale persisted focus may still carry
+      // one of these reasons, and it must render without streak copy.
+      for (final reason in [
+        FocusReason.imminentStreakRisk,
+        FocusReason.reinforcingActiveStreak,
+      ]) {
+        for (final framing in CoachingFraming.values) {
+          final response = renderer.render(
+            payload: _payload(reason: reason, framing: framing),
+          );
+          expect(
+            response.dailySummary.toLowerCase(),
+            isNot(contains('streak')),
+            reason: '${reason.name}/${framing.name}',
+          );
+          expect(
+            response.mainRecommendation.toLowerCase(),
+            isNot(contains('streak')),
+            reason: '${reason.name}/${framing.name}',
+          );
+        }
+      }
     });
 
-    test('reinforcingActiveStreak+momentum produces encouraging tone', () {
-      final response = renderer.render(
-        payload: _payload(
-          reason: FocusReason.reinforcingActiveStreak,
-          framing: CoachingFraming.momentum,
-        ),
-      );
-      expect(response.tone, CoachingTone.encouraging);
+    test('no deterministic template mentions streaks', () {
+      for (final reason in FocusReason.values) {
+        for (final framing in CoachingFraming.values) {
+          final response = renderer.render(
+            payload: _payload(reason: reason, framing: framing),
+          );
+          expect(
+            '${response.dailySummary} ${response.mainRecommendation}'
+                .toLowerCase(),
+            isNot(contains('streak')),
+            reason: '${reason.name}/${framing.name}',
+          );
+        }
+      }
     });
 
     test('fallbackReason is stored in metadata when provided', () {

@@ -33,7 +33,7 @@ class CommunityScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: AppColors.scaffold,
         foregroundColor: AppColors.textPrimary,
-        title: const PageTitle('My Circles'),
+        title: const PageTitle('My Groups'),
         centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -41,7 +41,7 @@ class CommunityScreen extends ConsumerWidget {
           const HelpAppBarButton('circles'),
           IconButton(
             icon: Icon(Icons.explore_rounded, color: AppColors.textPrimary),
-            tooltip: 'Discover circles',
+            tooltip: 'Discover groups',
             onPressed: () =>
                 Navigator.pushNamed(context, CircleDiscoveryScreen.routeName),
           ),
@@ -58,7 +58,7 @@ class CommunityScreen extends ConsumerWidget {
                 e,
                 Center(
                   child: Text(
-                    'Could not load circles.',
+                    'Could not load groups.',
                     style: TextStyle(color: AppColors.textMuted),
                   ),
                 ),
@@ -101,7 +101,7 @@ class CommunityScreen extends ConsumerWidget {
           foregroundColor: AppColors.onAccent,
           icon: const Icon(Icons.add_rounded),
           label: const Text(
-            'Circle',
+            'Group',
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
@@ -136,14 +136,14 @@ class CommunityScreen extends ConsumerWidget {
                 child: Icon(Icons.add_rounded, color: AppColors.accent),
               ),
               title: Text(
-                'Create a circle',
+                'Create a group',
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               subtitle: Text(
-                'Start a new accountability circle',
+                'Start a new accountability group',
                 style: TextStyle(color: AppColors.textMuted, fontSize: 13),
               ),
               onTap: () async {
@@ -152,7 +152,7 @@ class CommunityScreen extends ConsumerWidget {
                 if (!await ensureRegisteredForCircleAction(
                   context,
                   ref,
-                  actionLabel: 'create a circle',
+                  actionLabel: 'create a group',
                 )) {
                   return;
                 }
@@ -167,14 +167,14 @@ class CommunityScreen extends ConsumerWidget {
                 child: Icon(Icons.explore_rounded, color: AppColors.cyanDeep),
               ),
               title: Text(
-                'Discover circles',
+                'Discover groups',
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               subtitle: Text(
-                'Browse and join existing circles',
+                'Browse and join existing groups',
                 style: TextStyle(color: AppColors.textMuted, fontSize: 13),
               ),
               onTap: () {
@@ -266,7 +266,7 @@ class _DiscoverCirclesState extends ConsumerWidget {
               const _DiscoverHeader(),
               const SizedBox(height: 40),
               Text(
-                'Could not load circles to discover.',
+                'Could not load groups to discover.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.textMuted),
               ),
@@ -289,7 +289,7 @@ class _DiscoverCirclesState extends ConsumerWidget {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Text(
-                    'No public circles yet. Be the first to create one!',
+                    'No public groups yet. Be the first to create one!',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: AppColors.textMuted, fontSize: 14),
                   ),
@@ -322,8 +322,8 @@ class _DiscoverHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SectionHeader(
-          'Discover circles',
-          subtitle: 'Join an existing circle or create your own.',
+          'Discover groups',
+          subtitle: 'Join an existing group or create your own.',
         ),
       ],
     );
@@ -412,32 +412,7 @@ class _MyCircleCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (circle.currentStreak > 0)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('🔥', style: TextStyle(fontSize: 13)),
-                      const SizedBox(width: 2),
-                      Text(
-                        '${circle.currentStreak}',
-                        style: TextStyle(
-                          color: AppColors.accent,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                const SizedBox(height: 4),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textSecondary,
-                ),
-              ],
-            ),
+            Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
           ],
         ),
       ),

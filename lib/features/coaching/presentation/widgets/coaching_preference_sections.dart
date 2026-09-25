@@ -11,7 +11,7 @@ import '../../application/coaching_style_providers.dart';
 import '../../domain/models/coaching_style.dart';
 import '../../domain/models/enforcement_mode.dart';
 
-/// Discipline Mode and Coach Tone, each collapsed to the currently selected
+/// Strictness and Coach style, each collapsed to the currently selected
 /// value — tap it (or the chevron) to reveal the other options; picking one
 /// collapses again.
 ///
@@ -38,8 +38,12 @@ class _DisciplineModeSectionState extends ConsumerState<DisciplineModeSection> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const _SectionHeaderWithHelp(
-          label: 'Discipline Mode',
+          label: 'Strictness',
           helpId: 'disciplineModes',
+        ),
+        const SizedBox(height: 4),
+        const _SectionSubtitle(
+          "How strict should SidePal be when you don't follow your plan?",
         ),
         const SizedBox(height: 10),
         const FirstTimeFeatureCard(guideId: 'disciplineModes'),
@@ -101,7 +105,9 @@ class _CoachToneSectionState extends ConsumerState<CoachToneSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _SectionHeaderWithHelp(label: 'Coach Tone', helpId: 'coachTone'),
+        const _SectionHeaderWithHelp(label: 'Coach style', helpId: 'coachTone'),
+        const SizedBox(height: 4),
+        const _SectionSubtitle('Choose how you want SidePal to talk to you.'),
         const SizedBox(height: 10),
         _ToneTile(
           style: activeStyle,
@@ -156,6 +162,26 @@ class _SectionHeaderWithHelp extends StatelessWidget {
         Flexible(child: SettingsSectionHeader(label: label)),
         HelpDot(helpId),
       ],
+    );
+  }
+}
+
+/// One muted line under a section header: what the knob below decides.
+class _SectionSubtitle extends StatelessWidget {
+  const _SectionSubtitle(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    AppColors.bindTheme(context);
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 13,
+        height: 1.35,
+        color: AppColors.textSecondary,
+      ),
     );
   }
 }
@@ -286,10 +312,12 @@ class _ToneTile extends StatelessWidget {
   final bool? expandChevron;
 
   static String copyFor(CoachingStyle style) => switch (style) {
-    CoachingStyle.supportive => 'Encouraging and light',
-    CoachingStyle.balanced => 'Empathetic and steady',
-    CoachingStyle.disciplined => 'Direct and focused',
-    CoachingStyle.intense => 'Radical honesty only',
+    CoachingStyle.supportive => 'Encouraging and gentle.',
+    CoachingStyle.balanced => 'Supportive, but honest and direct.',
+    CoachingStyle.disciplined =>
+      'Straight to the point. Less encouragement, more action.',
+    CoachingStyle.intense =>
+      'Very direct. Challenges excuses and tells you what you may not want to hear.',
   };
 
   @override
@@ -300,7 +328,7 @@ class _ToneTile extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         // Redesign 2026-09-14: white card, no outline (the mock keeps the
-        // olive outline for Discipline Mode only), gray disc with the
+        // olive outline for Strictness only), gray disc with the
         // coach glyph.
         decoration: BoxDecoration(
           color: AppColors.surfacePanel,

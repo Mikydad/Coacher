@@ -106,7 +106,7 @@ class _IntentionQuickAddSheetState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'PROMISE',
+            'FOR LATER',
             style: TextStyle(
               color: AppColors.fg54,
               fontSize: 11,
@@ -133,7 +133,7 @@ class _IntentionQuickAddSheetState
             onSubmitted: (_) => _save(),
           ),
           const SizedBox(height: 16),
-          _MicroLabel('WHEN-ISH'),
+          _MicroLabel('WHEN?'),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,

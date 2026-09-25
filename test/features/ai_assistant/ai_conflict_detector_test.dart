@@ -187,7 +187,7 @@ void main() {
       final result = await detector.detect([action]);
 
       expect(result.softConflicts, isNotEmpty);
-      expect(result.softConflicts.first, contains('sleep window'));
+      expect(result.softConflicts.first, contains('quiet hours'));
       expect(result.hardBlocks, isEmpty);
     });
 

@@ -42,10 +42,10 @@ class AddTaskSleepExtrasSection extends StatelessWidget {
             AddTaskToggleRow(
               icon: Icons.bedtime_rounded,
               iconColor: AddTaskColors.accentDim,
-              title: 'Sleep window & quiet mode',
+              title: 'Quiet hours & status',
               subtitle: Platform.isIOS
-                  ? 'Updates daily sleep window; offers in-app Sleep or DND'
-                  : 'Updates daily sleep window and in-app quiet mode',
+                  ? 'Updates your quiet hours; offers in-app Sleep or DND status'
+                  : 'Updates your quiet hours and in-app quiet mode',
               value: syncSleepWindowAndQuietMode,
               onChanged: onSyncChanged,
             ),

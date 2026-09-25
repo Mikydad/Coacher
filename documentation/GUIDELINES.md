@@ -4257,3 +4257,90 @@ not silent reversal.
   notification, so the two never disagree. (3) Removing a member shows
   "Removing <name>…" at once (the callable cold-starts), then "removed" or
   a failure with Retry, on a messenger captured up front.
+
+- **2026-09-25 · Plain-language rename (tester feedback pass).** Miko
+  brought a 14-page tester document; the diagnosis it made is now a rule:
+  *copy names the user's benefit, not the system* ("Reminder status", not
+  "Reminder health"; "SidePal noticed", not "Inferred"). Every rename is
+  display-only — enum ids, `modeRefId` values, Firestore paths, storage
+  values and guide ids are untouched. Settled with Miko:
+  (1) **Circle → Group** app-wide in user-facing copy, including stakes
+  ("shared with your group"), server error strings and the pre-reveal push;
+  the bottom tab stays "Community". Help keywords keep "circle" as a
+  synonym so old habits still match.
+  (2) **The day streak is retired from every user-facing surface** (Home,
+  Profile, group header/list/Info, activity events, help copy, "Streaks
+  matter", the Vacation description) and the **streak coaching-insight
+  family is retired** rather than reworded (no more "Streak at risk" cards
+  or pushes). Reason: it competed with the product's real question — did
+  your actions match your commitments — and its rules were unexplainable
+  (a day with nothing planned broke it; the threshold moved with
+  strictness; today counted with no yesterday fallback, so Home read 0
+  for most of the day). Engines and stored data stay, silent. The
+  **per-goal streak on the goal detail screen stays** — a different metric.
+  (3) **Discipline Mode → Strictness** ("How strict should SidePal be when
+  you don't follow your plan?"), not "Accountability level", which would
+  have collided with the Accountability tab. Options stay Flexible /
+  Disciplined / Extreme; descriptions now say what each does to unfinished
+  tasks (Extreme: done or moved with a reason, no skipping, focus session
+  before ticking — "surrender" was wrong; it exists only for stakes).
+  (4) **Coach Tone → Coach style**, options Supportive / Balanced /
+  Direct / Tough, ending the double meaning of "Disciplined".
+  (5) **Attention mode → Status** (Meeting / Focus / Sleep / Vacation /
+  DND are statuses, not "pause reminders"); **Sleep window → Quiet hours**
+  everywhere it surfaces (settings, Home banner, Sleep-mode "Until
+  morning", Add-task extras, AI conflict warning).
+  (6) Home: **Flow now → state labels IN FOCUS / PAUSED / UP NEXT**;
+  "7-day trend" → **"This week so far"** (the chart has been Monday→today
+  since 2026-09-12; the old label and its help sheet were wrong);
+  "N tasks need you" → **"N unfinished tasks · Tasks you didn't complete or
+  reschedule."** with a fixed subtitle (the AI headline no longer replaces
+  it); **Promises → For later** (the word "promise" meant three things:
+  this list, the stake pledge, and weekly commitments), quick-add
+  **WHEN-ISH → WHEN?**, **On your radar → Suggested for later**, both with
+  help dots (new guides `forLater`, `suggestedForLater`).
+  (7) Time: **Time → Your Time**; the action verb is **Log** everywhere
+  (button "Log activity", sheet LOG, "+" tooltip) and "track" survives only
+  in the benefit line ("Track your time" pill); the sheet asks "What are
+  you doing right now?" only for a fresh log; the Timeline header is gone
+  (the day pager already names the day).
+  (8) Accountability: "On the line / Decided" → **In progress /
+  Finished**; KEPT → COMPLETED; "Choose your accountability" → "How do you
+  want to stay accountable?"; "Before you commit / STAKE — NO UNDO / THE
+  SERVER DECIDES — ALWAYS" → **"What happens if you fail / Your photo will
+  be shared / It happens automatically"** with the reveal window
+  interpolated (it is 5 min–24 h, never a fixed hour) and the mercy-veto
+  sentence reconciled beside "You can't cancel the stake after you
+  commit."; "Hold to give your word" → **"Hold to commit"**; the WHY
+  subline promised "You'll see these words every time you log a day",
+  which was false (the why is shown only on the review page and the
+  public card) — Miko chose **honest copy over a new feature**: "Write why
+  this matters to you, in your own words." (+ "It goes on your commitment
+  card." for public commitments). "Pledge card" → **commitment card**; the
+  post-start screen says "Your commitment is ready — Share card". The
+  "your word" wording stays on detail/result screens as flavour.
+  (9) Groups: tabs **Chat · Updates · Weekly commitments · Challenges ·
+  Members · Info**, one intro line at the top ("Keep each other
+  accountable — talk, share progress, make commitments, and take on
+  challenges."), the AI **pulse is a "group summary"**. Verified before
+  deciding: a moderator *can* generate one end-to-end (route, JSON mode,
+  rules, deployed index all checked); the tester who asked "how do I
+  generate it?" was a non-moderator reading "generate one below" with no
+  button. Now non-moderators read "your moderator can generate one"; the
+  button stays moderator-only. The dead "Weekly summary" notification
+  toggle is hidden. Vote copy is now truthful: the vote decides whether a
+  *proposed* challenge starts, not whether someone completed it.
+  (10) What SidePal knows → **"What SidePal knows about you"**; the four
+  provenance badges read **You told SidePal / You confirmed / SidePal
+  noticed / SidePal's guess** (amber guess keeps its trust role; "noticed"
+  maps to the deterministic OBSERVED source, "guess" to AI-inferred);
+  Timeline → **History** (the Time page owns "timeline").
+  (11) Reminder health → **Reminder status**: one status line, one
+  permission line, "Check again"; the six rows live behind "Details".
+  Coaching insights lose the "Sent today N/3" budget line.
+  *Not renamed:* "Coach AI" (not in the tester doc), money stake copy
+  (flag off). *Bugs fixed in passing:* other members' weekly commitments
+  were headed by raw user ids; the "photo is gone" success banner showed
+  on public commitments; the Profile quiet-hours row showed "8:00 AM" when
+  unset; the community intro said "Circles tab" while the tab is Community;
+  the Direction guide claimed it "saves as you type".

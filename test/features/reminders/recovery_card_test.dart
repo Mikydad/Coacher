@@ -65,7 +65,7 @@ void main() {
     await tester.pump();
 
     expect(find.byType(Card), findsNothing);
-    expect(find.textContaining('need you'), findsNothing);
+    expect(find.textContaining('unfinished'), findsNothing);
   });
 
   testWidgets('leads with a count and lists the task', (tester) async {
@@ -78,7 +78,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('1 task needs you'), findsOneWidget);
+    expect(find.text('1 unfinished task'), findsOneWidget);
     expect(find.text('Study'), findsOneWidget);
     expect(find.text('Do now'), findsOneWidget);
   });
@@ -96,7 +96,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('2 tasks need you'), findsOneWidget);
+    expect(find.text('2 unfinished tasks'), findsOneWidget);
   });
 
   testWidgets(

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/presentation/app_card.dart';
 import '../../../core/presentation/app_colors.dart';
+import '../../education/presentation/help_dot.dart';
 import '../application/activity_moment_rules.dart';
 import '../application/intentions_providers.dart';
 import '../data/opportunity_plan_repository.dart';
@@ -80,7 +81,11 @@ class _PromisesSectionState extends ConsumerState<PromisesSection> {
                 padding: const EdgeInsets.fromLTRB(18, 10, 10, 10),
                 child: Row(
                   children: [
-                    const AppSectionLabel('PROMISES'),
+                    // "For later" to the user (plain-language pass,
+                    // 2026-09-25); the code keeps its promise/intention
+                    // names.
+                    const AppSectionLabel('FOR LATER'),
+                    const HelpDot('forLater', dense: true),
                     const Spacer(),
                     AppCircleIconButton(
                       icon: Icons.add_rounded,
@@ -88,7 +93,7 @@ class _PromisesSectionState extends ConsumerState<PromisesSection> {
                       iconSize: 20,
                       shadow: false,
                       background: AppColors.surfaceLight,
-                      tooltip: 'Add a promise',
+                      tooltip: 'Add something for later',
                       onPressed: () => showIntentionQuickAddSheet(context),
                     ),
                   ],

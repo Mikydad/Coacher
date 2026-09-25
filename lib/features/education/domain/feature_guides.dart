@@ -81,11 +81,11 @@ abstract final class FeatureGuides {
     oneLiner: 'Plan your day as small, doable steps.',
     what:
         'Tasks are the building blocks of your day in SidePal. Each one has '
-        'a title, an optional time and duration, and a discipline mode that '
+        'a title, an optional time and duration, and a strictness level that '
         'decides how firmly the app holds you to it.',
     why:
         'A day planned as concrete steps gets done; a vague to-do list gets '
-        'postponed. Completing tasks feeds your progress score and streak.',
+        'postponed. Completing tasks feeds your progress score.',
     howSteps: [
       'Tap ADD TASK on the Home screen.',
       'Give it a name — a time and duration help the app plan around it.',
@@ -107,7 +107,7 @@ abstract final class FeatureGuides {
     ],
     suggestedPrompts: [
       'Add a 30 minute workout tomorrow morning',
-      'What is Discipline Mode?',
+      'What is Strictness?',
       'How does the progress score work?',
     ],
     tryItRoute: '/add-task',
@@ -115,30 +115,35 @@ abstract final class FeatureGuides {
 
   static const disciplineModes = FeatureGuide(
     id: 'disciplineModes',
-    title: 'Discipline Modes',
+    title: 'Strictness',
     emoji: '🎚️',
-    oneLiner: 'Choose how firmly the app holds you to your plan.',
+    oneLiner: "How strict SidePal is when you don't follow your plan.",
     what:
-        'Discipline Modes set how strictly SidePal treats your tasks — '
-        'Flexible gives gentle nudges, Disciplined asks you to account for '
-        'anything unfinished, and Extreme requires a completed focus '
-        'session before a task can be checked off. New tasks inherit a mode '
-        'from your default, scaled by how important the task is.',
+        'Strictness sets what SidePal asks of you when a task goes '
+        'unfinished. Flexible lets you move or dismiss it easily. '
+        'Disciplined asks for a decision — do it, move it, or say why. '
+        'Extreme requires it to be done or moved with a reason, with no '
+        'skipping, and a focus session before a task can be ticked off. '
+        'New tasks inherit the level from your default, scaled by how '
+        'important the task is.',
     why:
         'One size never fits every day. Flexible keeps easy days '
-        'guilt-free, while stricter modes protect the commitments you '
+        'guilt-free, while stricter levels protect the commitments you '
         'refuse to negotiate with yourself.',
     howSteps: [
-      'Open Profile and find the Discipline Modes section.',
-      'Pick a default mode — new tasks inherit it.',
-      'Override the mode on any single task from its detail screen.',
-      'Try a stricter mode on just your most important task first.',
+      'Open Profile and find the Strictness section.',
+      'Pick a default level — new tasks inherit it.',
+      'Override the level on any single task from its detail screen.',
+      'Try a stricter level on just your most important task first.',
     ],
     tips: [
       'Start flexible and tighten up — strictness you abandon teaches the '
           'wrong habit.',
     ],
     keywords: [
+      'strictness',
+      'strictness level',
+      'how strict',
       'discipline mode',
       'discipline modes',
       'enforcement',
@@ -150,7 +155,7 @@ abstract final class FeatureGuides {
       'mode should i use',
     ],
     suggestedPrompts: [
-      'Which discipline mode fits a busy week?',
+      'Which strictness fits a busy week?',
       'How do reminders work?',
       'What is Focus mode?',
     ],
@@ -169,7 +174,7 @@ abstract final class FeatureGuides {
     why:
         'Deep work happens one task at a time. A running timer turns "I '
         'should work on this" into a commitment with a finish line — and '
-        'Extreme-mode tasks require a completed session to count.',
+        'Extreme tasks require a completed session to count.',
     howSteps: [
       'Tap START FOCUS on the Home screen.',
       'Pick the task you want to work on.',
@@ -189,7 +194,7 @@ abstract final class FeatureGuides {
     ],
     suggestedPrompts: [
       'Start a focus session for my next task',
-      'What is Discipline Mode?',
+      'What is Strictness?',
       'How does the progress score work?',
     ],
     tryItRoute: '/focus',
@@ -202,7 +207,7 @@ abstract final class FeatureGuides {
     oneLiner: 'The app nudges you when a task is due.',
     what:
         'Any task with a time can remind you when it starts. Reminders '
-        'respect your sleep window and quiet hours, and adapt if you keep '
+        'respect your quiet hours and your status, and adapt if you keep '
         'snoozing or ignoring them.',
     why:
         'The hardest part of a plan is remembering it at the right moment. '
@@ -210,7 +215,7 @@ abstract final class FeatureGuides {
     howSteps: [
       'When adding a task, switch the reminder on and pick a time.',
       'Allow notifications when the app asks — no permission, no nudges.',
-      'Tune quiet hours in Profile under Reminder Settings.',
+      'Tune quiet hours in Profile under Notifications & Reminders.',
     ],
     tips: [
       'Set reminders a few minutes before the task, not at the deadline.',
@@ -228,7 +233,7 @@ abstract final class FeatureGuides {
     suggestedPrompts: [
       'Add a reminder to stretch at 4pm',
       'What is Plan Tomorrow?',
-      'Which discipline mode fits a busy week?',
+      'Which strictness fits a busy week?',
     ],
   );
 
@@ -240,7 +245,7 @@ abstract final class FeatureGuides {
     what:
         'Goals track something bigger than a day: a target (like "run '
         '20 km this month"), check-ins toward it, and the habits that '
-        'support it. Your goal activity drives the streak on Home.',
+        'support it. Your goal activity feeds your progress score on Home.',
     why:
         'Tasks answer "what now?"; goals answer "what for?". Progress you '
         'can see is progress you keep making.',
@@ -248,7 +253,7 @@ abstract final class FeatureGuides {
       'Open the Goals tab and create a goal.',
       'Give it a clear target and a deadline.',
       'Check in whenever you make progress.',
-      'Watch the streak and progress ring react on Home.',
+      'Watch the progress ring react on Home.',
     ],
     tips: [
       'One ambitious goal beats five vague ones.',
@@ -264,7 +269,7 @@ abstract final class FeatureGuides {
     ],
     suggestedPrompts: [
       'Create a goal to read 12 books this year',
-      'How does the streak work?',
+      'How does the progress score work?',
       'What are Tasks?',
     ],
     tryItTabIndex: MainTabIndex.goals,
@@ -288,7 +293,7 @@ abstract final class FeatureGuides {
       'Open Profile → Direction.',
       'Write a sentence for the year, the quarter, or the month — any can '
           'stay empty.',
-      'It saves as you type. Change it whenever what matters changes.',
+      'Tap Save. Change it whenever what matters changes.',
       'At the start of a month, SidePal quietly asks what your focus is.',
     ],
     tips: [
@@ -312,25 +317,27 @@ abstract final class FeatureGuides {
 
   static const time = FeatureGuide(
     id: 'time',
-    title: 'Time',
+    title: 'Your Time',
     emoji: '⏱️',
-    oneLiner: 'Record your day. See where your time went.',
+    oneLiner: 'See how you spent your time today or this week.',
     what:
-        'Tap Track on Home and say what you are doing — "Gym", '
-        '"Scrolling", "Working on SidePal". SidePal stamps the time; the '
-        'next thing you log ends the previous one, so you never type '
-        'durations. The Time page shows the day as a timeline with the '
-        'gaps you did not log left honest, plus a summary at the bottom.',
+        'Tap "Track your time" on Home and say what you are doing right '
+        'now — "Gym", "Scrolling", "Working on SidePal". SidePal stamps '
+        'the time; the next thing you log ends the previous one, so you '
+        'never type durations. The Your Time page shows your day as a '
+        'timeline with the gaps you did not log left honest, plus a '
+        'summary at the bottom.',
     why:
         'Plans say what you meant to do. The timeline says what you '
         'actually did. Seeing the two side by side is how you notice your '
         'own patterns — SidePal never scores or judges them.',
     howSteps: [
-      'On Home, tap "Track what you\'re doing".',
-      'Type what you are doing, or tap one of your recent activities.',
+      'On Home, tap "Track your time".',
+      'Type what you are doing right now, or tap one of your recent '
+          'activities.',
       'Optionally add how long you intend to spend.',
-      'Tap Track. Log the next thing when it changes.',
-      'Open Profile → Time to see the timeline and summary.',
+      'Tap Log. Log the next thing when it changes.',
+      'Open Profile → Your Time to see your day and the summary.',
     ],
     tips: [
       'Imperfect tracking is fine — three entries a day already tell a story.',
@@ -338,7 +345,9 @@ abstract final class FeatureGuides {
     ],
     keywords: [
       'time',
+      'your time',
       'time tracking',
+      'log time',
       'track',
       'timeline',
       'where did my time go',
@@ -346,34 +355,37 @@ abstract final class FeatureGuides {
       'log activity',
     ],
     suggestedPrompts: [
-      'What is the Time page?',
-      'How is Time different from the focus timer?',
+      'What is the Your Time page?',
+      'How is Your Time different from the focus timer?',
     ],
     tryItRoute: '/time',
   );
 
   static const circles = FeatureGuide(
     id: 'circles',
-    title: 'Circles',
+    title: 'Groups',
     emoji: '👥',
     oneLiner: 'Small accountability groups that keep you honest.',
     what:
-        'A Circle is a private group where members share weekly '
-        'commitments, post proof of their work, chat, and run challenges '
-        'together.',
+        'A Group is a private space where members keep each other '
+        'accountable — talk, share progress, make weekly commitments, and '
+        'take on challenges together.',
     why:
         'Telling someone your plan doubles the chance you follow it. '
-        'Circles make your progress visible to people who care.',
+        'Groups make your progress visible to people who care.',
     howSteps: [
-      'Open the Circles tab and create or join a circle.',
+      'Open the Community tab and create or join a group.',
       'Set your weekly commitments so members can see them.',
       'Post a photo proof when you complete something.',
       'Join a challenge to compete together.',
     ],
     tips: [
-      'Small circles work best — 3 to 6 people who actually know you.',
+      'Small groups work best — 3 to 6 people who actually know you.',
     ],
     keywords: [
+      'group',
+      'groups',
+      'accountability group',
       'circle',
       'circles',
       'community',
@@ -402,8 +414,8 @@ abstract final class FeatureGuides {
         'day is a ring, and tapping one shows what that day asked of you '
         'and what you did. Coaching insights sit underneath.',
     why:
-        'What gets measured gets improved. Seeing a streak you built is '
-        'the strongest reason not to break it.',
+        'What gets measured gets improved. One honest number a day beats '
+        'a page of statistics.',
     howSteps: [
       'Complete tasks and goal check-ins — the numbers update by '
           'themselves.',
@@ -423,12 +435,11 @@ abstract final class FeatureGuides {
       'score',
       'progress score',
       'discipline score',
-      'streak',
       'completion rate',
     ],
     suggestedPrompts: [
       'How am I doing this week?',
-      'How does the streak work?',
+      'How does the progress score work?',
       'What are Goals?',
     ],
     tryItTabIndex: MainTabIndex.profile, // Progress lives in Profile now
@@ -486,7 +497,7 @@ abstract final class FeatureGuides {
       'Open the Coach tab.',
       'Say what you want in your own words — no special commands.',
       'Review the plan it proposes, then confirm or tweak it.',
-      'Ask it anything about the app, like "what is Discipline Mode?".',
+      'Ask it anything about the app, like "what is Strictness?".',
     ],
     tips: [
       'Give times and durations for the best plans.',
@@ -503,7 +514,7 @@ abstract final class FeatureGuides {
     suggestedPrompts: [
       'Plan my morning with a workout and reading',
       'What is Plan Tomorrow?',
-      'Which discipline mode fits a busy week?',
+      'Which strictness fits a busy week?',
     ],
     tryItRoute: '/coach', // Coach is a sheet now; the route presents it
   );
@@ -523,7 +534,8 @@ abstract final class FeatureGuides {
     goalsHabitsBreakdown,
     taskIntegrity,
     coachingFocus,
-    streakAtRisk,
+    forLater,
+    suggestedForLater,
     weeklyCommitments,
     challengeVoting,
     cycleProgress,
@@ -537,22 +549,23 @@ abstract final class FeatureGuides {
 
   static const flowNow = FeatureGuide(
     id: 'flowNow',
-    title: 'Flow Now',
+    title: 'Up Next',
     emoji: '🌊',
     oneLiner: 'The one task you should be doing right now.',
     what:
-        'Flow Now watches your day and surfaces the single task that fits '
-        'this moment — the one in progress, or the next one due. The label '
-        'shows the current time block and how many tasks are still open.',
+        'This strip shows the single task that fits this moment. It reads '
+        'IN FOCUS while a focus session is running, PAUSED when you have '
+        'paused one, and UP NEXT when nothing is running. The header shows '
+        'the current time block and how many tasks are still open.',
     why:
-        'Deciding what to do next is where momentum dies. Flow Now makes '
+        'Deciding what to do next is where momentum dies. The strip makes '
         'that decision for you, so you can act instead of scanning a list.',
     howSteps: [
       'Glance at the strip — it always shows your best next move.',
       'Tap it to jump into that task or start a focus session.',
     ],
     tips: ['If the strip feels wrong, check your task times — it follows them.'],
-    keywords: ['flow now', 'flow now strip', 'next task suggestion'],
+    keywords: ['up next', 'in focus strip', 'next task suggestion', 'flow now'],
     suggestedPrompts: ['What is Focus?', "Tell me about Today's Tasks"],
   );
 
@@ -560,22 +573,20 @@ abstract final class FeatureGuides {
     id: 'todaysProgress',
     title: "Today's Progress",
     emoji: '📈',
-    oneLiner: 'Your streak, score, and 7-day trend at a glance.',
+    oneLiner: 'Your score for today, and this week so far.',
     what:
-        'The big number is your day streak — consecutive days with real '
-        'progress. The percentage is how much of today\'s planned work is '
-        'done, weighted by how important each item is. The small chart is '
-        'your last 7 days.',
+        'The percentage is how much of today\'s planned work is done, '
+        'weighted by how important each item is. The small chart is this '
+        'week so far, Monday to today.',
     why:
-        'Seeing the streak you built is the strongest reason not to break '
-        'it. One honest glance beats a page of statistics.',
+        'One honest glance beats a page of statistics.',
     howSteps: [],
     tips: [
       'Partial completions count too — the score rewards honesty, not '
           'perfection.',
     ],
-    keywords: ["today's progress", 'todays progress', 'day streak number'],
-    suggestedPrompts: ['How am I doing this week?', 'How does the streak work?'],
+    keywords: ["today's progress", 'todays progress', 'this week so far'],
+    suggestedPrompts: ['How am I doing this week?', 'How does the progress score work?'],
   );
 
   static const todaysTasks = FeatureGuide(
@@ -589,14 +600,14 @@ abstract final class FeatureGuides {
         'you need to move or reshuffle a task.',
     why:
         'The list is your day made concrete — checking items off here is '
-        'what feeds your progress score and streak.',
+        'what feeds your progress score.',
     howSteps: [
       'Tap the circle next to a task when you complete it.',
       'Score honestly if asked — partial still counts.',
       'Use the swap icon when plans change instead of ignoring the task.',
     ],
     keywords: ["today's tasks", 'todays task list'],
-    suggestedPrompts: ['Add a 30 minute workout today', 'What is Flow Now?'],
+    suggestedPrompts: ['Add a 30 minute workout today', 'What is Up Next?'],
   );
 
   static const todaysGoals = FeatureGuide(
@@ -606,8 +617,7 @@ abstract final class FeatureGuides {
     oneLiner: 'Goal check-ins that are due today.',
     what:
         'This card shows the goals and habits with progress due today. '
-        'Checking in here moves the long-term goal forward and keeps your '
-        'streak alive.',
+        'Checking in here moves the long-term goal forward.',
     why:
         'Goals fail quietly when they never show up in your day. Surfacing '
         'them next to your tasks keeps the long game visible.',
@@ -616,7 +626,7 @@ abstract final class FeatureGuides {
       'Even a small check-in counts — consistency beats size.',
     ],
     keywords: ["today's goals", 'todays goal list', 'goal check-ins today'],
-    suggestedPrompts: ['What are Goals?', 'How does the streak work?'],
+    suggestedPrompts: ['What are Goals?', 'How does the progress score work?'],
   );
 
   static const weeklySummary = FeatureGuide(
@@ -628,7 +638,7 @@ abstract final class FeatureGuides {
         'Discipline is your completion for the selected period: 60% goals '
         'and habits, 40% tasks, weighted by importance, so a heavy day '
         'counts more than a light one. "Days met" counts the days that '
-        'cleared your discipline mode\'s bar; a day with nothing planned is '
+        'cleared your strictness level\'s bar; a day with nothing planned is '
         'quiet, not a failure. The chip compares you with the previous '
         'period.',
     why:
@@ -682,7 +692,7 @@ abstract final class FeatureGuides {
           'beats a long list you abandon.',
     ],
     keywords: ['task integrity', 'plan vs done', 'completion integrity'],
-    suggestedPrompts: ['How am I doing this week?', 'Which discipline mode fits a busy week?'],
+    suggestedPrompts: ['How am I doing this week?', 'Which strictness fits a busy week?'],
   );
 
   static const coachingFocus = FeatureGuide(
@@ -702,63 +712,87 @@ abstract final class FeatureGuides {
     suggestedPrompts: ['How am I doing this week?', 'What is Coach AI?'],
   );
 
-  static const streakAtRisk = FeatureGuide(
-    id: 'streakAtRisk',
-    title: 'Streak at Risk',
-    emoji: '⚠️',
-    oneLiner: 'A warning before your streak breaks — not after.',
+  static const forLater = FeatureGuide(
+    id: 'forLater',
+    title: 'For Later',
+    emoji: '🕰️',
+    oneLiner: 'Things you want to do without choosing an exact time.',
     what:
-        'This card appears when today is on track to end without the '
-        'progress that keeps your streak alive, while there\'s still time '
-        'to save it.',
+        'For Later holds the small things you mean to do soon — a call, a '
+        'message, an errand — without picking a clock time. Say roughly '
+        'when (today, tomorrow, this week, the weekend) and SidePal finds '
+        'a good moment and nudges you.',
     why:
-        'Streaks rarely break on hard days — they break on days you '
-        'forgot. A timely nudge is the difference.',
+        'Not everything deserves a slot in your plan. Parking it here '
+        'keeps it out of your head without letting it slip.',
     howSteps: [
-      'Complete any planned task or goal check-in before the day ends.',
+      'Tap + on the For Later card and type what you want to do.',
+      'Pick roughly when, then tap "Find me a good time".',
     ],
-    keywords: ['streak at risk', 'streak warning', 'save my streak'],
-    suggestedPrompts: ['What should I do right now?', 'How does the streak work?'],
+    tips: ['Errands can remind you when you head out the door.'],
+    keywords: ['for later', 'plan for later', 'without an exact time', 'find me a good time'],
+    suggestedPrompts: ['Remind me to call my mom this week', "Tell me about Today's Tasks"],
+  );
+
+  static const suggestedForLater = FeatureGuide(
+    id: 'suggestedForLater',
+    title: 'Suggested for Later',
+    emoji: '💡',
+    oneLiner: 'Things SidePal noticed you might want to do.',
+    what:
+        'These are ideas SidePal picked up from your chats and your days — '
+        'someone you mentioned wanting to call, an errand that came up. '
+        'Nothing here nudges you until you say so.',
+    why:
+        'Good intentions get lost in conversation. Keeping them visible '
+        'means you decide, instead of forgetting.',
+    howSteps: [
+      'Tap "Remind me" to move one onto your For Later list.',
+      'Tap the × to dismiss anything that does not fit.',
+    ],
+    keywords: ['suggested for later', 'sidepal noticed', 'suggestions for later'],
+    suggestedPrompts: ['Tell me about For Later', 'What does SidePal know about me?'],
   );
 
   static const weeklyCommitments = FeatureGuide(
     id: 'weeklyCommitments',
     title: 'Weekly Commitments',
     emoji: '🤝',
-    oneLiner: 'What you promised your circle this week.',
+    oneLiner: 'What you told your group you would get done this week.',
     what:
-        'Weekly Commitments are the 1-3 things you publicly commit to in '
-        'a circle each week. Members see each other\'s commitments and '
-        'progress — that\'s the accountability.',
+        'Weekly Commitments are the 1-3 things you commit to in a group '
+        'each week. Members see each other\'s commitments and progress — '
+        'that\'s the accountability.',
     why:
-        'A private plan is easy to abandon. A promise your friends can '
+        'A private plan is easy to abandon. A commitment your friends can '
         'see is not.',
     howSteps: [
       'Set 1-3 commitments at the start of the week.',
       'Mark progress as you go — members see it update.',
       'Keep them small enough that you\'d be embarrassed NOT to finish.',
     ],
-    keywords: ['weekly commitments', 'circle commitments', 'my commitments'],
-    suggestedPrompts: ['What are Circles?', 'Tell me about Challenge Voting'],
+    keywords: ['weekly commitments', 'group commitments', 'my commitments'],
+    suggestedPrompts: ['What are Groups?', 'Tell me about Challenge Voting'],
   );
 
   static const challengeVoting = FeatureGuide(
     id: 'challengeVoting',
     title: 'Challenge Voting',
     emoji: '🗳️',
-    oneLiner: 'Challenges start when the circle agrees they should.',
+    oneLiner: 'Challenges start when the group agrees they should.',
     what:
-        'New challenges wait in "Waiting for votes" until enough members '
-        'vote them in — then they move to Active and everyone\'s progress '
-        'counts toward the team total.',
+        'A proposed challenge waits for votes until enough members approve '
+        'it — then it moves to Active and everyone\'s progress counts '
+        'toward the team total. "Needs your vote" means you have not '
+        'voted on it yet.',
     why:
         'A challenge nobody chose is homework. Voting makes it a pact.',
     howSteps: [
       'Vote on pending challenges you\'d actually do.',
       'Once active, log progress — proofs keep it honest.',
     ],
-    keywords: ['challenge voting', 'waiting for votes', 'active challenges'],
-    suggestedPrompts: ['What are Circles?', 'Tell me about Weekly Commitments'],
+    keywords: ['challenge voting', 'waiting for votes', 'needs your vote', 'active challenges'],
+    suggestedPrompts: ['What are Groups?', 'Tell me about Weekly Commitments'],
   );
 
   static const cycleProgress = FeatureGuide(
@@ -835,21 +869,21 @@ abstract final class FeatureGuides {
 
   static const coachTone = FeatureGuide(
     id: 'coachTone',
-    title: 'Coach Tone',
+    title: 'Coach Style',
     emoji: '🗣️',
-    oneLiner: 'How the coach talks to you — gentle, balanced, or blunt.',
+    oneLiner: 'How the coach talks to you — supportive, balanced, direct, or tough.',
     what:
-        'Coach Tone sets the personality of nudges, briefs, and Coach AI '
-        'replies — from supportive encouragement to no-excuses direct.',
+        'Coach style sets the personality of nudges, briefs, and coach '
+        'replies — from gentle encouragement to tough, no-excuses honesty.',
     why:
         'The same message lands differently on different people. Pick the '
         'voice you\'ll actually listen to.',
     howSteps: [
-      'Pick the tone that matches what gets through to you.',
+      'Pick the style that matches what gets through to you.',
       'Change it any time — messages adapt immediately.',
     ],
-    keywords: ['coach tone', 'coach personality', 'coaching style'],
-    suggestedPrompts: ['What is Coach AI?', 'Which discipline mode fits a busy week?'],
+    keywords: ['coach style', 'coach tone', 'coach personality', 'coaching style'],
+    suggestedPrompts: ['What is Coach AI?', 'Which strictness fits a busy week?'],
   );
 
   static const coreOptimization = FeatureGuide(
@@ -865,11 +899,11 @@ abstract final class FeatureGuides {
         'An app that nudges you at the wrong times gets muted. Five '
         'minutes here makes every reminder land better.',
     howSteps: [
-      'Set your sleep window in Reminder Settings so nudges respect it.',
+      'Set your quiet hours in Notifications & Reminders so nudges respect them.',
       'Pick the appearance you like — everything else is optional.',
     ],
     keywords: ['core optimization', 'optimization settings', 'app settings section'],
-    suggestedPrompts: ['How do reminders work?', 'Tell me about Coach Tone'],
+    suggestedPrompts: ['How do reminders work?', 'Tell me about Coach Style'],
   );
 
   static const deepWork = FeatureGuide(
@@ -899,7 +933,7 @@ abstract final class FeatureGuides {
     ],
     suggestedPrompts: [
       'What is Focus?',
-      'Tell me about Discipline Modes',
+      'Tell me about Strictness',
     ],
   );
 }

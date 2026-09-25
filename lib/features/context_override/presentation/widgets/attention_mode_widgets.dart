@@ -49,7 +49,7 @@ class AttentionModeSheetHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Set attention mode',
+          'Set your status',
           style: TextStyle(
             color: AppColors.fg,
             fontSize: 24,
@@ -213,7 +213,7 @@ class AttentionModeActivateButton extends StatelessWidget {
           ),
         ),
         child: const Text(
-          'Activate',
+          'Set status',
           style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
         ),
       ),

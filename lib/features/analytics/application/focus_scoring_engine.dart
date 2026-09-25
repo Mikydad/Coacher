@@ -299,9 +299,12 @@ FocusReason deriveFocusReason(FocusCandidate candidate) {
   }
 
   switch (insight.insightType) {
+    // Retired streak family (2026-09-25): never generated, and filtered out
+    // before scoring; mapped to non-streak reasons so a stale cached row can
+    // never surface FocusReason.imminentStreakRisk / reinforcingActiveStreak.
     case InsightType.streakRiskWarning:
     case InsightType.fragileStreakAlert:
-      return FocusReason.imminentStreakRisk;
+      return FocusReason.consistencyBreakdownAlert;
     case InsightType.highestMomentumLeverage:
     case InsightType.strongStreakPraise:
     case InsightType.consistentBehaviorPraise:

@@ -26,15 +26,17 @@ class CoachAiSettingsScreen extends StatelessWidget {
             children: [
               SettingRow(
                 icon: Icons.auto_awesome_rounded,
-                title: 'Coach AI',
-                subtitle: 'Your coach, from anywhere',
+                title: 'Your coach',
+                subtitle: 'Chat with your coach',
                 trailing: const SettingRowChevron(),
                 onTap: () => showCoachAiSheet(context),
               ),
               SettingRow(
                 icon: Icons.psychology_outlined,
-                title: 'What SidePal knows',
-                subtitle: 'Remembered facts, people & summaries',
+                title: 'What SidePal knows about you',
+                subtitle:
+                    'Review what SidePal remembers and uses to personalize '
+                    'suggestions.',
                 trailing: const SettingRowChevron(),
                 onTap: () => Navigator.pushNamed(
                   context,
@@ -46,8 +48,8 @@ class CoachAiSettingsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          'What SidePal knows is fully yours — review, edit, or delete any '
-          'remembered fact at any time.',
+          "You're always in control of what SidePal remembers. You can "
+          'review, edit, or delete it anytime.',
           style: TextStyle(
             fontSize: 11,
             color: AppColors.textSoft.withValues(alpha: 0.7),

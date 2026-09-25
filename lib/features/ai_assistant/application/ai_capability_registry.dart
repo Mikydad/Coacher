@@ -26,6 +26,8 @@ abstract final class AiCapabilityRegistry {
     _UnsupportedDomain(
       id: 'community',
       keywords: [
+        'group',
+        'groups',
         'circle',
         'circles',
         'community',
@@ -34,8 +36,8 @@ abstract final class AiCapabilityRegistry {
         'accountability partner',
       ],
       message:
-          'Community and Circles are not available in Coach AI yet — coming later. '
-          'You can open Circles from the app to manage those features.',
+          'Community and Groups are not available in Coach AI yet — coming later. '
+          'You can open the Community tab in the app to manage those features.',
       suggestedPrompts: ['What\'s my plan for tomorrow?'],
     ),
     _UnsupportedDomain(
@@ -120,7 +122,7 @@ abstract final class AiCapabilityRegistry {
       "tracking against them.\n"
       "🔎 Answer questions — what's on today, tomorrow, or this week.\n"
       "🧘 Protect your focus — start focus, sleep, or do-not-disturb windows.\n\n"
-      "Not in my hands yet: Circles/community, billing, and account settings — "
+      "Not in my hands yet: Groups/community, billing, and account settings — "
       "those live in the app's own screens.";
 
   static const capabilitySuggestedPrompts = [

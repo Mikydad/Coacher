@@ -317,7 +317,7 @@ void main() {
       final repo = _FakeRepo();
       await tester.pumpWidget(_app(const Scaffold(body: TrackPill()), repo));
       await tester.pump();
-      expect(find.text("Track what you're doing"), findsOneWidget);
+      expect(find.text('Track your time'), findsOneWidget);
 
       // Started a minute ago → ongoing.
       await repo.upsert(
@@ -338,7 +338,7 @@ void main() {
       ]);
       await tester.pumpWidget(_app(const Scaffold(body: TrackPill()), repo));
       await tester.pump();
-      expect(find.text("Track what you're doing"), findsOneWidget);
+      expect(find.text('Track your time'), findsOneWidget);
     });
   });
 
@@ -568,7 +568,7 @@ void v12Tests() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('time_observation')), findsOneWidget);
       expect(find.text('Most of your focused work happened after 9 PM.'), findsOneWidget);
-      expect(find.text('INFERRED'), findsOneWidget);
+      expect(find.text("SIDEPAL'S GUESS"), findsOneWidget);
     });
   });
   group('Export sheet', () {

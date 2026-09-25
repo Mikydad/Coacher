@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/presentation/app_card.dart';
 import '../../../core/presentation/app_colors.dart';
+import '../../education/presentation/help_dot.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../analytics/application/insight_generation_providers.dart';
 import '../../analytics/domain/models/generated_insight.dart';
@@ -55,8 +56,9 @@ class _OnYourRadarSectionState extends ConsumerState<OnYourRadarSection> {
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Row(
               children: [
-                AppSectionLabel('ON YOUR RADAR · $count'),
-                const SizedBox(width: 6),
+                AppSectionLabel('SUGGESTED FOR LATER · $count'),
+                const HelpDot('suggestedForLater', dense: true),
+                const SizedBox(width: 2),
                 AnimatedRotation(
                   turns: _expanded ? 0.5 : 0,
                   duration: const Duration(milliseconds: 260),
@@ -164,7 +166,7 @@ class _ObservationRow extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'INFERRED',
+                  'SidePal noticed',
                   style: TextStyle(
                     color: AppColors.fg54,
                     fontSize: 9,

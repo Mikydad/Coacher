@@ -325,6 +325,40 @@ void main() {
       );
       expect(result.evaluations.first.accepted, isFalse);
     });
+
+    test('retired streak-family insights are never selected or notified', () {
+      final now = DateTime(2026, 5, 7, 9);
+      for (final type in kRetiredInsightTypes) {
+        final result = selectDeliveryDecision(
+          insights: <GeneratedInsight>[
+            _insight(id: 'retired', confidence: 1.0, insightType: type),
+          ],
+          context: DeliverySelectionContext(
+            now: now,
+            scopeId: '2026-05-07',
+            preferredSurface: DeliverySurface.notification,
+          ),
+        );
+        expect(result.decision.selectedPrimaryInsightId, isNull, reason: type.name);
+        expect(result.decision.shouldNotify, isFalse, reason: type.name);
+        expect(result.evaluations, isEmpty, reason: type.name);
+      }
+
+      // A retired row never outranks a live one, even at higher confidence.
+      final mixed = selectDeliveryDecision(
+        insights: <GeneratedInsight>[
+          _insight(
+            id: 'retired',
+            confidence: 1.0,
+            insightType: InsightType.streakRiskWarning,
+          ),
+          _insight(id: 'live', confidence: 0.8),
+        ],
+        context: DeliverySelectionContext(now: now, scopeId: '2026-05-07'),
+      );
+      expect(mixed.decision.selectedPrimaryInsightId, 'live');
+      expect(mixed.decision.selectedSecondaryInsightId, isNull);
+    });
   });
 }
 
@@ -333,18 +367,19 @@ GeneratedInsight _insight({
   InsightPriority priority = InsightPriority.high,
   double confidence = 0.9,
   InsightAction action = InsightAction.focus,
+  InsightType insightType = InsightType.habitTooHard,
 }) {
   return GeneratedInsight(
     insightId: id,
     scopeType: InsightScopeType.global,
     scopeId: '2026-05-07',
-    insightType: InsightType.streakRiskWarning,
+    insightType: insightType,
     insightBucket: InsightBucket.risk,
     priority: priority,
     messageKey: 'k',
     message: 'fallback',
     action: action,
-    linkedPatternCodes: const <String>['streakRisk'],
+    linkedPatternCodes: const <String>['tooHard'],
     confidence: confidence,
     detectedAtMs: 1,
     sourceWindowStartDateKey: '2026-05-01',

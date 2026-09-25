@@ -15,8 +15,6 @@ import '../domain/models/activity_feed_item.dart';
 import '../domain/models/circle_enums.dart';
 import 'user_circle_membership_service.dart';
 
-const _kStreakMilestones = {7, 14, 30, 60, 100};
-
 /// Observes existing data providers (read-only) and fans out
 /// [ActivityFeedItem]s to every circle the user belongs to.
 ///
@@ -39,9 +37,6 @@ class CircleActivityBridgeService {
   final UserCircleMembershipService _membershipSvc;
   final String Function() _currentUserId;
   final String Function() _currentDisplayName;
-
-  // Tracks previous streak values to detect milestone crossings.
-  final Map<String, int> _lastKnownStreak = {};
 
   // Tracks task IDs already posted today to avoid duplicates in-session.
   final Set<String> _seenCompletedTaskIds = {};
@@ -150,32 +145,6 @@ class CircleActivityBridgeService {
       }
     } catch (e) {
       debugPrint('[CircleActivityBridge] task completion error: $e');
-    }
-  }
-
-  /// Called externally when a habit streak value changes.
-  /// Posts a [habitStreakReached] event if the new streak hits a milestone.
-  Future<void> checkHabitStreak({
-    required String habitId,
-    required String habitTitle,
-    required int currentStreak,
-  }) async {
-    try {
-      final prev = _lastKnownStreak[habitId] ?? 0;
-      _lastKnownStreak[habitId] = currentStreak;
-
-      if (currentStreak <= prev) return;
-      if (!_kStreakMilestones.contains(currentStreak)) return;
-
-      await _fanOut(
-        eventType: ActivityEventType.habitStreakReached,
-        entityId: habitId,
-        entityTitle: habitTitle,
-        value: '$currentStreak',
-        dateKey: DateKeys.todayKey(),
-      );
-    } catch (e) {
-      debugPrint('[CircleActivityBridge] habit streak error: $e');
     }
   }
 

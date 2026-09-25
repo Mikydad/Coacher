@@ -34,7 +34,7 @@ Future<bool> ensureRegisteredForCircleAction(
       ),
       content: Text(
         'You need an account to $actionLabel. '
-        'Browsing circles stays free — log in or sign up to take part.',
+        'Browsing groups stays free — log in or sign up to take part.',
         style: TextStyle(color: AppColors.textMuted),
       ),
       actions: [

@@ -537,7 +537,13 @@ class _BodyState extends ConsumerState<_Body> {
         AppColors.amber,
       ),
       StakeChallengeStatus.completedSuccess => (
-        'You kept your word. The photo is gone — nobody ever saw it.',
+        switch (c.type) {
+          StakeChallengeType.soloPhoto =>
+            'You kept your word. The photo is gone — nobody ever saw it.',
+          StakeChallengeType.soloPublic =>
+            'You kept your word. Your result card is ready to share.',
+          _ => 'You kept your word.',
+        },
         AppColors.statusGreen,
       ),
       StakeChallengeStatus.completedForfeit => ('Forfeited.', AppColors.danger),
@@ -902,7 +908,7 @@ class _BodyState extends ConsumerState<_Body> {
     final terminal = c.status.isTerminal;
     final (headline, sub, cta) = switch (c.status) {
       StakeChallengeStatus.completedSuccess => (
-        'Your victory card is ready',
+        'Your result card is ready',
         'You called your shot and hit it. Let them see.',
         'View & share',
       ),
@@ -917,9 +923,9 @@ class _BodyState extends ConsumerState<_Body> {
         'View & share',
       ),
       _ => (
-        'Your word is the stake',
-        'The pledge card is out there. Re-share it any time.',
-        'View pledge card',
+        'Your commitment is public',
+        'Your commitment card is out there. Re-share it any time.',
+        'View commitment card',
       ),
     };
     final tint = switch (c.status) {
@@ -1157,7 +1163,7 @@ class _BodyState extends ConsumerState<_Body> {
         const SizedBox(height: 8),
         Text(
           'Did they really do it? Silence counts as a confirm after 24h; a '
-          'dispute sends it to a circle vote.',
+          'dispute sends it to a group vote.',
           style: TextStyle(color: AppColors.textSoft, fontSize: 12.5),
         ),
         const SizedBox(height: 10),
@@ -1201,7 +1207,7 @@ class _BodyState extends ConsumerState<_Body> {
           SnackBar(
             content: Text(
               dispute
-                  ? 'Disputed — the circle votes for the next 48h.'
+                  ? 'Disputed — the group votes for the next 48h.'
                   : 'Confirmed.',
             ),
           ),
@@ -1264,7 +1270,7 @@ class _BodyState extends ConsumerState<_Body> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Your photo is live in the circle — $leftLabel left. It deletes '
+            'Your photo is live in the group — $leftLabel left. It deletes '
             'itself when the window closes.',
             style: TextStyle(
               color: AppColors.textPrimary,
@@ -1420,7 +1426,7 @@ class _BodyState extends ConsumerState<_Body> {
               ? 'On this phone it looks like you made it. The server decides '
                     'at $decidesAt; evidence synced late still counts until then.'
               : "It looks like this didn't make it. Your photo posts to the "
-                    'circle at $decidesAt unless you act first.',
+                    'group at $decidesAt unless you act first.',
           style: TextStyle(
             color: AppColors.textSoft,
             fontSize: 13,

@@ -55,11 +55,12 @@ enum EnforcementMode {
   String get description {
     switch (this) {
       case EnforcementMode.flexible:
-        return 'Reminders are gentle. Missing a day is okay.';
+        return 'Plans can change. Unfinished tasks are easy to move or dismiss.';
       case EnforcementMode.disciplined:
-        return 'Hold me accountable. Streaks matter.';
+        return 'Unfinished tasks need a decision — do them, move them, or say why.';
       case EnforcementMode.extreme:
-        return 'No excuses. Follow up until I act.';
+        return 'Unfinished tasks must be done or moved with a reason. No skipping, '
+            'and a focus session is required before ticking a task off.';
     }
   }
 }

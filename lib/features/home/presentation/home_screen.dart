@@ -25,7 +25,6 @@ import '../../analytics/application/analytics_event_logger.dart';
 import '../../analytics/application/progress_selection.dart';
 import '../../analytics/domain/progress_period.dart';
 import '../../analytics/application/analytics_period_bundle_notifier.dart';
-import '../../analytics/application/discipline_score.dart';
 import '../../analytics/application/announced_insight_store.dart';
 import '../../analytics/application/coaching_insight_notification_policy.dart';
 import '../../analytics/application/delivery_providers.dart';
@@ -88,8 +87,7 @@ enum _PlansChangedAction { reshuffle, defer, skip }
 const int kHomePreviewItemLimit = 3;
 
 /// Card heading inside Home's white cards (redesign 2026-09-14): 22px bold,
-/// one step under the recovery card's 24px headline and well under the
-/// streak number.
+/// one step under the recovery card's 24px headline.
 TextStyle get _kCardTitleStyle => TextStyle(
   fontSize: 22,
   fontWeight: FontWeight.w700,
@@ -205,8 +203,8 @@ class HomeScreen extends ConsumerWidget {
               Expanded(
                 child: _ActionTile(
                   icon: Icons.do_not_disturb_on_outlined,
-                  label: 'Set mode',
-                  tooltip: 'Set mode',
+                  label: 'Set status',
+                  tooltip: 'Set status',
                   onTap: () => showContextOverrideQuickActivateSheet(context),
                 ),
               ),
@@ -609,13 +607,10 @@ class _HomeTopAnalyticsCard extends ConsumerStatefulWidget {
 class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
     with TickerProviderStateMixin {
   late final AnimationController _introController;
-  late final AnimationController _milestonePopController;
   late final Animation<double> _introCurve;
   late final Animation<double> _sparklineCurve;
-  late final Animation<double> _popScale;
 
   bool _introPlayed = false;
-  int? _previousStreak;
 
   @override
   void initState() {
@@ -623,10 +618,6 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
     _introController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 850),
-    );
-    _milestonePopController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 260),
     );
     _introCurve = CurvedAnimation(
       parent: _introController,
@@ -636,42 +627,28 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
       parent: _introController,
       curve: const Interval(0.35, 1.0, curve: Curves.easeOutCubic),
     );
-    _popScale = Tween<double>(begin: 1.0, end: 1.12).animate(
-      CurvedAnimation(
-        parent: _milestonePopController,
-        curve: Curves.easeOutBack,
-        reverseCurve: Curves.easeInOut,
-      ),
-    );
   }
 
   @override
   void dispose() {
     _introController.dispose();
-    _milestonePopController.dispose();
     super.dispose();
   }
 
-  void _handleMilestones({required int streak, required int scorePercent}) {
-    if (!_introPlayed) {
-      _introPlayed = true;
-      _previousStreak = streak;
-      _introController.forward(from: 0);
-      return;
-    }
-    if (_previousStreak != null && streak > _previousStreak!) {
-      _milestonePopController
-          .forward(from: 0)
-          .then((_) => _milestonePopController.reverse());
-    }
-    _previousStreak = streak;
+  /// One intro sweep per Home visit: the ring fills and the bars grow.
+  void _playIntroOnce() {
+    if (_introPlayed) return;
+    _introPlayed = true;
+    _introController.forward(from: 0);
   }
 
   @override
   Widget build(BuildContext context) {
     final bundleAsync = ref.watch(analyticsPeriodBundleProvider);
-    // Redesign 2026-09-14: one white dashboard card — streak | today's ring
-    // | 7-day bars — instead of the stacked streak + orange pill + sparkline.
+    // Redesign 2026-09-14: one white dashboard card — today's ring | this
+    // week's bars — instead of the stacked orange pill + sparkline. The
+    // day-streak column came out in the plain-language pass (2026-09-25):
+    // testers read it as a score they were losing, not progress.
     return AppCard(
       color: AppColors.homeHeroCard,
       radius: 28,
@@ -681,7 +658,6 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
       child: bundleAsync.when(
         skipLoadingOnReload: true,
         data: (bundle) {
-          final streak = homeDisplayStreakDays(bundle);
           // Goals and habits that are ACTIVE AND DUE today (action days
           // only, plus habit tasks) — not every goal on the Goals tab. The
           // ring is the weighted rate, so partial progress shows; the
@@ -689,22 +665,14 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
           final day = bundle.goalHabitDay;
           final rate = day.weightedCompletionRate.clamp(0.0, 1.0);
           final scorePercent = (rate * 100).round();
-          _handleMilestones(streak: streak, scorePercent: scorePercent);
+          _playIntroOnce();
           return AnimatedBuilder(
-            animation: Listenable.merge([
-              _introController,
-              _milestonePopController,
-            ]),
+            animation: _introController,
             builder: (context, _) {
               final animating = _introController.isAnimating;
               final introValue = animating ? _introCurve.value : 1.0;
-              final displayStreak = animating
-                  ? (streak * introValue).round()
-                  : streak;
               final barsProgress = animating ? _sparklineCurve.value : 1.0;
               return _HeroDashboard(
-                streak: displayStreak,
-                streakScale: _popScale.value,
                 ringValue: rate * introValue,
                 percent: (scorePercent * introValue).round(),
                 completed: day.completedCount,
@@ -729,8 +697,6 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
           'home_screen',
           e,
           const _HeroDashboard(
-            streak: 0,
-            streakScale: 1,
             ringValue: 0,
             percent: 0,
             completed: 0,
@@ -744,13 +710,12 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
   }
 }
 
-/// The three dashboard columns. On wide phones they sit side by side with
-/// hairline dividers; under [_kWideDashboard] the trend drops to its own
-/// full-width row so nothing gets cramped.
+/// The two dashboard columns — today's ring and this week's bars. On wide
+/// phones they sit side by side with a hairline divider; under
+/// [_kWideDashboard] the trend drops to its own full-width row so nothing
+/// gets cramped.
 class _HeroDashboard extends StatelessWidget {
   const _HeroDashboard({
-    required this.streak,
-    required this.streakScale,
     required this.ringValue,
     required this.percent,
     required this.completed,
@@ -759,8 +724,6 @@ class _HeroDashboard extends StatelessWidget {
     required this.barsProgress,
   });
 
-  final int streak;
-  final double streakScale;
   final double ringValue;
   final int percent;
   final int completed;
@@ -769,18 +732,17 @@ class _HeroDashboard extends StatelessWidget {
   final double barsProgress;
 
   /// Inner card width (screen − 20 page pad − 20 card pad, each side) at
-  /// which the three columns sit side by side. Was 330, which only Plus /
-  /// Pro Max phones (430 pt → 350) reached: an iPhone 16 (393 → 313) and
-  /// even a 16 Pro (402 → 322) got the stacked layout with the bigger ring
-  /// and the trend on its own row, so the card looked "bigger" there
-  /// (Miko, 2026-09-24). At 300 every current iPhone but the 320-pt SE
-  /// gets the row: at 313 the ring column is ~125 pt for a 104-pt ring
-  /// and each trend cell ~14 pt for an 8-pt bar and a 10-pt label.
+  /// which the columns sit side by side. Was 330, which only Plus / Pro
+  /// Max phones (430 pt → 350) reached: an iPhone 16 (393 → 313) and even
+  /// a 16 Pro (402 → 322) got the stacked layout with the bigger ring and
+  /// the trend on its own row, so the card looked "bigger" there (Miko,
+  /// 2026-09-24). At 300 every current iPhone but the 320-pt SE gets the
+  /// row. With two columns (2026-09-25) the ring takes 5/11 of the width
+  /// (~140 pt at 313) and the trend 6/11 (~170 pt, ~24 pt per bar cell).
   static const double _kWideDashboard = 300;
 
   @override
   Widget build(BuildContext context) {
-    final streakColumn = _StreakColumn(streak: streak, scale: streakScale);
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= _kWideDashboard;
@@ -801,27 +763,16 @@ class _HeroDashboard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(flex: 5, child: streakColumn),
+                Expanded(flex: 5, child: ring),
                 const _HeroDivider(),
-                Expanded(flex: 10, child: ring),
-                const _HeroDivider(),
-                Expanded(flex: 8, child: trend),
+                Expanded(flex: 6, child: trend),
               ],
             ),
           );
         }
         return Column(
           children: [
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(flex: 2, child: streakColumn),
-                  const _HeroDivider(),
-                  Expanded(flex: 3, child: ring),
-                ],
-              ),
-            ),
+            ring,
             const SizedBox(height: 18),
             Divider(height: 1, thickness: 1, color: AppColors.divider),
             const SizedBox(height: 16),
@@ -843,53 +794,6 @@ class _HeroDivider extends StatelessWidget {
       width: 1,
       margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       color: AppColors.divider,
-    );
-  }
-}
-
-class _StreakColumn extends StatelessWidget {
-  const _StreakColumn({required this.streak, required this.scale});
-
-  final int streak;
-  final double scale;
-
-  @override
-  Widget build(BuildContext context) {
-    return Transform.scale(
-      scale: scale,
-      alignment: Alignment.center,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              '$streak',
-              style: TextStyle(
-                fontSize: 54,
-                height: 1,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -1.5,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              'day streak',
-              maxLines: 1,
-              style: TextStyle(
-                fontSize: 14,
-                letterSpacing: 0.6,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -1035,7 +939,9 @@ class _WeekTrend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final maxHeight = compact ? 64.0 : 72.0;
-    final barWidth = compact ? 8.0 : 12.0;
+    // Two-column layout (2026-09-25): the trend column is ~170 pt wide on
+    // a 393-pt phone, so the compact bars can be 10 pt instead of 8.
+    final barWidth = compact ? 10.0 : 12.0;
     // Defensive: the series is 1–7 entries; anything longer is clipped to
     // the last seven so today stays the last bar.
     final series = values.length > 7
@@ -1047,7 +953,7 @@ class _WeekTrend extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          '7-day trend',
+          'This week so far',
           textAlign: compact ? TextAlign.center : TextAlign.start,
           style: TextStyle(
             fontSize: 14,
@@ -1086,9 +992,9 @@ class _WeekTrend extends StatelessWidget {
                   _labels[i],
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    // 9 in the compact column: at a 393-pt phone each of
-                    // the seven cells is ~14 pt and "Sa"/"Su" touched at 10.
-                    fontSize: compact ? 9 : 11.5,
+                    // 10 in the compact column: each of the seven cells is
+                    // ~24 pt on a 393-pt phone since the streak column went.
+                    fontSize: compact ? 10 : 11.5,
                     fontWeight: i == todayIndex
                         ? FontWeight.w700
                         : FontWeight.w500,
@@ -1575,7 +1481,7 @@ class _FlowNowStrip extends ConsumerWidget {
           'home_screen',
           e,
           Text(
-            'Flow unavailable',
+            'Unavailable',
             style: TextStyle(color: _kMuted, fontSize: 12),
           ),
         ),
@@ -1712,11 +1618,12 @@ class _FlowNowStrip extends ConsumerWidget {
         focusActive &&
         displayTask != null &&
         execState.taskId == displayTask.id;
-    final statusLabel = !isThisFocus
-        ? 'Next up'
-        : (execState.phase == ExecutionPhase.paused
-              ? 'Focus paused'
-              : 'Focus active');
+    // Plain-language pass (2026-09-25): the strip's label carries the
+    // state — IN FOCUS / PAUSED / UP NEXT — so the task row's second line no
+    // longer repeats it.
+    final stripLabel = !isThisFocus
+        ? 'UP NEXT'
+        : (execState.phase == ExecutionPhase.paused ? 'PAUSED' : 'IN FOCUS');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1725,7 +1632,7 @@ class _FlowNowStrip extends ConsumerWidget {
         Row(
           children: [
             Text(
-              'FLOW NOW',
+              stripLabel,
               style: TextStyle(
                 color: _kAccent,
                 fontSize: 10,
@@ -1790,7 +1697,11 @@ class _FlowNowStrip extends ConsumerWidget {
                           ),
                           const SizedBox(height: 1),
                           Text(
-                            '$statusLabel · ${_FlowNowStrip._subtitleFor(task: displayTask, execState: execState, focusActive: isThisFocus)}',
+                            _FlowNowStrip._subtitleFor(
+                              task: displayTask,
+                              execState: execState,
+                              focusActive: isThisFocus,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(color: AppColors.fg, fontSize: 11),
@@ -1818,7 +1729,7 @@ class _FlowNowStrip extends ConsumerWidget {
           Padding(
             padding: EdgeInsets.only(top: 6),
             child: Text(
-              'No next task — add one or check Tasks.',
+              'Nothing planned — add a task or check Tasks.',
               style: TextStyle(color: _kMuted, fontSize: 12),
             ),
           ),

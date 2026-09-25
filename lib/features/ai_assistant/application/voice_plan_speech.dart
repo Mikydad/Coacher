@@ -85,7 +85,7 @@ String _describeAction(AiAction action) {
     case ActionType.endContextOverride:
       return 'end the active mode';
     case ActionType.createIntention:
-      return 'note your promise to ${_orA(s('title'), '')}'.trim();
+      return 'save ${_orA(s('title'), '')} for later'.trim();
     case ActionType.logActivity:
       return 'log ${_orA(s('text'), 'that activity')}';
     case ActionType.rememberFact:

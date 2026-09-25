@@ -6,7 +6,9 @@ import '../../../../core/presentation/keyboard_dismiss.dart';
 import '../../../education/presentation/help_dot.dart';
 import '../../../../core/utils/date_keys.dart';
 import '../../../../core/utils/stable_id.dart';
+import '../../application/circle_providers.dart';
 import '../../application/weekly_commitment_providers.dart';
+import '../../domain/models/circle_member.dart';
 import '../../domain/models/weekly_commitment.dart';
 
 import '../../../../core/presentation/app_card.dart';
@@ -24,6 +26,14 @@ class WeeklyCommitmentsView extends ConsumerWidget {
     final commitmentsAsync = ref.watch(
       circleWeeklyCommitmentsProvider(circleId),
     );
+    // Same member stream the detail screen already holds open — no extra
+    // query. Other members' groups are headed by their display name.
+    final members =
+        ref.watch(circleMembersProvider(circleId)).valueOrNull ??
+        const <CircleMember>[];
+    final memberNames = <String, String>{
+      for (final m in members) m.userId: m.displayName,
+    };
 
     return commitmentsAsync.when(
       loading: () =>
@@ -94,11 +104,22 @@ class WeeklyCommitmentsView extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 8),
-            if (mine.isEmpty)
+            if (mine.isEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                  'What you and your group said you would get done this week.',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 15,
+                    height: 1.4,
+                  ),
+                ),
+              ),
               _EmptyMyCommitments(
                 onAdd: () => _showEditSheet(context, ref, uid, weekKey, mine),
-              )
-            else
+              ),
+            ] else
               ...mine.map(
                 (c) => _CommitmentRow(
                   commitment: c,
@@ -110,19 +131,18 @@ class WeeklyCommitmentsView extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // ── Circle commitments ─────────────────────────────────────────
+            // ── Group commitments ──────────────────────────────────────────
             if (others.isNotEmpty) ...[
-              const _SectionHeader('Circle commitments'),
+              const _SectionHeader('Group commitments'),
               const SizedBox(height: 8),
-              ..._groupByUser(others).entries.map(
-                (entry) => _MemberCommitmentsGroup(
+              ..._groupByUser(others).entries.map((entry) {
+                final name = memberNames[entry.key]?.trim();
+                return _MemberCommitmentsGroup(
                   userId: entry.key,
-                  displayName: entry.value.first.userId == entry.key
-                      ? entry.key
-                      : entry.value.first.userId,
+                  displayName: name == null || name.isEmpty ? 'Member' : name,
                   commitments: entry.value,
-                ),
-              ),
+                );
+              }),
             ],
           ],
         );
@@ -622,7 +642,7 @@ class _MemberCommitmentsGroup extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(bottom: 6, top: 8),
           child: Text(
-            commitments.first.userId,
+            displayName,
             style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 12,

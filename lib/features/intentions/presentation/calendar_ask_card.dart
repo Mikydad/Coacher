@@ -53,7 +53,7 @@ class CalendarAskCard extends ConsumerWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'SidePal can time your promises around your real meetings — '
+            'SidePal can time your for-later items around your real meetings — '
             'read-only, never stored, never leaves this device.',
             style: TextStyle(
               color: AppColors.textSoft,
