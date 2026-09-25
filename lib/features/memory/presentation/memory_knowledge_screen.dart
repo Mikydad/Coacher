@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -743,22 +745,77 @@ class _ProvenanceBadge extends StatelessWidget {
 }
 
 /// Why this page exists, in the user's terms — shown at the top of Facts.
-class _MemoryIntro extends StatelessWidget {
+///
+/// Opens expanded on every visit, slides down to one sentence after
+/// [_holdFor] (Miko, 2026-09-25), and toggles on tap.
+class _MemoryIntro extends StatefulWidget {
   const _MemoryIntro();
+
+  static const _holdFor = Duration(seconds: 4);
+
+  @override
+  State<_MemoryIntro> createState() => _MemoryIntroState();
+}
+
+class _MemoryIntroState extends State<_MemoryIntro> {
+  static const _short =
+      'SidePal remembers useful things you tell it or that it notices.';
+  static const _full =
+      'SidePal remembers useful things you tell it or that it notices, so '
+      'it can understand you and make better suggestions later. For '
+      'example: if it knows you like calling your mom while walking, it '
+      'may suggest calling her when you have time for a walk.';
+
+  bool _expanded = true;
+  Timer? _collapseTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _collapseTimer = Timer(_MemoryIntro._holdFor, () {
+      if (mounted) setState(() => _expanded = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _collapseTimer?.cancel();
+    super.dispose();
+  }
+
+  void _toggle() {
+    _collapseTimer?.cancel();
+    setState(() => _expanded = !_expanded);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Text(
-        'SidePal remembers useful things you tell it or that it notices, so '
-        'it can understand you and make better suggestions later. For '
-        'example: if it knows you like calling your mom while walking, it '
-        'may suggest calling her when you have time for a walk.',
-        style: TextStyle(
-          color: AppColors.textMuted,
-          fontSize: 13,
-          height: 1.45,
+    final style = TextStyle(
+      color: AppColors.textMuted,
+      fontSize: 13,
+      height: 1.45,
+    );
+    return Semantics(
+      button: true,
+      hint: _expanded ? 'Collapse' : 'Expand',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _toggle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 260),
+              child: Text(
+                _expanded ? _full : _short,
+                key: ValueKey(_expanded),
+                style: style,
+              ),
+            ),
+          ),
         ),
       ),
     );

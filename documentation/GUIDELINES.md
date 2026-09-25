@@ -4344,3 +4344,18 @@ not silent reversal.
   on public commitments; the Profile quiet-hours row showed "8:00 AM" when
   unset; the community intro said "Circles tab" while the tab is Community;
   the Direction guide claimed it "saves as you type".
+
+- **2026-09-25 · Rename follow-ups (Miko's second pass).** (1) Home week
+  chart label is **"This week's progress"** (was "This week so far").
+  (2) The Home list is **"Plan for later"** after all — Miko preferred the
+  tester's wording over "For later"; "Suggested for later" unchanged.
+  (3) The Home tile **stays "Set status"** (asked about "Mode"; settled on
+  one word for the feature). (4) The Accountability hub opens with a
+  one-line explanation ("Hold yourself accountable by putting something at
+  stake, or by making your commitment public.") instead of the
+  head-to-head W/L line, and the stake creation list offers **only Photo
+  stake and Commit publicly** — Challenge a friend and Practice run are
+  hidden the same way money stakes are (code paths kept; existing
+  challenges of those types still open). (5) The "What SidePal knows about
+  you" intro opens expanded on every visit, collapses to one sentence after
+  4 s (260 ms AnimatedSize), and toggles on tap.

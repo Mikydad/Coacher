@@ -84,7 +84,7 @@ class _PromisesSectionState extends ConsumerState<PromisesSection> {
                     // "For later" to the user (plain-language pass,
                     // 2026-09-25); the code keeps its promise/intention
                     // names.
-                    const AppSectionLabel('FOR LATER'),
+                    const AppSectionLabel('PLAN FOR LATER'),
                     const HelpDot('forLater', dense: true),
                     const Spacer(),
                     AppCircleIconButton(
@@ -93,7 +93,7 @@ class _PromisesSectionState extends ConsumerState<PromisesSection> {
                       iconSize: 20,
                       shadow: false,
                       background: AppColors.surfaceLight,
-                      tooltip: 'Add something for later',
+                      tooltip: 'Plan something for later',
                       onPressed: () => showIntentionQuickAddSheet(context),
                     ),
                   ],

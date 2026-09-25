@@ -1063,12 +1063,13 @@ class _AccountabilityCreateFlowState
 
   // $ — money is parked behind [kMoneyStakesEnabled] (2026-09-18); the
   // server rail is the SIMULATED provider either way.
+  // Challenge a friend and Practice run are hidden for now (Miko,
+  // 2026-09-25): the flow keeps their code paths so existing challenges
+  // of those types still open; only the choice list omits them.
   List<_StakeChoice> get _availableStakes => [
     _StakeChoice.photo,
-    _StakeChoice.h2h,
     if (kMoneyStakesEnabled) _StakeChoice.money,
     _StakeChoice.public,
-    _StakeChoice.practice,
   ];
 
   void _pickStake(_StakeChoice c) {

@@ -63,32 +63,24 @@ class AccountabilityHubScreen extends ConsumerWidget {
 
           if (all.isEmpty) return const _EmptyState();
 
-          // PSY-4-adjacent scoreboard: W/L across decided multi-party
-          // challenges (side outcome, not personal — matches the stakes).
-          final myUid = FirestorePaths.activeUid;
-          var wins = 0;
-          var losses = 0;
-          for (final c in done.where((c) => c.type.isMultiParty)) {
-            final r = c.results.where((r) => r.uid == myUid).firstOrNull;
-            if (r == null) continue;
-            r.sideWon ? wins++ : losses++;
-          }
-
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
             children: [
-              if (wins + losses > 0)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    'Head-to-head record: $wins W – $losses L',
-                    style: TextStyle(
-                      color: AppColors.textSoft,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                    ),
+              // Plain-language pass (2026-09-25): the page explains itself
+              // instead of showing the head-to-head W/L line, which only
+              // appeared once you had finished a multi-party challenge.
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'Hold yourself accountable by putting something at stake, '
+                  'or by making your commitment public.',
+                  style: TextStyle(
+                    color: AppColors.textSoft,
+                    fontSize: 13,
+                    height: 1.4,
                   ),
                 ),
+              ),
               if (open.isNotEmpty) ...[
                 const SectionHeader('In progress'),
                 const SizedBox(height: 8),

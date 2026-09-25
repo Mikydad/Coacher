@@ -953,7 +953,7 @@ class _WeekTrend extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          'This week so far',
+          "This week's progress",
           textAlign: compact ? TextAlign.center : TextAlign.start,
           style: TextStyle(
             fontSize: 14,

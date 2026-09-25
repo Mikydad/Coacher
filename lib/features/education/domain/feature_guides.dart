@@ -577,7 +577,7 @@ abstract final class FeatureGuides {
     what:
         'The percentage is how much of today\'s planned work is done, '
         'weighted by how important each item is. The small chart is this '
-        'week so far, Monday to today.',
+        'week\'s progress, Monday to today.',
     why:
         'One honest glance beats a page of statistics.',
     howSteps: [],
@@ -585,7 +585,7 @@ abstract final class FeatureGuides {
       'Partial completions count too — the score rewards honesty, not '
           'perfection.',
     ],
-    keywords: ["today's progress", 'todays progress', 'this week so far'],
+    keywords: ["today's progress", 'todays progress', "this week's progress"],
     suggestedPrompts: ['How am I doing this week?', 'How does the progress score work?'],
   );
 
@@ -714,11 +714,11 @@ abstract final class FeatureGuides {
 
   static const forLater = FeatureGuide(
     id: 'forLater',
-    title: 'For Later',
+    title: 'Plan for Later',
     emoji: '🕰️',
     oneLiner: 'Things you want to do without choosing an exact time.',
     what:
-        'For Later holds the small things you mean to do soon — a call, a '
+        'Plan for later holds the small things you mean to do soon — a call, a '
         'message, an errand — without picking a clock time. Say roughly '
         'when (today, tomorrow, this week, the weekend) and SidePal finds '
         'a good moment and nudges you.',
@@ -726,7 +726,7 @@ abstract final class FeatureGuides {
         'Not everything deserves a slot in your plan. Parking it here '
         'keeps it out of your head without letting it slip.',
     howSteps: [
-      'Tap + on the For Later card and type what you want to do.',
+      'Tap + on the Plan for later card and type what you want to do.',
       'Pick roughly when, then tap "Find me a good time".',
     ],
     tips: ['Errands can remind you when you head out the door.'],
@@ -747,11 +747,11 @@ abstract final class FeatureGuides {
         'Good intentions get lost in conversation. Keeping them visible '
         'means you decide, instead of forgetting.',
     howSteps: [
-      'Tap "Remind me" to move one onto your For Later list.',
+      'Tap "Remind me" to move one onto your Plan for later list.',
       'Tap the × to dismiss anything that does not fit.',
     ],
     keywords: ['suggested for later', 'sidepal noticed', 'suggestions for later'],
-    suggestedPrompts: ['Tell me about For Later', 'What does SidePal know about me?'],
+    suggestedPrompts: ['Tell me about Plan for Later', 'What does SidePal know about me?'],
   );
 
   static const weeklyCommitments = FeatureGuide(

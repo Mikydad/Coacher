@@ -106,7 +106,7 @@ class _IntentionQuickAddSheetState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'FOR LATER',
+            'PLAN FOR LATER',
             style: TextStyle(
               color: AppColors.fg54,
               fontSize: 11,
