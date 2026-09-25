@@ -4359,3 +4359,20 @@ not silent reversal.
   challenges of those types still open). (5) The "What SidePal knows about
   you" intro opens expanded on every visit, collapses to one sentence after
   4 s (260 ms AnimatedSize), and toggles on tap.
+
+- **2026-09-25 · TestFlight build 1.0.2 (5) uploaded headless.** First
+  build with the plain-language rename, the Home row redesign and the
+  goal-editor copy; functions deployed the same evening. `flutter build
+  ipa` archived fine (Isar export check: 108) but its own export step
+  failed twice on "The request timed out / No signing certificate 'iOS
+  Distribution' found" — the cloud-managed signing round-trip on the slow
+  link, not a real certificate problem. What worked: `xcodebuild
+  -exportArchive … -allowProvisioningUpdates` with an ExportOptions of
+  method `app-store-connect`, `destination: upload`, `signingStyle:
+  automatic`, `uploadSymbols: true`, team HW6A4CQ2UB — it uploads straight
+  from the archive through Xcode's signed-in account, no Organizer, no
+  credentials typed. The first attempt was killed with the session; the
+  retry uploaded at ~2.5 MB/s and reported "Upload succeeded". dSYMs sent
+  to Crashlytics with the pod's `upload-symbols`. Rule: this is the
+  headless upload path from now on; the version bump lives in pubspec
+  (`1.0.2+5`).
