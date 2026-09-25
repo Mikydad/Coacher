@@ -1101,7 +1101,7 @@ class GoalEditorSetupStepsSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         GoalEditorSectionLabel(
-          'Setup steps',
+          'Actionable steps',
           trailing: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
@@ -1351,9 +1351,7 @@ class GoalEditorSetupStepRow extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                     decoration: InputDecoration(
-                      hintText: index == 0
-                          ? 'Install Flutter SDK'
-                          : 'Add next setup step…',
+                      hintText: 'Write your actions here…',
                       hintStyle: TextStyle(
                         color: GoalEditorColors.label.withValues(alpha: 0.5),
                         fontWeight: FontWeight.w400,
