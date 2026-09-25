@@ -4376,3 +4376,65 @@ not silent reversal.
   to Crashlytics with the pod's `upload-symbols`. Rule: this is the
   headless upload path from now on; the version bump lives in pubspec
   (`1.0.2+5`).
+
+- **2026-09-25 · Onboarding is guest-first; the July "register first"
+  decision is reversed.** "Get started" now enters the anonymous account
+  (the flow-level Skip path made the default) and the register step is
+  gone from the flow. The original reason for registering first — every
+  answer had to land under the real uid because there was no
+  anonymous→registered migration — no longer holds: uid-preserving account
+  linking (2026-08-23: Google/Apple link in place, conflict recovery,
+  guest connect card on Profile) means a guest upgrades without any
+  migration, so registration no longer needs to block first use.
+  Consequences: `kRequireRegisteredAuth` stays off for launch; the account
+  ask lives in four places — Welcome's "Log in" (existing accounts), the
+  Home backup card (below), Profile's Connect account, and the guest
+  log-out dialog. The connect sheet gained "Continue with email" (pushes
+  the sign-up screen, which links the email credential to the same uid and
+  pops `true`) because the removed register step was the only email
+  sign-up a guest had.
+
+- **2026-09-25 · Onboarding restructured to nine screens, one story.**
+  Welcome → What gets in your way → What matters to you → Knowing what you
+  want is the easy part → Tell SidePal what you want to do (demo) →
+  Setting up → We've personalized your SidePal → (first goal, after
+  sign-in) → You're ready. Cut: register, Meet your coach, Community,
+  "You're not lazy", Day One photo, science cards, premium. Merged the two
+  psychology screens into one that talks about behaviour, not identity.
+  Every line on the result card derives from the user's picks — the fake
+  "0 of 3 tasks" row is gone. The flow runs above AuthGate, so the profile
+  is committed Isar-only during the flow (`upsertProfile(replicate:
+  false)` — an enqueue without a uid would target the local placeholder
+  path and sit as a stuck write); `OnboardingHandoff` leaves a device
+  marker and `OnboardingHandoffBridge` (tab shell) replicates once a uid
+  exists. Day One keeps its model fields; it returns later from Progress
+  once the user has actually begun. Community is taught by its existing
+  first-open card. *Rejected:* a Business goal category just for
+  onboarding (app-wide cost for one screen; interests and categories need
+  not be identical).
+
+- **2026-09-25 · The first goal is created by the user, after sign-in,
+  from the picker's first-goal mode.** "Turn this into your first goal"
+  ends the flow with the `firstGoal` handoff; the bridge pushes
+  `GoalTemplatePickerScreen(firstGoal:)` — "What do you want to start
+  with?", the chosen interests as chips (first one default), that
+  interest's templates plus "Create my own goal" — then the adaptive
+  Ready screen ("Start my first action" / "Go to Home"), landing on Home
+  with the goal row visible where the Getting Started tour picks up.
+  Interests stay tags (2026-07-12 intact); the user names and saves the
+  goal in the normal editor. Interest → category: health→fitness,
+  skills→study, habits→habits, disciplined→focus, business/money/
+  organized→productivity. Templates are filtered by interest, not
+  category, so money never shows decluttering. Eight new templates (two
+  each for business, money, organized, disciplined) exist for this mode
+  only — the everyday New goal mosaic keeps its five cards. The tour
+  overlay now hides while any route other than the shell or the Add Task
+  sheet is on top (it used to draw over pushed screens).
+
+- **2026-09-25 · Home "Back up your SidePal" card: once, then once more
+  after seven days, then never.** Guest data survives reinstall on iOS
+  (keychain) but not Android, so the prompt has a concrete trigger
+  (`BackupCardPolicy`): guest + owns a goal + not the day onboarding
+  finished; "Not now" hides it for seven days; a second "Not now" ends
+  it — Profile's Connect account remains. Wording is "Back up", not
+  "Keep safe": guest data is not unsafe today, it is just device-bound.

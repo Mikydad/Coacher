@@ -266,3 +266,34 @@ Flutter post on cooperative cancellation of long async pipelines.
   post on the pulse button, a before/after carousel of the stake commit
   page, a build-in-public video on turning tester feedback into a rule
   instead of forty edits.
+
+## 2026-09-25 · The onboarding that explained itself before it listened
+
+- **Hook:** Fifteen screens, and the app asked what you wanted on screen
+  eleven.
+- **What happened:** Ran the onboarding past a second opinion. The
+  diagnosis was right — welcome, register, struggles, psychology, coach,
+  community, demo, "you're not lazy", photo, science, goals, loading,
+  result, pricing, ready — the user kept switching between "tell us" and
+  "learn this", and the app was explaining itself for ten screens before
+  it knew what the person came for. The suggestion missed the biggest
+  thing, though: registration sat at step two, a hard gate before any
+  value, because back in July there was no way to upgrade a guest without
+  migrating their data. Since August there is. The constraint had died
+  and the screen had outlived it.
+- **The turn:** Guest-first. Nine screens: what gets in your way, what
+  matters, why following through is hard, how SidePal helps, set up,
+  here's your SidePal, make your first goal, go. The catch was
+  architectural: the flow runs above the auth gate, so there is no user
+  id to create a goal under — and an outbox write with no uid would have
+  landed on a placeholder path and glowed amber forever. So the flow
+  writes locally and leaves a note; the app reads the note after the
+  anonymous sign-in and opens the goal picker before Home ever shows.
+  The user experiences one continuous story; the code experiences two
+  halves with a handshake.
+- **Takeaway:** When a screen exists because of a constraint, write the
+  constraint down next to it. The register step should have said "here
+  until account linking exists". Then the day linking shipped, the
+  screen would have asked to be deleted.
+- **Formats:** before/after screen-count post; thread on "the constraint
+  died and the screen outlived it"; short video walking the nine screens.
