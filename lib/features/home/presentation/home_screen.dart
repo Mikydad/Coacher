@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/presentation/widgets/backup_account_card.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
@@ -150,6 +151,9 @@ class HomeScreen extends ConsumerWidget {
           // Keyed as a guided-tour target ("this is your progress").
           _HomeTopAnalyticsCard(key: TourTargets.progressCard),
           const SizedBox(height: 20),
+          // Guest backup prompt — shows once a goal exists, on a later day;
+          // policy in BackupCardPolicy (2026-09-25).
+          const BackupAccountCard(),
           Row(
             children: [
               Expanded(

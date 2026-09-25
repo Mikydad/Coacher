@@ -117,6 +117,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     if (isLinkingAnonymous) {
       // uid is unchanged after linking — existing Firestore data is intact.
       debugPrint('[Auth] anonymous linked: uid=${user?.uid}');
+      // Reached from inside the app (connect flow, 2026-09-25): the tree
+      // behind us doesn't change on a same-uid link, so hand control back.
+      if (Navigator.canPop(context)) Navigator.pop(context, true);
     } else {
       debugPrint('[Auth] sign-up success: uid=${user?.uid}');
     }

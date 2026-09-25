@@ -5,23 +5,51 @@ import '../../../../core/presentation/app_colors.dart';
 import '../../../profile/application/profile_providers.dart';
 import '../../application/auth_providers.dart';
 import '../../domain/auth_failure.dart';
+import '../sign_up_screen.dart';
 import 'auth_apple_sign_in_button.dart' show isAppleSignInSupported;
 
-enum _ConnectProvider { google, apple }
+enum _ConnectProvider { google, apple, email }
 
 /// The full guest → connected flow, callable from anywhere with a context
 /// (Profile's Connect button, the guest log-out dialog):
 ///
-///   provider sheet (Google/Apple) → link with blocking progress →
+///   provider sheet (Google/Apple/email) → link with blocking progress →
 ///   success snackbar, or the reinstall-conflict dialog
 ///   (use existing account / try another / cancel).
+///
+/// Email (2026-09-25, guest-first onboarding removed the in-flow register
+/// step) pushes the sign-up screen, which links the credential to the
+/// anonymous uid and pops `true` on success.
 ///
 /// Linking upgrades the anonymous session in place (same uid) so all data
 /// survives phone changes and reinstalls from then on.
 Future<void> showConnectAccountFlow(BuildContext context, WidgetRef ref) async {
   final provider = await _showProviderSheet(context);
   if (provider == null || !context.mounted) return;
+  if (provider == _ConnectProvider.email) {
+    final linked = await Navigator.pushNamed(context, SignUpScreen.routeName);
+    if (linked == true && context.mounted) await _onLinked(context, ref);
+    return;
+  }
   await _connect(context, ref, provider);
+}
+
+/// Post-link housekeeping shared by every provider.
+Future<void> _onLinked(BuildContext context, WidgetRef ref) async {
+  final repo = ref.read(authRepositoryProvider);
+  // Profile UI reads from Isar — seed name from the linked identity.
+  final name = repo.currentUser?.displayName?.trim();
+  if (name != null && name.isNotEmpty) {
+    await ref
+        .read(profilePreferenceServiceProvider)
+        .syncDisplayNameFromAuthIfEmpty(name);
+  }
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Account connected — your data is now safe across devices.'),
+    ),
+  );
 }
 
 Future<_ConnectProvider?> _showProviderSheet(BuildContext context) {
@@ -68,6 +96,11 @@ Future<_ConnectProvider?> _showProviderSheet(BuildContext context) {
               label: 'Continue with Apple',
               onTap: () => Navigator.pop(ctx, _ConnectProvider.apple),
             ),
+          _ProviderRow(
+            icon: Icons.email_outlined,
+            label: 'Continue with email',
+            onTap: () => Navigator.pop(ctx, _ConnectProvider.email),
+          ),
           const SizedBox(height: 12),
         ],
       ),
@@ -89,26 +122,15 @@ Future<void> _connect(
         forceAccountPicker: forceAccountPicker,
       ),
       _ConnectProvider.apple => repo.signInWithApple(),
+      _ConnectProvider.email => throw StateError(
+        'email links through the sign-up screen, not _connect',
+      ),
     };
   });
   if (!context.mounted) return;
 
   if (failure == null) {
-    // Profile UI reads from Isar — seed name from the linked identity.
-    final name = repo.currentUser?.displayName?.trim();
-    if (name != null && name.isNotEmpty) {
-      await ref
-          .read(profilePreferenceServiceProvider)
-          .syncDisplayNameFromAuthIfEmpty(name);
-    }
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Account connected — your data is now safe across devices.',
-        ),
-      ),
-    );
+    await _onLinked(context, ref);
     return;
   }
 
