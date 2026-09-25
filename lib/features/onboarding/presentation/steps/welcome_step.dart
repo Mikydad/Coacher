@@ -1,48 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../auth/application/auth_providers.dart';
 import '../../../auth/presentation/login_screen.dart';
 import '../../application/onboarding_flow_controller.dart';
 import '../onboarding_ui.dart';
 
-/// Screen 1 — Welcome (ONBOARDING_PRD.md).
+/// Screen 1 — Welcome. "Get started" begins as a guest (guest-first,
+/// decision log 2026-09-25); "Log in" is for people who already have an
+/// account — a real sign-in ends the flow (shell's auth listener).
 class WelcomeStep extends ConsumerWidget {
   const WelcomeStep({super.key, required this.onSkip});
 
   final VoidCallback onSkip;
 
-  void _getStarted(WidgetRef ref) {
-    final controller = ref.read(onboardingFlowControllerProvider.notifier);
-    controller.next(); // → register
-    // Keychain-restored session after a reinstall: the account already
-    // exists, don't ask them to create one.
-    final user = ref.read(authRepositoryProvider).currentUser;
-    if (user != null && !user.isAnonymous) controller.skipRegisterStep();
-  }
-
-  void _logIn(BuildContext context, WidgetRef ref) {
-    ref
-        .read(onboardingFlowControllerProvider.notifier)
-        .setAuthIntent(OnboardingAuthIntent.login);
-    Navigator.of(context).pushNamed(LoginScreen.routeName).then((_) {
-      // Came back without signing in — restore register semantics.
-      ref
-          .read(onboardingFlowControllerProvider.notifier)
-          .setAuthIntent(OnboardingAuthIntent.register);
-    });
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final controller = ref.read(onboardingFlowControllerProvider.notifier);
     return OnboardingStepScaffold(
       progress: 0,
       onSkip: onSkip,
-      ctaLabel: 'Get Started',
-      onCta: () => _getStarted(ref),
+      ctaLabel: 'Get started',
+      onCta: controller.next,
       belowCta: Center(
         child: TextButton(
-          onPressed: () => _logIn(context, ref),
+          onPressed: () =>
+              Navigator.of(context).pushNamed(LoginScreen.routeName),
           child: Text(
             'Already have an account? Log in',
             style: TextStyle(
@@ -67,8 +49,8 @@ class WelcomeStep extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Today is the first step toward becoming the person you want '
-            'to be. Your journey starts here.',
+            'Plan what matters, see where your time really goes, and get '
+            'help following through.',
             textAlign: TextAlign.center,
             style: OnboardingType.body,
           ),

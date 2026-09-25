@@ -6,7 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/onboarding_flow_controller.dart';
 import '../onboarding_ui.dart';
 
-/// Screen 11 — Personalizing Your Coach. Scripted ~3s full-screen animation
+/// Screen 6 — Setting up. Truthful lines only (2026-09-25): nothing here
+/// claims a plan was built. Scripted ~3s full-screen animation
 /// (no interaction, no network), then auto-advances.
 class PersonalizingStep extends ConsumerStatefulWidget {
   const PersonalizingStep({super.key});
@@ -17,10 +18,9 @@ class PersonalizingStep extends ConsumerStatefulWidget {
 
 class _PersonalizingStepState extends ConsumerState<PersonalizingStep> {
   static const _messages = [
-    'Analyzing your goals…',
-    'Understanding your habits…',
-    'Building your first plan…',
-    'Preparing your AI coach…',
+    'Understanding what matters to you…',
+    'Preparing a starting suggestion…',
+    'Setting up your coach…',
   ];
 
   int _index = 0;
@@ -60,6 +60,12 @@ class _PersonalizingStepState extends ConsumerState<PersonalizingStep> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              Text(
+                'Setting up SidePal for you…',
+                textAlign: TextAlign.center,
+                style: OnboardingType.headline,
+              ),
+              const SizedBox(height: 36),
               SizedBox(
                 width: 64,
                 height: 64,
@@ -75,7 +81,10 @@ class _PersonalizingStepState extends ConsumerState<PersonalizingStep> {
                   _messages[_index],
                   key: ValueKey(_index),
                   textAlign: TextAlign.center,
-                  style: OnboardingType.cardTitle.copyWith(fontSize: 18),
+                  style: OnboardingType.cardBody.copyWith(
+                    fontSize: 16,
+                    color: OnboardingColors.textSecondary,
+                  ),
                 ),
               ),
             ],

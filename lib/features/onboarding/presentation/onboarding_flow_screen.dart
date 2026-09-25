@@ -8,16 +8,9 @@ import '../../auth/presentation/sign_up_screen.dart';
 import '../application/onboarding_flow_controller.dart';
 import 'onboarding_ui.dart';
 import 'steps/ai_demo_step.dart';
-import 'steps/community_step.dart';
-import 'steps/day_one_step.dart';
 import 'steps/goals_step.dart';
-import 'steps/journey_step.dart';
-import 'steps/meet_sidepal_step.dart';
 import 'steps/personalizing_step.dart';
-import 'steps/premium_step.dart';
-import 'steps/problem_step.dart';
-import 'steps/register_step.dart';
-import 'steps/science_step.dart';
+import 'steps/ready_step.dart';
 import 'steps/struggles_step.dart';
 import 'steps/welcome_step.dart';
 import 'steps/why_step.dart';
@@ -31,7 +24,8 @@ import 'steps/your_sidepal_step.dart';
 class OnboardingFlowApp extends StatelessWidget {
   const OnboardingFlowApp({super.key, required this.onFinished});
 
-  /// Called on BOTH exits — "Start My Journey" and the flow-level Skip.
+  /// Called on every exit — Ready, "Turn this into your first goal", a
+  /// real log-in, and the flow-level Skip.
   /// The [OnboardingGate] then falls through to [AuthGate].
   final VoidCallback onFinished;
 
@@ -82,30 +76,13 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
   @override
   void initState() {
     super.initState();
-    // A real (non-anonymous) sign-in is the one cross-cutting event:
-    //  * from the "Log in" path — existing account, finish the flow now;
-    //  * on the register step — account created (email or social), advance.
+    // A real (non-anonymous) sign-in is the one cross-cutting event: the
+    // only auth surface left in the flow is Welcome's "Log in", so a real
+    // user means an existing account — finish, never replay the tour.
     ref.listenManual(authStateProvider, (_, next) {
       final user = next.valueOrNull;
-      if (user == null || (user.isAnonymous)) return;
-      final flow = ref.read(onboardingFlowControllerProvider);
-      final controller = ref.read(onboardingFlowControllerProvider.notifier);
-      if (flow.authIntent == OnboardingAuthIntent.login) {
-        _finish();
-      } else if (flow.step == OnboardingStep.register) {
-        // A Google/Apple tap on the register step can resolve to an account
-        // that already exists — that's a returning user logging back in, not
-        // a registration: exit the flow instead of replaying the remaining
-        // marketing steps (which would also overwrite their saved answers).
-        if (ref.read(authRepositoryProvider).lastSignInUsedExistingAccount) {
-          _finish();
-          return;
-        }
-        // Dismiss any pushed auth routes before advancing the step behind.
-        Navigator.of(context).popUntil((r) => r.isFirst);
-        controller.markRegistered();
-        controller.next();
-      }
+      if (user == null || user.isAnonymous) return;
+      _finish();
     });
   }
 
@@ -119,8 +96,22 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
   /// anonymously once the gate falls through; no auth code here).
   void _skip() => _finish();
 
+  /// Ready's "Go to Home" — profile saved; the bridge replicates it once
+  /// the anonymous account exists.
   void _completeJourney() {
-    ref.read(onboardingFlowControllerProvider.notifier).complete();
+    ref
+        .read(onboardingFlowControllerProvider.notifier)
+        .complete(wantsFirstGoal: false);
+    _finish();
+  }
+
+  /// Your SidePal's "Turn this into your first goal" — a real goal needs a
+  /// uid, so the flow ends here and `OnboardingHandoffBridge` opens the
+  /// picker (then the created-variant Ready) right after sign-in.
+  void _completeWithFirstGoal() {
+    ref
+        .read(onboardingFlowControllerProvider.notifier)
+        .complete(wantsFirstGoal: true);
     _finish();
   }
 
@@ -160,34 +151,23 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
     switch (step) {
       case OnboardingStep.welcome:
         return WelcomeStep(onSkip: _skip);
-      case OnboardingStep.register:
-        return RegisterStep(onSkip: _skip);
       case OnboardingStep.struggles:
         return StrugglesStep(onSkip: _skip);
-      case OnboardingStep.whyThisHappens:
-        return WhyStep(onSkip: _skip);
-      case OnboardingStep.meetSidePal:
-        return MeetSidePalStep(onSkip: _skip);
-      case OnboardingStep.community:
-        return CommunityStep(onSkip: _skip);
-      case OnboardingStep.aiDemo:
-        return AiDemoStep(onSkip: _skip);
-      case OnboardingStep.theProblem:
-        return ProblemStep(onSkip: _skip);
-      case OnboardingStep.dayOnePhoto:
-        return DayOneStep(onSkip: _skip);
-      case OnboardingStep.science:
-        return ScienceStep(onSkip: _skip);
       case OnboardingStep.chooseGoals:
         return GoalsStep(onSkip: _skip);
+      case OnboardingStep.whyThisHappens:
+        return WhyStep(onSkip: _skip);
+      case OnboardingStep.aiDemo:
+        return AiDemoStep(onSkip: _skip);
       case OnboardingStep.personalizing:
         return const PersonalizingStep();
       case OnboardingStep.yourSidePal:
-        return YourSidePalStep(onSkip: _skip);
-      case OnboardingStep.premium:
-        return PremiumStep(onSkip: _skip);
-      case OnboardingStep.journey:
-        return JourneyStep(onStart: _completeJourney);
+        return YourSidePalStep(
+          onSkip: _skip,
+          onFirstGoal: _completeWithFirstGoal,
+        );
+      case OnboardingStep.ready:
+        return ReadyStep(goalCreated: false, onStart: _completeJourney);
     }
   }
 }

@@ -12,7 +12,10 @@ abstract class OnboardingProfileRepository {
   Future<OnboardingProfile?> getProfile();
 
   /// Commits to Isar, then replicates via the outbox (local-first Rule 1).
-  Future<void> upsertProfile(OnboardingProfile profile);
+  /// [replicate] false skips the outbox: the onboarding flow runs before
+  /// any account exists, and an enqueue without a uid would target the
+  /// local placeholder path and sit in the queue as a stuck write.
+  Future<void> upsertProfile(OnboardingProfile profile, {bool replicate});
 
   /// Reactive stream — emits the current profile whenever it changes.
   Stream<OnboardingProfile?> watchProfile();
@@ -33,13 +36,17 @@ class IsarOnboardingProfileRepository implements OnboardingProfileRepository {
   }
 
   @override
-  Future<void> upsertProfile(OnboardingProfile profile) async {
+  Future<void> upsertProfile(
+    OnboardingProfile profile, {
+    bool replicate = true,
+  }) async {
     profile.validate();
     await _isar.writeTxn(() async {
       await _isar.isarOnboardingProfiles.putByProfileId(
         IsarOnboardingProfile.fromDomain(profile),
       );
     });
+    if (!replicate) return;
     await outboxUpsert(
       entityType: 'onboardingProfile',
       documentPath: FirestorePaths.onboardingProfileDoc,

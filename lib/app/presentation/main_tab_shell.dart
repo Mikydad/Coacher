@@ -13,6 +13,7 @@ import '../../features/community/presentation/community_screen.dart';
 import '../../features/context_override/domain/models/interruption_level.dart';
 import '../../features/goals/presentation/goal_selection_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/onboarding/presentation/onboarding_handoff_bridge.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/reminders/application/attention_orchestrator_providers.dart';
 import '../../features/reminders/application/notification_route_resolver.dart';
@@ -93,6 +94,7 @@ class MainTabShell extends ConsumerWidget {
             ),
           ),
           const CloudSyncGlobalIndicator(),
+          const OnboardingHandoffBridge(),
         ],
       ),
     );

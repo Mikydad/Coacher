@@ -1,32 +1,32 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/auth_providers.dart';
 import '../domain/models/onboarding_profile.dart';
+import 'onboarding_handoff.dart';
 import 'onboarding_providers.dart';
 
-/// Ordered steps of the first-launch flow (ONBOARDING_PRD.md; registration
-/// inserted after Welcome — decision log 2026-07-12).
+/// Ordered steps of the first-launch flow (guest-first restructure,
+/// decision log 2026-09-25): one story — what gets in your way → what
+/// matters → why following through is hard → how SidePal helps → set up →
+/// your SidePal → (first goal, after sign-in) → ready.
+///
+/// Registration is no longer a step: the flow ends in the anonymous account
+/// and the account prompt comes later (Home backup card, Profile).
 enum OnboardingStep {
   welcome,
-  register,
   struggles,
-  whyThisHappens,
-  meetSidePal,
-  community,
-  aiDemo,
-  theProblem,
-  dayOnePhoto,
-  science,
   chooseGoals,
+  whyThisHappens,
+  aiDemo,
   personalizing,
   yourSidePal,
-  premium,
-  journey,
-}
 
-/// Why the user is on an auth surface — decides what a successful
-/// non-anonymous sign-in means (continue the tour vs. finish immediately).
-enum OnboardingAuthIntent { register, login }
+  /// In-flow closing screen — reached only via "Not now" on Your SidePal.
+  /// The "created a goal" variant is shown after sign-in by
+  /// [OnboardingHandoffBridge], because a real goal needs a uid.
+  ready,
+}
 
 @immutable
 class OnboardingFlowState {
@@ -34,19 +34,11 @@ class OnboardingFlowState {
     this.step = OnboardingStep.welcome,
     this.struggles = const <String>{},
     this.interests = const <String>{},
-    this.dayOnePhotoPath,
-    this.dayOnePhotoTakenAtMs,
-    this.authIntent = OnboardingAuthIntent.register,
-    this.registeredDuringOnboarding = false,
   });
 
   final OnboardingStep step;
   final Set<String> struggles;
   final Set<String> interests;
-  final String? dayOnePhotoPath;
-  final int? dayOnePhotoTakenAtMs;
-  final OnboardingAuthIntent authIntent;
-  final bool registeredDuringOnboarding;
 
   double get progress => step.index / (OnboardingStep.values.length - 1);
 
@@ -54,19 +46,10 @@ class OnboardingFlowState {
     OnboardingStep? step,
     Set<String>? struggles,
     Set<String>? interests,
-    String? dayOnePhotoPath,
-    int? dayOnePhotoTakenAtMs,
-    OnboardingAuthIntent? authIntent,
-    bool? registeredDuringOnboarding,
   }) => OnboardingFlowState(
     step: step ?? this.step,
     struggles: struggles ?? this.struggles,
     interests: interests ?? this.interests,
-    dayOnePhotoPath: dayOnePhotoPath ?? this.dayOnePhotoPath,
-    dayOnePhotoTakenAtMs: dayOnePhotoTakenAtMs ?? this.dayOnePhotoTakenAtMs,
-    authIntent: authIntent ?? this.authIntent,
-    registeredDuringOnboarding:
-        registeredDuringOnboarding ?? this.registeredDuringOnboarding,
   );
 }
 
@@ -83,19 +66,10 @@ class OnboardingFlowController extends StateNotifier<OnboardingFlowState> {
     final target = OnboardingStep.values[i + 1];
     state = state.copyWith(step: target);
     // Answers persist as the user leaves the step that produced them
-    // (struggles / photo / goals), so a crash mid-flow loses nothing.
+    // (struggles / goals), so a crash mid-flow loses nothing.
     if (target == OnboardingStep.whyThisHappens ||
-        target == OnboardingStep.science ||
         target == OnboardingStep.personalizing) {
       saveProgress();
-    }
-  }
-
-  /// Skips over the registration step (already signed in with a real
-  /// account — e.g. keychain-restored session after a reinstall).
-  void skipRegisterStep() {
-    if (state.step == OnboardingStep.register) {
-      state = state.copyWith(step: OnboardingStep.struggles);
     }
   }
 
@@ -105,24 +79,12 @@ class OnboardingFlowController extends StateNotifier<OnboardingFlowState> {
     final i = state.step.index;
     if (i == 0) return false;
     var target = OnboardingStep.values[i - 1];
-    // Never step back INTO registration once past it (account exists) or
-    // into the transient personalizing animation.
-    if (target == OnboardingStep.register && state.registeredDuringOnboarding) {
-      target = OnboardingStep.welcome;
-    }
+    // Never step back INTO the transient personalizing animation.
     if (target == OnboardingStep.personalizing) {
-      target = OnboardingStep.chooseGoals;
+      target = OnboardingStep.values[target.index - 1];
     }
     state = state.copyWith(step: target);
     return true;
-  }
-
-  void setAuthIntent(OnboardingAuthIntent intent) {
-    state = state.copyWith(authIntent: intent);
-  }
-
-  void markRegistered() {
-    state = state.copyWith(registeredDuringOnboarding: true);
   }
 
   // ── Answers ─────────────────────────────────────────────────────────────────
@@ -139,13 +101,6 @@ class OnboardingFlowController extends StateNotifier<OnboardingFlowState> {
     state = state.copyWith(interests: next);
   }
 
-  void setDayOnePhoto(String path) {
-    state = state.copyWith(
-      dayOnePhotoPath: path,
-      dayOnePhotoTakenAtMs: DateTime.now().millisecondsSinceEpoch,
-    );
-  }
-
   // ── Persistence ─────────────────────────────────────────────────────────────
 
   OnboardingProfile _buildProfile({int completedAtMs = 0}) {
@@ -153,33 +108,43 @@ class OnboardingFlowController extends StateNotifier<OnboardingFlowState> {
       id: kOnboardingProfileId,
       struggles: state.struggles.toList(),
       interests: state.interests.toList(),
-      registeredDuringOnboarding: state.registeredDuringOnboarding,
+      registeredDuringOnboarding: false,
       completedAtMs: completedAtMs,
-      dayOnePhotoLocalPath: state.dayOnePhotoPath,
-      dayOnePhotoTakenAtMs: state.dayOnePhotoTakenAtMs,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch,
     );
   }
 
-  /// Local Isar write + outbox replication — instant, never awaits network.
+  /// The flow runs above AuthGate, so there is usually no uid yet: the
+  /// profile is committed to Isar only, and [OnboardingHandoffBridge]
+  /// replicates it once the account exists. A keychain-restored session is
+  /// the one case where a uid already exists — then it replicates now.
+  bool get _canReplicate =>
+      _ref.read(authRepositoryProvider).currentUser != null;
+
+  /// Local Isar write — instant, never awaits network.
   Future<void> saveProgress() async {
     try {
       await _ref
           .read(onboardingProfileRepositoryProvider)
-          .upsertProfile(_buildProfile());
+          .upsertProfile(_buildProfile(), replicate: _canReplicate);
     } catch (e, st) {
       debugPrint('OnboardingFlowController: saveProgress failed: $e\n$st');
     }
   }
 
-  /// Final write when the user taps "Start My Journey".
-  Future<void> complete() async {
+  /// Final write when the flow ends. [wantsFirstGoal] records the CTA the
+  /// user chose on Your SidePal; the bridge reads it after sign-in.
+  Future<void> complete({required bool wantsFirstGoal}) async {
     try {
       await _ref
           .read(onboardingProfileRepositoryProvider)
           .upsertProfile(
             _buildProfile(completedAtMs: DateTime.now().millisecondsSinceEpoch),
+            replicate: _canReplicate,
           );
+      await OnboardingHandoff.schedule(
+        wantsFirstGoal ? OnboardingHandoffKind.firstGoal : OnboardingHandoffKind.syncOnly,
+      );
     } catch (e, st) {
       debugPrint('OnboardingFlowController: complete write failed: $e\n$st');
     }

@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/onboarding_flow_controller.dart';
 import '../onboarding_ui.dart';
 
-/// Screen 3 — Why This Happens.
+/// Screen 4 — the one problem/solution screen. Replaced "Your brain isn't
+/// working against you" + "You're not lazy" (2026-09-25): one idea, about
+/// the behaviour, never an identity label. Keeps the reward-comparison
+/// visual.
 class WhyStep extends ConsumerWidget {
   const WhyStep({super.key, required this.onSkip});
 
@@ -24,16 +27,14 @@ class WhyStep extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Your brain isn\'t working against you.',
+            'Knowing what you want is the easy part.',
             style: OnboardingType.headline,
           ),
           const SizedBox(height: 14),
           Text(
-            'We are biologically wired to seek immediate rewards — an '
-            'ancient survival mechanism that conflicts with today\'s '
-            'long-term goals.\n\nThat doesn\'t mean you\'re lazy. It means '
-            'your brain naturally chooses comfort over difficult work. '
-            'Understanding this is the first step toward lasting change.',
+            'Following through is harder. Plans get forgotten, distractions '
+            'win, and priorities shift.\n\nSidePal helps you notice when '
+            'you\'re drifting and get back to what matters.',
             style: OnboardingType.body,
           ),
           const SizedBox(height: 20),
