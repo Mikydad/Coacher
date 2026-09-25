@@ -297,7 +297,8 @@ class HomeScreen extends ConsumerWidget {
                     final remaining = rows.length - visible.length;
                     return Column(
                       children: [
-                        for (final row in visible)
+                        for (final (i, row) in visible.indexed) ...[
+                          if (i > 0) const _HomeRowDivider(),
                           _TaskItem(
                             // Guided-tour target: the first task's circle.
                             checkboxKey: row == visible.first
@@ -327,6 +328,7 @@ class HomeScreen extends ConsumerWidget {
                               arguments: TaskDetailArgs.fromRow(row),
                             ),
                           ),
+                        ],
                         if (remaining > 0)
                           _HomeSectionSeeMoreLink(
                             label: remaining == 1
@@ -339,8 +341,8 @@ class HomeScreen extends ConsumerWidget {
                           ),
                         // Direct add from Home (2026-08-25) — mirrors the
                         // goals card's "Create a goal" link.
-                        Align(
-                          alignment: Alignment.centerLeft,
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
                           child: _createTaskLink(context),
                         ),
                       ],
@@ -425,7 +427,8 @@ class HomeScreen extends ConsumerWidget {
                         // Goal detail stays reachable via the sheet's
                         // Details pill; while progress is still loading
                         // the tap falls back to the detail push.
-                        for (final g in visible)
+                        for (final (i, g) in visible.indexed) ...[
+                          if (i > 0) const _HomeRowDivider(),
                           Consumer(
                             builder: (context, tileRef, _) {
                               final progress = tileRef
@@ -460,6 +463,7 @@ class HomeScreen extends ConsumerWidget {
                               );
                             },
                           ),
+                        ],
                         if (remaining > 0)
                           _HomeSectionSeeMoreLink(
                             label: remaining == 1
@@ -474,8 +478,8 @@ class HomeScreen extends ConsumerWidget {
                         // Direct goal creation stays visible even with
                         // goals listed (2026-08-25) — it used to appear
                         // only in the empty state.
-                        Align(
-                          alignment: Alignment.centerLeft,
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
                           child: _createGoalLink(context),
                         ),
                       ],
@@ -1829,24 +1833,95 @@ class _FlowNowTimerControl extends StatelessWidget {
 /// "+ Create a task" link at the bottom of the Today's Tasks card
 /// (2026-08-25) — same shape as the goals card's "Create a goal".
 Widget _createTaskLink(BuildContext context) {
-  return TextButton.icon(
-    onPressed: () => showAddTaskSheet(context),
-    icon: Icon(Icons.add, size: 20, color: AppColors.accent),
-    label: const Text('Create a task'),
-    style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+  return _HomeCreateButton(
+    label: 'Create a task',
+    onTap: () => showAddTaskSheet(context),
   );
 }
 
 /// "+ Create a goal" — always visible at the bottom of the Today's goals
 /// card (2026-08-25; it used to exist only in the empty state).
 Widget _createGoalLink(BuildContext context) {
-  return TextButton.icon(
-    onPressed: () =>
+  return _HomeCreateButton(
+    label: 'Create a goal',
+    onTap: () =>
         Navigator.pushNamed(context, GoalTemplatePickerScreen.routeName),
-    icon: Icon(Icons.add, size: 20, color: AppColors.accent),
-    label: const Text('Create a goal'),
-    style: TextButton.styleFrom(foregroundColor: AppColors.accent),
   );
+}
+
+/// Full-width "create" row (Miko's mockup, 2026-09-25): a plus in a rounded
+/// square on the left, the label beside it, on a soft tinted surface.
+class _HomeCreateButton extends StatelessWidget {
+  const _HomeCreateButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    // Same surface + glyph tokens as the four Home action tiles, so the
+    // button reads as part of that family rather than a stray grey.
+    return Material(
+      color: AppColors.actionTile,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.fg12,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.add, color: AppColors.onActionTile, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: AppColors.onActionTile,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Hairline between Home list rows, fading out at both ends.
+class _HomeRowDivider extends StatelessWidget {
+  const _HomeRowDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    final line = AppColors.fg12;
+    return Container(
+      height: 1,
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            line.withValues(alpha: 0),
+            line,
+            line,
+            line.withValues(alpha: 0),
+          ],
+          stops: const [0, 0.18, 0.82, 1],
+        ),
+      ),
+    );
+  }
 }
 
 class _HomeSectionSeeMoreLink extends StatelessWidget {
@@ -2003,19 +2078,45 @@ class _TaskItem extends StatelessWidget {
           style: TextStyle(
             decoration: done ? TextDecoration.lineThrough : null,
             fontStyle: partial ? FontStyle.italic : FontStyle.normal,
-            color: AppColors.fg70,
+            fontWeight: FontWeight.w600,
+            color: done ? AppColors.fg70 : AppColors.fg,
           ),
         ),
         subtitle: subtitle == null
             ? null
-            : Text(
-                subtitle!,
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            : Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.schedule_rounded,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        subtitle!,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-        trailing: IconButton(
-          tooltip: 'Plans Changed?',
-          icon: Icon(Icons.swap_horiz, color: AppColors.fg54),
-          onPressed: onPlansChanged,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: 'Plans Changed?',
+              icon: Icon(Icons.swap_horiz, color: AppColors.fg54),
+              onPressed: onPlansChanged,
+            ),
+            Icon(Icons.chevron_right, color: AppColors.fg24, size: 20),
+          ],
         ),
       ),
     );
@@ -2388,11 +2489,13 @@ Future<Routine?> _routineForPlannedRow(
   return null;
 }
 
-String? _homeTaskSubtitle(PlannedTaskRow row, Map<String, int> scores) {
-  final id = row.task.id;
-  final p = scores[id];
-  if (p != null && p < 100) return '$p% complete';
-  return null;
+/// Meta line under each Home task (Miko's mockup, 2026-09-25): the
+/// scheduled time or "No time set", then the partial score when one exists.
+String _homeTaskSubtitle(PlannedTaskRow row, Map<String, int> scores) {
+  final time = taskScheduledTimeLabelForDisplay(row.task) ?? 'No time set';
+  final p = scores[row.task.id];
+  if (p != null && p < 100) return '$time · $p% complete';
+  return time;
 }
 
 int _completedForRows(List<PlannedTaskRow> rows, Map<String, int> scores) {
