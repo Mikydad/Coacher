@@ -38,6 +38,10 @@ class IsarTask {
   late bool strictModeRequired;
   String? modeRefId;
 
+  /// Linked goal (Phase 6); indexed for the goal-detail list.
+  @Index()
+  String? goalId;
+
   static IsarTask fromDomain(PlannedTask t) {
     return IsarTask()
       ..taskId = t.id
@@ -58,7 +62,8 @@ class IsarTask {
       ..sequenceIndex = t.sequenceIndex
       ..isHabitAnchor = t.isHabitAnchor
       ..strictModeRequired = t.strictModeRequired
-      ..modeRefId = t.modeRefId;
+      ..modeRefId = t.modeRefId
+      ..goalId = t.goalId;
   }
 
   PlannedTask toDomain() {
@@ -82,6 +87,7 @@ class IsarTask {
       isHabitAnchor: isHabitAnchor,
       strictModeRequired: strictModeRequired,
       modeRefId: modeRefId,
+      goalId: goalId,
     );
   }
 }

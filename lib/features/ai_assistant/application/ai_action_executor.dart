@@ -1352,6 +1352,9 @@ class AiActionExecutor {
       await tierGuard?.ensureCanAddReminder();
     }
 
+    // Goal link (Phase 6): stamped by the resolver from goalRef/goalTitle;
+    // an unresolved goal leaves the task unlinked, never blocks creation.
+    final goalId = p['_resolvedGoalId'] as String?;
     final task = PlannedTask(
       id: StableId.generate('task'),
       routineId: routineId,
@@ -1367,6 +1370,7 @@ class AiActionExecutor {
       updatedAtMs: DateTime.now().millisecondsSinceEpoch,
       planDateKey: dateStr,
       modeRefId: modeRefId,
+      goalId: goalId,
     );
 
     await planningRepository.upsertTask(task);
@@ -1399,7 +1403,10 @@ class AiActionExecutor {
       if (block != null) await timeBlockSyncService.syncBlock(block);
     }
 
-    return 'Added "$title" on ${_friendlyDate(dateStr)}${timeStr != null ? " at $timeStr" : ""}.';
+    final goalNote = p['goalTitle'] is String && goalId != null
+        ? ' (for "${p['goalTitle']}")'
+        : '';
+    return 'Added "$title" on ${_friendlyDate(dateStr)}${timeStr != null ? " at $timeStr" : ""}$goalNote.';
   }
 
   /// Loads the task row a resolver-stamped action targets. The resolver

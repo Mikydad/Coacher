@@ -406,6 +406,58 @@ void main() {
       expect(p['time'], '07:00');
     });
 
+    test('createTask with a goalRef links the task to that goal (Phase 6)',
+        () async {
+      final s = await AiScenario.start(
+        script: [
+          ScriptedProxy.propose(
+            presentation: 'preview',
+            content: 'Adding practice tomorrow — confirm below.',
+            actions: [
+              {
+                'actionType': 'createTask',
+                'parameters': {
+                  'title': 'Practice',
+                  'time': '19:00',
+                  'duration': 25,
+                  'date': 'tomorrow',
+                  'goalRef': 'g1',
+                },
+              },
+            ],
+          ),
+        ],
+      );
+      addTearDown(s.dispose);
+      final now = DateTime.now();
+      s.goals.goals.add(
+        UserGoal(
+          id: 'g-music',
+          title: 'Music',
+          categoryId: GoalCategories.study,
+          status: GoalStatus.active,
+          measurementKind: MeasurementKind.minutes,
+          targetValue: 25,
+          intensity: 3,
+          periodStartMs: now.subtract(const Duration(days: 1)).millisecondsSinceEpoch,
+          periodEndMs: now.add(const Duration(days: 29)).millisecondsSinceEpoch,
+          repeatCadence: GoalRepeatCadence.daily,
+          createdAtMs: 1,
+          updatedAtMs: 1,
+        ),
+      );
+
+      await s.service.sendMessage('add practice tomorrow at 7pm for my music goal');
+      expect(s.proxy.lastUserPrompt(), contains('[g1] Music'));
+      final card = s.latestCard!;
+      expect(card.plannedChanges!.actions.single.parameters['goalTitle'], 'Music');
+      await s.service.confirmPlan(card.plannedChanges, card.id);
+
+      final created = s.planning.tasksOn(tomorrow).single;
+      expect(created.goalId, 'g-music');
+      expect(s.lastAssistant.content, contains('for "Music"'));
+    });
+
     test('a taskRef handle targets the exact existing task', () async {
       final s = await AiScenario.start(
         script: [

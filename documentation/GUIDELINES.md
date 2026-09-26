@@ -4630,3 +4630,19 @@ not silent reversal.
   *Re-run* the bake-off after the flattened-parameter fix before judging
   luna again; its planning replies were truncated by the results file
   (now stored whole).
+
+- **2026-09-26 · Phase 6 of the Coach fix plan: tasks can belong to a goal
+  (D4 — linkage, not a Direction hierarchy).** `PlannedTask.goalId`
+  (nullable) ships as a full synced set: domain `toMap`/`fromMap` (so the
+  outbox payload and `RemoteIsarMerge` carry it), `IsarTask.goalId` with an
+  index (build_runner), `IsarPlanningRepository.getTasksForGoal` /
+  `watchTasksForGoal`. Goal detail shows a "Planned tasks" section from the
+  watch stream when any task is linked. The Coach's `createTask` takes an
+  optional `goalRef` ([g1]); the resolver stamps `_resolvedGoalId` on a
+  handle or a unique title match and never blocks creation on a miss; the
+  executor sets `goalId` and says "(for "Music")"; linked tasks render
+  "· for [g1]" in the payload so the model sees which plan items already
+  serve a goal. The server prompt asks for `goalRef` on tasks that serve a
+  goal, especially BEHIND PACE ones. *Not done:* a goal picker in the task
+  editor (optional; the Coach path was the gap). *Rejected:* making
+  Direction the parent of goals — Direction stays context (2026-09-11).

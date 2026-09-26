@@ -63,12 +63,27 @@ abstract class PlanningRepository {
   Future<({String routineId, String blockId})> ensureDefaultDayPlan(
     String dateKey,
   );
+
+  /// Tasks linked to [goalId] (Phase 6), any day. Local read; the UI
+  /// watches the stream variant.
+  Future<List<PlannedTask>> getTasksForGoal(String goalId);
+
+  /// Live Isar view of the tasks linked to [goalId], newest plan day first.
+  Stream<List<PlannedTask>> watchTasksForGoal(String goalId);
 }
 
 class FirestorePlanningRepository implements PlanningRepository {
   FirestorePlanningRepository(this._client);
 
   final FirestoreClient _client;
+
+  // Goal links are an Isar read (Phase 6); the remote path never lists them.
+  @override
+  Future<List<PlannedTask>> getTasksForGoal(String goalId) async => const [];
+
+  @override
+  Stream<List<PlannedTask>> watchTasksForGoal(String goalId) =>
+      Stream.value(const []);
 
   Future<void> _upsertWithQueue({
     required String entityType,

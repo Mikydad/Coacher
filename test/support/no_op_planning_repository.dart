@@ -11,6 +11,13 @@ import 'package:sidepal/features/planning/domain/models/task_item.dart';
 /// touches Isar for routines/blocks/tasks.
 class NoOpPlanningRepository implements PlanningRepository {
   @override
+  Future<List<PlannedTask>> getTasksForGoal(String goalId) async => const [];
+
+  @override
+  Stream<List<PlannedTask>> watchTasksForGoal(String goalId) =>
+      Stream.value(const []);
+
+  @override
   Future<void> deleteAccountabilityLog(String id) async {}
 
   @override

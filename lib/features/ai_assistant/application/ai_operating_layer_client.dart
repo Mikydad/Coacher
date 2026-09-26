@@ -197,7 +197,9 @@ const List<Map<String, dynamic>> kCoachAgentTools = [
                   'description':
                       'EXACT keys per actionType — createTask/editTask: '
                       'title, time ("HH:mm" 24-hour), duration (minutes, '
-                      'integer), date ("today" | "tomorrow" | YYYY-MM-DD); '
+                      'integer), date ("today" | "tomorrow" | YYYY-MM-DD), '
+                      'and for createTask an optional goalRef (the [g1] '
+                      'handle of the goal this task serves); '
                       'editTask/moveTask/deleteTask/addReminder/'
                       'removeReminder/rescheduleReminder: taskRef (the '
                       '[t1]-style handle shown next to the existing task — '
@@ -588,13 +590,15 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
     // back as taskRef/goalRef (D2) — exact targeting without raw ids.
     String ref(Map<String, dynamic> m) =>
         m['ref'] != null ? '[${m['ref']}] ' : '';
+    String forGoal(Map<String, dynamic> m) =>
+        m['goal'] != null ? ' · for [${m['goal']}]' : '';
 
     if (payload.activeTasks.isNotEmpty) {
       buffer.writeln("Today's tasks:");
       for (final t in payload.activeTasks) {
         buffer.writeln(
           '  - ${ref(t)}${t['title']} at ${t['time'] ?? 'no time'} '
-          '(${t['duration'] ?? '?'}, ${t['status'] ?? 'pending'})',
+          '(${t['duration'] ?? '?'}, ${t['status'] ?? 'pending'})${forGoal(t)}',
         );
       }
       buffer.writeln();
@@ -650,7 +654,7 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
       for (final t in payload.tomorrowTasks) {
         buffer.writeln(
           '  - ${ref(t)}${t['title']} at ${t['time'] ?? 'no time'} '
-          '(${t['duration'] ?? '?'}, ${t['status'] ?? 'pending'})',
+          '(${t['duration'] ?? '?'}, ${t['status'] ?? 'pending'})${forGoal(t)}',
         );
       }
       buffer.writeln();

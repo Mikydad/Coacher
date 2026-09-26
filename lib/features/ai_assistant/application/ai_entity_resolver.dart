@@ -81,11 +81,45 @@ class AiEntityResolver {
         final outcome = await _resolveGoal(action);
         if (outcome is _Question) return EntityResolutionQuestion(outcome.text);
         resolved.add((outcome as _Resolved).action);
+      } else if (action.actionType == ActionType.createTask) {
+        resolved.add(await _linkGoalIfNamed(action, goalHandles));
       } else {
         resolved.add(action);
       }
     }
     return EntityResolutionOk(resolved);
+  }
+
+  /// createTask may name the goal it serves (Phase 6): `goalRef` ([g1]) or
+  /// `goalTitle`. Best-effort — a unique match stamps `_resolvedGoalId`
+  /// and the canonical title; anything else leaves the task unlinked.
+  Future<AiAction> _linkGoalIfNamed(
+    AiAction action,
+    Map<String, AiGoalHandle> handles,
+  ) async {
+    final ref = _handleOf(action, 'goalRef');
+    final h = ref == null ? null : handles[ref];
+    if (h != null) {
+      final p = Map<String, dynamic>.from(action.parameters);
+      p['_resolvedGoalId'] = h.goalId;
+      p['goalTitle'] = h.title;
+      return action.copyWith(parameters: p);
+    }
+    final title = (action.parameters['goalTitle'] as String?)?.trim();
+    if (title == null || title.isEmpty) return action;
+    try {
+      final goals = (await goalsRepository.fetchGoalsOnce())
+          .where((g) => g.status == GoalStatus.active)
+          .where((g) => matchScore(title, g.title) >= 0.8)
+          .toList();
+      if (goals.length != 1) return action;
+      final p = Map<String, dynamic>.from(action.parameters);
+      p['_resolvedGoalId'] = goals.single.id;
+      p['goalTitle'] = goals.single.title;
+      return action.copyWith(parameters: p);
+    } catch (_) {
+      return action;
+    }
   }
 
   // ─── Handles (D2) ──────────────────────────────────────────────────────────

@@ -33,62 +33,63 @@ const IsarTaskSchema = CollectionSchema(
       name: r'durationMinutes',
       type: IsarType.long,
     ),
+    r'goalId': PropertySchema(id: 4, name: r'goalId', type: IsarType.string),
     r'isHabitAnchor': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'isHabitAnchor',
       type: IsarType.bool,
     ),
     r'modeRefId': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'modeRefId',
       type: IsarType.string,
     ),
-    r'notes': PropertySchema(id: 6, name: r'notes', type: IsarType.string),
+    r'notes': PropertySchema(id: 7, name: r'notes', type: IsarType.string),
     r'orderIndex': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'orderIndex',
       type: IsarType.long,
     ),
     r'planDateKey': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'planDateKey',
       type: IsarType.string,
     ),
-    r'priority': PropertySchema(id: 9, name: r'priority', type: IsarType.long),
+    r'priority': PropertySchema(id: 10, name: r'priority', type: IsarType.long),
     r'reminderEnabled': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'reminderEnabled',
       type: IsarType.bool,
     ),
     r'reminderTimeIso': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'reminderTimeIso',
       type: IsarType.string,
     ),
     r'routineId': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'routineId',
       type: IsarType.string,
     ),
     r'sequenceIndex': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'sequenceIndex',
       type: IsarType.long,
     ),
     r'statusName': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'statusName',
       type: IsarType.string,
     ),
     r'strictModeRequired': PropertySchema(
-      id: 15,
+      id: 16,
       name: r'strictModeRequired',
       type: IsarType.bool,
     ),
-    r'taskId': PropertySchema(id: 16, name: r'taskId', type: IsarType.string),
-    r'title': PropertySchema(id: 17, name: r'title', type: IsarType.string),
+    r'taskId': PropertySchema(id: 17, name: r'taskId', type: IsarType.string),
+    r'title': PropertySchema(id: 18, name: r'title', type: IsarType.string),
     r'updatedAtMs': PropertySchema(
-      id: 18,
+      id: 19,
       name: r'updatedAtMs',
       type: IsarType.long,
     ),
@@ -165,6 +166,19 @@ const IsarTaskSchema = CollectionSchema(
         ),
       ],
     ),
+    r'goalId': IndexSchema(
+      id: 2738626632585230611,
+      name: r'goalId',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'goalId',
+          type: IndexType.hash,
+          caseSensitive: true,
+        ),
+      ],
+    ),
   },
   links: {},
   embeddedSchemas: {},
@@ -184,6 +198,12 @@ int _isarTaskEstimateSize(
   bytesCount += 3 + object.blockId.length * 3;
   {
     final value = object.category;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.goalId;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
     }
@@ -229,21 +249,22 @@ void _isarTaskSerialize(
   writer.writeString(offsets[1], object.category);
   writer.writeLong(offsets[2], object.createdAtMs);
   writer.writeLong(offsets[3], object.durationMinutes);
-  writer.writeBool(offsets[4], object.isHabitAnchor);
-  writer.writeString(offsets[5], object.modeRefId);
-  writer.writeString(offsets[6], object.notes);
-  writer.writeLong(offsets[7], object.orderIndex);
-  writer.writeString(offsets[8], object.planDateKey);
-  writer.writeLong(offsets[9], object.priority);
-  writer.writeBool(offsets[10], object.reminderEnabled);
-  writer.writeString(offsets[11], object.reminderTimeIso);
-  writer.writeString(offsets[12], object.routineId);
-  writer.writeLong(offsets[13], object.sequenceIndex);
-  writer.writeString(offsets[14], object.statusName);
-  writer.writeBool(offsets[15], object.strictModeRequired);
-  writer.writeString(offsets[16], object.taskId);
-  writer.writeString(offsets[17], object.title);
-  writer.writeLong(offsets[18], object.updatedAtMs);
+  writer.writeString(offsets[4], object.goalId);
+  writer.writeBool(offsets[5], object.isHabitAnchor);
+  writer.writeString(offsets[6], object.modeRefId);
+  writer.writeString(offsets[7], object.notes);
+  writer.writeLong(offsets[8], object.orderIndex);
+  writer.writeString(offsets[9], object.planDateKey);
+  writer.writeLong(offsets[10], object.priority);
+  writer.writeBool(offsets[11], object.reminderEnabled);
+  writer.writeString(offsets[12], object.reminderTimeIso);
+  writer.writeString(offsets[13], object.routineId);
+  writer.writeLong(offsets[14], object.sequenceIndex);
+  writer.writeString(offsets[15], object.statusName);
+  writer.writeBool(offsets[16], object.strictModeRequired);
+  writer.writeString(offsets[17], object.taskId);
+  writer.writeString(offsets[18], object.title);
+  writer.writeLong(offsets[19], object.updatedAtMs);
 }
 
 IsarTask _isarTaskDeserialize(
@@ -257,22 +278,23 @@ IsarTask _isarTaskDeserialize(
   object.category = reader.readStringOrNull(offsets[1]);
   object.createdAtMs = reader.readLong(offsets[2]);
   object.durationMinutes = reader.readLong(offsets[3]);
+  object.goalId = reader.readStringOrNull(offsets[4]);
   object.id = id;
-  object.isHabitAnchor = reader.readBool(offsets[4]);
-  object.modeRefId = reader.readStringOrNull(offsets[5]);
-  object.notes = reader.readStringOrNull(offsets[6]);
-  object.orderIndex = reader.readLong(offsets[7]);
-  object.planDateKey = reader.readStringOrNull(offsets[8]);
-  object.priority = reader.readLong(offsets[9]);
-  object.reminderEnabled = reader.readBool(offsets[10]);
-  object.reminderTimeIso = reader.readStringOrNull(offsets[11]);
-  object.routineId = reader.readString(offsets[12]);
-  object.sequenceIndex = reader.readLongOrNull(offsets[13]);
-  object.statusName = reader.readString(offsets[14]);
-  object.strictModeRequired = reader.readBool(offsets[15]);
-  object.taskId = reader.readString(offsets[16]);
-  object.title = reader.readString(offsets[17]);
-  object.updatedAtMs = reader.readLong(offsets[18]);
+  object.isHabitAnchor = reader.readBool(offsets[5]);
+  object.modeRefId = reader.readStringOrNull(offsets[6]);
+  object.notes = reader.readStringOrNull(offsets[7]);
+  object.orderIndex = reader.readLong(offsets[8]);
+  object.planDateKey = reader.readStringOrNull(offsets[9]);
+  object.priority = reader.readLong(offsets[10]);
+  object.reminderEnabled = reader.readBool(offsets[11]);
+  object.reminderTimeIso = reader.readStringOrNull(offsets[12]);
+  object.routineId = reader.readString(offsets[13]);
+  object.sequenceIndex = reader.readLongOrNull(offsets[14]);
+  object.statusName = reader.readString(offsets[15]);
+  object.strictModeRequired = reader.readBool(offsets[16]);
+  object.taskId = reader.readString(offsets[17]);
+  object.title = reader.readString(offsets[18]);
+  object.updatedAtMs = reader.readLong(offsets[19]);
   return object;
 }
 
@@ -292,34 +314,36 @@ P _isarTaskDeserializeProp<P>(
     case 3:
       return (reader.readLong(offset)) as P;
     case 4:
-      return (reader.readBool(offset)) as P;
-    case 5:
       return (reader.readStringOrNull(offset)) as P;
+    case 5:
+      return (reader.readBool(offset)) as P;
     case 6:
       return (reader.readStringOrNull(offset)) as P;
     case 7:
-      return (reader.readLong(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 8:
-      return (reader.readStringOrNull(offset)) as P;
-    case 9:
       return (reader.readLong(offset)) as P;
-    case 10:
-      return (reader.readBool(offset)) as P;
-    case 11:
+    case 9:
       return (reader.readStringOrNull(offset)) as P;
-    case 12:
-      return (reader.readString(offset)) as P;
-    case 13:
-      return (reader.readLongOrNull(offset)) as P;
-    case 14:
-      return (reader.readString(offset)) as P;
-    case 15:
+    case 10:
+      return (reader.readLong(offset)) as P;
+    case 11:
       return (reader.readBool(offset)) as P;
-    case 16:
+    case 12:
+      return (reader.readStringOrNull(offset)) as P;
+    case 13:
       return (reader.readString(offset)) as P;
+    case 14:
+      return (reader.readLongOrNull(offset)) as P;
+    case 15:
+      return (reader.readString(offset)) as P;
+    case 16:
+      return (reader.readBool(offset)) as P;
     case 17:
       return (reader.readString(offset)) as P;
     case 18:
+      return (reader.readString(offset)) as P;
+    case 19:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -824,6 +848,81 @@ extension IsarTaskQueryWhere on QueryBuilder<IsarTask, IsarTask, QWhereClause> {
       );
     });
   }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterWhereClause> goalIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'goalId', value: [null]),
+      );
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterWhereClause> goalIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.between(
+          indexName: r'goalId',
+          lower: [null],
+          includeLower: false,
+          upper: [],
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterWhereClause> goalIdEqualTo(
+    String? goalId,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'goalId', value: [goalId]),
+      );
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterWhereClause> goalIdNotEqualTo(
+    String? goalId,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'goalId',
+                lower: [],
+                upper: [goalId],
+                includeUpper: false,
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'goalId',
+                lower: [goalId],
+                includeLower: false,
+                upper: [],
+              ),
+            );
+      } else {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'goalId',
+                lower: [goalId],
+                includeLower: false,
+                upper: [],
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'goalId',
+                lower: [],
+                upper: [goalId],
+                includeUpper: false,
+              ),
+            );
+      }
+    });
+  }
 }
 
 extension IsarTaskQueryFilter
@@ -1244,6 +1343,168 @@ extension IsarTaskQueryFilter
           upper: upper,
           includeUpper: includeUpper,
         ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterFilterCondition> goalIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'goalId'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterFilterCondition> goalIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'goalId'),
+      );
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterFilterCondition> goalIdEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'goalId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterFilterCondition> goalIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'goalId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterFilterCondition> goalIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'goalId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterFilterCondition> goalIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'goalId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterFilterCondition> goalIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'goalId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterFilterCondition> goalIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'goalId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterFilterCondition> goalIdContains(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'goalId',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterFilterCondition> goalIdMatches(
+    String pattern, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'goalId',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterFilterCondition> goalIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'goalId', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterFilterCondition> goalIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'goalId', value: ''),
       );
     });
   }
@@ -2874,6 +3135,18 @@ extension IsarTaskQuerySortBy on QueryBuilder<IsarTask, IsarTask, QSortBy> {
     });
   }
 
+  QueryBuilder<IsarTask, IsarTask, QAfterSortBy> sortByGoalId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'goalId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterSortBy> sortByGoalIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'goalId', Sort.desc);
+    });
+  }
+
   QueryBuilder<IsarTask, IsarTask, QAfterSortBy> sortByIsHabitAnchor() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isHabitAnchor', Sort.asc);
@@ -3106,6 +3379,18 @@ extension IsarTaskQuerySortThenBy
     });
   }
 
+  QueryBuilder<IsarTask, IsarTask, QAfterSortBy> thenByGoalId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'goalId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IsarTask, IsarTask, QAfterSortBy> thenByGoalIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'goalId', Sort.desc);
+    });
+  }
+
   QueryBuilder<IsarTask, IsarTask, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -3330,6 +3615,14 @@ extension IsarTaskQueryWhereDistinct
     });
   }
 
+  QueryBuilder<IsarTask, IsarTask, QDistinct> distinctByGoalId({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'goalId', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<IsarTask, IsarTask, QDistinct> distinctByIsHabitAnchor() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'isHabitAnchor');
@@ -3469,6 +3762,12 @@ extension IsarTaskQueryProperty
   QueryBuilder<IsarTask, int, QQueryOperations> durationMinutesProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'durationMinutes');
+    });
+  }
+
+  QueryBuilder<IsarTask, String?, QQueryOperations> goalIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'goalId');
     });
   }
 

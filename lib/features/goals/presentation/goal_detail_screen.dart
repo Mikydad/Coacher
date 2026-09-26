@@ -27,6 +27,8 @@ import '../domain/models/goal_enums.dart';
 import '../domain/models/goal_milestone.dart';
 import '../domain/models/user_goal.dart';
 import '../../education/presentation/help_dot.dart';
+import '../../../core/utils/friendly_date.dart';
+import '../../planning/domain/models/task_item.dart';
 import 'goal_editor_screen.dart';
 
 /// Obsidian Pulse goal detail — layered dark surfaces, no dividers, lime as
@@ -376,6 +378,7 @@ class GoalDetailScreen extends ConsumerWidget {
                     },
                   ),
               const SizedBox(height: 32),
+              _LinkedTasksSection(goalId: g.id),
               _SectionHeader(
                 title: 'Milestones',
                 helpId: 'milestones',
@@ -1110,6 +1113,92 @@ class _NewMilestoneDialogState extends State<_NewMilestoneDialog> {
 
 /// One active stake per goal: shows the attached challenge when one
 /// exists, otherwise the "Add accountability" entry point.
+/// Tasks linked to a goal (Phase 6), live from Isar. Lives here, next to
+/// its one reader, because `core/di/providers.dart` (which owns the
+/// planning repository) must not be imported by `goals_providers.dart`.
+final linkedTasksForGoalProvider =
+    StreamProvider.family<List<PlannedTask>, String>((ref, goalId) {
+      return ref.read(planningRepositoryProvider).watchTasksForGoal(goalId);
+    });
+
+/// Tasks the Coach (or a future editor) linked to this goal (Phase 6):
+/// the plan-side half of "what matters → what needs doing".
+class _LinkedTasksSection extends ConsumerWidget {
+  const _LinkedTasksSection({required this.goalId});
+
+  final String goalId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tasks = ref.watch(linkedTasksForGoalProvider(goalId)).value ?? const [];
+    if (tasks.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader(
+          title: 'Planned tasks',
+          subtitle: 'ON YOUR PLAN FOR THIS GOAL',
+          trailing: _EmphasisCount(
+            strong: '${tasks.where((t) => t.status == TaskStatus.completed).length} / ${tasks.length}',
+            soft: '  done',
+          ),
+        ),
+        const SizedBox(height: 12),
+        for (final t in tasks.take(8))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: AppCard(
+              child: Row(
+                children: [
+                  Icon(
+                    t.status == TaskStatus.completed
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    size: 20,
+                    color: t.status == TaskStatus.completed
+                        ? AppColors.accent
+                        : AppColors.fg54,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          t.title,
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          _linkedTaskMeta(t),
+                          style: TextStyle(color: AppColors.fg54, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  static String _linkedTaskMeta(PlannedTask t) {
+    final day = t.planDateKey == null ? '' : friendlyDateKey(t.planDateKey!);
+    final iso = t.reminderTimeIso;
+    final dt = iso == null ? null : DateTime.tryParse(iso)?.toLocal();
+    final time = dt == null
+        ? ''
+        : ' · ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    return '$day$time'.toUpperCase();
+  }
+}
+
 class _AccountabilitySection extends ConsumerWidget {
   const _AccountabilitySection({required this.goal});
 

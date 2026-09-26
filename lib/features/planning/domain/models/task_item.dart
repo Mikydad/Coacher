@@ -33,6 +33,7 @@ class PlannedTask {
     this.isHabitAnchor = false,
     this.strictModeRequired = false,
     this.modeRefId,
+    this.goalId,
   });
 
   final String id;
@@ -64,6 +65,11 @@ class PlannedTask {
 
   /// Optional policy/mode config id reference used during execution.
   final String? modeRefId;
+
+  /// The goal this task serves, when any (AI chat fix plan Phase 6, D4):
+  /// the one relation the "what matters → what needs doing" chain needs.
+  /// Nullable, additive, synced like every other field.
+  final String? goalId;
 
   void validate() {
     ModelValidators.requireNotBlank(id, 'task.id');
@@ -107,6 +113,7 @@ class PlannedTask {
     'isHabitAnchor': isHabitAnchor,
     'strictModeRequired': strictModeRequired,
     if (modeRefId != null) 'modeRefId': modeRefId,
+    if (goalId != null) 'goalId': goalId,
   };
 
   static PlannedTask fromMap(Map<String, dynamic> map) => PlannedTask(
@@ -129,5 +136,6 @@ class PlannedTask {
     isHabitAnchor: map['isHabitAnchor'] as bool? ?? false,
     strictModeRequired: map['strictModeRequired'] as bool? ?? false,
     modeRefId: map['modeRefId'] as String?,
+    goalId: map['goalId'] as String?,
   );
 }

@@ -495,12 +495,17 @@ class AiPayloadAssembler {
     // per turn, never persisted. They let the model name an existing item
     // exactly instead of by a title the resolver has to guess at.
     final taskHandles = <String, AiTaskHandle>{};
+    final goalRefById = {
+      for (final e in goalSections.handles.entries) e.value.goalId: e.key,
+    };
     var n = 0;
     List<Map<String, dynamic>> withRefs(List<PlannedTaskRow> rows) {
       final maps = _taskMapsFromRows(rows);
       for (var i = 0; i < rows.length; i++) {
         final ref = 't${++n}';
         final row = rows[i];
+        final goalRef = goalRefById[row.task.goalId];
+        if (goalRef != null) maps[i]['goal'] = goalRef;
         taskHandles[ref] = AiTaskHandle(
           taskId: row.task.id,
           routineId: row.routineId,

@@ -177,6 +177,30 @@ class IsarPlanningRepository implements PlanningRepository {
   }
 
   @override
+  Future<List<PlannedTask>> getTasksForGoal(String goalId) async {
+    final rows = await _isar.isarTasks.filter().goalIdEqualTo(goalId).findAll();
+    return _sortedByDay(rows.map((e) => e.toDomain()).toList());
+  }
+
+  @override
+  Stream<List<PlannedTask>> watchTasksForGoal(String goalId) {
+    return _isar.isarTasks
+        .filter()
+        .goalIdEqualTo(goalId)
+        .watch(fireImmediately: true)
+        .map((rows) => _sortedByDay(rows.map((e) => e.toDomain()).toList()));
+  }
+
+  static List<PlannedTask> _sortedByDay(List<PlannedTask> tasks) {
+    tasks.sort((a, b) {
+      final c = (b.planDateKey ?? '').compareTo(a.planDateKey ?? '');
+      if (c != 0) return c;
+      return a.orderIndex.compareTo(b.orderIndex);
+    });
+    return tasks;
+  }
+
+  @override
   Future<PlannedTask?> getTaskById(String taskId) async {
     final row = await _isar.isarTasks.getByTaskId(taskId);
     return row?.toDomain();
@@ -328,6 +352,7 @@ class IsarPlanningRepository implements PlanningRepository {
       isHabitAnchor: task.isHabitAnchor,
       strictModeRequired: task.strictModeRequired,
       modeRefId: task.modeRefId,
+      goalId: task.goalId,
     );
     await _isar.writeTxn(() async {
       await _isar.isarTasks.putByTaskId(IsarTask.fromDomain(stored));

@@ -119,6 +119,9 @@ pick sensible times from the free windows yourself instead of asking again.
   shown beside it — as taskRef/goalRef; fall back to taskTitle/goalTitle
   only when no handle is visible. The app shows the user exactly what will
   change before anything is applied.
+- When a new task serves one of their goals, add goalRef ([g1]) to that
+  createTask so it counts toward the goal — especially for goals marked
+  BEHIND PACE.
 - Presentation "preview" → the user gave a clear command ("add workout at 6am").
   Keep your text to one short confirmation line.
 - logActivity parameters: text (what they are doing, ≤80 chars, e.g. "Gym"),
