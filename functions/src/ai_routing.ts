@@ -96,13 +96,58 @@ export const DEFAULT_ROUTES: Record<string, PurposeRoute> = {
 };
 
 /** Models the routing table may select. A config typo must not let a
- *  request escape to an arbitrary (expensive) model. */
-const ALLOWED_MODELS = new Set([
+ *  request escape to an arbitrary (expensive) model. Widened in AI chat
+ *  fix plan Phase 5.1 to the current generation (request shaping per
+ *  family lives in ai_request.ts); gpt-6 Astra is deliberately absent —
+ *  no "none" reasoning effort and no Chat Completions tool calling. */
+export const ALLOWED_MODELS = new Set([
   "gpt-4o-mini",
   "gpt-4o",
   "gpt-4.1-mini",
   "gpt-4.1",
+  "gpt-4.1-nano",
+  "gpt-5",
+  "gpt-5-mini",
+  "gpt-5-nano",
+  "gpt-5.1",
+  "gpt-5.2",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.4-nano",
+  "gpt-5.5",
+  "gpt-5.6-luna",
+  "gpt-5.6-terra",
+  "gpt-5.6-sol",
+  "gpt-6-luna",
+  "gpt-6-sol",
 ]);
+
+/** Hard ceiling on a Remote Config `maxTokens` override (Phase 5.1): the
+ *  per-purpose cap is a cost bound, not a suggestion. */
+export const MAX_ROUTE_TOKENS = 4000;
+
+/** Model names in the override JSON that the allow-list refused — for a
+ *  LOUD log at config load. Silent dropping meant a bake-off "switched"
+ *  to a model that never ran (review §2 #1). */
+export function rejectedModelOverrides(json: string | undefined): string[] {
+  if (json === undefined || json.length === 0) return [];
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(json);
+  } catch {
+    return [];
+  }
+  if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return [];
+  const rejected: string[] = [];
+  for (const [purpose, raw] of Object.entries(decoded)) {
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) continue;
+    const model = (raw as Record<string, unknown>).model;
+    if (typeof model === "string" && !ALLOWED_MODELS.has(model)) {
+      rejected.push(`${purpose}: ${model}`);
+    }
+  }
+  return rejected;
+}
 
 /** Parses the `ai_purpose_routes` Remote Config JSON (partial per-purpose
  *  overrides). Malformed input yields no overrides — config can degrade
@@ -133,7 +178,7 @@ export function parseRouteOverrides(
       Number.isFinite(entry.maxTokens) &&
       entry.maxTokens >= 1
     ) {
-      override.maxTokens = Math.floor(entry.maxTokens);
+      override.maxTokens = Math.min(Math.floor(entry.maxTokens), MAX_ROUTE_TOKENS);
     }
     if (entry.quotaClass === "user" || entry.quotaClass === "system") {
       override.quotaClass = entry.quotaClass;

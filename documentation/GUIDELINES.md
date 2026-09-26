@@ -4570,3 +4570,63 @@ not silent reversal.
   marker as the streaming path. Voice (D7): an auto-committed intention or
   memory write is READ BACK verbatim with "say undo if that's not right",
   and a short "undo" / "scratch that" right after reverts it (typed too).
+
+- **2026-09-26 · Phase 5.1/5.2 of the Coach fix plan: the model is
+  switchable for real; the bake-off is a script, not a guess.**
+  `functions/src/ai_request.ts` builds every OpenAI Chat Completions body
+  per model family: gpt-4o/4.1 keep `max_tokens` + `temperature`; gpt-5.x
+  and gpt-6 get `max_completion_tokens`, `reasoning_effort: "none"` (the
+  original gpt-5 family knows only "minimal", so temperature is dropped
+  there), and temperature only where "none" makes it legal. gpt-6 Astra is
+  deliberately NOT on the allow-list (no "none" effort, no Chat Completions
+  tool calling). A Remote Config model the allow-list refuses is logged as
+  an error at config load instead of silently keeping the default; RC
+  `maxTokens` overrides are capped at 4000. `functions/eval/bakeoff.mjs`
+  replays ten fixtures (question shapes, add/delete by handle, existing
+  tomorrow task, plan-then-question history, goal cadence, greeting)
+  through the SERVER's prompt and request shaping against candidate
+  models, with a `--max-calls` cap, and reports pass rate, p50/p95 latency
+  and cost per turn. *Rule:* the model for `coach_agent` changes only on a
+  recorded bake-off result (this log), via `ai_purpose_routes`. *Rejected:*
+  strict tool schemas before the bake-off can validate them live
+  (Phase 1.4 deferral stands); the Responses API (would move the loop's
+  state server-side, against the settled client-orchestrated design).
+
+- **2026-09-26 · Phase 7 of the Coach fix plan: one prompt, one guide.**
+  The client no longer ships a copy of the Coach system prompt: it sends a
+  one-line placeholder (`kServerOwnedPromptPlaceholder`) and the server's
+  per-purpose prompt replaces it, as it has since fix-wave Phase 5. The
+  copy had drifted from the server text and a test pinned the dead version.
+  `CODEBASE_GUIDE.md` §7 and §10 now describe the real pipeline (two
+  endpoints, purposes, request shaping, the proposal lifecycle, the
+  harness) and the recipe for a new verb includes the tool export and the
+  server prompt deploy. *Rule:* prompt text lives in
+  `functions/src/coach_prompts.ts` only; a prompt change is a deploy (or an
+  `ai_system_prompts` Remote Config edit), never a client release.
+
+- **2026-09-26 · Coach model bake-off result (fix plan Phase 5.2) and the
+  route decision (5.3).** Miko ran `functions/eval/bakeoff.mjs` over ten
+  fixtures × two runs × four models (80 calls). Two checks were mine to
+  correct after reading the replies ("0/25" matched inside "10/25"; the
+  "call mom" fixture is a reminder-only task, so `removeReminder` is a
+  legitimate verb). Corrected scores: **gpt-6-sol 20/20** (p50 1781 ms,
+  $0.0074/turn), **gpt-4.1-mini 18/20** (p50 1220 ms, $0.0015/turn),
+  gpt-6-luna 16/20 (p50 1424 ms, $0.0004/turn), gpt-4o-mini 15/20 (p50
+  1734 ms, $0.0006/turn). The only 4.1-mini misses: it proposes a task
+  that already exists on tomorrow instead of saying so — which the app now
+  flags as a conflict on the card (Phase 2.2). gpt-4o-mini wrote prose
+  plans without the tool call on both planning turns and put the task
+  fields at the top level (no `parameters` map) in 8 of 20 tool calls;
+  luna did that in 5. **Finding fixed in the app:** `AiAction.fromJson`
+  now lifts flattened fields, so that drift no longer becomes "What time
+  should I schedule it?" (scenario added). **Decision:** `coach_agent` and
+  `coach_agent_voice` move to `gpt-4.1-mini` — the best pass rate inside
+  the D6 budget (2.6× today's per-turn cost, fastest p50); system purposes
+  stay on gpt-4o-mini (cheap JSON mode, no evidence of a problem).
+  gpt-6-sol is the quality leader but ~13× today's cost and slower, so it
+  is the candidate for a separate planning-turn purpose only if suggest
+  quality proves insufficient after the app fixes land on device. The
+  switch is a Remote Config edit (`ai_purpose_routes`), not a release.
+  *Re-run* the bake-off after the flattened-parameter fix before judging
+  luna again; its planning replies were truncated by the results file
+  (now stored whole).

@@ -1,0 +1,89 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "propose_changes",
+      "description": "Propose schedule/goal/reminder changes. The user sees a preview card and must confirm \u2014 nothing is applied directly. Use presentation \"preview\" for explicit user commands and \"suggestion\" for plans that are your own idea.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "presentation": {
+            "type": "string",
+            "enum": [
+              "preview",
+              "suggestion"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "Short coaching message to show with the plan (used when you return no assistant text)."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "actionType": {
+                  "type": "string",
+                  "enum": [
+                    "createTask",
+                    "editTask",
+                    "moveTask",
+                    "deleteTask",
+                    "createGoal",
+                    "modifyGoal",
+                    "deleteGoal",
+                    "addReminder",
+                    "removeReminder",
+                    "rescheduleReminder",
+                    "activateContextOverride",
+                    "endContextOverride",
+                    "createIntention",
+                    "logActivity",
+                    "rememberFact",
+                    "updateFact",
+                    "forgetFact"
+                  ]
+                },
+                "parameters": {
+                  "type": "object",
+                  "description": "EXACT keys per actionType \u2014 createTask/editTask: title, time (\"HH:mm\" 24-hour), duration (minutes, integer), date (\"today\" | \"tomorrow\" | YYYY-MM-DD); editTask/moveTask/deleteTask/addReminder/removeReminder/rescheduleReminder: taskRef (the [t1]-style handle shown next to the existing task \u2014 preferred) or taskTitle; modifyGoal/deleteGoal: goalRef (the [g1] handle) or goalTitle; moveTask: destinationDate; createGoal: title, target (number + unit, e.g. \"25 minutes\", \"3 sessions\", \"20 km\"), deadline, cadence (\"daily\" | \"weekly\" | \"monthly\" | \"none\"), category (\"fitness\" | \"study\" | \"productivity\" | \"focus\" | \"habits\" | \"mental_clarity\"); modifyGoal: goalTitle, field (\"title\" | \"target\" | \"deadline\" | \"intensity\"), newValue; deleteGoal: goalTitle; addReminder/rescheduleReminder: taskTitle, reminderTime (\"HH:mm\"); removeReminder: taskTitle. Never use startTime/start/when/durationMinutes \u2014 the app reads only the keys above."
+                },
+                "confidence": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "actionType",
+                "parameters"
+              ]
+            }
+          }
+        },
+        "required": [
+          "presentation",
+          "actions"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_day_schedule",
+      "description": "Read the tasks scheduled on a specific day that is not already in your context (context always includes today and tomorrow).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "YYYY-MM-DD"
+          }
+        },
+        "required": [
+          "date"
+        ]
+      }
+    }
+  }
+]

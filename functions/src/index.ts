@@ -12,7 +12,13 @@ import {
   OverQuotaRegistry,
   overQuotaUntilFor,
 } from "./ai_quota_gate";
-import { parseRouteOverrides, resolveRoute, utcDayKey } from "./ai_routing";
+import {
+  parseRouteOverrides,
+  rejectedModelOverrides,
+  resolveRoute,
+  utcDayKey,
+} from "./ai_routing";
+import { buildChatBody } from "./ai_request";
 import {
   countsAsInstruction,
   instructionCapFor,
@@ -279,6 +285,20 @@ async function aiServerConfig(): Promise<AiServerConfig> {
         defaultConfig: RC_DEFAULTS,
       });
       rcLoadedAtMs = now;
+      // A model the allow-list refuses is a LOUD error at load (Phase 5.1)
+      // — the route silently keeps its default, so nobody would notice.
+      try {
+        const rejected = rejectedModelOverrides(
+          rcTemplate.evaluate().getString("ai_purpose_routes"),
+        );
+        if (rejected.length > 0) {
+          logger.error("ai_purpose_routes names models outside ALLOWED_MODELS; those routes keep their default model", {
+            rejected,
+          });
+        }
+      } catch {
+        // Evaluation problems are handled by the caller's evaluate().
+      }
     } catch (error) {
       rcFailedAtMs = now;
       logger.warn("Remote Config refresh failed; serving last-known AI routes", {
@@ -407,6 +427,8 @@ const KNOWN_PURPOSES = new Set([
   "phrase_nudge",
   "summarize",
   "reflect",
+  "classify_task",
+  "recovery_triage",
   "unknown",
 ]);
 
@@ -725,17 +747,20 @@ export const aiChat = onCall(
           Authorization: `Bearer ${openAiApiKey.value()}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          model: route.model,
-          temperature,
-          max_tokens: maxTokens,
-          // Tool-calling turns return natural text or tool calls; only
-          // legacy schema-mode callers force a JSON object body.
-          ...(tools === undefined
-            ? { response_format: { type: "json_object" } }
-            : { tools, tool_choice: "auto" }),
-          messages: finalMessages,
-        }),
+        // Shaped per model family (Phase 5.1): max_tokens vs
+        // max_completion_tokens, reasoning_effort, and whether temperature
+        // is accepted. Tool-calling turns return natural text or tool
+        // calls; only legacy schema-mode callers force a JSON object body.
+        body: JSON.stringify(
+          buildChatBody({
+            model: route.model,
+            messages: finalMessages,
+            maxTokens,
+            temperature,
+            tools,
+            jsonMode: tools === undefined,
+          }),
+        ),
         signal: AbortSignal.any([quotaAbort.signal, AbortSignal.timeout(45_000)]),
       });
 
@@ -1014,16 +1039,17 @@ export const aiChatStream = onRequest(
         Authorization: `Bearer ${openAiApiKey.value()}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: route.model,
-        messages: finalMessages,
-        max_tokens: route.maxTokens,
-        temperature: route.temperature ?? 0.6,
-        stream: true,
-        // The final SSE frame then carries usage — token-accurate
-        // telemetry for the one purpose that had none (tokens were -1).
-        stream_options: { include_usage: true },
-      }),
+      // Per-family shaping (Phase 5.1); the final SSE frame carries usage
+      // — token-accurate telemetry for the one purpose that had none.
+      body: JSON.stringify(
+        buildChatBody({
+          model: route.model,
+          messages: finalMessages,
+          maxTokens: route.maxTokens,
+          temperature: route.temperature ?? 0.6,
+          stream: true,
+        }),
+      ),
       signal: upstreamAbort.signal,
     });
 

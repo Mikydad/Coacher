@@ -376,6 +376,36 @@ void main() {
       expect(goal.categoryId, GoalCategories.study);
     });
 
+    test('flattened tool parameters still make a complete card (bake-off '
+        '2026-09-26: gpt-4o-mini did this in 8 of 20 calls)', () async {
+      final s = await AiScenario.start(
+        script: [
+          ScriptedProxy.propose(
+            presentation: 'preview',
+            content: 'Adding stretching tomorrow at 7 — confirm below.',
+            actions: [
+              {
+                'actionType': 'createTask',
+                'title': 'Stretching',
+                'time': '07:00',
+                'duration': 15,
+                'date': 'tomorrow',
+              },
+            ],
+          ),
+        ],
+      );
+      addTearDown(s.dispose);
+
+      await s.service.sendMessage('add stretching tomorrow at 7am for 15 minutes');
+
+      final card = s.latestCard;
+      expect(card, isNotNull, reason: 'no clarifying question for a complete request');
+      final p = card!.plannedChanges!.actions.single.parameters;
+      expect(p['title'], 'Stretching');
+      expect(p['time'], '07:00');
+    });
+
     test('a taskRef handle targets the exact existing task', () async {
       final s = await AiScenario.start(
         script: [

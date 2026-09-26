@@ -331,3 +331,31 @@ Flutter post on cooperative cancellation of long async pipelines.
 - **Formats:** thread ("three AIs, one bug, who was right"); post on
   skipped-tests-as-contracts; short clip of the `--run-skipped` output
   turning green phase by phase.
+
+## 2026-09-26 · Seven phases in one day, because the tests came first
+
+- **Hook:** The Coach that re-proposed applied plans and answered "what do
+  I have" with a workout card got rebuilt in a day — and the reason it was
+  safe to move that fast is boring: the failing tests were written before
+  the fixes.
+- **What happened:** Phase 0 built a harness that runs the real client,
+  parser, service and executor over in-memory data with a scripted model,
+  and parked nine contracts as skipped tests, each tagged with the phase
+  that would flip it on. Then the phases ran: one proposal record instead
+  of three interacting fields; a router that reads question shape before
+  guessing "change request"; idempotent batches; validation at Confirm;
+  goal progress in the goal's own units instead of a count of days;
+  calendar and goal blocks in the free windows; handles like [t1] so the
+  model names the exact task; history rows that keep times; a session that
+  is a calendar day; memory quotes verified against what the user actually
+  said; a request builder that lets Remote Config switch to a current
+  model without a 400.
+- **The turn:** Every phase ended the same way: unskip the contract, watch
+  it pass, run the whole suite, deploy the server half, commit. Sixteen
+  scenarios by the end, none parked. The one test that failed all day was
+  a pre-existing weekday-pinned one — it was Saturday.
+- **Takeaway:** Write the audit as tests that fail. Then the fix plan is
+  just the order you unskip them in.
+- **Formats:** thread ("skipped tests as a project plan"); before/after of
+  the proposal state; a clip of `--run-skipped` going from nine red to
+  sixteen green.

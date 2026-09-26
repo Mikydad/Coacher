@@ -5,6 +5,7 @@ import {
   DEFAULT_ROUTES,
   FALLBACK_ROUTE,
   parseRouteOverrides,
+  rejectedModelOverrides,
   resolveRoute,
   utcDayKey,
 } from './ai_routing';
@@ -96,6 +97,24 @@ describe('parseRouteOverrides', () => {
     );
     assert.equal(overrides.chat.temperature, undefined);
     assert.equal(overrides.chat.maxTokens, undefined);
+  });
+
+  it('caps a maxTokens override at the hard ceiling (Phase 5.1)', () => {
+    const overrides = parseRouteOverrides('{"chat":{"maxTokens":100000}}');
+    assert.equal(overrides.chat.maxTokens, 4000);
+  });
+
+  it('names the models it refused so the load can log them (Phase 5.1)', () => {
+    assert.deepEqual(
+      rejectedModelOverrides('{"chat":{"model":"gpt-6-astra"},"reflect":{"model":"gpt-6-luna"}}'),
+      ['chat: gpt-6-astra'],
+    );
+    assert.deepEqual(rejectedModelOverrides('not json'), []);
+  });
+
+  it('accepts the current generation so a bake-off can actually switch', () => {
+    const overrides = parseRouteOverrides('{"coach_agent":{"model":"gpt-6-luna"}}');
+    assert.equal(overrides.coach_agent.model, 'gpt-6-luna');
   });
 
   it('ignores non-object purpose entries', () => {
