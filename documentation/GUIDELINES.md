@@ -4478,3 +4478,72 @@ not silent reversal.
   the regression scenarios. Contracts the plan has not shipped yet are
   `skip`ped with their phase tag (`--run-skipped` shows all nine failing
   today) — a fix is done when its skip goes.
+
+- **2026-09-26 · Phase 1 of the Coach fix plan: one proposal record, no
+  mutate default, unknown verbs rejected, truthful history rows.**
+  `AiProposal` (awaitingAnswer / suggested / awaitingConfirm / editing /
+  applied / cancelled / superseded) replaces `_pendingPlan`,
+  `_pendingClarification` and `_refiningPendingPlan` in
+  `AiAssistantService`. Rules: a new turn SUPERSEDES a live card (its plan
+  can never run again, not even from a later "yes" after an error turn); a
+  question after a suggestion is a question (the suggestion is not carried
+  into "refine this plan"); an applied plan is never carried; only a pending
+  question or an Edit blocks the answer-only stream. `AiIntentRouter` now
+  routes question-shaped text as `query` before anything else and returns
+  `unknown` (no hint) instead of `mutate` when nothing matches — the agent
+  path always has both tools, so the model decides. `AiAction.fromJson`
+  throws on an unknown verb and the mappers drop it. History: `saveTurn`
+  returns the row id, the proposal pins it, and confirmation marks THAT row;
+  cancel and decline write rows the model can see; auto-committed turns are
+  saved as executed. *Deferred:* strict `propose_changes` schemas to Phase
+  5.1 — changing the model's output contract without a live eval is a
+  regression risk; Phase 1 closes the app-side hole instead. *Rejected:*
+  keeping the keyword router's "return structured actions" hint for
+  unmatched text (it is the documented cause of the greeting-plans bug).
+
+- **2026-09-26 · Phase 2 of the Coach fix plan: idempotent batches,
+  validation at Confirm, execution separated from bookkeeping.** The batch
+  id is `ai_batch_<proposalId>`; `AiActionExecutor.execute` returns
+  `alreadyApplied` for a finished batch and refuses one still executing, so
+  a double tap, a crash-and-retry or a stale card can never create a second
+  set. `AiPlanValidator` runs at Confirm: a time already past today, or a
+  relative date proposed on a day that has since ended, blocks with a
+  reason and the card stays live. The deduplicator compares against the
+  action's OWN day (today or tomorrow); an item the user named that already
+  exists survives as a soft conflict on the card. In `confirmPlan` the
+  executor call and the bookkeeping are separate tries: "nothing was lost —
+  tap Confirm to try again" is said only when the executor threw before
+  applying; a history failure after the fact is logged and the outcome is
+  still reported. The executor persists per-action outcomes after every
+  action and retries the final state write; the boot sweep now CLOSES a
+  stranded batch whose every action has an outcome instead of rolling back a
+  plan the user has lived with. `createGoal` resolves "today"/"tomorrow"
+  deadlines, ends at 23:59 of that day, never at now; cadence, category and
+  measurement kind come from the model's new `cadence`/`category` params or
+  the target's unit words. The conflict detector compares reminders and the
+  active override on the action's day. *Consequence for tests:* fixtures
+  that confirm a fixed clock time "today" must use tomorrow — a past time is
+  now a real block, not a quirk.
+
+- **2026-09-26 · Phase 3 of the Coach fix plan: one planning snapshot,
+  progress in the goal's own units, opaque handles.** `GoalProgressMath`
+  (goals/application) is the single definition of "how far along" a goal is
+  inside its current evaluation window; the Coach payload now carries
+  logged/target/unit/window, days logged, a behind-pace flag, steps due
+  today, category and cadence, sorted behind-pace first (cap 8) — the
+  offline formatter and the prompt's planning method read the same fields.
+  The schedule slice builds one busy picture per day for today AND
+  tomorrow: timed tasks with a duration, goal `ScheduledTimeBlock`s, and
+  device-calendar busy intervals through the existing coarse bridge
+  (`calendarBusyToScheduleMaps`; contents never cross). Free windows use the
+  user's waking day from the sleep window (D3; 07:00–22:00 fallback), a
+  reminder-only task is not busy, up to 8 windows show with a "+N more"
+  marker, and the prompt states per day whether the calendar was included
+  or unavailable — "unavailable" is never rendered as "free". Tomorrow is
+  always sent (the tool description's "context always includes today and
+  tomorrow" is now true). Existing tasks and goals carry per-turn handles
+  ([t1], [g2]) the model passes back as `taskRef`/`goalRef`; the resolver
+  stamps those exactly and falls back to titles otherwise (D2 — opaque,
+  per turn, never persisted, so the "no raw ids" privacy rule holds).
+  *Not done:* prefetching a named other day; the `get_day_schedule` round
+  covers it.
