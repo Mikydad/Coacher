@@ -4,6 +4,7 @@ import 'dart:convert';
 import '../../../core/local_db/isar_collections/isar_ai_action_batch.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
+import '../../../core/tier/tier_gate.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../core/utils/stable_id.dart';
@@ -44,6 +45,7 @@ class ExecutionResult {
     this.batchId,
     this.wasRolledBack = false,
     this.alreadyApplied = false,
+    this.hitTierLimit = false,
   });
 
   final List<String> successes;
@@ -58,6 +60,10 @@ class ExecutionResult {
 
   /// True if the batch was rolled back due to a partial failure.
   final bool wasRolledBack;
+
+  /// True when at least one failure was a free-tier limit — the reply
+  /// carries a "See Pro" link (decision 2026-09-27).
+  final bool hitTierLimit;
 
   bool get hasFailures => failures.isNotEmpty;
 
@@ -290,6 +296,7 @@ class AiActionExecutor {
     final failures = <String>[];
     final succeededIds = <String>[];
     final failedIds = <String>[];
+    var hitTierLimit = false;
 
     for (final action in actions) {
       final actionId =
@@ -303,6 +310,7 @@ class AiActionExecutor {
       } catch (e) {
         failures.add('${_humanLabel(action)}: ${e.toString()}');
         failedIds.add(actionId);
+        if (e is TierLimitException) hitTierLimit = true;
       }
       // Persist the log AND the per-action outcome after EVERY action — a
       // crash mid-batch leaves a rollback-able record for the boot sweep
@@ -355,6 +363,7 @@ class AiActionExecutor {
       successes: successes,
       failures: failures,
       batchId: batchId,
+      hitTierLimit: hitTierLimit,
     );
   }
 
@@ -1074,6 +1083,7 @@ class AiActionExecutor {
     if (title.isEmpty) {
       throw ArgumentError('title is required to capture an intention');
     }
+    await tierGuard?.ensureCanCreatePromise();
 
     final now = DateTime.now();
     final windowKind = switch (p['window'] as String?) {

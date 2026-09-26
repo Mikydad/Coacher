@@ -271,8 +271,9 @@ class AiAssistantService extends ChangeNotifier {
           id: StableId.generate('msg'),
           role: ChatRole.assistant,
           content:
-              'Coach AI needs a registered account. Create a free account in '
-              'Profile → Sign in and your data comes with you.',
+              'The Coach needs an account. Sign in from Profile — it also '
+              'keeps your data safe if you lose or switch phones, and '
+              'everything you\'ve added comes with you.',
           timestamp: DateTime.now(),
         ),
       );
@@ -1139,8 +1140,9 @@ class AiAssistantService extends ChangeNotifier {
     // Voice (D7): the spoken reply READS BACK exactly what was stored and
     // offers undo — with no STT confidence gate, the read-back is how a
     // misheard "remember…" gets caught before it sticks.
+    // A free limit is not a glitch: say the limit, never "try again".
     final content = exec.hasFailures
-        ? (isMemoryBatch
+        ? (isMemoryBatch || exec.hitTierLimit
               ? exec.toSummaryMessage()
               : "I couldn't save that for later — please try again.")
         : voiceMode
@@ -1160,6 +1162,7 @@ class AiAssistantService extends ChangeNotifier {
         timestamp: DateTime.now(),
         autoCommittedBatchId: exec.hasFailures ? null : exec.batchId,
         isExecuted: !exec.hasFailures,
+        showProLink: exec.hitTierLimit,
       ),
     );
     _lastAutoCommit = (
@@ -1457,6 +1460,7 @@ class AiAssistantService extends ChangeNotifier {
           role: ChatRole.assistant,
           content: summary,
           timestamp: DateTime.now(),
+          showProLink: result.hitTierLimit,
         ),
       );
 

@@ -30,6 +30,7 @@ class AiChatMessage {
     this.retryInput,
     this.retryTurnId,
     this.isHistorical = false,
+    this.showProLink = false,
   });
 
   final String id;
@@ -80,6 +81,10 @@ class AiChatMessage {
   /// Phase 7, §8 U10) — rendered dimmed under an "earlier" divider.
   final bool isHistorical;
 
+  /// A free-tier limit blocked part of this turn — the bubble carries a
+  /// "See Pro" link to the Pro plan page (decision 2026-09-27).
+  final bool showProLink;
+
   bool get hasPreviewCard => plannedChanges != null && !isLoading;
   bool get hasDraftPlan =>
       draftPlan != null && plannedChanges == null && !isLoading;
@@ -101,6 +106,7 @@ class AiChatMessage {
     String? retryInput,
     String? retryTurnId,
     bool? isHistorical,
+    bool? showProLink,
     bool clearDraftPlan = false,
     bool clearPlannedChanges = false,
     bool clearAutoCommittedBatchId = false,
@@ -130,6 +136,7 @@ class AiChatMessage {
       retryInput: retryInput ?? this.retryInput,
       retryTurnId: retryTurnId ?? this.retryTurnId,
       isHistorical: isHistorical ?? this.isHistorical,
+      showProLink: showProLink ?? this.showProLink,
     );
   }
 

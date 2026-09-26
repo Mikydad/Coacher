@@ -48,16 +48,26 @@ class TierGate {
   /// THIS WEEK stat are single numbers, not history, and stay free.
   bool get canViewProgressHistory => isBypassed;
 
-  /// Time-log export (Day / Week / Month file share). Free for now; the
-  /// export sheet is the one caller, so gating later is `=> isBypassed`
-  /// here plus the upgrade pill there (decision 2026-09-15).
-  bool get canExportTimeLog => true;
+  /// Time insights are Pro (decision 2026-09-27): the Day summary totals,
+  /// AI observations, planned vs actual, the Direction mirror, and the Week
+  /// view. Logging and the Day timeline itself stay free and unlimited.
+  bool get canViewTimeInsights => isBypassed;
+
+  /// Time-log export (Day / Week / Month file share) is Pro with the rest
+  /// of the insights (decision 2026-09-27; free since 2026-09-15).
+  bool get canExportTimeLog => isBypassed;
+
+  /// [createdThisWeek] = promises created since Monday 00:00 local that
+  /// still exist, excluding AI-noticed dormant radar items.
+  bool canCreatePromiseThisWeek(int createdThisWeek) =>
+      _allows(createdThisWeek, limits.freePromisesPerWeek);
 
   bool canCreateReminder(int activeReminderCount) =>
       _allows(activeReminderCount, limits.freeReminders);
 
-  bool canCreatePhotoStakeThisMonth(int activatedThisMonth) =>
-      _allows(activatedThisMonth, limits.freePhotoStakesPerMonth);
+  /// Solo photo + public stakes that activated this calendar month.
+  bool canCreateStakeThisMonth(int activatedThisMonth) =>
+      _allows(activatedThisMonth, limits.freeStakesPerMonth);
 
   /// Max circles the user may belong to. [legacyLimit] is the pre-tier
   /// app-wide cap that continues to apply while enforcement is off.

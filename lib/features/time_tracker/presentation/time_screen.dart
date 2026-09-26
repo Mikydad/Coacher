@@ -5,6 +5,9 @@ import '../../../core/di/providers.dart' show insightCacheRepositoryProvider;
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../../../core/presentation/swipe_actions.dart';
+import '../../../core/tier/pro_locked.dart';
+import '../../../core/tier/tier_providers.dart';
+import '../../../core/tier/upgrade_prompt.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../analytics/domain/models/generated_insight.dart';
 import '../../education/presentation/help_dot.dart';
@@ -94,6 +97,17 @@ class _TimeScreenState extends ConsumerState<TimeScreen> {
   /// Export widens around the day being viewed: Day view → that day; Week
   /// view → today when it is this week, else the week's Monday.
   void _openExport() {
+    // Export is a Pro insight (decision 2026-09-27); logging stays free.
+    if (!ref.read(tierGateProvider).canExportTimeLog) {
+      showTierLimitSheet(
+        context,
+        title: 'Export is Pro',
+        message:
+            'Logging your time is always free. Exporting it as a file — to '
+            'keep, or to hand to another AI — comes with SidePal Pro.',
+      );
+      return;
+    }
     final mode = ref.read(timelineModeProvider);
     late final DateTime anchor;
     if (mode == TimelineMode.day) {
@@ -180,10 +194,16 @@ class _TimeScreenState extends ConsumerState<TimeScreen> {
               onDismissObservation: _dismissObservation,
             )
           else
-            _WeekBody(
-              onPrevious: () => _shiftWeek(-1),
-              onNext: () => _shiftWeek(1),
-              onDismissObservation: _dismissObservation,
+            // The Week view is a Pro insight (decision 2026-09-27).
+            ProLocked(
+              blocked: !ref.watch(tierGateProvider).canViewTimeInsights,
+              label: 'Unlock insights',
+              onUnlock: () => _showInsightsLimit(context),
+              child: _WeekBody(
+                onPrevious: () => _shiftWeek(-1),
+                onNext: () => _shiftWeek(1),
+                onDismissObservation: _dismissObservation,
+              ),
             ),
         ],
       ),
@@ -243,6 +263,16 @@ class _HomePillFooter extends ConsumerWidget {
     );
   }
 }
+
+/// The one prompt behind every locked Time insight.
+Future<void> _showInsightsLimit(BuildContext context) => showTierLimitSheet(
+  context,
+  title: 'Time insights are Pro',
+  message:
+      'Logging and your day\'s timeline are always free. Totals, the week '
+      'view, what I notice about your time, and planned vs actual come with '
+      'SidePal Pro.',
+);
 
 // ─── Day | Week toggle ────────────────────────────────────────────────────────
 
@@ -344,23 +374,37 @@ class _DayBody extends ConsumerWidget {
                     : null,
               ),
             },
-        if (!summary.isEmpty) ...[
+        if (!summary.isEmpty || observation != null) ...[
           const SizedBox(height: 28),
-          const SectionHeader('Summary'),
-          const SizedBox(height: 10),
-          _SummaryBlock(
-            logged: summary.logged,
-            untracked: summary.untracked,
-            lines: summary.lines,
-            categoryLines: summary.categoryLines,
-          ),
-        ],
-        if (observation != null) ...[
-          const SizedBox(height: 24),
-          _ObservationBlock(
-            heading: 'Something I noticed',
-            insight: observation,
-            onDismiss: () => onDismissObservation(dayScope),
+          // Summary totals and observations are Pro insights; the timeline
+          // above — what you logged — stays free (decision 2026-09-27).
+          ProLocked(
+            blocked: !ref.watch(tierGateProvider).canViewTimeInsights,
+            label: 'Unlock insights',
+            onUnlock: () => _showInsightsLimit(context),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!summary.isEmpty) ...[
+                  const SectionHeader('Summary'),
+                  const SizedBox(height: 10),
+                  _SummaryBlock(
+                    logged: summary.logged,
+                    untracked: summary.untracked,
+                    lines: summary.lines,
+                    categoryLines: summary.categoryLines,
+                  ),
+                ],
+                if (observation != null) ...[
+                  if (!summary.isEmpty) const SizedBox(height: 24),
+                  _ObservationBlock(
+                    heading: 'Something I noticed',
+                    insight: observation,
+                    onDismiss: () => onDismissObservation(dayScope),
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ],
@@ -613,8 +657,11 @@ class _ActivityTile extends ConsumerWidget {
       ));
     }
     // V1.2 planned-vs-actual: timer-sourced rows only (exact task link).
+    // Comparing against the plan is a Pro insight (decision 2026-09-27).
     final entityId = e.sourceEntityId ?? '';
-    if (e.isTimerSourced && entityId.isNotEmpty) {
+    if (e.isTimerSourced &&
+        entityId.isNotEmpty &&
+        ref.watch(tierGateProvider).canViewTimeInsights) {
       final block = ref
           .watch(plannedBlockForEntityProvider(entityId))
           .valueOrNull;

@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/local_db/isar_collections/isar_ai_action_batch.dart';
 import '../../../core/presentation/keyboard_dismiss.dart';
 import '../../../core/presentation/page_headers.dart';
+import '../../../core/tier/upgrade_prompt.dart';
 import '../../../core/utils/date_keys.dart';
 import '../application/ai_action_batch_state.dart';
 import '../application/ai_assistant_providers.dart';
@@ -685,11 +686,14 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   /// app (Siri "Talk to SidePal"): Siri's audio session is still releasing
   /// when we arrive, so the first mic open waits a beat — opening into
   /// Siri's session yields a recognizer that hears nothing forever.
-  void _enterVoiceMode(
+  Future<void> _enterVoiceMode(
     AiAssistantService service, {
     bool externalLaunch = false,
-  }) {
+  }) async {
     if (_voiceController != null) return;
+    if (!await ensureAccountFor(context, feature: 'the Coach') || !mounted) {
+      return;
+    }
     dismissKeyboard(context);
     // First-turn latency: warm the auth cache, TLS pool, and function
     // instances NOW, while the user is still raising the phone — the first
@@ -1321,9 +1325,18 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                           controller: _inputController,
                           focusNode: _inputFocusNode,
                           isLoading: service.isLoading,
-                          onSend: () {
+                          onSend: () async {
                             final text = _inputController.text.trim();
                             if (text.isEmpty) return;
+                            // Guests: the account sheet first; the typed
+                            // text stays in the box if they decline.
+                            if (!await ensureAccountFor(
+                                  context,
+                                  feature: 'the Coach',
+                                ) ||
+                                !mounted) {
+                              return;
+                            }
                             _inputController.clear();
                             // Send drops the keyboard (2026-09-22, Miko):
                             // the thread gets the screen; a tap on the
@@ -2168,6 +2181,23 @@ class _MessageItem extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AssistantMessageBubble(content: message.content),
+        // A free limit blocked part of this turn: one quiet link to Pro.
+        if (message.showProLink)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: ActionChip(
+              key: const ValueKey('coach_see_pro'),
+              avatar: Icon(
+                Icons.lock_open_rounded,
+                size: 14,
+                color: AppColors.accent,
+              ),
+              label: const Text('See Pro', style: TextStyle(fontSize: 12)),
+              backgroundColor: AppColors.inkCard,
+              side: BorderSide(color: AppColors.accent.withValues(alpha: 0.3)),
+              onPressed: () => openProPlan(context),
+            ),
+          ),
         // Auto-committed intention (the one confirmless action type):
         // inline [View] [Undo] instead of a preview card.
         if (message.autoCommittedBatchId != null)

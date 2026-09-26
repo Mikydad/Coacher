@@ -45,6 +45,7 @@ import '../features/tasks_hub/presentation/task_detail_screen.dart';
 import '../features/tasks_hub/presentation/tasks_hub_screen.dart';
 import '../features/timer/presentation/timer_session_screen.dart';
 
+import '../core/tier/pro_plan_screen.dart';
 import '../core/presentation/app_colors.dart';
 import '../core/presentation/theme_brightness_controller.dart';
 import '../core/config/build_flags.dart';
@@ -155,6 +156,7 @@ class CoachForLifeApp extends ConsumerWidget {
           return ForgotPasswordScreen(prefillEmail: email);
         },
         ChangePasswordScreen.routeName: (_) => const ChangePasswordScreen(),
+        ProPlanScreen.routeName: (_) => const ProPlanScreen(),
         MainTabShell.routeName: (_) => const MainTabShell(),
         GoalSelectionScreen.routeName: (_) => const GoalSelectionScreen(),
         GoalTemplatePickerScreen.routeName: (context) {

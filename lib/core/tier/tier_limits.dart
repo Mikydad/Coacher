@@ -32,7 +32,8 @@ class TierLimits {
     required this.freeHabitAnchorsPerDay,
     required this.freeReminders,
     required this.freeAiInstructionsPerDay,
-    required this.freePhotoStakesPerMonth,
+    required this.freeStakesPerMonth,
+    required this.freePromisesPerWeek,
     required this.freeCircles,
     required this.proCircles,
     required this.freeCircleMaxMembers,
@@ -62,14 +63,22 @@ class TierLimits {
   /// Charged AI turns per UTC day (enforced by the aiChat Cloud Function
   /// since fix-wave Phase 5, reading `freeAiInstructionsPerDay` out of the
   /// tier_limits_v1 RC blob; the client value is for UI messaging only).
-  /// V1 counts charged turns rather than server-classified actionable
-  /// messages — set generous until the paywall flips (settled Q8: the
-  /// mechanism ships first; per-message classification comes with
-  /// entitlements).
+  /// Only tool-bearing first rounds count (questions and chat never do).
+  /// The server keeps its own generous fallback until the paywall flips;
+  /// 3 is the launch value (decision 2026-09-27).
   final int freeAiInstructionsPerDay;
 
-  /// Activated photo-stake challenges per calendar month.
-  final int freePhotoStakesPerMonth;
+  /// Activated solo stakes (photo + public commitment) per calendar month
+  /// (decision 2026-09-27; was photo-only as `freePhotoStakesPerMonth`,
+  /// still accepted by the parser). Practice challenges are never counted;
+  /// money and points challenges are Pro-only, so they need no cap here.
+  final int freeStakesPerMonth;
+
+  /// Promises (intentions) a free user can create per Monday–Sunday week.
+  /// Counts ones created this week that still exist, so deleting frees a
+  /// slot; dormant "on your radar" items the AI noticed on its own are not
+  /// counted (the user never asked for them).
+  final int freePromisesPerWeek;
 
   /// Circles a free user can belong to (belong-to, not own). -1 = unlimited.
   final int freeCircles;
@@ -94,12 +103,13 @@ class TierLimits {
   /// Launch values — mirror PRD/Monetization/prd-monetization-tiers.md §4.
   static const TierLimits defaults = TierLimits(
     enforced: false,
-    freeTasksPerDay: 5,
-    freeGoals: 5,
-    freeHabitAnchorsPerDay: 5,
+    freeTasksPerDay: 4,
+    freeGoals: 3,
+    freeHabitAnchorsPerDay: 4,
     freeReminders: 5,
-    freeAiInstructionsPerDay: 5,
-    freePhotoStakesPerMonth: 3,
+    freeAiInstructionsPerDay: 3,
+    freeStakesPerMonth: 1,
+    freePromisesPerWeek: 2,
     freeCircles: 1,
     proCircles: -1,
     freeCircleMaxMembers: 5,
@@ -121,7 +131,8 @@ class TierLimits {
       freeHabitAnchorsPerDay: freeHabitAnchorsPerDay,
       freeReminders: freeReminders,
       freeAiInstructionsPerDay: freeAiInstructionsPerDay,
-      freePhotoStakesPerMonth: freePhotoStakesPerMonth,
+      freeStakesPerMonth: freeStakesPerMonth,
+      freePromisesPerWeek: freePromisesPerWeek,
       freeCircles: freeCircles,
       proCircles: proCircles,
       freeCircleMaxMembers: freeCircleMaxMembers,
@@ -172,10 +183,11 @@ class TierLimits {
         'freeAiInstructionsPerDay',
         d.freeAiInstructionsPerDay,
       ),
-      freePhotoStakesPerMonth: i(
-        'freePhotoStakesPerMonth',
-        d.freePhotoStakesPerMonth,
+      freeStakesPerMonth: i(
+        'freeStakesPerMonth',
+        i('freePhotoStakesPerMonth', d.freeStakesPerMonth),
       ),
+      freePromisesPerWeek: i('freePromisesPerWeek', d.freePromisesPerWeek),
       freeCircles: i('freeCircles', d.freeCircles),
       proCircles: i('proCircles', d.proCircles),
       freeCircleMaxMembers: i('freeCircleMaxMembers', d.freeCircleMaxMembers),
@@ -197,7 +209,8 @@ class TierLimits {
     'freeHabitAnchorsPerDay': freeHabitAnchorsPerDay,
     'freeReminders': freeReminders,
     'freeAiInstructionsPerDay': freeAiInstructionsPerDay,
-    'freePhotoStakesPerMonth': freePhotoStakesPerMonth,
+    'freeStakesPerMonth': freeStakesPerMonth,
+    'freePromisesPerWeek': freePromisesPerWeek,
     'freeCircles': freeCircles,
     'proCircles': proCircles,
     'freeCircleMaxMembers': freeCircleMaxMembers,

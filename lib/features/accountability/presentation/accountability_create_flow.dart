@@ -56,8 +56,15 @@ Future<void> openAccountabilityCreateFlow(
   String? prefilledCircleId,
   String? linkedGoalId,
   RecommitSeed? recommitSeed,
-}) {
-  return Navigator.of(context).push(
+}) async {
+  // Stakes need an account — witnesses, uploads and the server are all
+  // identity-bound (decision 2026-09-27). Guests get the polite sign-in
+  // sheet and continue straight into the flow if they link.
+  if (!await ensureAccountFor(context, feature: 'stakes') ||
+      !context.mounted) {
+    return;
+  }
+  await Navigator.of(context).push<void>(
     MaterialPageRoute(
       fullscreenDialog: true,
       builder: (_) => AccountabilityCreateFlow(
@@ -2552,11 +2559,11 @@ class _AccountabilityCreateFlowState
     final uid = FirestorePaths.activeUid;
     final now = DateTime.now();
 
-    // Free-tier monthly photo-stake quota — polite pre-check against the
-    // local mirror; stakeCreateChallenge enforces the same rule
-    // authoritatively server-side. Only activated challenges count
-    // (draft/cancelled don't consume an allowance).
-    if (_stake == _StakeChoice.photo) {
+    // Free-tier monthly stake quota (photo + public, decision 2026-09-27)
+    // — polite pre-check against the local mirror; server enforcement
+    // lands with the paywall. Only activated challenges count
+    // (draft/cancelled don't consume an allowance); practice never counts.
+    if (_stake == _StakeChoice.photo || _stake == _StakeChoice.public) {
       final tierGate = ref.read(tierGateProvider);
       if (!tierGate.isBypassed) {
         final challenges =
@@ -2569,21 +2576,26 @@ class _AccountabilityCreateFlowState
         final usedThisMonth = challenges
             .where(
               (c) =>
-                  c.type == StakeChallengeType.soloPhoto &&
+                  (c.type == StakeChallengeType.soloPhoto ||
+                      c.type == StakeChallengeType.soloPublic) &&
                   c.createdAtMs >= monthStartMs &&
                   c.status != StakeChallengeStatus.draft &&
                   c.status != StakeChallengeStatus.cancelled,
             )
             .length;
-        if (!tierGate.canCreatePhotoStakeThisMonth(usedThisMonth)) {
-          setState(() {
-            _creating = false;
-            _createError =
-                'The free plan includes '
-                '${tierGate.limits.freePhotoStakesPerMonth} photo stakes per '
-                'month — the counter resets on the 1st. SidePal Pro removes '
-                'the limit.';
-          });
+        if (!tierGate.canCreateStakeThisMonth(usedThisMonth)) {
+          setState(() => _creating = false);
+          if (mounted) {
+            final n = tierGate.limits.freeStakesPerMonth;
+            await showTierLimitSheet(
+              context,
+              title: 'Monthly stake used',
+              message:
+                  'The free plan includes $n ${n == 1 ? 'stake' : 'stakes'} '
+                  'a month — it resets on the 1st. Practice challenges stay '
+                  'unlimited. SidePal Pro removes the limit.',
+            );
+          }
           return;
         }
       }

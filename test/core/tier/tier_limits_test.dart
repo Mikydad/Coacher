@@ -9,14 +9,15 @@ void main() {
       expect(TierLimits.defaults.enforced, isFalse);
     });
 
-    test('launch values match the PRD tier matrix', () {
+    test('launch values match the PRD tier matrix (2026-09-27)', () {
       const d = TierLimits.defaults;
-      expect(d.freeTasksPerDay, 5);
-      expect(d.freeGoals, 5);
-      expect(d.freeHabitAnchorsPerDay, 5);
+      expect(d.freeTasksPerDay, 4);
+      expect(d.freeGoals, 3);
+      expect(d.freeHabitAnchorsPerDay, 4);
       expect(d.freeReminders, 5);
-      expect(d.freeAiInstructionsPerDay, 5);
-      expect(d.freePhotoStakesPerMonth, 3);
+      expect(d.freeAiInstructionsPerDay, 3);
+      expect(d.freeStakesPerMonth, 1);
+      expect(d.freePromisesPerWeek, 2);
       expect(d.freeCircles, 1);
       expect(d.proCircles, -1);
       expect(d.freeCircleMaxMembers, 5);
@@ -30,28 +31,37 @@ void main() {
 
   group('TierLimits.parse', () {
     test('null, empty, and whitespace resolve to defaults', () {
-      expect(TierLimits.parse(null).freeGoals, 5);
-      expect(TierLimits.parse('').freeGoals, 5);
-      expect(TierLimits.parse('   ').freeGoals, 5);
+      expect(TierLimits.parse(null).freeGoals, 3);
+      expect(TierLimits.parse('').freeGoals, 3);
+      expect(TierLimits.parse('   ').freeGoals, 3);
     });
 
     test('garbage resolves to defaults, never throws', () {
       expect(TierLimits.parse('not json').enforced, isFalse);
-      expect(TierLimits.parse('[1,2,3]').freeGoals, 5);
-      expect(TierLimits.parse('42').freeGoals, 5);
+      expect(TierLimits.parse('[1,2,3]').freeGoals, 3);
+      expect(TierLimits.parse('42').freeGoals, 3);
     });
 
     test('partial JSON overrides named fields, keeps defaults for the rest', () {
       final limits = TierLimits.parse('{"freeGoals": 10, "enforced": true}');
       expect(limits.freeGoals, 10);
       expect(limits.enforced, isTrue);
-      expect(limits.freeTasksPerDay, 5);
-      expect(limits.freePhotoStakesPerMonth, 3);
+      expect(limits.freeTasksPerDay, 4);
+      expect(limits.freeStakesPerMonth, 1);
+    });
+
+    test('the legacy photo-stake key still sets the stake cap', () {
+      final legacy = TierLimits.parse('{"freePhotoStakesPerMonth": 2}');
+      expect(legacy.freeStakesPerMonth, 2);
+      final both = TierLimits.parse(
+        '{"freePhotoStakesPerMonth": 2, "freeStakesPerMonth": 5}',
+      );
+      expect(both.freeStakesPerMonth, 5, reason: 'the new key wins');
     });
 
     test('mistyped field falls back to its default', () {
       final limits = TierLimits.parse('{"freeGoals": "ten", "enforced": 1}');
-      expect(limits.freeGoals, 5);
+      expect(limits.freeGoals, 3);
       expect(limits.enforced, isFalse);
     });
 

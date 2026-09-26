@@ -46,6 +46,20 @@ class AiTierGuard {
     }
   }
 
+  /// Promises: [TierLimits.freePromisesPerWeek] per Mon–Sun week.
+  Future<void> ensureCanCreatePromise() async {
+    final gate = _gate();
+    if (gate.isBypassed) return;
+    final count = await TierUsage.promisesCreatedThisWeek(DateTime.now());
+    if (!gate.canCreatePromiseThisWeek(count)) {
+      final n = gate.limits.freePromisesPerWeek;
+      throw TierLimitException(
+        'the free plan includes $n ${n == 1 ? 'promise' : 'promises'} a '
+        'week — it resets on Monday, and SidePal Pro removes the limit',
+      );
+    }
+  }
+
   Future<void> ensureCanAddReminder() async {
     final gate = _gate();
     if (gate.isBypassed) return;

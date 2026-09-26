@@ -4646,3 +4646,57 @@ not silent reversal.
   goal, especially BEHIND PACE ones. *Not done:* a goal picker in the task
   editor (optional; the Coach path was the gap). *Rejected:* making
   Direction the parent of goals — Direction stays context (2026-09-11).
+
+- **2026-09-27 · Free tier re-cut before the paywall ships; full table in
+  `PRD/Monetization/prd-monetization-tiers.md` §4, §4.1, §8.**
+  Supersedes the 2026-07-20 numbers. Free: **4 tasks/day, 4 habit
+  anchors/day (own count), 3 active goals, 5 reminders, 2 promises per
+  Mon–Sun week, 3 Coach actions/day, 1 activated photo stake/month,
+  1 circle (5 members)**. Time tracker: logging + the Day timeline are
+  free and unlimited; *insights* are Pro (Day summary totals, AI
+  observations, planned vs actual, Direction mirror, Week view, export —
+  `canExportTimeLog` becomes `=> isBypassed`). Progress history stays
+  Day-free / Week+-Pro. Caps count what exists now, so deleting frees a
+  slot; stakes count activations. Pricing unchanged ($9.99 / $79.99 /
+  7-day trial). **Guests** get the same caps as Free for on-device
+  features; Coach AI, circles, stakes, and buying Pro require an account
+  (Pro is tied to the account, never an anonymous session). **Prompt
+  rule:** guest at a cap → "sign in so you don't lose your data" → Pro
+  plan page; guest at an account-only feature → sign in → the feature;
+  signed-in free at a cap → polite message linking the Pro plan page.
+  *Why:* time logging is local and costs nothing, and a capped timeline
+  would feed partial data to Direction and the Coach — the paid value is
+  the insight, not the log. Guest caps equal Free caps so the account
+  pitch is data safety (honest) rather than "more tasks" (it wouldn't
+  be). *Considered:* capping time entries at 4/day (rejected: breaks the
+  timeline); promises fully Pro (rejected: users pay for what they've
+  tried — 2/week is the taste); lower guest caps to reward sign-up
+  (rejected: simplicity; data safety is the stronger reason to sign in).
+
+- **2026-09-27 · Subscriptions step 1 built: new limits, gates, and the
+  two prompt kinds (all dormant behind `kPaywallAvailable`).** Calls made
+  while building, so later sessions don't re-ask: (1) **"1 stake a month"
+  counts solo photo + public stakes** (field renamed `freeStakesPerMonth`;
+  the parser still accepts `freePhotoStakesPerMonth`); practice never
+  counts, money/points are Pro anyway. (2) **Tasks and habits are counted
+  separately** — `TierUsage.tasksPlannedForDay` now excludes Habit
+  Anchors, and adding a habit checks only the habit cap. (3) **Promises:**
+  count = active, created since Monday 00:00 local, not `dormant` — the
+  AI-noticed "on your radar" items never spend the allowance, and waking
+  one isn't gated. Finishing a promise does not free a slot; removing
+  does. (4) **Time:** the per-row "Planned 1h · Actual 50m" line is the
+  user's own logged intent and stays free; the plan-block comparison,
+  Day summary, observations, Week view, and export are locked (shared
+  `ProLocked` blur+pill, extracted from Progress's gate). (5) **Guest
+  test = signed-in anonymous session** (same rule as the Coach service);
+  `ensureAccountFor` awaits the auth stream so a not-yet-loaded state
+  can't read as "has an account". Guests get the account sheet on Coach
+  send/voice, circle create/join, and every stake entry; linking uses the
+  existing connect flow (same uid, data kept). (6) **Coach at a limit**
+  says the limit (never "please try again") and the bubble carries a
+  "See Pro" chip (`AiChatMessage.showProLink`, set from
+  `ExecutionResult.hitTierLimit`). (7) `/pro` is a comparison page built
+  from live `TierLimits` with an inert "Coming soon" button until the
+  store ships. *Deferred to step 4:* the server's AI-cap UX (today an
+  over-cap turn is rejected as `resource-exhausted`; the spec is "chat
+  continues, actions stop") and server enforcement of stakes/promises.

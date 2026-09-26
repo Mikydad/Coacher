@@ -1,67 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/presentation/app_colors.dart';
-import '../../auth/application/auth_providers.dart';
-import '../../auth/presentation/login_screen.dart';
-import '../../auth/presentation/sign_up_screen.dart';
-
-enum _CircleAuthChoice { login, signUp }
+import '../../../core/tier/upgrade_prompt.dart';
 
 /// Gates account-only circle actions (creating or joining a circle).
 ///
-/// Browsing circles and opening circle details stay open to anonymous users;
-/// only identity-bound actions call this. Returns `true` when the current user
-/// is registered (signed in and **not** anonymous) and the action may proceed.
-///
-/// For anonymous or signed-out users it shows a "Log in or sign up" prompt
-/// explaining that an account is required, routes to the chosen auth screen,
-/// and returns `false` so the caller aborts the action.
+/// Browsing circles and opening circle details stay open to guests; only
+/// identity-bound actions call this. Returns `true` when the user has an
+/// account and the action may proceed. Guests get the shared account sheet
+/// ([ensureAccountFor], decision 2026-09-27) — sign in keeps their data —
+/// and the action continues only if the link succeeded. [ref] and
+/// [actionLabel] are kept for the existing call sites; the sheet names the
+/// feature ("groups") rather than the action.
 Future<bool> ensureRegisteredForCircleAction(
   BuildContext context,
   WidgetRef ref, {
   required String actionLabel,
-}) async {
-  if (ref.read(isRegisteredProvider)) return true;
-
-  final choice = await showDialog<_CircleAuthChoice>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: AppColors.surfaceDark,
-      title: Text(
-        'Account required',
-        style: TextStyle(color: AppColors.textPrimary),
-      ),
-      content: Text(
-        'You need an account to $actionLabel. '
-        'Browsing groups stays free — log in or sign up to take part.',
-        style: TextStyle(color: AppColors.textMuted),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: Text('Not now', style: TextStyle(color: AppColors.textMuted)),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, _CircleAuthChoice.login),
-          child: Text('Log in', style: TextStyle(color: AppColors.accent)),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(ctx, _CircleAuthChoice.signUp),
-          style: FilledButton.styleFrom(backgroundColor: AppColors.accent),
-          child: const Text('Sign up'),
-        ),
-      ],
-    ),
-  );
-
-  if (!context.mounted || choice == null) return false;
-
-  switch (choice) {
-    case _CircleAuthChoice.login:
-      await Navigator.pushNamed(context, LoginScreen.routeName);
-    case _CircleAuthChoice.signUp:
-      await Navigator.pushNamed(context, SignUpScreen.routeName);
-  }
-  return false;
+}) {
+  return ensureAccountFor(context, feature: 'groups');
 }

@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/tier/tier_providers.dart';
+import '../../../core/tier/tier_usage.dart';
+import '../../../core/tier/upgrade_prompt.dart';
 import '../application/intention_capture.dart';
 import '../application/intentions_providers.dart';
 import 'geofence_opt_in_flow.dart';
@@ -59,6 +62,26 @@ class _IntentionQuickAddSheetState
     setState(() => _saving = true);
 
     final now = DateTime.now();
+    // Free: [TierLimits.freePromisesPerWeek] per Mon–Sun week (decision
+    // 2026-09-27). The typed text stays put if the limit blocks.
+    final gate = ref.read(tierGateProvider);
+    if (!gate.isBypassed &&
+        !gate.canCreatePromiseThisWeek(
+          await TierUsage.promisesCreatedThisWeek(now),
+        )) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      final n = gate.limits.freePromisesPerWeek;
+      await showTierLimitSheet(
+        context,
+        title: 'Weekly promises used',
+        message:
+            'The free plan includes $n ${n == 1 ? 'promise' : 'promises'} a '
+            'week — it resets on Monday, and removing one frees a slot. '
+            'SidePal Pro removes the limit.',
+      );
+      return;
+    }
     final window = resolveIntentionWindow(_window, now);
     final intention = buildIntention(
       IntentionDraft(

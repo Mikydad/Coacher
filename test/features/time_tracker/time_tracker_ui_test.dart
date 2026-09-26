@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sidepal/core/presentation/swipe_actions.dart';
+import 'package:sidepal/core/tier/pro_locked.dart';
+import 'package:sidepal/core/tier/tier_gate.dart';
+import 'package:sidepal/core/tier/tier_limits.dart';
+import 'package:sidepal/core/tier/tier_providers.dart';
 import 'package:sidepal/core/utils/date_keys.dart';
 import 'package:sidepal/features/time_tracker/application/activity_reminder_service.dart';
 import 'package:sidepal/features/time_tracker/application/time_export_service.dart';
@@ -130,12 +134,19 @@ ActivityReminderService _fakeReminders() => ActivityReminderService(
   cancel: (id) async => reminderLog.add('cancel:$id'),
 );
 
-Widget _app(Widget home, _FakeRepo repo) {
+Widget _app(Widget home, _FakeRepo repo, {bool freeEnforced = false}) {
   reminderLog.clear();
   return ProviderScope(
     overrides: [
       activityEventRepositoryProvider.overrideWithValue(repo),
       activityReminderServiceProvider.overrideWithValue(_fakeReminders()),
+      if (freeEnforced)
+        tierGateProvider.overrideWithValue(
+          TierGate(
+            limits: TierLimits.parse('{"enforced": true}'),
+            tier: UserTier.free,
+          ),
+        ),
     ],
     child: MaterialApp(
       home: home,
@@ -682,6 +693,44 @@ void v12Tests() {
       final week = TimeExportPeriod.around(TimeExportScope.week, DateTime.now());
       expect(find.text(week.label), findsOneWidget);
       expect(find.textContaining('across 1 of 7 days'), findsOneWidget);
+    });
+  });
+
+  group('Pro gate (decision 2026-09-27)', () {
+    testWidgets('free: timeline stays live, summary locked, export gated',
+        (tester) async {
+      if (!earlyEnough) return;
+      final repo = _FakeRepo([
+        _seed('Gym', _todayAt(0, 30), endMs: _todayAt(1, 0)),
+      ]);
+      await tester.pumpWidget(
+        _app(const TimeScreen(), repo, freeEnforced: true),
+      );
+      await tester.pumpAndSettle();
+
+      // What you logged is free: the row and the Log FAB are live.
+      expect(find.text('Gym'), findsAtLeastNWidgets(1));
+      expect(find.byKey(const ValueKey('time_track_fab')), findsOneWidget);
+      // The summary renders under the lock.
+      final lock = tester.widget<ProLocked>(find.byType(ProLocked));
+      expect(lock.blocked, isTrue);
+      expect(find.text('Unlock insights'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('time_export_button')));
+      await tester.pumpAndSettle();
+      expect(find.byType(ExportTimeSheet), findsNothing);
+      expect(find.text('Export is Pro'), findsOneWidget);
+    });
+
+    testWidgets('enforcement off: nothing is locked', (tester) async {
+      if (!earlyEnough) return;
+      final repo = _FakeRepo([
+        _seed('Gym', _todayAt(0, 30), endMs: _todayAt(1, 0)),
+      ]);
+      await tester.pumpWidget(_app(const TimeScreen(), repo));
+      await tester.pumpAndSettle();
+      expect(tester.widget<ProLocked>(find.byType(ProLocked)).blocked, isFalse);
+      expect(find.text('Unlock insights'), findsNothing);
     });
   });
 }
