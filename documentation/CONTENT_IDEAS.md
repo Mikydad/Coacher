@@ -297,3 +297,37 @@ Flutter post on cooperative cancellation of long async pipelines.
   screen would have asked to be deleted.
 - **Formats:** before/after screen-count post; thread on "the constraint
   died and the screen outlived it"; short video walking the nine screens.
+
+## 2026-09-26 · The audit that audited the audit
+
+- **Hook:** Three AIs looked at the same chat bug. The first found ten
+  real problems. The second found fifteen more. The third found seven the
+  second had missed — and four places where the second had been too kind.
+- **What happened:** Coach kept re-proposing a plan the user had already
+  applied, and answered "what do I have" with another workout card. An
+  external audit traced it to real code: an applied suggestion stayed the
+  "plan being discussed", a keyword router that defaults unknown text to
+  "the user wants a change", duplicate protection that only looks at
+  today, goal progress printed as "0/25 minutes" when the 0 was a count
+  of days. All ten findings held. Re-verifying them line by line turned
+  up the parts it could not see from another checkout: unknown verbs
+  silently become new tasks, idempotency is documented and never
+  implemented, and the model "upgradeable by config flip" can't be — the
+  allow-list drops unknown names silently and the request shape rejects
+  every current-generation model. A fact-check of that review then found
+  a tier-blind daily cap that would have capped paying users the day the
+  config went live, a retry message that says "nothing was lost" after
+  everything was applied, and goals born already expired.
+- **The turn:** No code changed for two days. Nine product decisions
+  first, written down with their rejected alternatives, then Phase 0:
+  fix the one bug independent of the AI work, and build a harness that
+  runs the real pipeline with a scripted model. The nine contracts the
+  plan has not shipped are already tests — skipped, tagged with their
+  phase, all nine failing on today's code when run unskipped.
+- **Takeaway:** An audit is a hypothesis about a codebase. The cheapest
+  way to make it true is to write each finding as a test that fails, then
+  fix until it passes. "Correct" findings that nobody can re-run decay
+  into folklore within a week.
+- **Formats:** thread ("three AIs, one bug, who was right"); post on
+  skipped-tests-as-contracts; short clip of the `--run-skipped` output
+  turning green phase by phase.

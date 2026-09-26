@@ -4438,3 +4438,43 @@ not silent reversal.
   finished; "Not now" hides it for seven days; a second "Not now" ends
   it — Profile's Connect account remains. Wording is "Back up", not
   "Keep safe": guest data is not unsafe today, it is just device-bound.
+
+- **2026-09-26 · Coach AI reliability: the nine decisions behind the fix
+  plan.** Source: `documentation/AI_CHAT_AUDIT_REVIEW_2026-09-26.md` (an
+  external audit, re-verified, plus an Opus fact-check folded in) and the
+  plan `documentation/AI_CHAT_FIX_PLAN.md`. Miko adopted every
+  recommendation. (D1) The keyword router keeps NO authority over tools:
+  every turn that reaches the agent path gets both tools; `unknown`
+  replaces the `mutate` default; the router only picks the answer-only
+  stream for clear questions. (D2) Opaque per-turn handles ("t3", "g2")
+  for existing items — generated per turn, never persisted, mapped back
+  in the service; the privacy property ("no raw ids") is kept. (D3) The
+  waking day comes from the sleep window / quiet hours when set, else
+  07:00–22:00, and the model is told the bounds. (D4) Direction stays
+  "context, not command" (2026-09-11 intact); only goal↔task linkage is
+  built, later. (D5) A Coach session is a calendar day per account;
+  closing the sheet pauses it. (D6) Up to ~5× today's per-turn model cost
+  is approved for `coach_agent` if a bake-off shows a clear win. (D7)
+  Voice auto-commit verbs keep auto-committing; the spoken reply reads
+  back exactly what was stored and "undo" by voice reverts it — no new
+  card. (D8) The server's daily instruction cap is fail-safe: it applies
+  only to accounts KNOWN to be free (entitlement doc read, not active) and
+  only to tool-bearing first rounds; questions never count. Full
+  "server classifies actionable" arrives with monetization. (D9) Work runs
+  on `fix/ai-chat-reliability`; every functions deploy is asked for.
+  *Rejected:* the external audit's Direction → quarter → month → action
+  hierarchy (contradicts the Direction PRD); a server-side agent loop;
+  OpenAI-hosted conversation state; vector retrieval over memory.
+
+- **2026-09-26 · Phase 0 of the Coach fix plan: tier-blind cap fixed,
+  scenario harness in place.** `functions/src/ai_instruction_cap.ts` is
+  the pure rule (D8) and `aiChat` reads the server-owned
+  `users/{uid}/entitlements/pro` doc (cached per instance, 5 min) beside
+  the config read; `aiChatStream` never counts. Before this the cap from
+  `tier_limits_v1` would have capped Pro users too and counted every
+  question. Client: `test/support/ai_scenario_harness.dart` runs the real
+  client → parser → service → executor stack over in-memory repositories
+  with a scripted model; `test/features/ai_assistant/scenarios/` holds
+  the regression scenarios. Contracts the plan has not shipped yet are
+  `skip`ped with their phase tag (`--run-skipped` shows all nine failing
+  today) — a fix is done when its skip goes.
