@@ -1018,18 +1018,47 @@ class AiPayloadAssembler {
   /// Reads the last 10 interactions for this session and formats them as
   /// OpenAI-compatible role/content messages. When assistantSummary is stored
   /// on the entry (Phase 3+ persistence), it becomes the assistant turn.
+  ///
+  /// Fix plan Phase 4.1: the newest [_kVerbatimTurns] turns ride verbatim;
+  /// anything older in the session is folded into ONE deterministic
+  /// "earlier in this session" line (no model call), within a character
+  /// budget — a long session used to fall off a cliff at turn 11.
   Future<List<Map<String, dynamic>>> buildConversationHistory(
     String sessionId,
   ) async {
     try {
       final entries = await historyRepository.getRecentForSession(
         sessionId,
-        limit: 10,
+        limit: _kHistoryRowsRead,
       );
+      final chronological = entries.reversed.toList();
+      final verbatimStart = chronological.length > _kVerbatimTurns
+          ? chronological.length - _kVerbatimTurns
+          : 0;
       final history = <Map<String, dynamic>>[];
-      for (final e in entries.reversed) {
+
+      if (verbatimStart > 0) {
+        final older = chronological.sublist(0, verbatimStart);
+        final parts = <String>[];
+        for (final e in older) {
+          final u = e.userInput.trim();
+          final a = (e.assistantSummary ?? '').trim();
+          final clipU = u.length > 80 ? '${u.substring(0, 77)}…' : u;
+          final clipA = a.length > 120 ? '${a.substring(0, 117)}…' : a;
+          parts.add(clipA.isEmpty ? 'user: $clipU' : 'user: $clipU / coach: $clipA');
+        }
+        var rolled = parts.join(' · ');
+        if (rolled.length > _kRollingSummaryChars) {
+          rolled = '…${rolled.substring(rolled.length - _kRollingSummaryChars)}';
+        }
+        history.add({
+          'role': 'assistant',
+          'content': '[Earlier in this session: $rolled]',
+        });
+      }
+
+      for (final e in chronological.sublist(verbatimStart)) {
         history.add({'role': 'user', 'content': e.userInput});
-        // If an assistant summary is stored, include it as the assistant turn
         final summary = e.assistantSummary;
         if (summary != null && summary.isNotEmpty) {
           history.add({'role': 'assistant', 'content': summary});
@@ -1040,6 +1069,10 @@ class AiPayloadAssembler {
       return [];
     }
   }
+
+  static const int _kVerbatimTurns = 8;
+  static const int _kHistoryRowsRead = 30;
+  static const int _kRollingSummaryChars = 900;
 
   /// Builds the top-5 recurring activity patterns from the last 14 days.
   ///

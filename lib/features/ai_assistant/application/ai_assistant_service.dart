@@ -74,6 +74,11 @@ class AiAssistantService extends ChangeNotifier {
   String _sessionId;
   final List<AiChatMessage> _messages = [];
   bool _isLoading = false;
+
+  /// The local day this session belongs to (decision D5, fix plan Phase
+  /// 4.2): a Coach session is a calendar day. Closing the sheet PAUSES it;
+  /// the first message on a new day rotates it.
+  String _sessionDayKey = DateKeys.todayKey();
   bool _inputFocusRequested = false;
 
   /// The one plan under discussion (AI chat fix plan Phase 1.1): a question
@@ -166,6 +171,11 @@ class AiAssistantService extends ChangeNotifier {
           .take(10)
           .toList();
       if (rows.isEmpty || _messages.isNotEmpty) return;
+      // Same day, same session (D5): the model's conversation history and
+      // the memory-extraction session both continue across a relaunch
+      // instead of restarting from an empty context.
+      _sessionId = latestSession;
+      _sessionDayKey = DateKeys.todayKey();
       for (final row in rows) {
         if (row.userInput.trim().isNotEmpty) {
           _addMessage(
@@ -269,6 +279,14 @@ class AiAssistantService extends ChangeNotifier {
       notifyListeners();
       return;
     }
+
+    // A new calendar day ends the session (D5): extraction runs for the
+    // finished day, the thread and the model context start fresh.
+    if (DateKeys.todayKey() != _sessionDayKey) startNewSession();
+
+    // Undo by voice/text (D7, fix plan Phase 4.5): a short "undo" right
+    // after an auto-committed intention or memory write reverts it.
+    if (!_isLoading && await _tryUndoLastAutoCommit(text)) return;
 
     // Queue instead of block (fix-wave Phase 3, settled Q6): typing never
     // waits on the network. The bubble renders now; the parse runs when
@@ -658,9 +676,20 @@ class AiAssistantService extends ChangeNotifier {
         result.actions.isNotEmpty &&
         result.actions.every((a) => autoCommitTypes.contains(a.actionType));
     if (isIntentionAutoCommit) {
+      // Anchor to what the user ACTUALLY said (Phase 4.3): the executor's
+      // "utterance supports the fact" check used to compare the fact
+      // against a rawUtterance the model itself supplied — a model that
+      // invents a fact also invents the quote (review §1.1 #9).
+      final anchored = [
+        for (final a in result.actions)
+          a.copyWith(
+            parameters: {...a.parameters, 'rawUtterance': userInput.trim()},
+          ),
+      ];
       await _autoCommitIntentionActions(
-        result.actions,
+        anchored,
         modelMessage: result.informationalMessage,
+        voiceMode: voiceMode,
       );
     } else if (result.requiresFollowUp) {
       final question = AiInformationalOutputGuard.sanitize(
@@ -1087,6 +1116,7 @@ class AiAssistantService extends ChangeNotifier {
   Future<void> _autoCommitIntentionActions(
     List<AiAction> actions, {
     String? modelMessage,
+    bool voiceMode = false,
   }) async {
     _proposal = null;
     ExecutionResult exec;
@@ -1106,10 +1136,15 @@ class AiAssistantService extends ChangeNotifier {
     // exact stored/deleted content next to the Undo (fix-wave Phase 6,
     // §8 M2: the model's own "Noted!" used to win, hiding what was
     // actually written until the user checked "What SidePal knows").
+    // Voice (D7): the spoken reply READS BACK exactly what was stored and
+    // offers undo — with no STT confidence gate, the read-back is how a
+    // misheard "remember…" gets caught before it sticks.
     final content = exec.hasFailures
         ? (isMemoryBatch
               ? exec.toSummaryMessage()
               : "I couldn't save that for later — please try again.")
+        : voiceMode
+        ? '${exec.toSummaryMessage()} Say "undo" if that\'s not right.'
         : (isMemoryBatch
               ? exec.toSummaryMessage()
               : trimmedModel?.isNotEmpty == true
@@ -1631,6 +1666,48 @@ class AiAssistantService extends ChangeNotifier {
     unawaited(_memoryExtraction?.onSessionEnded(stash.sessionId));
   }
 
+  /// The sheet closed (D5, Phase 4.2): the session PAUSES. The thread and
+  /// the session id stay, so reopening continues the same conversation
+  /// with the same model context; the day boundary is what ends a session
+  /// (checked on the next message and on this pause).
+  void pauseSession() {
+    if (DateKeys.todayKey() != _sessionDayKey) {
+      startNewSession();
+      return;
+    }
+    unawaited(_memoryExtraction?.noteSessionActivity(_sessionId));
+  }
+
+  static final _undoPattern = RegExp(
+    r"^(undo( that| it)?|no,? (forget|scratch) (that|it)|take (that|it) back|"
+    r"scratch that|that'?s (not right|wrong)|wrong)[.!]*$",
+  );
+
+  /// Reverts the most recent auto-committed write when the user says so
+  /// right after it (D7). Returns true when consumed.
+  Future<bool> _tryUndoLastAutoCommit(String input) async {
+    final normalized = input.toLowerCase().trim();
+    if (normalized.split(RegExp(r'\s+')).length > 5) return false;
+    if (!_undoPattern.hasMatch(normalized)) return false;
+    AiChatMessage? target;
+    for (final m in _messages.reversed) {
+      if (m.role != ChatRole.assistant) continue;
+      if (m.autoCommittedBatchId != null) target = m;
+      break; // only the LATEST assistant turn qualifies
+    }
+    if (target == null) return false;
+    _addMessage(
+      AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.user,
+        content: input,
+        timestamp: DateTime.now(),
+      ),
+    );
+    await undoAutoCommittedBatch(target.id, target.autoCommittedBatchId!);
+    return true;
+  }
+
   void startNewSession() {
     final endedSessionId = _sessionId;
     // Deferred end (fix-wave Phase 7, §8 U6): stash the thread for the
@@ -1655,6 +1732,7 @@ class AiAssistantService extends ChangeNotifier {
     // R9): entries used to accumulate for the app's lifetime.
     _onScheduleMutated?.call(_sessionId);
     _sessionId = StableId.generate('session');
+    _sessionDayKey = DateKeys.todayKey();
     _messages.clear();
     _proposal = null;
     _isLoading = false;
@@ -1942,7 +2020,7 @@ class AiAssistantService extends ChangeNotifier {
       return result.followUpQuestion;
     }
     if (result.isInformational || result.isUnsupported) {
-      return result.informationalMessage;
+      return _withToolTrace(result, result.informationalMessage);
     }
     if (result.isSuggest) {
       // The prose alone can lose the concrete times to the history cap; the
@@ -1956,21 +2034,27 @@ class AiAssistantService extends ChangeNotifier {
       return "I can answer questions about your schedule or help you add and move tasks. "
           "Try asking \"What's my plan for tomorrow?\" or \"Add a workout at 6am tomorrow.\"";
     }
-    return _planPreviewSummary(result);
+    return _withToolTrace(result, _planPreviewSummary(result));
   }
 
+  /// Appends what the turn looked up (Phase 4.1) so the next prompt knows
+  /// the model already saw that day — it used to re-ask or re-look-up.
+  String? _withToolTrace(AiPlannedChanges result, String? summary) {
+    if (result.toolTrace.isEmpty) return summary;
+    final trace = result.toolTrace.take(3).join('; ');
+    return '${summary ?? ''} [Looked up: $trace]'.trim();
+  }
+
+  /// Preview summary keeps times, dates and durations (Phase 4.1): the old
+  /// "createTask: Workout" lost the time, and the prompt rule "if your
+  /// earlier times are no longer visible, pick new ones" then produced a
+  /// second, different plan (review §1.1 #8).
   String _planPreviewSummary(AiPlannedChanges plan) {
-    final parts = plan.actions
-        .take(4)
-        .map((a) {
-          final title =
-              a.parameters['title']?.toString() ??
-              a.parameters['taskTitle']?.toString() ??
-              a.actionType.name;
-          return '${a.actionType.name}: $title';
-        })
-        .join('; ');
-    return 'Plan preview: $parts';
+    final message = plan.informationalMessage?.trim();
+    final actions = _compactActionsSummary(plan);
+    return message == null || message.isEmpty
+        ? 'Plan preview: $actions'
+        : '$message [Plan preview: $actions]';
   }
 
   /// Compact, lossless-enough action list for model context: keeps titles AND

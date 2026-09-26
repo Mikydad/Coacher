@@ -10,6 +10,25 @@ User: I prefer morning workouts, honestly.
 
 void main() {
   group('quote verification (the load-bearing gate)', () {
+    test('a quote copied from an ASSISTANT line never verifies (Phase 4.3)',
+        () {
+      final parsed = MemoryExtractionParser.parse(
+        '{"facts":[{"kind":"preference","content":"Likes evening runs",'
+        '"quote":"mornings or evenings?"}],"people":[],"observations":[]}',
+        transcript,
+      );
+      expect(parsed.facts.single.provenance, MemoryProvenance.aiInferred);
+      expect(parsed.facts.single.sourceQuote, isNull);
+    });
+
+    test('a three-character quote is not a quote (Phase 4.3)', () {
+      expect(MemoryExtractionParser.quoteMatches('run', transcript), isFalse);
+      expect(
+        MemoryExtractionParser.quoteMatches('I prefer morning workouts', transcript),
+        isTrue,
+      );
+    });
+
     test('verbatim quote → userStated with the quote kept', () {
       final parsed = MemoryExtractionParser.parse(
         '{"facts":[{"kind":"preference","content":"Prefers morning workouts",'

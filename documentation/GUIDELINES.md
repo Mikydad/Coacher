@@ -4547,3 +4547,26 @@ not silent reversal.
   per turn, never persisted, so the "no raw ids" privacy rule holds).
   *Not done:* prefetching a named other day; the `get_day_schedule` round
   covers it.
+
+- **2026-09-26 · Phase 4 of the Coach fix plan: continuity, memory
+  attribution, truncation, voice read-back.** History rows now keep the
+  assistant's actual text, a plan summary that retains times/dates/
+  durations (the lossy "createTask: Workout" line was one leg of the
+  duplicate-plan loop), and a "[Looked up: …]" trace of read-only tool
+  calls, capped at 3000 chars. The model receives the newest eight turns
+  verbatim and one deterministic "[Earlier in this session: …]" line for
+  older turns (up to 30 rows read, 900 chars) — no model call, no cliff at
+  turn 11. **A Coach session is a calendar day (D5):** closing the sheet
+  calls `pauseSession()` and keeps the thread and session id; the first
+  message on a new day rotates the session; a relaunch adopts the latest
+  same-day session id so the model context and memory-extraction session
+  continue. `startNewSession()` remains the explicit reset and keeps its
+  stash/restore semantics. Memory: `quoteMatches` verifies against "User:"
+  lines only, with a 12-character-or-three-word floor; before an
+  auto-commit the service overwrites `rawUtterance` with what the user
+  actually typed or said, so the executor's anchor check compares against
+  reality, never the model's own quote. `aiChat` returns `finish_reason`;
+  a reply cut at the cap carries the same "(That reply got cut off…)"
+  marker as the streaming path. Voice (D7): an auto-committed intention or
+  memory write is READ BACK verbatim with "say undo if that's not right",
+  and a short "undo" / "scratch that" right after reverts it (typed too).

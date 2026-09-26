@@ -843,10 +843,14 @@ export const aiChat = onCall(
             function?: { name?: string; arguments?: string };
           }>;
         };
+        finish_reason?: string | null;
       }>;
       usage?: { total_tokens?: number };
     };
     const message = json.choices?.[0]?.message;
+    // Surfaced so a reply cut at the cap can be marked (fix plan Phase 4.4);
+    // this path used to discard it and ship half a reply as whole.
+    const finishReason = json.choices?.[0]?.finish_reason ?? null;
     const content = typeof message?.content === "string" ? message.content : null;
     const toolCalls = (message?.tool_calls ?? [])
       .filter((c) => typeof c.id === "string" && typeof c.function?.name === "string")
@@ -886,7 +890,7 @@ export const aiChat = onCall(
     await recordPurposeUsage(uid, purpose, totalTokens, {
       countsTowardDailyBudget: route.quotaClass === "user",
     });
-    return { content, toolCalls };
+    return { content, toolCalls, finishReason };
   },
 );
 

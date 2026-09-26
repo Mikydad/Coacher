@@ -101,9 +101,11 @@ Future<void> showCoachAiSheet(
     builder: (_) => _CoachAiSheet(askBar: askBar),
   ).whenComplete(() {
     try {
-      // The service is created via the parser future; if it never resolved
-      // (sheet closed before AI booted) there is no session to end.
-      container.read(resolvedAiAssistantProvider).value?.startNewSession();
+      // Closing the sheet PAUSES the session (D5, fix plan Phase 4.2): the
+      // thread and model context continue on reopen; a new calendar day is
+      // what ends a session. If the parser future never resolved (sheet
+      // closed before AI booted) there is nothing to pause.
+      container.read(resolvedAiAssistantProvider).value?.pauseSession();
     } catch (e) {
       debugPrint('[Coach] session-end extraction skipped: $e');
     }

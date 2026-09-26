@@ -54,10 +54,11 @@ class AiInteractionHistoryRepository {
     bool executed = false,
   }) async {
     final trimmed = assistantSummary?.trim();
-    // 1200, not 500: suggest-plan messages carry the concrete times the next
-    // turn needs ("as you suggested"); truncating them caused re-ask loops.
+    // 3000 (fix plan Phase 4.1; was 1200, before that 500): the assistant's
+    // actual text plus the compact action list and tool trace must survive
+    // — every lossy cut here became a re-ask or a re-proposal later.
     final capped = trimmed != null && trimmed.isNotEmpty
-        ? (trimmed.length > 1200 ? '${trimmed.substring(0, 1197)}…' : trimmed)
+        ? (trimmed.length > 3000 ? '${trimmed.substring(0, 2997)}…' : trimmed)
         : null;
 
     final entry = IsarAiInteractionHistory()

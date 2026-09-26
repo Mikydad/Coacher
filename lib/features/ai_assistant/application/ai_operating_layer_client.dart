@@ -459,6 +459,8 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
     // One prose-plan repair per turn — a model that ignores the nudge twice
     // isn't going to comply on the third ask.
     var proseRepairAttempted = false;
+    // Read-only lookups this turn made, carried into history (Phase 4.1).
+    final toolTrace = <String>[];
 
     for (var loop = 0; loop <= kMaxLoops; loop++) {
       AiProxyChatResult result;
@@ -508,7 +510,9 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
           result.content,
           payload.userInput,
         );
-        if (mapped != null) return mapped;
+        if (mapped != null) {
+          return mapped.copyWith(toolTrace: toolTrace);
+        }
         // The tool was called but nothing usable parsed. Degrading to
         // informational here is how plans became text-only bubbles with no
         // Confirm card — instead answer every call with a tool error and
@@ -557,10 +561,16 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
           });
           continue;
         }
+        // A reply cut at the token cap is marked, never shipped as whole
+        // (Phase 4.4) — the same marker the streaming path uses.
         return AiPlannedChanges(
           sessionId: payload.userInput,
           responseType: AiResponseType.informational,
-          informationalMessage: text,
+          informationalMessage: result.truncated
+              ? '$text …\n\n(That reply got cut off — ask again for the rest.)'
+              : text,
+          toolTrace: toolTrace,
+          truncated: result.truncated,
         );
       }
 
@@ -576,6 +586,11 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
         final toolResult = toolRunner != null
             ? await toolRunner!.run(call.name, args)
             : 'Error: tool unavailable.';
+        final argText = args.values.map((v) => v.toString()).join(' ');
+        toolTrace.add(
+          '${call.name} $argText → '
+          '${toolResult.length > 160 ? '${toolResult.substring(0, 157)}…' : toolResult}',
+        );
         messages.add({
           'role': 'tool',
           'tool_call_id': call.id,

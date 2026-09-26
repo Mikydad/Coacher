@@ -22,7 +22,17 @@ class AiPlannedChanges {
     this.suggestedPrompts = const [],
     this.isError = false,
     this.retryTurnId,
+    this.toolTrace = const [],
+    this.truncated = false,
   });
+
+  /// Read-only tool calls the agent loop made for this turn, one line each
+  /// ("get_day_schedule 2026-10-03 → …"), so the next turn's history can
+  /// carry what the model already looked up (fix plan Phase 4.1).
+  final List<String> toolTrace;
+
+  /// The model's reply was cut at the token cap (Phase 4.4).
+  final bool truncated;
 
   /// A failed round-trip rendered as an honest, RETRYABLE error (fix-wave
   /// Phase 3, §8 H1/H10). Error results carry their copy in
@@ -91,6 +101,8 @@ class AiPlannedChanges {
     List<String>? suggestedPrompts,
     bool? isError,
     String? retryTurnId,
+    List<String>? toolTrace,
+    bool? truncated,
   }) {
     return AiPlannedChanges(
       sessionId: sessionId ?? this.sessionId,
@@ -103,6 +115,8 @@ class AiPlannedChanges {
       suggestedPrompts: suggestedPrompts ?? this.suggestedPrompts,
       isError: isError ?? this.isError,
       retryTurnId: retryTurnId ?? this.retryTurnId,
+      toolTrace: toolTrace ?? this.toolTrace,
+      truncated: truncated ?? this.truncated,
     );
   }
 

@@ -11,6 +11,7 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sidepal/core/ai/ai_proxy_client.dart';
 import 'package:sidepal/core/utils/date_keys.dart';
 import 'package:sidepal/features/ai_assistant/application/ai_action_executor.dart';
 import 'package:sidepal/features/ai_assistant/application/ai_intent_router.dart';
@@ -403,6 +404,40 @@ void main() {
 
       expect(s.titlesOn(today), isEmpty);
       expect(s.titlesOn(tomorrow), ['Workout']);
+    });
+
+    test('a reply cut at the token cap is marked, never shipped as whole',
+        () async {
+      final s = await AiScenario.start(
+        script: [
+          const AiProxyChatResult(
+            content: 'Your afternoon has three things: study at 14:00, a call at',
+            finishReason: 'length',
+          ),
+        ],
+      );
+      addTearDown(s.dispose);
+
+      await s.service.sendMessage("What's on my plan today?");
+
+      expect(s.lastAssistant.content, contains('got cut off'));
+    });
+
+    test('closing the sheet pauses the session; the thread and id survive',
+        () async {
+      final s = await AiScenario.start(
+        script: [ScriptedProxy.text('Nothing yet today.')],
+      );
+      addTearDown(s.dispose);
+      await s.service.sendMessage("What's on my plan today?");
+      final id = s.service.sessionId;
+      final count = s.messages.length;
+
+      s.service.pauseSession();
+
+      expect(s.service.sessionId, id);
+      expect(s.messages.length, count);
+      expect(s.service.canRestoreConversation, isFalse);
     });
 
     test('a time that has already passed today is blocked at confirm', () async {
