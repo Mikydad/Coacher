@@ -65,13 +65,16 @@ ReminderConfig _makeReminder({
   );
 }
 
-AiAction _addReminderAction({required String reminderTime}) {
+AiAction _addReminderAction({
+  required String reminderTime,
+  String date = '2026-05-22',
+}) {
   return AiAction(
     actionType: ActionType.addReminder,
     parameters: {
       'taskTitle': 'Morning Run',
       'reminderTime': reminderTime,
-      'date': '2026-05-22',
+      'date': date,
     },
     confidence: 0.9,
   );
@@ -81,6 +84,7 @@ AiAction _createTaskAction({
   required String time,
   int duration = 30,
   String title = 'Workout',
+  String date = '2026-05-22',
 }) {
   return AiAction(
     actionType: ActionType.createTask,
@@ -88,7 +92,7 @@ AiAction _createTaskAction({
       'title': title,
       'time': time,
       'duration': duration,
-      'date': '2026-05-22',
+      'date': date,
     },
     confidence: 0.9,
   );
@@ -148,6 +152,27 @@ void main() {
         contains('Morning Run'),
       );
       expect(result.hardBlocks, isEmpty);
+    });
+
+    test('Same clock time on ANOTHER day → no collision (fix plan Phase 2.5)',
+        () async {
+      final existing = _makeReminder(
+        id: 'r1',
+        scheduledAtIso: '2026-05-22T06:00:00.000',
+        taskTitle: 'Morning Run',
+      );
+      final detector = AiConflictDetector(
+        reminderRepository: _FakeReminderRepository(reminders: [existing]),
+        contextOverrideRepository: _FakeContextOverrideRepository(),
+      );
+
+      final action = _addReminderAction(
+        reminderTime: '06:02',
+        date: '2026-05-23',
+      );
+      final result = await detector.detect([action]);
+
+      expect(result.softConflicts, isEmpty);
     });
 
     test('Two reminders 5 min apart → no collision', () async {
@@ -240,6 +265,32 @@ void main() {
         expect(result.softConflicts, isNotEmpty);
         expect(result.softConflicts.first, contains('Focus'));
         expect(result.hardBlocks, isEmpty);
+      },
+    );
+
+    test(
+      "Task on ANOTHER day is not blocked by today's active DND "
+      '(fix plan Phase 2.5)',
+      () async {
+        final now = DateTime(2026, 5, 22, 10, 0);
+        final expiresAt = DateTime(2026, 5, 22, 12, 0);
+        final attentionState = _stateWithActiveOverride(
+          override: ContextOverride.doNotDisturb,
+          activatedAt: now,
+          expiresAt: expiresAt,
+        );
+        final detector = AiConflictDetector(
+          reminderRepository: _FakeReminderRepository(),
+          contextOverrideRepository: _FakeContextOverrideRepository(
+            state: attentionState,
+          ),
+        );
+
+        final action = _createTaskAction(time: '10:30', date: '2026-05-23');
+        final result = await detector.detect([action]);
+
+        expect(result.hardBlocks, isEmpty);
+        expect(result.softConflicts, isEmpty);
       },
     );
 

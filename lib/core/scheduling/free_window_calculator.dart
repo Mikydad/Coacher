@@ -52,6 +52,8 @@ class FreeWindowCalculator {
   static List<FreeWindow> computeWindows(
     List<Map<String, dynamic>> scheduleMaps, {
     int fromMinuteOfDay = 0,
+    int dayStart = dayStartMinute,
+    int dayEnd = dayEndMinute,
   }) {
     int? parseMinute(Object? hhmm) {
       if (hhmm is! String) return null;
@@ -98,15 +100,13 @@ class FreeWindowCalculator {
     }
 
     final windows = <FreeWindow>[];
-    var cursor = fromMinuteOfDay > dayStartMinute
-        ? fromMinuteOfDay
-        : dayStartMinute;
+    var cursor = fromMinuteOfDay > dayStart ? fromMinuteOfDay : dayStart;
     for (final interval in [
       ...merged,
-      (dayEndMinute, dayEndMinute, null, false),
+      (dayEnd, dayEnd, null, false),
     ]) {
-      final endsAtBlock = interval.$1 < dayEndMinute;
-      final gapEnd = endsAtBlock ? interval.$1 : dayEndMinute;
+      final endsAtBlock = interval.$1 < dayEnd;
+      final gapEnd = endsAtBlock ? interval.$1 : dayEnd;
       final gap = gapEnd - cursor;
       final beforeCalendar = endsAtBlock && interval.$4;
       final keep =
@@ -123,22 +123,38 @@ class FreeWindowCalculator {
         );
       }
       if (interval.$2 > cursor) cursor = interval.$2;
-      if (cursor >= dayEndMinute) break;
+      if (cursor >= dayEnd) break;
     }
     return windows;
   }
 
   /// Human-readable strings like "14:00–16:30 (2h 30m)" — the exact shape
-  /// the Coach prompt consumed before extraction. At most 4 are returned.
+  /// the Coach prompt consumes. Waking bounds are per user since fix plan
+  /// Phase 3.2 (D3); [maxWindows] caps the list and, when it truncates, the
+  /// last entry says how many more there are (the old silent cut at 4 made
+  /// the evening look busy).
   static List<String> computeFormatted(
     List<Map<String, dynamic>> scheduleMaps, {
     int fromMinuteOfDay = 0,
+    int dayStart = dayStartMinute,
+    int dayEnd = dayEndMinute,
+    int maxWindows = 8,
   }) {
-    return computeWindows(scheduleMaps, fromMinuteOfDay: fromMinuteOfDay)
+    final all = computeWindows(
+      scheduleMaps,
+      fromMinuteOfDay: fromMinuteOfDay,
+      dayStart: dayStart,
+      dayEnd: dayEnd,
+    );
+    final shown = all
+        .take(maxWindows)
         .map((w) => '${formatMinute(w.startMinute)}–'
             '${formatMinute(w.endMinute)} (${formatSpan(w.durationMinutes)})')
-        .take(4)
         .toList();
+    if (all.length > maxWindows) {
+      shown.add('+${all.length - maxWindows} more');
+    }
+    return shown;
   }
 
   static String formatMinute(int minute) =>

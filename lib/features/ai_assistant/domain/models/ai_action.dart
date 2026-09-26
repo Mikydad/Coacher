@@ -98,11 +98,19 @@ class AiAction {
 
   // ─── Serialisation ────────────────────────────────────────────────────────
 
+  /// Throws [ArgumentError] on an unknown verb (AI chat fix plan Phase 1.4,
+  /// review §2 #2). The old `orElse: () => createTask` turned a drifted
+  /// "updateTask"/"scheduleTask" with a title and time into a brand-new
+  /// task on the card. Callers that map model output catch and drop.
   factory AiAction.fromJson(Map<String, dynamic> json) {
     final typeStr = json['actionType'] as String? ?? '';
     final type = ActionType.values.firstWhere(
       (e) => e.name == typeStr,
-      orElse: () => ActionType.createTask,
+      orElse: () => throw ArgumentError.value(
+        typeStr,
+        'actionType',
+        'Unknown action verb',
+      ),
     );
     return AiAction(
       actionType: type,

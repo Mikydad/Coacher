@@ -5,6 +5,7 @@ import '../../goals/domain/models/goal_enums.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/data/planning_repository.dart';
 import '../domain/models/ai_action.dart';
+import '../domain/models/ai_operating_layer_payload.dart';
 
 /// Resolves entity-targeting actions (edit/move/delete task, modify/delete
 /// goal, remove reminder) to concrete Isar ids at PREVIEW time — before the
@@ -50,14 +51,33 @@ class AiEntityResolver {
   /// resolved list (params stamped with `_resolvedTaskId`/`_resolvedGoalId`
   /// + location keys, titles rewritten to the matched entity) or a local
   /// disambiguation question.
-  Future<EntityResolution> resolve(List<AiAction> actions) async {
+  ///
+  /// [taskHandles] / [goalHandles] are this turn's opaque handles (D2,
+  /// fix plan Phase 3.5): a `taskRef`/`goalRef` the model passed back
+  /// resolves exactly, with no title guessing. An unknown handle falls
+  /// through to the title path.
+  Future<EntityResolution> resolve(
+    List<AiAction> actions, {
+    Map<String, AiTaskHandle> taskHandles = const {},
+    Map<String, AiGoalHandle> goalHandles = const {},
+  }) async {
     final resolved = <AiAction>[];
     for (final action in actions) {
       if (taskTargetKinds.contains(action.actionType)) {
+        final byHandle = _taskByHandle(action, taskHandles);
+        if (byHandle != null) {
+          resolved.add(byHandle);
+          continue;
+        }
         final outcome = await _resolveTask(action);
         if (outcome is _Question) return EntityResolutionQuestion(outcome.text);
         resolved.add((outcome as _Resolved).action);
       } else if (goalTargetKinds.contains(action.actionType)) {
+        final byHandle = _goalByHandle(action, goalHandles);
+        if (byHandle != null) {
+          resolved.add(byHandle);
+          continue;
+        }
         final outcome = await _resolveGoal(action);
         if (outcome is _Question) return EntityResolutionQuestion(outcome.text);
         resolved.add((outcome as _Resolved).action);
@@ -66,6 +86,43 @@ class AiEntityResolver {
       }
     }
     return EntityResolutionOk(resolved);
+  }
+
+  // ─── Handles (D2) ──────────────────────────────────────────────────────────
+
+  static String? _handleOf(AiAction action, String key) {
+    final raw = action.parameters[key]?.toString().trim().toLowerCase();
+    if (raw == null || raw.isEmpty) return null;
+    return raw.replaceAll(RegExp(r'[\[\]]'), '');
+  }
+
+  AiAction? _taskByHandle(AiAction action, Map<String, AiTaskHandle> handles) {
+    final ref = _handleOf(action, 'taskRef');
+    if (ref == null) return null;
+    final h = handles[ref];
+    if (h == null) return null;
+    final p = Map<String, dynamic>.from(action.parameters);
+    p['_resolvedTaskId'] = h.taskId;
+    p['_resolvedRoutineId'] = h.routineId;
+    p['_resolvedBlockId'] = h.blockId;
+    p['_resolvedDateKey'] = h.dateKey;
+    if (action.actionType == ActionType.editTask) {
+      p['title'] = h.title;
+    } else {
+      p['taskTitle'] = h.title;
+    }
+    return action.copyWith(parameters: p);
+  }
+
+  AiAction? _goalByHandle(AiAction action, Map<String, AiGoalHandle> handles) {
+    final ref = _handleOf(action, 'goalRef');
+    if (ref == null) return null;
+    final h = handles[ref];
+    if (h == null) return null;
+    final p = Map<String, dynamic>.from(action.parameters);
+    p['_resolvedGoalId'] = h.goalId;
+    p['goalTitle'] = h.title;
+    return action.copyWith(parameters: p);
   }
 
   // ─── Tasks ──────────────────────────────────────────────────────────────────

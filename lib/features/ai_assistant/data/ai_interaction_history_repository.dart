@@ -31,6 +31,28 @@ class AiInteractionHistoryRepository {
     String? assistantSummary,
     String? responseType,
   }) async {
+    await saveTurn(
+      sessionId: sessionId,
+      userInput: userInput,
+      parsedActions: parsedActions,
+      resolvedCategory: resolvedCategory,
+      assistantSummary: assistantSummary,
+      responseType: responseType,
+    );
+  }
+
+  /// [save] that returns the new row's id (AI chat fix plan Phase 1.5) so
+  /// the proposal can pin its own row, and that can record a turn as
+  /// already [executed] (auto-commits). Null only from fakes.
+  Future<int?> saveTurn({
+    required String sessionId,
+    required String userInput,
+    required List<AiAction> parsedActions,
+    String? resolvedCategory,
+    String? assistantSummary,
+    String? responseType,
+    bool executed = false,
+  }) async {
     final trimmed = assistantSummary?.trim();
     // 1200, not 500: suggest-plan messages carry the concrete times the next
     // turn needs ("as you suggested"); truncating them caused re-ask loops.
@@ -49,15 +71,15 @@ class AiInteractionHistoryRepository {
       ..parsedActionsJson = jsonEncode(
         parsedActions.map((a) => a.toJson()).toList(),
       )
-      ..confirmed = false
-      ..executed = false
+      ..confirmed = executed
+      ..executed = executed
       ..resolvedCategory = resolvedCategory
       ..assistantSummary = capped
       ..responseType = responseType
       ..timestampMs = DateTime.now().millisecondsSinceEpoch;
 
-    await _isar.writeTxn(() async {
-      await _isar.isarAiInteractionHistorys.put(entry);
+    return _isar.writeTxn(() async {
+      return _isar.isarAiInteractionHistorys.put(entry);
     });
   }
 
@@ -104,6 +126,31 @@ class AiInteractionHistoryRepository {
   /// Marks the NEWEST entry of [sessionId] executed — see [markConfirmed].
   Future<void> markExecuted(String sessionId) =>
       _markLatest(sessionId, (e) => e.executed = true);
+
+  // By-row variants (fix plan Phase 1.5): the proposal knows its own row,
+  // so confirmation never marks — or overwrites the summary of — whatever
+  // unrelated turn happened to be newest (review §1.1 #4).
+
+  Future<void> markConfirmedById(int isarId) =>
+      _mutateById(isarId, (e) => e.confirmed = true);
+
+  Future<void> markExecutedById(int isarId) =>
+      _mutateById(isarId, (e) => e.executed = true);
+
+  Future<void> saveAssistantSummaryById(int isarId, String summary) =>
+      _mutateById(isarId, (e) => e.assistantSummary = summary);
+
+  Future<void> _mutateById(
+    int isarId,
+    void Function(IsarAiInteractionHistory) mutate,
+  ) async {
+    final row = await _isar.isarAiInteractionHistorys.get(isarId);
+    if (row == null) return;
+    await _isar.writeTxn(() async {
+      mutate(row);
+      await _isar.isarAiInteractionHistorys.put(row);
+    });
+  }
 
   Future<void> _markLatest(
     String sessionId,

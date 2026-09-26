@@ -317,8 +317,14 @@ class InMemoryHistoryRepo extends _NoopFake
   final List<IsarAiInteractionHistory> rows = [];
   int _clock = 0;
 
-  /// Set to make a mutation throw once (retry-hole scenarios).
+  /// Set to make the next executed-mark throw once (retry-hole scenarios).
   Object? failNextMarkExecuted;
+
+  Object? _takeFailure() {
+    final f = failNextMarkExecuted;
+    failNextMarkExecuted = null;
+    return f;
+  }
 
   @override
   Future<void> save({
@@ -329,21 +335,66 @@ class InMemoryHistoryRepo extends _NoopFake
     String? assistantSummary,
     String? responseType,
   }) async {
+    await saveTurn(
+      sessionId: sessionId,
+      userInput: userInput,
+      parsedActions: parsedActions,
+      resolvedCategory: resolvedCategory,
+      assistantSummary: assistantSummary,
+      responseType: responseType,
+    );
+  }
+
+  @override
+  Future<int?> saveTurn({
+    required String sessionId,
+    required String userInput,
+    required List<AiAction> parsedActions,
+    String? resolvedCategory,
+    String? assistantSummary,
+    String? responseType,
+    bool executed = false,
+  }) async {
+    final id = ++_clock;
     rows.add(
       IsarAiInteractionHistory()
+        ..isarId = id
         ..sessionId = sessionId
         ..userInput = userInput
         ..parsedActionsJson = jsonEncode(
           parsedActions.map((a) => a.toJson()).toList(),
         )
-        ..confirmed = false
-        ..executed = false
+        ..confirmed = executed
+        ..executed = executed
         ..resolvedCategory = resolvedCategory
         ..assistantSummary = assistantSummary
         ..responseType = responseType
-        ..timestampMs = ++_clock,
+        ..timestampMs = id,
     );
+    return id;
   }
+
+  IsarAiInteractionHistory? _byId(int id) {
+    for (final r in rows) {
+      if (r.isarId == id) return r;
+    }
+    return null;
+  }
+
+  @override
+  Future<void> markConfirmedById(int isarId) async =>
+      _byId(isarId)?.confirmed = true;
+
+  @override
+  Future<void> markExecutedById(int isarId) async {
+    final failure = _takeFailure();
+    if (failure != null) throw failure;
+    _byId(isarId)?.executed = true;
+  }
+
+  @override
+  Future<void> saveAssistantSummaryById(int isarId, String summary) async =>
+      _byId(isarId)?.assistantSummary = summary;
 
   List<IsarAiInteractionHistory> _session(String sessionId) =>
       rows.where((r) => r.sessionId == sessionId).toList()
@@ -382,11 +433,8 @@ class InMemoryHistoryRepo extends _NoopFake
 
   @override
   Future<void> markExecuted(String sessionId) async {
-    final failure = failNextMarkExecuted;
-    if (failure != null) {
-      failNextMarkExecuted = null;
-      throw failure;
-    }
+    final failure = _takeFailure();
+    if (failure != null) throw failure;
     _latest(sessionId)?.executed = true;
   }
 
@@ -414,7 +462,7 @@ class _FakeCoachingStyleRepo extends _NoopFake
   Future<UserCoachingProfile?> getProfile() async => null;
 }
 
-class _FakeReminderRepo extends _NoopFake implements ReminderRepository {
+class FakeReminderRepo extends _NoopFake implements ReminderRepository {
   final upserted = <ReminderConfig>[];
 
   @override
@@ -427,7 +475,7 @@ class _FakeReminderRepo extends _NoopFake implements ReminderRepository {
       upserted.add(reminder);
 }
 
-class _FakeReminderSync extends _NoopFake implements ReminderSyncService {
+class FakeReminderSync extends _NoopFake implements ReminderSyncService {
   @override
   Future<void> removeForDeletedTask(String taskId) async {}
 
@@ -435,7 +483,7 @@ class _FakeReminderSync extends _NoopFake implements ReminderSyncService {
   Future<void> syncForTaskIds(List<String> taskIds) async {}
 }
 
-class _FakeTimeBlockSync extends _NoopFake implements TimeBlockSyncService {
+class FakeTimeBlockSync extends _NoopFake implements TimeBlockSyncService {
   @override
   Future<void> removeBlockForEntity(String entityId) async {}
 
@@ -451,7 +499,7 @@ class _FakeTimeBlockSync extends _NoopFake implements TimeBlockSyncService {
   }) => null;
 }
 
-class _FakeContextOverrideService extends _NoopFake
+class FakeContextOverrideService extends _NoopFake
     implements ContextOverrideService {}
 
 // ─── The scenario ────────────────────────────────────────────────────────────
@@ -489,7 +537,7 @@ class AiScenario {
     final history = InMemoryHistoryRepo();
     final batches = AiActionBatchRepository(opened.isar);
     final contextOverrideRepo = _FakeContextOverrideRepo();
-    final reminderRepo = _FakeReminderRepo();
+    final reminderRepo = FakeReminderRepo();
 
     final assembler = AiPayloadAssembler(
       planningRepository: planning,
@@ -529,9 +577,9 @@ class AiScenario {
       planningRepository: planning,
       goalsRepository: goals,
       reminderRepository: reminderRepo,
-      reminderSyncService: _FakeReminderSync(),
-      timeBlockSyncService: _FakeTimeBlockSync(),
-      contextOverrideService: _FakeContextOverrideService(),
+      reminderSyncService: FakeReminderSync(),
+      timeBlockSyncService: FakeTimeBlockSync(),
+      contextOverrideService: FakeContextOverrideService(),
       batchRepository: batches,
     );
     final service = AiAssistantService(

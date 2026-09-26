@@ -46,7 +46,10 @@ class _SlowExecutor implements AiActionExecutor {
   int executeCalls = 0;
 
   @override
-  Future<ExecutionResult> execute(List<AiAction> actions) async {
+  Future<ExecutionResult> execute(
+    List<AiAction> actions, {
+    String? batchId,
+  }) async {
     executeCalls++;
     await Future<void>.delayed(const Duration(milliseconds: 20));
     return ExecutionResult(successes: ['done'], batchId: 'b$executeCalls');
@@ -57,6 +60,27 @@ class _SlowExecutor implements AiActionExecutor {
 }
 
 class _FakeHistory implements AiInteractionHistoryRepository {
+  @override
+  Future<int?> saveTurn({
+    required String sessionId,
+    required String userInput,
+    required List<AiAction> parsedActions,
+    String? resolvedCategory,
+    String? assistantSummary,
+    String? responseType,
+    bool executed = false,
+  }) async {
+    await save(
+      sessionId: sessionId,
+      userInput: userInput,
+      parsedActions: parsedActions,
+      resolvedCategory: resolvedCategory,
+      assistantSummary: assistantSummary,
+      responseType: responseType,
+    );
+    return null;
+  }
+
   final savedInputs = <String>[];
 
   @override
@@ -112,7 +136,7 @@ final _mutatePlan = AiPlannedChanges(
         'title': 'Workout',
         'time': '14:00',
         'duration': 30,
-        'date': 'today',
+        'date': 'tomorrow' // past times today are blocked at confirm (Phase 2.2),
       },
     ),
   ],

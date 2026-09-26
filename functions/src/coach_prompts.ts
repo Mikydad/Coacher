@@ -111,9 +111,14 @@ pick sensible times from the free windows yourself instead of asking again.
   addReminder/rescheduleReminder {taskTitle, reminderTime ("HH:mm")};
   removeReminder {taskTitle}. Never invent keys like startTime, start,
   when, or durationMinutes — the app cannot read them.
-- For edit/move/delete, pass the task or goal title as the user said it —
-  the app matches it to the real item and shows the user exactly what
-  will change before anything is applied.
+- createGoal also takes cadence ("daily" | "weekly" | "monthly" | "none" —
+  "run 20 km a week" is weekly) and category ("fitness" | "study" |
+  "productivity" | "focus" | "habits" | "mental_clarity"). The target is a
+  number plus its unit ("25 minutes", "3 sessions", "20 km").
+- To edit/move/delete an EXISTING item, pass its handle — the [t1]/[g1]
+  shown beside it — as taskRef/goalRef; fall back to taskTitle/goalTitle
+  only when no handle is visible. The app shows the user exactly what will
+  change before anything is applied.
 - Presentation "preview" → the user gave a clear command ("add workout at 6am").
   Keep your text to one short confirmation line.
 - logActivity parameters: text (what they are doing, ≤80 chars, e.g. "Gym"),
@@ -148,7 +153,8 @@ pick sensible times from the free windows yourself instead of asking again.
 ## Planning method (when suggesting)
 0. If a direction is given, prefer items that move it when choosing what to
    suggest — quietly, without announcing the rule.
-1. Check goalProgress — who is behind (daysMet vs target pace)?
+1. Check goal progress — who is BEHIND PACE (logged vs target for the
+   window)? Prefer their steps due today.
 2. Place items inside the free windows provided — never on top of existing
    blocks. "reminder only" items are notifications, not busy time.
 3. Match times/durations to recentPatterns when available.

@@ -202,9 +202,14 @@ pick sensible times from the free windows yourself instead of asking again.
   addReminder/rescheduleReminder {taskTitle, reminderTime ("HH:mm")};
   removeReminder {taskTitle}. Never invent keys like startTime, start,
   when, or durationMinutes — the app cannot read them.
-- For edit/move/delete, pass the task or goal title as the user said it —
-  the app matches it to the real item and shows the user exactly what
-  will change before anything is applied.
+- createGoal also takes cadence ("daily" | "weekly" | "monthly" | "none" —
+  "run 20 km a week" is weekly) and category ("fitness" | "study" |
+  "productivity" | "focus" | "habits" | "mental_clarity"). The target is a
+  number plus its unit ("25 minutes", "3 sessions", "20 km").
+- To edit/move/delete an EXISTING item, pass its handle — the [t1]/[g1]
+  shown beside it — as taskRef/goalRef; fall back to taskTitle/goalTitle
+  only when no handle is visible. The app shows the user exactly what will
+  change before anything is applied.
 - Presentation "preview" → the user gave a clear command ("add workout at 6am").
   Keep your text to one short confirmation line.
 - logActivity parameters: text (what they are doing, ≤80 chars, e.g.
@@ -237,7 +242,8 @@ pick sensible times from the free windows yourself instead of asking again.
   which only attaches to a task that already exists.
 
 ## Planning method (when suggesting)
-1. Check goalProgress — who is behind (daysMet vs target pace)?
+1. Check goal progress — who is BEHIND PACE (logged vs target for the
+   window)? Prefer their steps due today.
 2. Place items inside the free windows provided — never on top of existing
    blocks. "reminder only" items are notifications, not busy time.
 3. Match times/durations to recentPatterns when available.
@@ -359,8 +365,17 @@ const List<Map<String, dynamic>> kCoachAgentTools = [
                       'EXACT keys per actionType — createTask/editTask: '
                       'title, time ("HH:mm" 24-hour), duration (minutes, '
                       'integer), date ("today" | "tomorrow" | YYYY-MM-DD); '
-                      'moveTask: taskTitle, destinationDate; deleteTask: '
-                      'taskTitle; createGoal: title, target, deadline; '
+                      'editTask/moveTask/deleteTask/addReminder/'
+                      'removeReminder/rescheduleReminder: taskRef (the '
+                      '[t1]-style handle shown next to the existing task — '
+                      'preferred) or taskTitle; modifyGoal/deleteGoal: '
+                      'goalRef (the [g1] handle) or goalTitle; '
+                      'moveTask: destinationDate; createGoal: title, '
+                      'target (number + unit, '
+                      'e.g. "25 minutes", "3 sessions", "20 km"), deadline, '
+                      'cadence ("daily" | "weekly" | "monthly" | "none"), '
+                      'category ("fitness" | "study" | "productivity" | '
+                      '"focus" | "habits" | "mental_clarity"); '
                       'modifyGoal: goalTitle, field ("title" | "target" | '
                       '"deadline" | "intensity"), newValue; deleteGoal: '
                       'goalTitle; addReminder/rescheduleReminder: taskTitle, '
@@ -724,13 +739,22 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
       buffer.writeln();
     }
 
+    // Existing items carry an opaque handle ([t1], [g2]) the model passes
+    // back as taskRef/goalRef (D2) — exact targeting without raw ids.
+    String ref(Map<String, dynamic> m) =>
+        m['ref'] != null ? '[${m['ref']}] ' : '';
+
     if (payload.activeTasks.isNotEmpty) {
       buffer.writeln("Today's tasks:");
       for (final t in payload.activeTasks) {
         buffer.writeln(
-          '  - ${t['title']} at ${t['time'] ?? 'no time'} (${t['duration'] ?? '?'} min, ${t['status'] ?? 'pending'})',
+          '  - ${ref(t)}${t['title']} at ${t['time'] ?? 'no time'} '
+          '(${t['duration'] ?? '?'}, ${t['status'] ?? 'pending'})',
         );
       }
+      buffer.writeln();
+    } else {
+      buffer.writeln("Today's tasks: (nothing planned)");
       buffer.writeln();
     }
 
@@ -738,18 +762,28 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
       buffer.writeln('Active goals:');
       for (final g in payload.goals) {
         buffer.writeln(
-          '  - ${g['title']} (target: ${g['target'] ?? '?'}, deadline: ${g['deadline'] ?? '?'})',
+          '  - ${ref(g)}${g['title']} (target: ${g['target'] ?? '?'} '
+          '${g['cadence'] ?? ''}, ${g['category'] ?? 'uncategorised'}, '
+          'deadline: ${g['deadline'] ?? '?'})',
         );
       }
       buffer.writeln();
     }
 
     if (payload.goalProgress.isNotEmpty) {
-      buffer.writeln('Goal progress this period:');
+      buffer.writeln(
+        'Goal progress (logged/target in the goal\'s own units, for its '
+        'current window):',
+      );
       for (final g in payload.goalProgress) {
+        final unit = (g['unit'] ?? '').toString();
+        final steps = g['stepsDueToday'];
         buffer.writeln(
-          '  - ${g['title']}: ${g['daysMet']}/${g['target']} '
-          '(${g['daysElapsed']}/${g['totalDays']} days, ${g['periodSummary']})',
+          '  - ${ref(g)}${g['title']}: ${g['logged']}/${g['target']}'
+          '${unit.isEmpty ? '' : ' $unit'} ${g['window']}'
+          ' · ${g['daysLogged']} of ${g['daysElapsed']} elapsed days logged'
+          '${g['behindPace'] == true ? ' · BEHIND PACE' : ''}'
+          '${steps is List && steps.isNotEmpty ? ' · steps due today: ${steps.join(', ')}' : ''}',
         );
       }
       buffer.writeln();
@@ -770,12 +804,13 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
       buffer.writeln("Tomorrow's tasks:");
       for (final t in payload.tomorrowTasks) {
         buffer.writeln(
-          '  - ${t['title']} at ${t['time'] ?? 'no time'} (${t['duration'] ?? '?'}, ${t['status'] ?? 'pending'})',
+          '  - ${ref(t)}${t['title']} at ${t['time'] ?? 'no time'} '
+          '(${t['duration'] ?? '?'}, ${t['status'] ?? 'pending'})',
         );
       }
       buffer.writeln();
     } else {
-      buffer.writeln("Tomorrow's tasks: (none)");
+      buffer.writeln("Tomorrow's tasks: (nothing planned)");
       buffer.writeln();
     }
 
@@ -790,17 +825,31 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
       buffer.writeln();
     }
 
+    final waking = payload.wakingWindow ?? '07:00–22:00';
+    String calendarNote(bool? available) => switch (available) {
+      true => ' — includes calendar events',
+      false => ' — calendar unavailable, plan only',
+      null => '',
+    };
     if (payload.todayFreeWindows.isNotEmpty) {
       buffer.writeln(
-        'Free windows today (07:00–22:00, remaining): '
+        'Free windows today ($waking waking day, remaining'
+        '${calendarNote(payload.todayCalendarAvailable)}): '
         '${payload.todayFreeWindows.join(', ')}',
+      );
+      buffer.writeln();
+    } else {
+      buffer.writeln(
+        'Free windows today: none left in the $waking waking day'
+        '${calendarNote(payload.todayCalendarAvailable)}.',
       );
       buffer.writeln();
     }
 
     if (payload.tomorrowFreeWindows.isNotEmpty) {
       buffer.writeln(
-        'Free windows tomorrow (07:00–22:00): '
+        'Free windows tomorrow ($waking waking day'
+        '${calendarNote(payload.tomorrowCalendarAvailable)}): '
         '${payload.tomorrowFreeWindows.join(', ')}',
       );
       buffer.writeln();
@@ -818,9 +867,10 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
     }
 
     if (payload.proactiveContext != null) {
-      buffer.writeln(
-        'Proactive suggestion context: ${payload.proactiveContext}',
-      );
+      buffer.writeln('Proactive suggestion context:');
+      for (final e in payload.proactiveContext!.entries) {
+        buffer.writeln('  - ${e.key}: ${e.value}');
+      }
       buffer.writeln();
     }
 
@@ -837,7 +887,10 @@ class ProxyAiOperatingLayerClient implements AiOperatingLayerClient {
     }
 
     if (payload.behaviorPreferences.isNotEmpty) {
-      buffer.writeln('User preferences: ${payload.behaviorPreferences}');
+      buffer.writeln('User preferences:');
+      for (final e in payload.behaviorPreferences.entries) {
+        buffer.writeln('  - ${e.key}: ${e.value}');
+      }
     }
 
     if (payload.recentPatterns.isNotEmpty) {

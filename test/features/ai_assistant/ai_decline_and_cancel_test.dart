@@ -36,7 +36,10 @@ class _RecordingExecutor implements AiActionExecutor {
   final List<List<AiAction>> executed = [];
 
   @override
-  Future<ExecutionResult> execute(List<AiAction> actions) async {
+  Future<ExecutionResult> execute(
+    List<AiAction> actions, {
+    String? batchId,
+  }) async {
     executed.add(actions);
     return const ExecutionResult(successes: ['done']);
   }
@@ -46,6 +49,27 @@ class _RecordingExecutor implements AiActionExecutor {
 }
 
 class _FakeHistory implements AiInteractionHistoryRepository {
+  @override
+  Future<int?> saveTurn({
+    required String sessionId,
+    required String userInput,
+    required List<AiAction> parsedActions,
+    String? resolvedCategory,
+    String? assistantSummary,
+    String? responseType,
+    bool executed = false,
+  }) async {
+    await save(
+      sessionId: sessionId,
+      userInput: userInput,
+      parsedActions: parsedActions,
+      resolvedCategory: resolvedCategory,
+      assistantSummary: assistantSummary,
+      responseType: responseType,
+    );
+    return null;
+  }
+
   @override
   Future<void> save({
     required String sessionId,

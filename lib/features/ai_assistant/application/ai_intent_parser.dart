@@ -301,12 +301,15 @@ class AiIntentParser {
     // Step 4 — Missing field check + Assumption Engine
     var enrichedActions = await _enrichWithAssumptions(result.actions);
 
-    // Drop actions that duplicate tasks already on today's list
+    // Drop actions that duplicate tasks already on their own day (today or
+    // tomorrow — fix plan Phase 2.2) unless the user named the item; a named
+    // duplicate becomes a soft conflict on the card below.
     enrichedActions = AiPlanDeduplicator.filter(
       enrichedActions,
       payload.activeTasks,
       userInput,
       isRefiningPreviousPlan: previousPlan != null,
+      tomorrowTasks: payload.tomorrowTasks,
     );
     if (enrichedActions.isEmpty &&
         result.actions.isNotEmpty &&
@@ -314,7 +317,8 @@ class AiIntentParser {
       return AiPlannedChanges(
         sessionId: sessionId,
         followUpQuestion:
-            "That already appears on today's list. What else would you like to add?",
+            "That's already on your list for that day. What else would you "
+            'like to add?',
       );
     }
 
@@ -323,7 +327,11 @@ class AiIntentParser {
     // can never guess. Zero/multiple matches become a LOCAL question — no
     // model call, no quota (fix-wave Phase 1, settled Q2).
     if (entityResolver != null) {
-      final resolution = await entityResolver!.resolve(enrichedActions);
+      final resolution = await entityResolver!.resolve(
+        enrichedActions,
+        taskHandles: payload.taskHandles,
+        goalHandles: payload.goalHandles,
+      );
       switch (resolution) {
         case EntityResolutionQuestion(:final question):
           return AiPlannedChanges(
@@ -348,6 +356,25 @@ class AiIntentParser {
     // Step 5 — Conflict detection (reminder collision, context, enforcement)
     final allConflicts = List<String>.from(result.conflicts);
     final allBlocked = <String>[];
+
+    // An item the user explicitly asked for that already exists on that day
+    // survives dedup (they named it) but the card must say so (Phase 2.2).
+    for (final action in enrichedActions) {
+      final existing = AiPlanDeduplicator.findExisting(
+        action,
+        todayTasks: payload.activeTasks,
+        tomorrowTasks: payload.tomorrowTasks,
+      );
+      if (existing == null) continue;
+      final day = (action.parameters['date'] as String?) == 'tomorrow'
+          ? 'tomorrow'
+          : 'today';
+      final at = existing['time'];
+      allConflicts.add(
+        '"${existing['title']}" is already on your list for $day'
+        '${at != null && at != 'no time set' ? ' at $at' : ''}.',
+      );
+    }
 
     if (conflictDetector != null) {
       try {

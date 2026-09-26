@@ -13,6 +13,7 @@ class AiPlanDeduplicator {
     List<Map<String, dynamic>> activeTasks,
     String userInput, {
     bool isRefiningPreviousPlan = false,
+    List<Map<String, dynamic>> tomorrowTasks = const [],
   }) {
     if (isRefiningPreviousPlan || actions.isEmpty) {
       return actions;
@@ -37,8 +38,53 @@ class AiPlanDeduplicator {
       kept.add(a);
     }
 
-    if (activeTasks.isEmpty) return kept;
-    return kept.where((a) => !_isRedundant(a, activeTasks, userInput)).toList();
+    if (activeTasks.isEmpty && tomorrowTasks.isEmpty) return kept;
+    return kept
+        .where(
+          (a) => !_isRedundant(
+            a,
+            _tasksForActionDate(a, activeTasks, tomorrowTasks),
+            userInput,
+          ),
+        )
+        .toList();
+  }
+
+  /// The existing task (if any) an action would duplicate on ITS day —
+  /// today or tomorrow (fix plan Phase 2.2; other days are not in the
+  /// payload). Null when nothing matches. The parser turns a match the
+  /// user explicitly asked for into a soft conflict on the card.
+  static Map<String, dynamic>? findExisting(
+    AiAction action, {
+    required List<Map<String, dynamic>> todayTasks,
+    required List<Map<String, dynamic>> tomorrowTasks,
+  }) {
+    if (action.actionType != ActionType.createTask) return null;
+    final title = _actionTitle(action);
+    if (title == null || title.isEmpty) return null;
+    final tasks = _tasksForActionDate(action, todayTasks, tomorrowTasks);
+    return _findActiveTask(tasks, title);
+  }
+
+  /// today → [activeTasks]; tomorrow → [tomorrowTasks]; any other day →
+  /// empty (a same-titled task on a day we can't see is not a duplicate —
+  /// the old today-only bug in reverse, §8 E10).
+  static List<Map<String, dynamic>> _tasksForActionDate(
+    AiAction action,
+    List<Map<String, dynamic>> activeTasks,
+    List<Map<String, dynamic>> tomorrowTasks,
+  ) {
+    final date = action.parameters['date'] as String?;
+    if (date == null ||
+        date.isEmpty ||
+        date == 'today' ||
+        date == DateKeys.todayKey()) {
+      return activeTasks;
+    }
+    if (date == 'tomorrow' || date == DateKeys.tomorrowKey()) {
+      return tomorrowTasks;
+    }
+    return const [];
   }
 
   static bool _isRedundant(
@@ -55,17 +101,9 @@ class AiPlanDeduplicator {
         return false;
     }
 
-    // [activeTasks] covers TODAY only — a same-titled task on another day
-    // is a new task, not a duplicate. Without this, "set up the same
-    // deep-work block for tomorrow" was silently dropped as already on
-    // today's list (§8 E10).
-    final date = action.parameters['date'] as String?;
-    if (date != null &&
-        date.isNotEmpty &&
-        date != 'today' &&
-        date != DateKeys.todayKey()) {
-      return false;
-    }
+    // [activeTasks] is already the list for the action's OWN day (see
+    // _tasksForActionDate) — empty for days the payload does not carry.
+    if (activeTasks.isEmpty) return false;
 
     final title = _actionTitle(action);
     if (title == null || title.isEmpty) return false;

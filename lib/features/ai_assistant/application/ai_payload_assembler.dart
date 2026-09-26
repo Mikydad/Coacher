@@ -5,9 +5,11 @@ import 'package:flutter/foundation.dart';
 import '../../../core/context/context_snapshot_service.dart';
 import '../../../core/scheduling/free_window_calculator.dart';
 import '../../../core/utils/date_keys.dart';
+import '../../time_blocks/data/time_block_repository.dart';
+import '../../goals/application/goal_progress_math.dart';
+import '../../goals/domain/models/user_goal.dart';
 import '../../coaching/data/coaching_style_repository.dart';
 import '../../context_override/data/context_override_repository.dart';
-import '../../goals/application/goal_period_helpers.dart';
 import '../../goals/data/goals_repository.dart';
 import '../../goals/domain/models/goal_check_in.dart';
 import '../../goals/domain/models/goal_enums.dart';
@@ -50,6 +52,7 @@ class AiPayloadAssembler {
     this.directionRepository,
     this.activityEventRepository,
     this.contextSnapshotService,
+    this.timeBlockRepository,
     EntityNormaliser? normaliser,
     Duration scheduleCacheTtl = const Duration(seconds: 30),
   }) : _normaliser = normaliser ?? const EntityNormaliser(),
@@ -75,6 +78,10 @@ class AiPayloadAssembler {
   /// Phase 4b: coarse device-context labels ("free_25m") — never raw
   /// signals — join the prompt when available.
   final ContextSnapshotService? contextSnapshotService;
+
+  /// Goal time blocks (fix plan Phase 3.2): scheduled goal work is busy
+  /// time too; the old free windows saw planned tasks only.
+  final TimeBlockRepository? timeBlockRepository;
   final EntityNormaliser _normaliser;
   final Duration _scheduleCacheTtl;
 
@@ -118,12 +125,13 @@ class AiPayloadAssembler {
     // SENT payload — the slice itself stays whole in the session cache, so
     // a follow-up that needs more pays no extra reads. Suggest/mutate
     // turns keep everything: planning needs the full picture.
-    final kind = intentRoute?.kind;
     final focus = intentRoute?.focusDate;
-    final planningTurn =
-        kind == null || kind == AiIntentKind.suggest || kind == AiIntentKind.mutate;
+    final planningTurn = intentRoute == null || intentRoute.isPlanningTurn;
     final sendWeek = planningTurn || focus == AiFocusDate.week;
-    final sendTomorrow = planningTurn || focus == AiFocusDate.tomorrow;
+    // Tomorrow is ALWAYS sent (fix plan Phase 3.3): trimming it on query
+    // turns and then printing "Tomorrow's tasks: (none)" told the model a
+    // planned day was empty (review §1.1 #5). Week counts and 14-day
+    // patterns stay planning-only.
     final sendPatterns = planningTurn;
 
     return AiOperatingLayerPayload(
@@ -132,8 +140,8 @@ class AiPayloadAssembler {
       goals: schedule.goals,
       goalProgress: schedule.goalProgress,
       todaySchedule: schedule.todaySchedule,
-      tomorrowTasks: sendTomorrow ? schedule.tomorrowTasks : const [],
-      tomorrowSchedule: sendTomorrow ? schedule.tomorrowSchedule : const [],
+      tomorrowTasks: schedule.tomorrowTasks,
+      tomorrowSchedule: schedule.tomorrowSchedule,
       weekOverview: sendWeek ? schedule.weekOverview : const [],
       focusState: schedule.focusState,
       contextOverride: schedule.contextOverride,
@@ -147,13 +155,27 @@ class AiPayloadAssembler {
       proactiveContext: proactiveContext,
       previousPlan: previousPlanSummary,
       featureGuide: featureGuideText,
-      todayFreeWindows: computeFreeWindows(
-        schedule.todaySchedule,
+      // Free windows come from the day's whole busy picture — tasks with a
+      // duration, goal blocks, calendar busy intervals — inside the user's
+      // waking bounds (Phase 3.2, D3).
+      todayFreeWindows: FreeWindowCalculator.computeFormatted(
+        schedule.todayBusy,
         fromMinuteOfDay: _nowMinuteOfDay(),
+        dayStart: schedule.wakingStartMinute,
+        dayEnd: schedule.wakingEndMinute,
       ),
-      tomorrowFreeWindows: sendTomorrow
-          ? computeFreeWindows(schedule.tomorrowSchedule)
-          : const [],
+      tomorrowFreeWindows: FreeWindowCalculator.computeFormatted(
+        schedule.tomorrowBusy,
+        dayStart: schedule.wakingStartMinute,
+        dayEnd: schedule.wakingEndMinute,
+      ),
+      todayCalendarAvailable: schedule.todayCalendarAvailable,
+      tomorrowCalendarAvailable: schedule.tomorrowCalendarAvailable,
+      wakingWindow:
+          '${FreeWindowCalculator.formatMinute(schedule.wakingStartMinute)}–'
+          '${FreeWindowCalculator.formatMinute(schedule.wakingEndMinute)}',
+      taskHandles: schedule.taskHandles,
+      goalHandles: schedule.goalHandles,
       memoryFacts: dynamicResults[3] as List<String>,
       peopleDigest: dynamicResults[4] as List<String>,
       episodicSummaries: dynamicResults[5] as List<String>,
@@ -447,81 +469,177 @@ class AiPayloadAssembler {
       return cached;
     }
 
+    final todayKey = DateKeys.todayKey();
+    final tomorrowKey = DateKeys.tomorrowKey();
     final results = await Future.wait([
-      _buildActiveTasks(),
-      _buildGoals(),
-      _buildGoalProgress(),
-      _buildTodaySchedule(),
-      _buildTomorrowTasks(),
-      _buildTomorrowSchedule(),
+      _rowsFor(todayKey, enforcePlanDate: true),
+      _rowsFor(tomorrowKey),
+      _buildGoalSections(),
       _buildWeekOverview(),
       _buildFocusState(),
       _buildContextOverride(),
       _buildBehaviorPreferences(),
       _buildRecentPatterns(),
+      _buildWakingBounds(),
+      _buildDayBusyExtras(todayKey),
+      _buildDayBusyExtras(tomorrowKey),
     ]);
+    final todayRows = results[0] as List<PlannedTaskRow>;
+    final tomorrowRows = results[1] as List<PlannedTaskRow>;
+    final goalSections = results[2] as _GoalSections;
+    final waking = results[8] as ({int start, int end});
+    final todayExtras = results[9] as _DayBusyExtras;
+    final tomorrowExtras = results[10] as _DayBusyExtras;
+
+    // Handles (D2): "t1".. today then tomorrow, "g1".. goals — opaque,
+    // per turn, never persisted. They let the model name an existing item
+    // exactly instead of by a title the resolver has to guess at.
+    final taskHandles = <String, AiTaskHandle>{};
+    var n = 0;
+    List<Map<String, dynamic>> withRefs(List<PlannedTaskRow> rows) {
+      final maps = _taskMapsFromRows(rows);
+      for (var i = 0; i < rows.length; i++) {
+        final ref = 't${++n}';
+        final row = rows[i];
+        taskHandles[ref] = AiTaskHandle(
+          taskId: row.task.id,
+          routineId: row.routineId,
+          blockId: row.blockId,
+          dateKey: row.dateKey,
+          title: row.task.title,
+        );
+        maps[i]['ref'] = ref;
+      }
+      return maps;
+    }
+
+    final activeTasks = withRefs(todayRows);
+    final tomorrowTasks = withRefs(tomorrowRows);
+    final todaySchedule = _scheduleMapsFromRows(todayRows);
+    final tomorrowSchedule = _scheduleMapsFromRows(tomorrowRows);
 
     final slice = _CachedScheduleSlice(
       fetchedAt: DateTime.now(),
-      activeTasks: results[0] as List<Map<String, dynamic>>,
-      goals: results[1] as List<Map<String, dynamic>>,
-      goalProgress: results[2] as List<Map<String, dynamic>>,
-      todaySchedule: results[3] as List<Map<String, dynamic>>,
-      tomorrowTasks: results[4] as List<Map<String, dynamic>>,
-      tomorrowSchedule: results[5] as List<Map<String, dynamic>>,
-      weekOverview: results[6] as List<Map<String, dynamic>>,
-      focusState: results[7] as Map<String, dynamic>,
-      contextOverride: results[8] as Map<String, dynamic>?,
-      behaviorPreferences: results[9] as Map<String, dynamic>,
-      recentPatterns: results[10] as List<Map<String, dynamic>>,
+      activeTasks: activeTasks,
+      goals: goalSections.goals,
+      goalProgress: goalSections.progress,
+      todaySchedule: todaySchedule,
+      tomorrowTasks: tomorrowTasks,
+      tomorrowSchedule: tomorrowSchedule,
+      weekOverview: results[3] as List<Map<String, dynamic>>,
+      focusState: results[4] as Map<String, dynamic>,
+      contextOverride: results[5] as Map<String, dynamic>?,
+      behaviorPreferences: results[6] as Map<String, dynamic>,
+      recentPatterns: results[7] as List<Map<String, dynamic>>,
+      todayBusy: [...todaySchedule, ...todayExtras.blocks],
+      tomorrowBusy: [...tomorrowSchedule, ...tomorrowExtras.blocks],
+      todayCalendarAvailable: todayExtras.calendarAvailable,
+      tomorrowCalendarAvailable: tomorrowExtras.calendarAvailable,
+      wakingStartMinute: waking.start,
+      wakingEndMinute: waking.end,
+      taskHandles: taskHandles,
+      goalHandles: goalSections.handles,
     );
     _scheduleCache[sessionId] = slice;
     return slice;
   }
 
+  Future<List<PlannedTaskRow>> _rowsFor(
+    String dateKey, {
+    bool enforcePlanDate = false,
+  }) async {
+    try {
+      return await collectTasksForDateKey(
+        planningRepository,
+        dateKey,
+        enforceTaskPlanDate: enforcePlanDate,
+      );
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Waking bounds (D3): the configured sleep window when set (bed →
+  /// wake), else 07:00–22:00.
+  Future<({int start, int end})> _buildWakingBounds() async {
+    const fallback = (
+      start: FreeWindowCalculator.dayStartMinute,
+      end: FreeWindowCalculator.dayEndMinute,
+    );
+    try {
+      final state = await contextOverrideRepository.getAttentionState();
+      if (state == null || !state.hasSleepWindow) return fallback;
+      final bed = _parseHm(state.sleepWindowStart!);
+      final wake = _parseHm(state.sleepWindowEnd!);
+      if (bed == null || wake == null) return fallback;
+      // A window that wraps midnight (23:00–07:00) means the waking day is
+      // wake → bed; a same-day nap-style window falls back.
+      if (wake < bed && bed - wake >= 6 * 60) return (start: wake, end: bed);
+      return fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  static int? _parseHm(String hhmm) {
+    final parts = hhmm.split(':');
+    if (parts.length != 2) return null;
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h == null || m == null) return null;
+    return h * 60 + m;
+  }
+
+  /// Busy blocks beyond planned tasks for one day: goal time blocks and
+  /// device-calendar busy intervals (Phase 3.2). Calendar availability is
+  /// reported separately so the prompt never presents "unavailable" as
+  /// "free" (review §1.1 #5).
+  Future<_DayBusyExtras> _buildDayBusyExtras(String dateKey) async {
+    final day = DateKeys.parseLocalDateKey(dateKey);
+    final blocks = <Map<String, dynamic>>[];
+
+    final tbRepo = timeBlockRepository;
+    if (tbRepo != null) {
+      try {
+        final dayStart = DateTime(day.year, day.month, day.day);
+        final dayEnd = dayStart.add(const Duration(days: 1));
+        final found = await tbRepo.listBlocksForDateRange(dayStart, dayEnd);
+        for (final b in found) {
+          if (b.entityKind == 'task') continue; // already a scheduled task
+          final start = b.startAt.toLocal();
+          final end = b.computedEndAt.toLocal();
+          blocks.add({
+            'title': 'Goal time',
+            'startTime': FreeWindowCalculator.formatMinute(
+              start.hour * 60 + start.minute,
+            ),
+            'endTime': FreeWindowCalculator.formatMinute(
+              end.hour * 60 + end.minute,
+            ),
+          });
+        }
+      } catch (e) {
+        debugPrint('[AiPayloadAssembler] goal blocks failed: $e');
+      }
+    }
+
+    bool? calendarAvailable;
+    final snapshots = contextSnapshotService;
+    if (snapshots != null) {
+      try {
+        final busy = await snapshots.calendarBusyForDay(day);
+        calendarAvailable = busy != null;
+        if (busy != null) {
+          blocks.addAll(calendarBusyToScheduleMaps(busy, day));
+        }
+      } catch (_) {
+        calendarAvailable = false;
+      }
+    }
+    return _DayBusyExtras(blocks: blocks, calendarAvailable: calendarAvailable);
+  }
+
   // ─── Private builders ─────────────────────────────────────────────────────
-
-  Future<List<Map<String, dynamic>>> _buildActiveTasks() async {
-    try {
-      final rows = await collectTodayPlannedRows(planningRepository);
-      return _taskMapsFromRows(rows);
-    } catch (_) {
-      return [];
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> _buildTomorrowTasks() async {
-    try {
-      final rows = await collectTasksForDateKey(
-        planningRepository,
-        DateKeys.tomorrowKey(),
-      );
-      return _taskMapsFromRows(rows);
-    } catch (_) {
-      return [];
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> _buildTodaySchedule() async {
-    try {
-      final rows = await collectTodayPlannedRows(planningRepository);
-      return _scheduleMapsFromRows(rows);
-    } catch (_) {
-      return [];
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> _buildTomorrowSchedule() async {
-    try {
-      final rows = await collectTasksForDateKey(
-        planningRepository,
-        DateKeys.tomorrowKey(),
-      );
-      return _scheduleMapsFromRows(rows);
-    } catch (_) {
-      return [];
-    }
-  }
 
   Future<List<Map<String, dynamic>>> _buildWeekOverview() async {
     try {
@@ -600,9 +718,12 @@ class AiPayloadAssembler {
   }
 
   List<Map<String, dynamic>> _scheduleMapsFromRows(List<PlannedTaskRow> rows) {
+    // Busy = has a time AND a duration. A reminder-only task is a
+    // notification, not occupied time (fix plan Phase 3.2 — its "?" end
+    // time used to become a 30-minute pseudo-block).
     final scheduled = rows.where((r) {
       final iso = r.task.reminderTimeIso;
-      return iso != null && iso.isNotEmpty;
+      return iso != null && iso.isNotEmpty && r.task.durationMinutes >= 1;
     }).toList();
 
     return scheduled.map((row) {
@@ -621,43 +742,20 @@ class AiPayloadAssembler {
     }).toList();
   }
 
-  Future<List<Map<String, dynamic>>> _buildGoals() async {
+  /// Active goals, their progress in their own units (Phase 3.1), and the
+  /// "g1".. handles — one pass over the repository.
+  Future<_GoalSections> _buildGoalSections() async {
     try {
-      final goals = await goalsRepository.fetchGoalsOnce();
-      return goals.where((g) => g.status == GoalStatus.active).take(5).map((g) {
-        final deadline = DateTime.fromMillisecondsSinceEpoch(
-          g.periodEndMs,
-        ).toLocal();
-        final deadlineStr =
-            '${deadline.year}-${deadline.month.toString().padLeft(2, '0')}-${deadline.day.toString().padLeft(2, '0')}';
-        return {
-          'title': g.title,
-          'target':
-              '${g.targetValue.toStringAsFixed(0)} ${g.customLabel ?? g.measurementKind.name}',
-          'deadline': deadlineStr,
-          'category': g.categoryId,
-        };
-      }).toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> _buildGoalProgress() async {
-    try {
-      final goals = await goalsRepository.fetchGoalsOnce();
-      final active = goals.where((g) => g.status == GoalStatus.active).take(5);
       final now = DateTime.now();
-      final progress = <Map<String, dynamic>>[];
+      final todayKey = DateKeys.todayKey(now);
+      final active = (await goalsRepository.fetchGoalsOnce())
+          .where((g) => g.status == GoalStatus.active)
+          .toList();
 
+      final entries = <({UserGoal goal, GoalWindowProgress progress, List<String> steps})>[];
       for (final g in active) {
-        final periodStart = DateTime.fromMillisecondsSinceEpoch(
-          g.periodStartMs,
-        ).toLocal();
-        final periodEnd = DateTime.fromMillisecondsSinceEpoch(
-          g.periodEndMs,
-        ).toLocal();
-
+        final periodStart = DateTime.fromMillisecondsSinceEpoch(g.periodStartMs).toLocal();
+        final periodEnd = DateTime.fromMillisecondsSinceEpoch(g.periodEndMs).toLocal();
         List<GoalCheckIn> checkIns;
         try {
           checkIns = await goalsRepository.getCheckInsForGoal(
@@ -668,25 +766,71 @@ class AiPayloadAssembler {
         } catch (_) {
           checkIns = const [];
         }
-
-        progress.add({
-          'title': g.title,
-          'target':
-              '${g.targetValue.toStringAsFixed(0)} ${g.customLabel ?? g.measurementKind.name}',
-          'periodSummary': GoalPeriodHelpers.formatPeriodSummary(g),
-          'daysMet': GoalPeriodHelpers.countMetCheckIns(checkIns),
-          // Action-day counts: repeating goals are paced by their own
-          // planned days, not the full calendar.
-          'daysElapsed': GoalPeriodHelpers.scheduledDaysElapsedThrough(g, now),
-          'totalDays': GoalPeriodHelpers.totalScheduledDaysInPeriod(g),
-          if (g.hasRepeatSchedule)
-            'repeatSchedule': GoalPeriodHelpers.formatRepeatSummary(g),
-        });
+        final steps = <String>[];
+        try {
+          final actions = await goalsRepository.getActions(g.id);
+          final today = DateKeys.parseLocalDateKey(todayKey);
+          for (final a in actions) {
+            if (a.isScheduledOn(today) && !a.isCompletedOn(todayKey)) {
+              steps.add(a.title);
+              if (steps.length == 3) break;
+            }
+          }
+        } catch (_) {}
+        entries.add((
+          goal: g,
+          progress: GoalProgressMath.compute(g, checkIns, now),
+          steps: steps,
+        ));
       }
 
-      return progress;
+      // Behind-pace goals first, then the nearest deadline; cap 8.
+      entries.sort((a, b) {
+        if (a.progress.behindPace != b.progress.behindPace) {
+          return a.progress.behindPace ? -1 : 1;
+        }
+        return a.goal.periodEndMs.compareTo(b.goal.periodEndMs);
+      });
+      final shown = entries.take(8).toList();
+
+      final goals = <Map<String, dynamic>>[];
+      final progress = <Map<String, dynamic>>[];
+      final handles = <String, AiGoalHandle>{};
+      var n = 0;
+      for (final e in shown) {
+        final g = e.goal;
+        final ref = 'g${++n}';
+        handles[ref] = AiGoalHandle(goalId: g.id, title: g.title);
+        final deadline = DateTime.fromMillisecondsSinceEpoch(g.periodEndMs).toLocal();
+        final unit = e.progress.unitLabel;
+        final target = '${e.progress.targetText}${unit.isEmpty ? '' : ' $unit'}';
+        goals.add({
+          'ref': ref,
+          'title': g.title,
+          'target': target,
+          'deadline': DateKeys.yyyymmdd(deadline),
+          'category': g.categoryId,
+          'cadence': GoalProgressMath.cadenceLabelFor(g),
+        });
+        progress.add({
+          'ref': ref,
+          'title': g.title,
+          'logged': e.progress.loggedText,
+          'target': e.progress.targetText,
+          'unit': unit,
+          'window': e.progress.windowLabel,
+          'daysLogged': e.progress.daysLogged,
+          'daysElapsed': e.progress.daysElapsed,
+          'daysInWindow': e.progress.daysInWindow,
+          'behindPace': e.progress.behindPace,
+          'cadence': GoalProgressMath.cadenceLabelFor(g),
+          'category': g.categoryId,
+          if (e.steps.isNotEmpty) 'stepsDueToday': e.steps,
+        });
+      }
+      return _GoalSections(goals: goals, progress: progress, handles: handles);
     } catch (_) {
-      return [];
+      return const _GoalSections(goals: [], progress: [], handles: {});
     }
   }
 
@@ -979,6 +1123,23 @@ class AiPayloadAssembler {
   }
 }
 
+class _GoalSections {
+  const _GoalSections({
+    required this.goals,
+    required this.progress,
+    required this.handles,
+  });
+  final List<Map<String, dynamic>> goals;
+  final List<Map<String, dynamic>> progress;
+  final Map<String, AiGoalHandle> handles;
+}
+
+class _DayBusyExtras {
+  const _DayBusyExtras({required this.blocks, required this.calendarAvailable});
+  final List<Map<String, dynamic>> blocks;
+  final bool? calendarAvailable;
+}
+
 class _CachedScheduleSlice {
   _CachedScheduleSlice({
     required this.fetchedAt,
@@ -993,6 +1154,14 @@ class _CachedScheduleSlice {
     required this.contextOverride,
     required this.behaviorPreferences,
     required this.recentPatterns,
+    required this.todayBusy,
+    required this.tomorrowBusy,
+    required this.todayCalendarAvailable,
+    required this.tomorrowCalendarAvailable,
+    required this.wakingStartMinute,
+    required this.wakingEndMinute,
+    required this.taskHandles,
+    required this.goalHandles,
   });
 
   final DateTime fetchedAt;
@@ -1007,6 +1176,14 @@ class _CachedScheduleSlice {
   final Map<String, dynamic>? contextOverride;
   final Map<String, dynamic> behaviorPreferences;
   final List<Map<String, dynamic>> recentPatterns;
+  final List<Map<String, dynamic>> todayBusy;
+  final List<Map<String, dynamic>> tomorrowBusy;
+  final bool? todayCalendarAvailable;
+  final bool? tomorrowCalendarAvailable;
+  final int wakingStartMinute;
+  final int wakingEndMinute;
+  final Map<String, AiTaskHandle> taskHandles;
+  final Map<String, AiGoalHandle> goalHandles;
 
   bool isExpired(Duration ttl) => DateTime.now().difference(fetchedAt) > ttl;
 }

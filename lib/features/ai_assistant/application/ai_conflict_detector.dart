@@ -1,6 +1,7 @@
 import '../../context_override/data/context_override_repository.dart';
 import '../../context_override/domain/models/context_override.dart';
 import '../../reminders/data/reminder_repository.dart';
+import '../../../core/utils/date_keys.dart';
 import '../domain/models/ai_action.dart';
 
 // ─── Result ───────────────────────────────────────────────────────────────────
@@ -53,9 +54,16 @@ class AiConflictDetector {
         if (collision != null) softConflicts.add(collision);
       }
 
-      // 1b — Context / sleep window conflict
+      // 1b — Context / sleep window conflict. The ACTIVE override window
+      // belongs to today: a task on another day cannot collide with it
+      // (fix plan Phase 2.5 — tomorrow's 14:00 used to be blocked by
+      // today's 13:00–15:00 focus). Quiet hours apply on any day.
       if (_isSchedulingAction(action)) {
         final timeStr = action.parameters['time'] as String?;
+        // The override applies only to actions on the day it was activated.
+        final overrideDay = attentionState?.overrideDateKey;
+        final onOverrideDay =
+            overrideDay == null || overrideDay == _actionDateKey(action);
         final durationMinutes =
             (action.parameters['duration'] as num?)?.toInt() ?? 30;
         final taskTitle =
@@ -68,7 +76,9 @@ class AiConflictDetector {
             title: taskTitle,
             timeStr: timeStr,
             durationMinutes: durationMinutes,
-            attentionState: attentionState,
+            attentionState: onOverrideDay
+                ? attentionState
+                : attentionState?.withoutActiveOverride(),
           );
           if (contextResult != null) {
             if (contextResult.isHard) {
@@ -112,6 +122,7 @@ class AiConflictDetector {
       if (proposedHour < 0) return null;
 
       final allReminders = await reminderRepository.listAllReminders();
+      final actionDay = _actionDateKey(action);
 
       for (final existing in allReminders) {
         if (existing.scheduledAtIso == null) continue;
@@ -119,6 +130,9 @@ class AiConflictDetector {
           existing.scheduledAtIso!,
         )?.toLocal();
         if (existingDt == null) continue;
+        // Same DAY only (Phase 2.5): clock minutes alone made every
+        // reminder collide with its namesake on other days.
+        if (DateKeys.yyyymmdd(existingDt) != actionDay) continue;
 
         final diffMinutes =
             (existingDt.hour * 60 + existingDt.minute) -
@@ -218,10 +232,12 @@ class AiConflictDetector {
 
       int? overrideStart;
       int? overrideEnd;
+      String? overrideDateKey;
       if (state.hasActiveOverride && state.lastOverrideActivatedAt != null) {
         final activatedAt = DateTime.fromMillisecondsSinceEpoch(
           state.lastOverrideActivatedAt!,
         ).toLocal();
+        overrideDateKey = DateKeys.yyyymmdd(activatedAt);
         overrideStart = activatedAt.hour * 60 + activatedAt.minute;
 
         if (state.overrideExpiresAt != null) {
@@ -241,6 +257,7 @@ class AiConflictDetector {
 
       return _AttentionSnapshot(
         activeOverride: state.activeOverride,
+        overrideDateKey: overrideDateKey,
         overrideStartMinutes: overrideStart,
         overrideEndMinutes: overrideEnd,
         sleepWindowStartMinutes: sleepStart,
@@ -251,6 +268,18 @@ class AiConflictDetector {
     } catch (_) {
       return null;
     }
+  }
+
+  /// The local day an action targets: resolver stamp, then the model's
+  /// date, then today.
+  String _actionDateKey(AiAction action) {
+    final p = action.parameters;
+    final stamped = p['_resolvedDateKey'] as String?;
+    if (stamped != null && stamped.isNotEmpty) return stamped;
+    final raw = (p['date'] ?? p['destinationDate']) as String?;
+    if (raw == null || raw.isEmpty || raw == 'today') return DateKeys.todayKey();
+    if (raw == 'tomorrow') return DateKeys.tomorrowKey();
+    return raw;
   }
 
   bool _isSchedulingAction(AiAction action) {
@@ -300,6 +329,7 @@ class _ContextConflict {
 class _AttentionSnapshot {
   const _AttentionSnapshot({
     required this.activeOverride,
+    this.overrideDateKey,
     this.overrideStartMinutes,
     this.overrideEndMinutes,
     this.sleepWindowStartMinutes,
@@ -309,10 +339,23 @@ class _AttentionSnapshot {
   });
 
   final ContextOverride activeOverride;
+
+  /// Local day the active override was activated on (Phase 2.5).
+  final String? overrideDateKey;
   final int? overrideStartMinutes;
   final int? overrideEndMinutes;
   final int? sleepWindowStartMinutes;
   final int? sleepWindowEndMinutes;
   final String? sleepWindowStart;
   final String? sleepWindowEnd;
+
+  /// Same snapshot with today's active override dropped — for actions on
+  /// other days, where only the configured quiet hours can apply.
+  _AttentionSnapshot withoutActiveOverride() => _AttentionSnapshot(
+    activeOverride: ContextOverride.none,
+    sleepWindowStartMinutes: sleepWindowStartMinutes,
+    sleepWindowEndMinutes: sleepWindowEndMinutes,
+    sleepWindowStart: sleepWindowStart,
+    sleepWindowEnd: sleepWindowEnd,
+  );
 }

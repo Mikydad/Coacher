@@ -12,6 +12,7 @@ library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sidepal/core/utils/date_keys.dart';
+import 'package:sidepal/features/ai_assistant/application/ai_action_executor.dart';
 import 'package:sidepal/features/ai_assistant/application/ai_intent_router.dart';
 import 'package:sidepal/features/ai_assistant/domain/models/ai_action.dart';
 import 'package:sidepal/features/ai_assistant/domain/models/ai_intent_kind.dart';
@@ -141,7 +142,6 @@ void main() {
         expect(s.anyLiveCard, isFalse);
         expect(s.titlesOn(tomorrow), hasLength(2), reason: 'no duplicates');
       },
-      skip: 'Phase 1.2 — stale pending clarification (review §1.1 #1)',
     );
 
     test(
@@ -162,7 +162,6 @@ void main() {
           );
         }
       },
-      skip: 'Phase 1.3 — router mutate default (review §1.1 #2)',
     );
 
     test(
@@ -200,7 +199,6 @@ void main() {
         expect(createdTask ?? false, isFalse);
         expect(s.titlesOn(today), isEmpty);
       },
-      skip: 'Phase 1.4 — AiAction.fromJson coerces unknown verbs (review §2 #2)',
     );
 
     test(
@@ -232,7 +230,6 @@ void main() {
             card.plannedChanges!.conflicts.isNotEmpty;
         expect(flagged, isTrue, reason: 'existing tomorrow task must be flagged');
       },
-      skip: 'Phase 2.2 — dedup is today-only (review §1.1 #3)',
     );
 
     test(
@@ -246,7 +243,8 @@ void main() {
 
         expect(s.titlesOn(tomorrow), hasLength(2));
       },
-      skip: 'Phase 2.1 — no idempotency key at execution (review §1.1 #3)',
+      // Phase 1.1 closes the state-level path (inert card can never run);
+      // Phase 2.1 adds the batch-level key for crash/retry paths.
     );
 
     test(
@@ -259,27 +257,29 @@ void main() {
               presentation: 'preview',
               content: 'Adding your workout — confirm below.',
               actions: [
-                ScriptedProxy.createTask(title: 'Workout', time: '06:00'),
+                ScriptedProxy.createTask(
+                  title: 'Workout',
+                  time: '06:00',
+                  date: 'tomorrow',
+                ),
               ],
             ),
           ],
         );
         addTearDown(s.dispose);
-        await s.service.sendMessage('add workout at 6am');
+        await s.service.sendMessage('add workout at 6am tomorrow');
         s.history.failNextMarkExecuted = StateError('isar closed');
         final card = s.latestCard!;
 
         await s.service.confirmPlan(card.plannedChanges, card.id);
 
-        expect(s.titlesOn(today), ['Workout']);
+        expect(s.titlesOn(tomorrow), ['Workout']);
         expect(
           s.messages.any((m) => m.content.contains('nothing was lost')),
           isFalse,
         );
         expect(s.latestCard!.isExecuted, isTrue);
       },
-      skip: 'Phase 2.3 — confirmPlan catch wraps post-execution writes '
-          '(review §1.1 #3)',
     );
 
     test(
@@ -310,8 +310,123 @@ void main() {
 
         expect(s.titlesOn(today), isEmpty);
       },
-      skip: 'Phase 1.2 — _pendingPlan survives its demoted card (review §2.1 #3)',
     );
+
+    test('the executor never runs the same batch id twice', () async {
+      final s = await AiScenario.start();
+      addTearDown(s.dispose);
+      final executor = AiActionExecutor(
+        planningRepository: s.planning,
+        goalsRepository: s.goals,
+        reminderRepository: FakeReminderRepo(),
+        reminderSyncService: FakeReminderSync(),
+        timeBlockSyncService: FakeTimeBlockSync(),
+        contextOverrideService: FakeContextOverrideService(),
+        batchRepository: s.batches,
+      );
+      final actions = [
+        AiAction(
+          actionType: ActionType.createTask,
+          parameters: {'title': 'Workout', 'time': '06:00', 'duration': 30},
+        ),
+      ];
+
+      final first = await executor.execute(actions, batchId: 'ai_batch_p1');
+      final second = await executor.execute(actions, batchId: 'ai_batch_p1');
+
+      expect(first.alreadyApplied, isFalse);
+      expect(second.alreadyApplied, isTrue);
+      expect(s.titlesOn(today), ['Workout']);
+    });
+
+    test('a goal with deadline "tomorrow" and a daily target is born live, '
+        'daily, in minutes', () async {
+      final s = await AiScenario.start(
+        script: [
+          ScriptedProxy.propose(
+            presentation: 'preview',
+            content: 'Creating your reading goal — confirm below.',
+            actions: [
+              {
+                'actionType': 'createGoal',
+                'parameters': {
+                  'title': 'Read',
+                  'target': '20 minutes a day',
+                  'deadline': 'tomorrow',
+                  'category': 'study',
+                },
+              },
+            ],
+          ),
+        ],
+      );
+      addTearDown(s.dispose);
+
+      await s.service.sendMessage('create a goal to read 20 minutes a day by tomorrow');
+      final card = s.latestCard!;
+      await s.service.confirmPlan(card.plannedChanges, card.id);
+
+      expect(s.goals.goals, hasLength(1));
+      final goal = s.goals.goals.single;
+      expect(goal.periodEndMs, greaterThan(DateTime.now().millisecondsSinceEpoch));
+      expect(goal.repeatCadence, GoalRepeatCadence.daily);
+      expect(goal.measurementKind, MeasurementKind.minutes);
+      expect(goal.targetValue, 20);
+      expect(goal.categoryId, GoalCategories.study);
+    });
+
+    test('a taskRef handle targets the exact existing task', () async {
+      final s = await AiScenario.start(
+        script: [
+          ScriptedProxy.propose(
+            presentation: 'preview',
+            content: 'Removing it — confirm below.',
+            actions: [
+              {
+                'actionType': 'deleteTask',
+                'parameters': {'taskRef': 't1'},
+              },
+            ],
+          ),
+        ],
+      );
+      addTearDown(s.dispose);
+      s.planning.seed(title: 'Workout', dateKey: tomorrow, time: '18:00');
+      s.planning.seed(title: 'Workout', dateKey: today, time: '18:00');
+      // The prompt lists today first: today's Workout is [t1].
+
+      await s.service.sendMessage('delete the first workout');
+      expect(s.proxy.lastUserPrompt(), contains('[t1] Workout'));
+      final card = s.latestCard!;
+      expect(card.plannedChanges!.actions.single.parameters['taskTitle'], 'Workout');
+      await s.service.confirmPlan(card.plannedChanges, card.id);
+
+      expect(s.titlesOn(today), isEmpty);
+      expect(s.titlesOn(tomorrow), ['Workout']);
+    });
+
+    test('a time that has already passed today is blocked at confirm', () async {
+      final s = await AiScenario.start(
+        script: [
+          ScriptedProxy.propose(
+            presentation: 'preview',
+            content: 'Adding it — confirm below.',
+            actions: [
+              ScriptedProxy.createTask(title: 'Stretch', time: '00:01'),
+            ],
+          ),
+        ],
+      );
+      addTearDown(s.dispose);
+
+      await s.service.sendMessage('add stretch at 00:01 today');
+      final card = s.latestCard!;
+      await s.service.confirmPlan(card.plannedChanges, card.id);
+
+      expect(s.titlesOn(today), isEmpty);
+      expect(s.lastAssistant.content, contains('already passed'));
+      expect(s.anyLiveCard, isTrue, reason: 'the card stays live to edit');
+    });
 
     test(
       'goal progress reaches the model in the goal\'s own units',
@@ -351,9 +466,9 @@ void main() {
 
         final prompt = s.proxy.lastUserPrompt();
         expect(prompt, contains('10/25'));
-        expect(prompt, isNot(contains('0/25 minutes')));
+        expect(prompt, contains('Music: 10/25 minutes today'));
+        expect(prompt, isNot(contains(': 0/25')));
       },
-      skip: 'Phase 3.1 — daysMet printed against a value target (review §1.1 #6)',
     );
 
     test(
@@ -380,8 +495,6 @@ void main() {
         expect(prompt, contains('Free windows tomorrow'));
         expect(prompt, contains('07:00–22:00 (15h)'));
       },
-      skip: 'Phase 3.2 — "?" end time becomes a 30-minute busy block '
-          '(review §1.1 #7)',
     );
   });
 }
