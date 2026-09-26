@@ -39,6 +39,7 @@ import {
 } from 'firebase-admin/firestore';
 import { randomBytes } from 'node:crypto';
 
+import { proEntitlementActive } from '../ai_instruction_cap';
 import {
   decideApprove,
   decideJoin,
@@ -308,11 +309,7 @@ function displayNameOf(request: CallableRequest): string {
  */
 async function maxCirclesFor(db: Firestore, uid: string): Promise<number> {
   const pro = await db.doc(`users/${uid}/entitlements/pro`).get();
-  const active = pro.data()?.active === true;
-  const expiresAtMs = pro.data()?.expiresAtMs;
-  const unexpired =
-    typeof expiresAtMs !== 'number' || expiresAtMs > Date.now();
-  return active && unexpired ? -1 : FREE_MAX_CIRCLES;
+  return proEntitlementActive(pro.data()) ? -1 : FREE_MAX_CIRCLES;
 }
 
 function circleRefs(db: Firestore, circleId: string, uid: string) {

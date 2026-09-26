@@ -13,6 +13,12 @@ import {
   overQuotaUntilFor,
 } from "./ai_quota_gate";
 import { parseRouteOverrides, resolveRoute, utcDayKey } from "./ai_routing";
+import {
+  countsAsInstruction,
+  instructionCapFor,
+  tierFromEntitlement,
+  TierKnowledge,
+} from "./ai_instruction_cap";
 import { accountPolicyRejection, appCheckHeaderOk } from "./speech_shared";
 import { resolveSystemPrompt, SERVER_PROMPT_PURPOSES } from "./coach_prompts";
 import { openAiApiKey } from "./secrets";
@@ -324,6 +330,38 @@ function applyServerSystemPrompt(
   ];
 }
 
+// ─── Tier knowledge (AI chat fix plan Phase 0.1, decision D8 2026-09-26) ───
+//
+// The daily instruction cap from `tier_limits_v1` used to apply to every
+// uid, Pro included, and to count every charged turn. Now it applies only
+// to accounts KNOWN to be free (entitlement doc read, not active) and only
+// to tool-bearing first rounds; an unreadable doc means "unknown" → no cap.
+// Same server-owned `users/{uid}/entitlements/pro` doc the circles cap
+// reads. Cached per instance so the interactive path pays one doc read per
+// uid per 5 minutes (it runs concurrently with the config read anyway).
+const TIER_TTL_MS = 5 * 60 * 1000;
+const tierCache = new Map<string, { tier: TierKnowledge; atMs: number }>();
+
+async function tierFor(uid: string): Promise<TierKnowledge> {
+  const now = Date.now();
+  const cached = tierCache.get(uid);
+  if (cached !== undefined && now - cached.atMs < TIER_TTL_MS) return cached.tier;
+  let tier: TierKnowledge;
+  try {
+    const snap = await getFirestore().doc(`users/${uid}/entitlements/pro`).get();
+    tier = tierFromEntitlement({ ok: true, data: snap.data() }, now);
+  } catch (error) {
+    logger.warn("entitlement read failed; daily instruction cap skipped", {
+      uid,
+      error: `${error}`,
+    });
+    tier = "unknown";
+  }
+  if (tierCache.size > 5000) tierCache.clear();
+  tierCache.set(uid, { tier, atMs: now });
+  return tier;
+}
+
 /// Per-user daily budget for SYSTEM purposes (extraction, parsing, nudge
 /// phrasing) — separate from the user's hourly chat quota so background
 /// work can never eat the quota the user sees. UTC-day window on the same
@@ -444,7 +482,13 @@ async function enforceRateLimit(
   uid: string,
   turnId: string | undefined,
   loopIndex: number,
-  limits?: { dailyTokenBudget: number; dailyInstructionCap: number },
+  limits?: {
+    dailyTokenBudget: number;
+    /** Undefined = no cap for this account (Pro, or tier unknown). */
+    dailyInstructionCap: number | undefined;
+    /** True only for tool-bearing first rounds — the turns that count. */
+    instruction: boolean;
+  },
 ): Promise<void> {
   const db = getFirestore();
   const ref = db.collection("aiUsage").doc(uid);
@@ -509,7 +553,11 @@ async function enforceRateLimit(
           { reason: "token_budget", retryAfterMs: Math.max(0, midnightMs - now) },
         );
       }
-      if (dayTurns >= limits.dailyInstructionCap) {
+      if (
+        limits.instruction &&
+        limits.dailyInstructionCap !== undefined &&
+        dayTurns >= limits.dailyInstructionCap
+      ) {
         markChatOverQuota(uid, overQuotaUntilFor("daily_cap", { now, midnightMs }));
         throw new HttpsError(
           "resource-exhausted",
@@ -534,7 +582,7 @@ async function enforceRateLimit(
     const totalCount = (typeof data?.totalCount === "number" ? data.totalCount : 0) + 1;
     const dayFields = {
       dayKey,
-      dayTurns: dayTurns + 1,
+      dayTurns: dayTurns + (limits?.instruction === true ? 1 : 0),
       dayTokens,
       recentTurns,
     };
@@ -634,7 +682,8 @@ export const aiChat = onCall(
     const tStart = Date.now();
 
     // Purpose routing: model / temperature / cap / quota class per purpose.
-    const cfg = await aiServerConfig();
+    // The tier read rides alongside (Phase 0.1): one cached doc read.
+    const [cfg, tier] = await Promise.all([aiServerConfig(), tierFor(uid)]);
     const { routesJson, systemDailyBudget } = cfg;
     const route = resolveRoute(purpose, parseRouteOverrides(routesJson));
     if (!route.enabled) {
@@ -725,7 +774,14 @@ export const aiChat = onCall(
       }
       const limits = {
         dailyTokenBudget: cfg.dailyTokenBudget,
-        dailyInstructionCap: cfg.dailyInstructionCap,
+        dailyInstructionCap: instructionCapFor({
+          configuredCap: cfg.dailyInstructionCap,
+          tier,
+        }),
+        instruction: countsAsInstruction({
+          hasTools: tools !== undefined,
+          loopIndex,
+        }),
       };
       if (gate === "quota_first") {
         await enforceRateLimit(uid, turnId, loopIndex, limits);
@@ -941,9 +997,12 @@ export const aiChatStream = onRequest(
     // old `undefined` clobbered the single lastTurnId slot and made a
     // concurrent agent loop's follow-ups charge as fresh turns.
     const streamTurnId = `stream_${tStart}_${uid.slice(0, 8)}`;
+    // Answer-only endpoint: never an instruction (Phase 0.1), so no cap and
+    // no tier read; the hourly window and token budget still apply.
     const quotaPromise = enforceRateLimit(uid, streamTurnId, 0, {
       dailyTokenBudget: cfg.dailyTokenBudget,
-      dailyInstructionCap: cfg.dailyInstructionCap,
+      dailyInstructionCap: undefined,
+      instruction: false,
     });
     const fetchPromise = fetch(OPENAI_URL, {
       method: "POST",
