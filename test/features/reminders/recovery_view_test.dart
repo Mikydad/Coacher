@@ -190,7 +190,7 @@ void main() {
       ], now: now);
 
       expect(view.rows, isEmpty);
-      expect(view.routineDigestLine, 'Missed today: Stretch, Water');
+      expect(view.routineDigestLine, 'Reminders passed: Stretch, Water');
       expect(view.isNotEmpty, isTrue);
     });
 
@@ -202,7 +202,7 @@ void main() {
         routineMiss('Walk'),
       ], now: now);
 
-      expect(view.routineDigestLine, 'Missed today: Stretch, Vitamins and 2 more');
+      expect(view.routineDigestLine, 'Reminders passed: Stretch, Vitamins and 2 more');
     });
 
     test('an older routine miss is not dredged up', () {
@@ -229,7 +229,7 @@ void main() {
       ], now: now);
 
       expect(view.rows, hasLength(1));
-      expect(view.routineDigestLine, 'Missed today: Water');
+      expect(view.routineDigestLine, 'Reminder passed: Water');
     });
   });
 

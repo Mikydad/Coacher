@@ -165,7 +165,7 @@ void main() {
     expect(find.text('+3 more waiting'), findsOneWidget);
   });
 
-  testWidgets('shows the routine digest without making rows of it', (
+  testWidgets('routine misses alone show no card (2026-09-27)', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -173,8 +173,26 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Missed today: Water, Stretch'), findsOneWidget);
-    expect(find.text('Do now'), findsNothing);
+    expect(find.textContaining('passed'), findsNothing);
+    expect(find.textContaining('TODAY'), findsNothing);
+  });
+
+  testWidgets('the routine digest rides under real rows, never as a row', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        RecoveryView(
+          rows: [_row(_occ(id: 't1', title: 'Study'))],
+          routineMisses: const ['Goal: Water', 'Stretch'],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // One row (Study); the digest drops the "Goal: " prefix.
+    expect(find.text('Do now'), findsOneWidget);
+    expect(find.text('Reminders passed: Water, Stretch'), findsOneWidget);
   });
 
   testWidgets('Do now reports the entity', (tester) async {

@@ -51,7 +51,10 @@ class RecoveryView {
   bool get isEmpty => rows.isEmpty && routineMisses.isEmpty;
   bool get isNotEmpty => !isEmpty;
 
-  /// "Missed today: Water, Stretch" / "…and 2 more".
+  /// "Reminders passed: Water, Stretch" / "…and 2 more" (2026-09-27: was
+  /// "Missed today", which read as a verdict while the day is still open —
+  /// the reminder window passed, the thing itself may still get done).
+  /// A "Goal: " style kind prefix on the stored title is dropped.
   ///
   /// The PRD's example is "Water: 3 of 6 today", which assumes a task can
   /// recur several times within one day. This app has no intra-day
@@ -59,11 +62,21 @@ class RecoveryView {
   /// digest names the routines missed instead of counting repeats.
   String? get routineDigestLine {
     if (routineMisses.isEmpty) return null;
-    if (routineMisses.length <= 2) {
-      return 'Missed today: ${routineMisses.join(', ')}';
-    }
-    final shown = routineMisses.take(2).join(', ');
-    return 'Missed today: $shown and ${routineMisses.length - 2} more';
+    final titles = routineMisses.map(_withoutKindPrefix).toList();
+    final lead = titles.length == 1 ? 'Reminder passed' : 'Reminders passed';
+    if (titles.length <= 2) return '$lead: ${titles.join(', ')}';
+    final shown = titles.take(2).join(', ');
+    return '$lead: $shown and ${titles.length - 2} more';
+  }
+
+  static final _kindPrefix = RegExp(
+    r'^(goal|habit|task|routine)\s*:\s*',
+    caseSensitive: false,
+  );
+
+  static String _withoutKindPrefix(String title) {
+    final stripped = title.replaceFirst(_kindPrefix, '');
+    return stripped.isEmpty ? title : stripped;
   }
 }
 

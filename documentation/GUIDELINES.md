@@ -4768,3 +4768,12 @@ not silent reversal.
   stays reachable through the Coach) and the inner grey box were dropped
   — Today's Tasks right below already shows what's open. Roughly half the
   old height (~116 → ~60px).
+
+- **2026-09-27 · Unfinished card: rows or nothing; "Reminder passed".** A
+  card holding only the routine digest ("TODAY · Missed today: Goal: X")
+  no longer shows — the goal is already in the progress ring and Today's
+  goals. Under real rows the line now reads "Reminder(s) passed: X" (the
+  window passed; the day isn't over, so "Missed" was a false verdict) and
+  drops a "Goal:"/"Habit:" title prefix. Also: Up next omits the duration
+  when a task has none (no "0m target"), and the Promise tile uses
+  `bookmark_add` — the handshake is the Accountability tab's icon.

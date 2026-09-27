@@ -45,7 +45,11 @@ class _RecoveryCardState extends ConsumerState<RecoveryCard> {
   @override
   Widget build(BuildContext context) {
     final view = ref.watch(recoveryViewProvider).valueOrNull;
-    if (view == null || view.isEmpty) return const SizedBox.shrink();
+    // Rows or nothing (Miko, 2026-09-27): a card holding only the routine
+    // digest line ("TODAY · Reminder passed: …") repeated what Today's goals
+    // and the progress ring already show. The digest rides along under
+    // real rows only.
+    if (view == null || view.rows.isEmpty) return const SizedBox.shrink();
 
     // FR-R-62: the deterministic order renders NOW; if the one bounded
     // triage call has answered, its ranking enhances in place. valueOrNull
@@ -74,11 +78,8 @@ class _RecoveryCardState extends ConsumerState<RecoveryCard> {
         children: [
           Row(
             children: [
-              AppSectionLabel(
-                shown.isEmpty ? 'TODAY' : _headline(view.rows.length),
-              ),
-              if (shown.isNotEmpty)
-                const HelpDot('unfinishedTasks', dense: true),
+              AppSectionLabel(_headline(view.rows.length)),
+              const HelpDot('unfinishedTasks', dense: true),
               const Spacer(),
               if (hasMore)
                 InkWell(
@@ -156,8 +157,7 @@ class _RecoveryCardState extends ConsumerState<RecoveryCard> {
               ),
             ),
           if (view.routineDigestLine != null) ...[
-            if (shown.isNotEmpty)
-              Divider(height: 16, thickness: 1, color: AppColors.divider),
+            Divider(height: 16, thickness: 1, color: AppColors.divider),
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Text(

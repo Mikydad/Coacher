@@ -214,7 +214,8 @@ class HomeScreen extends ConsumerWidget {
                 // Promise quick-add (2026-09-27): took Set status's slot —
                 // capture is frequent, status is occasional.
                 child: _ActionTile(
-                  icon: Icons.handshake_outlined,
+                  // Not the handshake — that's the Accountability tab's icon.
+                  icon: Icons.bookmark_add_outlined,
                   label: 'Promise',
                   tooltip: 'Add a promise',
                   onTap: () async {
@@ -1588,6 +1589,11 @@ class _FlowNowStrip extends ConsumerWidget {
     final stripLabel = !isThisFocus
         ? 'UP NEXT'
         : (execState.phase == ExecutionPhase.paused ? 'PAUSED' : 'IN FOCUS');
+    final subtitle = _FlowNowStrip._subtitleFor(
+      task: displayTask,
+      execState: execState,
+      focusActive: isThisFocus,
+    );
 
     // One row (Miko, 2026-09-27): the "block · N open" header, its `?` and
     // the inner grey box left — Today's Tasks right below already shows
@@ -1632,11 +1638,11 @@ class _FlowNowStrip extends ConsumerWidget {
                           letterSpacing: 0.8,
                         ),
                       ),
-                      TextSpan(
-                        text:
-                            ' · ${_FlowNowStrip._subtitleFor(task: displayTask, execState: execState, focusActive: isThisFocus)}',
-                        style: TextStyle(color: _kMuted),
-                      ),
+                      if (subtitle.isNotEmpty)
+                        TextSpan(
+                          text: ' · $subtitle',
+                          style: TextStyle(color: _kMuted),
+                        ),
                     ],
                   ),
                   maxLines: 1,
@@ -1676,11 +1682,14 @@ class _FlowNowStrip extends ConsumerWidget {
     required ExecutionState execState,
     required bool focusActive,
   }) {
+    // No duration set → no "0m target" / "/ 0m" (2026-09-27): say only
+    // what's known.
     final parts = <String>[];
     if (focusActive) {
       final targetMin = execState.targetDurationMinutes ?? task.durationMinutes;
-      parts.add('${_formatElapsed(execState.elapsed)} / ${targetMin}m');
-    } else {
+      final elapsed = _formatElapsed(execState.elapsed);
+      parts.add(targetMin > 0 ? '$elapsed / ${targetMin}m' : elapsed);
+    } else if (task.durationMinutes > 0) {
       parts.add('${task.durationMinutes}m target');
     }
     final timeLabel = taskScheduledTimeLabelForDisplay(task);
