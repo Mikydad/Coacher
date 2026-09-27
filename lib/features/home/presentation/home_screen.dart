@@ -45,6 +45,7 @@ import '../../scoring/application/scoring_controller.dart';
 import '../../scoring/presentation/score_task_dialog.dart';
 import '../../add_task/presentation/add_task_sheet.dart';
 import '../../tasks_hub/presentation/task_detail_screen.dart';
+import '../../tasks_hub/presentation/task_accent.dart';
 import '../../tasks_hub/presentation/tasks_hub_screen.dart';
 import '../../focus/presentation/focus_selection_screen.dart';
 import '../../goals/application/goals_providers.dart';
@@ -1441,7 +1442,7 @@ class _FlowNowStrip extends ConsumerWidget {
       padding: const EdgeInsets.only(bottom: 20),
       child: AppCard(
         radius: 20,
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
         child: _buildContent(context, ref, flow, execState, todayRows),
       ),
     );
@@ -1578,114 +1579,93 @@ class _FlowNowStrip extends ConsumerWidget {
     ExecutionState execState,
     List<PlannedTaskRow> todayRows,
   ) {
-    final block = flow.currentBlockLabel;
-    final open = flow.openTaskCount;
     // Non-null: build() hides the strip when there is no task to show.
     final displayTask = _displayTask(flow, execState, todayRows)!;
     final isThisFocus =
         _isFocusActive(execState) && execState.taskId == displayTask.id;
-    // Plain-language pass (2026-09-25): the strip's label carries the
-    // state — IN FOCUS / PAUSED / UP NEXT — so the task row's second line no
-    // longer repeats it.
+    // Plain-language pass (2026-09-25): the label carries the state —
+    // IN FOCUS / PAUSED / UP NEXT.
     final stripLabel = !isThisFocus
         ? 'UP NEXT'
         : (execState.phase == ExecutionPhase.paused ? 'PAUSED' : 'IN FOCUS');
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
+    // One row (Miko, 2026-09-27): the "block · N open" header, its `?` and
+    // the inner grey box left — Today's Tasks right below already shows
+    // what's open. State label + duration/timer on top, the task under it.
+    return Row(
       children: [
-        Row(
-          children: [
-            Text(
-              stripLabel,
-              style: TextStyle(
-                color: _kAccent,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                '$block · $open open',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: AppColors.fg,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const HelpDot('flowNow'),
-          ],
+        _FlowNowTimerControl(
+          task: displayTask,
+          execState: execState,
+          onPressed: () => unawaited(
+            _toggleFocusTimer(context, ref, displayTask, execState),
+          ),
         ),
-        const SizedBox(height: 8),
-        Material(
-          color: AppColors.surfaceLight,
-          borderRadius: BorderRadius.circular(14),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Row(
+        const SizedBox(width: 12),
+        // The task's category color (same as its stripe on the Tasks page),
+        // so the title reads as a task, not a line of text (2026-09-27).
+        Container(
+          width: 4,
+          height: 36,
+          decoration: BoxDecoration(
+            color: taskAccentColor(displayTask),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: InkWell(
+            onTap: () => _openTimerScreen(context, ref, displayTask),
+            borderRadius: BorderRadius.circular(8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _FlowNowTimerControl(
-                  task: displayTask,
-                  execState: execState,
-                  onPressed: () => unawaited(
-                    _toggleFocusTimer(context, ref, displayTask, execState),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _openTimerScreen(context, ref, displayTask),
-                    borderRadius: BorderRadius.circular(8),
-                    // Two lines matching the 36px button height: title on
-                    // top, status + timer merged below — keeps the row slim.
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          isThisFocus ? execState.taskLabel : displayTask.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: AppColors.fg,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: stripLabel,
+                        style: TextStyle(
+                          color: _kAccent,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
                         ),
-                        const SizedBox(height: 1),
-                        Text(
-                          _FlowNowStrip._subtitleFor(
-                            task: displayTask,
-                            execState: execState,
-                            focusActive: isThisFocus,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: AppColors.fg, fontSize: 11),
-                        ),
-                      ],
-                    ),
+                      ),
+                      TextSpan(
+                        text:
+                            ' · ${_FlowNowStrip._subtitleFor(task: displayTask, execState: execState, focusActive: isThisFocus)}',
+                        style: TextStyle(color: _kMuted),
+                      ),
+                    ],
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10.5),
                 ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 32,
-                    minHeight: 32,
+                const SizedBox(height: 2),
+                Text(
+                  isThisFocus ? execState.taskLabel : displayTask.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  // The loudest text on the card: the task itself.
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
                   ),
-                  onPressed: () => _openTimerScreen(context, ref, displayTask),
-                  icon: Icon(Icons.chevron_right, color: _kMuted, size: 20),
                 ),
               ],
             ),
           ),
+        ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          onPressed: () => _openTimerScreen(context, ref, displayTask),
+          icon: Icon(Icons.chevron_right, color: _kMuted, size: 20),
         ),
       ],
     );

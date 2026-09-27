@@ -13,9 +13,9 @@ import '../../planning/application/planned_task_actions.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
 import '../../planning/domain/models/task_item.dart';
-import '../../planning/domain/sleep_task.dart';
 import '../../scoring/application/scoring_controller.dart';
 import '../../timer/presentation/timer_session_screen.dart';
+import 'task_accent.dart';
 import 'task_detail_screen.dart';
 
 import '../../../core/presentation/app_colors.dart';
@@ -371,40 +371,6 @@ class _HubSectionHeader extends StatelessWidget {
   }
 }
 
-/// Stripe + checkbox color for one row.
-///
-/// The six built-in categories hold a fixed hue so the list reads by kind.
-/// A custom category derives a stable hue from its own name; an
-/// uncategorized task derives one from its title and wears it desaturated —
-/// enough to give the list rhythm without pretending to mean something a
-/// categorized row's color does.
-Color _taskAccent(PlannedTask t) {
-  final category = t.category?.trim();
-  if (category == null || category.isEmpty) {
-    return _derivedAccent(t.title, saturation: 0.20, lightness: 0.52);
-  }
-  return switch (category) {
-    'Study' => AppColors.categoryBlue,
-    'Fitness' => AppColors.coral,
-    'Work' => AppColors.orange,
-    'Personal' => AppColors.violetSoft,
-    'Plan' || 'Planning' => AppColors.success,
-    kSleepTaskCategory => AppColors.periwinkle,
-    _ => _derivedAccent(category, saturation: 0.45, lightness: 0.60),
-  };
-}
-
-/// Same text → same hue, every launch: [String.hashCode] is stable within a
-/// run and the value only ever drives decoration.
-Color _derivedAccent(
-  String seed, {
-  required double saturation,
-  required double lightness,
-}) {
-  final hue = (seed.hashCode.abs() % 360).toDouble();
-  return HSLColor.fromAHSL(1, hue, saturation, lightness).toColor();
-}
-
 class _HubTaskTile extends ConsumerWidget {
   const _HubTaskTile({
     required this.row,
@@ -445,7 +411,7 @@ class _HubTaskTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = row.task;
     final isOverdue = ref.watch(overdueEntityIdsProvider).contains(t.id);
-    final accent = _taskAccent(t);
+    final accent = taskAccentColor(t);
     final done = t.status == TaskStatus.completed;
 
     // Meta chunks, each rendered as its own span so the reminder can carry

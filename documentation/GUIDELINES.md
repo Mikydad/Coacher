@@ -4761,3 +4761,10 @@ not silent reversal.
   outside notifications). *Accepted cost:* with notifications off, Home no
   longer shows open promises (Seize the moment still surfaces one when a
   window fits); the Tasks page is the floor.
+
+- **2026-09-27 · Up next is one row.** Start/pause button · (state label
+  UP NEXT / IN FOCUS / PAUSED + duration or timer, then the task title) ·
+  chevron. The "current block · N open" header, its `?` (`flowNow` guide
+  stays reachable through the Coach) and the inner grey box were dropped
+  — Today's Tasks right below already shows what's open. Roughly half the
+  old height (~116 → ~60px).
