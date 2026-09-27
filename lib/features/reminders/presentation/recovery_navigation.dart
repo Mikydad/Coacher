@@ -206,7 +206,10 @@ Future<void> showRecoveryPromptIfNeeded(
   WidgetRef ref,
 ) async {
   final view = ref.read(recoveryViewProvider).valueOrNull;
-  if (view == null || view.isEmpty) return;
+  // Rows, not `isEmpty`: RecoveryCard renders nothing for a digest-only
+  // view (routine misses without rows, 2026-09-27), and gating on
+  // `isEmpty` opened a sheet holding just "Not now" after a session.
+  if (view == null || view.rows.isEmpty) return;
   if (!context.mounted) return;
 
   await showModalBottomSheet<void>(
