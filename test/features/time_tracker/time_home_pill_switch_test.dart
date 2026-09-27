@@ -108,7 +108,7 @@ void main() {
     expect(prefs.stored?.homeTrackPillEnabled, isTrue);
   });
 
-  testWidgets('the Home pill provider defaults to shown', (tester) async {
+  testWidgets('the Home pill provider defaults to hidden', (tester) async {
     final prefs = _MemoryPrefs(); // nothing stored yet
     await tester.pumpWidget(
       _app(
@@ -121,6 +121,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(TrackPill), findsOneWidget);
+    expect(find.byType(TrackPill), findsNothing);
+    expect(find.text('hidden'), findsOneWidget);
   });
 }

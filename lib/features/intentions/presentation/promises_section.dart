@@ -11,10 +11,10 @@ import '../domain/models/intention.dart';
 import 'activity_ask_card.dart';
 import 'calendar_ask_card.dart';
 import 'intention_quick_add_sheet.dart';
-import 'on_your_radar_section.dart';
 
-/// The Promises strip (humanizing Phase 1) — top of Home, the ambient
-/// answer to "what did I say I'd do?". Each row shows the planned moment
+/// The Promises list (humanizing Phase 1) — the answer to "what did I say
+/// I'd do?". Lives on the Tasks page since 2026-09-27 (Home adds through
+/// its Promise tile; "Suggested for later" stays on Home as its own card). Each row shows the planned moment
 /// and its reason; this surface is also the delivery floor when
 /// notifications are denied or the budget is exhausted (PRD §4.5).
 ///
@@ -77,26 +77,36 @@ class _PromisesSectionState extends ConsumerState<PromisesSection> {
           ),
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 10, 10, 10),
-                child: Row(
-                  children: [
-                    // "For later" to the user (plain-language pass,
-                    // 2026-09-25); the code keeps its promise/intention
-                    // names.
-                    const AppSectionLabel('PLAN FOR LATER'),
-                    const HelpDot('forLater', dense: true),
-                    const Spacer(),
-                    AppCircleIconButton(
-                      icon: Icons.add_rounded,
-                      size: 36,
-                      iconSize: 20,
-                      shadow: false,
-                      background: AppColors.surfaceLight,
-                      tooltip: 'Plan something for later',
-                      onPressed: () => showIntentionQuickAddSheet(context),
-                    ),
-                  ],
+              // The whole header adds, not just the + (Miko, 2026-09-27):
+              // tapping the card is the obvious gesture, most of all when
+              // it is empty.
+              InkWell(
+                key: const ValueKey('promises_header_add'),
+                borderRadius: BorderRadius.vertical(
+                  top: const Radius.circular(24),
+                  bottom: Radius.circular(open.isEmpty ? 24 : 0),
+                ),
+                onTap: () => showIntentionQuickAddSheet(context),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 10, 10, 10),
+                  child: Row(
+                    children: [
+                      // "Promises" again (Miko, 2026-09-27), after a
+                      // spell as "Plan for later" (2026-09-25).
+                      const AppSectionLabel('PROMISES'),
+                      const HelpDot('forLater', dense: true),
+                      const Spacer(),
+                      AppCircleIconButton(
+                        icon: Icons.add_rounded,
+                        size: 36,
+                        iconSize: 20,
+                        shadow: false,
+                        background: AppColors.surfaceLight,
+                        tooltip: 'Add a promise',
+                        onPressed: () => showIntentionQuickAddSheet(context),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               if (open.isNotEmpty) ...[
@@ -175,9 +185,6 @@ class _PromisesSectionState extends ConsumerState<PromisesSection> {
           (i) => i.activityTags.any(handsFreeCompatibleTags.contains),
         ))
           const ActivityAskCard(),
-        // "On your radar" (Phase 7b) — dormant understandings + today's
-        // reflection observation, collapsed by default, hidden when empty.
-        const OnYourRadarSection(),
       ],
     );
   }

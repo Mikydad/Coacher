@@ -53,7 +53,8 @@ import '../../goals/domain/models/goal_categories.dart';
 import '../../goals/domain/models/goal_enums.dart';
 import '../../goals/domain/models/user_goal.dart';
 import '../../goals/presentation/goal_detail_screen.dart';
-import '../../intentions/presentation/promises_section.dart';
+import '../../intentions/presentation/intention_quick_add_sheet.dart';
+import '../../intentions/presentation/on_your_radar_section.dart';
 import '../../intentions/presentation/seize_the_moment_card.dart';
 import '../../goals/presentation/goal_template_picker_screen.dart';
 import '../../plan_tomorrow/presentation/plan_tomorrow_screen.dart';
@@ -64,6 +65,8 @@ import '../../context_override/domain/models/interruption_level.dart';
 import '../../reminders/presentation/recovery_card.dart';
 import '../../reminders/presentation/reminder_health_section.dart';
 import '../../reminders/presentation/recovery_navigation.dart';
+import '../../context_override/application/context_override_providers.dart';
+import '../../context_override/domain/models/context_override.dart';
 import '../../context_override/presentation/active_override_banner.dart';
 import '../../context_override/presentation/context_override_quick_activate_sheet.dart';
 import '../../context_override/presentation/post_override_review_card.dart';
@@ -136,10 +139,12 @@ class HomeScreen extends ConsumerWidget {
         scrolledUnderElevation: 0,
         title: const SidePalAppBarTitle(),
         actions: [
-          // One action in the chrome (2026-09-19): the accountability
-          // history shortcut and the placeholder bell left — the history
-          // screen keeps its route, the bell returns with a notification
-          // center.
+          // Two actions at most in Home's chrome: sync, plus status
+          // (2026-09-27 — moved up from the action tiles, icon only; a
+          // status is a mode, and the icon shows when one is on). The
+          // history shortcut and placeholder bell stay gone (2026-09-19).
+          const _StatusAction(),
+          const SizedBox(width: 10),
           const _SyncFromCloudAction(),
           const SizedBox(width: 20),
         ],
@@ -205,11 +210,30 @@ class HomeScreen extends ConsumerWidget {
               ),
               const SizedBox(width: 10),
               Expanded(
+                // Promise quick-add (2026-09-27): took Set status's slot —
+                // capture is frequent, status is occasional.
                 child: _ActionTile(
-                  icon: Icons.do_not_disturb_on_outlined,
-                  label: 'Set status',
-                  tooltip: 'Set status',
-                  onTap: () => showContextOverrideQuickActivateSheet(context),
+                  icon: Icons.handshake_outlined,
+                  label: 'Promise',
+                  tooltip: 'Add a promise',
+                  onTap: () async {
+                    // The list lives on the Tasks page, so Home confirms
+                    // the save and offers the way there.
+                    final saved = await showIntentionQuickAddSheet(context);
+                    if (!saved || !context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Promise saved'),
+                        action: SnackBarAction(
+                          label: 'View',
+                          onPressed: () => Navigator.pushNamed(
+                            context,
+                            TasksHubScreen.routeName,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -223,19 +247,15 @@ class HomeScreen extends ConsumerWidget {
             const TrackPill(),
           ],
           const SizedBox(height: 24),
-          // Humanizing Phase 1 — promises live near the top: seize-the-moment
-          // (only when a free window fits an open promise right now), then
-          // the ambient promises strip.
-          const SeizeTheMomentCard(),
-          const PromisesSection(),
-          const SizedBox(height: 24),
+          // Order (Miko, 2026-09-27): the next useful action leads. Warnings
+          // (silent unless something is wrong), then what's still owed, then
+          // Up next and Today's Tasks; Suggested for later below the tasks.
+          // Weekly discipline left Home — its number lives on Progress.
           const ActiveOverrideBanner(),
-          // What SidePal still owes you leads the recovery band (FR-R-50):
-          // above the post-override review, because an overdue task is a
-          // standing debt while that card is a one-off.
           // Silence is the normal state (FR-R-80): this appears only when
           // reminders genuinely cannot do their job.
           const ReminderHealthHomeHint(),
+          // What SidePal still owes you (FR-R-50), compact since 2026-09-27.
           RecoveryCard(
             onOpenTask: (entityId, entityKind) => openRecoveryTask(
               context,
@@ -250,10 +270,11 @@ class HomeScreen extends ConsumerWidget {
           // one-off band, above the post-override review. Silent otherwise.
           const NewMonthDirectionCard(),
           const PostOverrideReviewCard(),
-          const _DailyDisciplineSection(),
-          const SizedBox(height: 24),
+          // Seize-the-moment stays up with the "now" band: it only appears
+          // when a free window fits an open promise right now.
+          const SeizeTheMomentCard(),
+          // Hides itself (with its gap) when there's no task to show.
           _FlowNowStrip(flowSnapshotAsync: flowSnapshotAsync),
-          const SizedBox(height: 20),
           // Coaching focus + proactive suggestions left Home (2026-08-23):
           // focus lives on Progress (notification + Profile-tab dot when a
           // new one lands); suggestions live behind the Coach FAB's dot.
@@ -365,6 +386,12 @@ class HomeScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 20),
+          // Suggested for later (Phase 7b) — its own card since 2026-09-27,
+          // only when SidePal has noticed something. The Promises list moved
+          // to the Tasks page; Home adds through the Promise tile. It carries
+          // its own 20px bottom gap, so no spacer follows it — a hidden card
+          // must not leave a double gap before Today's goals.
+          const OnYourRadarSection(),
           AppCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -875,7 +902,9 @@ class _ProgressRingColumn extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          '$completed of $total goals/habits completed',
+          // Words only (Miko, 2026-09-27): "goals", not "goals/habits" —
+          // the count itself is unchanged.
+          '$completed of $total ${total == 1 ? 'goal' : 'goals'} completed',
           textAlign: TextAlign.center,
           maxLines: 2,
           style: TextStyle(
@@ -1066,83 +1095,6 @@ class _TrendBar extends StatelessWidget {
             ? AppColors.coach
             : AppColors.coach.withValues(alpha: 0.42),
       ),
-    );
-  }
-}
-
-class _DailyDisciplineSection extends ConsumerWidget {
-  const _DailyDisciplineSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final bundleAsync = ref.watch(analyticsPeriodBundleProvider);
-    return bundleAsync.when(
-      skipLoadingOnReload: true,
-      data: (bundle) => _DisciplineHeading(
-        value: bundle.goalHabitWeek.weightedCompletionRate.clamp(0.0, 1.0),
-      ),
-      loading: () => const _DisciplineHeading(value: null),
-      error: (e, _) => swallowedAsyncError(
-        'home_screen',
-        e,
-        const _DisciplineHeading(value: null),
-      ),
-    );
-  }
-}
-
-/// "WEEKLY DISCIPLINE 42%" — bold heading, the percentage a shade lighter,
-/// olive bar under it. [value] null = not loaded yet (no number, empty bar).
-class _DisciplineHeading extends StatelessWidget {
-  const _DisciplineHeading({required this.value});
-
-  final double? value;
-
-  @override
-  Widget build(BuildContext context) {
-    final v = value;
-    final headingStyle = TextStyle(
-      fontSize: 22,
-      fontWeight: FontWeight.w800,
-      letterSpacing: 0.4,
-      height: 1.1,
-      color: AppColors.textPrimary,
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Flexible(
-              child: Text(
-                'WEEKLY DISCIPLINE',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: headingStyle,
-              ),
-            ),
-            if (v != null) ...[
-              const SizedBox(width: 8),
-              Text(
-                '${(v * 100).round()}%',
-                style: headingStyle.copyWith(color: AppColors.textSecondary),
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 10),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: v ?? 0,
-            minHeight: 8,
-            color: AppColors.accent,
-            backgroundColor: AppColors.surfaceLight,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -1470,31 +1422,48 @@ class _FlowNowStrip extends ConsumerWidget {
     final todayRows =
         ref.watch(todayAllTasksRowsProvider).valueOrNull ?? const [];
 
-    return AppCard(
-      radius: 20,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      child: flowSnapshotAsync.when(
-        data: (flow) => _buildContent(context, ref, flow, execState, todayRows),
-        loading: () => const SizedBox(
-          height: 40,
-          child: Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-        ),
-        error: (e, _) => swallowedAsyncError(
-          'home_screen',
-          e,
-          Text(
-            'Unavailable',
-            style: TextStyle(color: _kMuted, fontSize: 12),
-          ),
-        ),
+    // Shown only when there is a task to put on it (Miko, 2026-09-27): the
+    // one in focus/paused, or the next open one. No tasks, all done, still
+    // loading or failed → nothing at all (spacing included) — Today's Tasks
+    // already says "No tasks yet", and a spinner that then vanishes is noise.
+    final flow = flowSnapshotAsync.when(
+      data: (flow) => flow,
+      loading: () => null,
+      error: (e, _) =>
+          swallowedAsyncError<HomeFlowSnapshot?>('home_screen', e, null),
+    );
+    if (flow == null) return const SizedBox.shrink();
+    if (_displayTask(flow, execState, todayRows) == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: AppCard(
+        radius: 20,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: _buildContent(context, ref, flow, execState, todayRows),
       ),
     );
+  }
+
+  static bool _isFocusActive(ExecutionState execState) =>
+      execState.targetType == TimerSessionTargetType.task &&
+      execState.taskId.isNotEmpty &&
+      (execState.phase == ExecutionPhase.inProgress ||
+          execState.phase == ExecutionPhase.paused);
+
+  /// The task the strip is about: the one in focus if it's today's, else the
+  /// next open task. Null = the strip hides.
+  PlannedTask? _displayTask(
+    HomeFlowSnapshot flow,
+    ExecutionState execState,
+    List<PlannedTaskRow> todayRows,
+  ) {
+    final next = flow.nextTaskRow?.task;
+    return _isFocusActive(execState)
+        ? (_findTask(todayRows, execState.taskId) ?? next)
+        : next;
   }
 
   PlannedTask? _findTask(List<PlannedTaskRow> rows, String taskId) {
@@ -1611,21 +1580,10 @@ class _FlowNowStrip extends ConsumerWidget {
   ) {
     final block = flow.currentBlockLabel;
     final open = flow.openTaskCount;
-    final next = flow.nextTaskRow?.task;
-
-    final focusActive =
-        execState.targetType == TimerSessionTargetType.task &&
-        execState.taskId.isNotEmpty &&
-        (execState.phase == ExecutionPhase.inProgress ||
-            execState.phase == ExecutionPhase.paused);
-
-    final displayTask = focusActive
-        ? (_findTask(todayRows, execState.taskId) ?? next)
-        : next;
+    // Non-null: build() hides the strip when there is no task to show.
+    final displayTask = _displayTask(flow, execState, todayRows)!;
     final isThisFocus =
-        focusActive &&
-        displayTask != null &&
-        execState.taskId == displayTask.id;
+        _isFocusActive(execState) && execState.taskId == displayTask.id;
     // Plain-language pass (2026-09-25): the strip's label carries the
     // state — IN FOCUS / PAUSED / UP NEXT — so the task row's second line no
     // longer repeats it.
@@ -1664,83 +1622,71 @@ class _FlowNowStrip extends ConsumerWidget {
             const HelpDot('flowNow'),
           ],
         ),
-        if (displayTask != null) ...[
-          const SizedBox(height: 8),
-          Material(
-            color: AppColors.surfaceLight,
-            borderRadius: BorderRadius.circular(14),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Row(
-                children: [
-                  _FlowNowTimerControl(
-                    task: displayTask,
-                    execState: execState,
-                    onPressed: () => unawaited(
-                      _toggleFocusTimer(context, ref, displayTask, execState),
-                    ),
+        const SizedBox(height: 8),
+        Material(
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Row(
+              children: [
+                _FlowNowTimerControl(
+                  task: displayTask,
+                  execState: execState,
+                  onPressed: () => unawaited(
+                    _toggleFocusTimer(context, ref, displayTask, execState),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: InkWell(
-                      onTap: () => _openTimerScreen(context, ref, displayTask),
-                      borderRadius: BorderRadius.circular(8),
-                      // Two lines matching the 36px button height: title on
-                      // top, status + timer merged below — keeps the row slim.
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            isThisFocus
-                                ? execState.taskLabel
-                                : displayTask.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: AppColors.fg,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _openTimerScreen(context, ref, displayTask),
+                    borderRadius: BorderRadius.circular(8),
+                    // Two lines matching the 36px button height: title on
+                    // top, status + timer merged below — keeps the row slim.
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          isThisFocus ? execState.taskLabel : displayTask.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.fg,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
                           ),
-                          const SizedBox(height: 1),
-                          Text(
-                            _FlowNowStrip._subtitleFor(
-                              task: displayTask,
-                              execState: execState,
-                              focusActive: isThisFocus,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: AppColors.fg, fontSize: 11),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          _FlowNowStrip._subtitleFor(
+                            task: displayTask,
+                            execState: execState,
+                            focusActive: isThisFocus,
                           ),
-                        ],
-                      ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: AppColors.fg, fontSize: 11),
+                        ),
+                      ],
                     ),
                   ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 32,
-                      minHeight: 32,
-                    ),
-                    onPressed: () =>
-                        _openTimerScreen(context, ref, displayTask),
-                    icon: Icon(Icons.chevron_right, color: _kMuted, size: 20),
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
                   ),
-                ],
-              ),
+                  onPressed: () => _openTimerScreen(context, ref, displayTask),
+                  icon: Icon(Icons.chevron_right, color: _kMuted, size: 20),
+                ),
+              ],
             ),
           ),
-        ] else
-          Padding(
-            padding: EdgeInsets.only(top: 6),
-            child: Text(
-              'Nothing planned — add a task or check Tasks.',
-              style: TextStyle(color: _kMuted, fontSize: 12),
-            ),
-          ),
+        ),
       ],
     );
   }
@@ -2473,6 +2419,26 @@ class _SyncFromCloudActionState extends State<_SyncFromCloudAction> {
               ),
             )
           : null,
+    );
+  }
+}
+
+/// Set status, icon only (2026-09-27). Tinted while a status is on, so the
+/// chrome says "you're in a mode" even with the banner scrolled away.
+class _StatusAction extends ConsumerWidget {
+  const _StatusAction();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final effective = ref.watch(effectiveOverrideProvider);
+    final active = effective != ContextOverride.none;
+    return AppCircleIconButton(
+      icon: active
+          ? Icons.do_not_disturb_on_rounded
+          : Icons.do_not_disturb_on_outlined,
+      iconColor: active ? AppColors.cyan : null,
+      tooltip: active ? 'Status: ${effective.displayName}' : 'Set status',
+      onPressed: () => showContextOverrideQuickActivateSheet(context),
     );
   }
 }

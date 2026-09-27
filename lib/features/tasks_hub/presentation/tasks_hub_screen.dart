@@ -8,6 +8,7 @@ import '../../../core/utils/date_keys.dart';
 import '../../add_task/presentation/add_task_args.dart';
 import '../../add_task/presentation/add_task_sheet.dart';
 import '../../education/presentation/help_dot.dart';
+import '../../intentions/presentation/promises_section.dart';
 import '../../planning/application/planned_task_actions.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
@@ -289,6 +290,11 @@ class TasksHubScreen extends ConsumerWidget {
                   style: TextStyle(color: Colors.red.shade200),
                 ),
               ),
+              // Promises (moved from Home, 2026-09-27): near-term things
+              // without a clock time, so they sit between today and other
+              // days. The card carries its own label and + button.
+              const SizedBox(height: 28),
+              const PromisesSection(),
               const SizedBox(height: 28),
               const _HubSectionHeader('Open on other days'),
               const SizedBox(height: 8),

@@ -12,8 +12,8 @@ import '../../thinking/application/thinking_loop_service.dart';
 import '../application/intentions_providers.dart';
 import '../domain/models/intention.dart';
 
-/// "On your radar" (humanizing Phase 7b) — the quiet collapsed tail of
-/// the Promises section. Standing understandings, not obligations:
+/// "Suggested for later" (humanizing Phase 7b; was "On your radar") — its
+/// own Home card since 2026-09-27, below Today's Tasks. Standing understandings, not obligations:
 /// dormant intentions (extraction Phase 2 + reflection Phase 7) and
 /// today's reflection observation, all generating ZERO notifications
 /// until the user engages.
@@ -26,8 +26,8 @@ import '../domain/models/intention.dart';
 /// - the observation is labeled INFERRED (provenance honesty) and its
 ///   dismissal clears the reflection insight scope.
 ///
-/// Collapsed by default — radar content must never compete with open
-/// promises. Hidden entirely when there is nothing on the radar.
+/// One suggestion shows; the rest wait behind "N MORE". Hidden entirely
+/// when there is nothing on the radar.
 class OnYourRadarSection extends ConsumerStatefulWidget {
   const OnYourRadarSection({super.key});
 
@@ -42,72 +42,103 @@ class _OnYourRadarSectionState extends ConsumerState<OnYourRadarSection> {
   Widget build(BuildContext context) {
     final radar = ref.watch(radarIntentionsProvider);
     final observation = _todayObservation(ref);
-    final count = radar.length + (observation != null ? 1 : 0);
+    final rows = <Widget>[
+      if (observation != null) _ObservationRow(observation: observation),
+      for (final intention in radar) _RadarRow(intention: intention),
+    ];
+    final count = rows.length;
     if (count == 0) return const SizedBox.shrink();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 20),
-        InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () => setState(() => _expanded = !_expanded),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                AppSectionLabel('SUGGESTED FOR LATER · $count'),
-                const HelpDot('suggestedForLater', dense: true),
-                const SizedBox(width: 2),
-                AnimatedRotation(
-                  turns: _expanded ? 0.5 : 0,
-                  duration: const Duration(milliseconds: 260),
-                  child: Icon(
-                    Icons.expand_more_rounded,
-                    size: 18,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
+    Widget padded(Widget row) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: row,
+    );
+
+    // Its own card on Home (Miko, 2026-09-27), built like the Promises
+    // card: label inside, the first suggestion showing, the rest behind
+    // "N MORE". The bottom gap lives here so a hidden card leaves none.
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: AppColors.surfacePanel,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: appCardShadow,
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 10, 10),
+              child: Row(
+                children: [
+                  AppSectionLabel('SUGGESTED FOR LATER · $count'),
+                  const HelpDot('suggestedForLater', dense: true),
+                ],
+              ),
             ),
-          ),
-        ),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 260),
-          curve: Curves.easeOutCubic,
-          alignment: Alignment.topCenter,
-          child: !_expanded
-              ? const SizedBox(width: double.infinity)
-              : Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfacePanel,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: appCardShadow,
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    child: Column(
-                      children: [
-                        if (observation != null)
-                          _ObservationRow(observation: observation),
-                        if (observation != null && radar.isNotEmpty)
-                          Divider(height: 1, color: AppColors.divider),
-                        for (var i = 0; i < radar.length; i++) ...[
-                          if (i > 0)
-                            Divider(height: 1, color: AppColors.divider),
-                          _RadarRow(intention: radar[i]),
-                        ],
-                      ],
-                    ),
+            Divider(height: 1, thickness: 1, color: AppColors.divider),
+            padded(rows.first),
+            if (count > 1) ...[
+              Divider(height: 1, color: AppColors.divider, indent: 16),
+              InkWell(
+                key: const ValueKey('radar_more'),
+                borderRadius: BorderRadius.circular(22),
+                onTap: () => setState(() => _expanded = !_expanded),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        _expanded ? 'SHOW LESS' : '${count - 1} MORE',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      AnimatedRotation(
+                        turns: _expanded ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 260),
+                        child: Icon(
+                          Icons.expand_more_rounded,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: !_expanded
+                    ? const SizedBox(width: double.infinity)
+                    : Column(
+                        children: [
+                          for (var i = 1; i < count; i++) ...[
+                            Divider(
+                              height: 1,
+                              color: AppColors.divider,
+                              indent: 16,
+                            ),
+                            padded(rows[i]),
+                          ],
+                        ],
+                      ),
+              ),
+            ] else
+              const SizedBox(height: 6),
+          ],
         ),
-      ],
+      ),
     );
   }
 

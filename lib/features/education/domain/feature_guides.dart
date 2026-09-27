@@ -534,6 +534,7 @@ abstract final class FeatureGuides {
     goalsHabitsBreakdown,
     taskIntegrity,
     coachingFocus,
+    unfinishedTasks,
     forLater,
     suggestedForLater,
     weeklyCommitments,
@@ -712,26 +713,58 @@ abstract final class FeatureGuides {
     suggestedPrompts: ['How am I doing this week?', 'What is Coach AI?'],
   );
 
+  static const unfinishedTasks = FeatureGuide(
+    id: 'unfinishedTasks',
+    title: 'Unfinished Tasks',
+    emoji: '⏳',
+    oneLiner: "Tasks you didn't complete or reschedule.",
+    what:
+        'When a task\'s time passes and it is neither done nor moved, it '
+        'waits here until you deal with it. The most important one shows '
+        'first; tap MORE to see the rest.',
+    why:
+        'A task that quietly disappears teaches you to distrust your plan. '
+        'Keeping it in view means you decide what happens to it.',
+    howSteps: [
+      'Tap "Do now" to open the task and get it done.',
+      'Use the menu next to it to move it to tomorrow or skip it.',
+    ],
+    tips: [
+      'In Flexible, the × hides a task for today. Disciplined and Extreme '
+          'keep it here until you decide.',
+    ],
+    keywords: [
+      'unfinished tasks',
+      'unfinished task',
+      'overdue tasks',
+      'do now',
+    ],
+    suggestedPrompts: ['What is Strictness?', "Tell me about Today's Tasks"],
+  );
+
   static const forLater = FeatureGuide(
     id: 'forLater',
-    title: 'Plan for Later',
-    emoji: '🕰️',
-    oneLiner: 'Things you want to do without choosing an exact time.',
+    title: 'Promises',
+    emoji: '🤞',
+    oneLiner: 'Something you want to do when you have a free moment.',
     what:
-        'Plan for later holds the small things you mean to do soon — a call, a '
-        'message, an errand — without picking a clock time. Say roughly '
-        'when (today, tomorrow, this week, the weekend) and SidePal finds '
-        'a good moment and nudges you.',
+        'A promise is something you want to do when you have time — in '
+        'your free time, not at a set hour. Calling an old friend, '
+        'replying to a message, picking up groceries, reading that '
+        'article. Say roughly when (today, tomorrow, this week, the '
+        'weekend) and SidePal finds a free moment and reminds you. Your '
+        'promises are listed on the Tasks page.',
     why:
-        'Not everything deserves a slot in your plan. Parking it here '
-        'keeps it out of your head without letting it slip.',
+        'Not everything needs a slot in your plan. Writing it down here '
+        'gets it out of your head without letting it slip.',
     howSteps: [
-      'Tap + on the Plan for later card and type what you want to do.',
+      'Tap Promise on Home (or + on the Promises card in Tasks) and type '
+          'what you want to do.',
       'Pick roughly when, then tap "Find me a good time".',
     ],
     tips: ['Errands can remind you when you head out the door.'],
-    keywords: ['for later', 'plan for later', 'without an exact time', 'find me a good time'],
-    suggestedPrompts: ['Remind me to call my mom this week', "Tell me about Today's Tasks"],
+    keywords: ['promises', 'promise', 'free time', 'without an exact time', 'find me a good time'],
+    suggestedPrompts: ['Promise to call an old friend this week', "Tell me about Today's Tasks"],
   );
 
   static const suggestedForLater = FeatureGuide(
@@ -747,11 +780,11 @@ abstract final class FeatureGuides {
         'Good intentions get lost in conversation. Keeping them visible '
         'means you decide, instead of forgetting.',
     howSteps: [
-      'Tap "Remind me" to move one onto your Plan for later list.',
+      'Tap "Remind me" to move one onto your Promises.',
       'Tap the × to dismiss anything that does not fit.',
     ],
     keywords: ['suggested for later', 'sidepal noticed', 'suggestions for later'],
-    suggestedPrompts: ['Tell me about Plan for Later', 'What does SidePal know about me?'],
+    suggestedPrompts: ['Tell me about Promises', 'What does SidePal know about me?'],
   );
 
   static const weeklyCommitments = FeatureGuide(

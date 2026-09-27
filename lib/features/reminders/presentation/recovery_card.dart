@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/presentation/app_card.dart';
 import '../../../core/presentation/app_colors.dart';
-import '../../../core/presentation/page_headers.dart';
+import '../../education/presentation/help_dot.dart';
 import '../application/recovery_triage_service.dart';
 import '../application/recovery_view.dart';
 import '../domain/models/reminder_occurrence_enums.dart';
@@ -62,111 +62,122 @@ class _RecoveryCardState extends ConsumerState<RecoveryCard> {
     final overflow = _expanded ? ordered.length - capped.length : 0;
     final hasMore = ordered.length > 1;
 
-    // Redesign 2026-09-14: a clean white card — headline, muted subtitle,
-    // hairline, then the rows. No translucent gray fill, so it never reads
-    // as disabled.
+    // Compact (Miko, 2026-09-27): one label line instead of a hero header,
+    // subtitle and hairline, so Home reaches Up next and Today's Tasks
+    // sooner. The explanation moved into the `?`; the count and the
+    // "N MORE" toggle share the label's line. Rows are unchanged.
     return AppCard(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-      child: Padding(
-        padding: EdgeInsets.zero,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(
-              shown.isEmpty ? 'Today' : _headline(view.rows.length),
-              hero: true,
-              subtitle: shown.isEmpty
-                  ? null
-                  : "Tasks you didn't complete or reschedule.",
-            ),
-            if (shown.isNotEmpty)
-              Divider(height: 28, thickness: 1, color: AppColors.divider),
-            for (final row in shown)
-              _RecoveryRowTile(
-                row: row,
-                onDo: () => widget.onOpenTask?.call(
-                  row.occurrence.entityId,
-                  row.occurrence.entityKind,
-                ),
-                onDismiss: row.insistence.canDismiss
-                    ? () => ref
-                          .read(reminderOccurrenceServiceProvider)
-                          .dismissForToday(row.occurrence.entityId)
-                    : null,
-                onResolve: widget.onResolve == null
-                    ? null
-                    : (kind) => widget.onResolve!(row, kind),
+      padding: const EdgeInsets.fromLTRB(18, 6, 10, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AppSectionLabel(
+                shown.isEmpty ? 'TODAY' : _headline(view.rows.length),
               ),
-            if (hasMore)
-              InkWell(
-                key: const ValueKey('recovery_more'),
-                borderRadius: BorderRadius.circular(12),
-                onTap: () => setState(() => _expanded = !_expanded),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: [
-                      Text(
-                        _expanded
-                            ? 'SHOW LESS'
-                            : '${ordered.length - shown.length} MORE',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      AnimatedRotation(
-                        turns: _expanded ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 260),
-                        child: Icon(
-                          Icons.expand_more_rounded,
-                          size: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            if (overflow > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 4, bottom: 4),
-                child: Text(
-                  '+$overflow more waiting',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-            if (view.routineDigestLine != null) ...[
               if (shown.isNotEmpty)
-                Divider(height: 16, thickness: 1, color: AppColors.divider),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  view.routineDigestLine!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.35,
-                    color: AppColors.textMuted,
+                const HelpDot('unfinishedTasks', dense: true),
+              const Spacer(),
+              if (hasMore)
+                InkWell(
+                  key: const ValueKey('recovery_more'),
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => setState(() => _expanded = !_expanded),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _expanded
+                              ? 'SHOW LESS'
+                              : '${ordered.length - shown.length} MORE',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        AnimatedRotation(
+                          turns: _expanded ? 0.5 : 0,
+                          duration: const Duration(milliseconds: 260),
+                          child: Icon(
+                            Icons.expand_more_rounded,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                )
+              else
+                const SizedBox(height: 36),
+            ],
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: Column(
+              children: [
+                for (final row in shown)
+                  _RecoveryRowTile(
+                    row: row,
+                    onDo: () => widget.onOpenTask?.call(
+                      row.occurrence.entityId,
+                      row.occurrence.entityKind,
+                    ),
+                    onDismiss: row.insistence.canDismiss
+                        ? () => ref
+                              .read(reminderOccurrenceServiceProvider)
+                              .dismissForToday(row.occurrence.entityId)
+                        : null,
+                    onResolve: widget.onResolve == null
+                        ? null
+                        : (kind) => widget.onResolve!(row, kind),
+                  ),
+              ],
+            ),
+          ),
+          if (overflow > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 4),
+              child: Text(
+                '+$overflow more waiting',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ),
+          if (view.routineDigestLine != null) ...[
+            if (shown.isNotEmpty)
+              Divider(height: 16, thickness: 1, color: AppColors.divider),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                view.routineDigestLine!,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: AppColors.textMuted,
                 ),
               ),
-            ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
 }
 
-String _headline(int count) =>
-    count == 1 ? '1 unfinished task' : '$count unfinished tasks';
+/// "UNFINISHED · 2" — the section-label voice every Home card uses.
+String _headline(int count) => 'UNFINISHED · $count';
 
 class _RecoveryRowTile extends StatelessWidget {
   const _RecoveryRowTile({
@@ -187,7 +198,7 @@ class _RecoveryRowTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
           if (row.isCritical)

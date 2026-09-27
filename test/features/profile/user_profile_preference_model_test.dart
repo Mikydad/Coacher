@@ -54,9 +54,24 @@ void main() {
       );
     });
 
-    test('missing key → shown (rows written before the switch existed)', () {
-      final m = _pref().toMap()..remove('homeTrackPillEnabled');
-      expect(UserProfilePreference.fromMap(m).homeTrackPillEnabled, isTrue);
+    test('round-trips true', () {
+      final p = _pref().copyWith(homeTrackPillEnabled: true);
+      expect(
+        UserProfilePreference.fromMap(p.toMap()).homeTrackPillEnabled,
+        isTrue,
+      );
+    });
+
+    test('missing key → hidden (off by default, 2026-09-27)', () {
+      final m = _pref().toMap()..remove('homeTrackPillOn');
+      expect(UserProfilePreference.fromMap(m).homeTrackPillEnabled, isFalse);
+    });
+
+    test('the retired key no longer turns the pill on', () {
+      final m = _pref().toMap()
+        ..remove('homeTrackPillOn')
+        ..['homeTrackPillEnabled'] = true;
+      expect(UserProfilePreference.fromMap(m).homeTrackPillEnabled, isFalse);
     });
   });
 

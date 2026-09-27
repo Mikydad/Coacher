@@ -3660,7 +3660,8 @@ not silent reversal.
   or not.** Item 4 returns in its narrowest form: one `Show on Home`
   switch at the bottom of the Time page, persisted as
   `UserProfilePreference.homeTrackPillEnabled` (default true, so rows from
-  before the field and a fresh install both show the pill). It decides
+  before the field and a fresh install both show the pill — superseded
+  2026-09-27: off by default, stored as `homeTrackPillOn`). It decides
   ONLY whether Home renders `TrackPill`; the Time page, its history, the
   Profile row, Siri, timer-sourced logging and the intended-duration
   reminder are untouched — Miko: "nothing more". Local write, Isar watch
@@ -4700,3 +4701,63 @@ not silent reversal.
   store ships. *Deferred to step 4:* the server's AI-cap UX (today an
   over-cap turn is rejected as `resource-exhausted`; the spec is "chat
   continues, actions stop") and server enforcement of stakes/promises.
+
+- **2026-09-27 · Home leads with the next action: reorder, not removal.**
+  Prompted by "a distracted user should see the next task on open". New
+  order: progress card → four action tiles → (tracking pill, opt-in) →
+  warnings (status banner, reminder-health hint — silent unless broken) →
+  **Unfinished** (compact) → one-offs (new month, post-override review) →
+  Seize the moment (it is a "now" card, so it stays up) → **Up next** →
+  **Today's Tasks** → Plan for later + Suggested for later → Today's goals
+  and the rest unchanged. Calls: (1) **Tracking pill off by default.** The
+  stored key moved from `homeTrackPillEnabled` to `homeTrackPillOn`
+  (default false) because the old key wrote `true` for everyone who never
+  touched the switch — a new key is the only way to reset existing
+  installs; anyone who wants it flips `Show on Home` on the Time page
+  once. Supersedes the 2026-09-18 "default true". (2) **WEEKLY
+  DISCIPLINE heading + bar left Home** (the number stays on Progress; the
+  top progress card is unrelated and stays). (3) **Plan for later: the
+  whole header row opens the add sheet**, same as `+`; rows still open
+  their detail sheet, `?` still opens help. (4) **Unfinished card is one
+  label line** — `UNFINISHED · N`, a `?` (`unfinishedTasks` guide holds
+  the old subtitle), and the `N MORE` toggle on the same line; rows, "Do
+  now", dismiss/menu and the Disciplined/Extreme persistence contract are
+  unchanged. (5) **Up next shows only when it has a task** — the one in
+  focus/paused, or the next open task. No tasks, all done, loading or
+  error → the strip and its gap vanish (Today's Tasks already says "No
+  tasks yet"; "Nothing planned" was wrong when the day was finished).
+  *Deferred:* the richer Up next card ("Helps with: <goal>",
+  "Make it smaller", "Move it") — a separate step. *Rejected:* moving the
+  progress card below the tasks (Miko: tiles and progress stay put).
+
+- **2026-09-27 · "Plan for later" is "Promises" again; Promise takes Set
+  status's tile; status moves to Home's top bar.** Reverses the 2026-09-25
+  rename (made because "promise" meant three things — the list, the stake
+  pledge, weekly commitments); Miko prefers the plain word, and the
+  paywall already says "Weekly promises used". Stake copy ("A promise was
+  broken") still uses the word — accepted overlap. Help (`forLater` guide,
+  id unchanged): "something you want to do when you have time — in your
+  free time", with examples (calling an old friend, replying to a
+  message, groceries). Card `PROMISES`, sheet `NEW PROMISE`, Coach
+  read-backs "add X to your promises" / `Promise: "X"`. Home tiles: Start
+  focus · Add task · Plan tomorrow · **Promise** (opens the add sheet).
+  **Set status** → icon-only button left of sync in Home's app bar only,
+  tinted while a status is on — Home's chrome caps at these two actions.
+  "Suggested for later" keeps its name.
+
+- **2026-09-27 · The Promises list moves to the Tasks page; "Suggested
+  for later" becomes its own Home card.** Home adds through the Promise
+  tile, so the Home list was a duplicate — but it is the only place
+  promises can be seen, finished or removed, so it moved rather than
+  vanished: Tasks page, between **Today** and **Open on other days**
+  (near-term, no clock time). The calendar/motion permission asks travel
+  with it. The Home tile confirms a save with a "Promise saved · View"
+  snackbar (`showIntentionQuickAddSheet` now completes `true` on save),
+  since nothing on Home changes. **Suggested for later** is a white card
+  under Today's Tasks, built like the Promises card: label + count
+  inside, the first suggestion (observation first) visible, the rest
+  behind `N MORE`; hidden entirely — gap included — when empty.
+  *Rejected:* removing the list outright (promises would be unfinishable
+  outside notifications). *Accepted cost:* with notifications off, Home no
+  longer shows open promises (Seize the moment still surfaces one when a
+  window fits); the Tasks page is the floor.

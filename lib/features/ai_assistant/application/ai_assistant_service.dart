@@ -1144,7 +1144,7 @@ class AiAssistantService extends ChangeNotifier {
     final content = exec.hasFailures
         ? (isMemoryBatch || exec.hitTierLimit
               ? exec.toSummaryMessage()
-              : "I couldn't save that for later — please try again.")
+              : "I couldn't save that promise — please try again.")
         : voiceMode
         ? '${exec.toSummaryMessage()} Say "undo" if that\'s not right.'
         : (isMemoryBatch
