@@ -604,8 +604,12 @@ abstract final class FeatureGuides {
         'what feeds your progress score.',
     howSteps: [
       'Tap the circle next to a task when you complete it.',
-      'Score honestly if asked — partial still counts.',
+      'Only got partway? Press and hold the circle to score it.',
       'Use the swap icon when plans change instead of ignoring the task.',
+    ],
+    tips: [
+      'Tapped by mistake? Tap Undo on the message that pops up.',
+      'Disciplined and Extreme always ask for a score — that is the point.',
     ],
     keywords: ["today's tasks", 'todays task list'],
     suggestedPrompts: ['Add a 30 minute workout today', 'What is Up Next?'],

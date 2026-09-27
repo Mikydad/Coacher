@@ -111,6 +111,40 @@ class _CountingRuntimeCache extends _FakeTimerRuntimeCache {
 }
 
 void main() {
+  // Regression (Miko, 2026-09-27): a task with no duration made a 0-minute
+  // target, so Start auto-stopped at once and opened the score card.
+  group('task target duration', () {
+    ExecutionController make() => ExecutionController(
+      repository: _FakeExecutionRepository(),
+      runtimeCache: _FakeTimerRuntimeCache(),
+      resumeStore: _FakeFocusResumeStore(),
+      initialTaskId: '',
+      initialTaskLabel: '',
+    );
+
+    test('0 minutes means no target (open-ended timer)', () {
+      fakeAsync((async) {
+        final ctrl = make();
+        async.flushMicrotasks();
+        ctrl.setTask(id: 'fast', label: 'Fast', durationMinutes: 0);
+        expect(ctrl.state.targetDurationMinutes, isNull);
+      });
+    });
+
+    test("a task without a duration doesn't inherit the previous target", () {
+      fakeAsync((async) {
+        final ctrl = make();
+        async.flushMicrotasks();
+        ctrl.setTask(id: 'a', label: 'A', durationMinutes: 25);
+        expect(ctrl.state.targetDurationMinutes, 25);
+        ctrl.setTask(id: 'b', label: 'B', durationMinutes: 0);
+        expect(ctrl.state.targetDurationMinutes, isNull);
+        ctrl.setTask(id: 'c', label: 'C');
+        expect(ctrl.state.targetDurationMinutes, isNull);
+      });
+    });
+  });
+
   test('persists on phase transitions, never on per-second ticks', () {
     fakeAsync((async) {
       final cache = _CountingRuntimeCache();

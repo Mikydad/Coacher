@@ -32,10 +32,19 @@ abstract final class OverrideRules {
     return false;
   }
 
+  /// The least focus that counts as "timed" (Miko, 2026-09-27): any ended
+  /// session above 0s used to pass, so a 2-second start/end satisfied
+  /// "Timer required".
+  static const mandatoryTimerMinSeconds = 60;
+
+  /// One ended task session of at least [mandatoryTimerMinSeconds]. Not a
+  /// sum: a resumed session's elapsed already includes the earlier part.
   static bool hasSatisfiedMandatoryTimer(List<TimerSession> sessions) {
     for (final s in sessions) {
       if (s.targetType != TimerSessionTargetType.task) continue;
-      if ((s.elapsedSeconds) > 0 && s.endedAtMs != null) return true;
+      if (s.endedAtMs != null && s.elapsedSeconds >= mandatoryTimerMinSeconds) {
+        return true;
+      }
     }
     return false;
   }

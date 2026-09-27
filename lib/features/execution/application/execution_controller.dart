@@ -196,6 +196,14 @@ class ExecutionController extends StateNotifier<ExecutionState> {
     int? durationMinutes,
     Duration resumeElapsed = Duration.zero,
   }) {
+    // A task with no duration (0 min) has no target — the timer runs
+    // open-ended. A 0-minute target auto-stopped the session the instant
+    // Start was pressed and opened the score card (Miko, 2026-09-27). And
+    // null must CLEAR the target: copyWith(null) would keep the previous
+    // task's.
+    final target = (durationMinutes != null && durationMinutes > 0)
+        ? durationMinutes
+        : null;
     final sameRunningTask =
         state.targetType == TimerSessionTargetType.task &&
         state.taskId == id &&
@@ -204,7 +212,8 @@ class ExecutionController extends StateNotifier<ExecutionState> {
     if (sameRunningTask) {
       state = state.copyWith(
         taskLabel: label,
-        targetDurationMinutes: durationMinutes,
+        targetDurationMinutes: target,
+        clearTargetDurationMinutes: target == null,
       );
       return;
     }
@@ -213,7 +222,8 @@ class ExecutionController extends StateNotifier<ExecutionState> {
       taskId: id,
       taskLabel: label,
       readyToScore: false,
-      targetDurationMinutes: durationMinutes,
+      targetDurationMinutes: target,
+      clearTargetDurationMinutes: target == null,
     );
     _engine.restore(phase: ExecutionPhase.notStarted, elapsed: resumeElapsed);
   }

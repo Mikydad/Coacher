@@ -347,6 +347,12 @@ class HomeScreen extends ConsumerWidget {
                                 _uncompleteTaskFromHome(context, ref, row);
                               }
                             },
+                            onCheckboxLongPress: () => _completeTaskFromHome(
+                              context,
+                              ref,
+                              row,
+                              askPartial: true,
+                            ),
                             onPlansChanged: () =>
                                 _openPlansChangedFlow(context, ref, row),
                             onTap: () => Navigator.pushNamed(
@@ -1982,9 +1988,13 @@ class _TaskItem extends StatelessWidget {
     required this.onPlansChanged,
     this.onTap,
     this.checkboxKey,
+    this.onCheckboxLongPress,
   });
 
   final Key? checkboxKey;
+
+  /// Long-press on an unticked box: "Partly done" (score card).
+  final VoidCallback? onCheckboxLongPress;
   final String title;
   final String? subtitle;
   final bool done;
@@ -2003,14 +2013,17 @@ class _TaskItem extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         contentPadding: EdgeInsets.zero,
-        leading: Checkbox(
-          key: checkboxKey,
-          value: done,
-          onChanged: (value) {
-            if (value == null) return;
-            onCheckedChange(value);
-          },
-          activeColor: AppColors.accent,
+        leading: GestureDetector(
+          onLongPress: done ? null : onCheckboxLongPress,
+          child: Checkbox(
+            key: checkboxKey,
+            value: done,
+            onChanged: (value) {
+              if (value == null) return;
+              onCheckedChange(value);
+            },
+            activeColor: AppColors.accent,
+          ),
         ),
         title: Text(
           title,
@@ -2477,11 +2490,14 @@ int _partialForRows(List<PlannedTaskRow> rows, Map<String, int> scores) {
   return n;
 }
 
+/// [askPartial]: the checkbox long-press ("Partly done") — in flexible it
+/// opens the score card instead of the one-tap completion.
 Future<void> _completeTaskFromHome(
   BuildContext context,
   WidgetRef ref,
-  PlannedTaskRow row,
-) async {
+  PlannedTaskRow row, {
+  bool askPartial = false,
+}) async {
   final t = row.task;
   final routineForPolicy = await _routineForPlannedRow(ref, row);
   if (!context.mounted) return;
@@ -2512,7 +2528,8 @@ Future<void> _completeTaskFromHome(
         builder: (ctx) => AlertDialog(
           title: const Text('Timer required'),
           content: Text(
-            'This task requires a completed timer session before marking done.\n\nTask: ${t.title}',
+            'This task needs at least 1 minute of focus on the timer '
+            'before you can mark it done.\n\nTask: ${t.title}',
           ),
           actions: [
             TextButton(
@@ -2542,21 +2559,31 @@ Future<void> _completeTaskFromHome(
     }
   }
   if (!context.mounted) return;
-  // Ask for the completion rate — same score dialog the focus/timer flow
-  // uses, with the discipline-mode contract:
-  // flexible → dismissing the card (tap outside / back) accepts the default,
-  //   done at 100% (mis-taps are recoverable by unchecking the checkbox);
-  // disciplined → must submit a score (reason below 100%);
-  // extreme → must submit a score and a reason at any percentage.
-  final scoreResult =
-      await ScoreTaskDialog.show(
-        context,
-        taskTitle: t.title,
-        requireSubmit: mode == 'disciplined' || mode == 'extreme',
-        requireReasonAlways: mode == 'extreme',
-        reasonThresholdPercent: ScoreTaskDialog.reasonThresholdForMode(mode),
-      ) ??
-      const ScoreTaskDialogResult(completionPercent: 100, reason: null);
+  // Discipline-mode contract for checking a task off (2026-09-27):
+  // flexible → one tap = done at 100%, no card, with Undo; the long-press
+  //   ("Partly done") opens the score card, where Cancel changes nothing;
+  // disciplined → the score card (reason below its bar);
+  // extreme → the score card, reason at any percentage.
+  // In the strict modes "Leave without rating?" leaves the task unticked.
+  final strict = mode == 'disciplined' || mode == 'extreme';
+  final oneTap = !strict && !askPartial;
+  final ScoreTaskDialogResult scoreResult;
+  if (oneTap) {
+    scoreResult = const ScoreTaskDialogResult(
+      completionPercent: 100,
+      reason: null,
+    );
+  } else {
+    final asked = await ScoreTaskDialog.show(
+      context,
+      taskTitle: t.title,
+      requireSubmit: strict,
+      requireReasonAlways: mode == 'extreme',
+      reasonThresholdPercent: ScoreTaskDialog.reasonThresholdForMode(mode),
+    );
+    if (asked == null) return; // left without rating: nothing changes
+    scoreResult = asked;
+  }
   if (!context.mounted) return;
   final completionPercent = scoreResult.completionPercent;
   final isComplete = completionPercent >= 100;
@@ -2637,6 +2664,23 @@ Future<void> _completeTaskFromHome(
     );
     if (!context.mounted) return;
     invalidateTaskListProviders(ref);
+    // One tap: instant, quiet, reversible — "Done" with Undo, and no
+    // next-task dialog on top (it would cover Undo; Up next already shows
+    // what's next).
+    if (oneTap) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Done: ${t.title}'),
+            action: SnackBarAction(
+              label: 'Undo',
+              onPressed: () => _uncompleteTaskFromHome(context, ref, row),
+            ),
+          ),
+        );
+      return;
+    }
     // Only a full completion suggests the next task. On Home the suggestion is
     // dismissible (tap outside stays on Home) and never auto-opens Focus.
     if (isComplete) {

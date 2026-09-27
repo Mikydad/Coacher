@@ -4777,3 +4777,36 @@ not silent reversal.
   drops a "Goal:"/"Habit:" title prefix. Also: Up next omits the duration
   when a task has none (no "0m target"), and the Promise tile uses
   `bookmark_add` — the handshake is the Accountability tab's icon.
+
+- **2026-09-27 · Rating is never a trap; Flexible check-off is one tap.**
+  (1) Disciplined/Extreme score card: Save is still the only way to
+  *record*, but "Not now", tapping outside and Back ask **"Leave without
+  rating?"** (Rate it / Leave without rating). Leaving = flexible's
+  dismiss: worked time kept, no score, task stays open (timer → Focus
+  list, resume point kept; Home → stays unticked). Extreme's
+  accountability survives because the task stays unfinished. (2) Focus
+  **End under 1 minute asks "End session?"** (Keep going / End);
+  auto-stop at the planned duration never asks. (3) **Flexible Home
+  checkbox: one tap = done at 100%, no card**, "Done: X" snackbar with
+  **Undo** (reuses the uncheck path — like uncheck, it does not reverse
+  the reminder-completion or stored score); no next-task dialog after a
+  one-tap (it covered Undo; Up next shows what's next). **Long-press the
+  circle = "Partly done"** (score card, Cancel changes nothing). The old
+  "dismiss = 100%" is gone. Disciplined/Extreme Home check-off unchanged
+  apart from (1). *Deferred:* lighter strict-mode card (preset chips
+  instead of the slider).
+
+- **2026-09-27 · A task with no duration runs an open-ended timer.**
+  `ExecutionController.setTask` maps 0/null minutes to *no target* (and
+  clears the previous task's); the timer screen never auto-stops without
+  a positive target. Before, a 0-minute target auto-stopped the session
+  the instant Start was pressed and opened the score card (seen via
+  Extreme's "Timer required" → Start timer). Ending such a session asks
+  for a score as before (nothing to compute from).
+
+- **2026-09-27 · "Timer required" means at least 1 minute.**
+  `OverrideRules.hasSatisfiedMandatoryTimer` needs one ended task session
+  of ≥60s (`mandatoryTimerMinSeconds`), not >0s — a 2-second start/end
+  used to unlock Extreme/strict-required check-off. One session, not a
+  sum: resumed sessions already carry the earlier elapsed. The Home
+  dialog says "needs at least 1 minute of focus".

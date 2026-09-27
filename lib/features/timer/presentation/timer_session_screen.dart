@@ -107,6 +107,43 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
     }
   }
 
+  /// End pressed by hand. Under a minute in, ask first (Miko, 2026-09-27):
+  /// an accidental End at 0:25 stopped the timer and opened the rating
+  /// card. Auto-stop at the planned duration never asks.
+  Future<void> _confirmThenStop({required String activeLabel}) async {
+    final latest = ref.read(executionControllerProvider);
+    final elapsed = latest.elapsed;
+    if (latest.phase != ExecutionPhase.finished &&
+        elapsed < const Duration(minutes: 1)) {
+      final seconds = elapsed.inSeconds;
+      final end = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('End session?'),
+          content: Text(
+            "You've focused for $seconds "
+            '${seconds == 1 ? 'second' : 'seconds'}.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('End'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep going'),
+            ),
+          ],
+        ),
+      );
+      if (end != true || !mounted) return;
+    }
+    await _handleStopFlow(
+      execState: ref.read(executionControllerProvider),
+      activeLabel: activeLabel,
+    );
+  }
+
   Future<void> _handleStopFlow({
     required ExecutionState execState,
     required String activeLabel,
@@ -145,8 +182,10 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
       // Discipline-mode contract for the post-session rating:
       // flexible → dismissible; dismissing keeps the worked time, records
       //   no score, and returns to the Focus page;
-      // disciplined → must submit a score (reason below its 90% bar);
-      // extreme → must submit a score AND a reason at any percentage.
+      // disciplined → a score to record one (reason below its 90% bar);
+      // extreme → a score AND a reason at any percentage.
+      // Strict modes can still leave after a "Leave without rating?" check
+      // (2026-09-27) — same outcome as flexible's dismiss.
       final mode = await effectiveModeRefIdForTaskId(ref, execState.taskId);
       if (!mounted) return;
       final ScoreTaskDialogResult? result;
@@ -163,6 +202,9 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
           requireReasonAlways: mode == 'extreme',
           initialPercent: computedPercent ?? 100,
           reasonThresholdPercent: ScoreTaskDialog.reasonThresholdForMode(mode),
+          leaveMessage:
+              "Your focus time is saved. The task stays open — it isn't "
+              'marked done. Start it again to pick up where you left off.',
         );
       }
       if (!mounted) return;
@@ -405,9 +447,11 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
         execState.phase == ExecutionPhase.notStarted &&
         !_autoStartCancelled &&
         (_remainingAutoStartSeconds ?? 0) > 0;
+    // No target (or a 0 one, e.g. from an older runtime cache) = open-ended:
+    // never auto-stop at 0:00.
     final targetDuration =
         execState.targetType == TimerSessionTargetType.task &&
-            execState.targetDurationMinutes != null
+            (execState.targetDurationMinutes ?? 0) > 0
         ? Duration(minutes: execState.targetDurationMinutes!)
         : null;
     final shouldAutoStop =
@@ -603,10 +647,8 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
                               execState.phase == ExecutionPhase.notStarted ||
                                   _isHandlingStopFlow
                               ? null
-                              : () => _handleStopFlow(
-                                  execState: execState,
-                                  activeLabel: activeLabel,
-                                ),
+                              : () =>
+                                    _confirmThenStop(activeLabel: activeLabel),
                           icon: const Icon(Icons.stop_circle_outlined),
                           label: Text(
                             _isHandlingStopFlow ? 'Saving...' : 'End',
