@@ -3,8 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/presentation/app_colors.dart';
-import '../../../core/presentation/page_headers.dart';
+import '../../timer/presentation/focus_stage.dart';
 import '../application/stake_goal_check_in_bridge.dart';
 import '../application/stakes_providers.dart';
 import '../domain/models/stake_challenge.dart';
@@ -108,105 +107,71 @@ class _StakeTimerScreenState extends ConsumerState<StakeTimerScreen> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _stopAndSave();
       },
-      child: Scaffold(
-        appBar: AppBar(centerTitle: true, title: const PageTitle('Focus')),
-        body: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              const Spacer(),
-              SizedBox(
-                width: 220,
-                height: 220,
-                child: Stack(
-                  fit: StackFit.expand,
-                  alignment: Alignment.center,
-                  children: [
-                    CircularProgressIndicator(
-                      value: progress,
-                      strokeWidth: 7,
-                      backgroundColor: AppColors.fg12,
-                      color: metMercy
-                          ? AppColors.statusGreen
-                          : AppColors.accent,
-                    ),
-                    Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _format(_elapsed),
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 44,
-                              fontWeight: FontWeight.w700,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            'of $target min · counts from $mercy',
-                            style: TextStyle(
-                              color: AppColors.textSoft,
-                              fontSize: 12.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+      child: FocusStageScaffold(
+        title: 'Focus',
+        body: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight - 32,
               ),
-              const SizedBox(height: 28),
-              Text(
-                widget.challenge.frozenGoal.title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              Row(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _saving
-                          ? null
-                          : _running
-                          ? _pause
-                          : _start,
-                      child: Text(
-                        _running
+                  const SizedBox(height: 8),
+                  FocusRing(
+                    size: focusRingSize(constraints),
+                    progress: progress,
+                    timeText: _format(_elapsed),
+                    statusLabel: _running
+                        ? 'Focus'
+                        : _elapsed == Duration.zero
+                        ? 'Ready'
+                        : 'Paused',
+                    statusIcon: !_running && _elapsed > Duration.zero
+                        ? Icons.pause_rounded
+                        : Icons.track_changes_rounded,
+                    chipLabel: 'of $target min · counts from $mercy',
+                    color: metMercy ? FocusColors.success : null,
+                    dimmed: !_running && _elapsed > Duration.zero,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 28),
+                    child: FocusControls(
+                      primary: FocusRoundButton(
+                        primary: true,
+                        icon: _running
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        label: _running
                             ? 'Pause'
                             : _elapsed == Duration.zero
                             ? 'Start'
                             : 'Resume',
+                        onPressed: _saving
+                            ? null
+                            : _running
+                            ? _pause
+                            : _start,
+                      ),
+                      secondary: FocusRoundButton(
+                        icon: Icons.check_rounded,
+                        label: 'Finish & record',
+                        busy: _saving,
+                        onPressed: _saving || _elapsed == Duration.zero
+                            ? null
+                            : _stopAndSave,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: _saving || _elapsed == Duration.zero
-                          ? null
-                          : _stopAndSave,
-                      child: _saving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.4,
-                              ),
-                            )
-                          : const Text('Finish & record'),
-                    ),
+                  FocusWorkingOnCard(
+                    title: widget.challenge.frozenGoal.title,
+                    icon: Icons.flag_outlined,
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),

@@ -335,6 +335,46 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
             ),
           ],
         ),
+        // Start Focus is pinned below the list (Miko, 2026-09-27): with a
+        // long list, tapping a task meant scrolling to the very bottom to
+        // start it.
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(60),
+                backgroundColor: hasRunningTask
+                    ? AppColors.dark2B2D31
+                    : AppColors.accent,
+                foregroundColor: hasRunningTask
+                    ? AppColors.fg
+                    : AppColors.onAccent,
+              ),
+              onPressed: hasRunningTask
+                  ? () => Navigator.pushNamed(
+                      context,
+                      TimerSessionScreen.routeName,
+                    )
+                  : _quickBusy
+                  ? null
+                  : _hasQuickText
+                  // Field has text → start the typed task (duration → timer).
+                  ? () => _onStartFocusPressed(const [])
+                  // Field empty → keep today's list-selection behaviour.
+                  : taskList.maybeWhen(
+                      data: (tasks) =>
+                          () => _onStartFocusPressed(tasks),
+                      orElse: () => null,
+                    ),
+              child: Text(
+                hasRunningTask ? 'Running Focus' : 'Start Focus',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ),
         body: KeyboardDismissOnTap(
           child: ListView(
             padding: const EdgeInsets.all(16),
@@ -451,38 +491,6 @@ class _FocusSelectionScreenState extends ConsumerState<FocusSelectionScreen> {
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 24),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(60),
-                  backgroundColor: hasRunningTask
-                      ? AppColors.dark2B2D31
-                      : AppColors.accent,
-                  foregroundColor: hasRunningTask
-                      ? AppColors.fg
-                      : AppColors.onAccent,
-                ),
-                onPressed: hasRunningTask
-                    ? () => Navigator.pushNamed(
-                        context,
-                        TimerSessionScreen.routeName,
-                      )
-                    : _quickBusy
-                    ? null
-                    : _hasQuickText
-                    // Field has text → start the typed task (duration → timer).
-                    ? () => _onStartFocusPressed(const [])
-                    // Field empty → keep today's list-selection behaviour.
-                    : taskList.maybeWhen(
-                        data: (tasks) =>
-                            () => _onStartFocusPressed(tasks),
-                        orElse: () => null,
-                      ),
-                child: Text(
-                  hasRunningTask ? 'Running Focus' : 'Start Focus',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
               ),
             ],
           ),

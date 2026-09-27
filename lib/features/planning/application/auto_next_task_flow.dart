@@ -21,7 +21,7 @@ import 'planned_task_providers.dart';
 import 'task_prioritizer.dart';
 import '../../../core/presentation/app_colors.dart';
 
-enum NextTaskDecision { startNow, extraTime, moveWithReason }
+enum NextTaskDecision { startNow, extraTime }
 
 PlannedTaskRow? pickNextAutoTaskFromPrioritized(
   Iterable<PrioritizedTaskRow> prioritized, {
@@ -89,43 +89,43 @@ Future<void> runAutoNextTaskFlow(
         : 'Heads up: overlaps ${overlaps.length} upcoming habit anchors.';
   }
   final conflictText = conflictNotice;
+  // "Not now" (Miko, 2026-09-27) replaced "Move to later": after finishing
+  // a task the user must be able to just stop — a fourth button would
+  // crowd the dialog, and moving a task stays one tap away on Home / task
+  // detail. Not now, tapping outside and Back all return null: nothing
+  // changes and the timer screen lands on the Focus list.
   final decision = await showDialog<NextTaskDecision>(
     context: context,
-    barrierDismissible: false,
-    builder: (ctx) => PopScope(
-      canPop: false,
-      child: AlertDialog(
-        title: const Text('Start next task?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Next up: ${selectedNext.task.title}'),
-            if (conflictText != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                conflictText,
-                style: const TextStyle(fontSize: 12, color: Colors.amberAccent),
-              ),
-            ],
+    builder: (ctx) => AlertDialog(
+      title: const Text('Start next task?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Next up: ${selectedNext.task.title}'),
+          if (conflictText != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              conflictText,
+              style: const TextStyle(fontSize: 12, color: Colors.amberAccent),
+            ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () =>
-                Navigator.pop(ctx, NextTaskDecision.moveWithReason),
-            child: const Text('Move to later'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, NextTaskDecision.extraTime),
-            child: const Text('Need extra time'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, NextTaskDecision.startNow),
-            child: const Text('Start now'),
-          ),
         ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Not now'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, NextTaskDecision.extraTime),
+          child: const Text('Need extra time'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, NextTaskDecision.startNow),
+          child: const Text('Start now'),
+        ),
+      ],
     ),
   );
   if (!context.mounted || decision == null) return;
@@ -171,17 +171,6 @@ Future<void> runAutoNextTaskFlow(
       return;
     case NextTaskDecision.extraTime:
       final handled = await _handleExtraTime(context, ref, row: selectedNext);
-      if (!context.mounted) return;
-      if (handled) {
-        await _returnToFocusList(context, ref);
-      }
-      return;
-    case NextTaskDecision.moveWithReason:
-      final handled = await _handleMoveWithReason(
-        context,
-        ref,
-        row: selectedNext,
-      );
       if (!context.mounted) return;
       if (handled) {
         await _returnToFocusList(context, ref);
@@ -481,166 +470,6 @@ _promptExtensionRequest(
         ),
       );
   return result;
-}
-
-Future<bool> _handleMoveWithReason(
-  BuildContext context,
-  WidgetRef ref, {
-  required PlannedTaskRow row,
-}) async {
-  final reasons = OverrideReasonCategory.values;
-  OverrideReasonCategory selectedReason = reasons.first;
-  var noteText = '';
-  String? errorText;
-  final choice =
-      await showDialog<({OverrideReasonCategory reason, String note})>(
-        context: context,
-        builder: (ctx) => StatefulBuilder(
-          builder: (ctx, setState) {
-            return AlertDialog(
-              title: const Text('Move task with reason'),
-              content: SingleChildScrollView(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(ctx).size.height * 0.6,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      DropdownButtonFormField<OverrideReasonCategory>(
-                        initialValue: selectedReason,
-                        items: [
-                          for (final r in reasons)
-                            DropdownMenuItem(value: r, child: Text(r.label)),
-                        ],
-                        onChanged: (v) =>
-                            setState(() => selectedReason = v ?? reasons.first),
-                        decoration: const InputDecoration(
-                          labelText: 'Reason category',
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        textCapitalization: TextCapitalization.sentences,
-                        maxLines: 2,
-                        onChanged: (v) => noteText = v,
-                        decoration: const InputDecoration(
-                          labelText: 'Logical reason (1-2 sentences)',
-                          hintText:
-                              'Explain why this move is the best decision now.',
-                        ),
-                      ),
-                      if (errorText != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            errorText!,
-                            style: const TextStyle(
-                              color: Colors.redAccent,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    final note = noteText.trim();
-                    try {
-                      FlowTransitionEvent.validateReasonNote(note);
-                    } catch (_) {
-                      setState(
-                        () =>
-                            errorText = 'Give a clear reason in 1-2 sentences.',
-                      );
-                      return;
-                    }
-                    Navigator.pop(ctx, (reason: selectedReason, note: note));
-                  },
-                  child: const Text('Move task'),
-                ),
-              ],
-            );
-          },
-        ),
-      );
-  if (choice == null) return false;
-
-  final t = row.task;
-  final planning = ref.read(planningRepositoryProvider);
-  final moved = PlannedTask(
-    id: t.id,
-    routineId: t.routineId,
-    blockId: t.blockId,
-    title: t.title,
-    durationMinutes: t.durationMinutes,
-    priority: t.priority,
-    orderIndex: t.orderIndex,
-    reminderEnabled: t.reminderEnabled,
-    reminderTimeIso: t.reminderTimeIso,
-    status: t.status,
-    createdAtMs: t.createdAtMs,
-    updatedAtMs: DateTime.now().millisecondsSinceEpoch,
-    category: t.category,
-    planDateKey: t.planDateKey ?? row.dateKey,
-    notes: _appendMoveReason(
-      existing: t.notes,
-      reason: choice.reason,
-      explanation: choice.note,
-    ),
-    sequenceIndex: (t.sequenceIndex ?? t.orderIndex) + 1000,
-    isHabitAnchor: t.isHabitAnchor,
-    strictModeRequired: t.strictModeRequired,
-    modeRefId: t.modeRefId,
-  );
-  await planning.upsertTask(moved);
-  await planning.logFlowTransitionEvent(
-    FlowTransitionEvent(
-      id: StableId.generate('flowev'),
-      taskId: t.id,
-      type: FlowTransitionType.moveWithReason,
-      planChangeIntent: PlanChangeIntent.logical,
-      reasonCategory: choice.reason,
-      reasonNote: choice.note,
-      createdAtMs: DateTime.now().millisecondsSinceEpoch,
-    ),
-  );
-  await ref.read(reminderSyncServiceProvider).markLogicalReasonProvided(t.id);
-  // migrated to coordinator
-  await ScheduleMutationCoordinator.instance.run(
-    TaskDeferredMutation(
-      entityId: t.id,
-      sourceContext: 'auto_next_task_flow.defer',
-      fromDateStr: t.planDateKey ?? DateKeys.todayKey(),
-      toDateStr: DateKeys.todayKey(),
-    ),
-    commitOverride: () async {},
-  );
-  if (!context.mounted) return false;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text('Moved "${t.title}" to later: ${choice.reason.label}.'),
-    ),
-  );
-  return true;
-}
-
-String _appendMoveReason({
-  required String? existing,
-  required OverrideReasonCategory reason,
-  required String explanation,
-}) {
-  final stamp = DateTime.now().toIso8601String();
-  final entry = '[Moved $stamp] ${reason.label}: $explanation';
-  if (existing == null || existing.trim().isEmpty) return entry;
-  return '$existing\n$entry';
 }
 
 String _appendExtraTimeNote({

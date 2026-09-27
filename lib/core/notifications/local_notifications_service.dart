@@ -4,6 +4,9 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart'
     hide InterruptionLevel;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'
+    as fln
+    show InterruptionLevel;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -297,6 +300,40 @@ class LocalNotificationsService
       payload: payload,
     );
     await _indexNotificationTaskMapping(id: id, payload: payload);
+  }
+
+  /// A one-shot that only surfaces while the app is NOT in the foreground
+  /// (the focus "time's up" alert): the timer screen celebrates in-app, so
+  /// a banner on top of it would say the same thing twice. Plain sound, no
+  /// actions, no payload — a tap just opens the app where it was. Not in
+  /// the reminder ledger (it is not a reminder); reconciliation's phantom
+  /// sweep may clear it from the tray once the app is open, which is fine.
+  Future<void> scheduleWhenAway({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime when,
+  }) async {
+    await _plugin.zonedSchedule(
+      id,
+      title,
+      body,
+      tz.TZDateTime.from(_normalizeScheduleTime(when), tz.local),
+      NotificationDetails(
+        android: NotificationPresentation.android(
+          InterruptionLevel.medium,
+          silent: false,
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: false,
+          presentBanner: false,
+          presentList: false,
+          presentSound: false,
+          interruptionLevel: fln.InterruptionLevel.active,
+        ),
+      ),
+      androidScheduleMode: NotificationPresentation.scheduleMode,
+    );
   }
 
   /// Immediate one-shot notification (no scheduling) — e.g. a challenge

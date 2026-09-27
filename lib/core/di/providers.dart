@@ -14,6 +14,7 @@ import '../../features/planning/application/routine_mode_policy_resolver.dart';
 import '../../features/planning/data/isar_planning_repository.dart';
 import '../../features/planning/data/planning_repository.dart';
 import '../../features/execution/application/execution_controller.dart';
+import '../../features/execution/application/focus_end_alert.dart';
 import '../../features/time_tracker/application/time_tracker_providers.dart';
 import '../../features/execution/data/execution_repository.dart';
 import '../../features/execution/data/timer_runtime_cache.dart';
@@ -72,9 +73,8 @@ final localNotificationsServiceProvider = Provider<LocalNotificationsService>(
 /// Guard against iOS's 64-pending-local-notification cap — consulted by the
 /// AttentionOrchestrator before scheduling any future notification.
 final notificationBudgetProvider = Provider<NotificationBudget>(
-  (ref) => NotificationBudget(
-    pending: ref.read(localNotificationsServiceProvider),
-  ),
+  (ref) =>
+      NotificationBudget(pending: ref.read(localNotificationsServiceProvider)),
 );
 final offlineStoreProvider = Provider<OfflineStore>(
   (ref) => OfflineStore.instance,
@@ -123,6 +123,7 @@ final executionControllerProvider =
         initialTaskId: ref.read(activeExecutionTaskIdProvider),
         initialTaskLabel: ref.read(activeExecutionTaskLabelProvider),
         activityEvents: ref.read(activityEventRepositoryProvider),
+        endAlert: const LocalFocusEndAlert(),
       );
     });
 
@@ -155,7 +156,8 @@ final reminderOccurrenceServiceProvider = Provider<ReminderOccurrenceService>(
 /// stream — never an invalidate-and-refetch; the local write IS the update.
 final unresolvedReminderOccurrencesProvider =
     StreamProvider<List<ReminderOccurrence>>(
-      (ref) => ref.watch(reminderOccurrenceRepositoryProvider).watchUnresolved(),
+      (ref) =>
+          ref.watch(reminderOccurrenceRepositoryProvider).watchUnresolved(),
     );
 
 /// Arms compiled ladders ([L-PRE], FR-R-30…34).

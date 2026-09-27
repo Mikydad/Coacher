@@ -12,6 +12,7 @@ import '../data/execution_repository.dart';
 import '../data/timer_runtime_cache.dart';
 import '../domain/models/timer_session.dart';
 import '../domain/task_timer_engine.dart';
+import 'focus_end_alert.dart';
 
 class ExecutionState {
   const ExecutionState({
@@ -84,6 +85,9 @@ class ExecutionController extends StateNotifier<ExecutionState> {
     /// activity event on start and writes its explicit end on stop. Null
     /// keeps the controller byte-identical for tests and the no-op harness.
     this.activityEvents,
+
+    /// The "time's up" notification (2026-09-27). Null in tests.
+    this.endAlert,
   }) : _engine = TaskTimerEngine(),
        super(
          ExecutionState(
@@ -147,6 +151,7 @@ class ExecutionController extends StateNotifier<ExecutionState> {
   final TimerRuntimeCache runtimeCache;
   final FocusResumeStore resumeStore;
   final ActivityEventRepository? activityEvents;
+  final FocusEndAlertPort? endAlert;
   final TaskTimerEngine _engine;
 
   /// The activity event opened by [start] for this session (Time Tracker).
@@ -215,8 +220,10 @@ class ExecutionController extends StateNotifier<ExecutionState> {
         targetDurationMinutes: target,
         clearTargetDurationMinutes: target == null,
       );
+      if (state.phase == ExecutionPhase.inProgress) _armEndAlert();
       return;
     }
+    unawaited(endAlert?.disarm());
     state = state.copyWith(
       targetType: TimerSessionTargetType.task,
       taskId: id,
@@ -236,11 +243,38 @@ class ExecutionController extends StateNotifier<ExecutionState> {
       readyToScore: false,
       clearTargetDurationMinutes: true,
     );
+    unawaited(endAlert?.disarm());
     _engine.restore(phase: ExecutionPhase.notStarted, elapsed: Duration.zero);
+  }
+
+  /// Schedules the "time's up" notification for the remaining time. Reads
+  /// `state.elapsed` BEFORE the engine starts/resumes (the engine's stream
+  /// updates state asynchronously). No target (open-ended) = nothing to
+  /// announce.
+  void _armEndAlert() {
+    final alert = endAlert;
+    if (alert == null) return;
+    final target = state.targetDurationMinutes;
+    if (state.targetType != TimerSessionTargetType.task ||
+        target == null ||
+        target <= 0) {
+      unawaited(alert.disarm());
+      return;
+    }
+    final remaining = Duration(minutes: target) - state.elapsed;
+    if (remaining <= Duration.zero) return;
+    unawaited(
+      alert.arm(
+        taskLabel: state.taskLabel,
+        targetMinutes: target,
+        at: DateTime.now().add(remaining),
+      ),
+    );
   }
 
   void start() {
     final fresh = state.phase == ExecutionPhase.notStarted;
+    if (fresh) _armEndAlert();
     _engine.start();
     // A fresh start (not a resume) is a real "I'm doing this now" moment —
     // log it. Isar write, milliseconds; the timer UI never waits on it.
@@ -279,11 +313,19 @@ class ExecutionController extends StateNotifier<ExecutionState> {
     }
   }
 
-  void pause() => _engine.pause();
-  void resume() => _engine.resume();
+  void pause() {
+    _engine.pause();
+    unawaited(endAlert?.disarm());
+  }
+
+  void resume() {
+    if (state.phase == ExecutionPhase.paused) _armEndAlert();
+    _engine.resume();
+  }
 
   Future<void> stopAndPersist() async {
     final snapshot = _engine.stop();
+    unawaited(endAlert?.disarm());
     final now = DateTime.now().millisecondsSinceEpoch;
     final session = switch (state.targetType) {
       TimerSessionTargetType.task => TimerSession(

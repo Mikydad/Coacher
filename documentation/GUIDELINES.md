@@ -4810,3 +4810,41 @@ not silent reversal.
   used to unlock Extreme/strict-required check-off. One session, not a
   sum: resumed sessions already carry the earlier elapsed. The Home
   dialog says "needs at least 1 minute of focus".
+
+- **2026-09-27 · Timer screens are an always-dark "stage".** The Focus
+  session and the accountability (stake) timer share
+  `lib/features/timer/presentation/focus_stage.dart`: navy gradient,
+  glowing progress ring with the time inside, one big lime round primary
+  (Start/Pause/Resume) with a quiet round secondary beside it (End /
+  Finish & record), and a "Working on" card. Look only — behavior,
+  flows and copy of the actions are unchanged. Always dark in both theme
+  modes (a session should feel like a different place); tokens alias
+  `AppPalette.dark` directly like `OnboardingColors`. Lime accent, not the
+  reference's purple; gradient only, no scenery. The ring counts **up**;
+  no target = faint track + "No time limit". Explicitly *not* adopted from
+  the reference: break modes, focus sounds, end-sound picker, restart.
+
+- **2026-09-27 · Finishing a focus task celebrates; "time's up" reaches
+  you when away.** (1) A session that ends at **100%** (auto-stop at the
+  target, or rated 100%) turns the timer stage into a celebration — ring
+  closes, check pops, confetti burst, success haptic, "Task done! · N min
+  of focus" — and the flow (recovery sheet, "Start next task?") waits for
+  **Continue** (Back = Continue). Partial ends get a quiet snackbar
+  ("Saved: 60% done · 15 min of focus"); no burst. After End, the stage
+  says "Session ended" and Start is off. (2) `ExecutionController` arms a
+  local notification for the remaining time on start/resume
+  (`FocusEndAlertPort`, fixed id), disarms on pause/stop/task switch;
+  open-ended sessions never arm. It is **foreground-silent** on iOS (the
+  in-app celebration is the moment there), plain sound, no actions, no
+  payload, not in the reminder ledger. Stake timer unchanged.
+
+- **2026-09-27 · "Start next task?" = Not now · Need extra time · Start
+  now.** "Not now" replaced "Move to later" (three buttons, not four);
+  tapping outside / Back also mean Not now. Nothing changes and the timer
+  lands on the Focus list. Moving a task later stays available on Home and
+  task detail. `NextTaskDecision.moveWithReason` and its dialog code were
+  removed from the auto-next flow.
+
+- **2026-09-27 · Focus list: Start Focus is pinned** to the bottom of the
+  screen (Scaffold `bottomNavigationBar`), so a tapped task can be started
+  without scrolling past the whole list.
