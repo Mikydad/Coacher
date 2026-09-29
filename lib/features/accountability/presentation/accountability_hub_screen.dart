@@ -5,6 +5,8 @@ import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../../ai_assistant/presentation/widgets/coach_ai_fab.dart';
+import '../../education/domain/page_explainers.dart';
+import '../../education/presentation/page_explainer_sheet.dart';
 import '../application/points_providers.dart';
 import '../application/stake_action_items.dart';
 import '../application/stake_seen_store.dart';
@@ -30,7 +32,18 @@ class AccountabilityHubScreen extends ConsumerWidget {
       appBar: AppBar(
         centerTitle: true,
         title: const PageTitle('Accountability'),
-        actions: [_PointsChip(onTap: () => _showLedger(context, ref))],
+        actions: [
+          IconButton(
+            onPressed: () => showPageExplainer(
+              context,
+              PageExplainers.accountability,
+              fromHelp: true,
+            ),
+            tooltip: 'About this page',
+            icon: const Icon(Icons.help_outline_rounded, size: 20),
+          ),
+          _PointsChip(onTap: () => _showLedger(context, ref)),
+        ],
       ),
       body: challengesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),

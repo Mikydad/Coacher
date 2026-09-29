@@ -4848,3 +4848,31 @@ not silent reversal.
 - **2026-09-27 · Focus list: Start Focus is pinned** to the bottom of the
   screen (Scaffold `bottomNavigationBar`), so a tapped task can be started
   without scrolling past the whole list.
+
+- **2026-09-28 · Concept pages get a one-page illustrated explainer, not
+  a carousel.** `PageExplainers` (education/domain) holds five: Stakes
+  (Accountability tab), Groups (Community tab), Direction, Strictness,
+  Coach. Shape is fixed: painted "blob" scene (`ExplainerSceneView`,
+  CustomPainter, AppColors only) → title → one line → first-person
+  example → three icon steps → one small psychology line → optional video
+  row → one primary button + "Maybe later". Copy is plain and short on
+  purpose (Miko: "small but simple"); the `why` line uses established
+  ideas only (loss aversion, being seen by people you know) — no invented
+  statistics. **Auto-shows** only on Accountability, Groups and Direction
+  (`FirstVisitExplainer`: page visible + route on top + no tour running,
+  450 ms after draw, each page once — no per-session cap (2026-09-29),
+  marked seen when it opens,
+  device-level in the education seen-set as `explainer:<id>`). Strictness
+  and Coach show it only from their `?`. Any `?` whose guide has an
+  explainer opens the explainer; "More details" there opens the long
+  guide sheet (`showGuideSheet`). Groups' inline first-time card was
+  removed (the sheet replaces it). **Videos**: Remote Config
+  `explainer_videos_v1` = JSON `{explainerId: url}`, read synchronously
+  (never waits on the network); no URL → no row; opens via `url_launcher`.
+
+- **2026-09-29 · The guided first-task tour is off.** Miko: new users no
+  longer get the Getting Started spotlight (tap Add Task → name → save →
+  tap the circle → progress). `kGettingStartedTourEnabled = false` in
+  `getting_started_controller.dart`; the controller goes straight to
+  hidden and writes no onboarding verdict, so flipping the flag back on
+  still judges each account fresh. Code and tests kept on purpose.

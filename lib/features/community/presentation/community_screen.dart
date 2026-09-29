@@ -1,4 +1,3 @@
-import '../../education/presentation/first_time_feature_card.dart';
 import '../../education/presentation/help_dot.dart';
 import '../../../core/firebase/firestore_paths.dart';
 import 'package:flutter/material.dart';
@@ -76,19 +75,16 @@ class CommunityScreen extends ConsumerWidget {
                   onRefresh: () async => invalidateCircleScopedProviders(ref),
                   child: ListView.separated(
                     padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-                    // Index 0 is the once-only intro card.
-                    itemCount: circles.length + 1,
+                    itemCount: circles.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) => i == 0
-                        ? const FirstTimeFeatureCard(guideId: 'circles')
-                        : _MyCircleCard(
-                            circle: circles[i - 1],
-                            onTap: () => Navigator.pushNamed(
-                              context,
-                              CircleDetailScreen.routeName,
-                              arguments: circles[i - 1].id,
-                            ),
-                          ),
+                    itemBuilder: (_, i) => _MyCircleCard(
+                      circle: circles[i],
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        CircleDetailScreen.routeName,
+                        arguments: circles[i].id,
+                      ),
+                    ),
                   ),
                 );
               },
@@ -241,8 +237,6 @@ class _DiscoverCirclesState extends ConsumerWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
-            const FirstTimeFeatureCard(guideId: 'circles'),
-            const SizedBox(height: 24),
             const _DiscoverHeader(),
             const SizedBox(height: 40),
             Center(
@@ -261,8 +255,6 @@ class _DiscoverCirclesState extends ConsumerWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             children: [
-              const FirstTimeFeatureCard(guideId: 'circles'),
-              const SizedBox(height: 24),
               const _DiscoverHeader(),
               const SizedBox(height: 40),
               Text(
@@ -274,17 +266,14 @@ class _DiscoverCirclesState extends ConsumerWidget {
           ),
         ),
         data: (circles) {
-          final itemCount = circles.isEmpty ? 3 : circles.length + 2;
+          final itemCount = circles.isEmpty ? 2 : circles.length + 1;
           return ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             itemCount: itemCount,
             separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (_, i) {
-              if (i == 0) {
-                return const FirstTimeFeatureCard(guideId: 'circles');
-              }
-              if (i == 1) return const _DiscoverHeader();
+              if (i == 0) return const _DiscoverHeader();
               if (circles.isEmpty) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24),
@@ -295,7 +284,7 @@ class _DiscoverCirclesState extends ConsumerWidget {
                   ),
                 );
               }
-              final circle = circles[i - 2];
+              final circle = circles[i - 1];
               final isJoined =
                   joinedIds.contains(circle.id) ||
                   (currentUid.isNotEmpty && circle.creatorId == currentUid);

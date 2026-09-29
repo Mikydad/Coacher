@@ -5,10 +5,23 @@ import '../../../core/presentation/app_colors.dart';
 import '../../ai_assistant/presentation/ai_assistant_screen.dart';
 import '../domain/feature_guide.dart';
 import '../domain/feature_guides.dart';
+import '../domain/page_explainers.dart';
+import 'page_explainer_sheet.dart';
 
-/// Opens the styled help sheet for any page guide or element topic.
+/// Opens help for any page guide or element topic. A topic with an
+/// illustrated [PageExplainer] opens that (it links on to the long guide
+/// via "More details"); everything else opens the guide sheet directly.
 /// Unknown ids are a silent no-op so a stale HelpDot can never crash.
 Future<void> showHelpSheet(BuildContext context, String guideId) {
+  final explainer = PageExplainers.forGuide(guideId);
+  if (explainer != null) {
+    return showPageExplainer(context, explainer, fromHelp: true);
+  }
+  return showGuideSheet(context, guideId);
+}
+
+/// The long-form guide sheet: what, why, how, tips, Ask Coach.
+Future<void> showGuideSheet(BuildContext context, String guideId) {
   final guide = FeatureGuides.byId(guideId);
   if (guide == null) return Future.value();
   return showModalBottomSheet<void>(

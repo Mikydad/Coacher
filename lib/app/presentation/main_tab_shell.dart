@@ -11,6 +11,8 @@ import '../../features/analytics/application/focus_providers.dart';
 import '../../features/auth/presentation/widgets/email_verification_banner.dart';
 import '../../features/community/presentation/community_screen.dart';
 import '../../features/context_override/domain/models/interruption_level.dart';
+import '../../features/education/domain/page_explainers.dart';
+import '../../features/education/presentation/first_visit_explainer.dart';
 import '../../features/goals/presentation/goal_selection_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/onboarding/presentation/onboarding_handoff_bridge.dart';
@@ -79,8 +81,20 @@ class MainTabShell extends ConsumerWidget {
               children: const [
                 MainTabInset(child: HomeScreen()),
                 MainTabInset(child: GoalSelectionScreen()),
-                MainTabInset(child: AccountabilityHubScreen()),
-                MainTabInset(child: CommunityScreen()),
+                MainTabInset(
+                  child: FirstVisitExplainer(
+                    explainer: PageExplainers.accountability,
+                    tabIndex: MainTabIndex.accountability,
+                    child: AccountabilityHubScreen(),
+                  ),
+                ),
+                MainTabInset(
+                  child: FirstVisitExplainer(
+                    explainer: PageExplainers.groups,
+                    tabIndex: MainTabIndex.community,
+                    child: CommunityScreen(),
+                  ),
+                ),
                 MainTabInset(child: ProfileScreen()),
               ],
             ),

@@ -30,6 +30,8 @@ import '../features/education/presentation/getting_started_tour.dart';
 import '../features/feedback/presentation/tester_bug_bubble.dart';
 import '../features/memory/presentation/memory_knowledge_screen.dart';
 import '../features/direction/presentation/direction_screen.dart';
+import '../features/education/domain/page_explainers.dart';
+import '../features/education/presentation/first_visit_explainer.dart';
 import '../features/time_tracker/presentation/time_screen.dart';
 import '../features/time_tracker/presentation/track_sheet_host_screen.dart';
 import '../features/profile/presentation/default_enforcement_mode_selection_screen.dart';
@@ -229,7 +231,10 @@ class CoachForLifeApp extends ConsumerWidget {
         CoachingStyleSelectionScreen.routeName: (_) =>
             const CoachingStyleSelectionScreen(),
         MemoryKnowledgeScreen.routeName: (_) => const MemoryKnowledgeScreen(),
-        DirectionScreen.routeName: (_) => const DirectionScreen(),
+        DirectionScreen.routeName: (_) => const FirstVisitExplainer(
+          explainer: PageExplainers.direction,
+          child: DirectionScreen(),
+        ),
         TimeScreen.routeName: (_) => const TimeScreen(),
         TrackSheetHostScreen.routeName: (_) => const TrackSheetHostScreen(),
         // ── Coach AI ──────────────────────────────────────────────────────

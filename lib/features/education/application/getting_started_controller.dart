@@ -39,6 +39,12 @@ enum TourStep {
 
 enum TourStatus { loading, hidden, active }
 
+/// The guided first-task tour is OFF (decision 2026-09-29, Miko): new users
+/// land on Home without the spotlight. The code stays so it can be turned
+/// back on by flipping this. While off, no onboarding verdict is written,
+/// so turning it on later still judges each account fresh.
+const bool kGettingStartedTourEnabled = false;
+
 class GettingStartedState {
   const GettingStartedState({
     required this.status,
@@ -85,6 +91,7 @@ class GettingStartedController extends StateNotifier<GettingStartedState> {
     Future<bool> Function()? hasExistingDataProbe,
     int Function()? streakReader,
     Future<void> Function(String uid)? awaitReady,
+    this.enabled = true,
     Duration celebrateFor = const Duration(milliseconds: 3500),
     Duration titleSettleFor = const Duration(milliseconds: 1800),
   }) : _uid = uid,
@@ -104,6 +111,9 @@ class GettingStartedController extends StateNotifier<GettingStartedState> {
 
   final EducationPrefs _prefs;
   final String? _uid;
+
+  /// False → the tour never starts ([kGettingStartedTourEnabled]).
+  final bool enabled;
   final Future<bool> Function() _hasExistingDataProbe;
   final Future<void> Function(String uid) _awaitReady;
   final int Function()? _streakReader;
@@ -153,8 +163,9 @@ class GettingStartedController extends StateNotifier<GettingStartedState> {
   Future<void> _init() async {
     final uid = _uid;
     // Signed out: nothing to judge, nothing to persist. The provider
-    // rebuilds with the uid once someone signs in.
-    if (uid == null) {
+    // rebuilds with the uid once someone signs in. Disabled: same — hidden,
+    // and no verdict recorded.
+    if (uid == null || !enabled) {
       state = state.copyWith(status: TourStatus.hidden);
       return;
     }
@@ -318,6 +329,7 @@ final gettingStartedControllerProvider =
       final controller = GettingStartedController(
         ref.watch(educationPrefsProvider),
         uid: uid,
+        enabled: kGettingStartedTourEnabled,
         streakReader: () => ref.read(homeDisplayStreakDaysProvider),
       );
 
