@@ -230,12 +230,18 @@ class CoachForLifeApp extends ConsumerWidget {
             const DefaultEnforcementModeSelectionScreen(),
         CoachingStyleSelectionScreen.routeName: (_) =>
             const CoachingStyleSelectionScreen(),
-        MemoryKnowledgeScreen.routeName: (_) => const MemoryKnowledgeScreen(),
+        MemoryKnowledgeScreen.routeName: (_) => const FirstVisitExplainer(
+          explainer: PageExplainers.memory,
+          child: MemoryKnowledgeScreen(),
+        ),
         DirectionScreen.routeName: (_) => const FirstVisitExplainer(
           explainer: PageExplainers.direction,
           child: DirectionScreen(),
         ),
-        TimeScreen.routeName: (_) => const TimeScreen(),
+        TimeScreen.routeName: (_) => const FirstVisitExplainer(
+          explainer: PageExplainers.time,
+          child: TimeScreen(),
+        ),
         TrackSheetHostScreen.routeName: (_) => const TrackSheetHostScreen(),
         // ── Coach AI ──────────────────────────────────────────────────────
         AiAssistantScreen.routeName: (context) {

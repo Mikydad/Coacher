@@ -36,8 +36,11 @@ class _ReminderHealthSectionState extends ConsumerState<ReminderHealthSection> {
   void initState() {
     super.initState();
     // Fresh reading on every open; the Home hint shares the same provider
-    // and simply picks up the newer snapshot.
-    ref.invalidate(reminderHealthProvider);
+    // and simply picks up the newer snapshot. After the first frame: `ref`
+    // can't reach the ProviderScope while initState is still running.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.invalidate(reminderHealthProvider);
+    });
   }
 
   @override

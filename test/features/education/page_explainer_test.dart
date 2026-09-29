@@ -64,7 +64,11 @@ void main() {
         for (final s in e.steps) {
           expect(find.text(s.label), findsOneWidget);
         }
-        expect(find.text('Maybe later'), findsOneWidget);
+        // A second close link only when the primary does something.
+        expect(
+          find.text('Maybe later'),
+          e.action == ExplainerAction.dismiss ? findsNothing : findsOneWidget,
+        );
         // No video URL configured → no video row.
         expect(find.text('See how it works'), findsNothing);
       });
@@ -120,9 +124,15 @@ void main() {
         contains('explainer:direction'),
       );
 
-      await tester.ensureVisible(find.text('Maybe later'));
+      // A stray tap on the backdrop must not close an auto-shown sheet.
+      await tester.tapAt(const Offset(20, 20));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Maybe later'));
+      expect(find.text(PageExplainers.direction.title), findsOneWidget);
+
+      final primary = find.text(PageExplainers.direction.primaryLabel);
+      await tester.ensureVisible(primary);
+      await tester.pumpAndSettle();
+      await tester.tap(primary);
       await tester.pumpAndSettle();
       expect(find.text(PageExplainers.direction.title), findsNothing);
     });

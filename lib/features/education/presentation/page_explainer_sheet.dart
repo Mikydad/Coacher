@@ -40,6 +40,11 @@ Uri? explainerVideoUrl(String explainerId) {
 /// Presents [explainer]. [fromHelp] is the `?` path: the quiet link under
 /// the button becomes "More details" (the long guide) instead of
 /// "Maybe later", since the user asked for help rather than being shown it.
+///
+/// An auto-shown sheet ignores taps on the dimmed backdrop (swipe down and
+/// the buttons still close it): it appears ~½ s after the page, often right
+/// as a tap lands, and a stray tap used to close it unseen — while the
+/// page is already marked seen (Miko, 2026-09-29).
 Future<void> showPageExplainer(
   BuildContext context,
   PageExplainer explainer, {
@@ -49,6 +54,7 @@ Future<void> showPageExplainer(
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,
+    isDismissible: fromHelp,
     backgroundColor: AppColors.surfacePanel,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -77,6 +83,10 @@ class PageExplainerSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final e = explainer;
     final showMoreDetails = fromHelp && e.guideId != null;
+    // "Maybe later" only when the primary does something; when the primary
+    // just closes ("Got it"), a second close link is noise.
+    final showMaybeLater =
+        !showMoreDetails && e.action != ExplainerAction.dismiss;
     return ConstrainedBox(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * 0.92,
@@ -148,19 +158,22 @@ class PageExplainerSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            TextButton(
-              onPressed: () => showMoreDetails
-                  ? _openDetails(context, e.guideId!)
-                  : Navigator.of(context).pop(),
-              child: Text(
-                showMoreDetails ? 'More details' : 'Maybe later',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSoft,
+            if (showMoreDetails || showMaybeLater)
+              TextButton(
+                onPressed: () => showMoreDetails
+                    ? _openDetails(context, e.guideId!)
+                    : Navigator.of(context).pop(),
+                child: Text(
+                  showMoreDetails ? 'More details' : 'Maybe later',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSoft,
+                  ),
                 ),
-              ),
-            ),
+              )
+            else
+              const SizedBox(height: 8),
           ],
         ),
       ),
@@ -372,4 +385,9 @@ IconData _iconFor(ExplainerIcon icon) => switch (icon) {
   ExplainerIcon.chat => Icons.chat_bubble_rounded,
   ExplainerIcon.sparkle => Icons.auto_awesome_rounded,
   ExplainerIcon.undo => Icons.undo_rounded,
+  ExplainerIcon.edit => Icons.edit_rounded,
+  ExplainerIcon.timer => Icons.timer_rounded,
+  ExplainerIcon.timeline => Icons.view_timeline_rounded,
+  ExplainerIcon.memory => Icons.psychology_rounded,
+  ExplainerIcon.forget => Icons.delete_outline_rounded,
 };

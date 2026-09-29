@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
+import '../../education/domain/page_explainers.dart';
+import '../../education/presentation/page_explainer_sheet.dart';
 import '../application/memory_providers.dart';
 import '../domain/models/memory_fact.dart';
 import '../domain/models/person.dart';
@@ -55,6 +57,17 @@ class _MemoryKnowledgeScreenState extends ConsumerState<MemoryKnowledgeScreen> {
         appBar: AppBar(
           title: const PageTitle('What SidePal knows about you'),
           centerTitle: true,
+          actions: [
+            IconButton(
+              onPressed: () => showPageExplainer(
+                context,
+                PageExplainers.memory,
+                fromHelp: true,
+              ),
+              tooltip: 'About this page',
+              icon: const Icon(Icons.help_outline_rounded, size: 20),
+            ),
+          ],
           bottom: TabBar(
             indicatorColor: AppColors.cyan,
             labelColor: AppColors.textPrimary,

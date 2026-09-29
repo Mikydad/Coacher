@@ -54,6 +54,10 @@ class _ScenePainter extends CustomPainter {
         _strictness(k);
       case ExplainerScene.coach:
         _coach(k);
+      case ExplainerScene.time:
+        _time(k);
+      case ExplainerScene.memory:
+        _memory(k);
     }
     canvas.restore();
   }
@@ -281,6 +285,102 @@ class _ScenePainter extends CustomPainter {
     );
     k.line(const Offset(244, 76), const Offset(256, 70), band, 3.5);
     k.line(const Offset(244, 78), const Offset(254, 82), band, 3.5);
+  }
+
+  /// A blob glancing up at a big clock over a day ribbon of logged blocks.
+  void _time(_Kit k) {
+    final orange = k.soft(AppColors.orange);
+    k.backdrop(AppColors.orange);
+    k.dots(orange, const [Offset(26, 22), Offset(140, 14), Offset(264, 20)]);
+
+    // The day ribbon: logged blocks with honest gaps between them.
+    k.canvas.drawRRect(
+      RRect.fromLTRBR(118, 112, 266, 128, const Radius.circular(8)),
+      Paint()..color = Colors.white.withValues(alpha: 0.7),
+    );
+    for (final (a, b, col) in [
+      (122.0, 162.0, k.soft(AppColors.violet)),
+      (170.0, 188.0, k.soft(AppColors.coral)),
+      (204.0, 262.0, k.soft(AppColors.mint)),
+    ]) {
+      k.canvas.drawRRect(
+        RRect.fromLTRBR(a, 115, b, 125, const Radius.circular(5)),
+        Paint()..color = col,
+      );
+    }
+
+    // Big clock.
+    const c = Offset(196, 60);
+    k.circle(c, 32, Colors.white);
+    k.canvas.drawCircle(
+      c,
+      32,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = orange,
+    );
+    for (var i = 0; i < 12; i++) {
+      final a = i * math.pi / 6;
+      final dir = Offset(math.cos(a), math.sin(a));
+      k.line(c + dir * 25, c + dir * 28, orange.withValues(alpha: 0.7), 2);
+    }
+    k.line(c, c + const Offset(0, -18), k.ink(orange), 3);
+    k.line(c, c + const Offset(13, 6), k.ink(orange), 3);
+    k.circle(c, 3, k.ink(orange));
+
+    k.shadow(const Offset(66, 136), 34, orange);
+    k.blob(
+      const Offset(66, 102),
+      34,
+      k.soft(AppColors.cyan),
+      _Mood.happy,
+      lookUp: true,
+    );
+  }
+
+  /// A calm blob with a thought cloud holding a heart and a phone.
+  void _memory(_Kit k) {
+    final violet = k.soft(AppColors.violet);
+    k.backdrop(AppColors.violet);
+    k.dots(violet, const [Offset(24, 24), Offset(262, 128), Offset(120, 16)]);
+
+    // Thought trail rising from the head.
+    k.circle(const Offset(118, 70), 4, Colors.white);
+    k.circle(const Offset(132, 58), 6, Colors.white);
+    // The cloud.
+    for (final (o, r) in [
+      (const Offset(172, 56), 22.0),
+      (const Offset(202, 40), 26.0),
+      (const Offset(234, 52), 23.0),
+      (const Offset(206, 68), 22.0),
+      (const Offset(184, 70), 16.0),
+    ]) {
+      k.circle(o, r, Colors.white);
+    }
+    // A heart and a phone: "calling mom" remembered.
+    final coral = k.soft(AppColors.coral);
+    k.fill(
+      Path()
+        ..moveTo(186, 62)
+        ..cubicTo(166, 48, 176, 32, 186, 42)
+        ..cubicTo(196, 32, 206, 48, 186, 62)
+        ..close(),
+      coral,
+    );
+    final cyan = k.soft(AppColors.cyan);
+    k.canvas.drawRRect(
+      RRect.fromLTRBR(212, 36, 232, 68, const Radius.circular(5)),
+      Paint()..color = cyan,
+    );
+    k.canvas.drawRRect(
+      RRect.fromLTRBR(215, 41, 229, 60, const Radius.circular(2)),
+      Paint()..color = Colors.white.withValues(alpha: 0.6),
+    );
+    k.circle(const Offset(222, 64), 1.8, Colors.white);
+
+    k.shadow(const Offset(78, 136), 36, violet);
+    k.blob(const Offset(78, 102), 36, k.soft(AppColors.mint), _Mood.calm);
   }
 
   /// A blob with a speech bubble and a ticked "done" chip.

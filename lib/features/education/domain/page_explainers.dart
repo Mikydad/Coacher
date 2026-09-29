@@ -56,7 +56,7 @@ class ExplainerStep {
 }
 
 /// Which illustration heads the sheet.
-enum ExplainerScene { stake, group, direction, strictness, coach }
+enum ExplainerScene { stake, group, direction, strictness, coach, time, memory }
 
 enum ExplainerIcon {
   target,
@@ -74,6 +74,11 @@ enum ExplainerIcon {
   chat,
   sparkle,
   undo,
+  edit,
+  timer,
+  timeline,
+  memory,
+  forget,
 }
 
 /// What the primary button does. [dismiss] fits pages where the page
@@ -87,6 +92,8 @@ abstract final class PageExplainers {
     direction,
     strictness,
     coach,
+    time,
+    memory,
   ];
 
   static PageExplainer? byId(String id) {
@@ -195,5 +202,40 @@ abstract final class PageExplainers {
     ],
     primaryLabel: 'Got it',
     guideId: 'coachAi',
+  );
+
+  static const time = PageExplainer(
+    id: 'time',
+    scene: ExplainerScene.time,
+    title: 'See where your time goes',
+    body: "Log what you're doing. SidePal turns it into your day.",
+    example:
+        "“I logged ‘scrolling’ at 1 pm and ‘work’ at 3. That's two "
+        'hours I didn\'t plan.”',
+    why: 'Plans show what you meant to do. Your day shows what you did.',
+    steps: [
+      ExplainerStep(ExplainerIcon.edit, 'Log what you do'),
+      ExplainerStep(ExplainerIcon.timer, 'SidePal times it'),
+      ExplainerStep(ExplainerIcon.timeline, 'See your day'),
+    ],
+    primaryLabel: 'Got it',
+    guideId: 'time',
+  );
+
+  static const memory = PageExplainer(
+    id: 'memory',
+    scene: ExplainerScene.memory,
+    title: 'SidePal remembers for you',
+    body: 'Useful things you share are kept here, so suggestions fit you.',
+    example:
+        '“I said I like calling my mom on walks. Now SidePal suggests it '
+        'when I have time for a walk.”',
+    why: "Advice that knows you is advice you'll actually take.",
+    steps: [
+      ExplainerStep(ExplainerIcon.chat, 'You mention it'),
+      ExplainerStep(ExplainerIcon.memory, 'SidePal remembers'),
+      ExplainerStep(ExplainerIcon.forget, 'Edit or forget it'),
+    ],
+    primaryLabel: 'Got it',
   );
 }

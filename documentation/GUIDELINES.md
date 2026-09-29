@@ -4876,3 +4876,13 @@ not silent reversal.
   `getting_started_controller.dart`; the controller goes straight to
   hidden and writes no onboarding verdict, so flipping the flag back on
   still judges each account fresh. Code and tests kept on purpose.
+
+- **2026-09-29 · Your Time and "What SidePal knows about you" join the
+  explainers** (Miko): both open their illustrated sheet on first visit
+  (route-level `FirstVisitExplainer` in app.dart, like Direction), and
+  their `?` opens it too (Time via its guide; Memory gets a `?` button).
+  The memory page keeps its inline `_MemoryIntro` line.
+  Auto-shown sheets ignore taps on the dimmed backdrop (swipe/buttons
+  still close them) — a sheet that appears ½ s after the page was being
+  closed unseen by the user's next tap while already marked seen. When the
+  primary button only closes ("Got it"), there is no "Maybe later".
