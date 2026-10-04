@@ -69,6 +69,9 @@ class _FakeAuthRepo implements AuthRepositoryInterface {
   }) async => null;
   @override
   Future<AuthFailure?> deleteAccount() async => null;
+  @override
+  Future<AuthFailure?> reauthenticateWithProvider(String providerId) async =>
+      null;
 }
 
 // ── Helper ────────────────────────────────────────────────────────────────────
@@ -189,6 +192,20 @@ void main() {
         isNull,
         reason: 'Button must be disabled until ToS is checked',
       );
+    });
+
+    testWidgets('the dim button says why, until the Terms box is ticked', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_buildScreen(_FakeAuthRepo()));
+      final hint = find.text('Tick the Terms box above to create your account.');
+      expect(hint, findsOneWidget);
+
+      await tester.tap(find.byType(Checkbox));
+      await tester.pump();
+      expect(hint, findsNothing);
+      final btn = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+      expect(btn.onPressed, isNotNull);
     });
   });
 }

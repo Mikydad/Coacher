@@ -24,7 +24,7 @@ const kGeofencePoliteEndHour = 22;
 /// "Buy flowers" → "Buy flowers on the way?" (title-cased action,
 /// question form — suggestion-as-question, never a command).
 Map<String, String> geofenceNudgeCopy(String title) {
-  final action = title.trim().isEmpty ? 'your promise' : title.trim();
+  final action = title.trim().isEmpty ? 'what you planned' : title.trim();
   final capitalized = action[0].toUpperCase() + action.substring(1);
   return {'title': 'Heading out?', 'body': '$capitalized on the way?'};
 }

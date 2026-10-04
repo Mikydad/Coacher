@@ -14,15 +14,6 @@ import 'circle_detail_screen.dart';
 
 import '../../../core/presentation/app_colors.dart';
 
-const _kCategories = [
-  'fitness',
-  'learning',
-  'business',
-  'reading',
-  'productivity',
-  'other',
-];
-
 class CircleCreateScreen extends ConsumerStatefulWidget {
   const CircleCreateScreen({super.key});
 
@@ -62,7 +53,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
     if (!await ensureRegisteredForCircleAction(
       context,
       ref,
-      actionLabel: 'create a circle',
+      actionLabel: 'create a group',
     )) {
       return;
     }
@@ -110,7 +101,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Could not create circle: $e')));
+        ).showSnackBar(SnackBar(content: Text('Could not create group: $e')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -124,7 +115,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.surfaceDark,
         foregroundColor: AppColors.textPrimary,
-        title: const PageTitle('Create circle'),
+        title: const PageTitle('Create group'),
         centerTitle: true,
         elevation: 0,
       ),
@@ -135,7 +126,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.all(20),
             children: [
-              _SectionLabel('Circle name'),
+              _SectionLabel('Group name'),
               const SizedBox(height: 8),
               _buildNameField(),
               const SizedBox(height: 24),
@@ -188,7 +179,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
       maxLines: 3,
       maxLength: 200,
       onTapOutside: (_) => dismissKeyboard(context),
-      decoration: _inputDecoration('What is this circle about?'),
+      decoration: _inputDecoration('What is this group about?'),
     );
   }
 
@@ -196,7 +187,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: _kCategories.map((cat) {
+      children: kCircleCategories.map((cat) {
         final selected = _selectedCategory == cat;
         return ChoiceChip(
           label: Text(
@@ -277,7 +268,7 @@ class _CircleCreateScreenState extends ConsumerState<CircleCreateScreen> {
               ),
             )
           : const Text(
-              'Create circle',
+              'Create group',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
             ),
     );

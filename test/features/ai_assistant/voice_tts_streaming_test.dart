@@ -133,4 +133,52 @@ void main() {
       expect(await collect(range.stream), [2, 3, 4, 5]);
     });
   });
+
+  // ── Pre-launch audit M8 — playback latch ──────────────────────────────────
+
+  group('awaitClipPlayback', () {
+    test('completes when the latch completes (clip finished / stopped)', () async {
+      final done = Completer<void>();
+      final wait = StreamingOpenAiTtsVoiceAdapter.awaitClipPlayback(
+        play: Future<void>.value(),
+        done: done,
+        deadline: const Duration(seconds: 1),
+      );
+      done.complete();
+      await wait;
+    });
+
+    test('a play() rejection fails the latch instead of escaping the zone', () async {
+      final done = Completer<void>();
+      final rejecting = Completer<void>();
+      final wait = StreamingOpenAiTtsVoiceAdapter.awaitClipPlayback(
+        play: rejecting.future,
+        done: done,
+        deadline: const Duration(seconds: 1),
+      );
+      rejecting.completeError(StateError('audio session lost'));
+      await expectLater(wait, throwsA(isA<StateError>()));
+    });
+
+    test('a stalled player hits the deadline', () async {
+      final done = Completer<void>();
+      final wait = StreamingOpenAiTtsVoiceAdapter.awaitClipPlayback(
+        play: Completer<void>().future,
+        done: done,
+        deadline: const Duration(milliseconds: 20),
+      );
+      await expectLater(wait, throwsA(isA<TimeoutException>()));
+    });
+
+    test('deadline scales with the clip and has a floor', () {
+      expect(
+        StreamingOpenAiTtsVoiceAdapter.playbackDeadlineFor(const Duration(seconds: 5)),
+        const Duration(seconds: 20),
+      );
+      expect(
+        StreamingOpenAiTtsVoiceAdapter.playbackDeadlineFor(null),
+        const Duration(seconds: 90),
+      );
+    });
+  });
 }

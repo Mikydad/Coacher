@@ -49,6 +49,18 @@ void main() {
       (input: 'You doing', kind: AiIntentKind.query, focus: null),
       // …but a greeting that carries a real command still mutates.
       (input: 'hi add a workout at 6am', kind: AiIntentKind.mutate, focus: null),
+      // Question shape wins over the old mutate default (fix plan Phase 1.3,
+      // D1): the audit's screenshot wording routed as change requests.
+      (input: 'What do i have', kind: AiIntentKind.query, focus: null),
+      (input: 'Should i workout?', kind: AiIntentKind.query, focus: null),
+      (input: 'How fast can Answer', kind: AiIntentKind.query, focus: null),
+      (input: 'Do I have anything tomorrow', kind: AiIntentKind.query, focus: AiFocusDate.tomorrow),
+      (input: 'What do I have later this week', kind: AiIntentKind.query, focus: AiFocusDate.week),
+      // …but a question that carries a command still plans.
+      (input: 'Can you add a workout at 6am', kind: AiIntentKind.mutate, focus: null),
+      // Nothing matched: no steering at all, never mutate.
+      (input: 'Another', kind: AiIntentKind.unknown, focus: null),
+      (input: 'piano practice', kind: AiIntentKind.unknown, focus: null),
     ];
 
     for (final c in cases) {

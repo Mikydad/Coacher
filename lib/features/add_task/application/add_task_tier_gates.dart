@@ -20,7 +20,9 @@ Future<bool> checkAddTaskTierGates(
   final tierGate = ref.read(tierGateProvider);
   if (tierGate.isBypassed) return true;
 
-  if (!isEdit) {
+  // Tasks and habits are counted separately: a new habit is checked
+  // against the habit cap only (decision 2026-09-27).
+  if (!isEdit && !addingHabitAnchor) {
     final dayCount = await TierUsage.tasksPlannedForDay(planDateKey);
     if (!tierGate.canCreateTaskForDay(dayCount)) {
       onBlocked();

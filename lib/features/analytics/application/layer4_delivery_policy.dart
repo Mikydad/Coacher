@@ -115,6 +115,7 @@ bool passesNotificationGate(
   GeneratedInsight insight, {
   Layer4DeliveryPolicyConfig config = kLayer4DeliveryPolicyConfig,
 }) {
+  if (isRetiredInsightType(insight.insightType)) return false;
   switch (insight.priority) {
     case InsightPriority.high:
       return insight.confidence >= config.thresholds.notifyConfidenceHigh;

@@ -12,12 +12,18 @@ class FakeSpeechAdapter implements VoiceSpeechAdapter {
   void Function(String status)? _onStatus;
   void Function(String text, bool isFinal)? _onResult;
 
+  /// Held open by tests that pause mid-startup (audit M9).
+  Completer<bool>? initializeGate;
+  Object? initializeError;
+
   @override
   Future<bool> initialize({
     required void Function(String status) onStatus,
     required void Function() onError,
   }) async {
     _onStatus = onStatus;
+    if (initializeError != null) throw initializeError!;
+    if (initializeGate != null) return initializeGate!.future;
     return available;
   }
 
@@ -488,4 +494,60 @@ void main() {
     });
   });
 
+
+  // ── Pre-launch audit M9 — startup lifecycle ───────────────────────────────
+
+  test('a pause during startup cancels the pending listen', () async {
+    final controller = build();
+    speech.initializeGate = Completer<bool>();
+    final starting = controller.start();
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.phase, VoiceModePhase.connecting);
+
+    await controller.pauseToIdle(); // app backgrounded mid-permission
+    speech.initializeGate!.complete(true);
+    expect(await starting, isFalse);
+    expect(speech.listenCalls, 0, reason: 'no hot mic in a backgrounded app');
+    expect(controller.phase, VoiceModePhase.idle);
+  });
+
+  test('a native setup failure parks at idle with honest copy, never throws', () async {
+    final controller = build();
+    speech.initializeError = StateError('configure failed');
+    expect(await controller.start(), isFalse);
+    expect(controller.phase, VoiceModePhase.idle);
+    expect(controller.micAvailable, isFalse);
+    expect(controller.statusMessage, contains('try again'));
+    expect(speech.listenCalls, 0);
+  });
+
+  test('a startup that never resolves times out instead of hanging', () async {
+    final controller = VoiceModeController(
+      speech: speech = FakeSpeechAdapter()..initializeGate = Completer<bool>(),
+      tts: tts = FakeTtsAdapter(),
+      sendAndGetReply: (_) async => null,
+      startupTimeout: const Duration(milliseconds: 30),
+    );
+    expect(await controller.start(), isFalse);
+    expect(controller.phase, VoiceModePhase.idle);
+  });
+
+  test('an audio interruption parks the loop at idle', () async {
+    final interruptions = StreamController<bool>();
+    final controller = VoiceModeController(
+      speech: speech = FakeSpeechAdapter(),
+      tts: tts = FakeTtsAdapter(),
+      sendAndGetReply: (_) async => null,
+      continuationGap: Duration.zero,
+      staleStatusWindow: Duration.zero,
+      audioInterruptions: interruptions.stream,
+    );
+    await controller.start();
+    expect(controller.phase, VoiceModePhase.listening);
+    interruptions.add(true);
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.phase, VoiceModePhase.idle);
+    await interruptions.close();
+  });
 }

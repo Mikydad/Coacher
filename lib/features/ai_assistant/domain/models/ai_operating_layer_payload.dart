@@ -38,7 +38,28 @@ class AiOperatingLayerPayload {
     this.todayActivityLog = const [],
     this.voiceMode = false,
     this.retryTurnId,
+    this.todayCalendarAvailable,
+    this.tomorrowCalendarAvailable,
+    this.wakingWindow,
+    this.taskHandles = const {},
+    this.goalHandles = const {},
   });
+
+  /// Calendar signal availability per day (fix plan Phase 3.2): true =
+  /// busy intervals merged into that day's free windows; false = the
+  /// signal was unavailable (denied, no channel, failed) and the windows
+  /// come from the plan alone; null = the app has no calendar bridge.
+  final bool? todayCalendarAvailable;
+  final bool? tomorrowCalendarAvailable;
+
+  /// "07:00–22:00" — the waking bounds the free windows were computed in
+  /// (per user from the sleep window when set, D3).
+  final String? wakingWindow;
+
+  /// Opaque per-turn handles (D2): "t1" → the task it stands for. Never
+  /// persisted, never a database id; the resolver maps a `taskRef` back.
+  final Map<String, AiTaskHandle> taskHandles;
+  final Map<String, AiGoalHandle> goalHandles;
 
   /// Set by [AiIntentParser] when this turn RETRIES a failed one: the
   /// client reuses this turnId (rounds at loopIndex >= 1) so the server's
@@ -89,8 +110,10 @@ class AiOperatingLayerPayload {
   /// Human-readable summaries of changes already confirmed in this session.
   final List<String> completedInSession;
 
-  /// Active goals with progress in the current period.
-  /// Each entry: { title, target, periodSummary, daysMet, daysElapsed, totalDays }.
+  /// Active goals with progress in their CURRENT evaluation window, in the
+  /// goal's own units (fix plan Phase 3.1). Each entry: { ref, title,
+  /// logged, target, unit, window, daysLogged, daysElapsed, daysInWindow,
+  /// behindPace, cadence, category, stepsDueToday }.
   final List<Map<String, dynamic>> goalProgress;
 
   /// Supported / unsupported capability lists for the model.
@@ -196,5 +219,35 @@ class AiOperatingLayerPayload {
     if (deviceContext.isNotEmpty) 'deviceContext': deviceContext,
     if (direction.isNotEmpty) 'direction': direction,
     if (todayActivityLog.isNotEmpty) 'todayActivityLog': todayActivityLog,
+    if (todayCalendarAvailable != null)
+      'todayCalendarAvailable': todayCalendarAvailable,
+    if (tomorrowCalendarAvailable != null)
+      'tomorrowCalendarAvailable': tomorrowCalendarAvailable,
+    if (wakingWindow != null) 'wakingWindow': wakingWindow,
   };
+}
+
+/// What a per-turn task handle stands for — enough for the resolver to
+/// stamp the action without a lookup.
+class AiTaskHandle {
+  const AiTaskHandle({
+    required this.taskId,
+    required this.routineId,
+    required this.blockId,
+    required this.dateKey,
+    required this.title,
+  });
+
+  final String taskId;
+  final String routineId;
+  final String blockId;
+  final String dateKey;
+  final String title;
+}
+
+class AiGoalHandle {
+  const AiGoalHandle({required this.goalId, required this.title});
+
+  final String goalId;
+  final String title;
 }

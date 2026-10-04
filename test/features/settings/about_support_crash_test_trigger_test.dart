@@ -31,7 +31,11 @@ class _FakeSink implements CrashlyticsTestSink {
 
 const _versionLabel = 'SIDEPAL V1.0.1 BUILD 2';
 
-Widget _host({required bool testerMode, required _FakeSink sink}) =>
+Widget _host({
+  required bool testerMode,
+  required _FakeSink sink,
+  bool crashTriggerEnabled = true,
+}) =>
     ProviderScope(
       overrides: [
         testerModeProvider.overrideWith((ref) => _FixedTesterMode(testerMode)),
@@ -45,7 +49,11 @@ Widget _host({required bool testerMode, required _FakeSink sink}) =>
           ),
         ),
       ],
-      child: const MaterialApp(home: Scaffold(body: VersionFooter())),
+      child: MaterialApp(
+        home: Scaffold(
+          body: VersionFooter(crashTriggerEnabled: crashTriggerEnabled),
+        ),
+      ),
     );
 
 Future<void> _pumpAndLongPress(WidgetTester tester, Widget host) async {
@@ -129,5 +137,17 @@ void main() {
       find.textContaining('Collection is off in this build'),
       findsNothing,
     );
+  });
+
+  testWidgets('a non-tester build compiles the trigger out even in tester mode', (
+    tester,
+  ) async {
+    final sink = _FakeSink();
+    await _pumpAndLongPress(
+      tester,
+      _host(testerMode: true, sink: sink, crashTriggerEnabled: false),
+    );
+    expect(find.text('Crashlytics smoke test'), findsNothing);
+    expect(sink.crashCalls, 0);
   });
 }

@@ -58,6 +58,16 @@ abstract final class AiIntentRouter {
     caseSensitive: false,
   );
 
+  /// Question shape (AI chat fix plan Phase 1.3, D1): a message that OPENS
+  /// like a question is a question, whatever else it contains — "What do i
+  /// have", "Should I work out?", "How fast can Answer" all used to fall to
+  /// the mutate default. Checked after the mutate verbs so "can you add a
+  /// workout at 6am" still plans.
+  static final _questionOpener = RegExp(
+    r"^(what|what'?s|whats|when|where|who|why|how|which|should|could|"
+    r'can|do|does|did|is|are|am|will|would|any(thing)?)\b',
+  );
+
   static AiIntentRoute classify(String userInput) {
     final lower = userInput.toLowerCase().trim();
     final focusDate = _detectFocusDate(lower);
@@ -80,7 +90,7 @@ abstract final class AiIntentRouter {
       return AiIntentRoute(kind: AiIntentKind.mutate, focusDate: focusDate);
     }
 
-    if (_isQuery(lower)) {
+    if (_isQuery(lower) || _questionOpener.hasMatch(lower)) {
       return AiIntentRoute(kind: AiIntentKind.query, focusDate: focusDate);
     }
 
@@ -93,7 +103,9 @@ abstract final class AiIntentRouter {
       return AiIntentRoute(kind: AiIntentKind.suggest, focusDate: focusDate);
     }
 
-    return AiIntentRoute(kind: AiIntentKind.mutate, focusDate: focusDate);
+    // No rule matched: no steering (D1). The agent path has both tools; the
+    // model decides whether anything should change.
+    return AiIntentRoute(kind: AiIntentKind.unknown, focusDate: focusDate);
   }
 
   static AiFocusDate? _detectFocusDate(String lower) {
@@ -146,6 +158,7 @@ abstract final class AiIntentRouter {
       'goal',
       'on my',
       'doing on',
+      'week',
     ];
     final hasScheduleContext =
         scheduleWords.any(lower.contains) || lower.endsWith('?');

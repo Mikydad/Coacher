@@ -85,13 +85,13 @@ void main() {
   group('FocusScoringEngine — determinism', () {
     test('same candidate always produces same scores', () {
       final candidate = _candidate(
-        insightType: InsightType.streakRiskWarning,
+        insightType: InsightType.habitTooHard,
         bucket: InsightBucket.risk,
         priority: InsightPriority.high,
         confidence: 0.9,
         urgency: 0.85,
         coachingImportance: 0.9,
-        patterns: [_pattern(PatternCode.streakRisk, severity: 0.8)],
+        patterns: [_pattern(PatternCode.tooHard, severity: 0.8)],
       );
 
       final b1 = computeFocusScoreBreakdown(candidate);
@@ -107,17 +107,17 @@ void main() {
 
     test('high-priority risk insight scores higher than low-priority reinforcement', () {
       final highRisk = _candidate(
-        insightType: InsightType.streakRiskWarning,
+        insightType: InsightType.habitTooHard,
         bucket: InsightBucket.risk,
         priority: InsightPriority.high,
         confidence: 0.9,
         urgency: 0.85,
         coachingImportance: 0.9,
-        patterns: [_pattern(PatternCode.streakRisk, severity: 0.9)],
+        patterns: [_pattern(PatternCode.tooHard, severity: 0.9)],
       );
 
       final lowReinforcement = _candidate(
-        insightType: InsightType.strongStreakPraise,
+        insightType: InsightType.consistentBehaviorPraise,
         bucket: InsightBucket.reinforcement,
         priority: InsightPriority.low,
         confidence: 0.6,
@@ -133,7 +133,7 @@ void main() {
 
     test('in-focus-session suppresses urgency + feasibility', () {
       final normal = _candidate(
-        insightType: InsightType.streakRiskWarning,
+        insightType: InsightType.habitTooHard,
         bucket: InsightBucket.risk,
         priority: InsightPriority.high,
         confidence: 0.9,
@@ -159,7 +159,7 @@ void main() {
 
     test('overdue items increase urgency score', () {
       final noOverdue = _candidate(
-        insightType: InsightType.streakRiskWarning,
+        insightType: InsightType.habitTooHard,
         bucket: InsightBucket.risk,
         priority: InsightPriority.high,
         confidence: 0.8,
@@ -199,17 +199,17 @@ void main() {
 
     test('highest scoring candidate is selected as primary', () {
       final highRisk = _candidate(
-        insightType: InsightType.streakRiskWarning,
+        insightType: InsightType.habitTooHard,
         bucket: InsightBucket.risk,
         priority: InsightPriority.high,
         confidence: 0.9,
         urgency: 0.9,
         coachingImportance: 0.9,
-        patterns: [_pattern(PatternCode.streakRisk, severity: 0.9)],
+        patterns: [_pattern(PatternCode.tooHard, severity: 0.9)],
         insightId: 'high-risk-insight',
       );
       final lowReinforcement = _candidate(
-        insightType: InsightType.strongStreakPraise,
+        insightType: InsightType.consistentBehaviorPraise,
         bucket: InsightBucket.reinforcement,
         priority: InsightPriority.low,
         confidence: 0.5,
@@ -238,13 +238,13 @@ void main() {
 
       // Competing candidate with higher score but still within min duration.
       final newCandidate = _candidate(
-        insightType: InsightType.fragileStreakAlert,
+        insightType: InsightType.goalAtRisk,
         bucket: InsightBucket.risk,
         priority: InsightPriority.high,
         confidence: 0.95,
         urgency: 0.95,
         coachingImportance: 0.95,
-        patterns: [_pattern(PatternCode.streakRisk, severity: 0.95)],
+        patterns: [_pattern(PatternCode.tooHard, severity: 0.95)],
         insightId: 'new-competing-insight',
       );
 
@@ -270,13 +270,13 @@ void main() {
 
       // Strong new candidate with score well above threshold.
       final newCandidate = _candidate(
-        insightType: InsightType.streakRiskWarning,
+        insightType: InsightType.habitTooHard,
         bucket: InsightBucket.risk,
         priority: InsightPriority.high,
         confidence: 0.95,
         urgency: 0.95,
         coachingImportance: 0.95,
-        patterns: [_pattern(PatternCode.streakRisk, severity: 0.95)],
+        patterns: [_pattern(PatternCode.tooHard, severity: 0.95)],
         insightId: 'new-dominant-insight',
       );
 
@@ -294,13 +294,13 @@ void main() {
     test('same focus gains reinforced lifecycle on second selection', () {
       final now = DateTime(2026, 5, 7, 10);
       final candidate = _candidate(
-        insightType: InsightType.streakRiskWarning,
+        insightType: InsightType.habitTooHard,
         bucket: InsightBucket.risk,
         priority: InsightPriority.high,
         confidence: 0.9,
         urgency: 0.9,
         coachingImportance: 0.9,
-        patterns: [_pattern(PatternCode.streakRisk, severity: 0.9)],
+        patterns: [_pattern(PatternCode.tooHard, severity: 0.9)],
         insightId: 'persistent-insight',
       );
 
@@ -326,7 +326,7 @@ void main() {
 
       // Very low score candidate that won't pass minFocusScoreToActivate.
       final weakCandidate = _candidate(
-        insightType: InsightType.strongStreakPraise,
+        insightType: InsightType.consistentBehaviorPraise,
         bucket: InsightBucket.reinforcement,
         priority: InsightPriority.low,
         confidence: 0.1,
@@ -367,17 +367,17 @@ void main() {
 
     test('focus confidence is higher when top candidate dominates', () {
       final dominant = _candidate(
-        insightType: InsightType.streakRiskWarning,
+        insightType: InsightType.habitTooHard,
         bucket: InsightBucket.risk,
         priority: InsightPriority.high,
         confidence: 0.99,
         urgency: 0.99,
         coachingImportance: 0.99,
-        patterns: [_pattern(PatternCode.streakRisk, severity: 0.99)],
+        patterns: [_pattern(PatternCode.tooHard, severity: 0.99)],
         insightId: 'dominant',
       );
       final weak = _candidate(
-        insightType: InsightType.strongStreakPraise,
+        insightType: InsightType.consistentBehaviorPraise,
         bucket: InsightBucket.reinforcement,
         priority: InsightPriority.low,
         confidence: 0.2,
@@ -387,23 +387,23 @@ void main() {
         insightId: 'weak',
       );
       final tied1 = _candidate(
-        insightType: InsightType.streakRiskWarning,
+        insightType: InsightType.habitTooHard,
         bucket: InsightBucket.risk,
         priority: InsightPriority.high,
         confidence: 0.85,
         urgency: 0.85,
         coachingImportance: 0.85,
-        patterns: [_pattern(PatternCode.streakRisk, severity: 0.85)],
+        patterns: [_pattern(PatternCode.tooHard, severity: 0.85)],
         insightId: 'tied1',
       );
       final tied2 = _candidate(
-        insightType: InsightType.fragileStreakAlert,
+        insightType: InsightType.goalAtRisk,
         bucket: InsightBucket.risk,
         priority: InsightPriority.high,
         confidence: 0.84,
         urgency: 0.84,
         coachingImportance: 0.84,
-        patterns: [_pattern(PatternCode.streakRisk, severity: 0.84)],
+        patterns: [_pattern(PatternCode.tooHard, severity: 0.84)],
         insightId: 'tied2',
       );
 
@@ -467,8 +467,8 @@ void main() {
   group('FocusContextSnapshot serialization', () {
     test('toMap / fromMap roundtrips', () {
       const snap = FocusContextSnapshot(
-        insightTypes: ['streakRiskWarning'],
-        keyPatternCodes: ['streakRisk'],
+        insightTypes: ['habitTooHard'],
+        keyPatternCodes: ['tooHard'],
         topEvidence: {'streakRisk.severity': 0.9},
         selectedRationale: 'test rationale',
         timingProfile: 'morning',
@@ -481,6 +481,63 @@ void main() {
         closeTo(0.9, 0.001),
       );
       expect(restored.selectedRationale, equals(snap.selectedRationale));
+    });
+  });
+
+  group('Streak family retired (2026-09-25)', () {
+    test('retired insight kinds are never selected as the coaching focus', () {
+      for (final type in kRetiredInsightTypes) {
+        final retired = _candidate(
+          insightType: type,
+          bucket: InsightBucket.risk,
+          priority: InsightPriority.high,
+          confidence: 0.99,
+          urgency: 0.99,
+          coachingImportance: 0.99,
+          patterns: [_pattern(PatternCode.streakRisk, severity: 0.99)],
+          insightId: 'retired-${type.name}',
+        );
+        final live = _candidate(
+          insightType: InsightType.inconsistencyNotice,
+          bucket: InsightBucket.neutral,
+          priority: InsightPriority.medium,
+          confidence: 0.6,
+          urgency: 0.5,
+          coachingImportance: 0.5,
+          patterns: [_pattern(PatternCode.inconsistentBehavior)],
+          insightId: 'live-insight',
+        );
+        final result = selectFocus(
+          candidates: [retired, live],
+          now: DateTime(2026, 5, 7, 10),
+        );
+        expect(result.focus.primaryInsightId, 'live-insight', reason: type.name);
+      }
+    });
+
+    test('deriveFocusReason never yields a streak reason', () {
+      for (final type in InsightType.values) {
+        final reason = deriveFocusReason(
+          _candidate(
+            insightType: type,
+            bucket: InsightBucket.risk,
+            priority: InsightPriority.high,
+            confidence: 0.9,
+            urgency: 0.9,
+            coachingImportance: 0.9,
+            patterns: [
+              _pattern(PatternCode.streakRisk, severity: 0.9),
+              _pattern(PatternCode.strongStreak, severity: 0.9),
+            ],
+          ),
+        );
+        expect(reason, isNot(FocusReason.imminentStreakRisk), reason: type.name);
+        expect(
+          reason,
+          isNot(FocusReason.reinforcingActiveStreak),
+          reason: type.name,
+        );
+      }
     });
   });
 }
@@ -521,6 +578,7 @@ FocusCandidate _candidate({
     supportingPatterns: patterns,
     realtimeContext: ctx,
   );
+
 }
 
 DetectedBehaviorPattern _pattern(PatternCode code, {double severity = 0.8}) {
@@ -542,17 +600,17 @@ DetectedBehaviorPattern _pattern(PatternCode code, {double severity = 0.8}) {
 List<FocusCandidate> _multipleCandidates() {
   return [
     _candidate(
-      insightType: InsightType.streakRiskWarning,
+      insightType: InsightType.habitTooHard,
       bucket: InsightBucket.risk,
       priority: InsightPriority.high,
       confidence: 0.9,
       urgency: 0.85,
       coachingImportance: 0.9,
-      patterns: [_pattern(PatternCode.streakRisk)],
-      insightId: 'insight-streak-risk',
+      patterns: [_pattern(PatternCode.tooHard)],
+      insightId: 'insight-too-hard',
     ),
     _candidate(
-      insightType: InsightType.strongStreakPraise,
+      insightType: InsightType.consistentBehaviorPraise,
       bucket: InsightBucket.reinforcement,
       priority: InsightPriority.low,
       confidence: 0.7,
@@ -600,15 +658,15 @@ CurrentCoachingFocus _makeFocus({
       focusScore: focusScore,
     ),
     contextSnapshot: const FocusContextSnapshot(
-      insightTypes: ['streakRiskWarning'],
-      keyPatternCodes: ['streakRisk'],
+      insightTypes: ['habitTooHard'],
+      keyPatternCodes: ['tooHard'],
       topEvidence: {},
       selectedRationale: 'test',
       timingProfile: 'morning',
     ),
     evaluationTrace: const ['trace line 1', 'trace line 2'],
     suppressedCandidates: const [],
-    sourceInsightTypes: const ['streakRiskWarning'],
+    sourceInsightTypes: const ['habitTooHard'],
     detectedAtMs: detectedAtMs ?? nowMs,
     activeUntilMs: activeUntilMs ??
         (nowMs + const Duration(hours: 2).inMilliseconds),

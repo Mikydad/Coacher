@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/utils/date_keys.dart';
+import '../../goals/application/goal_period_helpers.dart';
 import '../../goals/application/goals_providers.dart';
 import '../../goals/data/goals_repository.dart';
 import '../../goals/domain/models/goal_check_in.dart';
@@ -13,6 +14,11 @@ import '../data/analytics_repository.dart';
 import '../domain/models/analytics_event.dart';
 import '../domain/models/analytics_stats_cache.dart';
 import 'behavior_feature_entity_kind.dart';
+
+/// A task stays a coaching subject only while it was on the plan within this
+/// many days (today inclusive). Older tasks are history, not behavior to
+/// coach today.
+const int kTaskCoachingRecencyDays = 7;
 
 class FeatureBuilderDateWindow {
   const FeatureBuilderDateWindow({
@@ -250,6 +256,20 @@ class FeatureBuilderInputAdapters {
       }
     }
 
+    // Coaching subjects are current tasks only: on today's plan, or planned
+    // within the last [kTaskCoachingRecencyDays]. A task last planned weeks
+    // ago used to stay in the batch with zero recent occurrences and read as
+    // "missed" today; dropping it here also lets the daily prune clear its
+    // cached insights.
+    final recencyStartKey = DateKeys.yyyymmdd(
+      FeatureBuilderDateNormalizer.localDayStart(
+        nowLocal,
+      ).subtract(const Duration(days: kTaskCoachingRecencyDays - 1)),
+    );
+    accum.removeWhere(
+      (_, a) => !a.keys.any((k) => k.compareTo(recencyStartKey) >= 0),
+    );
+
     return accum.map((id, a) {
       final ref = a.referenceRow;
       if (ref == null) {
@@ -274,16 +294,28 @@ class FeatureBuilderInputAdapters {
   }) async {
     final out = <String, GoalFeatureSeed>{};
     final goals = await _goalsRepository.fetchGoalsOnce();
-    // Coaching subjects only: a paused goal was deliberately shelved, and a
-    // goal whose period hasn't started has zero behavior to pattern on —
-    // seeding it made streakRisk fire ("missed last 2 days") on day -1.
-    final windowEndExclusiveMs = DateKeys.parseLocalDateKey(
-      endDateKey,
-    ).add(const Duration(days: 1)).millisecondsSinceEpoch;
+    // Coaching subjects only: a paused goal was deliberately shelved, a goal
+    // whose period hasn't started has zero behavior to pattern on (seeding it
+    // made streakRisk fire "missed last 2 days" on day -1), and a goal whose
+    // period has ended is over — no more coaching, same as paused. A goal
+    // with no loggable day in the window so far has no evidence either.
+    final windowKeys = <String>[];
+    for (
+      var cursor = DateKeys.parseLocalDateKey(startDateKey);
+      DateKeys.yyyymmdd(cursor).compareTo(endDateKey) <= 0;
+      cursor = cursor.add(const Duration(days: 1))
+    ) {
+      windowKeys.add(DateKeys.yyyymmdd(cursor));
+    }
     for (final goal in goals) {
       if (goal.id.trim().isEmpty) continue;
       if (goal.status != GoalStatus.active) continue;
-      if (goal.periodStartMs >= windowEndExclusiveMs) continue;
+      if (!GoalPeriodHelpers.isDateKeyInPeriod(goal, endDateKey)) continue;
+      if (!windowKeys.any(
+        (k) => GoalPeriodHelpers.allowsLoggingOnDateKey(goal, k),
+      )) {
+        continue;
+      }
       final checkIns = await _goalsRepository.getCheckInsForGoal(
         goal.id,
         startDateKey: startDateKey,

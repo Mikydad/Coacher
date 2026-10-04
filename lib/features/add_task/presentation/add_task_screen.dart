@@ -9,6 +9,8 @@ import '../../../core/di/providers.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
+import '../../tasks_hub/presentation/tasks_hub_screen.dart';
+import '../application/saved_for_another_day.dart';
 import '../../planning/domain/models/routine.dart';
 import '../../planning/application/form_draft_autosave.dart';
 import '../../planning/application/form_draft_providers.dart';
@@ -39,7 +41,6 @@ import 'sections/add_task_accountability_deep_work_row.dart';
 import 'sections/add_task_accountability_row.dart';
 import 'sections/add_task_advanced_section.dart';
 import 'sections/add_task_category_section.dart';
-import 'sections/add_task_classification_section.dart';
 import 'sections/add_task_duration_section.dart';
 import 'sections/add_task_reminder_section.dart';
 import 'sections/add_task_sleep_extras_section.dart';
@@ -386,7 +387,9 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
         _isHabitAnchor = loaded.isHabitAnchor;
         // Phase A: _isRigid defaults to false; no field on PlannedTask yet.
         _modeUserCustomized = false;
-        _advancedExpanded = _isHabitAnchor || _strictModeRequired || _isRigid;
+        // Open Advanced when it holds something the user set — including a
+        // user classification, which lives there now.
+        _advancedExpanded = _isHabitAnchor || _userTaxonomy != null;
         _loaded = true;
       });
       _suppressDraftDirty = false;
@@ -614,7 +617,29 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
       _draftAutosave?.cancel();
       await ref.read(formDraftRepositoryProvider).delete(_draftKey);
 
-      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
+      // A task filed under another day never shows in Home's Today's
+      // Tasks (QA, 2026-09-24): say where it went. The messenger is
+      // captured before the pop so the snackbar lands on the screen
+      // beneath; the action opens the Tasks hub.
+      final otherDay = savedForAnotherDayMessage(
+        planDateKey: planKey,
+        todayKey: DateKeys.todayKey(),
+      );
+      final messenger = ScaffoldMessenger.of(context);
+      final navigator = Navigator.of(context);
+      navigator.pop();
+      if (otherDay != null) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(otherDay),
+            action: SnackBarAction(
+              label: 'View',
+              onPressed: () => navigator.pushNamed(TasksHubScreen.routeName),
+            ),
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -864,30 +889,6 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                             alarm: _alarm,
                             onAlarmChanged: (v) => setState(() => _alarm = v),
                           ),
-                          // Classification only matters when a reminder
-                          // exists — it selects the ladder's shape, not
-                          // whether one is armed (FR-R-23).
-                          if (_reminder) ...[
-                            const SizedBox(height: 12),
-                            AddTaskClassificationSection(
-                              taxonomy: _effectiveTaxonomy,
-                              isCritical: _userCritical,
-                              onTaxonomyChanged: (t) => setState(() {
-                                _userTaxonomy = t;
-                                // Critical is meaningless off the expiring
-                                // class; drop it rather than keep it hidden
-                                // and armed.
-                                if (t != ReminderTaxonomy.timeSensitive) {
-                                  _userCritical = false;
-                                }
-                              }),
-                              onCriticalChanged: (v) => setState(() {
-                                _userCritical = v;
-                                // Ticking Critical IS choosing the class.
-                                _userTaxonomy ??= _effectiveTaxonomy;
-                              }),
-                            ),
-                          ],
                           const SizedBox(height: 12),
                           AddTaskDurationSection(
                             category: _category,
@@ -955,15 +956,26 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                               sectionKey: _advancedSectionKey,
                               expanded: _advancedExpanded,
                               isHabitAnchor: _isHabitAnchor,
-                              strictModeRequired: _strictModeRequired,
-                              isRigid: _isRigid,
                               onToggleExpanded: _toggleAdvancedExpanded,
                               onHabitAnchorChanged: (v) =>
                                   setState(() => _isHabitAnchor = v),
-                              onStrictChanged: (v) =>
-                                  setState(() => _strictModeRequired = v),
-                              onRigidChanged: (v) =>
-                                  setState(() => _isRigid = v),
+                              // "If you miss it" lives here since
+                              // 2026-09-18, only while a reminder exists —
+                              // it selects the ladder's shape, not whether
+                              // one is armed (FR-R-23). Sleep never reaches
+                              // this branch, so it never sees the chooser.
+                              reminderEnabled: _reminder,
+                              taxonomy: _effectiveTaxonomy,
+                              isCritical: _userCritical,
+                              onTaxonomyChanged: (t) =>
+                                  setState(() => _userTaxonomy = t),
+                              onCriticalChanged: (v) => setState(() {
+                                _userCritical = v;
+                                // Ticking Critical IS choosing the class:
+                                // the current answer becomes the user's, so
+                                // criticality 3 has a class to ride on.
+                                _userTaxonomy ??= _effectiveTaxonomy;
+                              }),
                             ),
                           ],
                         ],

@@ -5,41 +5,22 @@ import '../../application/onboarding_flow_controller.dart';
 import '../../domain/models/onboarding_profile.dart';
 import '../onboarding_ui.dart';
 
-/// Screen 10 — Choose Your Goals. Multi-select goal CATEGORIES, stored as
-/// interest tags (never auto-created goals — decision log 2026-07-12).
+/// Screen 3 — What matters to you right now. Multi-select interests, stored
+/// as tags (never auto-created goals — decision log 2026-07-12); the
+/// first-goal picker after sign-in is where one becomes real (2026-09-25).
 class GoalsStep extends ConsumerWidget {
   const GoalsStep({super.key, required this.onSkip});
 
   final VoidCallback onSkip;
 
   static const _options = [
-    (
-      OnboardingInterests.buildBusiness,
-      Icons.rocket_launch_outlined,
-      'Build a business',
-    ),
-    (
-      OnboardingInterests.improveHealth,
-      Icons.favorite_outline,
-      'Improve my health',
-    ),
-    (
-      OnboardingInterests.learnSkills,
-      Icons.menu_book_outlined,
-      'Learn new skills',
-    ),
-    (
-      OnboardingInterests.getOrganized,
-      Icons.grid_view_outlined,
-      'Get organized',
-    ),
-    (OnboardingInterests.makeMoney, Icons.payments_outlined, 'Make more money'),
-    (OnboardingInterests.betterHabits, Icons.refresh, 'Build better habits'),
-    (
-      OnboardingInterests.moreDisciplined,
-      Icons.shield_outlined,
-      'Become more disciplined',
-    ),
+    (OnboardingInterests.buildBusiness, Icons.rocket_launch_outlined),
+    (OnboardingInterests.improveHealth, Icons.favorite_outline),
+    (OnboardingInterests.learnSkills, Icons.menu_book_outlined),
+    (OnboardingInterests.getOrganized, Icons.grid_view_outlined),
+    (OnboardingInterests.makeMoney, Icons.payments_outlined),
+    (OnboardingInterests.betterHabits, Icons.refresh),
+    (OnboardingInterests.moreDisciplined, Icons.shield_outlined),
   ];
 
   @override
@@ -50,17 +31,17 @@ class GoalsStep extends ConsumerWidget {
       progress: flow.progress,
       onBack: controller.back,
       onSkip: onSkip,
-      ctaLabel: 'Start Building',
+      ctaLabel: 'Continue',
       onCta: flow.interests.isEmpty ? null : controller.next,
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('What\'s your biggest goal?', style: OnboardingType.headline),
-          const SizedBox(height: 10),
           Text(
-            'What do you want to achieve first? Pick as many as you like.',
-            style: OnboardingType.body,
+            'What matters most to you right now?',
+            style: OnboardingType.headline,
           ),
+          const SizedBox(height: 10),
+          Text('Choose as many as you like.', style: OnboardingType.body),
           const SizedBox(height: 16),
           Expanded(
             child: ListView.separated(
@@ -68,9 +49,9 @@ class GoalsStep extends ConsumerWidget {
               itemCount: _options.length,
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, i) {
-                final (key, icon, title) = _options[i];
+                final (key, icon) = _options[i];
                 return OnboardingSelectableCard(
-                  title: title,
+                  title: OnboardingInterests.label(key),
                   icon: icon,
                   selected: flow.interests.contains(key),
                   onTap: () => controller.toggleInterest(key),

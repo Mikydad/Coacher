@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/utils/date_keys.dart';
 import '../application/time_tracker_providers.dart';
+import '../domain/activity_overlap.dart';
 import '../domain/models/activity_category_rule.dart';
 import '../domain/models/activity_event.dart';
 import '../domain/recent_activities.dart';
@@ -18,7 +20,7 @@ import 'time_screen.dart';
 /// [ Scrolling                ]
 /// RECENT   (Gym) (Scrolling) …   ← the user's own, tap fills the field
 /// DURATION · OPTIONAL  (15m) (30m) (45m) (1h) (Custom…)
-/// [        TRACK ▸        ]
+/// [         LOG ▸         ]
 /// ```
 ///
 /// Edit mode (`edit != null`) is the same sheet with an End row and a
@@ -43,7 +45,8 @@ Future<void> showTrackActivitySheet(
       borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
     ),
     routeSettings: const RouteSettings(name: TrackActivitySheet.routeName),
-    builder: (_) => TrackActivitySheet(edit: edit, presetStartMs: presetStartMs),
+    builder: (_) =>
+        TrackActivitySheet(edit: edit, presetStartMs: presetStartMs),
   );
 }
 
@@ -72,6 +75,10 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
   int? _intended;
   bool _saving = false;
   String? _note;
+
+  /// True once the user has moved the start earlier than now: the sheet is
+  /// then backfilling ("What were you doing?"), not logging the present.
+  bool _startMoved = false;
 
   @override
   void initState() {
@@ -130,6 +137,7 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
     }
     setState(() {
       _startMs = candidate;
+      _startMoved = candidate < now;
       _note = note;
     });
   }
@@ -170,7 +178,8 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
     final minutes = await showDialog<int>(
       context: context,
       builder: (_) => _CustomDurationDialog(
-        initial: _intended != null && !kIntendedDurationChips.contains(_intended)
+        initial:
+            _intended != null && !kIntendedDurationChips.contains(_intended)
             ? _intended
             : null,
       ),
@@ -178,7 +187,8 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
     if (minutes == null || !mounted) return;
     if (minutes < 1 || minutes > kActivityIntendedMaxMinutes) {
       setState(
-        () => _note = 'Duration must be 1–$kActivityIntendedMaxMinutes minutes.',
+        () =>
+            _note = 'Duration must be 1–$kActivityIntendedMaxMinutes minutes.',
       );
       return;
     }
@@ -188,11 +198,54 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
     });
   }
 
+  /// One thing at a time (2026-09-24): an entry that overlaps what is
+  /// already logged asks before it cuts the other entry short. Returns
+  /// false when the user backs out.
+  Future<bool> _confirmOverlap(int nowMs) async {
+    final dayKey = DateKeys.yyyymmdd(_day);
+    final events = ref.read(dayEventsProvider(dayKey)).valueOrNull ?? const [];
+    final clashes = overlappingActivities(
+      events,
+      startMs: _startMs,
+      endMs: _endMs,
+      nowMs: nowMs,
+      excludeId: widget.edit?.id,
+    );
+    if (clashes.isEmpty) return true;
+    final notice = overlapNotice(
+      existing: clashes.first,
+      newText: _text.text,
+      startMs: _startMs,
+      formatTime: (ms) => TimeOfDay.fromDateTime(
+        DateTime.fromMillisecondsSinceEpoch(ms),
+      ).format(context),
+    );
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(notice.title),
+        content: Text(notice.body),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Log anyway'),
+          ),
+        ],
+      ),
+    );
+    return go == true;
+  }
+
   Future<void> _submit() async {
     if (!_canSubmit) return;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (!await _confirmOverlap(nowMs) || !mounted) return;
     setState(() => _saving = true);
     final actions = ref.read(timeTrackerActionsProvider);
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
     final edit = widget.edit;
     try {
       final event = edit == null
@@ -278,6 +331,7 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
     );
     final viewInsets = MediaQuery.of(context).viewInsets;
     final isEdit = widget.isEdit;
+    final isFreshNow = !isEdit && widget.presetStartMs == null && !_startMoved;
 
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(20, 4, 20, 20 + viewInsets.bottom),
@@ -351,7 +405,9 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
                           ? 'Set an end time'
                           : 'Ended at ${_clock(context, _endMs!)}',
                       style: TextStyle(
-                        color: _endMs == null ? AppColors.textSoft : AppColors.fg,
+                        color: _endMs == null
+                            ? AppColors.textSoft
+                            : AppColors.fg,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -362,7 +418,11 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
                   IconButton(
                     key: const ValueKey('track_end_clear'),
                     tooltip: 'Clear end',
-                    icon: Icon(Icons.close, size: 16, color: AppColors.textSoft),
+                    icon: Icon(
+                      Icons.close,
+                      size: 16,
+                      color: AppColors.textSoft,
+                    ),
                     visualDensity: VisualDensity.compact,
                     onPressed: () => setState(() => _endMs = null),
                   ),
@@ -372,14 +432,23 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
           const SizedBox(height: 14),
 
           // ── Activity ─────────────────────────────────────────────────
+          // Present tense only for a fresh log that starts now; editing an
+          // entry or backfilling a gap asks about the past (2026-09-25).
           Text(
-            'What are you doing?',
+            isFreshNow ? 'What are you doing right now?' : 'What were you doing?',
             style: TextStyle(
               color: AppColors.textMuted,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
           ),
+          if (isFreshNow) ...[
+            const SizedBox(height: 4),
+            Text(
+              "Log what you're doing to see how you use your time.",
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            ),
+          ],
           const SizedBox(height: 8),
           TextField(
             key: const ValueKey('track_text'),
@@ -387,8 +456,12 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
             autofocus: !isEdit,
             maxLength: kActivityTextMaxChars,
             buildCounter:
-                (context, {required currentLength, required isFocused, maxLength}) =>
-                    null,
+                (
+                  context, {
+                  required currentLength,
+                  required isFocused,
+                  maxLength,
+                }) => null,
             textCapitalization: TextCapitalization.sentences,
             textInputAction: TextInputAction.done,
             style: TextStyle(
@@ -428,7 +501,10 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
                   );
                 },
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 9,
+                    horizontal: 4,
+                  ),
                   child: Row(
                     children: [
                       Icon(
@@ -485,12 +561,14 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
               ChoiceChip(
                 key: const ValueKey('track_duration_custom'),
                 label: Text(
-                  _intended != null && !kIntendedDurationChips.contains(_intended)
+                  _intended != null &&
+                          !kIntendedDurationChips.contains(_intended)
                       ? '${_intended}m'
                       : 'Custom…',
                 ),
                 selected:
-                    _intended != null && !kIntendedDurationChips.contains(_intended),
+                    _intended != null &&
+                    !kIntendedDurationChips.contains(_intended),
                 onSelected: (_) => _pickCustomDuration(),
               ),
             ],
@@ -579,7 +657,7 @@ class _TrackActivitySheetState extends ConsumerState<TrackActivitySheet> {
                 ),
               ),
               child: Text(
-                isEdit ? 'SAVE' : 'TRACK  ▸',
+                isEdit ? 'SAVE' : 'LOG  ▸',
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,

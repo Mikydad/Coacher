@@ -24,6 +24,13 @@ import 'package:flutter_test/flutter_test.dart';
 /// Planning repo that returns a single routine with a single block containing
 /// the given tasks for every date key.
 class _FakePlanningRepo implements PlanningRepository {
+  @override
+  Future<List<PlannedTask>> getTasksForGoal(String goalId) async => const [];
+
+  @override
+  Stream<List<PlannedTask>> watchTasksForGoal(String goalId) =>
+      Stream.value(const []);
+
   _FakePlanningRepo({this.tasks = const []});
   final List<PlannedTask> tasks;
 
@@ -59,6 +66,10 @@ class _FakePlanningRepo implements PlanningRepository {
     required String routineId,
     required String blockId,
   }) async => tasks;
+
+  @override
+  Future<PlannedTask?> getTaskById(String taskId) async =>
+      tasks.where((t) => t.id == taskId).firstOrNull;
 
   @override
   Future<List<RoutineModeConfig>> getRoutineModeConfigs({

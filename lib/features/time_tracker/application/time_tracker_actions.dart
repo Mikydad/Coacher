@@ -26,6 +26,15 @@ class TimeTrackerActions {
       // The next log ends the previous activity — its "are up" reminder
       // has nothing left to ask.
       await reminders.cancelFor(previous.id);
+      // …and that end is written, not just implied (2026-09-24): the Home
+      // pill reads "latest start, no explicit end", so a still-open
+      // previous entry could keep claiming "since 9:00" after a later,
+      // already-ended entry had cut it. A backfilled entry that starts
+      // BEFORE the running one leaves it alone.
+      if (!previous.hasExplicitEnd &&
+          saved.startedAtMs >= previous.startedAtMs) {
+        await repository.setEnd(previous.id, saved.startedAtMs);
+      }
     }
     await reminders.scheduleFor(saved);
     return saved;

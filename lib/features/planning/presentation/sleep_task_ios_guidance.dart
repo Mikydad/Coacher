@@ -40,7 +40,7 @@ Future<void> showSleepTaskIosFocusGuidance(
               'iOS does not let apps turn on Sleep Focus or Do Not Disturb '
               'automatically. You can enable them in Settings → Focus, or use '
               'Shortcuts automations.\n\n'
-              'Coach can still align your daily sleep window and run an in-app '
+              'Coach can still align your quiet hours and run an in-app '
               'quiet mode for this block.',
               style: TextStyle(
                 fontSize: 13,

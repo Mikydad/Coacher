@@ -10,7 +10,7 @@ void main() {
 
       expect(match, isNotNull);
       expect(match!.domainId, 'community');
-      expect(match.message, contains('Circles'));
+      expect(match.message, contains('Groups'));
     });
 
     test('returns billing match for subscription queries', () {

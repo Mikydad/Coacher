@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/presentation/app_colors.dart';
 import '../../application/ai_assistant_providers.dart';
-import '../../application/proactive_suggestion_display.dart';
 import '../ai_assistant_screen.dart';
 
 /// The omnipresent Coach AI button — one per main tab, always bottom-right.
@@ -22,7 +21,11 @@ import '../ai_assistant_screen.dart';
 class CoachAiFab extends ConsumerWidget {
   const CoachAiFab({super.key});
 
-  static Color get _accent => AppColors.cyan;
+  static Color get _accent => AppColors.coach;
+
+  /// 64px (redesign 2026-09-14) — a touch larger than a stock FAB so the
+  /// coach reads as the page's floating companion, not another control.
+  static const double kSize = 64;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -32,15 +35,6 @@ class CoachAiFab extends ConsumerWidget {
             .whenOrNull(
               data: (svc) => svc.pendingPlan?.isBlockedByContext == true,
             ) ??
-        false;
-
-    // Proactive suggestions moved off Home behind this button (2026-08-23):
-    // a quiet accent dot says "the coach has something", and a tap lands on
-    // the suggestions panel instead of the bare ask bar.
-    final hasSuggestions =
-        ref
-            .watch(proactiveSuggestionsProvider)
-            .whenOrNull(data: (s) => activeProactiveSuggestions(s).isNotEmpty) ??
         false;
 
     // Long-press = straight into Voice Mode (2026-08-22): the same
@@ -56,13 +50,15 @@ class CoachAiFab extends ConsumerWidget {
       // Solid accent + a soft glow: the coach is the app's one primary
       // action, and the old ink-on-ink outline disappeared into the page.
       child: Container(
+        width: kSize,
+        height: kSize,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: _accent.withValues(alpha: 0.30),
-              blurRadius: 14,
-              offset: const Offset(0, 3),
+              color: AppColors.coachShadow,
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -70,13 +66,9 @@ class CoachAiFab extends ConsumerWidget {
           // Multiple instances live in the tab IndexedStack at once — opt out
           // of Hero animation entirely so route transitions never collide.
           heroTag: null,
-          onPressed: () => showCoachAiSheet(
-            context,
-            askBar: true,
-            args: hasSuggestions
-                ? const CoachRouteArgs(openSuggestionsPanel: true)
-                : null,
-          ),
+          // Suggestions left the coach for the Progress day view
+          // (2026-09-22); a tap is the bare ask bar again.
+          onPressed: () => showCoachAiSheet(context, askBar: true),
           elevation: 0,
           highlightElevation: 0,
           splashColor: AppColors.onAccent.withValues(alpha: 0.12),
@@ -85,16 +77,14 @@ class CoachAiFab extends ConsumerWidget {
           child: Icon(
             Icons.auto_awesome_rounded,
             color: AppColors.onAccent,
-            size: 26,
+            size: 28,
           ),
         ),
       ),
     );
 
-    if (!hasBlockedPlan && !hasSuggestions) return fab;
-    // Red (blocked plan) outranks the suggestions dot; on the solid accent
-    // disc the suggestions dot flips to the on-accent tone to stay visible.
-    final dotColor = hasBlockedPlan ? Colors.redAccent : AppColors.onAccent;
+    if (!hasBlockedPlan) return fab;
+    const dotColor = Colors.redAccent;
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -125,11 +115,7 @@ class CoachSatelliteFabs extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        const CoachAiFab(),
-        const SizedBox(height: 10),
-        pageFab,
-      ],
+      children: [const CoachAiFab(), const SizedBox(height: 10), pageFab],
     );
   }
 }

@@ -1,4 +1,5 @@
 import '../domain/models/current_coaching_focus.dart';
+import '../domain/models/generated_insight.dart';
 import 'focus_candidate.dart';
 import 'focus_scoring_engine.dart';
 import 'layer4_delivery_policy.dart';
@@ -76,9 +77,11 @@ FocusSelectionResult selectFocus({
   final ts = now ?? DateTime.now();
   final nowMs = ts.millisecondsSinceEpoch;
 
-  // Score all candidates.
+  // Score all candidates. Retired streak-family insights (still possible in
+  // the persisted cache) are never focus material.
   final scored =
       candidates
+          .where((c) => !isRetiredInsightType(c.insight.insightType))
           .map(
             (c) => FocusScoredCandidate(
               candidate: c,

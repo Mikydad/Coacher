@@ -17,7 +17,7 @@ import { logger } from 'firebase-functions/v2';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 
-import { canRemoveRevealedPhoto, vetoEligible } from './decisions';
+import { photoRemovalDoor, PhotoRemovalDoor, vetoEligible } from './decisions';
 import { escrowRef, markEscrow, newEscrowDoc } from './escrows';
 import { measureParticipant } from './measurement';
 import { balanceRef, txnRef, writeLedgerTxn } from './ledger';
@@ -44,6 +44,8 @@ import {
   eventDoc,
   evidenceFromSnap,
 } from './firestore_layout';
+import { PHOTO_RESERVATIONS, PHOTO_RESERVATION_TTL_MS, PHOTO_SCREENS } from './nsfw_screen';
+import { verdictBindsTo } from './screen_verdict';
 import { assertTransition } from './state_machine';
 import {
   ChallengeCadence,
@@ -121,11 +123,12 @@ function participantOf(ch: StakeChallenge, uid: string): Participant {
   return p;
 }
 
+/** C1 — membership means status ACTIVE (pending / removed docs don't count). */
 async function isCircleMember(circleId: string, uid: string): Promise<boolean> {
   const snap = await getFirestore()
     .doc(`circles/${circleId}/members/${uid}`)
     .get();
-  return snap.exists;
+  return snap.exists && snap.data()?.status === 'active';
 }
 
 function appendEvent(
@@ -289,7 +292,7 @@ export const stakeCreateChallenge = onCall(
     if (type === 'solo_photo') {
       circleId = str(request.data?.circleId, 'circleId', 1, 64);
       if (!(await isCircleMember(circleId, uid))) {
-        throw new HttpsError('permission-denied', 'Not a member of that circle.');
+        throw new HttpsError('permission-denied', 'Not a member of that group.');
       }
       const rawPhoto = (request.data?.photo ?? {}) as Record<string, unknown>;
       const storagePath = str(rawPhoto.storagePath, 'photo.storagePath', 1, 256);
@@ -326,7 +329,7 @@ export const stakeCreateChallenge = onCall(
       }
       if (!(await isCircleMember(circleId, uid)) ||
           !(await isCircleMember(circleId, opponentUid))) {
-        throw new HttpsError('permission-denied', 'Both players must be members of that circle.');
+        throw new HttpsError('permission-denied', 'Both players must be members of that group.');
       }
       const stakeAmount = int(
         request.data?.stakeAmount,
@@ -382,7 +385,7 @@ export const stakeCreateChallenge = onCall(
       if (typeof rawCircle === 'string' && rawCircle.length > 0) {
         circleId = str(rawCircle, 'circleId', 1, 64);
         if (!(await isCircleMember(circleId, uid))) {
-          throw new HttpsError('permission-denied', 'Not a member of that circle.');
+          throw new HttpsError('permission-denied', 'Not a member of that group.');
         }
       }
 
@@ -464,8 +467,18 @@ export const stakeCreateChallenge = onCall(
       // Handshake with the NSFW trigger (see nsfw_screen.ts): the photo
       // uploads before this call, so its verdict may already be in.
       if (type === 'solo_photo') {
-        const screen = await tx.get(db.collection('stake_photo_screens').doc(id));
-        const screenStatus = screen.data()?.status;
+        const screen = await tx.get(db.collection(PHOTO_SCREENS).doc(id));
+        const photoPath = participants[0]?.photo?.storagePath;
+        // H1 — only a verdict bound to THIS uid + object counts; anything
+        // else (stranger's upload, pre-binding verdict) leaves the draft in
+        // pending_screen for the bound trigger/sweep to settle.
+        const bound = verdictBindsTo(
+          typeof screen.data()?.uid === 'string' && typeof screen.data()?.path === 'string'
+            ? { uid: screen.data()!.uid as string, path: screen.data()!.path as string }
+            : undefined,
+          { uid, photoPath },
+        );
+        const screenStatus = bound ? screen.data()?.status : undefined;
         if (screenStatus === 'rejected') {
           throw new HttpsError(
             'failed-precondition',
@@ -671,8 +684,12 @@ export const stakeDeclineChallenge = onCall(
 );
 
 // ─── stakeRemovePhoto (P-5/D9) ───────────────────────────────────────────────
-// Early takedown of a live reveal: only after the 30% exposure floor, only
-// for the price. The loss stays on the record either way.
+// Early takedown, for the price, payable only from trusted points. Two doors
+// (2026-09-18): BEFORE the reveal — deadline passed, outcome pending, photo
+// screened but not posted — the staker can make sure it never posts (no
+// floor: nothing was exposed). AFTER the reveal — only past the 30%
+// exposure floor. The loss stays on the record either way, and a
+// post-reveal takedown leaves one neutral line in the circle feed (P-5).
 
 export const stakeRemovePhoto = onCall(
   CALL_OPTS,
@@ -682,7 +699,26 @@ export const stakeRemovePhoto = onCall(
     const now = Date.now();
     const db = getFirestore();
 
+    // Feed-note inputs, read before the transaction (same shape as the
+    // sweep's reveal post): the circle may be gone, and a bare create into
+    // a deleted circle would abort the takedown.
+    const pre = await loadChallenge(id);
+    const preMe = pre.participants.find((p) => p.uid === uid);
+    if (!preMe?.photo) {
+      throw new HttpsError('permission-denied', 'Not your stake photo.');
+    }
+    let circleExists = false;
+    let displayName = 'A member';
+    if (pre.circleId) {
+      circleExists = (await db.doc(`circles/${pre.circleId}`).get()).exists;
+      if (circleExists) {
+        const member = await db.doc(`circles/${pre.circleId}/members/${uid}`).get();
+        displayName = (member.data()?.displayName as string | undefined) ?? displayName;
+      }
+    }
+
     let photoPath: string | undefined;
+    let door: PhotoRemovalDoor = 'none';
     await db.runTransaction(async (tx) => {
       const ref = db.collection(CHALLENGES).doc(id);
       const snap = await tx.get(ref);
@@ -693,18 +729,21 @@ export const stakeRemovePhoto = onCall(
         throw new HttpsError('permission-denied', 'Not your stake photo.');
       }
       const data = snap.data()!;
-      if (data.photoState !== 'revealed') {
-        throw new HttpsError('failed-precondition', 'No live reveal to remove.');
-      }
-      const revealedAtMs = data.revealedAtMs as number | undefined;
-      if (
-        revealedAtMs === undefined ||
-        !canRemoveRevealedPhoto(revealedAtMs, me.photo.revealWindowMins, now)
-      ) {
+      door = photoRemovalDoor({
+        status: ch.status,
+        photoState: data.photoState as string | undefined,
+        revealedAtMs: data.revealedAtMs as number | undefined,
+        revealWindowMins: me.photo.revealWindowMins,
+        nowMs: now,
+      });
+      if (door === 'floor') {
         throw new HttpsError(
           'failed-precondition',
           'The photo must stay up for at least 30% of its window first.',
         );
+      }
+      if (door === 'none') {
+        throw new HttpsError('failed-precondition', 'No photo to take down right now.');
       }
 
       // Dedupe + balance (reads before writes).
@@ -718,6 +757,16 @@ export const stakeRemovePhoto = onCall(
           `Removing the photo costs ${PHOTO_REMOVAL_PRICE} points.`,
         );
       }
+      // Audit H7 / D1: self-reported earnings (tasks, goals, check-ins) can
+      // be inflated by a determined client, so the one sink that touches
+      // someone else's stake is payable only from server-awarded points.
+      if ((bal?.trusted ?? 0) < PHOTO_REMOVAL_PRICE) {
+        throw new HttpsError(
+          'failed-precondition',
+          `Removing the photo costs ${PHOTO_REMOVAL_PRICE} points earned from ` +
+            'challenge wins.',
+        );
+      }
 
       writeLedgerTxn(tx, uid, bal, {
         source: 'spend_photo_removal',
@@ -726,15 +775,39 @@ export const stakeRemovePhoto = onCall(
         atMs: now,
       });
       tx.update(ref, { photoState: 'removed', updatedAtMs: now });
-      appendEvent(tx, id, { type: 'photo_removed', uid, atMs: now });
+      appendEvent(tx, id, {
+        type: 'photo_removed',
+        uid,
+        atMs: now,
+        data: { preReveal: door === 'pre_reveal' },
+      });
+      // P-5: a photo the circle already saw gets one neutral line saying it
+      // came down early. A pre-reveal takedown was never public — nothing
+      // to announce.
+      if (door === 'post_reveal' && ch.circleId && circleExists) {
+        const feedRef = db.collection(`circles/${ch.circleId}/activityFeed`).doc();
+        tx.create(
+          feedRef,
+          activityFeedItemDoc({
+            id: feedRef.id,
+            circleId: ch.circleId,
+            userId: uid,
+            displayName,
+            eventType: 'stakePhotoRemoved',
+            entityId: ch.id,
+            entityTitle: ch.frozenGoal.title,
+            nowMs: now,
+          }),
+        );
+      }
       photoPath = me.photo.storagePath;
     });
 
     if (photoPath) {
       await getStorage().bucket().file(photoPath).delete({ ignoreNotFound: true });
     }
-    logger.info('stakeRemovePhoto ok', { uid, id });
-    return { ok: true };
+    logger.info('stakeRemovePhoto ok', { uid, id, door });
+    return { ok: true, door };
   },
 );
 
@@ -1029,7 +1102,7 @@ export const stakeCastVote = onCall(
       throw new HttpsError('permission-denied', 'Participants cannot vote.');
     }
     if (!ch.circleId || !(await isCircleMember(ch.circleId, uid))) {
-      throw new HttpsError('permission-denied', 'Only circle members can vote.');
+      throw new HttpsError('permission-denied', 'Only group members can vote.');
     }
     // A dispute about aboutUid must exist with its 48h window still open.
     const disputes = await db
@@ -1072,7 +1145,7 @@ export const stakeReportScreenshot = onCall(
 
     const ch = await loadChallenge(id);
     if (!ch.circleId || !(await isCircleMember(ch.circleId, uid))) {
-      throw new HttpsError('permission-denied', 'Not a member of that circle.');
+      throw new HttpsError('permission-denied', 'Not a member of that group.');
     }
 
     // Offender's display name for the public naming (D11); the member doc
@@ -1140,7 +1213,7 @@ export const stakeReportPhoto = onCall(
 
     const ch = await loadChallenge(id);
     if (!ch.circleId || !(await isCircleMember(ch.circleId, uid))) {
-      throw new HttpsError('permission-denied', 'Not a member of that circle.');
+      throw new HttpsError('permission-denied', 'Not a member of that group.');
     }
 
     await db.runTransaction(async (tx) => {
@@ -1154,5 +1227,55 @@ export const stakeReportPhoto = onCall(
       appendEvent(tx, id, { type: 'photo_reported', uid, atMs: now });
     });
     return { ok: true };
+  },
+);
+
+// ─── stakeReservePhotoUpload (M12) ───────────────────────────────────────────
+
+/**
+ * Reserve `stake_photos/{challengeId}/{uid}.jpg` before uploading it.
+ * storage.rules requires the reservation for the create and the screening
+ * trigger refuses unreserved objects, so anonymous / unsolicited uploads
+ * never reach Vision. Idempotent for the same uid; another uid's
+ * reservation on the same id is refused (ids are client-generated
+ * StableIds, so a clash is an attack, not an accident).
+ */
+export const stakeReservePhotoUpload = onCall(
+  CALL_OPTS,
+  async (request: CallableRequest<{ challengeId?: unknown }>) => {
+    const uid = requireAuth(request);
+    requireRegistered(request);
+    const now = Date.now();
+    const challengeId = str(request.data?.challengeId, 'challengeId', 8, 64);
+    if (!/^[A-Za-z0-9_-]+$/.test(challengeId)) {
+      throw new HttpsError('invalid-argument', 'challengeId has invalid characters.');
+    }
+    const db = getFirestore();
+    const enforcement = (
+      await db.collection(ENFORCEMENT).doc(uid).get()
+    ).data() as EnforcementDoc | undefined;
+    if (isChallengeBanned(enforcement?.challengeBanUntilMs, now)) {
+      throw new HttpsError(
+        'permission-denied',
+        'You are temporarily banned from starting challenges.',
+      );
+    }
+    const ref = db.collection(PHOTO_RESERVATIONS).doc(challengeId);
+    await db.runTransaction(async (tx) => {
+      const existing = await tx.get(ref);
+      if (existing.exists && existing.data()?.uid !== uid) {
+        throw new HttpsError('already-exists', 'That challenge id is taken.');
+      }
+      if (await tx.get(db.collection(CHALLENGES).doc(challengeId)).then((s) => s.exists)) {
+        throw new HttpsError('already-exists', 'That challenge already exists.');
+      }
+      tx.set(ref, {
+        uid,
+        atMs: now,
+        expiresAtMs: now + PHOTO_RESERVATION_TTL_MS,
+        path: `stake_photos/${challengeId}/${uid}.jpg`,
+      });
+    });
+    return { challengeId, expiresAtMs: now + PHOTO_RESERVATION_TTL_MS };
   },
 );

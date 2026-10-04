@@ -190,7 +190,7 @@ void main() {
       ], now: now);
 
       expect(view.rows, isEmpty);
-      expect(view.routineDigestLine, 'Missed today: Stretch, Water');
+      expect(view.routineDigestLine, 'Reminders passed: Stretch, Water');
       expect(view.isNotEmpty, isTrue);
     });
 
@@ -202,7 +202,7 @@ void main() {
         routineMiss('Walk'),
       ], now: now);
 
-      expect(view.routineDigestLine, 'Missed today: Stretch, Vitamins and 2 more');
+      expect(view.routineDigestLine, 'Reminders passed: Stretch, Vitamins and 2 more');
     });
 
     test('an older routine miss is not dredged up', () {
@@ -229,7 +229,48 @@ void main() {
       ], now: now);
 
       expect(view.rows, hasLength(1));
-      expect(view.routineDigestLine, 'Missed today: Water');
+      expect(view.routineDigestLine, 'Reminder passed: Water');
+    });
+  });
+
+  group('liveness guard (2026-09-18)', () {
+    test('a row whose entity is gone is dropped before ordering', () {
+      final view = RecoveryViewBuilder.build(
+        [occ(id: 'deleted-task'), occ(id: 'live-task')],
+        now: now,
+        isLive: (o) => o.entityId != 'deleted-task',
+      );
+
+      expect(view.rows.map((r) => r.occurrence.entityId), ['live-task']);
+    });
+
+    test('routine misses are guarded too — a deleted routine leaves the digest',
+        () {
+      final view = RecoveryViewBuilder.build(
+        [
+          occ(
+            id: 'water',
+            taxonomy: ReminderTaxonomy.routine,
+            state: ReminderOccurrenceState.resolved,
+            resolutionKind: ReminderResolutionKind.expired,
+          ),
+          occ(
+            id: 'stretch',
+            taxonomy: ReminderTaxonomy.routine,
+            state: ReminderOccurrenceState.resolved,
+            resolutionKind: ReminderResolutionKind.expired,
+          ),
+        ],
+        now: now,
+        isLive: (o) => o.entityId != 'water',
+      );
+
+      expect(view.routineMisses, ['stretch']);
+    });
+
+    test('no predicate means the pool is trusted (pure contract intact)', () {
+      final view = RecoveryViewBuilder.build([occ(id: 'a')], now: now);
+      expect(view.rows, hasLength(1));
     });
   });
 

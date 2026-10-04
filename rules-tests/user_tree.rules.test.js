@@ -151,3 +151,83 @@ describe('users tree — server-owned carve-out (rescueState / briefState)', () 
     await assertFails(asUser(STRANGER).doc(`users/${OWNER}/briefState/morning`).get());
   });
 });
+
+// ─── Pre-launch audit H16 — server-side last-write-wins on the user tree ────
+
+describe('users tree — LWW guard on updatedAtMs (H16)', () => {
+  const OWNER_UID = 'user_owner';
+  const path = `users/${OWNER_UID}/routines/r1/blocks/b1/tasks/t1`;
+
+  async function seedTask(updatedAtMs) {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(path).set({ title: 'Task', updatedAtMs });
+    });
+  }
+
+  it('a newer or equal updatedAtMs is accepted', async () => {
+    await seedTask(100);
+    const db = env.authenticatedContext(OWNER_UID).firestore();
+    await assertSucceeds(db.doc(path).set({ title: 'Newer', updatedAtMs: 200 }, { merge: true }));
+    await assertSucceeds(db.doc(path).set({ title: 'Retry', updatedAtMs: 200 }, { merge: true }));
+  });
+
+  it('a stale offline edit (older updatedAtMs) is rejected', async () => {
+    await seedTask(200);
+    const db = env.authenticatedContext(OWNER_UID).firestore();
+    await assertFails(db.doc(path).set({ title: 'Stale', updatedAtMs: 100 }, { merge: true }));
+    await assertFails(db.doc(path).update({ title: 'Stale', updatedAtMs: 100 }));
+  });
+
+  it('a merge that omits updatedAtMs keeps the stored value and passes', async () => {
+    await seedTask(200);
+    const db = env.authenticatedContext(OWNER_UID).firestore();
+    await assertSucceeds(db.doc(path).set({ title: 'Heartbeat only' }, { merge: true }));
+  });
+
+  it('documents without the field, creates, and deletes are unaffected', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${OWNER_UID}/deviceTokens/d1`).set({ token: 'x' });
+    });
+    const db = env.authenticatedContext(OWNER_UID).firestore();
+    await assertSucceeds(db.doc(`users/${OWNER_UID}/deviceTokens/d1`).update({ token: 'y' }));
+    await assertSucceeds(db.doc(`users/${OWNER_UID}/routines/new`).set({ updatedAtMs: 1 }));
+    await seedTask(500);
+    await assertSucceeds(db.doc(path).delete());
+  });
+
+  it('tombstones (deletedEntities) are owner-writable like any user entity', async () => {
+    const db = env.authenticatedContext(OWNER_UID).firestore();
+    await assertSucceeds(
+      db.doc(`users/${OWNER_UID}/deletedEntities/task_t1`).set({
+        entityType: 'task',
+        entityId: 't1',
+        deletedAtMs: 1,
+        updatedAtMs: 1,
+      }),
+    );
+    await assertFails(
+      env
+        .authenticatedContext('user_stranger')
+        .firestore()
+        .doc(`users/${OWNER_UID}/deletedEntities/task_t1`)
+        .get(),
+    );
+  });
+});
+
+// ─── Pre-launch audit M11 / D5 — tester allowlist is console-written ─────────
+
+describe('tester_allowlist — server allowlist', () => {
+  it('an account can read only its own grant; nobody writes', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('tester_allowlist/user_owner').set({ grantedAtMs: 1 });
+    });
+    await assertSucceeds(env.authenticatedContext('user_owner').firestore().doc('tester_allowlist/user_owner').get());
+    await assertFails(env.authenticatedContext('user_stranger').firestore().doc('tester_allowlist/user_owner').get());
+    await assertFails(
+      env.authenticatedContext('user_stranger').firestore().doc('tester_allowlist/user_stranger').set({ self: true }),
+    );
+    await assertFails(env.authenticatedContext('user_owner').firestore().doc('tester_allowlist/user_owner').delete());
+  });
+});
+

@@ -28,13 +28,13 @@ class SettingRow extends StatelessWidget {
       color: AppColors.inkDeep,
       child: InkWell(
         onTap: onTap,
-        highlightColor: AppColors.limeCream.withValues(alpha: 0.05),
-        splashColor: AppColors.limeCream.withValues(alpha: 0.08),
+        highlightColor: AppColors.accent.withValues(alpha: 0.05),
+        splashColor: AppColors.accent.withValues(alpha: 0.08),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
           child: Row(
             children: [
-              Icon(icon, color: AppColors.textSoft, size: 22),
+              Icon(icon, color: AppColors.textPrimary, size: 22),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -43,15 +43,18 @@ class SettingRow extends StatelessWidget {
                     Text(
                       title,
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 1),
+                    const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: TextStyle(fontSize: 11, color: AppColors.textSoft),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -72,9 +75,10 @@ class SettingRowChevron extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppColors.bindTheme(context);
     return Icon(
       Icons.chevron_right_rounded,
-      color: AppColors.textSoft,
+      color: AppColors.textSecondary,
       size: 20,
     );
   }

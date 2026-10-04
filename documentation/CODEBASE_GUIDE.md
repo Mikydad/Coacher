@@ -305,25 +305,54 @@ bugs (AUDIT §3). Plain-Dart singletons (`SyncService`, `OfflineStore`,
 ## 7. The AI coach and notifications (how the "smart" parts work)
 
 ### AI pipeline
-One Cloud Function, `aiChat` (`functions/src/index.ts`), is the **only**
-deployed function. OpenAI key lives in Secret Manager; model pinned server-side
-(`gpt-4o-mini`); per-uid rate limit 40/hour; anonymous accounts rejected
-(guests see a sign-in nudge instead of Coach AI).
+Server (`functions/src/`): `aiChat` (callable, tool-calling agent turns) and
+`aiChatStream` (NDJSON, answer-only turns for typed questions and voice). The
+OpenAI key lives in Secret Manager. Every call declares a **purpose**;
+`ai_routing.ts` maps purpose → model / temperature / token cap / quota class
+(Remote Config `ai_purpose_routes` overrides per field; models are
+allow-listed, a refused model is logged at config load); `coach_prompts.ts`
+owns the **system prompt** per purpose (client `system` messages are dropped
+and replaced; `ai_system_prompts` overrides); `ai_request.ts` shapes the
+request per model family (gpt-4o/4.1 vs gpt-5.x/6). Quotas: 40 turns/hour,
+300k tokens/day, a fail-safe daily instruction cap for accounts known to be
+free (`ai_instruction_cap.ts`); anonymous accounts are rejected (guests see
+a sign-in nudge). `aiChat` returns `finish_reason` so a cut reply is marked.
 
 Client flow (`features/ai_assistant/application/`):
 ```
-sendMessage → fast paths (yes/no plan replies, feature-guide questions — no LLM)
-  → AiPayloadAssembler.assemble   ← gathers tasks, goals, schedule, free windows,
-                                    behaviour stats, last 10 chat turns (30s cache)
-  → ProxyAiOperatingLayerClient   ← tool-calling loop (max 3): propose_changes
-                                    (writes) + get_day_schedule (reads)
-  → sanity passes: missing fields, assumptions, dedupe, conflicts
-  → preview card — NOTHING is written until the user taps Confirm
-  → AiActionExecutor.execute (with snapshot-based undo)
+sendMessage → local gates: day rollover (a session is a calendar day),
+              "undo" after an auto-commit, yes/no to a live card, decline,
+              capability + feature-guide answers (no LLM)
+  → AiIntentRouter.classify  query | suggest | mutate | unknown (question
+                              shape first; no mutate default)
+  → answer-only STREAM for clear questions (no tools) — otherwise:
+  → AiPayloadAssembler.assemble  ← today + tomorrow tasks with [t1] handles,
+       goals with [g1] handles + progress in the goal's own units, one busy
+       picture per day (timed tasks, goal blocks, calendar busy) → free
+       windows inside the user's waking day, memory, people, promises,
+       Direction, timeline, last 8 turns verbatim + an "earlier" line
+  → ProxyAiOperatingLayerClient  ← tool loop (≤4 rounds): propose_changes
+       (writes → card) + get_day_schedule (reads); unknown verbs dropped
+  → AiIntentParser passes: delete guard, missing fields, assumptions,
+       date-aware dedup + existing-item conflicts, entity resolution by
+       handle or title, conflict detector (day-aware)
+  → AiProposal (awaitingAnswer | suggested | awaitingConfirm | editing |
+       applied | cancelled | superseded) — the ONE plan under discussion
+  → preview card — nothing is written until the user taps Confirm
+  → confirmPlan: AiPlanValidator (past time, day drift) → AiActionExecutor
+       .execute(batchId: proposal's) — idempotent, inverse-op undo log,
+       per-action outcomes persisted — then bookkeeping (separate try)
 ```
-The "AI never writes directly" rule is prompt-enforced, not structural — hence
-the undo mechanism. Chat history is Isar-only, purged after 48h. A Remote
-Config bool `ai_enabled` swaps in a mock client as a kill switch.
+Auto-commit exceptions (no card, inline undo): createIntention, rememberFact,
+updateFact, forgetFact. History rows (Isar, purged after 48h) keep the
+assistant's text, a lossless plan summary and a tool trace; the proposal pins
+its own row. `ai_enabled` (Remote Config) is the kill switch — release builds
+get an honest "unavailable" client, debug builds the mock.
+
+Tests: `test/support/ai_scenario_harness.dart` runs the real stack over
+in-memory repos with a scripted model; `test/features/ai_assistant/scenarios/`
+holds the multi-turn contracts. `functions/eval/bakeoff.mjs` compares models
+on the same fixtures (needs an OpenAI key; see its README).
 
 ### Notifications & reminders (all local — no FCM)
 - `LocalNotificationsService` (core/notifications/) wraps the plugin.
@@ -451,10 +480,15 @@ Named route in `lib/app/app.dart`'s route table (or a new tab — extend
 `application/`.
 
 ### A new AI capability
-Server: extend `aiChat` validation if needed. Client: new tool in
-`ai_operating_layer_client.dart` + executor mapping in `AiActionExecutor`
-(keep the propose→confirm→execute→undo contract). Ground factual "teach me"
-answers in `features/education/domain/feature_guides.dart`, not the LLM.
+A new verb: add it to `ActionType`, the `propose_changes` enum and parameter
+description in `ai_operating_layer_client.dart` (then `python3
+functions/eval/export_tools.py`), the server prompt's parameter rules in
+`functions/src/coach_prompts.ts` (deploy), a real handler + inverse op in
+`AiActionExecutor`, and a scenario in `test/features/ai_assistant/scenarios/`.
+Never advertise a verb before its handler exists. A new background AI job is
+a *purpose* on `aiChat` (`ai_routing.ts`, system quota class), never a new
+function. Ground factual "teach me" answers in
+`features/education/domain/feature_guides.dart`, not the LLM.
 
 ### Performance rules (from PERFORMANCE.md — these are invariants)
 - `.select()` when watching big state objects (the Home screen once rebuilt

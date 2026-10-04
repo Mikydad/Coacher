@@ -5,15 +5,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../../core/tier/tier_providers.dart';
+import '../../../core/tier/tier_usage.dart';
+import '../../../core/tier/upgrade_prompt.dart';
 import '../application/intention_capture.dart';
 import '../application/intentions_providers.dart';
 import 'geofence_opt_in_flow.dart';
 
 /// 3-field quick-add for promises (PRD §4.2): what / when-ish / kind.
 /// No clock time anywhere — SidePal picks the moment. Works fully offline;
-/// the local write IS the update.
-Future<void> showIntentionQuickAddSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+/// the local write IS the update. Completes `true` when a promise was saved
+/// (Home confirms it, since the list lives on the Tasks page).
+Future<bool> showIntentionQuickAddSheet(BuildContext context) async {
+  final saved = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -25,6 +29,7 @@ Future<void> showIntentionQuickAddSheet(BuildContext context) {
     ),
     builder: (_) => const _IntentionQuickAddSheet(),
   );
+  return saved ?? false;
 }
 
 class _IntentionQuickAddSheet extends ConsumerStatefulWidget {
@@ -59,6 +64,26 @@ class _IntentionQuickAddSheetState
     setState(() => _saving = true);
 
     final now = DateTime.now();
+    // Free: [TierLimits.freePromisesPerWeek] per Mon–Sun week (decision
+    // 2026-09-27). The typed text stays put if the limit blocks.
+    final gate = ref.read(tierGateProvider);
+    if (!gate.isBypassed &&
+        !gate.canCreatePromiseThisWeek(
+          await TierUsage.promisesCreatedThisWeek(now),
+        )) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      final n = gate.limits.freePromisesPerWeek;
+      await showTierLimitSheet(
+        context,
+        title: 'Weekly promises used',
+        message:
+            'The free plan includes $n ${n == 1 ? 'promise' : 'promises'} a '
+            'week — it resets on Monday, and removing one frees a slot. '
+            'SidePal Pro removes the limit.',
+      );
+      return;
+    }
     final window = resolveIntentionWindow(_window, now);
     final intention = buildIntention(
       IntentionDraft(
@@ -93,20 +118,22 @@ class _IntentionQuickAddSheetState
         }
       } catch (_) {}
     }
-    if (mounted) Navigator.of(context).pop();
+    if (mounted) Navigator.of(context).pop(true);
   }
 
   @override
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.of(context).viewInsets;
-    return Padding(
+    // Scrolls (2026-09-27): with the keyboard up, a small phone has less
+    // room than the fields need — a fixed Column overflowed.
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(20, 4, 20, 20 + viewInsets.bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'PROMISE',
+            'NEW PROMISE',
             style: TextStyle(
               color: AppColors.fg54,
               fontSize: 11,
@@ -121,7 +148,7 @@ class _IntentionQuickAddSheetState
             textCapitalization: TextCapitalization.sentences,
             style: TextStyle(color: AppColors.textPrimary, fontSize: 16),
             decoration: InputDecoration(
-              hintText: 'Call cousin Sara…',
+              hintText: 'Call an old friend…',
               hintStyle: TextStyle(color: AppColors.fg54),
               filled: true,
               fillColor: AppColors.fg12.withValues(alpha: 0.06),
@@ -133,10 +160,11 @@ class _IntentionQuickAddSheetState
             onSubmitted: (_) => _save(),
           ),
           const SizedBox(height: 16),
-          _MicroLabel('WHEN-ISH'),
+          _MicroLabel('WHEN?'),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: [
               for (final w in IntentionWindowKind.values)
                 ChoiceChip(
@@ -151,6 +179,7 @@ class _IntentionQuickAddSheetState
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: [
               for (final k in _IntentionKind.values)
                 ChoiceChip(

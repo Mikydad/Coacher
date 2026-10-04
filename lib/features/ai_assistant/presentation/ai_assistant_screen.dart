@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/local_db/isar_collections/isar_ai_action_batch.dart';
 import '../../../core/presentation/keyboard_dismiss.dart';
 import '../../../core/presentation/page_headers.dart';
+import '../../../core/tier/upgrade_prompt.dart';
 import '../../../core/utils/date_keys.dart';
 import '../application/ai_action_batch_state.dart';
 import '../application/ai_assistant_providers.dart';
@@ -20,6 +21,7 @@ import '../domain/models/ai_chat_message.dart';
 import '../domain/models/ai_planned_changes.dart';
 import '../../../core/ai/ai_proxy_client.dart';
 import '../application/voice_mode_adapters.dart';
+import '../application/voice_audio_interruptions.dart';
 import '../application/voice_mode_controller.dart';
 import '../application/voice_warmup.dart';
 import '../application/voice_tts_resilience.dart';
@@ -28,11 +30,9 @@ import 'widgets/ai_input_card.dart';
 import 'widgets/chat_bubbles.dart';
 import 'widgets/voice_mode_card.dart';
 import 'widgets/planned_changes_card.dart';
-import 'widgets/proactive_suggestions_coach_panel.dart';
 import 'widgets/quick_directives_row.dart';
 import '../../../app/application/main_tab_navigation.dart';
 import '../../../app/presentation/main_tab_bar_inset.dart';
-import '../application/proactive_suggestion_display.dart';
 
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/sync/sync_service.dart';
@@ -42,7 +42,6 @@ import '../../../core/sync/sync_service.dart';
 class CoachRouteArgs {
   const CoachRouteArgs({
     this.preDraftedText,
-    this.openSuggestionsPanel = false,
     this.proactiveSuggestionId,
     this.proactiveSuggestionType,
     this.autoSendMessage = false,
@@ -53,7 +52,6 @@ class CoachRouteArgs {
 
   /// When true, shows the full proactive suggestions list at the top of Coach
   /// (e.g. from Home "See all in Coach").
-  final bool openSuggestionsPanel;
 
   /// Proactive card the user tapped — passed into AI session context.
   final String? proactiveSuggestionId;
@@ -104,9 +102,11 @@ Future<void> showCoachAiSheet(
     builder: (_) => _CoachAiSheet(askBar: askBar),
   ).whenComplete(() {
     try {
-      // The service is created via the parser future; if it never resolved
-      // (sheet closed before AI booted) there is no session to end.
-      container.read(resolvedAiAssistantProvider).value?.startNewSession();
+      // Closing the sheet PAUSES the session (D5, fix plan Phase 4.2): the
+      // thread and model context continue on reopen; a new calendar day is
+      // what ends a session. If the parser future never resolved (sheet
+      // closed before AI booted) there is nothing to pause.
+      container.read(resolvedAiAssistantProvider).value?.pauseSession();
     } catch (e) {
       debugPrint('[Coach] session-end extraction skipped: $e');
     }
@@ -155,6 +155,21 @@ class _CoachAiSheetState extends State<_CoachAiSheet> {
   final _sheetController = DraggableScrollableController();
   bool _popped = false;
 
+  /// Whether the thread has messages (set by the screen). The ask-bar peek
+  /// is ONLY for an empty thread (2026-09-18): once a conversation exists
+  /// the peek stops being a snap stage, the keyboard re-pin leaves the
+  /// sheet alone, and the sheet is kept at the conversation stage or
+  /// above. Before this, the re-pin raced the grow animation while the
+  /// keyboard closed and parked a live conversation at ask-bar height —
+  /// the reply out of sight, the last bubble clipped behind the composer.
+  final _threadHasMessages = ValueNotifier<bool>(false);
+
+  /// Drives the snap list. Flipped only once the sheet actually SITS at
+  /// the conversation stage: the sheet's snap physics re-settle on the
+  /// nearest stage whenever the list changes, and a list without the peek
+  /// while the sheet is still near it would settle on the dismiss floor.
+  final _peekRetired = ValueNotifier<bool>(false);
+
   /// Ask-bar height in PIXELS (grabber header + input card + insets). The
   /// peek must be pixel-anchored: the sheet's fractions apply to the space
   /// LEFT OVER above the keyboard, so a fractional peek collapses to
@@ -163,10 +178,96 @@ class _CoachAiSheetState extends State<_CoachAiSheet> {
 
   double? _lastPeekFraction;
 
+  /// The conversation stage, pixel-anchored like the peek (2026-09-22):
+  /// [_CoachAiSheet.midSize] of the SURFACE, re-expressed against the
+  /// space left above the keyboard. A plain 0.6 fraction was 0.6 of that
+  /// leftover — 305pt with a phone keyboard up, barely taller than the
+  /// 244pt input-only peek — so the first send from the peek "grew" to a
+  /// stage that showed ~60pt of thread and read as nothing happening.
+  double? _lastMidFraction;
+  double get _midFraction => _lastMidFraction ?? _CoachAiSheet.midSize;
+
+  static double _conversationFraction(double available, double surface) {
+    if (available <= 0 || surface <= 0) return _CoachAiSheet.midSize;
+    final px = _CoachAiSheet.midSize * surface;
+    return (px / available).clamp(_CoachAiSheet.midSize, _CoachAiSheet.maxSize);
+  }
+
+  /// Keyboard toggles change the conversation FRACTION (same pixels). A
+  /// sheet sitting at the old fraction follows to the new one, so the
+  /// thread keeps its height instead of ballooning to a full page when
+  /// the keyboard closes, or shrinking under it when it opens.
+  void _repinMid(double mid) {
+    final old = _lastMidFraction;
+    _lastMidFraction = mid;
+    if (old == null || (mid - old).abs() < 0.005) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _popped || !_sheetController.isAttached) return;
+      if ((_sheetController.size - old).abs() < 0.04) {
+        _sheetController.jumpTo(mid);
+      }
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _threadHasMessages.addListener(_onThreadChanged);
+  }
+
   @override
   void dispose() {
+    _threadHasMessages.removeListener(_onThreadChanged);
+    _threadHasMessages.dispose();
+    _peekRetired.dispose();
     _sheetController.dispose();
     super.dispose();
+  }
+
+  /// A message landed or left: the screen's own grow-on-message animation
+  /// is in flight, so only OBSERVE — retire the peek once the sheet sits at
+  /// the conversation stage. Animating here too would restart the screen's
+  /// animation and defeat its overflow-to-full measurement.
+  void _onThreadChanged() => _settleConversationStage(grow: false);
+
+  /// With messages, the sheet must rest at the conversation stage or
+  /// higher. [grow] animates it there (the keyboard path — nothing else is
+  /// moving the sheet then); otherwise it waits, bounded, for whoever is.
+  /// A sheet on its way out (at the dismiss floor) is left alone.
+  void _settleConversationStage({required bool grow, int attempt = 0}) {
+    if (!_threadHasMessages.value) {
+      _peekRetired.value = false;
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || _popped) return;
+      if (!_sheetController.isAttached) {
+        // The controller attaches once the thread's scrollable lays out;
+        // bounded retry so a detached sheet can never become a loop.
+        if (attempt < 30) {
+          _settleConversationStage(grow: grow, attempt: attempt + 1);
+        }
+        return;
+      }
+      if (_sheetController.size <= _CoachAiSheet.minSize + 0.005) return;
+      if (_sheetController.size < _midFraction - 0.05) {
+        if (!grow) {
+          if (attempt < 30) {
+            _settleConversationStage(grow: false, attempt: attempt + 1);
+          }
+          return;
+        }
+        await _sheetController.animateTo(
+          _midFraction,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+        );
+        if (!mounted || _popped || !_sheetController.isAttached) return;
+      }
+      if (_sheetController.size >= _midFraction - 0.05) {
+        _peekRetired.value = true;
+      }
+    });
   }
 
   void _popOnce() {
@@ -182,6 +283,12 @@ class _CoachAiSheetState extends State<_CoachAiSheet> {
     final old = _lastPeekFraction;
     _lastPeekFraction = peek;
     if (old == null || (peek - old).abs() < 0.005) return;
+    // A live conversation has no peek to pin to — keep it at the
+    // conversation stage instead (see _threadHasMessages).
+    if (_threadHasMessages.value) {
+      _settleConversationStage(grow: true);
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_sheetController.isAttached) return;
       if ((_sheetController.size - old).abs() < 0.04) {
@@ -204,51 +311,66 @@ class _CoachAiSheetState extends State<_CoachAiSheet> {
               ? _CoachAiSheet
                     .maxSize // pathological; let content flex
               : (_peekPx / available).clamp(_CoachAiSheet.peekSize, 0.5);
+          final mid = _conversationFraction(
+            available,
+            MediaQuery.sizeOf(context).height,
+          );
           _repinPeek(peek);
-          return _buildSheet(context, peek);
+          _repinMid(mid);
+          return _buildSheet(context, peek, mid);
         },
       ),
     );
   }
 
-  Widget _buildSheet(BuildContext context, double peek) {
+  Widget _buildSheet(BuildContext context, double peek, double mid) {
     return NotificationListener<DraggableScrollableNotification>(
       onNotification: (n) {
         if (n.extent <= n.minExtent + 0.005) _popOnce();
         return false;
       },
-      child: DraggableScrollableSheet(
-        controller: _sheetController,
-        expand: false,
-        initialChildSize: widget.askBar ? peek : _CoachAiSheet.midSize,
-        minChildSize: _CoachAiSheet.minSize,
-        maxChildSize: _CoachAiSheet.maxSize,
-        snap: true,
-        snapSizes: [peek, _CoachAiSheet.midSize],
-        builder: (context, scrollController) => AnimatedBuilder(
-          animation: _sheetController,
-          builder: (context, child) {
-            // Corners square off over the last stretch toward full page —
-            // the sheet reads as BECOMING a page, not covering one.
-            final extent = _sheetController.isAttached
-                ? _sheetController.size
-                : _CoachAiSheet.midSize;
-            final t = ((extent - 0.9) / 0.1).clamp(0.0, 1.0);
-            final radius = 28.0 * (1 - t);
-            return ClipRRect(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
-              child: child,
-            );
-          },
-          child: AiAssistantScreen(
-            sheetMode: true,
-            autofocusInput: widget.askBar,
-            sheetPeekFraction: peek,
-            sheetScrollController: scrollController,
-            sheetController: _sheetController,
-            onSheetDismiss: _popOnce,
-          ),
+      child: ValueListenableBuilder<bool>(
+        valueListenable: _peekRetired,
+        builder: (context, peekRetired, _) => DraggableScrollableSheet(
+          controller: _sheetController,
+          expand: false,
+          initialChildSize: widget.askBar ? peek : mid,
+          minChildSize: _CoachAiSheet.minSize,
+          maxChildSize: _CoachAiSheet.maxSize,
+          snap: true,
+          // The peek is a stage only while the thread is empty.
+          snapSizes: peekRetired ? [mid] : [peek, mid],
+          builder: (context, scrollController) => _sheetChild(scrollController),
         ),
+      ),
+    );
+  }
+
+  Widget _sheetChild(ScrollController scrollController) {
+    return AnimatedBuilder(
+      animation: _sheetController,
+      builder: (context, child) {
+        // Corners square off over the last stretch toward full page —
+        // the sheet reads as BECOMING a page, not covering one.
+        final extent = _sheetController.isAttached
+            ? _sheetController.size
+            : _CoachAiSheet.midSize;
+        final t = ((extent - 0.9) / 0.1).clamp(0.0, 1.0);
+        final radius = 28.0 * (1 - t);
+        return ClipRRect(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
+          child: child,
+        );
+      },
+      child: AiAssistantScreen(
+        sheetMode: true,
+        autofocusInput: widget.askBar,
+        sheetPeekFraction: _lastPeekFraction ?? _CoachAiSheet.peekSize,
+        sheetMidFraction: _midFraction,
+        sheetScrollController: scrollController,
+        sheetController: _sheetController,
+        sheetThreadNotifier: _threadHasMessages,
+        onSheetDismiss: _popOnce,
       ),
     );
   }
@@ -260,8 +382,10 @@ class AiAssistantScreen extends ConsumerStatefulWidget {
     this.sheetMode = false,
     this.autofocusInput = false,
     this.sheetPeekFraction,
+    this.sheetMidFraction,
     this.sheetScrollController,
     this.sheetController,
+    this.sheetThreadNotifier,
     this.onSheetDismiss,
   });
 
@@ -279,11 +403,19 @@ class AiAssistantScreen extends ConsumerStatefulWidget {
   /// keyboard). Stage-snapping in the grabber uses this, not a constant.
   final double? sheetPeekFraction;
 
+  /// The conversation stage as a fraction of the sheet's current space
+  /// (pixel-anchored by the sheet; see `_CoachAiSheetState._midFraction`).
+  final double? sheetMidFraction;
+
   /// The [DraggableScrollableSheet]-provided controller (sheet mode only).
   final ScrollController? sheetScrollController;
 
   /// Lets the slim header translate its drags into sheet resizes.
   final DraggableScrollableController? sheetController;
+
+  /// Tells the sheet whether the thread has messages (sheet mode only),
+  /// so the ask-bar peek exists only for an empty thread (2026-09-18).
+  final ValueNotifier<bool>? sheetThreadNotifier;
 
   /// Closes the sheet (header drag past the dismiss threshold).
   final VoidCallback? onSheetDismiss;
@@ -292,11 +424,14 @@ class AiAssistantScreen extends ConsumerStatefulWidget {
   ConsumerState<AiAssistantScreen> createState() => _AiAssistantScreenState();
 }
 
+/// Under this many pixels the thread area shows nothing (see the body
+/// LayoutBuilder). One message row plus padding is about 96px.
+const double _kMinThreadHeight = 96;
+
 class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   final TextEditingController _inputController = TextEditingController();
   final FocusNode _inputFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
-  bool _openSuggestionsPanel = false;
   String? _pendingAutoSendMessage;
   ({String id, String? type})? _pendingProactiveContext;
   bool _autoSendHandled = false;
@@ -347,9 +482,9 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       });
       return;
     }
-    if (sheet.size < _CoachAiSheet.midSize - 0.05) {
+    if (sheet.size < _mid - 0.05) {
       await sheet.animateTo(
-        _CoachAiSheet.midSize,
+        _mid,
         duration: const Duration(milliseconds: 260),
         curve: Curves.easeOutCubic,
       );
@@ -371,11 +506,12 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       if (sheet.size >= _CoachAiSheet.maxSize - 0.05) return; // already full
       // The user dragged down while we animated — their position wins
       // until the next message event.
-      if (sheet.size < _CoachAiSheet.midSize - 0.06) return;
+      if (sheet.size < _mid - 0.06) return;
       final scroll = _activeScrollController;
       if (scroll.hasClients &&
           // Small tolerance: a few overflowing pixels aren't "a long chat".
-          scroll.position.maxScrollExtent > 32) {
+          // The trailing anchor space is not content.
+          scroll.position.maxScrollExtent - _threadTrailingSpace > 32) {
         sheet.animateTo(
           _CoachAiSheet.maxSize,
           duration: const Duration(milliseconds: 300),
@@ -386,6 +522,8 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       if (attempt < 4) _expandToFullIfOverflowing(attempt + 1);
     });
   }
+
+  double get _mid => widget.sheetMidFraction ?? _CoachAiSheet.midSize;
 
   AiAssistantService? _listenedService;
   int _seenMessageCount = 0;
@@ -410,9 +548,15 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     _seenMessageCount = service.messages.length;
     _seenLastMessageSignature = _lastMessageSignature(service);
     service.addListener(_onServiceMessagesChanged);
+    // Attach runs during build; the sheet rebuilds on this notifier, so
+    // publish after the frame.
+    final hasThread = service.messages.isNotEmpty;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.sheetThreadNotifier?.value = hasThread;
+    });
     if (service.messages.isNotEmpty) {
       if (widget.sheetMode) _growSheetForMessages();
-      _scrollToBottom();
+      _anchorLatestToTop();
     }
   }
 
@@ -422,6 +566,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     final count = service.messages.length;
     final signature = _lastMessageSignature(service);
     final grew = count > _seenMessageCount;
+    widget.sheetThreadNotifier?.value = count > 0;
     // The count is NOT the whole story (2026-08-25 regression): a reply
     // replaces its loading bubble in place (remove + add, same count), and
     // streamed replies rewrite one bubble token by token — the sheet never
@@ -433,13 +578,14 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       // A new message resets any deliberate park — the user asked for more.
       _userParkedSheet = false;
       _growSheetForMessages();
-      _scrollToBottom();
+      _anchorLatestToTop();
       return;
     }
     if (contentChanged) {
-      // Streaming follows the tail only if the reader is already there
-      // (§8 U3) — never yank someone who scrolled up to reread.
-      _scrollToBottom(onlyIfNearBottom: true);
+      // Newest-on-top (2026-09-19): a streamed reply grows DOWN from its
+      // anchored top, so there is no tail to follow; a typed reply that
+      // replaced its loading bubble is a new id and anchors itself.
+      _anchorLatestToTop();
       // A manual drag mid-stream is a deliberate park (§8 U9): content
       // ticks stop resizing the sheet until the next real message.
       if (_userParkedSheet) return;
@@ -463,7 +609,6 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         DateKeys.todayKey();
     if (args is! CoachRouteArgs) return;
     setState(() {
-      _openSuggestionsPanel = args.openSuggestionsPanel;
     });
     if (args.preDraftedText != null) {
       _inputController.text = args.preDraftedText!;
@@ -541,11 +686,14 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   /// app (Siri "Talk to SidePal"): Siri's audio session is still releasing
   /// when we arrive, so the first mic open waits a beat — opening into
   /// Siri's session yields a recognizer that hears nothing forever.
-  void _enterVoiceMode(
+  Future<void> _enterVoiceMode(
     AiAssistantService service, {
     bool externalLaunch = false,
-  }) {
+  }) async {
     if (_voiceController != null) return;
+    if (!await ensureAccountFor(context, feature: 'the Coach') || !mounted) {
+      return;
+    }
     dismissKeyboard(context);
     // First-turn latency: warm the auth cache, TLS pool, and function
     // instances NOW, while the user is still raising the phone — the first
@@ -591,18 +739,29 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       ),
       sendAndGetReply: (text) => _voiceSendAndGetReply(service, text),
       tryStreamReply: _kStreamingChat ? service.tryStreamVoiceReply : null,
+      audioInterruptions: voiceAudioInterruptions(),
     );
     setState(() {
       _voiceController = controller;
       _voiceImmersive = true;
       _voiceReachedFull = false;
     });
-    controller.start(
-      listenDelay: externalLaunch ? const Duration(milliseconds: 900) : null,
-    );
     // Background sync stays off the network while voice is live — pulls
     // and outbox storms were competing with voice turns for bandwidth.
     SyncService.instance.voiceModeActive = true;
+    // start() never throws (audit M9); a failed setup releases the
+    // sync deferral so a dead voice session cannot park sync forever.
+    unawaited(
+      controller
+          .start(
+            listenDelay: externalLaunch
+                ? const Duration(milliseconds: 900)
+                : null,
+          )
+          .then((ok) {
+            if (!ok) SyncService.instance.voiceModeActive = false;
+          }),
+    );
     // Full-screen stage (ChatGPT-voice style): snap the sheet to full;
     // dragging down demotes to the compact card via the extent listener.
     widget.sheetController?.addListener(_onSheetExtentChangedForVoice);
@@ -659,7 +818,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     final sheet = widget.sheetController;
     if (sheet != null && sheet.isAttached) {
       sheet.animateTo(
-        _CoachAiSheet.midSize,
+        _mid,
         duration: const Duration(milliseconds: 260),
         curve: Curves.easeOutCubic,
       );
@@ -746,22 +905,70 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   ScrollController get _activeScrollController =>
       widget.sheetScrollController ?? _scrollController;
 
-  /// Scrolls the thread to its end. [onlyIfNearBottom] is the streaming
-  /// case (fix-wave Phase 7, §8 U3): content ticks must not yank a reader
-  /// who deliberately scrolled up — only follow the tail when they are
-  /// already at it.
-  void _scrollToBottom({bool onlyIfNearBottom = false}) {
+  /// Newest-on-top (Miko, 2026-09-19). The latest message is anchored to
+  /// the TOP of the thread viewport — like ChatGPT — instead of the thread
+  /// scrolling "to the bottom": the bottom target was computed against a
+  /// viewport still changing (sheet growing, keyboard moving), so from the
+  /// second reply on, the newest text sat below the fold. A top anchor is
+  /// stable under both, and a streamed reply grows downward from it.
+  ///
+  /// Anchors the latest exchange the way ChatGPT does: the user's newest
+  /// question pins to the top and the reply flows beneath it (anchoring
+  /// the reply itself scrolled a one-line question out of view). With no
+  /// user message in the thread, the latest non-loading message anchors.
+  /// [force] re-applies the current anchor after a viewport change; a user
+  /// who scrolled the thread themselves is not yanked until the next
+  /// message lands.
+  final GlobalKey _latestMessageKey = GlobalKey();
+  String? _anchoredMessageId;
+  bool _userScrolledThread = false;
+
+  /// Bottom padding under the thread so the last message can sit at the
+  /// top of the viewport with empty space beneath it.
+  double _threadTrailingSpace = 0;
+  double? _lastThreadHeight;
+
+  void _anchorLatestToTop({
+    bool force = false,
+    bool animate = true,
+    int attempt = 0,
+  }) {
+    final service = _listenedService;
+    if (service == null) return;
+    final index = threadAnchorIndex(service.messages);
+    if (index < 0) return;
+    final latest = service.messages[index];
+    if (!force) {
+      if (latest.id == _anchoredMessageId) return;
+      // A new message resets any deliberate scroll-away.
+      _userScrolledThread = false;
+    } else if (_userScrolledThread) {
+      return;
+    }
+    final targetId = latest.id;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final controller = _activeScrollController;
       if (!controller.hasClients) return;
-      final position = controller.position;
-      if (onlyIfNearBottom &&
-          position.maxScrollExtent - position.pixels > 220) {
+      final ctx = _latestMessageKey.currentContext;
+      if (ctx == null) {
+        // Not laid out yet (lazy list, far below): jump to the end so it
+        // builds, then anchor on the next frame. Bounded.
+        controller.jumpTo(controller.position.maxScrollExtent);
+        if (attempt < 3) {
+          _anchorLatestToTop(
+            force: true,
+            animate: animate,
+            attempt: attempt + 1,
+          );
+        }
         return;
       }
-      controller.animateTo(
-        position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
+      _anchoredMessageId = targetId;
+      Scrollable.ensureVisible(
+        ctx,
+        alignment: 0.0,
+        duration: animate ? const Duration(milliseconds: 300) : Duration.zero,
         curve: Curves.easeOut,
       );
     });
@@ -778,6 +985,10 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     final serviceAsync = ref.watch(resolvedAiAssistantProvider);
 
     final body = serviceAsync.when(
+      // A provider reload must never swap a live thread for the loading
+      // body — that blanks every bubble for a frame (2026-09-19).
+      skipLoadingOnReload: true,
+      skipLoadingOnRefresh: true,
       data: (service) {
         _attachServiceListener(service);
         return _buildBody(service);
@@ -847,10 +1058,12 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                 return;
               }
               final peek = widget.sheetPeekFraction ?? _CoachAiSheet.peekSize;
-              const mid = _CoachAiSheet.midSize;
+              final mid = _mid;
               const full = _CoachAiSheet.maxSize;
               final size = sheet.size;
-              final target = size < (peek + mid) / 2
+              // A live conversation never settles on the peek.
+              final hasThread = widget.sheetThreadNotifier?.value ?? false;
+              final target = !hasThread && size < (peek + mid) / 2
                   ? peek
                   : size < (mid + full) / 2
                   ? mid
@@ -944,7 +1157,6 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     // Auto-scroll moved off the build path (§8 U3): the service listener
     // scrolls on real message events; a rebuild alone never yanks the list.
 
-    final showSuggestionsPanel = _shouldShowSuggestionsPanel();
 
     // Discoverability chrome above the thread. Rendered in the sheet too
     // (fix-wave Phase 7, §8 U2): the old `!sheetMode` gate left the
@@ -962,13 +1174,6 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
           padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: FirstTimeFeatureCard(guideId: 'coachAi'),
         ),
-        // Expanded while the chat is empty (suggestions are the
-        // content); collapses to the slim header once a conversation
-        // is underway so the transcript gets the space.
-        if (showSuggestionsPanel)
-          ProactiveSuggestionsCoachPanel(
-            initiallyExpanded: _openSuggestionsPanel || !hasMessages,
-          ),
       ],
       // Accidental-close recovery (fix-wave Phase 7, §8 U1/U10): within
       // 10 minutes of the sheet closing, the stashed thread can come back
@@ -995,6 +1200,30 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
               onTap: () => dismissKeyboard(context),
               child: LayoutBuilder(
                 builder: (context, constraints) {
+                  // Below a useful height the thread paints NOTHING rather
+                  // than a sliver of the last bubble clipped behind the
+                  // composer (2026-09-18). The ask-bar peek is input-only
+                  // by design; this makes the layout say so. Visibility
+                  // (not a swap): the thread's scrollable stays mounted and
+                  // attached, because the sheet controller — and every
+                  // grow animation — rides on it.
+                  final showThread = constraints.maxHeight >= _kMinThreadHeight;
+                  // Viewport changed (sheet growing, keyboard moving): keep
+                  // the anchored message pinned, frame by frame, no
+                  // animation. Trailing space lets any last message sit at
+                  // the top with room beneath it.
+                  // Nearly a full viewport: a one-line reply must be able
+                  // to reach the top too, or ensureVisible clamps short.
+                  _threadTrailingSpace = (constraints.maxHeight - 40).clamp(
+                    0.0,
+                    double.infinity,
+                  );
+                  if (_lastThreadHeight != constraints.maxHeight) {
+                    _lastThreadHeight = constraints.maxHeight;
+                    if (_anchoredMessageId != null) {
+                      _anchorLatestToTop(force: true, animate: false);
+                    }
+                  }
                   // The extras block is capped so the thread always keeps
                   // ~160px: with the keyboard up (or a short sheet) the extras
                   // scroll inside their cap instead of overflowing the Column.
@@ -1002,38 +1231,56 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                     0.0,
                     double.infinity,
                   );
-                  return Column(
-                    children: [
-                      if (topExtras.isNotEmpty)
-                        ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxHeight: extrasMaxHeight,
-                          ),
-                          child: SingleChildScrollView(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: topExtras,
+                  return Visibility(
+                    visible: showThread,
+                    maintainState: true,
+                    maintainAnimation: true,
+                    maintainSize: true,
+                    maintainInteractivity: true,
+                    child: Column(
+                      children: [
+                        if (topExtras.isNotEmpty)
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxHeight: extrasMaxHeight,
+                            ),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: topExtras,
+                              ),
                             ),
                           ),
+                        // Conversation thread
+                        Expanded(
+                          child: hasMessages
+                              ? NotificationListener<ScrollStartNotification>(
+                                  onNotification: (n) {
+                                    if (n.dragDetails != null) {
+                                      _userScrolledThread = true;
+                                    }
+                                    return false;
+                                  },
+                                  child: _MessageList(
+                                    messages: messages,
+                                    service: service,
+                                    scrollController: _activeScrollController,
+                                    latestMessageKey: _latestMessageKey,
+                                    trailingSpace: _threadTrailingSpace,
+                                    isLoading: service.isLoading,
+                                    onSuggestedPrompt: (prompt) {
+                                      _inputController.text = prompt;
+                                      _inputFocusNode.requestFocus();
+                                    },
+                                    onEditPlan: () =>
+                                        _onEditPlanPressed(service),
+                                    onStop: service.cancelCurrentTurn,
+                                  ),
+                                )
+                              : _buildEmptyState(),
                         ),
-                      // Conversation thread
-                      Expanded(
-                        child: hasMessages
-                            ? _MessageList(
-                                messages: messages,
-                                service: service,
-                                scrollController: _activeScrollController,
-                                isLoading: service.isLoading,
-                                onSuggestedPrompt: (prompt) {
-                                  _inputController.text = prompt;
-                                  _inputFocusNode.requestFocus();
-                                },
-                                onEditPlan: () => _onEditPlanPressed(service),
-                                onStop: service.cancelCurrentTurn,
-                              )
-                            : _buildEmptyState(),
-                      ),
-                    ],
+                      ],
+                    ),
                   );
                 },
               ),
@@ -1078,10 +1325,25 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                           controller: _inputController,
                           focusNode: _inputFocusNode,
                           isLoading: service.isLoading,
-                          onSend: () {
+                          onSend: () async {
                             final text = _inputController.text.trim();
                             if (text.isEmpty) return;
+                            // Guests: the account sheet first; the typed
+                            // text stays in the box if they decline.
+                            if (!await ensureAccountFor(
+                                  context,
+                                  feature: 'the Coach',
+                                ) ||
+                                !mounted) {
+                              return;
+                            }
                             _inputController.clear();
+                            // Send drops the keyboard (2026-09-22, Miko):
+                            // the thread gets the screen; a tap on the
+                            // input brings the keyboard back. Coach only —
+                            // nothing else re-focuses on its own after
+                            // this (chips and prompts are user taps).
+                            _inputFocusNode.unfocus();
                             service.sendMessage(text);
                           },
                           onVoiceModeRequested: () => _enterVoiceMode(service),
@@ -1133,13 +1395,6 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         _inputFocusNode.requestFocus();
       },
     );
-  }
-
-  bool _shouldShowSuggestionsPanel() {
-    if (_openSuggestionsPanel) return true;
-    final suggestions = ref.watch(proactiveSuggestionsProvider).valueOrNull;
-    if (suggestions == null) return false;
-    return activeProactiveSuggestions(suggestions).length > 1;
   }
 
   Widget _buildLoadingBody() {
@@ -1336,11 +1591,25 @@ class _EmptyState extends StatelessWidget {
 
 // ─── Message list ─────────────────────────────────────────────────────────────
 
+/// Which message the thread anchors to the top (newest-on-top,
+/// 2026-09-19): the latest user message, else the latest non-loading one.
+/// Shared by the screen (what to scroll to) and the list (where the key
+/// goes) so the two can never disagree.
+int threadAnchorIndex(List<AiChatMessage> messages) {
+  for (var i = messages.length - 1; i >= 0; i--) {
+    final m = messages[i];
+    if (!m.isLoading && m.role == ChatRole.user) return i;
+  }
+  return messages.lastIndexWhere((m) => !m.isLoading);
+}
+
 class _MessageList extends StatelessWidget {
   const _MessageList({
     required this.messages,
     required this.service,
     required this.scrollController,
+    required this.latestMessageKey,
+    required this.trailingSpace,
     required this.isLoading,
     required this.onSuggestedPrompt,
     required this.onEditPlan,
@@ -1350,6 +1619,13 @@ class _MessageList extends StatelessWidget {
   final List<AiChatMessage> messages;
   final AiAssistantService service;
   final ScrollController scrollController;
+
+  /// Attached to the latest non-loading message so the screen can anchor
+  /// it to the top of the viewport (newest-on-top, 2026-09-19).
+  final GlobalKey latestMessageKey;
+
+  /// Empty space under the last message so it can sit at the top.
+  final double trailingSpace;
   final bool isLoading;
   final void Function(String prompt) onSuggestedPrompt;
 
@@ -1361,66 +1637,76 @@ class _MessageList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // SelectionArea: bubbles are copyable (§8 U8) — long-press selects.
-    return SelectionArea(
-      child: ListView.builder(
-        controller: scrollController,
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: messages.length + (isLoading ? 1 : 0),
-        itemBuilder: (context, i) {
-          if (i == messages.length) {
-            // While a turn is in flight the thread ends with a Stop chip —
-            // NOT a second ThinkingIndicator: the loading bubble already
-            // draws the dots, and the trailing copy was the §8 U4
-            // double-indicator.
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: ActionChip(
-                  avatar: Icon(
-                    Icons.stop_rounded,
-                    size: 14,
-                    color: AppColors.textSoft,
-                  ),
-                  label: const Text('Stop', style: TextStyle(fontSize: 12)),
-                  backgroundColor: AppColors.inkCard,
-                  side: BorderSide(
-                    color: AppColors.textSoft.withValues(alpha: 0.25),
-                  ),
-                  onPressed: onStop,
+    // Bubbles are copyable (§8 U8) — each bubble carries its OWN
+    // SelectionArea (chat_bubbles.dart, 2026-09-22). One area around the
+    // whole list tripped Flutter's `!_selectionStartsInScrollable`
+    // assertion on a long-press drag inside the scrollable.
+    return ListView.builder(
+      controller: scrollController,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: EdgeInsets.fromLTRB(0, 8, 0, 8 + trailingSpace),
+      itemCount: messages.length + (isLoading ? 1 : 0),
+      itemBuilder: (context, i) {
+        final anchorIndex = threadAnchorIndex(messages);
+        if (i == messages.length) {
+          // While a turn is in flight the thread ends with a Stop chip —
+          // NOT a second ThinkingIndicator: the loading bubble already
+          // draws the dots, and the trailing copy was the §8 U4
+          // double-indicator.
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: ActionChip(
+                avatar: Icon(
+                  Icons.stop_rounded,
+                  size: 14,
+                  color: AppColors.textSoft,
                 ),
+                label: const Text('Stop', style: TextStyle(fontSize: 12)),
+                backgroundColor: AppColors.inkCard,
+                side: BorderSide(
+                  color: AppColors.textSoft.withValues(alpha: 0.25),
+                ),
+                onPressed: onStop,
               ),
-            );
-          }
-          final msg = messages[i];
-          Widget item = _MessageItem(
-            message: msg,
-            service: service,
-            onSuggestedPrompt: onSuggestedPrompt,
-            onEditPlan: onEditPlan,
+            ),
           );
-          // Rehydrated turns read as context, not conversation (§8 U10):
-          // dimmed, with a labelled divider before the block and a plain
-          // rule where the live conversation resumes.
-          if (msg.isHistorical) {
-            item = Opacity(opacity: 0.7, child: item);
-          }
-          final earlierDivider = i == 0 && msg.isHistorical;
-          final freshDivider =
-              i > 0 && messages[i - 1].isHistorical && !msg.isHistorical;
-          if (!earlierDivider && !freshDivider) return item;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (earlierDivider) const _ThreadDivider(label: 'EARLIER TODAY'),
-              if (freshDivider) const _ThreadDivider(),
-              item,
-            ],
-          );
-        },
-      ),
+        }
+        final msg = messages[i];
+        Widget item = _MessageItem(
+          message: msg,
+          service: service,
+          onSuggestedPrompt: onSuggestedPrompt,
+          onEditPlan: onEditPlan,
+        );
+        // Rehydrated turns read as context, not conversation (§8 U10):
+        // dimmed, with a labelled divider before the block and a plain
+        // rule where the live conversation resumes.
+        if (msg.isHistorical) {
+          item = Opacity(opacity: 0.7, child: item);
+        }
+        if (i == anchorIndex) {
+          item = KeyedSubtree(key: latestMessageKey, child: item);
+        }
+        final earlierDivider = i == 0 && msg.isHistorical;
+        final freshDivider =
+            i > 0 && messages[i - 1].isHistorical && !msg.isHistorical;
+        // Keyed by id: list mutations (loading bubble out, reply in)
+        // keep every other bubble's element — no re-registration churn.
+        final keyed = !earlierDivider && !freshDivider
+            ? item
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (earlierDivider)
+                    const _ThreadDivider(label: 'EARLIER TODAY'),
+                  if (freshDivider) const _ThreadDivider(),
+                  item,
+                ],
+              );
+        return KeyedSubtree(key: ValueKey('msg-${msg.id}'), child: keyed);
+      },
     );
   }
 }
@@ -1801,8 +2087,8 @@ class _MessageItem extends StatelessWidget {
                     ? null
                     : () => service.applySuggestedPlan(message.id),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accentBright,
-                  foregroundColor: AppColors.accentDeep,
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: AppColors.onAccent,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(999),
@@ -1895,6 +2181,23 @@ class _MessageItem extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AssistantMessageBubble(content: message.content),
+        // A free limit blocked part of this turn: one quiet link to Pro.
+        if (message.showProLink)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: ActionChip(
+              key: const ValueKey('coach_see_pro'),
+              avatar: Icon(
+                Icons.lock_open_rounded,
+                size: 14,
+                color: AppColors.accent,
+              ),
+              label: const Text('See Pro', style: TextStyle(fontSize: 12)),
+              backgroundColor: AppColors.inkCard,
+              side: BorderSide(color: AppColors.accent.withValues(alpha: 0.3)),
+              onPressed: () => openProPlan(context),
+            ),
+          ),
         // Auto-committed intention (the one confirmless action type):
         // inline [View] [Undo] instead of a preview card.
         if (message.autoCommittedBatchId != null)

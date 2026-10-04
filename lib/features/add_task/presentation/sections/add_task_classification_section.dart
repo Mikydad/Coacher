@@ -34,17 +34,20 @@ String _explanationFor(ReminderTaxonomy t) => switch (t) {
     'Low-stakes. Misses just add up in one daily line.',
 };
 
-/// Classification row for the reminder card (FR-R-21).
+/// "If you miss it" — the classification chooser (FR-R-21), living in
+/// Advanced settings since 2026-09-18 and shown only while a reminder is on.
 ///
 /// Never a required decision: the heuristic has already answered by the time
 /// this renders, and [taxonomy] shows that answer. Tapping a segment makes it
 /// the user's answer instead — which is then never overwritten by the
 /// heuristic or by AI.
 ///
-/// The Critical toggle appears only for `EXPIRES`, because criticality 3 is
-/// the one thing that pierces the interruption boundary, the Focus Shield and
-/// the sleep window — and that only makes sense for something that stops
-/// mattering later.
+/// The Critical toggle is offered for every class. The three segments
+/// decide what a MISS means; Critical decides how LOUD the reminder is
+/// (criticality 3 pierces the interruption boundary, the Focus Shield and
+/// the sleep window). Those are two different questions, and tying Critical
+/// to `EXPIRES` alone read as if the other two classes could never matter
+/// enough (Miko, 2026-09-18).
 class AddTaskClassificationSection extends StatelessWidget {
   const AddTaskClassificationSection({
     super.key,
@@ -81,24 +84,14 @@ class AddTaskClassificationSection extends StatelessWidget {
             }
           },
         ),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-          alignment: Alignment.topCenter,
-          child: taxonomy == ReminderTaxonomy.timeSensitive
-              ? Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: AddTaskToggleRow(
-                    icon: CupertinoIcons.exclamationmark_triangle_fill,
-                    iconColor: AddTaskColors.cyan,
-                    title: 'Critical',
-                    subtitle:
-                        'Reaches you through focus sessions and quiet hours.',
-                    value: isCritical,
-                    onChanged: onCriticalChanged,
-                  ),
-                )
-              : const SizedBox(width: double.infinity),
+        const SizedBox(height: 8),
+        AddTaskToggleRow(
+          icon: CupertinoIcons.exclamationmark_triangle_fill,
+          iconColor: AddTaskColors.cyan,
+          title: 'Critical',
+          subtitle: 'Reaches you through focus sessions and quiet hours.',
+          value: isCritical,
+          onChanged: onCriticalChanged,
         ),
       ],
     );

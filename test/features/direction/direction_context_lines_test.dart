@@ -100,7 +100,29 @@ void main() {
       _entry(DirectionHorizon.month, now, 'Month'),
     ], now);
     expect(mostSpecificDirectionSlot(all)!.text, 'Month');
-    expect(mostSpecificDirectionSlot(resolveDirectionSlots(const [], now)),
-        isNull);
+    expect(
+      mostSpecificDirectionSlot(resolveDirectionSlots(const [], now)),
+      isNull,
+    );
+  });
+
+  test('previous period with text and no answer → closeout on the slot', () {
+    final august = _entry(DirectionHorizon.month, DateTime(2026, 8, 5), 'Rest');
+    final slots = resolveDirectionSlots([august], now);
+    expect(slots[DirectionHorizon.month]!.closeout?.id, august.id);
+    expect(slots[DirectionHorizon.month]!.previous?.id, august.id);
+
+    final answered = august.copyWith(
+      outcome: DirectionOutcome.partly,
+      outcomeAtMs: 1,
+    );
+    final done = resolveDirectionSlots([answered], now);
+    expect(done[DirectionHorizon.month]!.closeout, isNull);
+    expect(
+      done[DirectionHorizon.month]!.previous?.outcome,
+      DirectionOutcome.partly,
+    );
+    // The suggestion still carries the text for "Keep".
+    expect(done[DirectionHorizon.month]!.suggestion, 'Rest');
   });
 }

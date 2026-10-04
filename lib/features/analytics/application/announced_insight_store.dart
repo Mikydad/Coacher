@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/utils/date_keys.dart';
+import '../../auth/application/auth_providers.dart';
 
 /// The coaching banner's frozen copy (2026-08-25).
 ///
@@ -58,9 +60,15 @@ class AnnouncedInsight {
 class AnnouncedInsightStore {
   static const prefsKey = 'coaching_announced_insight_v1';
 
+  /// Owner-tagged (audit H4): the snapshot is personal coaching copy, so a
+  /// read validates the account before showing it and the logout wipe
+  /// removes the key.
   Future<void> save(AnnouncedInsight announced) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(prefsKey, jsonEncode(announced.toMap()));
+    await prefs.setString(
+      prefsKey,
+      jsonEncode({...announced.toMap(), 'ownerUid': FirestorePaths.activeUid}),
+    );
   }
 
   Future<void> clear() async {
@@ -76,6 +84,11 @@ class AnnouncedInsightStore {
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! Map) return null;
+      final owner = decoded['ownerUid'];
+      if (owner is String && owner != FirestorePaths.activeUid) {
+        await prefs.remove(prefsKey);
+        return null;
+      }
       final announced = AnnouncedInsight.fromMap(
         decoded.cast<String, Object?>(),
       );
@@ -92,8 +105,10 @@ final announcedInsightStoreProvider = Provider<AnnouncedInsightStore>(
 );
 
 /// Today's frozen banner copy for the Progress screen's fallback path.
-final announcedInsightTodayProvider = FutureProvider<AnnouncedInsight?>(
-  (ref) => ref
+/// Auth-scoped and in `userScopedProviders` (audit H4).
+final announcedInsightTodayProvider = FutureProvider<AnnouncedInsight?>((ref) {
+  ref.watch(authUidProvider);
+  return ref
       .watch(announcedInsightStoreProvider)
-      .readFor(DateKeys.todayKey(DateTime.now())),
-);
+      .readFor(DateKeys.todayKey(DateTime.now()));
+});

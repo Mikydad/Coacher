@@ -1,5 +1,7 @@
 import 'package:sidepal/features/context_override/application/sleep_window_util.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sidepal/features/context_override/domain/models/context_override.dart';
+import 'package:sidepal/features/context_override/domain/models/user_attention_state.dart';
 
 void main() {
   group('isWithinSleepWindow', () {
@@ -127,6 +129,51 @@ void main() {
         nextMorningAfter(DateTime(2026, 5, 18, 22, 0), null),
         DateTime(2026, 5, 19, 7, 0),
       );
+    });
+  });
+
+  group('effectiveOverride honours a paused sleep window (2026-09-15)', () {
+    UserAttentionState state({int? pausedUntilMs}) => UserAttentionState(
+      id: kUserAttentionStateId,
+      activeOverride: ContextOverride.none,
+      manuallyMuted: false,
+      updatedAtMs: 0,
+      sleepWindowStart: '23:00',
+      sleepWindowEnd: '07:00',
+      sleepWindowPausedUntilMs: pausedUntilMs,
+    );
+    final night = DateTime(2026, 9, 15, 2, 0);
+    final wake = DateTime(2026, 9, 15, 7, 0).millisecondsSinceEpoch;
+
+    test('inside the window and not paused → sleep', () {
+      expect(effectiveOverride(state(), night), ContextOverride.sleep);
+    });
+    test('inside the window but paused until wake → none', () {
+      expect(
+        effectiveOverride(state(pausedUntilMs: wake), night),
+        ContextOverride.none,
+      );
+    });
+    test('the pause lapses: next night is sleep again', () {
+      expect(
+        effectiveOverride(
+          state(pausedUntilMs: wake),
+          DateTime(2026, 9, 15, 23, 30),
+        ),
+        ContextOverride.sleep,
+      );
+    });
+    test('a manual override still wins over the pause', () {
+      final manual = UserAttentionState(
+        id: kUserAttentionStateId,
+        activeOverride: ContextOverride.focus,
+        manuallyMuted: false,
+        updatedAtMs: 0,
+        sleepWindowStart: '23:00',
+        sleepWindowEnd: '07:00',
+        sleepWindowPausedUntilMs: wake,
+      );
+      expect(effectiveOverride(manual, night), ContextOverride.focus);
     });
   });
 }

@@ -1,15 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
+import '../../education/domain/page_explainers.dart';
+import '../../education/presentation/page_explainer_sheet.dart';
 import '../application/memory_providers.dart';
 import '../domain/models/memory_fact.dart';
 import '../domain/models/person.dart';
 
 /// "What SidePal knows" (PRD §5.4) — the transparency surface for long-term
 /// memory. Three tabs: Facts (everything remembered, provenance-labeled),
-/// People (who SidePal knows about), Timeline (episodic summaries).
+/// People (who SidePal knows about), History (episodic summaries).
 /// Every fact is correctable (✓), editable (✏) and forgettable (🗑);
 /// "Forget everything" nukes the lot. All actions are Isar-first — they
 /// work identically in airplane mode.
@@ -51,8 +55,19 @@ class _MemoryKnowledgeScreenState extends ConsumerState<MemoryKnowledgeScreen> {
       length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: const PageTitle('What SidePal knows'),
+          title: const PageTitle('What SidePal knows about you'),
           centerTitle: true,
+          actions: [
+            IconButton(
+              onPressed: () => showPageExplainer(
+                context,
+                PageExplainers.memory,
+                fromHelp: true,
+              ),
+              tooltip: 'About this page',
+              icon: const Icon(Icons.help_outline_rounded, size: 20),
+            ),
+          ],
           bottom: TabBar(
             indicatorColor: AppColors.cyan,
             labelColor: AppColors.textPrimary,
@@ -65,7 +80,7 @@ class _MemoryKnowledgeScreenState extends ConsumerState<MemoryKnowledgeScreen> {
             tabs: const [
               Tab(text: 'FACTS'),
               Tab(text: 'PEOPLE'),
-              Tab(text: 'TIMELINE'),
+              Tab(text: 'HISTORY'),
             ],
           ),
         ),
@@ -92,13 +107,15 @@ class _FactsTab extends ConsumerWidget {
     if (facts.isEmpty) {
       return const _EmptyState(
         'Nothing remembered yet.\nTell Coach "remember that…" — or just talk; '
-        'SidePal learns quietly and labels every guess.',
+        "SidePal learns quietly and marks every guess as SidePal's guess.",
       );
     }
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
+        const _MemoryIntro(),
+        const SizedBox(height: 16),
         Container(
           decoration: BoxDecoration(
             color: AppColors.surfacePanel,
@@ -645,8 +662,8 @@ class _TimelineTab extends ConsumerWidget {
 
     if (summaries.isEmpty) {
       return const _EmptyState(
-        'No conversation summaries yet.\nAfter you chat with Coach, the gist '
-        'is kept here — the raw transcript is purged.',
+        'No chat summaries yet.\nAfter you chat with your coach, the gist is '
+        'kept here and the full transcript is deleted.',
       );
     }
 
@@ -711,10 +728,14 @@ class _ProvenanceBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (provenance) {
-      MemoryProvenance.userStated => ('STATED', AppColors.cyan),
-      MemoryProvenance.userConfirmed => ('CONFIRMED', AppColors.cyan),
-      MemoryProvenance.derivedDeterministic => ('OBSERVED', AppColors.fg70),
-      MemoryProvenance.aiInferred => ('INFERRED', AppColors.amber),
+      MemoryProvenance.userStated => ('YOU TOLD SIDEPAL', AppColors.cyan),
+      MemoryProvenance.userConfirmed => ('YOU CONFIRMED', AppColors.cyan),
+      MemoryProvenance.derivedDeterministic => (
+        'SIDEPAL NOTICED',
+        AppColors.fg70,
+      ),
+      // Amber is the trust signal: a guess, not something you said.
+      MemoryProvenance.aiInferred => ("SIDEPAL'S GUESS", AppColors.amber),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -724,11 +745,90 @@ class _ProvenanceBadge extends StatelessWidget {
       ),
       child: Text(
         label,
+        softWrap: false,
         style: TextStyle(
           color: color,
           fontSize: 9,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
+}
+
+/// Why this page exists, in the user's terms — shown at the top of Facts.
+///
+/// Opens expanded on every visit, slides down to one sentence after
+/// [_holdFor] (Miko, 2026-09-25), and toggles on tap.
+class _MemoryIntro extends StatefulWidget {
+  const _MemoryIntro();
+
+  static const _holdFor = Duration(seconds: 4);
+
+  @override
+  State<_MemoryIntro> createState() => _MemoryIntroState();
+}
+
+class _MemoryIntroState extends State<_MemoryIntro> {
+  static const _short =
+      'SidePal remembers useful things you tell it or that it notices.';
+  static const _full =
+      'SidePal remembers useful things you tell it or that it notices, so '
+      'it can understand you and make better suggestions later. For '
+      'example: if it knows you like calling your mom while walking, it '
+      'may suggest calling her when you have time for a walk.';
+
+  bool _expanded = true;
+  Timer? _collapseTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _collapseTimer = Timer(_MemoryIntro._holdFor, () {
+      if (mounted) setState(() => _expanded = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _collapseTimer?.cancel();
+    super.dispose();
+  }
+
+  void _toggle() {
+    _collapseTimer?.cancel();
+    setState(() => _expanded = !_expanded);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final style = TextStyle(
+      color: AppColors.textMuted,
+      fontSize: 13,
+      height: 1.45,
+    );
+    return Semantics(
+      button: true,
+      hint: _expanded ? 'Collapse' : 'Expand',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _toggle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 260),
+              child: Text(
+                _expanded ? _full : _short,
+                key: ValueKey(_expanded),
+                style: style,
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -764,6 +864,6 @@ String _kindLabel(MemoryFactKind kind) => switch (kind) {
   MemoryFactKind.preference => 'Preference',
   MemoryFactKind.learnedPattern => 'Pattern',
   MemoryFactKind.episodicSummary => 'Conversation summary',
-  MemoryFactKind.promiseNote => 'Promise note',
-  MemoryFactKind.observation => 'On your radar',
+  MemoryFactKind.promiseNote => 'For-later note',
+  MemoryFactKind.observation => 'Suggested for later',
 };

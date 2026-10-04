@@ -1,13 +1,25 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/notifications/local_notifications_service.dart';
 import '../../../core/offline/offline_store.dart';
 import '../../../core/push/push_messaging_service.dart';
+import '../../../core/session/session_scope.dart';
+import '../../../core/storage/app_storage_dir.dart';
 import '../../../core/sync/sync_cursor_store.dart';
 import '../../../core/sync/sync_service.dart';
+import '../../analytics/application/announced_insight_store.dart';
 import '../../direction/application/new_month_prompt.dart';
+import '../../execution/data/timer_runtime_cache.dart';
+import '../../focus/data/focus_resume_store.dart';
 import '../../intentions/application/geofence_arming.dart';
+import '../../memory/application/memory_extraction_service.dart';
+import '../../reminders/application/recovery_triage_service.dart';
+import '../../reminders/application/strategist_proposals_store.dart';
 import '../../thinking/application/thinking_loop_service.dart';
+import '../../../app/first_launch_gate.dart';
 
 // ── Feature flag ──────────────────────────────────────────────────────────────
 
@@ -25,6 +37,13 @@ const bool kRequireRegisteredAuth = bool.fromEnvironment(
 // ── Prefs keys ────────────────────────────────────────────────────────────────
 
 const String kLastSignedInUidPrefsKey = 'last_signed_in_uid';
+
+/// Set by [AuthRepository] the moment a sign-in CREATES a Firebase account
+/// (`additionalUserInfo.isNewUser`); holds that uid. The first-launch gate
+/// consumes it: a uid minted seconds ago has no remote data, so the seed
+/// pull is skipped and the app reveals at once (2026-09-22). Keyed by uid
+/// so a stale marker can never apply to another account.
+const String kAccountCreatedUidPrefsKey = 'account_created_uid_v1';
 
 // ── Policy ────────────────────────────────────────────────────────────────────
 
@@ -58,6 +77,38 @@ abstract final class AuthSessionPolicy {
     return stored != newUid;
   }
 
+  // ── Fresh account (nothing to pull) ──────────────────────────────────────────
+
+  static Future<void> markAccountCreated(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(kAccountCreatedUidPrefsKey, uid);
+  }
+
+  /// True — and clears the marker — when [uid] is the account the last
+  /// sign-in created. A marker for a different uid is dropped as stale.
+  static Future<bool> consumeAccountCreated(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    final marked = prefs.getString(kAccountCreatedUidPrefsKey);
+    if (marked == null) return false;
+    await prefs.remove(kAccountCreatedUidPrefsKey);
+    return marked == uid;
+  }
+
+  /// Fallback for sign-in paths that don't surface `isNewUser`: Firebase
+  /// stamps creation and last-sign-in at the same instant for a brand-new
+  /// account, and a later sign-in on another device moves only the second.
+  /// An anonymous session restored from the iOS keychain after a reinstall
+  /// also matches — its old data then arrives through the background pull
+  /// a few seconds after reveal instead of before it (accepted 2026-09-22).
+  static bool looksFreshlyCreated({
+    required DateTime? creationTime,
+    required DateTime? lastSignInTime,
+    Duration tolerance = const Duration(seconds: 2),
+  }) {
+    if (creationTime == null || lastSignInTime == null) return false;
+    return lastSignInTime.difference(creationTime).abs() <= tolerance;
+  }
+
   // ── Wipe ─────────────────────────────────────────────────────────────────────
 
   /// Wipe all local device state: Isar collections, notification schedule,
@@ -66,53 +117,123 @@ abstract final class AuthSessionPolicy {
   /// Does **not** call `FirebaseAuth.signOut()` — the caller is responsible
   /// for that (so the order is: clear local → then sign out, giving the
   /// reactive [AuthGate] a clean state to present).
-  static Future<void> clearLocalSession() async {
-    // 0. Account boundary for device-scoped transports (runs FIRST, while
-    //    the outgoing user is still authenticated):
-    //    - remove this device's push-token doc from the outgoing user's
-    //      tree so their rescue/brief pushes never reach the next user
-    //      (P1-01; best-effort with timeout, no-op without Firebase);
-    //    - disarm the native home-exit geofence, whose armed list carries
-    //      the outgoing user's intention copy and fires without Flutter
-    //      alive (P1-02; no-op without the iOS channel).
+  ///
+  /// Order matters (pre-launch audit H2–H4, 2026-09-15):
+  ///  * the session generation is bumped FIRST and synchronously, so every
+  ///    job that captured a [SessionToken] before this line drops its
+  ///    result instead of writing into the wiped store;
+  ///  * in-flight writers (remote pull, memory extraction) are DRAINED
+  ///    before the wipe — a timeout is not a cancellation;
+  ///  * per-account disk caches outside Isar (timer resume file, focus
+  ///    resume file, strategist proposals, announced insight, triage
+  ///    counter) are cleared, not just the database.
+  ///
+  /// [transportsAlreadyReleased] — the deletion coordinator releases the
+  /// device transports while the user is still authenticated (the push
+  /// token doc delete is rejected once the Auth user is gone).
+  static Future<void> clearLocalSession({
+    bool transportsAlreadyReleased = false,
+  }) async {
+    SessionScope.beginTeardown();
+    try {
+      // 0. Account boundary for device-scoped transports (runs FIRST, while
+      //    the outgoing user is still authenticated).
+      if (!transportsAlreadyReleased) await releaseDeviceTransports();
+
+      // 0b. Join writers that may still be mid-flight for the outgoing
+      //     account. Their tokens are already stale (bumped above), so they
+      //     abort at their next write; this just waits for that to happen
+      //     before the store is cleared underneath them.
+      await SyncService.instance.drainInFlightPull();
+      await MemoryExtractionService.drainInFlight();
+
+      // 1. Cancel all pending OS notifications.
+      await LocalNotificationsService.instance.cancelAll();
+
+      // 1b. Per-account files outside Isar (H4). BEFORE the Isar wipe and
+      //     before any lazily recreated controller can reload them.
+      await _clearFileCaches();
+
+      // 2. Wipe Isar (all collections).
+      await OfflineStore.instance.clearAll();
+
+      // 3. Drop any queued offline writes — they belong to the previous user
+      //    and must never replay into the next account's Firestore tree.
+      await SyncService.instance.clearQueue();
+
+      // 3b. Drop sync cursors so the next account's first pull is a FULL pull
+      //     (cursors describe the previous account's merge progress).
+      await SyncCursorStore.clearAll();
+      // 3c. Every account's "seed settled" answer is void with the rows gone
+      //     (2026-09-23): an account returning to this device is seeded and
+      //     judged afresh by the gate that remounts for it.
+      FirstLaunchGate.resetSeedSignals();
+
+      // 4. Clear the relevant SharedPreferences keys.
+      //    NOTE: kLastSignedInUidPrefsKey is intentionally kept so that the next
+      //    restart can detect whether a *different* account signed in and trigger
+      //    another wipe if needed. Removing it here would cause every cold-start
+      //    after a logout to look like a "new install" and loop-wipe indefinitely.
+      final prefs = await SharedPreferences.getInstance();
+      await Future.wait([
+        prefs.remove('isar_seeded_v1'),
+        prefs.remove('notification_task_id_index_v1'),
+        // The Getting Started verdict is stored per uid since 2026-09-23
+        // (`education_onboarding_state_v1:<uid>`) and is deliberately kept:
+        // an account that returns to this device keeps its own answer. This
+        // removes only the pre-migration device-level key. Seen feature
+        // cards stay device-level on purpose.
+        prefs.remove('education_onboarding_state_v1'),
+        // Thinking Loop cadence is per-account (P2-10): without this, user
+        // A's morning reflection would make user B silently skip theirs for
+        // the rest of the local day after an account switch.
+        prefs.remove(ThinkingLoopService.lastDayPrefsKey),
+        prefs.remove(ThinkingLoopService.inputsHashPrefsKey),
+        prefs.remove(ThinkingLoopService.timeWeekDonePrefsKey),
+        prefs.remove(ThinkingLoopService.timeMonthDonePrefsKey),
+        // Direction's month-card flag is per-account (PRD/Direction §5.3).
+        prefs.remove(kDirectionMonthCardHandledPrefsKey),
+        // Audit H4: personal coaching copy and per-account counters that
+        // used to survive into the next account's session.
+        prefs.remove(StrategistProposalsStore.prefsKey),
+        prefs.remove(AnnouncedInsightStore.prefsKey),
+        prefs.remove(RecoveryTriageService.countPrefsKey),
+      ]);
+    } finally {
+      SessionScope.endTeardown();
+    }
+  }
+
+  /// Device transports that carry the outgoing account's identity:
+  ///  - remove this device's push-token doc from the outgoing user's tree
+  ///    so their rescue/brief pushes never reach the next user (P1-01;
+  ///    best-effort with timeout, no-op without Firebase);
+  ///  - disarm the native home-exit geofence, whose armed list carries the
+  ///    outgoing user's intention copy and fires without Flutter alive
+  ///    (P1-02; no-op without the iOS channel).
+  /// Must run while the outgoing user is still authenticated.
+  static Future<void> releaseDeviceTransports() async {
     await PushMessagingService.instance.deregisterDevice();
     await GeofenceArmingService().clearForLogout();
+  }
 
-    // 1. Cancel all pending OS notifications.
-    await LocalNotificationsService.instance.cancelAll();
+  static Future<void> _clearFileCaches() async {
+    Future<void> guard(String what, Future<void> Function() fn) async {
+      try {
+        await fn();
+      } catch (e) {
+        debugPrint('[AuthSessionPolicy] $what clear failed: $e');
+      }
+    }
 
-    // 2. Wipe Isar (all collections).
-    await OfflineStore.instance.clearAll();
-
-    // 3. Drop any queued offline writes — they belong to the previous user
-    //    and must never replay into the next account's Firestore tree.
-    await SyncService.instance.clearQueue();
-
-    // 3b. Drop sync cursors so the next account's first pull is a FULL pull
-    //     (cursors describe the previous account's merge progress).
-    await SyncCursorStore.clearAll();
-
-    // 4. Clear the relevant SharedPreferences keys.
-    //    NOTE: kLastSignedInUidPrefsKey is intentionally kept so that the next
-    //    restart can detect whether a *different* account signed in and trigger
-    //    another wipe if needed. Removing it here would cause every cold-start
-    //    after a logout to look like a "new install" and loop-wipe indefinitely.
-    final prefs = await SharedPreferences.getInstance();
-    await Future.wait([
-      prefs.remove('isar_seeded_v1'),
-      prefs.remove('notification_task_id_index_v1'),
-      // Onboarding is per-account (a different sign-in re-evaluates new vs
-      // existing); seen feature cards stay device-level on purpose.
-      prefs.remove('education_onboarding_state_v1'),
-      // Thinking Loop cadence is per-account (P2-10): without this, user
-      // A's morning reflection would make user B silently skip theirs for
-      // the rest of the local day after an account switch.
-      prefs.remove(ThinkingLoopService.lastDayPrefsKey),
-      prefs.remove(ThinkingLoopService.inputsHashPrefsKey),
-      prefs.remove(ThinkingLoopService.timeWeekDonePrefsKey),
-      prefs.remove(ThinkingLoopService.timeMonthDonePrefsKey),
-      // Direction's month-card flag is per-account (PRD/Direction §5.3).
-      prefs.remove(kDirectionMonthCardHandledPrefsKey),
-    ]);
+    await guard('timer runtime cache', const TimerRuntimeCache().clear);
+    await guard('focus resume store', FocusResumeStore.deleteFile);
+    // Deprecated JSON reminder cache — nothing writes it any more, but an
+    // upgraded install may still carry the previous account's copy.
+    await guard('legacy reminder cache', () async {
+      final dir = await getAppStorageDirectory();
+      final file = File('${dir.path}/reminder_cache.json');
+      if (await file.exists()) await file.delete();
+    });
   }
 }

@@ -73,30 +73,67 @@ void main() {
     expect(() => e.validate(), throwsArgumentError);
   });
 
-  test('validate rejects a horizon/key mismatch and a non-deterministic id',
-      () {
-    final mismatch = DirectionEntry(
-      id: 'dir_year_2026-09',
-      horizon: DirectionHorizon.year,
-      periodKey: '2026-09',
-      text: 'x',
-      periodStartMs: 1,
-      periodEndMs: 2,
-      createdAtMs: 1,
-      updatedAtMs: 1,
-    );
-    expect(() => mismatch.validate(), throwsArgumentError);
+  test(
+    'validate rejects a horizon/key mismatch and a non-deterministic id',
+    () {
+      final mismatch = DirectionEntry(
+        id: 'dir_year_2026-09',
+        horizon: DirectionHorizon.year,
+        periodKey: '2026-09',
+        text: 'x',
+        periodStartMs: 1,
+        periodEndMs: 2,
+        createdAtMs: 1,
+        updatedAtMs: 1,
+      );
+      expect(() => mismatch.validate(), throwsArgumentError);
 
-    final randomId = DirectionEntry(
-      id: 'direction_123abc',
-      horizon: DirectionHorizon.month,
-      periodKey: '2026-09',
-      text: 'x',
-      periodStartMs: 1,
-      periodEndMs: 2,
-      createdAtMs: 1,
-      updatedAtMs: 1,
+      final randomId = DirectionEntry(
+        id: 'direction_123abc',
+        horizon: DirectionHorizon.month,
+        periodKey: '2026-09',
+        text: 'x',
+        periodStartMs: 1,
+        periodEndMs: 2,
+        createdAtMs: 1,
+        updatedAtMs: 1,
+      );
+      expect(() => randomId.validate(), throwsArgumentError);
+    },
+  );
+
+  group('outcome (close-out, 2026-09-19)', () {
+    final period = DirectionPeriods.current(
+      DirectionHorizon.month,
+      DateTime(2026, 9, 11),
     );
-    expect(() => randomId.validate(), throwsArgumentError);
+    final entry = DirectionEntry.forPeriod(period, text: 'Ship it', nowMs: 1);
+
+    test('round-trips through the map, absent by default', () {
+      expect(entry.outcome, isNull);
+      expect(DirectionEntry.fromMap(entry.toMap()).outcome, isNull);
+      final answered = entry.copyWith(
+        outcome: DirectionOutcome.notYet,
+        outcomeAtMs: 5,
+      );
+      final back = DirectionEntry.fromMap(answered.toMap());
+      expect(back.outcome, DirectionOutcome.notYet);
+      expect(back.outcomeAtMs, 5);
+      expect(answered.toMap()['outcome'], 'not_yet');
+    });
+
+    test('needsCloseoutAt: written, unanswered, and the period has ended', () {
+      final before = DateTime(2026, 9, 20);
+      final after = DateTime(2026, 10, 1, 8);
+      expect(entry.needsCloseoutAt(before), isFalse);
+      expect(entry.needsCloseoutAt(after), isTrue);
+      expect(
+        entry
+            .copyWith(outcome: DirectionOutcome.achieved, outcomeAtMs: 1)
+            .needsCloseoutAt(after),
+        isFalse,
+      );
+      expect(entry.copyWith(text: '').needsCloseoutAt(after), isFalse);
+    });
   });
 }

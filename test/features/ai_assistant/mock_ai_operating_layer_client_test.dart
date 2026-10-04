@@ -67,7 +67,7 @@ void main() {
       final result = await client.parseIntent(payload);
 
       expect(result.isUnsupported, isTrue);
-      expect(result.informationalMessage, contains('Circles'));
+      expect(result.informationalMessage, contains('Groups'));
     });
 
     test('returns suggest plan for planning requests', () async {

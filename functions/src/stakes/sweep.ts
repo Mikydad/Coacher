@@ -14,7 +14,15 @@ import { logger } from 'firebase-functions/v2';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 
-import { decideChallenge, DecisionInputs, revealExpiresAtMs, sweepAction } from './decisions';
+import {
+  decideChallenge,
+  DecisionInputs,
+  decisionDueAtMs,
+  preRevealNoticeDue,
+  revealExpiresAtMs,
+  sweepAction,
+} from './decisions';
+import { DeviceToken, sendToTokens } from '../intentions/push_send';
 import {
   activityFeedItemDoc,
   CHALLENGES,
@@ -23,9 +31,14 @@ import {
   eventDoc,
   evidenceFromSnap,
 } from './firestore_layout';
+import { redrivePartialPurges } from './account_purge';
 import { escrowRef, markEscrow, processRefundQueue } from './escrows';
 import { balanceRef, writeLedgerTxn } from './ledger';
-import { applyVerdictToChallenge, PHOTO_SCREENS } from './nsfw_screen';
+import {
+  applyVerdictToChallenge,
+  PHOTO_RESERVATIONS,
+  PHOTO_SCREENS,
+} from './nsfw_screen';
 import { EscrowDoc } from './payments';
 import { BalanceDoc, EARN_AMOUNTS } from './points';
 import { assertTransition } from './state_machine';
@@ -44,13 +57,19 @@ export async function runSweepOnce(
     // may never come (bit us on day one: uploads during the trigger's
     // own deployment window were stuck in draft permanently).
     screensApplied: await applyPendingScreens(now),
+    reservationsExpired: await expirePhotoReservations(now),
     expired: await expireInvites(now),
     toVerification: await moveToVerification(now),
+    // 2026-09-18: an hour before a photo would post, the staker hears
+    // about it — and about the veto and the paid takedown — once.
+    preRevealNotices: await sendPreRevealNotices(now),
     decided: await decideDue(now),
     reveals: await expireReveals(now),
     // Phase 2 of the two-phase money move: drive refund_pending →
     // refunded through the provider (crash-safe, idempotent).
     refunds: await processRefundQueue(now),
+    // H12 — account purges that hit a failed step are re-driven here.
+    purgesRedriven: await redrivePartialPurges(now),
   };
   logger.info('stakeSweep done', counts);
   return counts;
@@ -82,6 +101,11 @@ async function applyPendingScreens(now: number): Promise<number> {
     const screen = (await db.collection(PHOTO_SCREENS).doc(doc.id).get()).data();
     const status = screen?.status;
     if (status !== 'approved' && status !== 'rejected') continue;
+    // H1 — verdicts written before the binding existed carry no uid/path
+    // and are never applied; the owner re-uploads to get a bound verdict.
+    if (typeof screen?.uid !== 'string' || typeof screen?.path !== 'string') {
+      continue;
+    }
     await applyVerdictToChallenge(
       doc.id,
       {
@@ -89,10 +113,45 @@ async function applyPendingScreens(now: number): Promise<number> {
         reasons: (screen?.reasons as string[] | undefined) ?? [],
       },
       now,
+      { uid: screen.uid as string, path: screen.path as string },
     );
     applied += 1;
   }
   return applied;
+}
+
+/**
+ * M12 — reservations that never became a challenge: delete the doc and
+ * the orphan object so an abandoned create can't accumulate storage.
+ */
+async function expirePhotoReservations(now: number): Promise<number> {
+  const db = getFirestore();
+  const snap = await db
+    .collection(PHOTO_RESERVATIONS)
+    .where('expiresAtMs', '<=', now)
+    .limit(BATCH_LIMIT)
+    .get();
+  let expired = 0;
+  for (const doc of snap.docs) {
+    const challenge = await db.collection(CHALLENGES).doc(doc.id).get();
+    if (challenge.exists) {
+      // Consumed: the challenge pins the object; the reservation is done.
+      await doc.ref.delete();
+      continue;
+    }
+    const uid = doc.data().uid as string | undefined;
+    if (uid) {
+      await getStorage()
+        .bucket()
+        .file(`stake_photos/${doc.id}/${uid}.jpg`)
+        .delete({ ignoreNotFound: true })
+        .catch(() => undefined);
+    }
+    await db.collection(PHOTO_SCREENS).doc(doc.id).delete().catch(() => undefined);
+    await doc.ref.delete();
+    expired += 1;
+  }
+  return expired;
 }
 
 async function expireInvites(now: number): Promise<number> {
@@ -133,6 +192,87 @@ async function moveToVerification(now: number): Promise<number> {
     });
   }
   return snap.size;
+}
+
+/**
+ * The pre-reveal notice (2026-09-18): for a solo photo stake whose decision
+ * is due within the hour and would reveal, one push telling the staker
+ * they can still use the monthly mercy veto or take the photo down for
+ * points. Stamped on the doc so it goes once; a push nobody could receive
+ * (no device tokens) is stamped too, so the pass never spins on it.
+ */
+async function sendPreRevealNotices(now: number): Promise<number> {
+  const db = getFirestore();
+  // Solo decisions land at deadline + 12h; the notice window opens 1h
+  // before. `deadlineMs <= now - 11h` is the cheap pre-filter.
+  const snap = await db
+    .collection(CHALLENGES)
+    .where('status', '==', 'pending_verification')
+    .where('deadlineMs', '<=', now - 11 * 3_600_000)
+    .limit(BATCH_LIMIT)
+    .get();
+
+  let sent = 0;
+  for (const doc of snap.docs) {
+    const data = doc.data();
+    if (data.preRevealNoticeAtMs !== undefined) continue;
+    if (data.photoState !== 'approved') continue; // removed / never a photo
+    const ch = challengeFromSnap(doc);
+    if (ch.type !== 'solo_photo') continue;
+    if (!preRevealNoticeDue(ch, now)) continue;
+
+    // Dry-run the decision as it would land: only a reveal is worth a push.
+    const inputs = await loadDecisionInputs(ch);
+    let wouldReveal = false;
+    try {
+      const preview = decideChallenge(ch, inputs, decisionDueAtMs(ch));
+      wouldReveal = preview.perParticipant.some(
+        (r) => r.uid === ch.creatorUid && r.resolution.kind === 'reveal_photo',
+      );
+    } catch (e) {
+      logger.warn('preRevealNotice preview failed', { id: ch.id, e: String(e) });
+      continue;
+    }
+    if (!wouldReveal) {
+      await doc.ref.update({ preRevealNoticeAtMs: now, preRevealNoticeSkipped: 'would_not_reveal' });
+      continue;
+    }
+
+    const tokens = await deviceTokensFor(ch.creatorUid);
+    if (tokens.length === 0) {
+      await doc.ref.update({ preRevealNoticeAtMs: now, preRevealNoticeSkipped: 'no_devices' });
+      continue;
+    }
+    const minutesLeft = Math.max(1, Math.round((decisionDueAtMs(ch) - now) / 60_000));
+    const result = await sendToTokens(ch.creatorUid, tokens, (token) => ({
+      token,
+      notification: {
+        title: 'Your stake photo posts soon',
+        body:
+          `"${ch.frozenGoal.title}" didn't make it. In about ${minutesLeft} min ` +
+          'your photo goes to the group — unless you use your monthly mercy ' +
+          'veto or take it down for points. Open the challenge.',
+      },
+      data: { type: 'stake_pre_reveal', challengeId: ch.id },
+      apns: { headers: { 'apns-collapse-id': `stake_pre_reveal_${ch.id}` } },
+    }));
+    // Honest bookkeeping (P2-02): stamp only when FCM took at least one.
+    if (result.delivered > 0) {
+      await doc.ref.update({ preRevealNoticeAtMs: now });
+      sent += 1;
+    }
+  }
+  return sent;
+}
+
+async function deviceTokensFor(uid: string): Promise<DeviceToken[]> {
+  const snap = await getFirestore().collection(`users/${uid}/deviceTokens`).get();
+  const tokens: DeviceToken[] = [];
+  for (const d of snap.docs) {
+    const token = d.data().token as string | undefined;
+    if (token) tokens.push({ docId: d.id, token });
+  }
+  return tokens;
 }
 
 async function decideDue(now: number): Promise<number> {
@@ -217,13 +357,23 @@ async function decideDue(now: number): Promise<number> {
         outcome: {
           decidedAtMs: decision.decidedAtMs,
           perParticipant: decision.perParticipant,
+          // Audit H8 / D1: evidence is client-asserted (unit window and
+          // per-row bounds enforced by rules; multi-party outcomes also go
+          // through dispute + vote). Recorded on the outcome so the policy
+          // is visible on every settled record.
+          evidenceSelfReported: true,
         },
       };
 
       // Photo lifecycle (P-3/P-4): reveal on forfeit, delete otherwise.
+      // A photo taken down BEFORE the reveal (stakeRemovePhoto's pre-reveal
+      // door, 2026-09-18) stays 'removed': the loss is decided as usual,
+      // nothing posts, no feed line, the veto is not burned for it.
+      const alreadyRemoved = fresh.data()?.photoState === 'removed';
       for (const r of decision.perParticipant) {
         const photo = ch.participants.find((p) => p.uid === r.uid)?.photo;
         if (!photo) continue;
+        if (alreadyRemoved) continue;
         if (r.resolution.kind === 'reveal_photo') {
           update.photoState = 'revealed';
           update.revealedAtMs = now; // window counts from the actual post

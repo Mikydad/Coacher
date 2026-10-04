@@ -65,3 +65,6 @@ ios/build/
 /package-lock.json
 libisar.so
 *.p8
+
+# Coach model bake-off output (functions/eval/README.md)
+functions/eval/results.json

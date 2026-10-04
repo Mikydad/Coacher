@@ -14,6 +14,7 @@ import '../../features/planning/application/routine_mode_policy_resolver.dart';
 import '../../features/planning/data/isar_planning_repository.dart';
 import '../../features/planning/data/planning_repository.dart';
 import '../../features/execution/application/execution_controller.dart';
+import '../../features/execution/application/focus_end_alert.dart';
 import '../../features/time_tracker/application/time_tracker_providers.dart';
 import '../../features/execution/data/execution_repository.dart';
 import '../../features/execution/data/timer_runtime_cache.dart';
@@ -21,6 +22,7 @@ import '../../features/focus/data/focus_resume_store.dart';
 import '../../features/scoring/application/scoring_controller.dart';
 import '../../features/scoring/data/scoring_repository.dart';
 import '../../features/goals/application/goal_reminder_sync_service.dart';
+import '../../features/goals/application/goals_providers.dart';
 import '../../features/analytics/data/ai_summary_repository.dart';
 import '../../features/analytics/data/analytics_repository.dart';
 import '../../features/analytics/data/delivery_repository.dart';
@@ -42,6 +44,7 @@ import '../../features/reminders/application/alarm_scheduler.dart';
 import '../../features/reminders/application/ladder_compiler.dart';
 import '../../features/reminders/application/ladder_scheduler.dart';
 import '../../features/time_blocks/domain/models/scheduled_time_block.dart';
+import '../../features/reminders/application/recovery_liveness.dart';
 import '../../features/reminders/application/recovery_notification_scheduler.dart';
 import '../../features/reminders/application/recovery_triage_service.dart';
 import '../../features/reminders/application/recovery_view.dart';
@@ -51,6 +54,7 @@ import '../../features/reminders/data/reminder_occurrence_repository.dart';
 import '../../features/reminders/data/reminder_repository.dart';
 import '../../features/reminders/domain/models/reminder_occurrence.dart';
 import '../../features/ai_assistant/data/ai_interaction_history_repository.dart';
+import '../../features/community/application/circle_functions.dart';
 import '../../features/community/application/circle_providers.dart';
 import '../../features/community/application/user_circle_membership_service.dart';
 
@@ -70,9 +74,8 @@ final localNotificationsServiceProvider = Provider<LocalNotificationsService>(
 /// Guard against iOS's 64-pending-local-notification cap — consulted by the
 /// AttentionOrchestrator before scheduling any future notification.
 final notificationBudgetProvider = Provider<NotificationBudget>(
-  (ref) => NotificationBudget(
-    pending: ref.read(localNotificationsServiceProvider),
-  ),
+  (ref) =>
+      NotificationBudget(pending: ref.read(localNotificationsServiceProvider)),
 );
 final offlineStoreProvider = Provider<OfflineStore>(
   (ref) => OfflineStore.instance,
@@ -121,6 +124,7 @@ final executionControllerProvider =
         initialTaskId: ref.read(activeExecutionTaskIdProvider),
         initialTaskLabel: ref.read(activeExecutionTaskLabelProvider),
         activityEvents: ref.read(activityEventRepositoryProvider),
+        endAlert: const LocalFocusEndAlert(),
       );
     });
 
@@ -153,7 +157,8 @@ final reminderOccurrenceServiceProvider = Provider<ReminderOccurrenceService>(
 /// stream — never an invalidate-and-refetch; the local write IS the update.
 final unresolvedReminderOccurrencesProvider =
     StreamProvider<List<ReminderOccurrence>>(
-      (ref) => ref.watch(reminderOccurrenceRepositoryProvider).watchUnresolved(),
+      (ref) =>
+          ref.watch(reminderOccurrenceRepositoryProvider).watchUnresolved(),
     );
 
 /// Arms compiled ladders ([L-PRE], FR-R-30…34).
@@ -348,10 +353,36 @@ final overdueEntityIdsProvider = Provider<Set<String>>((ref) {
 final recoveryViewProvider = StreamProvider<RecoveryView>((ref) {
   final now = DateTime.now();
   final todayStart = DateTime(now.year, now.month, now.day);
+  // Liveness (2026-09-18): a row is only worth showing when its entity
+  // still exists and still wants doing. Goals come off their watch stream
+  // (a status change re-filters the card at once); tasks are looked up per
+  // emission. While goals are still loading, show nothing rather than a
+  // ghost row that vanishes a frame later.
+  final goalsAsync = ref.watch(goalsStreamProvider);
+  if (goalsAsync.isLoading && goalsAsync.valueOrNull == null) {
+    return const Stream.empty();
+  }
+  final activeGoalIds = RecoveryLiveness.activeGoalIds(
+    goalsAsync.valueOrNull ?? const [],
+  );
+  final planning = ref.watch(planningRepositoryProvider);
   return ref
       .watch(reminderOccurrenceRepositoryProvider)
       .watchRecoveryPool(todayStartMs: todayStart.millisecondsSinceEpoch)
-      .map((rows) => RecoveryViewBuilder.build(rows, now: DateTime.now()));
+      .asyncMap((rows) async {
+        final liveTaskIds = await RecoveryLiveness.liveTaskIds(
+          rows,
+          taskById: planning.getTaskById,
+        );
+        return RecoveryViewBuilder.build(
+          rows,
+          now: DateTime.now(),
+          isLive: RecoveryLiveness.predicate(
+            activeGoalIds: activeGoalIds,
+            liveTaskIds: liveTaskIds,
+          ),
+        );
+      });
 });
 
 @Deprecated(
@@ -435,10 +466,8 @@ final userCircleMembershipServiceProvider =
     Provider<UserCircleMembershipService>((ref) {
       return UserCircleMembershipService(
         memberRepo: ref.read(circleMemberRepositoryProvider),
-        circleRepo: ref.read(circleRepositoryProvider),
+        functions: ref.read(circleFunctionsProvider),
         currentUserId: () => FirebaseAuth.instance.currentUser?.uid ?? '',
-        currentDisplayName: () =>
-            FirebaseAuth.instance.currentUser?.displayName ?? 'User',
         maxCirclesPerUser: () => ref
             .read(tierGateProvider)
             .maxJoinedCircles(

@@ -45,6 +45,36 @@ void main() {
 
   // ─── fromMap defaults ──────────────────────────────────────────────────────
 
+  group('homeTrackPillEnabled (2026-09-18)', () {
+    test('round-trips false', () {
+      final p = _pref().copyWith(homeTrackPillEnabled: false);
+      expect(
+        UserProfilePreference.fromMap(p.toMap()).homeTrackPillEnabled,
+        isFalse,
+      );
+    });
+
+    test('round-trips true', () {
+      final p = _pref().copyWith(homeTrackPillEnabled: true);
+      expect(
+        UserProfilePreference.fromMap(p.toMap()).homeTrackPillEnabled,
+        isTrue,
+      );
+    });
+
+    test('missing key → hidden (off by default, 2026-09-27)', () {
+      final m = _pref().toMap()..remove('homeTrackPillOn');
+      expect(UserProfilePreference.fromMap(m).homeTrackPillEnabled, isFalse);
+    });
+
+    test('the retired key no longer turns the pill on', () {
+      final m = _pref().toMap()
+        ..remove('homeTrackPillOn')
+        ..['homeTrackPillEnabled'] = true;
+      expect(UserProfilePreference.fromMap(m).homeTrackPillEnabled, isFalse);
+    });
+  });
+
   group('fromMap defaults for missing keys', () {
     test('missing id → kUserProfilePreferenceId', () {
       final m = _pref().toMap()..remove('id');

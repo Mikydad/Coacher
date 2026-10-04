@@ -22,6 +22,7 @@ CircleMessage _makeMessage({
 }
 
 void main() {
+  _reactionsByUserTests();
   group('CircleMessage toMap / fromMap', () {
     test('text message round-trip preserves all fields', () {
       final msg = _makeMessage();
@@ -98,3 +99,107 @@ void main() {
     });
   });
 }
+
+// ─── Reactions: own-key write model (pre-launch audit L2) ────────────────────
+
+void _reactionsByUserTests() {
+  group('CircleMessage reactionsByUser', () {
+    test('fromMap merges legacy emoji→uids with uid→emojis', () {
+      final m = CircleMessage.fromMap({
+        'id': 'm',
+        'circleId': 'c',
+        'senderId': 'a',
+        'senderDisplayName': 'A',
+        'type': 'text',
+        'content': 'hi',
+        'reactions': {
+          '👍': ['a', 'b'],
+        },
+        'reactionsByUser': {
+          'c': ['👍', '🔥'],
+          'a': ['🔥'],
+        },
+        'createdAtMs': 1,
+      });
+      expect(m.reactions['👍'], ['a', 'b', 'c']);
+      expect(m.reactions['🔥'], ['c', 'a']);
+      expect(m.reactionsByUser['c'], ['👍', '🔥']);
+    });
+
+    test('reactionsOf includes legacy entries so old reactions read as mine', () {
+      final m = CircleMessage.fromMap({
+        'id': 'm',
+        'circleId': 'c',
+        'senderId': 'a',
+        'senderDisplayName': 'A',
+        'type': 'text',
+        'reactions': {
+          '👍': ['b'],
+        },
+        'reactionsByUser': {
+          'b': ['🔥'],
+        },
+        'createdAtMs': 1,
+      });
+      expect(m.reactionsOf('b'), ['🔥', '👍']);
+      expect(m.reactionsOf('zzz'), isEmpty);
+    });
+
+    test('toMap writes both maps and round-trips', () {
+      final m = CircleMessage(
+        id: 'm',
+        circleId: 'c',
+        senderId: 'a',
+        senderDisplayName: 'A',
+        type: MessageType.text,
+        content: 'hi',
+        reactionsByUser: const {
+          'a': ['👍'],
+        },
+        createdAtMs: 1,
+      );
+      final map = m.toMap();
+      expect(map['reactionsByUser'], {
+        'a': ['👍'],
+      });
+      final back = CircleMessage.fromMap(map);
+      expect(back.reactions['👍'], ['a']);
+    });
+
+    test('mergeReactions drops empty emoji buckets and dedupes uids', () {
+      final merged = CircleMessage.mergeReactions(
+        {
+          '👍': ['a'],
+          '💤': [],
+        },
+        {
+          'a': ['👍'],
+        },
+      );
+      expect(merged, {
+        '👍': ['a'],
+      });
+    });
+  });
+
+  test('tombstone fields round-trip and are absent when not deleted', () {
+    final live = CircleMessage(
+      id: 'm',
+      circleId: 'c',
+      senderId: 's',
+      senderDisplayName: 'S',
+      type: MessageType.text,
+      content: 'hi',
+      createdAtMs: 1,
+    );
+    expect(live.isDeleted, isFalse);
+    expect(live.toMap().containsKey('deletedAtMs'), isFalse);
+    final gone = CircleMessage.fromMap(
+      live.copyWith(deletedAtMs: 9, deletedByUid: 's').toMap(),
+    );
+    expect(gone.isDeleted, isTrue);
+    expect(gone.deletedByModerator, isFalse);
+    expect(gone.deletedAtMs, 9);
+  });
+}
+

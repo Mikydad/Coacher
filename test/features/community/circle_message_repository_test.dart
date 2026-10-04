@@ -66,30 +66,53 @@ void main() {
     });
   });
 
-  group('updateReactions', () {
-    test('updateReactions stores new reactions map', () async {
+  group('setMyReactions (own key only — audit L2)', () {
+    test('writes reactionsByUser.{uid} and the merged view reflects it', () async {
       final msg = _makeMessage();
       await repo.sendMessage(msg);
 
-      final reactions = {
-        '🔥': ['user-1', 'user-2'],
-        '💪': ['user-3'],
-      };
-      await repo.updateReactions(msg.circleId, msg.id, reactions);
+      await repo.setMyReactions(msg.circleId, msg.id, 'user-1', ['🔥', '💪']);
+      await repo.setMyReactions(msg.circleId, msg.id, 'user-2', ['🔥']);
 
       final list = await repo.watchMessages('circle-1').first;
       final updated = list.firstWhere((m) => m.id == msg.id);
       expect(updated.reactions['🔥'], containsAll(['user-1', 'user-2']));
-      expect(updated.reactions['💪'], contains('user-3'));
+      expect(updated.reactions['💪'], ['user-1']);
+      expect(updated.reactionsOf('user-2'), ['🔥']);
     });
 
-    test('clearing reactions stores empty map', () async {
+    test('clearing own reactions leaves the other member untouched', () async {
       final msg = _makeMessage();
       await repo.sendMessage(msg);
-      await repo.updateReactions(msg.circleId, msg.id, {});
+      await repo.setMyReactions(msg.circleId, msg.id, 'user-1', ['🔥']);
+      await repo.setMyReactions(msg.circleId, msg.id, 'user-2', ['🔥']);
+      await repo.setMyReactions(msg.circleId, msg.id, 'user-1', []);
 
       final list = await repo.watchMessages('circle-1').first;
-      expect(list.first.reactions, isEmpty);
+      expect(list.first.reactions['🔥'], ['user-2']);
+      expect(list.first.reactionsOf('user-1'), isEmpty);
+    });
+  });
+
+  group('deleteMessage (2026-09-24 tombstone)', () {
+    test('strips content and image, keeps the row, stamps who', () async {
+      final msg = _makeMessage().copyWith(imageUrl: 'https://x/y.jpg');
+      await repo.sendMessage(msg);
+      await repo.deleteMessage(
+        msg.circleId,
+        msg.id,
+        byUid: 'moderator-9',
+        nowMs: 5_000_000,
+      );
+      final list = await repo.watchMessages(msg.circleId).first;
+      expect(list, hasLength(1), reason: 'the row stays');
+      final m = list.single;
+      expect(m.isDeleted, isTrue);
+      expect(m.deletedByModerator, isTrue);
+      expect(m.deletedAtMs, 5_000_000);
+      expect(m.content, isNull);
+      expect(m.imageUrl, isNull);
     });
   });
 }
+

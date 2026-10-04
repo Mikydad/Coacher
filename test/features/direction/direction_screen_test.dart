@@ -38,8 +38,10 @@ class _FakeDirectionRepository extends DirectionRepository {
   Future<List<DirectionEntry>> fetchAllOnce() async => _snapshot;
 
   @override
-  Future<DirectionEntry?> get(DirectionHorizon horizon, String periodKey) async =>
-      _rows[directionEntryId(horizon, periodKey)];
+  Future<DirectionEntry?> get(
+    DirectionHorizon horizon,
+    String periodKey,
+  ) async => _rows[directionEntryId(horizon, periodKey)];
 
   @override
   Future<DirectionEntry?> setText(DirectionPeriod period, String text) async {
@@ -58,6 +60,22 @@ class _FakeDirectionRepository extends DirectionRepository {
     _emit();
     return entry;
   }
+
+  @override
+  Future<DirectionEntry?> setOutcome(
+    DirectionEntry entry,
+    DirectionOutcome outcome,
+  ) async {
+    final updated = entry.copyWith(
+      outcome: outcome,
+      outcomeAtMs: clock,
+      updatedAtMs: clock++,
+    );
+    _rows[updated.id] = updated;
+    writes.add('${entry.periodKey}!${outcome.storageValue}');
+    _emit();
+    return updated;
+  }
 }
 
 final _now = DateTime(2026, 9, 11, 22);
@@ -75,7 +93,8 @@ Widget _wrap(Widget child, _FakeDirectionRepository repo) {
   );
 }
 
-Finder _add(DirectionHorizon h) => find.byKey(ValueKey('direction_add_${h.name}'));
+Finder _add(DirectionHorizon h) =>
+    find.byKey(ValueKey('direction_add_${h.name}'));
 Finder _field(DirectionHorizon h) =>
     find.byKey(ValueKey('direction_field_${h.name}'));
 Finder _save(DirectionHorizon h) =>
@@ -96,8 +115,9 @@ DirectionEntry _seed(DirectionHorizon h, DateTime at, String text) =>
 
 void main() {
   group('DirectionScreen entry', () {
-    testWidgets('empty → + Add rows; Add → field; Save writes and closes',
-        (tester) async {
+    testWidgets('empty → + Add rows; Add → field; Save writes and closes', (
+      tester,
+    ) async {
       final repo = _FakeDirectionRepository();
       await tester.pumpWidget(_wrap(const DirectionScreen(), repo));
       await tester.pump();
@@ -112,7 +132,10 @@ void main() {
       expect(_field(DirectionHorizon.month), findsOneWidget);
       expect(_add(DirectionHorizon.month), findsNothing);
 
-      await tester.enterText(_field(DirectionHorizon.month), ' Launch SidePal ');
+      await tester.enterText(
+        _field(DirectionHorizon.month),
+        ' Launch SidePal ',
+      );
       expect(repo.writes, isEmpty, reason: 'nothing writes before Save');
       await tester.tap(_save(DirectionHorizon.month));
       await tester.pump();
@@ -147,7 +170,10 @@ void main() {
       await tester.tap(_statement(DirectionHorizon.month));
       await tester.pump();
       expect(
-        tester.widget<TextField>(_field(DirectionHorizon.month)).controller!.text,
+        tester
+            .widget<TextField>(_field(DirectionHorizon.month))
+            .controller!
+            .text,
         'Launch',
       );
       await tester.tap(_save(DirectionHorizon.month));
@@ -168,8 +194,9 @@ void main() {
       expect(repo.writes, ['2026-Q3=Ship it']);
     });
 
-    testWidgets('safety net: leaving with a dirty open editor still saves',
-        (tester) async {
+    testWidgets('safety net: leaving with a dirty open editor still saves', (
+      tester,
+    ) async {
       final repo = _FakeDirectionRepository();
       await tester.pumpWidget(_wrap(const DirectionScreen(), repo));
       await tester.pump();
@@ -181,8 +208,9 @@ void main() {
       expect(repo.writes, ['2026-Q3=Ship it']);
     });
 
-    testWidgets('a stream update does not clobber an open editor',
-        (tester) async {
+    testWidgets('a stream update does not clobber an open editor', (
+      tester,
+    ) async {
       final repo = _FakeDirectionRepository();
       await tester.pumpWidget(_wrap(const DirectionScreen(), repo));
       await tester.pump();
@@ -195,7 +223,10 @@ void main() {
       repo._emit();
       await tester.pump();
       expect(
-        tester.widget<TextField>(_field(DirectionHorizon.month)).controller!.text,
+        tester
+            .widget<TextField>(_field(DirectionHorizon.month))
+            .controller!
+            .text,
         'Mine',
       );
       // Cancel reveals the remote value as the statement.
@@ -206,8 +237,9 @@ void main() {
   });
 
   group('DirectionScreen suggestion', () {
-    testWidgets('previous period shows as a suggestion; Keep carries it',
-        (tester) async {
+    testWidgets('previous period shows as a suggestion; Keep carries it', (
+      tester,
+    ) async {
       final aug = DirectionPeriods.previous(
         DirectionPeriods.current(DirectionHorizon.month, _now),
       );
@@ -229,8 +261,9 @@ void main() {
       expect(find.text('Last month: Get ready for launch'), findsNothing);
     });
 
-    testWidgets('inside an open editor, typing hides the suggestion',
-        (tester) async {
+    testWidgets('inside an open editor, typing hides the suggestion', (
+      tester,
+    ) async {
       final aug = DirectionPeriods.previous(
         DirectionPeriods.current(DirectionHorizon.month, _now),
       );
@@ -249,8 +282,9 @@ void main() {
   });
 
   group('DirectionStrip', () {
-    testWidgets('empty → "Set your direction →", tap opens the page',
-        (tester) async {
+    testWidgets('empty → "Set your direction →", tap opens the page', (
+      tester,
+    ) async {
       final repo = _FakeDirectionRepository();
       await tester.pumpWidget(
         _wrap(const Scaffold(body: DirectionStrip()), repo),
@@ -286,6 +320,42 @@ void main() {
       );
       await tester.pump();
       expect(find.text('Set your direction →'), findsOneWidget);
+    });
+  });
+
+  group('close-out (2026-09-19)', () {
+    testWidgets('last month with text and no answer shows the three chips; '
+        'tapping one writes the outcome and the row leaves', (tester) async {
+      final august = DirectionEntry.forPeriod(
+        DirectionPeriods.current(DirectionHorizon.month, DateTime(2026, 8, 5)),
+        text: 'Rest and reset',
+        nowMs: 1,
+      );
+      final repo = _FakeDirectionRepository([august]);
+      await tester.pumpWidget(_wrap(const DirectionScreen(), repo));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('direction_closeout_month')),
+        findsOneWidget,
+      );
+      expect(find.text('Achieved'), findsOneWidget);
+      expect(find.text('Partly'), findsOneWidget);
+      expect(find.text('Not yet'), findsOneWidget);
+
+      final chip = find.byKey(const ValueKey('direction_outcome_month_partly'));
+      await tester.ensureVisible(chip);
+      await tester.pumpAndSettle();
+      await tester.tap(chip);
+      await tester.pumpAndSettle();
+
+      expect(repo.writes, contains('2026-08!partly'));
+      expect(
+        find.byKey(const ValueKey('direction_closeout_month')),
+        findsNothing,
+      );
+      // The suggestion now carries the answer in its label.
+      expect(find.textContaining('Last month (partly)'), findsOneWidget);
     });
   });
 }

@@ -110,7 +110,7 @@ void main() {
   });
 
   group('OverrideRules.hasSatisfiedMandatoryTimer', () {
-    test('true when ended task session exists with elapsed > 0', () {
+    test('true when an ended task session reached 1 minute', () {
       final sessions = [
         TimerSession(
           id: 's1',
@@ -118,7 +118,7 @@ void main() {
           taskId: 't1',
           startedAtMs: 1,
           endedAtMs: 2,
-          elapsedSeconds: 20,
+          elapsedSeconds: 60,
           createdAtMs: 1,
           updatedAtMs: 2,
         ),
@@ -148,6 +148,23 @@ void main() {
           createdAtMs: 1,
           updatedAtMs: 2,
         ),
+      ];
+      expect(OverrideRules.hasSatisfiedMandatoryTimer(sessions), isFalse);
+    });
+
+    test('false when every ended session is under 1 minute (2026-09-27)', () {
+      final sessions = [
+        for (final (i, secs) in [2, 30, 59].indexed)
+          TimerSession(
+            id: 'short$i',
+            targetType: TimerSessionTargetType.task,
+            taskId: 't1',
+            startedAtMs: 1,
+            endedAtMs: 2,
+            elapsedSeconds: secs,
+            createdAtMs: 1,
+            updatedAtMs: 2,
+          ),
       ];
       expect(OverrideRules.hasSatisfiedMandatoryTimer(sessions), isFalse);
     });

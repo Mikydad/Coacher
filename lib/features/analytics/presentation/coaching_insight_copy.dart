@@ -1,8 +1,11 @@
 import '../domain/models/generated_insight.dart';
 
+// Streak pattern codes still feed the remaining rules as silent inputs, but
+// they are never named to the user (day streak retired 2026-09-25): an empty
+// label drops the code from the "Why:" line.
 const Map<String, String> _patternCodeLabels = <String, String>{
-  'streakRisk': 'streak at risk',
-  'strongStreak': 'strong streak',
+  'streakRisk': '',
+  'strongStreak': '',
   'inconsistentBehavior': 'inconsistent follow-through',
   'lateBehavior': 'often completed late',
   'timeMisalignment': 'timing mismatch',
@@ -37,10 +40,6 @@ String? coachingMetricsCaption(GeneratedInsight insight) {
   if (raw is! Map) return null;
   final map = raw.cast<String, dynamic>();
   final bits = <String>[];
-  final streak = map['currentStreak'];
-  if (streak is num && streak.round() >= 0) {
-    bits.add('streak ${streak.round()}d');
-  }
   final rate = map['completionRate7d'];
   if (rate is num) {
     final pct = (rate.clamp(0.0, 1.0) * 100).round();
@@ -88,10 +87,13 @@ bool shouldShowSecondaryInsight({
 }
 
 /// Short UI label for an extra ranked insight (not raw enum names).
+/// Empty for the retired streak family — callers show nothing.
 String coachingInsightTypeShortLabel(InsightType type) {
   switch (type) {
     case InsightType.streakRiskWarning:
-      return 'Streak risk';
+    case InsightType.strongStreakPraise:
+    case InsightType.fragileStreakAlert:
+      return '';
     case InsightType.habitTooHard:
       return 'Intensity';
     case InsightType.timingMisalignment:
@@ -104,8 +106,6 @@ String coachingInsightTypeShortLabel(InsightType type) {
       return 'Consistency';
     case InsightType.lowEngagementNotice:
       return 'Engagement';
-    case InsightType.strongStreakPraise:
-      return 'Momentum';
     case InsightType.consistentBehaviorPraise:
       return 'Steady habits';
     case InsightType.goalProgressSuccess:
@@ -113,8 +113,6 @@ String coachingInsightTypeShortLabel(InsightType type) {
     // Phase 3 focus-oriented
     case InsightType.highestMomentumLeverage:
       return 'Best momentum';
-    case InsightType.fragileStreakAlert:
-      return 'Fragile streak';
     case InsightType.bestRecoveryOpportunity:
       return 'Recovery chance';
     // Phase 3 global summaries

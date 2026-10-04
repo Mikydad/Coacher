@@ -1,5 +1,7 @@
 import '../../../core/utils/date_keys.dart';
+import '../../goals/application/goal_period_helpers.dart';
 import '../../goals/domain/models/goal_enums.dart';
+import '../../goals/domain/models/user_goal.dart';
 import '../../planning/application/planned_task_collect.dart';
 import '../domain/models/analytics_event.dart';
 import '../domain/models/behavior_feature_object.dart';
@@ -187,9 +189,12 @@ class FeatureBuilderAssembler {
       entityId: seed.row.task.id,
       entityKind: behaviorEntityKindFromStorage(seed.entityKind),
       timeMetrics: timeMetrics,
+      // A task's opportunity days are the days it was on the plan: a task
+      // first planned today has not "missed the last 2 days".
       streakMetrics: computeFeatureStreakMetrics(
         completionDateKeys: completionDateKeys,
         nowLocal: nowLocal,
+        opportunityDateKeys: scheduledAll,
       ),
       effortMetrics: computeFeatureEffortMetrics(
         sessions: sessions,
@@ -220,8 +225,23 @@ class FeatureBuilderAssembler {
         .map((c) => c.dateKey.trim())
         .where((k) => k.isNotEmpty)
         .toSet();
-    final opportunities7d = _goalOpportunitiesForDays(seed.goal.horizon, 7);
-    final opportunities30d = _goalOpportunitiesForDays(seed.goal.horizon, 30);
+    // Opportunity days = days the goal accepts a log: every period day for a
+    // passive goal, action days only for a repeating one. A Mon–Fri goal has
+    // five chances a week, not seven, and Sunday is never a miss.
+    final opportunityKeys = _goalOpportunityDateKeys(
+      seed.goal,
+      windowKeys: keys30d,
+    );
+    final opportunities7d = _goalOpportunitiesForDays(
+      seed.goal,
+      7,
+      opportunityDays: opportunityKeys.where(keys7d.contains).length,
+    );
+    final opportunities30d = _goalOpportunitiesForDays(
+      seed.goal,
+      30,
+      opportunityDays: opportunityKeys.length,
+    );
 
     final progressFromCheckIns = computeCompletionRate(
       completedCount: completionDateKeys.where(keys30d.contains).length,
@@ -253,6 +273,7 @@ class FeatureBuilderAssembler {
       streakMetrics: computeFeatureStreakMetrics(
         completionDateKeys: completionDateKeys,
         nowLocal: nowLocal,
+        opportunityDateKeys: opportunityKeys,
       ),
       effortMetrics: BehaviorEffortMetrics.empty,
       goalMetrics: computeFeatureGoalMetrics(
@@ -298,17 +319,40 @@ DateTime _scheduledInstantForTaskRow(PlannedTaskRow row, String dateKey) {
   return DateTime(date.year, date.month, date.day, 9);
 }
 
-int _goalOpportunitiesForDays(GoalHorizon horizon, int days) {
-  switch (horizon) {
-    case GoalHorizon.daily:
-      return days;
-    case GoalHorizon.weekly:
-      return (days / 7).ceil().clamp(1, days);
-    case GoalHorizon.monthly:
-      return (days / 30).ceil().clamp(1, days);
-    case GoalHorizon.entireGoal:
-      // The whole period is one evaluation window — a single opportunity.
+/// Days in [windowKeys] on which [goal] accepts a log
+/// (`GoalPeriodHelpers.allowsLoggingOnDateKey`).
+Set<String> _goalOpportunityDateKeys(
+  UserGoal goal, {
+  required Set<String> windowKeys,
+}) {
+  return windowKeys
+      .where((key) => GoalPeriodHelpers.allowsLoggingOnDateKey(goal, key))
+      .toSet();
+}
+
+/// Scheduled opportunities in a [days]-long window: one per opportunity day
+/// ([opportunityDays]) for a repeating goal — a Mon–Fri goal has five a
+/// week, an every-other-day goal fifteen a month — and a single opportunity
+/// for a passive (repeat-off) goal, whose target accumulates over the whole
+/// period. Legacy repeating goals without explicit days fall back to one per
+/// week / month.
+int _goalOpportunitiesForDays(
+  UserGoal goal,
+  int days, {
+  required int opportunityDays,
+}) {
+  final scheduled = opportunityDays.clamp(0, days);
+  switch (goal.repeatCadence) {
+    case GoalRepeatCadence.off:
       return 1;
+    case GoalRepeatCadence.daily:
+      return scheduled;
+    case GoalRepeatCadence.weekly:
+      if (goal.scheduledWeekdays?.isNotEmpty ?? false) return scheduled;
+      return (days / 7).ceil().clamp(1, days);
+    case GoalRepeatCadence.monthly:
+      if (goal.repeatDaysOfMonth?.isNotEmpty ?? false) return scheduled;
+      return (days / 30).ceil().clamp(1, days);
   }
 }
 

@@ -80,6 +80,10 @@ enum ActivityEventType {
   habitStreakReached,
   taskFinished,
   challengeProgressUpdated,
+
+  /// A member logged challenge progress with a PUBLIC proof photo
+  /// (2026-09-19). entityId = challengeId, value = the photo's URL.
+  challengeProofPosted,
   milestoneReached,
   weeklyCommitmentMet,
   memberJoined,
@@ -89,6 +93,10 @@ enum ActivityEventType {
   /// forfeited stake photo went live (entityId = challengeId,
   /// value = revealExpiresAtMs).
   stakePhotoRevealed,
+
+  /// The staker paid to take a live stake photo down early (P-5, D9).
+  /// entityId = challengeId. Not tappable — there is nothing to see.
+  stakePhotoRemoved,
 
   /// Someone screenshotted a stake photo — the public naming (D11).
   /// entityId = challengeId, value = ban duration in ms.
@@ -105,3 +113,14 @@ extension ActivityEventTypeStorage on ActivityEventType {
     );
   }
 }
+
+/// Category slugs a circle can carry (create screen and edit sheet).
+const List<String> kCircleCategories = [
+  'fitness',
+  'learning',
+  'business',
+  'reading',
+  'productivity',
+  'other',
+];
+

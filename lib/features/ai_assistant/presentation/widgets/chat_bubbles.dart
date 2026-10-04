@@ -29,9 +29,15 @@ class UserMessageBubble extends StatelessWidget {
             bottomRight: Radius.circular(16),
           ),
         ),
-        child: Text(
-          content,
-          style: TextStyle(fontSize: 14, color: AppColors.fg),
+        // Per-bubble selection (2026-09-22): long-press selects THIS
+        // bubble's text. A single SelectionArea around the thread list
+        // tripped Flutter's `!_selectionStartsInScrollable` assertion when
+        // a long-press drag began inside the scrollable.
+        child: SelectionArea(
+          child: Text(
+            content,
+            style: TextStyle(fontSize: 14, color: AppColors.fg),
+          ),
         ),
       ),
     );
@@ -62,10 +68,12 @@ class AssistantMessageBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text.rich(
-              markdownLiteSpan(
-                grounded.text,
-                TextStyle(fontSize: 14, color: AppColors.textSoft),
+            SelectionArea(
+              child: Text.rich(
+                markdownLiteSpan(
+                  grounded.text,
+                  TextStyle(fontSize: 14, color: AppColors.textSoft),
+                ),
               ),
             ),
             // One chip per distinct cited fact (P3-01) — a reply grounded

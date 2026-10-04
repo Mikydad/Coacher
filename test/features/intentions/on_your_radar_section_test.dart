@@ -130,10 +130,10 @@ void main() {
   testWidgets('hidden entirely when nothing is on the radar', (tester) async {
     await tester.pumpWidget(_harness(intentions: const []));
     await tester.pumpAndSettle();
-    expect(find.textContaining('ON YOUR RADAR'), findsNothing);
+    expect(find.textContaining('SUGGESTED FOR LATER'), findsNothing);
   });
 
-  testWidgets('collapsed by default: count visible, content hidden',
+  testWidgets('a card: the first suggestion shows, the rest wait behind MORE',
       (tester) async {
     await tester.pumpWidget(
       _harness(
@@ -142,8 +142,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('ON YOUR RADAR · 2'), findsOneWidget);
+    expect(find.text('SUGGESTED FOR LATER · 2'), findsOneWidget);
+    // The observation leads; the dormant intention is behind "1 MORE".
+    expect(find.textContaining('slipping to weekends'), findsOneWidget);
     expect(find.text('Get back into climbing'), findsNothing);
+    expect(find.text('1 MORE'), findsOneWidget);
   });
 
   testWidgets('expanding reveals dormant rows and the labeled observation',
@@ -155,11 +158,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('ON YOUR RADAR · 2'));
+    await tester.tap(find.text('1 MORE'));
     await tester.pumpAndSettle();
     expect(find.text('Get back into climbing'), findsOneWidget);
     expect(find.textContaining('slipping to weekends'), findsOneWidget);
-    expect(find.text('INFERRED'), findsOneWidget);
+    expect(find.text('SidePal noticed'), findsOneWidget);
   });
 
   testWidgets("yesterday's observation does not linger", (tester) async {
@@ -173,7 +176,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('ON YOUR RADAR · 1'), findsOneWidget);
+    expect(find.text('SUGGESTED FOR LATER · 1'), findsOneWidget);
   });
 
   testWidgets('"Remind me" promotes to open and plans the ladder',
@@ -187,8 +190,7 @@ void main() {
       _harness(intentions: [dormant], repo: repo, nudge: nudge),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('ON YOUR RADAR · 1'));
-    await tester.pumpAndSettle();
+    expect(find.text('SUGGESTED FOR LATER · 1'), findsOneWidget);
     await tester.tap(find.text('Remind me'));
     await tester.pumpAndSettle();
 
@@ -202,8 +204,7 @@ void main() {
       _harness(intentions: [_dormant('intention_1')], repo: repo),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('ON YOUR RADAR · 1'));
-    await tester.pumpAndSettle();
+    expect(find.text('SUGGESTED FOR LATER · 1'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.close));
     await tester.pumpAndSettle();
 
@@ -223,8 +224,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('ON YOUR RADAR · 1'));
-    await tester.pumpAndSettle();
+    expect(find.text('SUGGESTED FOR LATER · 1'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.close));
     await tester.pumpAndSettle();
 

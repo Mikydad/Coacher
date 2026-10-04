@@ -94,11 +94,26 @@ class MemoryExtractionParser {
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
 
-  /// True when [quote] appears verbatim (normalized) in [transcript].
+  /// True when [quote] appears verbatim (normalized) in what the USER said
+  /// (fix plan Phase 4.3, review §1.1 #9). The transcript is speaker-
+  /// labelled ("User: …" / "Assistant: …"); the old whole-transcript match
+  /// let a sentence the assistant invented verify as `userStated`. A
+  /// transcript with no speaker labels (legacy callers) is matched whole.
+  /// Three characters was never a quote: 12 characters or three words.
   static bool quoteMatches(String quote, String transcript) {
     final q = normalizeForMatch(quote);
-    if (q.length < 3) return false;
-    return normalizeForMatch(transcript).contains(q);
+    if (q.length < 12 && q.split(' ').where((w) => w.isNotEmpty).length < 3) {
+      return false;
+    }
+    final userLines = transcript
+        .split('\n')
+        .where((l) => l.trimLeft().startsWith('User:'))
+        .map((l) => l.trimLeft().substring(5))
+        .toList();
+    final haystack = userLines.isEmpty
+        ? transcript
+        : userLines.join('\n');
+    return normalizeForMatch(haystack).contains(q);
   }
 
   /// Throws [FormatException] on undecodable input (fix-wave Phase 6,

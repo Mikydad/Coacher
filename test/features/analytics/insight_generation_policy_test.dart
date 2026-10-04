@@ -17,12 +17,30 @@ void main() {
       final mappedTypes = kLayer3InsightPolicyConfig.rules
           .map((rule) => rule.insightType)
           .toSet();
-      // V1 types must all be present.
-      expect(mappedTypes, containsAll(kLayer3V1InsightTypes));
-      // V3 catalog covers all types including Phase 3 additions and the
-      // humanizing Phase 2 relationship-care nudge.
-      expect(mappedTypes, equals(kLayer3V4InsightTypes));
-      expect(kLayer3InsightPolicyConfig.rules, hasLength(kLayer3V4InsightTypes.length));
+      // V1 types must all be present — minus the retired streak family.
+      expect(
+        mappedTypes,
+        containsAll(kLayer3V1InsightTypes.difference(kRetiredInsightTypes)),
+      );
+      // V5 catalog: every Phase 3 / humanizing type, none of the retired ones.
+      expect(mappedTypes, equals(kLayer3V5InsightTypes));
+      expect(kLayer3InsightPolicyConfig.rules, hasLength(kLayer3V5InsightTypes.length));
+    });
+
+    test('streak insight family is retired from generation (2026-09-25)', () {
+      final mappedTypes = kLayer3InsightPolicyConfig.rules
+          .map((rule) => rule.insightType)
+          .toSet();
+      for (final type in kRetiredInsightTypes) {
+        expect(mappedTypes, isNot(contains(type)), reason: type.name);
+        expect(isRetiredInsightType(type), isTrue);
+      }
+      expect(kLayer3V5InsightTypes.intersection(kRetiredInsightTypes), isEmpty);
+      // No surviving rule carries streak copy or a streak message key.
+      for (final rule in kLayer3InsightPolicyConfig.rules) {
+        expect(rule.fallbackMessage.toLowerCase(), isNot(contains('streak')));
+        expect(rule.messageKey, isNot(contains('streak')));
+      }
     });
 
     test('includes deterministic combination rule for goal_at_risk', () {

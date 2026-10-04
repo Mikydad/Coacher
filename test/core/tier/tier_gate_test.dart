@@ -17,7 +17,10 @@ void main() {
       expect(gate.canCreateGoal(999), isTrue);
       expect(gate.canAddHabitAnchorForDay(999), isTrue);
       expect(gate.canCreateReminder(999), isTrue);
-      expect(gate.canCreatePhotoStakeThisMonth(999), isTrue);
+      expect(gate.canCreateStakeThisMonth(999), isTrue);
+      expect(gate.canCreatePromiseThisWeek(999), isTrue);
+      expect(gate.canViewTimeInsights, isTrue);
+      expect(gate.canExportTimeLog, isTrue);
     });
 
     test('Pro allows everything even when enforced', () {
@@ -31,17 +34,27 @@ void main() {
   group('TierGate free limits (enforced)', () {
     final gate = TierGate(limits: _limits(), tier: UserTier.free);
 
-    test('allows below the cap, blocks at the cap', () {
-      expect(gate.canCreateTaskForDay(4), isTrue);
-      expect(gate.canCreateTaskForDay(5), isFalse);
-      expect(gate.canCreateGoal(4), isTrue);
-      expect(gate.canCreateGoal(5), isFalse);
-      expect(gate.canAddHabitAnchorForDay(4), isTrue);
-      expect(gate.canAddHabitAnchorForDay(5), isFalse);
+    test('allows below the cap, blocks at the cap (2026-09-27 values)', () {
+      expect(gate.canCreateTaskForDay(3), isTrue);
+      expect(gate.canCreateTaskForDay(4), isFalse);
+      expect(gate.canCreateGoal(2), isTrue);
+      expect(gate.canCreateGoal(3), isFalse);
+      expect(gate.canAddHabitAnchorForDay(3), isTrue);
+      expect(gate.canAddHabitAnchorForDay(4), isFalse);
       expect(gate.canCreateReminder(4), isTrue);
       expect(gate.canCreateReminder(5), isFalse);
-      expect(gate.canCreatePhotoStakeThisMonth(2), isTrue);
-      expect(gate.canCreatePhotoStakeThisMonth(3), isFalse);
+      expect(gate.canCreateStakeThisMonth(0), isTrue);
+      expect(gate.canCreateStakeThisMonth(1), isFalse);
+      expect(gate.canCreatePromiseThisWeek(1), isTrue);
+      expect(gate.canCreatePromiseThisWeek(2), isFalse);
+    });
+
+    test('time insights and export are Pro; free + enforced is blocked', () {
+      expect(gate.canViewTimeInsights, isFalse);
+      expect(gate.canExportTimeLog, isFalse);
+      final pro = TierGate(limits: _limits(), tier: UserTier.pro);
+      expect(pro.canViewTimeInsights, isTrue);
+      expect(pro.canExportTimeLog, isTrue);
     });
 
     test('a negative RC limit means unlimited', () {

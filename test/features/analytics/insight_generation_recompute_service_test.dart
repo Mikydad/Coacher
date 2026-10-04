@@ -121,7 +121,7 @@ void main() {
     await service.recomputeEntity(
       entityId: 'entity-1',
       patterns: <DetectedPattern>[
-        _pattern('entity-1', PatternCode.streakRisk, PatternGroup.streakConsistency),
+        _pattern('entity-1', PatternCode.tooHard, PatternGroup.effortDifficulty),
       ],
       now: DateTime(2026, 5, 7, 10),
     );
@@ -151,7 +151,7 @@ void main() {
       dateKey: '2026-05-07',
       patternsByEntityId: <String, List<DetectedPattern>>{
         'entity-1': <DetectedPattern>[
-          _pattern('entity-1', PatternCode.streakRisk, PatternGroup.streakConsistency),
+          _pattern('entity-1', PatternCode.tooHard, PatternGroup.effortDifficulty),
         ],
         'entity-2': <DetectedPattern>[
           _pattern('entity-2', PatternCode.tooHard, PatternGroup.effortDifficulty),

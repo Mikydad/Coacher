@@ -277,7 +277,7 @@ String describePlannedAction(AiAction action) {
     // Normally auto-committed and never previewed; described anyway in
     // case an intention rides along in a mixed batch.
     case ActionType.createIntention:
-      return 'Remember "${p['title'] ?? 'promise'}"';
+      return 'Promise: "${p['title'] ?? 'something'}"';
 
     case ActionType.logActivity:
       final t = p['time'];
@@ -408,8 +408,8 @@ class _ActionButtons extends StatelessWidget {
 
     final confirmBg = isBlocked
         ? AppColors.danger.withValues(alpha: 0.85)
-        : AppColors.accentBright;
-    final confirmFg = isBlocked ? AppColors.fg : AppColors.accentDeep;
+        : AppColors.accent;
+    final confirmFg = isBlocked ? AppColors.fg : AppColors.onAccent;
 
     return Column(
       children: [

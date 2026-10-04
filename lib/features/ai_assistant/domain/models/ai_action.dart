@@ -98,19 +98,46 @@ class AiAction {
 
   // ─── Serialisation ────────────────────────────────────────────────────────
 
+  /// Throws [ArgumentError] on an unknown verb (AI chat fix plan Phase 1.4,
+  /// review §2 #2). The old `orElse: () => createTask` turned a drifted
+  /// "updateTask"/"scheduleTask" with a title and time into a brand-new
+  /// task on the card. Callers that map model output catch and drop.
   factory AiAction.fromJson(Map<String, dynamic> json) {
     final typeStr = json['actionType'] as String? ?? '';
     final type = ActionType.values.firstWhere(
       (e) => e.name == typeStr,
-      orElse: () => ActionType.createTask,
+      orElse: () => throw ArgumentError.value(
+        typeStr,
+        'actionType',
+        'Unknown action verb',
+      ),
     );
+    // Flattened parameters (bake-off 2026-09-26): gpt-4o-mini put the
+    // fields at the top level in 8 of 20 tool calls, gpt-6-luna in 5 —
+    // {"actionType":"createTask","title":…,"time":…} with no `parameters`
+    // map. Read as empty, that became "What time should I schedule it?"
+    // for a fully specified request. Lift them.
+    final rawParams = json['parameters'];
+    final parameters = rawParams is Map && rawParams.isNotEmpty
+        ? Map<String, dynamic>.from(rawParams)
+        : <String, dynamic>{
+            for (final e in json.entries)
+              if (!_envelopeKeys.contains(e.key)) e.key: e.value,
+          };
     return AiAction(
       actionType: type,
-      parameters: Map<String, dynamic>.from(json['parameters'] as Map? ?? {}),
+      parameters: parameters,
       confidence: (json['confidence'] as num?)?.toDouble() ?? 1.0,
       reasonLabel: json['reasonLabel'] as String?,
     );
   }
+
+  static const _envelopeKeys = {
+    'actionType',
+    'parameters',
+    'confidence',
+    'reasonLabel',
+  };
 
   Map<String, dynamic> toJson() => {
     'actionType': actionType.name,

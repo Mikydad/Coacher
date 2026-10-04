@@ -5,15 +5,21 @@ import '../../../core/di/providers.dart' show insightCacheRepositoryProvider;
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../../../core/presentation/swipe_actions.dart';
+import '../../../core/tier/pro_locked.dart';
+import '../../../core/tier/tier_providers.dart';
+import '../../../core/tier/upgrade_prompt.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../analytics/domain/models/generated_insight.dart';
 import '../../education/presentation/help_dot.dart';
+import '../../profile/application/profile_providers.dart';
 import '../application/time_tracker_providers.dart';
 import '../domain/day_summary.dart';
 import '../domain/duration_format.dart';
 import '../domain/models/activity_event.dart';
+import '../domain/time_export.dart';
 import '../domain/timeline_builder.dart';
 import '../domain/week_periods.dart';
+import 'export_time_sheet.dart';
 import 'track_activity_sheet.dart';
 
 /// The Time page (PRD/Time_Tracker §5.2 + V1.2 §5): one day's timeline
@@ -42,8 +48,9 @@ class _TimeScreenState extends ConsumerState<TimeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(timelineDayKeyProvider.notifier).state = DateKeys.todayKey();
-      ref.read(timelineWeekKeyProvider.notifier).state =
-          WeekPeriods.of(DateTime.now()).key;
+      ref.read(timelineWeekKeyProvider.notifier).state = WeekPeriods.of(
+        DateTime.now(),
+      ).key;
     });
   }
 
@@ -87,6 +94,38 @@ class _TimeScreenState extends ConsumerState<TimeScreen> {
     await ref.read(timeTrackerActionsProvider).delete(event.id);
   }
 
+  /// Export widens around the day being viewed: Day view → that day; Week
+  /// view → today when it is this week, else the week's Monday.
+  void _openExport() {
+    // Export is a Pro insight (decision 2026-09-27); logging stays free.
+    if (!ref.read(tierGateProvider).canExportTimeLog) {
+      showTierLimitSheet(
+        context,
+        title: 'Export is Pro',
+        message:
+            'Logging your time is always free. Exporting it as a file — to '
+            'keep, or to hand to another AI — comes with SidePal Pro.',
+      );
+      return;
+    }
+    final mode = ref.read(timelineModeProvider);
+    late final DateTime anchor;
+    if (mode == TimelineMode.day) {
+      anchor = DateKeys.parseLocalDateKey(ref.read(timelineDayKeyProvider));
+    } else {
+      final week = weekPeriodForKey(ref.read(timelineWeekKeyProvider));
+      final now = DateTime.now();
+      anchor = week.contains(now) ? now : week.start;
+    }
+    showExportTimeSheet(
+      context,
+      anchor: anchor,
+      initialScope: mode == TimelineMode.day
+          ? TimeExportScope.day
+          : TimeExportScope.week,
+    );
+  }
+
   Future<void> _dismissObservation(String scopeId) async {
     await dismissTimeObservation(
       ref.read(insightCacheRepositoryProvider),
@@ -114,9 +153,17 @@ class _TimeScreenState extends ConsumerState<TimeScreen> {
           ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const PageTitle('Time'),
+        title: const PageTitle('Your Time'),
         centerTitle: true,
-        actions: const [HelpAppBarButton('time')],
+        actions: [
+          IconButton(
+            key: const ValueKey('time_export_button'),
+            tooltip: 'Export',
+            onPressed: _openExport,
+            icon: const Icon(Icons.ios_share_rounded, size: 20),
+          ),
+          const HelpAppBarButton('time'),
+        ],
       ),
       floatingActionButton: mode == TimelineMode.day && isToday
           ? FloatingActionButton.extended(
@@ -126,7 +173,7 @@ class _TimeScreenState extends ConsumerState<TimeScreen> {
               backgroundColor: AppColors.accent,
               foregroundColor: AppColors.onAccent,
               icon: const Icon(Icons.add),
-              label: const Text('Track'),
+              label: const Text('Log activity'),
             )
           : null,
       body: ListView(
@@ -147,16 +194,85 @@ class _TimeScreenState extends ConsumerState<TimeScreen> {
               onDismissObservation: _dismissObservation,
             )
           else
-            _WeekBody(
-              onPrevious: () => _shiftWeek(-1),
-              onNext: () => _shiftWeek(1),
-              onDismissObservation: _dismissObservation,
+            // The Week view is a Pro insight (decision 2026-09-27).
+            ProLocked(
+              blocked: !ref.watch(tierGateProvider).canViewTimeInsights,
+              label: 'Unlock insights',
+              onUnlock: () => _showInsightsLimit(context),
+              child: _WeekBody(
+                onPrevious: () => _shiftWeek(-1),
+                onNext: () => _shiftWeek(1),
+                onDismissObservation: _dismissObservation,
+              ),
             ),
         ],
+      ),
+      // Pinned under the content (Miko, 2026-09-19) — a footer, like a
+      // page's own bottom button — not an item at the end of the list.
+      bottomNavigationBar: const _HomePillFooter(),
+    );
+  }
+}
+
+/// The page's one setting (Miko, 2026-09-18): whether Home shows the
+/// tracking pill. You don't track every day, so the pill is optional; the
+/// page itself, its history and every other way of logging stay as they
+/// are. A pinned footer (2026-09-19): always at the bottom of the page,
+/// above the home indicator, with the Track button floating above it.
+class _HomePillFooter extends ConsumerWidget {
+  const _HomePillFooter();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final enabled = ref.watch(homeTrackPillEnabledProvider);
+    return Material(
+      color: AppColors.ink,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Divider(height: 1, thickness: 1, color: AppColors.divider),
+              SwitchListTile.adaptive(
+                key: const ValueKey('time_home_pill_switch'),
+                contentPadding: EdgeInsets.zero,
+                value: enabled,
+                onChanged: (v) => ref
+                    .read(profilePreferenceServiceProvider)
+                    .setHomeTrackPillEnabled(v),
+                title: Text(
+                  'Show on Home',
+                  style: TextStyle(
+                    color: AppColors.fg,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  'The "Track your time" pill under the action buttons.',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
+
+/// The one prompt behind every locked Time insight.
+Future<void> _showInsightsLimit(BuildContext context) => showTierLimitSheet(
+  context,
+  title: 'Time insights are Pro',
+  message:
+      'Logging and your day\'s timeline are always free. Totals, the week '
+      'view, what I notice about your time, and planned vs actual come with '
+      'SidePal Pro.',
+);
 
 // ─── Day | Week toggle ────────────────────────────────────────────────────────
 
@@ -229,9 +345,9 @@ class _DayBody extends ConsumerWidget {
           onPrevious: onPrevious,
           onNext: onNext,
         ),
-        const SizedBox(height: 20),
-        const SectionHeader('Timeline'),
-        const SizedBox(height: 10),
+        // No "Timeline" header (2026-09-25): the pager already names the
+        // day, so the entries follow it directly.
+        const SizedBox(height: 12),
         if (loaded && rows.isEmpty)
           _EmptyTimeline(isToday: isToday)
         else
@@ -258,23 +374,37 @@ class _DayBody extends ConsumerWidget {
                     : null,
               ),
             },
-        if (!summary.isEmpty) ...[
+        if (!summary.isEmpty || observation != null) ...[
           const SizedBox(height: 28),
-          const SectionHeader('Summary'),
-          const SizedBox(height: 10),
-          _SummaryBlock(
-            logged: summary.logged,
-            untracked: summary.untracked,
-            lines: summary.lines,
-            categoryLines: summary.categoryLines,
-          ),
-        ],
-        if (observation != null) ...[
-          const SizedBox(height: 24),
-          _ObservationBlock(
-            heading: 'Something I noticed',
-            insight: observation,
-            onDismiss: () => onDismissObservation(dayScope),
+          // Summary totals and observations are Pro insights; the timeline
+          // above — what you logged — stays free (decision 2026-09-27).
+          ProLocked(
+            blocked: !ref.watch(tierGateProvider).canViewTimeInsights,
+            label: 'Unlock insights',
+            onUnlock: () => _showInsightsLimit(context),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!summary.isEmpty) ...[
+                  const SectionHeader('Summary'),
+                  const SizedBox(height: 10),
+                  _SummaryBlock(
+                    logged: summary.logged,
+                    untracked: summary.untracked,
+                    lines: summary.lines,
+                    categoryLines: summary.categoryLines,
+                  ),
+                ],
+                if (observation != null) ...[
+                  if (!summary.isEmpty) const SizedBox(height: 24),
+                  _ObservationBlock(
+                    heading: 'Something I noticed',
+                    insight: observation,
+                    onDismiss: () => onDismissObservation(dayScope),
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ],
@@ -527,9 +657,14 @@ class _ActivityTile extends ConsumerWidget {
       ));
     }
     // V1.2 planned-vs-actual: timer-sourced rows only (exact task link).
+    // Comparing against the plan is a Pro insight (decision 2026-09-27).
     final entityId = e.sourceEntityId ?? '';
-    if (e.isTimerSourced && entityId.isNotEmpty) {
-      final block = ref.watch(plannedBlockForEntityProvider(entityId)).valueOrNull;
+    if (e.isTimerSourced &&
+        entityId.isNotEmpty &&
+        ref.watch(tierGateProvider).canViewTimeInsights) {
+      final block = ref
+          .watch(plannedBlockForEntityProvider(entityId))
+          .valueOrNull;
       if (block != null && DateKeys.todayKey(block.startAt) == e.dateKey) {
         final line = StringBuffer(
           'Planned ${_clock(context, block.startAt.millisecondsSinceEpoch)}'
@@ -686,7 +821,9 @@ class _EmptyTimeline extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Text(
-        isToday ? 'Nothing logged yet.' : 'Nothing logged.',
+        isToday
+            ? "No time logged yet.\nLog what you're doing to see where your day goes."
+            : 'Nothing logged.',
         key: const ValueKey('time_empty'),
         style: TextStyle(color: AppColors.textMuted, fontSize: 14),
       ),
@@ -822,7 +959,7 @@ class _ObservationBlock extends StatelessWidget {
                     Flexible(child: _MicroLabel(heading)),
                     const SizedBox(width: 8),
                     Text(
-                      'INFERRED',
+                      "SIDEPAL'S GUESS",
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w800,

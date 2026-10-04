@@ -6,6 +6,9 @@ import {
   decideChallenge,
   DecisionInputs,
   decisionDueAtMs,
+  photoRemovalDoor,
+  PRE_REVEAL_NOTICE_LEAD_MS,
+  preRevealNoticeDue,
   revealExpiresAtMs,
   sweepAction,
   vetoEligible,
@@ -582,5 +585,80 @@ describe('photo reveal window', () => {
     const floor = revealedAt + 90_000;
     assert.equal(canRemoveRevealedPhoto(revealedAt, 5, floor - 1), false);
     assert.equal(canRemoveRevealedPhoto(revealedAt, 5, floor), true);
+  });
+
+  describe('photoRemovalDoor (2026-09-18)', () => {
+    it('pending outcome + screened photo → pre_reveal, no floor', () => {
+      assert.equal(
+        photoRemovalDoor({
+          status: 'pending_verification',
+          photoState: 'approved',
+          revealedAtMs: undefined,
+          revealWindowMins: 60,
+          nowMs: revealedAt,
+        }),
+        'pre_reveal',
+      );
+    });
+
+    it('an active challenge is not a door — surrender owns that', () => {
+      assert.equal(
+        photoRemovalDoor({
+          status: 'active',
+          photoState: 'approved',
+          revealedAtMs: undefined,
+          revealWindowMins: 60,
+          nowMs: revealedAt,
+        }),
+        'none',
+      );
+    });
+
+    it('revealed → floor until 30%, then post_reveal', () => {
+      const floor = revealedAt + 18 * 60_000;
+      const base = {
+        status: 'completed_forfeit' as const,
+        photoState: 'revealed',
+        revealedAtMs: revealedAt,
+        revealWindowMins: 60,
+      };
+      assert.equal(photoRemovalDoor({ ...base, nowMs: floor - 1 }), 'floor');
+      assert.equal(photoRemovalDoor({ ...base, nowMs: floor }), 'post_reveal');
+    });
+
+    it('already removed / deleted / expired → none', () => {
+      for (const photoState of ['removed', 'deleted', 'expired']) {
+        assert.equal(
+          photoRemovalDoor({
+            status: 'completed_forfeit',
+            photoState,
+            revealedAtMs: revealedAt,
+            revealWindowMins: 60,
+            nowMs: revealedAt + DAY,
+          }),
+          'none',
+          photoState,
+        );
+      }
+    });
+  });
+
+  describe('preRevealNoticeDue (2026-09-18)', () => {
+    const ch = challenge({ status: 'pending_verification' });
+    const dueAt = decisionDueAtMs(ch);
+
+    it('opens one lead window before the decision, closes at it', () => {
+      assert.equal(preRevealNoticeDue(ch, dueAt - PRE_REVEAL_NOTICE_LEAD_MS - 1), false);
+      assert.equal(preRevealNoticeDue(ch, dueAt - PRE_REVEAL_NOTICE_LEAD_MS), true);
+      assert.equal(preRevealNoticeDue(ch, dueAt - 1), true);
+      assert.equal(preRevealNoticeDue(ch, dueAt), false);
+    });
+
+    it('never fires outside pending_verification', () => {
+      assert.equal(
+        preRevealNoticeDue(challenge({ status: 'active' }), dueAt - 60_000),
+        false,
+      );
+    });
   });
 });

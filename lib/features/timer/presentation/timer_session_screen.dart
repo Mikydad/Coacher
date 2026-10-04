@@ -22,8 +22,7 @@ import '../../education/presentation/help_dot.dart';
 import '../../planning/application/planned_task_actions.dart';
 import '../../time_blocks/application/time_block_providers.dart';
 
-import '../../../core/presentation/app_colors.dart';
-import '../../../core/presentation/page_headers.dart';
+import 'focus_stage.dart';
 
 class TimerLaunchArgs {
   const TimerLaunchArgs({this.autoStartDelaySeconds});
@@ -48,6 +47,12 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
   bool _autoStartCancelled = false;
   bool _isHandlingStopFlow = false;
   bool _autoStopQueued = false;
+
+  /// The "task done" celebration (2026-09-27). Set when a session ends at
+  /// 100%; stays on screen (under any next-task dialog) until the route
+  /// goes. [_celebrationDone] completes on Continue / Back.
+  ({String label, int minutes})? _celebration;
+  Completer<void>? _celebrationDone;
 
   @override
   void initState() {
@@ -107,6 +112,60 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
     }
   }
 
+  /// End pressed by hand. Under a minute in, ask first (Miko, 2026-09-27):
+  /// an accidental End at 0:25 stopped the timer and opened the rating
+  /// card. Auto-stop at the planned duration never asks.
+  Future<void> _confirmThenStop({required String activeLabel}) async {
+    final latest = ref.read(executionControllerProvider);
+    final elapsed = latest.elapsed;
+    if (latest.phase != ExecutionPhase.finished &&
+        elapsed < const Duration(minutes: 1)) {
+      final seconds = elapsed.inSeconds;
+      final end = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('End session?'),
+          content: Text(
+            "You've focused for $seconds "
+            '${seconds == 1 ? 'second' : 'seconds'}.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('End'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep going'),
+            ),
+          ],
+        ),
+      );
+      if (end != true || !mounted) return;
+    }
+    await _handleStopFlow(
+      execState: ref.read(executionControllerProvider),
+      activeLabel: activeLabel,
+    );
+  }
+
+  /// Shows the celebration and returns a future that completes when the
+  /// user taps Continue (or Back).
+  Future<void> _showCelebration(String label, Duration focused) {
+    final done = Completer<void>();
+    setState(() {
+      _celebration = (label: label, minutes: focused.inMinutes);
+      _celebrationDone = done;
+    });
+    return done.future;
+  }
+
+  void _finishCelebration() {
+    final done = _celebrationDone;
+    if (done == null || done.isCompleted) return;
+    setState(() => done.complete());
+  }
+
   Future<void> _handleStopFlow({
     required ExecutionState execState,
     required String activeLabel,
@@ -145,8 +204,10 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
       // Discipline-mode contract for the post-session rating:
       // flexible → dismissible; dismissing keeps the worked time, records
       //   no score, and returns to the Focus page;
-      // disciplined → must submit a score (reason below its 90% bar);
-      // extreme → must submit a score AND a reason at any percentage.
+      // disciplined → a score to record one (reason below its 90% bar);
+      // extreme → a score AND a reason at any percentage.
+      // Strict modes can still leave after a "Leave without rating?" check
+      // (2026-09-27) — same outcome as flexible's dismiss.
       final mode = await effectiveModeRefIdForTaskId(ref, execState.taskId);
       if (!mounted) return;
       final ScoreTaskDialogResult? result;
@@ -163,6 +224,9 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
           requireReasonAlways: mode == 'extreme',
           initialPercent: computedPercent ?? 100,
           reasonThresholdPercent: ScoreTaskDialog.reasonThresholdForMode(mode),
+          leaveMessage:
+              "Your focus time is saved. The task stays open — it isn't "
+              'marked done. Start it again to pick up where you left off.',
         );
       }
       if (!mounted) return;
@@ -173,6 +237,11 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
         await returnToFocusList(context, ref);
         return;
       }
+      // Celebrate at once (the saves below run under it); the rest of the
+      // flow waits for Continue.
+      final celebrated = result.completionPercent >= 100
+          ? _showCelebration(activeLabel, execState.elapsed)
+          : null;
       await ref
           .read(scoringControllerProvider)
           .submit(
@@ -210,13 +279,17 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
         ...prev,
         execState.taskId: result.completionPercent,
       };
-      if (mounted) {
+      if (celebrated != null) {
+        await celebrated;
+      } else if (mounted) {
+        final minutes = execState.elapsed.inMinutes;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              result.completionPercent == 100
-                  ? 'Task marked completed and score saved.'
-                  : 'Task marked partial (${result.completionPercent}%) and score saved.',
+              minutes >= 1
+                  ? 'Saved: ${result.completionPercent}% done · '
+                        '$minutes min of focus.'
+                  : 'Saved: ${result.completionPercent}% done.',
             ),
           ),
         );
@@ -405,9 +478,11 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
         execState.phase == ExecutionPhase.notStarted &&
         !_autoStartCancelled &&
         (_remainingAutoStartSeconds ?? 0) > 0;
+    // No target (or a 0 one, e.g. from an older runtime cache) = open-ended:
+    // never auto-stop at 0:00.
     final targetDuration =
         execState.targetType == TimerSessionTargetType.task &&
-            execState.targetDurationMinutes != null
+            (execState.targetDurationMinutes ?? 0) > 0
         ? Duration(minutes: execState.targetDurationMinutes!)
         : null;
     final shouldAutoStop =
@@ -426,205 +501,149 @@ class _TimerSessionScreenState extends ConsumerState<TimerSessionScreen> {
       });
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const PageTitle('Focus session'),
-        centerTitle: true,
-        actions: const [HelpAppBarButton('focus')],
-      ),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: constraints.maxHeight - 40,
+    final notStarted = execState.phase == ExecutionPhase.notStarted;
+    final canEnd = !notStarted && !_isHandlingStopFlow;
+    // After End (saving, rating) the session is over: say so instead of
+    // "Ready", and Start stays off until the flow moves on.
+    final ended =
+        _isHandlingStopFlow || execState.phase == ExecutionPhase.finished;
+    final celebration = _celebration;
+
+    if (celebration != null) {
+      final waiting = _celebrationDone?.isCompleted == false;
+      return PopScope(
+        canPop: !waiting,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _finishCelebration();
+        },
+        child: FocusStageScaffold(
+          title: 'Focus session',
+          body: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight - 32,
+                ),
+                child: Center(
+                  child: FocusCelebration(
+                    ringSize: focusRingSize(constraints) * 0.9,
+                    taskLabel: celebration.label,
+                    focusedMinutes: celebration.minutes,
+                    onContinue: waiting ? _finishCelebration : null,
+                  ),
+                ),
               ),
-              child: Column(
-                children: [
-                  const SizedBox(height: 24),
-                  // "PHASE / Deep Focus" named a concept nobody introduced —
-                  // first-time testers asked what the screen was (2026-08-25).
-                  const Text(
-                    'Focus timer',
-                    style: TextStyle(fontSize: 54, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Timing your work on this task',
-                    style: TextStyle(color: AppColors.fg70),
-                  ),
-                  const SizedBox(height: 30),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 40),
-                    decoration: BoxDecoration(
-                      color: AppColors.dark0B0D10,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: AppColors.cyan.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          timerText,
-                          style: const TextStyle(
-                            fontSize: 86,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.dark1F2026,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            running
-                                ? 'FOCUS ACTIVE'
-                                : paused
-                                ? 'PAUSED'
-                                : 'READY',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 26),
-                  Text(
-                    'Currently engaged in',
-                    style: TextStyle(color: AppColors.fg70),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfacePanel,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      activeLabel,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 34,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
-                  if (showAutoStart) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.dark1F2026,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.fg24),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Auto-starting in ${_remainingAutoStartSeconds}s',
-                              style: TextStyle(color: AppColors.fg70),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              _autoStartTicker?.cancel();
-                              setState(() {
-                                _autoStartCancelled = true;
-                                _remainingAutoStartSeconds = null;
-                              });
-                            },
-                            child: const Text('Cancel'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(60),
-                            backgroundColor: running
-                                ? AppColors.dark2B2D31
-                                : AppColors.accent,
-                            foregroundColor: running
-                                ? AppColors.fg
-                                : AppColors.onAccent,
-                          ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return FocusStageScaffold(
+      title: 'Focus session',
+      actions: const [HelpAppBarButton('focus')],
+      body: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight - 32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const SizedBox(height: 8),
+                FocusRing(
+                  size: focusRingSize(constraints),
+                  progress: targetDuration == null
+                      ? null
+                      : elapsed.inMilliseconds / targetDuration.inMilliseconds,
+                  timeText: timerText,
+                  statusLabel: ended
+                      ? 'Session ended'
+                      : running
+                      ? 'Focus'
+                      : paused
+                      ? 'Paused'
+                      : 'Ready',
+                  statusIcon: ended
+                      ? Icons.stop_circle_outlined
+                      : paused
+                      ? Icons.pause_rounded
+                      : Icons.track_changes_rounded,
+                  chipLabel: targetDuration == null
+                      ? 'No time limit'
+                      : 'of ${targetDuration.inMinutes} min',
+                  dimmed: paused,
+                ),
+                Column(
+                  children: [
+                    const SizedBox(height: 28),
+                    if (showAutoStart) ...[
+                      FocusNotice(
+                        text: 'Auto-starting in ${_remainingAutoStartSeconds}s',
+                        action: TextButton(
                           onPressed: () {
-                            if (running) {
-                              ctrl.pause();
-                            } else if (paused) {
-                              ctrl.resume();
-                            } else {
-                              _autoStartTicker?.cancel();
+                            _autoStartTicker?.cancel();
+                            setState(() {
+                              _autoStartCancelled = true;
                               _remainingAutoStartSeconds = null;
-                              _startSession(execState);
-                            }
+                            });
                           },
-                          icon: Icon(
-                            running
-                                ? Icons.pause_circle_outline
-                                : Icons.play_arrow_rounded,
-                          ),
-                          label: Text(
-                            running
-                                ? 'Pause'
-                                : paused
-                                ? 'Resume'
-                                : 'Start',
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(color: FocusColors.accent),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(60),
-                            backgroundColor: AppColors.dark2B2D31,
-                            foregroundColor: AppColors.fg,
-                          ),
-                          onPressed:
-                              execState.phase == ExecutionPhase.notStarted ||
-                                  _isHandlingStopFlow
-                              ? null
-                              : () => _handleStopFlow(
-                                  execState: execState,
-                                  activeLabel: activeLabel,
-                                ),
-                          icon: const Icon(Icons.stop_circle_outlined),
-                          label: Text(
-                            _isHandlingStopFlow ? 'Saving...' : 'End',
-                          ),
-                        ),
+                      const SizedBox(height: 20),
+                    ],
+                    FocusControls(
+                      primary: FocusRoundButton(
+                        primary: true,
+                        icon: running
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        label: running
+                            ? 'Pause'
+                            : paused
+                            ? 'Resume'
+                            : 'Start',
+                        onPressed: ended
+                            ? null
+                            : () {
+                                if (running) {
+                                  ctrl.pause();
+                                } else if (paused) {
+                                  ctrl.resume();
+                                } else {
+                                  _autoStartTicker?.cancel();
+                                  _remainingAutoStartSeconds = null;
+                                  _startSession(execState);
+                                }
+                              },
+                      ),
+                      secondary: FocusRoundButton(
+                        icon: Icons.stop_rounded,
+                        label: _isHandlingStopFlow ? 'Saving...' : 'End',
+                        busy: _isHandlingStopFlow,
+                        onPressed: canEnd
+                            ? () => _confirmThenStop(activeLabel: activeLabel)
+                            : null,
+                      ),
+                    ),
+                    if (execState.readyToScore) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        'Task is now marked as ready for scoring.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: FocusColors.textSecondary),
                       ),
                     ],
-                  ),
-                  if (execState.readyToScore) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      'Task is now marked as ready for scoring.',
-                      style: TextStyle(color: AppColors.fg70),
-                    ),
+                    const SizedBox(height: 28),
                   ],
-                  const SizedBox(height: 12),
-                ],
-              ),
+                ),
+                FocusWorkingOnCard(title: activeLabel),
+              ],
             ),
           ),
         ),

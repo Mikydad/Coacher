@@ -15,7 +15,17 @@ class DirectionSlot {
     required this.period,
     required this.current,
     required this.suggestion,
+    this.closeout,
+    this.previous,
   });
+
+  /// The previous period's entry when it still needs a close-out answer
+  /// (2026-09-19): it had text, and the user never said how it went.
+  final DirectionEntry? closeout;
+
+  /// The previous period's entry, whatever its state — for the answered
+  /// label next to the suggestion.
+  final DirectionEntry? previous;
 
   /// The calendar period for this horizon at `now`.
   final DirectionPeriod period;
@@ -51,10 +61,10 @@ Map<DirectionHorizon, DirectionSlot> resolveDirectionSlots(
   for (final horizon in kDirectionHorizonOrder) {
     final period = DirectionPeriods.current(horizon, now);
     final current = byId[directionEntryId(horizon, period.key)];
+    final prev = DirectionPeriods.previous(period);
+    final prevEntry = byId[directionEntryId(horizon, prev.key)];
     String? suggestion;
     if (current == null || current.isEmpty) {
-      final prev = DirectionPeriods.previous(period);
-      final prevEntry = byId[directionEntryId(horizon, prev.key)];
       if (prevEntry != null && prevEntry.isNotEmpty) {
         suggestion = prevEntry.text;
       }
@@ -63,6 +73,10 @@ Map<DirectionHorizon, DirectionSlot> resolveDirectionSlots(
       period: period,
       current: current,
       suggestion: suggestion,
+      closeout: prevEntry != null && prevEntry.needsCloseoutAt(now)
+          ? prevEntry
+          : null,
+      previous: prevEntry,
     );
   }
   return slots;
@@ -89,7 +103,9 @@ List<String> buildDirectionContextLines(
   for (final horizon in kDirectionHorizonOrder) {
     final slot = slots[horizon]!;
     if (!slot.hasText) continue;
-    lines.add('${_horizonPhrase(horizon)} (${slot.period.label}): ${slot.text}');
+    lines.add(
+      '${_horizonPhrase(horizon)} (${slot.period.label}): ${slot.text}',
+    );
   }
   return lines;
 }

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/auth/application/auth_providers.dart';
+import '../session/session_scope.dart';
 import 'tier_gate.dart';
 import 'tier_limits.dart';
 import 'tier_limits_service.dart';
@@ -24,7 +25,9 @@ class TierLimitsController extends StateNotifier<TierLimits> {
   }
 
   Future<void> _load() async {
-    final limits = await TierLimitsService.instance.limits();
+    // Ship-free lock (audit H11 / D2): a console push of `enforced: true`
+    // cannot wall users in before a paywall exists.
+    final limits = (await TierLimitsService.instance.limits()).withLaunchLock();
     if (mounted) state = limits;
   }
 
@@ -75,14 +78,21 @@ class ProEntitlementController extends StateNotifier<bool> {
       if (mounted) state = false;
       return;
     }
+    final session = SessionScope.capture();
     final prefs = await SharedPreferences.getInstance();
+    // Audit H11: the account may have changed while prefs loaded — a stale
+    // answer must not become the new account's tier.
+    if (!mounted || _uid != uid || !session.isCurrent) return;
     final entitled = prefs.getBool(_entitlementKeyForUid(uid)) ?? false;
-    if (mounted) state = entitled;
+    state = entitled;
   }
 
-  /// Sets the entitlement for the signed-in registered account. Debug and
-  /// (later) purchase-flow surface; ignored for anonymous sessions.
+  /// Sets the entitlement for the signed-in registered account. Purchase-
+  /// flow surface (RevenueCat, D2); inert until [kPaywallAvailable] so the
+  /// placeholder flag cannot become a real entitlement before the server
+  /// one exists. Ignored for anonymous sessions.
   Future<bool> setEntitled(bool entitled) async {
+    if (!kPaywallAvailable) return false;
     final uid = _uid;
     if (uid == null || !_registered) return false;
     final prefs = await SharedPreferences.getInstance();

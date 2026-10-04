@@ -7,7 +7,9 @@ import '../../domain/progress_period.dart';
 import 'progress_design_tokens.dart';
 import 'progress_shared_widgets.dart';
 
-/// The period's headline numbers: blended %, days met, streaks, delta.
+/// The period's headline numbers: blended %, days met, delta vs the previous
+/// period. (Streak chips retired 2026-09-25 — the day streak is not a
+/// user-facing concept any more.)
 class PeriodRollupCard extends StatelessWidget {
   const PeriodRollupCard({super.key, required this.series});
 
@@ -93,20 +95,6 @@ class PeriodRollupCard extends StatelessWidget {
                   ),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (series.currentStreak != null)
-                ProgressChip(
-                  label: 'Streak: ${series.currentStreak}d',
-                  highlighted: series.currentStreak! > 0,
-                  accentColor: ProgressDesignTokens.primaryDim,
-                ),
-              if (!isDay) ProgressChip(label: 'Best: ${series.bestStreak}d'),
             ],
           ),
         ],

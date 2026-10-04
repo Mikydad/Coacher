@@ -53,6 +53,11 @@ class IsarPointsBalance {
   late int updatedAtMs;
 
   late int balance;
+
+  /// The server-awarded share (signup bonus + challenge wins) — the only
+  /// points that can pay for a photo takedown (audit H7). Rows written
+  /// before the field read 0, which is also what the server assumes.
+  int trusted = 0;
 }
 
 /// Mirror of the curated `charities` collection (active entries only, D7).

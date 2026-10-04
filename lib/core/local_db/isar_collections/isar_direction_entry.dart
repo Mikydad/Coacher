@@ -31,6 +31,11 @@ class IsarDirectionEntry {
   late int periodEndMs;
   late int createdAtMs;
 
+  /// Close-out (2026-09-19): `achieved` | `partly` | `not_yet`, null until
+  /// answered. Rows from before the field read null.
+  String? outcomeStorage;
+  int? outcomeAtMs;
+
   static IsarDirectionEntry fromDomain(DirectionEntry e) {
     return IsarDirectionEntry()
       ..entryId = e.id
@@ -40,7 +45,9 @@ class IsarDirectionEntry {
       ..text = e.text
       ..periodStartMs = e.periodStartMs
       ..periodEndMs = e.periodEndMs
-      ..createdAtMs = e.createdAtMs;
+      ..createdAtMs = e.createdAtMs
+      ..outcomeStorage = e.outcome?.storageValue
+      ..outcomeAtMs = e.outcomeAtMs;
   }
 
   DirectionEntry toDomain() {
@@ -56,6 +63,8 @@ class IsarDirectionEntry {
       periodEndMs: periodEndMs,
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs,
+      outcome: DirectionOutcome.fromStorage(outcomeStorage),
+      outcomeAtMs: outcomeAtMs,
     );
   }
 }

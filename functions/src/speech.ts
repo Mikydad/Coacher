@@ -7,6 +7,7 @@ import {
   enforceSpeechRateLimit,
   recordSpeechUsage,
   speechConfig,
+  accountPolicyRejection,
 } from "./speech_shared";
 
 // TTS proxy for Voice Mode (OpenAI TTS, Level 1 — plan of 2026-08-07).
@@ -31,24 +32,15 @@ export const aiSpeech = onCall(
     timeoutSeconds: 30,
     memory: "256MiB",
     maxInstances: 10,
-    // No warm instance here anymore: the streaming endpoint took over the
-    // spoken-turn critical path (Phase 1, 2026-08-08) and carries the
-    // minInstances budget. This callable stays as the buffered fallback
-    // path for older builds and the _kStreamingTts=false A/B setting.
+    // No warm instance here: the streaming endpoint took over the
+    // spoken-turn critical path (Phase 1, 2026-08-08); its own warm
+    // instance went too in the 2026-09-24 cost audit (see aiChat in
+    // index.ts). This callable stays as the buffered fallback path for
+    // older builds and the _kStreamingTts=false A/B setting.
   },
   async (request: CallableRequest<AiSpeechData>) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Sign in required.");
-    }
-    // Same spend-control stance as aiChat: anonymous uids are free to mint,
-    // so per-uid quotas don't bound cost for them.
-    const signInProvider = (request.auth.token as Record<string, any>)?.firebase
-      ?.sign_in_provider;
-    if (signInProvider === "anonymous") {
-      throw new HttpsError(
-        "permission-denied",
-        "Sign in with an account to use Coach AI.",
-      );
     }
     const uid = request.auth.uid;
 
@@ -58,7 +50,21 @@ export const aiSpeech = onCall(
     }
     const text = validated.text;
 
-    const { enabled, voice } = await speechConfig();
+    const { enabled, voice, enforceAppCheck, requireVerifiedEmail } =
+      await speechConfig();
+    // Same spend-control stance as aiChat (audit H10): anonymous uids are
+    // free to mint, and unverified password accounts are when the flag says.
+    const rejection = accountPolicyRejection(
+      request.auth.token as Record<string, any>,
+      requireVerifiedEmail,
+    );
+    if (rejection !== null) {
+      throw new HttpsError("permission-denied", rejection);
+    }
+    // App Check behind the shared flag — callables get `request.app`.
+    if (enforceAppCheck && request.app == null) {
+      throw new HttpsError("permission-denied", "App attestation required.");
+    }
     if (!enabled) {
       // Kill switch: the client falls back to the on-device voice.
       throw new HttpsError("failed-precondition", "Speech synthesis is disabled.");

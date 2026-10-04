@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/presentation/keyboard_dismiss.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../education/application/education_providers.dart';
 import '../application/circle_providers.dart';
 import '../domain/models/circle_enums.dart';
 import '../domain/models/circle_member.dart';
@@ -37,8 +38,8 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
 
   static const _tabs = [
     'Chat',
-    'Activity',
-    'Commitments',
+    'Updates',
+    'Weekly commitments',
     'Challenges',
     'Members',
     'Info',
@@ -72,49 +73,61 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
     super.dispose();
   }
 
+  /// Optimistic: the line goes at once, the preference persists behind.
+  void _dismissIntro() {
+    ref.read(educationSeenCardsProvider.notifier).markSeen(_kGroupIntroKey);
+  }
+
   @override
   Widget build(BuildContext context) {
     final authAsync = ref.watch(authStateProvider);
     final circleAsync = ref.watch(circleDetailProvider(widget.circleId));
     final membersAsync = ref.watch(circleMembersProvider(widget.circleId));
+    final showIntro = ref.watch(showFeatureCardProvider(_kGroupIntroKey));
 
     if (authAsync.isLoading && !authAsync.hasValue) {
       return Scaffold(
-        backgroundColor: AppColors.surfaceDeep,
+        backgroundColor: AppColors.scaffold,
         body: Center(child: CircularProgressIndicator(color: AppColors.accent)),
       );
     }
 
-    // When the circle document is deleted (stream emits null), go back
+    // When the circle document is deleted (stream emits null) — or our read
+    // of it is revoked (permission-denied: we left, were removed, or the
+    // delete sweep took the member docs first, 2026-09-24) — go back
     // immediately instead of showing a "not found" placeholder.
     ref.listen<AsyncValue<dynamic>>(circleDetailProvider(widget.circleId), (
       _,
       next,
     ) {
-      if (next is AsyncData && next.value == null) {
-        if (context.mounted) {
-          Navigator.of(context).popUntil((r) {
-            return r.settings.name == '/community' || r.isFirst;
-          });
-        }
+      final gone =
+          (next is AsyncData && next.value == null) ||
+          (next is AsyncError && isPermissionDenied(next.error));
+      if (gone && context.mounted) {
+        Navigator.of(context).popUntil((r) {
+          return r.settings.name == '/community' || r.isFirst;
+        });
       }
     });
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDeep,
+      backgroundColor: AppColors.scaffold,
       body: circleAsync.when(
         loading: () =>
             Center(child: CircularProgressIndicator(color: AppColors.accent)),
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(
-              kDebugMode
-                  ? 'Could not load circle.\n$e'
-                  : 'Could not load circle.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textMuted),
-            ),
+            child: isPermissionDenied(e)
+                // The listener above is popping us; no error to show.
+                ? CircularProgressIndicator(color: AppColors.accent)
+                : Text(
+                    kDebugMode
+                        ? 'Could not load group.\n$e'
+                        : 'Could not load group.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
           ),
         ),
         data: (circle) {
@@ -136,30 +149,60 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
             child: NestedScrollView(
               headerSliverBuilder: (context, innerBoxIsScrolled) => [
                 SliverAppBar(
-                  backgroundColor: AppColors.surfaceDark,
+                  backgroundColor: AppColors.surfacePanel,
                   foregroundColor: AppColors.textPrimary,
-                  expandedHeight: 200,
+                  // The name lives in the toolbar so it survives the
+                  // collapse; the header below holds only what fades.
+                  // Height = toolbar + member line + avatars + tab strip
+                  // (2026-09-19): the old 200 was ~30px short of its own
+                  // content, so the avatar row sat on the tab strip.
+                  title: Text(
+                    circle.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  centerTitle: false,
+                  expandedHeight: _CircleHeader.heightFor(
+                    showIntro: showIntro,
+                  ),
                   pinned: true,
                   floating: false,
                   flexibleSpace: FlexibleSpaceBar(
                     background: _CircleHeader(
-                      circleName: circle.name,
-                      streak: circle.currentStreak,
                       memberCount: circle.memberCount,
                       members: activeMembers,
+                      showIntro: showIntro,
+                      onDismissIntro: _dismissIntro,
                     ),
                   ),
                   bottom: PreferredSize(
                     preferredSize: const Size.fromHeight(48),
-                    child: TabBar(
-                      controller: _tabController,
-                      isScrollable: true,
-                      labelColor: AppColors.accent,
-                      unselectedLabelColor: AppColors.textMuted,
-                      indicatorColor: AppColors.accent,
-                      indicatorSize: TabBarIndicatorSize.label,
-                      tabAlignment: TabAlignment.start,
-                      tabs: _tabs.map((t) => Tab(text: t)).toList(),
+                    // Opaque: nothing from the header may show through the
+                    // tab strip, whatever the scroll offset.
+                    child: ColoredBox(
+                      color: AppColors.surfacePanel,
+                      child: TabBar(
+                        controller: _tabController,
+                        isScrollable: true,
+                        labelColor: AppColors.accent,
+                        unselectedLabelColor: AppColors.textSecondary,
+                        labelStyle: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                        ),
+                        unselectedLabelStyle: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                        ),
+                        indicatorColor: AppColors.accent,
+                        indicatorSize: TabBarIndicatorSize.label,
+                        dividerColor: AppColors.divider,
+                        tabAlignment: TabAlignment.start,
+                        tabs: _tabs.map((t) => Tab(text: t)).toList(),
+                      ),
                     ),
                   ),
                 ),
@@ -169,9 +212,9 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
                 children: [
                   // Chat
                   CircleChatView(circleId: widget.circleId),
-                  // Activity
+                  // Updates
                   CircleActivityView(circleId: widget.circleId),
-                  // Commitments
+                  // Weekly commitments
                   WeeklyCommitmentsView(circleId: widget.circleId),
                   // Challenges
                   CircleChallengesView(circleId: widget.circleId),
@@ -191,18 +234,34 @@ class _CircleDetailScreenState extends ConsumerState<CircleDetailScreen>
 
 // ── Header ────────────────────────────────────────────────────────────────────
 
+/// Per-device dismissal key for the one-line group explainer. It lives in
+/// the education "seen cards" set (a plain string key, no registered guide).
+const _kGroupIntroKey = 'group_intro_dismissed';
+
 class _CircleHeader extends StatelessWidget {
   const _CircleHeader({
-    required this.circleName,
-    required this.streak,
     required this.memberCount,
     required this.members,
+    required this.showIntro,
+    required this.onDismissIntro,
   });
 
-  final String circleName;
-  final int streak;
+  /// Toolbar (56) + top pad (4) + member line (18) + gap (12) + avatars
+  /// (36) + bottom pad (12) + tab strip (48) = 186; +2 slack for font
+  /// metrics. Excludes the status bar (SafeArea adds it). The streak badge
+  /// that used to widen the member line is gone (2026-09-25).
+  static const double _baseHeight = 188;
+
+  /// Gap (8) + the intro line's fixed box (48: up to three 12px lines).
+  static const double _introHeight = 56;
+
+  static double heightFor({required bool showIntro}) =>
+      showIntro ? _baseHeight + _introHeight : _baseHeight;
+
   final int memberCount;
   final List<CircleMember> members;
+  final bool showIntro;
+  final VoidCallback onDismissIntro;
 
   @override
   Widget build(BuildContext context) {
@@ -210,46 +269,37 @@ class _CircleHeader extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         // Dark background
-        Container(color: AppColors.surfaceDeep),
+        Container(color: AppColors.scaffold),
         // Glass card
         Positioned.fill(
           child: ClipRRect(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(color: AppColors.fg.withOpacity(0.05)),
+              child: Container(color: AppColors.fg.withValues(alpha: 0.05)),
             ),
           ),
         ),
         SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 56, 20, 12),
+            // Clears the toolbar above and the tab strip below.
+            padding: const EdgeInsets.fromLTRB(20, kToolbarHeight + 4, 20, 60),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        circleName,
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (streak > 0) _StreakBadge(streak),
-                  ],
-                ),
-                const SizedBox(height: 6),
                 Text(
                   '$memberCount / ${AccountabilityCircleConst.kMaxMembers} members',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                    height: 1.3,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 if (members.isNotEmpty) _MemberAvatarRow(members: members),
+                if (showIntro) ...[
+                  const SizedBox(height: 8),
+                  _GroupIntroLine(onDismiss: onDismissIntro),
+                ],
               ],
             ),
           ),
@@ -259,30 +309,38 @@ class _CircleHeader extends StatelessWidget {
   }
 }
 
-class _StreakBadge extends StatelessWidget {
-  const _StreakBadge(this.streak);
-  final int streak;
+/// One-line explainer under the header, shown until dismissed. Fixed
+/// height so the collapsing header never has to measure it.
+class _GroupIntroLine extends StatelessWidget {
+  const _GroupIntroLine({required this.onDismiss});
+  final VoidCallback onDismiss;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.accent.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.accent.withOpacity(0.3)),
-      ),
+    return SizedBox(
+      height: 48,
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('🔥', style: TextStyle(fontSize: 13)),
-          const SizedBox(width: 4),
-          Text(
-            '$streak day${streak == 1 ? '' : 's'}',
-            style: TextStyle(
-              color: AppColors.accent,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+          Expanded(
+            child: Text(
+              'Keep each other accountable — talk, share progress, make '
+              'commitments, and take on challenges.',
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                height: 1.3,
+              ),
+            ),
+          ),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onDismiss,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 0, 8),
+              child: Icon(Icons.close, size: 16, color: AppColors.textSoft),
             ),
           ),
         ],
@@ -333,7 +391,7 @@ class _MemberAvatarRow extends StatelessWidget {
               child: Text(
                 initial,
                 style: TextStyle(
-                  color: isMe ? Colors.black : color,
+                  color: isMe ? AppColors.onAccent : color,
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
@@ -357,7 +415,7 @@ class _PlaceholderTab extends StatelessWidget {
     return Center(
       child: Text(
         message,
-        style: TextStyle(color: AppColors.textMuted, fontSize: 15),
+        style: TextStyle(color: AppColors.textSecondary, fontSize: 15),
       ),
     );
   }
@@ -367,3 +425,8 @@ class _PlaceholderTab extends StatelessWidget {
 class AccountabilityCircleConst {
   static const int kMaxMembers = 8;
 }
+
+/// Firestore refused the read: the account is no longer allowed to see this
+/// circle (left, removed, or deleted underneath it).
+bool isPermissionDenied(Object? error) =>
+    error is FirebaseException && error.code == 'permission-denied';

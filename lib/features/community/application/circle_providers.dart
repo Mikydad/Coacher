@@ -14,6 +14,9 @@ import '../domain/models/activity_feed_item.dart';
 import '../domain/models/circle_member.dart';
 import '../domain/models/circle_message.dart';
 import '../domain/models/removal_vote.dart';
+import 'ai_pulse_providers.dart';
+import 'challenge_providers.dart';
+import 'weekly_commitment_providers.dart';
 
 // ── Repository providers ──────────────────────────────────────────────────────
 
@@ -89,14 +92,27 @@ final discoverCirclesProvider = FutureProvider.autoDispose
 
 /// Clears cached per-circle streams after logout / account switch.
 void invalidateCircleScopedProviders(WidgetRef ref) {
-  ref.invalidate(myCircleIdsProvider);
-  ref.invalidate(myCirclesProvider);
-  ref.invalidate(circleDetailProvider);
-  ref.invalidate(circleMembersProvider);
-  ref.invalidate(circleMessagesProvider);
-  ref.invalidate(circleActivityFeedProvider);
-  ref.invalidate(circleRemovalVotesProvider);
+  for (final provider in circleScopedProviders) {
+    ref.invalidate(provider);
+  }
 }
+
+/// Every circle-keyed stream family. Audit H6: the challenge, commitment,
+/// and pulse families were persistent, circle-id-only streams that outlived
+/// the account — they are auth-scoped now and reset here.
+List<ProviderOrFamily> get circleScopedProviders => [
+  myCircleIdsProvider,
+  myCirclesProvider,
+  circleDetailProvider,
+  circleMembersProvider,
+  circleMessagesProvider,
+  circleActivityFeedProvider,
+  circleRemovalVotesProvider,
+  circleChallengesProvider,
+  circleWeeklyCommitmentsProvider,
+  latestDailyPulseProvider,
+  latestWeeklyPulseProvider,
+];
 
 /// Live stream of a single circle document.
 final circleDetailProvider = StreamProvider.autoDispose

@@ -12,10 +12,13 @@ import '../../profile/application/profile_providers.dart';
 /// Execution-mode choices offered by the Add Task form, in display order.
 const kAddTaskModeChoiceIds = ['flexible', 'disciplined', 'extreme'];
 const kAddTaskModeLabels = ['Flexible', 'Disciplined', 'Extreme'];
+// Mirrors `EnforcementMode.description` (the Profile Strictness copy) so the
+// Add Task picker never drifts from it.
 const kAddTaskModeDescriptions = [
-  'Reminders are gentle. Missing a day is okay.',
-  'Hold me accountable. Streaks matter.',
-  'No excuses. Follow up until I act.',
+  'Plans can change. Unfinished tasks are easy to move or dismiss.',
+  'Unfinished tasks need a decision — do them, move them, or say why.',
+  'Unfinished tasks must be done or moved with a reason. No skipping, and '
+      'a focus session is required before ticking a task off.',
 ];
 
 /// Plan day for the form: the reminder's calendar day when a reminder is set,

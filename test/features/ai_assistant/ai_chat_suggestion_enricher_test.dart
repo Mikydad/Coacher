@@ -106,13 +106,17 @@ void main() {
       final payload = AiOperatingLayerPayload(
         userInput: 'How am I doing on my goals?',
         goalProgress: [
+          // Progress in the goal's own units (fix plan Phase 3.1).
           {
             'title': 'Reading',
-            'target': '30 pages',
-            'daysMet': 3,
+            'logged': '3',
+            'target': '30',
+            'unit': 'pages',
+            'window': 'this period',
+            'daysLogged': 3,
             'daysElapsed': 5,
-            'totalDays': 30,
-            'periodSummary': 'Jun 2026',
+            'daysInWindow': 30,
+            'behindPace': true,
           },
         ],
         behaviorPreferences: {'coachingStyle': 'supportive'},

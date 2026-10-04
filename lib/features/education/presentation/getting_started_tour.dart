@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/presentation/app_colors.dart';
+import '../../feedback/application/feedback_route_tracker.dart';
 import '../application/getting_started_controller.dart';
 import 'tour_targets.dart';
 
@@ -69,9 +70,21 @@ class _GettingStartedTourLayerState
       if (_targetRect != null) setState(() => _targetRect = null);
       return;
     }
-    final rect = TourTargets.rectOf(_keyForStep(state.step)!);
+    // Another screen on top (goal editor, the onboarding first-goal picker,
+    // any pushed route): Home's targets still measure — they're behind the
+    // route — but a spotlight would draw over the foreign screen. Only the
+    // shell and the Add Task sheet are tour surfaces (2026-09-25).
+    final top = FeedbackRouteTracker.topRouteName.value;
+    final foreign = top != null && !_tourRoutes.contains(top);
+    final rect = foreign
+        ? null
+        : TourTargets.rectOf(_keyForStep(state.step)!);
     if (rect != _targetRect) setState(() => _targetRect = rect);
   }
+
+  /// Route names the spotlight may render over: the tab shell and the Add
+  /// Task sheet (`/add-task`, the name the controller's step logic keys on).
+  static const Set<String> _tourRoutes = {'/', '/add-task'};
 
   static const _instructions = {
     TourStep.tapAddTask: (

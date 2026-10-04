@@ -5,7 +5,11 @@ import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../../ai_assistant/presentation/widgets/coach_ai_fab.dart';
+import '../../education/domain/page_explainers.dart';
+import '../../education/presentation/page_explainer_sheet.dart';
 import '../application/points_providers.dart';
+import '../application/stake_action_items.dart';
+import '../application/stake_seen_store.dart';
 import '../application/stakes_providers.dart';
 import '../domain/models/points.dart';
 import '../domain/models/stake_challenge.dart';
@@ -28,7 +32,18 @@ class AccountabilityHubScreen extends ConsumerWidget {
       appBar: AppBar(
         centerTitle: true,
         title: const PageTitle('Accountability'),
-        actions: [_PointsChip(onTap: () => _showLedger(context, ref))],
+        actions: [
+          IconButton(
+            onPressed: () => showPageExplainer(
+              context,
+              PageExplainers.accountability,
+              fromHelp: true,
+            ),
+            tooltip: 'About this page',
+            icon: const Icon(Icons.help_outline_rounded, size: 20),
+          ),
+          _PointsChip(onTap: () => _showLedger(context, ref)),
+        ],
       ),
       body: challengesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -39,47 +54,55 @@ class AccountabilityHubScreen extends ConsumerWidget {
           ),
         ),
         data: (all) {
+          // Cards that need the user float to the top (2026-09-24), so the
+          // tab badge always points at something visible. Same seen rule
+          // as the badge (Miko): opening the stake clears its line — the
+          // line is a notification, not a to-do — and it re-arms when
+          // something genuinely new happens (a new day's log, a verdict).
+          final seen = ref.watch(stakeSeenProvider);
+          final actions = {
+            for (final e in ref.watch(stakeActionItemsProvider).entries)
+              if (!seen.contains(e.value.seenKey)) e.key: e.value,
+          };
           final open = all.where((c) => !c.status.isTerminal).toList()
-            ..sort((a, b) => a.deadlineMs.compareTo(b.deadlineMs));
+            ..sort((a, b) {
+              final na = actions.containsKey(a.id) ? 0 : 1;
+              final nb = actions.containsKey(b.id) ? 0 : 1;
+              if (na != nb) return na - nb;
+              return a.deadlineMs.compareTo(b.deadlineMs);
+            });
           final done = all.where((c) => c.status.isTerminal).toList()
             ..sort((a, b) => b.updatedAtMs.compareTo(a.updatedAtMs));
 
           if (all.isEmpty) return const _EmptyState();
 
-          // PSY-4-adjacent scoreboard: W/L across decided multi-party
-          // challenges (side outcome, not personal — matches the stakes).
-          final myUid = FirestorePaths.activeUid;
-          var wins = 0;
-          var losses = 0;
-          for (final c in done.where((c) => c.type.isMultiParty)) {
-            final r = c.results.where((r) => r.uid == myUid).firstOrNull;
-            if (r == null) continue;
-            r.sideWon ? wins++ : losses++;
-          }
-
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
             children: [
-              if (wins + losses > 0)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    'Head-to-head record: $wins W – $losses L',
-                    style: TextStyle(
-                      color: AppColors.textSoft,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                    ),
+              // Plain-language pass (2026-09-25): the page explains itself
+              // instead of showing the head-to-head W/L line, which only
+              // appeared once you had finished a multi-party challenge.
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'Hold yourself accountable by putting something at stake, '
+                  'or by making your commitment public.',
+                  style: TextStyle(
+                    color: AppColors.textSoft,
+                    fontSize: 13,
+                    height: 1.4,
                   ),
                 ),
+              ),
               if (open.isNotEmpty) ...[
-                const SectionHeader('On the line'),
+                const SectionHeader('In progress'),
                 const SizedBox(height: 8),
-                for (final c in open) _ChallengeCard(challenge: c),
+                for (final c in open)
+                  _ChallengeCard(challenge: c, action: actions[c.id]),
               ],
               if (done.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const SectionHeader('Decided'),
+                const SectionHeader('Finished'),
                 const SizedBox(height: 8),
                 for (final c in done) _ChallengeCard(challenge: c),
               ],
@@ -232,7 +255,7 @@ class _EmptyState extends StatelessWidget {
             Icon(Icons.handshake_rounded, size: 56, color: AppColors.fg24),
             const SizedBox(height: 16),
             Text(
-              'Put something on the line',
+              'Put something at stake',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.textPrimary,
@@ -242,8 +265,8 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Stake a photo you\'d hate your circle to see. '
-              'Keep your word and it dies unseen — break it and it posts.',
+              'Hold yourself accountable by putting something at stake, '
+              'or by making your commitment public.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textMuted, height: 1.4),
             ),
@@ -255,9 +278,13 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _ChallengeCard extends StatelessWidget {
-  const _ChallengeCard({required this.challenge});
+  const _ChallengeCard({required this.challenge, this.action});
 
   final StakeChallenge challenge;
+
+  /// Why this card needs the user, when it does — the same predicate that
+  /// lights the tab badge.
+  final StakeActionItem? action;
 
   @override
   Widget build(BuildContext context) {
@@ -294,6 +321,30 @@ class _ChallengeCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 3),
+                      if (action != null) ...[
+                        Row(
+                          children: [
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: BoxDecoration(
+                                color: AppColors.accent,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              action!.reason.label,
+                              style: TextStyle(
+                                color: AppColors.accent,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                      ],
                       Text(
                         _subtitle(c),
                         maxLines: 1,
@@ -399,8 +450,14 @@ class _StatusChip extends StatelessWidget {
       StakeChallengeStatus.draft => ('checking', AppColors.amber),
       StakeChallengeStatus.pendingAccept => ('invited', AppColors.amber),
       StakeChallengeStatus.active => ('live', AppColors.statusGreen),
-      StakeChallengeStatus.pendingVerification => ('deciding', AppColors.amber),
-      StakeChallengeStatus.completedSuccess => ('kept', AppColors.statusGreen),
+      StakeChallengeStatus.pendingVerification => (
+        'checking result',
+        AppColors.amber,
+      ),
+      StakeChallengeStatus.completedSuccess => (
+        'completed',
+        AppColors.statusGreen,
+      ),
       StakeChallengeStatus.completedForfeit => ('forfeited', AppColors.danger),
       StakeChallengeStatus.completedSurrendered => (
         'surrendered',

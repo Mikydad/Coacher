@@ -128,7 +128,9 @@ kCoachingInsightTaxonomy = <InsightType, CoachingInsightSpec>{
   InsightType.streakRiskWarning: CoachingInsightSpec(
     insightType: InsightType.streakRiskWarning,
     family: CoachingInsightFamily.risk,
-    description: 'Recent missed days risk ending current momentum streak.',
+    description:
+        'RETIRED 2026-09-25 (streak family) — kept for lifecycle resolution of '
+        'persisted rows only; never generated or rendered.',
     requiredPatternCodes: {PatternCode.streakRisk},
     cooldown: InsightCooldownPolicy.oneDay,
     resolutionRule: InsightResolutionRule(
@@ -207,7 +209,9 @@ kCoachingInsightTaxonomy = <InsightType, CoachingInsightSpec>{
   InsightType.strongStreakPraise: CoachingInsightSpec(
     insightType: InsightType.strongStreakPraise,
     family: CoachingInsightFamily.reinforcement,
-    description: 'Current streak exceeds strong-streak threshold.',
+    description:
+        'RETIRED 2026-09-25 (streak family) — kept for lifecycle resolution of '
+        'persisted rows only; never generated or rendered.',
     requiredPatternCodes: {PatternCode.strongStreak},
     cooldown: InsightCooldownPolicy.oneDay,
     resolutionRule: InsightResolutionRule(
@@ -252,7 +256,8 @@ kCoachingInsightTaxonomy = <InsightType, CoachingInsightSpec>{
     insightType: InsightType.fragileStreakAlert,
     family: CoachingInsightFamily.focus,
     description:
-        'Entity with streak risk — earliest candidate for streak breakage.',
+        'RETIRED 2026-09-25 (streak family) — kept for lifecycle resolution of '
+        'persisted rows only; never generated or rendered.',
     requiredPatternCodes: {PatternCode.streakRisk},
     cooldown: InsightCooldownPolicy.oneDay,
     resolutionRule: InsightResolutionRule(

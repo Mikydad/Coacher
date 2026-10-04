@@ -97,6 +97,7 @@ final aiPayloadAssemblerProvider = Provider<AiPayloadAssembler>((ref) {
     directionRepository: ref.read(directionRepositoryProvider),
     activityEventRepository: ref.read(activityEventRepositoryProvider),
     contextSnapshotService: ref.read(contextSnapshotServiceProvider),
+    timeBlockRepository: ref.read(timeBlockRepositoryProvider),
   );
 });
 

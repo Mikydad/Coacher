@@ -22,8 +22,9 @@ class ScoreTaskDialog extends StatefulWidget {
 
   final String taskTitle;
 
-  /// When true (disciplined / extreme) the Cancel button is hidden — Save is
-  /// the only way out. Keep in sync with the PopScope/barrier in [show].
+  /// When true (disciplined / extreme) Save is the only way to RECORD, but
+  /// never a trap (Miko, 2026-09-27): "Not now", tapping outside and Back
+  /// all ask [confirmLeave] first. Keep in sync with the PopScope in [show].
   final bool requireSubmit;
 
   /// When true (extreme mode) a reason is required at any score, not only
@@ -52,14 +53,17 @@ class ScoreTaskDialog extends StatefulWidget {
         _ => 80,
       };
 
-  /// Dismissability is the task's discipline-mode contract:
+  /// Dismissability is the task's discipline-mode contract. `null` always
+  /// means "left without rating" — nothing is scored; the caller keeps the
+  /// task open (timer: back to the Focus list; Home: stays unticked).
   ///
-  /// - [requireSubmit] false (flexible): tapping outside / back returns null.
-  ///   What null means is the caller's choice — the home checkbox flow treats
-  ///   it as "accept the default, done at 100%"; the timer flow treats it as
-  ///   "leave without rating".
-  /// - [requireSubmit] true (disciplined / extreme): no outside-tap, no back —
-  ///   the user must press Save. `show` never returns null in this case.
+  /// - [requireSubmit] false (flexible): Cancel, tapping outside and Back
+  ///   return null at once.
+  /// - [requireSubmit] true (disciplined / extreme): the same exits first
+  ///   ask "Leave without rating?" ([leaveMessage] says what's kept) — a
+  ///   mistaken Done must never strand anyone (2026-09-27). Leaving never
+  ///   marks the task done, so the mode's accountability still applies
+  ///   (Extreme's unfinished row stays).
   /// - [requireReasonAlways] (extreme): reason mandatory at any score.
   static Future<ScoreTaskDialogResult?> show(
     BuildContext context, {
@@ -68,12 +72,20 @@ class ScoreTaskDialog extends StatefulWidget {
     bool requireReasonAlways = false,
     int initialPercent = 100,
     int reasonThresholdPercent = 100,
+    String leaveMessage = "The task stays open — it isn't marked done.",
   }) {
     return showDialog<ScoreTaskDialogResult>(
       context: context,
-      barrierDismissible: !requireSubmit,
-      builder: (_) => PopScope(
+      builder: (dialogContext) => PopScope<ScoreTaskDialogResult>(
         canPop: !requireSubmit,
+        onPopInvokedWithResult: (didPop, _) async {
+          if (didPop) return;
+          final leave = await confirmLeave(dialogContext, leaveMessage);
+          if (leave && dialogContext.mounted) {
+            // An explicit pop is not blocked by canPop.
+            Navigator.of(dialogContext).pop();
+          }
+        },
         child: ScoreTaskDialog(
           taskTitle: taskTitle,
           requireSubmit: requireSubmit,
@@ -83,6 +95,28 @@ class ScoreTaskDialog extends StatefulWidget {
         ),
       ),
     );
+  }
+
+  /// "Leave without rating?" — true when the user chooses to leave.
+  static Future<bool> confirmLeave(BuildContext context, String message) async {
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Leave without rating?'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Leave without rating'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Rate it'),
+          ),
+        ],
+      ),
+    );
+    return leave ?? false;
   }
 
   @override
@@ -182,11 +216,12 @@ class _ScoreTaskDialogState extends State<ScoreTaskDialog> {
         ),
       ),
       actions: [
-        if (!widget.requireSubmit)
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+        // Strict modes: a visible way out that still asks first — it goes
+        // through the PopScope in [show], same as tapping outside.
+        TextButton(
+          onPressed: () => Navigator.maybePop(context),
+          child: Text(widget.requireSubmit ? 'Not now' : 'Cancel'),
+        ),
         FilledButton(onPressed: _submit, child: const Text('Save Score')),
       ],
     );

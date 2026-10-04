@@ -10,6 +10,7 @@ import '../../application/progress_period_series.dart';
 import '../../application/progress_selection.dart';
 import '../../domain/progress_period.dart';
 import 'day_detail_card.dart';
+import 'day_suggestions_card.dart';
 import 'day_hero.dart';
 import 'direction_line.dart';
 import 'month_bars.dart';
@@ -193,6 +194,8 @@ class _PeriodContent extends StatelessWidget {
               isToday: point.dateKey == todayKey,
               sweep: ringSweep,
             ),
+            // Suggestions live here now (2026-09-22), today only.
+            if (point.dateKey == todayKey) const DaySuggestionsCard(),
           ],
         );
       case ProgressHorizon.week:

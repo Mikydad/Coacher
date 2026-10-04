@@ -16,7 +16,7 @@ void main() {
     await tester.tap(find.byType(HelpDot));
     await tester.pumpAndSettle();
 
-    expect(find.text('🌊  Flow Now'), findsOneWidget);
+    expect(find.text('🌊  Up Next'), findsOneWidget);
     expect(
       find.text('The one task you should be doing right now.'),
       findsOneWidget,
@@ -78,7 +78,7 @@ void main() {
     expect(args, isA<CoachRouteArgs>());
     expect(
       (args as CoachRouteArgs).preDraftedText,
-      'Tell me about Flow Now',
+      'Tell me about Up Next',
     );
   });
 }

@@ -4,7 +4,9 @@ import 'generated_insight.dart';
 
 /// Current prompt template version. Increment when prompts change materially.
 /// Used to correlate AI responses with specific prompt logic in analytics.
-const String kCoachingAiPromptVersion = 'v1.1.0'; // v1.1.0: Direction context
+// v1.1.0: Direction context. v1.2.0: streaks are not a concept (no streak
+// evidence in the prompt, explicit do-not-mention rule).
+const String kCoachingAiPromptVersion = 'v1.2.0';
 
 // ─── Coaching framing ─────────────────────────────────────────────────────────
 
@@ -12,13 +14,13 @@ const String kCoachingAiPromptVersion = 'v1.1.0'; // v1.1.0: Direction context
 /// Derived deterministically from [CurrentCoachingFocus] — never chosen by AI.
 /// Ensures tone consistency and prevents random oscillation between framings.
 enum CoachingFraming {
-  /// Positive momentum: user is in a strong behavioral streak.
+  /// Positive momentum: user is on a strong run of consistent behavior.
   momentum,
 
   /// Recovery: user is bouncing back from a missed or degraded period.
   recovery,
 
-  /// Protection: an active streak or goal is at risk and needs guarding.
+  /// Protection: consistency or a goal is at risk and needs guarding.
   protection,
 
   /// Stabilization: volatility is high; consistency is the priority.
@@ -116,7 +118,7 @@ enum SummaryType {
   /// Framed around helping the user recover from a lapse or setback.
   recovery,
 
-  /// Positive reinforcement for a sustained behavior or streak.
+  /// Positive reinforcement for a sustained behavior.
   reinforcement,
 }
 

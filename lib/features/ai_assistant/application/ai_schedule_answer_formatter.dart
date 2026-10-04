@@ -44,11 +44,13 @@ abstract final class AiScheduleAnswerFormatter {
   static String _formatGoalProgress(AiOperatingLayerPayload payload) {
     final coachingStyle =
         payload.behaviorPreferences['coachingStyle']?.toString() ?? 'balanced';
-    final buffer = StringBuffer('Here\'s your goal progress this period:\n');
+    final buffer = StringBuffer('Here\'s your goal progress:\n');
     for (final g in payload.goalProgress) {
+      final unit = (g['unit'] ?? '').toString();
       buffer.writeln(
-        '• ${g['title']}: ${g['daysMet']}/${g['target']} '
-        '(${g['daysElapsed']}/${g['totalDays']} days)',
+        '• ${g['title']}: ${g['logged']}/${g['target']}'
+        '${unit.isEmpty ? '' : ' $unit'} ${g['window']}'
+        '${g['behindPace'] == true ? ' — behind pace' : ''}',
       );
     }
     if (coachingStyle == 'supportive') {

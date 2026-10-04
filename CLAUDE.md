@@ -66,4 +66,7 @@ replication). These rules apply to EVERY change; they are not suggestions.
   `PRD/DESIGN_PRD.md` + `PRD/create-prd.md` (design & PRD templates),
   `documentation/errors.md` (known Firestore/index pitfalls — read before
   adding any Firestore query with `orderBy`/range filters).
+- `documentation/CONTENT_IDEAS.md` is the build-in-public story log: append a
+  story-beat entry (Hook / What happened / The turn / Takeaway / Formats)
+  whenever a session hits a notable struggle, fix, or milestone.
 - Never commit or push without explicit permission.

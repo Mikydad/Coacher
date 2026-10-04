@@ -19,7 +19,7 @@ Future<void> showJoinWithCodeSheet(
   if (!await ensureRegisteredForCircleAction(
     context,
     ref,
-    actionLabel: 'join a circle',
+    actionLabel: 'join a group',
   )) {
     return;
   }
@@ -149,7 +149,7 @@ class _JoinWithCodeSheetState extends ConsumerState<_JoinWithCodeSheet> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Enter the invite key a circle member shared with you.',
+            'Enter the invite key a group member shared with you.',
             style: TextStyle(color: AppColors.textMuted, fontSize: 13),
           ),
           const SizedBox(height: 16),
@@ -197,7 +197,7 @@ class _JoinWithCodeSheetState extends ConsumerState<_JoinWithCodeSheet> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Join circle'),
+                : const Text('Join group'),
           ),
         ],
       ),

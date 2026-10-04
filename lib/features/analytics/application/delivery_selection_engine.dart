@@ -71,7 +71,11 @@ DeliverySelectionResult selectDeliveryDecision({
     now: context.now,
     justCompletedTask: context.justCompletedTask,
   );
-  final sorted = List<GeneratedInsight>.from(insights)
+  // Retired streak-family rows can still sit in the Layer 3 cache; they are
+  // never candidates for a card or a notification (2026-09-25).
+  final sorted = insights
+      .where((i) => !isRetiredInsightType(i.insightType))
+      .toList()
     ..sort((a, b) => compareDeliveryCandidates(a, b, profile: profile));
 
   final evaluations = <DeliveryCandidateEvaluation>[];

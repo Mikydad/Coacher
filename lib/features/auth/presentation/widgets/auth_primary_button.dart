@@ -4,7 +4,7 @@ import '../../../../core/presentation/app_colors.dart';
 
 /// Full-width primary action button for auth screens.
 ///
-/// `#B2ED00` background, bold black text.
+/// The app's lime primary (`AppColors.accent` / `onAccent`), bold text.
 /// Shows a `CircularProgressIndicator` (black) when [isLoading] is true.
 /// Visually disabled (opacity 0.4) when [onPressed] is null or [isLoading].
 class AuthPrimaryButton extends StatelessWidget {
@@ -33,20 +33,20 @@ class AuthPrimaryButton extends StatelessWidget {
         child: ElevatedButton(
           onPressed: isDisabled ? null : onPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.accentDim,
-            foregroundColor: Colors.black,
-            disabledBackgroundColor: AppColors.accentDim,
+            backgroundColor: AppColors.accent,
+            foregroundColor: AppColors.onAccent,
+            disabledBackgroundColor: AppColors.accent,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
             elevation: 0,
           ),
           child: isLoading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
-                    color: Colors.black,
+                    color: AppColors.onAccent,
                     strokeWidth: 2.5,
                   ),
                 )

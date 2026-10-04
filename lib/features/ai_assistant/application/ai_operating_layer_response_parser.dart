@@ -43,9 +43,16 @@ AiPlannedChanges parseOperatingLayerJsonMap(
   }
 
   final actionsRaw = inner['actions'] as List? ?? [];
-  final actions = actionsRaw
-      .map((a) => AiAction.fromJson(Map<String, dynamic>.from(a as Map)))
-      .toList();
+  // Unknown verbs are dropped, never coerced (fix plan Phase 1.4).
+  final actions = <AiAction>[];
+  for (final a in actionsRaw) {
+    if (a is! Map) continue;
+    try {
+      actions.add(AiAction.fromJson(Map<String, dynamic>.from(a)));
+    } on ArgumentError {
+      continue;
+    }
+  }
 
   final conflictsRaw = inner['conflicts'] as List? ?? [];
   final conflicts = conflictsRaw.map((c) => c.toString()).toList();

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../features/time_blocks/application/time_block_providers.dart';
 import 'goal_block_sync_service.dart';
+import 'goal_category_options.dart';
 import 'goal_period_helpers.dart';
 import '../data/goals_repository.dart';
 import '../data/isar_goals_repository.dart';
@@ -67,6 +68,29 @@ final activeGoalsProvider = Provider<AsyncValue<List<UserGoal>>>((ref) {
     loading: () => const AsyncValue.loading(),
     error: AsyncValue.error,
   );
+});
+
+/// Every category the user can file a goal under: built-ins plus custom
+/// ones from all their goals (see `goal_category_options.dart`).
+final goalCategoryOptionsProvider = Provider<List<String>>((ref) {
+  final list = ref.watch(goalsStreamProvider).valueOrNull ?? const [];
+  return goalCategoryOptions(list.map((g) => g.categoryId));
+});
+
+/// Active goals that are NOT planned for today: a future start, a repeat
+/// day that isn't today, or a one-time goal. Home's empty state names them
+/// (2026-09-24) so a goal "saved for another day" isn't mistaken for lost.
+final otherDayGoalsCountProvider = Provider<int>((ref) {
+  final list = ref.watch(goalsStreamProvider).valueOrNull;
+  if (list == null) return 0;
+  final todayKey = DateKeys.todayKey();
+  return list
+      .where(
+        (g) =>
+            g.status == GoalStatus.active &&
+            !GoalPeriodHelpers.isGoalActiveOnDateKey(g, todayKey),
+      )
+      .length;
 });
 
 /// Active goals for which **today** is a planned action day. Passive goals

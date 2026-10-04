@@ -62,13 +62,16 @@ int? _parseHHmm(String raw) {
 ///
 /// Evaluation order:
 /// 1. If `state.activeOverride` is non-none AND not expired → return it.
-/// 2. Else if current time is within the configured sleep window → return `sleep`.
+/// 2. Else if current time is within the configured sleep window — and the
+///    window was not ended for tonight ([UserAttentionState.isSleepWindowPaused])
+///    → return `sleep`.
 /// 3. Otherwise → return `none`.
 ContextOverride effectiveOverride(UserAttentionState state, DateTime now) {
   if (state.hasActiveOverride && !state.isExpired(now)) {
     return state.activeOverride;
   }
   if (state.hasSleepWindow &&
+      !state.isSleepWindowPaused(now) &&
       isWithinSleepWindow(now, state.sleepWindowStart, state.sleepWindowEnd)) {
     return ContextOverride.sleep;
   }

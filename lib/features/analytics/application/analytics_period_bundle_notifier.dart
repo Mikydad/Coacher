@@ -10,6 +10,7 @@ import '../../profile/application/profile_providers.dart';
 import 'analytics_period_bundle_loader.dart';
 import 'analytics_period_bundle.dart';
 import 'daily_analytics_providers.dart' show computeAnalyticsPeriodBundle;
+import '../../../core/telemetry/nonfatal.dart';
 
 /// Local-first analytics bundle: cached Isar snapshots first, fresh compute in background.
 class AnalyticsPeriodBundleNotifier
@@ -45,6 +46,7 @@ class AnalyticsPeriodBundleNotifier
       // the cached value, which is exactly how the 2026-07-22 "0% forever"
       // class of bug hides (repo rule: log all swallowed errors).
       debugPrint('analytics_period_bundle: swallowed error: $e');
+      reportNonfatal('analytics.periodBundleRefresh', e);
     }
   }
 }

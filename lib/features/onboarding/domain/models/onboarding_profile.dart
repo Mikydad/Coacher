@@ -43,6 +43,18 @@ abstract final class OnboardingInterests {
   static const betterHabits = 'better_habits';
   static const moreDisciplined = 'more_disciplined';
 
+  /// Display label, shared by the goals step and the first-goal picker.
+  static String label(String key) => switch (key) {
+    buildBusiness => 'Build a business',
+    improveHealth => 'Improve my health',
+    learnSkills => 'Learn new skills',
+    getOrganized => 'Get organized',
+    makeMoney => 'Make more money',
+    betterHabits => 'Build better habits',
+    moreDisciplined => 'Become more disciplined',
+    _ => key,
+  };
+
   static const all = [
     buildBusiness,
     improveHealth,

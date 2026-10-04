@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/presentation/app_card.dart';
+
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 
@@ -8,7 +10,7 @@ import '../../../core/presentation/page_headers.dart';
 Color get kSettingsSurface => AppColors.ink;
 Color get kSettingsSurfaceHigh => AppColors.inkWarm;
 Color get kSettingsOnSurface => AppColors.white;
-Color get kSettingsOnSurfaceVariant => AppColors.textSoft;
+Color get kSettingsOnSurfaceVariant => AppColors.textSecondary;
 
 /// Shared chrome for Profile-linked settings sub-pages.
 class SettingsPageScaffold extends StatelessWidget {
@@ -41,10 +43,7 @@ class SettingsPageScaffold extends StatelessWidget {
         centerTitle: true,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(
-            height: 1,
-            color: AppColors.fg.withValues(alpha: 0.06),
-          ),
+          child: Container(height: 1, color: AppColors.divider),
         ),
       ),
       body: ListView(
@@ -62,15 +61,7 @@ class SettingsSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      label.toUpperCase(),
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 2,
-        color: kSettingsOnSurfaceVariant,
-      ),
-    );
+    return AppSectionLabel(label.toUpperCase());
   }
 }
 
@@ -84,9 +75,11 @@ class SettingsObsidianCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
+      // Redesign 2026-09-15: same card treatment as Home — shadow, no border.
       decoration: BoxDecoration(
         color: kSettingsSurfaceHigh,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: appCardShadow,
       ),
       child: child,
     );

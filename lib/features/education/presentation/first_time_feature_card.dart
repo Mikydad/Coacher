@@ -77,18 +77,7 @@ class _FirstTimeFeatureCardState extends ConsumerState<FirstTimeFeatureCard> {
                     ),
                   ),
                 ),
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _dismiss,
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(
-                      Icons.close,
-                      size: 16,
-                      color: AppColors.textSoft,
-                    ),
-                  ),
-                ),
+                // No × (Miko, 2026-09-29): "Got it" is the one dismiss.
               ],
             ),
             const SizedBox(height: 4),

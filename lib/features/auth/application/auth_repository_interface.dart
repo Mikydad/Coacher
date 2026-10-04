@@ -50,5 +50,16 @@ abstract class AuthRepositoryInterface {
     required String email,
     required String password,
   });
+
+  /// Provider-appropriate re-authentication before a sensitive change
+  /// (audit H13): `apple.com` runs the native sheet and keeps the fresh
+  /// authorization code so [deleteAccount] can revoke it; `google.com`
+  /// re-runs the account picker. Returns [AuthSignInCanceled] when the
+  /// user backs out.
+  Future<AuthFailure?> reauthenticateWithProvider(String providerId);
+
+  /// Deletes the Firebase user. When an Apple authorization code was
+  /// captured by [reauthenticateWithProvider], the Apple token is revoked
+  /// first (Apple's account-deletion requirement).
   Future<AuthFailure?> deleteAccount();
 }

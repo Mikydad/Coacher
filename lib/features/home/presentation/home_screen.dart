@@ -1,14 +1,15 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/presentation/widgets/backup_account_card.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../ai_assistant/application/ai_assistant_providers.dart';
-import '../../ai_assistant/presentation/ai_assistant_screen.dart';
 import '../../profile/application/profile_providers.dart';
 import '../../../core/sync/sync_service.dart';
 import '../../../core/utils/stable_id.dart';
@@ -22,8 +23,9 @@ import '../../planning/application/planned_task_collect.dart';
 import '../../planning/application/planned_task_providers.dart';
 import '../../planning/application/task_schedule_display.dart';
 import '../../analytics/application/analytics_event_logger.dart';
+import '../../analytics/application/progress_selection.dart';
+import '../../analytics/domain/progress_period.dart';
 import '../../analytics/application/analytics_period_bundle_notifier.dart';
-import '../../analytics/application/discipline_score.dart';
 import '../../analytics/application/announced_insight_store.dart';
 import '../../analytics/application/coaching_insight_notification_policy.dart';
 import '../../analytics/application/delivery_providers.dart';
@@ -39,11 +41,11 @@ import '../../planning/domain/models/flow_transition_event.dart';
 import '../../planning/domain/models/block.dart';
 import '../../planning/domain/models/routine.dart';
 import '../../planning/domain/models/task_item.dart';
-import '../../planning/presentation/accountability_history_screen.dart';
 import '../../scoring/application/scoring_controller.dart';
 import '../../scoring/presentation/score_task_dialog.dart';
 import '../../add_task/presentation/add_task_sheet.dart';
 import '../../tasks_hub/presentation/task_detail_screen.dart';
+import '../../tasks_hub/presentation/task_accent.dart';
 import '../../tasks_hub/presentation/tasks_hub_screen.dart';
 import '../../focus/presentation/focus_selection_screen.dart';
 import '../../goals/application/goals_providers.dart';
@@ -52,7 +54,8 @@ import '../../goals/domain/models/goal_categories.dart';
 import '../../goals/domain/models/goal_enums.dart';
 import '../../goals/domain/models/user_goal.dart';
 import '../../goals/presentation/goal_detail_screen.dart';
-import '../../intentions/presentation/promises_section.dart';
+import '../../intentions/presentation/intention_quick_add_sheet.dart';
+import '../../intentions/presentation/on_your_radar_section.dart';
 import '../../intentions/presentation/seize_the_moment_card.dart';
 import '../../goals/presentation/goal_template_picker_screen.dart';
 import '../../plan_tomorrow/presentation/plan_tomorrow_screen.dart';
@@ -63,6 +66,8 @@ import '../../context_override/domain/models/interruption_level.dart';
 import '../../reminders/presentation/recovery_card.dart';
 import '../../reminders/presentation/reminder_health_section.dart';
 import '../../reminders/presentation/recovery_navigation.dart';
+import '../../context_override/application/context_override_providers.dart';
+import '../../context_override/domain/models/context_override.dart';
 import '../../context_override/presentation/active_override_banner.dart';
 import '../../context_override/presentation/context_override_quick_activate_sheet.dart';
 import '../../context_override/presentation/post_override_review_card.dart';
@@ -77,6 +82,7 @@ import '../../education/presentation/help_dot.dart';
 import '../../timer/presentation/timer_session_screen.dart';
 import 'sidepal_app_bar_title.dart';
 
+import '../../../core/presentation/app_card.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/async_value_ui.dart';
 
@@ -84,6 +90,16 @@ enum _PlansChangedAction { reshuffle, defer, skip }
 
 /// Tasks and goals shown on Home before "see more" links to the full hub.
 const int kHomePreviewItemLimit = 3;
+
+/// Card heading inside Home's white cards (redesign 2026-09-14): 22px bold,
+/// one step under the recovery card's 24px headline.
+TextStyle get _kCardTitleStyle => TextStyle(
+  fontSize: 22,
+  fontWeight: FontWeight.w700,
+  height: 1.15,
+  letterSpacing: -0.3,
+  color: AppColors.textPrimary,
+);
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -113,37 +129,43 @@ class HomeScreen extends ConsumerWidget {
         child: CoachAiFab(),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      // Header (redesign 2026-09-14): a plain wordmark on the left, three
+      // white circular buttons on the right — intentional touch targets
+      // rather than loose icons.
       appBar: AppBar(
+        toolbarHeight: 72,
+        titleSpacing: 20,
+        centerTitle: false,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         title: const SidePalAppBarTitle(),
         actions: [
+          // Two actions at most in Home's chrome: sync, plus status
+          // (2026-09-27 — moved up from the action tiles, icon only; a
+          // status is a mode, and the icon shows when one is on). The
+          // history shortcut and placeholder bell stay gone (2026-09-19).
+          const _StatusAction(),
+          const SizedBox(width: 10),
           const _SyncFromCloudAction(),
-          IconButton(
-            tooltip: 'Accountability history',
-            onPressed: () => Navigator.pushNamed(
-              context,
-              AccountabilityHistoryScreen.routeName,
-            ),
-            icon: const Icon(Icons.history),
-          ),
-          const Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: Icon(Icons.notifications_none),
-          ),
+          const SizedBox(width: 20),
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
           const _Layer4NotificationDispatchBridge(),
           // Keyed as a guided-tour target ("this is your progress").
           _HomeTopAnalyticsCard(key: TourTargets.progressCard),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
+          // Guest backup prompt — shows once a goal exists, on a later day;
+          // policy in BackupCardPolicy (2026-09-25).
+          const BackupAccountCard(),
           Row(
             children: [
               Expanded(
-                child: _ActionCircle(
-                  icon: Icons.bolt,
-                  label: 'Start Focus',
+                child: _ActionTile(
+                  icon: Icons.bolt_rounded,
+                  label: 'Start focus',
                   tooltip: 'Start focus',
                   active: true,
                   onTap: () {
@@ -164,22 +186,22 @@ class HomeScreen extends ConsumerWidget {
                   },
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
-                child: _ActionCircle(
+                child: _ActionTile(
                   // Guided-tour target: "tap here to create your first task".
                   key: TourTargets.addTaskTile,
-                  icon: Icons.add,
-                  label: 'Add Task',
+                  icon: Icons.add_rounded,
+                  label: 'Add task',
                   tooltip: 'Add task',
                   onTap: () => showAddTaskSheet(context),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
-                child: _ActionCircle(
-                  icon: Icons.calendar_today,
-                  label: 'Plan Tomorrow',
+                child: _ActionTile(
+                  icon: Icons.calendar_today_outlined,
+                  label: 'Plan tomorrow',
                   tooltip: 'Plan tomorrow',
                   onTap: () => Navigator.pushNamed(
                     context,
@@ -187,35 +209,55 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
-                child: _ActionCircle(
-                  icon: Icons.do_not_disturb_on_outlined,
-                  label: 'Set Mode',
-                  tooltip: 'Set mode',
-                  onTap: () => showContextOverrideQuickActivateSheet(context),
+                // Promise quick-add (2026-09-27): took Set status's slot —
+                // capture is frequent, status is occasional.
+                child: _ActionTile(
+                  // Not the handshake — that's the Accountability tab's icon.
+                  icon: Icons.bookmark_add_outlined,
+                  label: 'Promise',
+                  tooltip: 'Add a promise',
+                  onTap: () async {
+                    // The list lives on the Tasks page, so Home confirms
+                    // the save and offers the way there.
+                    final saved = await showIntentionQuickAddSheet(context);
+                    if (!saved || !context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Promise saved'),
+                        action: SnackBarAction(
+                          label: 'View',
+                          onPressed: () => Navigator.pushNamed(
+                            context,
+                            TasksHubScreen.routeName,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          // Time Tracker (2026-09-12): capture is one tap from Home — a thin
-          // pill, not a card; it opens the sheet, never the timeline.
-          const TrackPill(),
-          const SizedBox(height: 16),
-          // Humanizing Phase 1 — promises live near the top: seize-the-moment
-          // (only when a free window fits an open promise right now), then
-          // the ambient promises strip.
-          const SeizeTheMomentCard(),
-          const PromisesSection(),
-          const SizedBox(height: 20),
+          // Time Tracker (2026-09-12): capture is one tap from Home — a
+          // pill, not a card; it opens the sheet, never the timeline. The
+          // Time page's footer switch hides it (2026-09-18) — that switch
+          // decides this and nothing else.
+          if (ref.watch(homeTrackPillEnabledProvider)) ...[
+            const SizedBox(height: 16),
+            const TrackPill(),
+          ],
+          const SizedBox(height: 24),
+          // Order (Miko, 2026-09-27): the next useful action leads. Warnings
+          // (silent unless something is wrong), then what's still owed, then
+          // Up next and Today's Tasks; Suggested for later below the tasks.
+          // Weekly discipline left Home — its number lives on Progress.
           const ActiveOverrideBanner(),
-          // What SidePal still owes you leads the recovery band (FR-R-50):
-          // above the post-override review, because an overdue task is a
-          // standing debt while that card is a one-off.
           // Silence is the normal state (FR-R-80): this appears only when
           // reminders genuinely cannot do their job.
           const ReminderHealthHomeHint(),
+          // What SidePal still owes you (FR-R-50), compact since 2026-09-27.
           RecoveryCard(
             onOpenTask: (entityId, entityKind) => openRecoveryTask(
               context,
@@ -230,14 +272,15 @@ class HomeScreen extends ConsumerWidget {
           // one-off band, above the post-override review. Silent otherwise.
           const NewMonthDirectionCard(),
           const PostOverrideReviewCard(),
-          const _DailyDisciplineSection(),
-          const SizedBox(height: 16),
+          // Seize-the-moment stays up with the "now" band: it only appears
+          // when a free window fits an open promise right now.
+          const SeizeTheMomentCard(),
+          // Hides itself (with its gap) when there's no task to show.
           _FlowNowStrip(flowSnapshotAsync: flowSnapshotAsync),
-          const SizedBox(height: 16),
           // Coaching focus + proactive suggestions left Home (2026-08-23):
           // focus lives on Progress (notification + Profile-tab dot when a
           // new one lands); suggestions live behind the Coach FAB's dot.
-          _NeonCard(
+          AppCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -247,14 +290,8 @@ class HomeScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(8),
                   child: Row(
                     children: [
-                      const Expanded(
-                        child: Text(
-                          "Today's Tasks",
-                          style: TextStyle(
-                            fontSize: 30,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                      Expanded(
+                        child: Text("Today's Tasks", style: _kCardTitleStyle),
                       ),
                       const HelpDot('todaysTasks'),
                       IconButton(
@@ -276,7 +313,7 @@ class HomeScreen extends ConsumerWidget {
                         children: [
                           Text(
                             'No tasks yet.',
-                            style: TextStyle(color: AppColors.fg54),
+                            style: TextStyle(color: AppColors.textSecondary),
                           ),
                           const SizedBox(height: 8),
                           _createTaskLink(context),
@@ -287,7 +324,8 @@ class HomeScreen extends ConsumerWidget {
                     final remaining = rows.length - visible.length;
                     return Column(
                       children: [
-                        for (final row in visible)
+                        for (final (i, row) in visible.indexed) ...[
+                          if (i > 0) const _HomeRowDivider(),
                           _TaskItem(
                             // Guided-tour target: the first task's circle.
                             checkboxKey: row == visible.first
@@ -309,6 +347,12 @@ class HomeScreen extends ConsumerWidget {
                                 _uncompleteTaskFromHome(context, ref, row);
                               }
                             },
+                            onCheckboxLongPress: () => _completeTaskFromHome(
+                              context,
+                              ref,
+                              row,
+                              askPartial: true,
+                            ),
                             onPlansChanged: () =>
                                 _openPlansChangedFlow(context, ref, row),
                             onTap: () => Navigator.pushNamed(
@@ -317,6 +361,7 @@ class HomeScreen extends ConsumerWidget {
                               arguments: TaskDetailArgs.fromRow(row),
                             ),
                           ),
+                        ],
                         if (remaining > 0)
                           _HomeSectionSeeMoreLink(
                             label: remaining == 1
@@ -329,8 +374,8 @@ class HomeScreen extends ConsumerWidget {
                           ),
                         // Direct add from Home (2026-08-25) — mirrors the
                         // goals card's "Create a goal" link.
-                        Align(
-                          alignment: Alignment.centerLeft,
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
                           child: _createTaskLink(context),
                         ),
                       ],
@@ -342,14 +387,20 @@ class HomeScreen extends ConsumerWidget {
                   ),
                   error: (e, _) => Text(
                     'Could not load tasks.',
-                    style: TextStyle(color: Colors.red.shade200),
+                    style: TextStyle(color: AppColors.danger),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          _NeonCard(
+          const SizedBox(height: 20),
+          // Suggested for later (Phase 7b) — its own card since 2026-09-27,
+          // only when SidePal has noticed something. The Promises list moved
+          // to the Tasks page; Home adds through the Promise tile. It carries
+          // its own 20px bottom gap, so no spacer follows it — a hidden card
+          // must not leave a double gap before Today's goals.
+          const OnYourRadarSection(),
+          AppCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -362,14 +413,8 @@ class HomeScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(8),
                   child: Row(
                     children: [
-                      const Expanded(
-                        child: Text(
-                          "Today's goals",
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                      Expanded(
+                        child: Text("Today's goals", style: _kCardTitleStyle),
                       ),
                       const HelpDot('todaysGoals'),
                       IconButton(
@@ -386,18 +431,25 @@ class HomeScreen extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text(
                   'Commitments active today — tap a goal to log progress.',
-                  style: TextStyle(color: AppColors.fg54, fontSize: 13),
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 todaysGoalsAsync.when(
                   data: (goals) {
                     if (goals.isEmpty) {
+                      final otherDays = ref.watch(otherDayGoalsCountProvider);
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'No goals in progress for today.',
-                            style: TextStyle(color: AppColors.fg54),
+                            otherDays == 0
+                                ? 'No goals in progress for today.'
+                                : 'No goals due today. $otherDays saved for '
+                                      'other days in the Goals tab.',
+                            style: TextStyle(color: AppColors.textSecondary),
                           ),
                           const SizedBox(height: 8),
                           _createGoalLink(context),
@@ -414,7 +466,8 @@ class HomeScreen extends ConsumerWidget {
                         // Goal detail stays reachable via the sheet's
                         // Details pill; while progress is still loading
                         // the tap falls back to the detail push.
-                        for (final g in visible)
+                        for (final (i, g) in visible.indexed) ...[
+                          if (i > 0) const _HomeRowDivider(),
                           Consumer(
                             builder: (context, tileRef, _) {
                               final progress = tileRef
@@ -449,6 +502,7 @@ class HomeScreen extends ConsumerWidget {
                               );
                             },
                           ),
+                        ],
                         if (remaining > 0)
                           _HomeSectionSeeMoreLink(
                             label: remaining == 1
@@ -463,8 +517,8 @@ class HomeScreen extends ConsumerWidget {
                         // Direct goal creation stays visible even with
                         // goals listed (2026-08-25) — it used to appear
                         // only in the empty state.
-                        Align(
-                          alignment: Alignment.centerLeft,
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
                           child: _createGoalLink(context),
                         ),
                       ],
@@ -485,14 +539,14 @@ class HomeScreen extends ConsumerWidget {
                     e,
                     Text(
                       'Could not load goals.',
-                      style: TextStyle(color: Colors.red.shade200),
+                      style: TextStyle(color: AppColors.danger),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           // COACHING INSIGHTS card removed (2026-08-23): it restated the
           // hero card's numbers — Progress is the analytics surface.
           tasksAsync.when(
@@ -501,12 +555,12 @@ class HomeScreen extends ConsumerWidget {
               final partial = _partialForRows(rows, scores);
               return Text(
                 'Completed: $completed • Partial: $partial',
-                style: TextStyle(color: AppColors.fg70),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
               );
             },
             loading: () => Text(
               'Completed: … • Partial: …',
-              style: TextStyle(color: AppColors.fg70),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
             error: (Object? error, StackTrace? stackTrace) =>
                 const SizedBox.shrink(),
@@ -565,19 +619,19 @@ void _maybeTriggerMorningBrief(BuildContext context, WidgetRef ref) {
         backgroundColor: AppColors.inkWarm,
         behavior: SnackBarBehavior.floating,
         content: Text(
-          'Coach AI has suggestions for today — tap to review.',
+          'Suggestions for today are ready — tap to review.',
           style: TextStyle(color: AppColors.fg),
         ),
         action: SnackBarAction(
           label: 'Open',
           textColor: AppColors.accentDim,
-          onPressed: () => showCoachAiSheet(
-            context,
-            args: const CoachRouteArgs(
-              openSuggestionsPanel: true,
-              preDraftedText: 'Give me a quick plan for today',
-            ),
-          ),
+          // Suggestions live on the Progress DAY view now (2026-09-22).
+          onPressed: () {
+            ref
+                .read(progressSelectionProvider.notifier)
+                .setHorizon(ProgressHorizon.day);
+            Navigator.of(context).pushNamed(AnalyticsProgressScreen.routeName);
+          },
         ),
         duration: const Duration(seconds: 5),
       ),
@@ -596,13 +650,10 @@ class _HomeTopAnalyticsCard extends ConsumerStatefulWidget {
 class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
     with TickerProviderStateMixin {
   late final AnimationController _introController;
-  late final AnimationController _milestonePopController;
   late final Animation<double> _introCurve;
   late final Animation<double> _sparklineCurve;
-  late final Animation<double> _popScale;
 
   bool _introPlayed = false;
-  int? _previousStreak;
 
   @override
   void initState() {
@@ -610,10 +661,6 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
     _introController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 850),
-    );
-    _milestonePopController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 260),
     );
     _introCurve = CurvedAnimation(
       parent: _introController,
@@ -623,184 +670,64 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
       parent: _introController,
       curve: const Interval(0.35, 1.0, curve: Curves.easeOutCubic),
     );
-    _popScale = Tween<double>(begin: 1.0, end: 1.12).animate(
-      CurvedAnimation(
-        parent: _milestonePopController,
-        curve: Curves.easeOutBack,
-        reverseCurve: Curves.easeInOut,
-      ),
-    );
   }
 
   @override
   void dispose() {
     _introController.dispose();
-    _milestonePopController.dispose();
     super.dispose();
   }
 
-  Color _scoreAccent(int scorePercent) {
-    if (scorePercent >= 80) return AppColors.accent;
-    if (scorePercent >= 50) return AppColors.scoreAmber;
-    return AppColors.scoreCoral;
-  }
-
-  void _handleMilestones({required int streak, required int scorePercent}) {
-    if (!_introPlayed) {
-      _introPlayed = true;
-      _previousStreak = streak;
-      _introController.forward(from: 0);
-      return;
-    }
-    if (_previousStreak != null && streak > _previousStreak!) {
-      _milestonePopController
-          .forward(from: 0)
-          .then((_) => _milestonePopController.reverse());
-    }
-    _previousStreak = streak;
+  /// One intro sweep per Home visit: the ring fills and the bars grow.
+  void _playIntroOnce() {
+    if (_introPlayed) return;
+    _introPlayed = true;
+    _introController.forward(from: 0);
   }
 
   @override
   Widget build(BuildContext context) {
     final bundleAsync = ref.watch(analyticsPeriodBundleProvider);
-    return _NeonCard(
+    // Redesign 2026-09-14: one white dashboard card — today's ring | this
+    // week's bars — instead of the stacked orange pill + sparkline. The
+    // day-streak column came out in the plain-language pass (2026-09-25):
+    // testers read it as a score they were losing, not progress.
+    return AppCard(
       color: AppColors.homeHeroCard,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      radius: 28,
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+      onTap: () =>
+          Navigator.pushNamed(context, AnalyticsProgressScreen.routeName),
       child: bundleAsync.when(
         skipLoadingOnReload: true,
         data: (bundle) {
-          final streak = homeDisplayStreakDays(bundle);
-          final scorePercent =
-              (bundle.goalHabitDay.weightedCompletionRate * 100).round();
-          _handleMilestones(streak: streak, scorePercent: scorePercent);
+          // Goals and habits that are ACTIVE AND DUE today (action days
+          // only, plus habit tasks) — not every goal on the Goals tab. The
+          // ring is the weighted rate, so partial progress shows; the
+          // sub-line counts only fully completed items.
+          final day = bundle.goalHabitDay;
+          final rate = day.weightedCompletionRate.clamp(0.0, 1.0);
+          final scorePercent = (rate * 100).round();
+          _playIntroOnce();
           return AnimatedBuilder(
-            animation: Listenable.merge([
-              _introController,
-              _milestonePopController,
-            ]),
+            animation: _introController,
             builder: (context, _) {
-              final introValue = _introController.isAnimating
-                  ? _introCurve.value
-                  : 1.0;
-              final displayStreak = _introController.isAnimating
-                  ? (streak * introValue).round()
-                  : streak;
-              final displayScore = _introController.isAnimating
-                  ? (scorePercent * introValue).round()
-                  : scorePercent;
-              final sparkProgress = _introController.isAnimating
-                  ? _sparklineCurve.value
-                  : 1.0;
-              return Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => Navigator.pushNamed(
-                    context,
-                    AnalyticsProgressScreen.routeName,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(height: 4),
-                      Center(
-                        child: Transform.scale(
-                          scale: _popScale.value,
-                          alignment: Alignment.center,
-                          child: Column(
-                            children: [
-                              Text(
-                                '$displayStreak',
-                                style: const TextStyle(
-                                  fontSize: 68,
-                                  height: 1,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                'day streak',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  letterSpacing: 1.2,
-                                  color: AppColors.fg54,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Center(
-                        child: Column(
-                          children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  "Today's Progress",
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.fg70,
-                                  ),
-                                ),
-                                const HelpDot('todaysProgress'),
-                              ],
-                            ),
-                            const SizedBox(height: 5),
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 320),
-                              curve: Curves.easeOutCubic,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(999),
-                                color: _scoreAccent(scorePercent).withAlpha(24),
-                                border: Border.all(
-                                  color: _scoreAccent(
-                                    scorePercent,
-                                  ).withAlpha(110),
-                                ),
-                              ),
-                              child: Text(
-                                '$displayScore% Goals/Habits',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  height: 1.1,
-                                  fontWeight: FontWeight.w700,
-                                  color: _scoreAccent(scorePercent),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 9),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          '7-day trend',
-                          style: TextStyle(color: AppColors.fg70, fontSize: 11),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      _MiniSparkline(
-                        valuesA: bundle.goalHabitWeekSeries,
-                        valuesB: bundle.taskWeekSeries,
-                        drawProgress: sparkProgress,
-                        height: 40,
-                      ),
-                    ],
-                  ),
-                ),
+              final animating = _introController.isAnimating;
+              final introValue = animating ? _introCurve.value : 1.0;
+              final barsProgress = animating ? _sparklineCurve.value : 1.0;
+              return _HeroDashboard(
+                ringValue: rate * introValue,
+                percent: (scorePercent * introValue).round(),
+                completed: day.completedCount,
+                total: day.createdCount,
+                weekValues: bundle.blendedWeekSeries,
+                barsProgress: barsProgress,
               );
             },
           );
         },
         loading: () => const Padding(
-          padding: EdgeInsets.symmetric(vertical: 16),
+          padding: EdgeInsets.symmetric(vertical: 24),
           child: Center(
             child: SizedBox(
               width: 22,
@@ -812,18 +739,13 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
         error: (e, _) => swallowedAsyncError(
           'home_screen',
           e,
-          Column(
-            children: [
-              SizedBox(height: 4),
-              Text(
-                '0',
-                style: TextStyle(fontSize: 68, fontWeight: FontWeight.w700),
-              ),
-              Text(
-                'day streak',
-                style: TextStyle(fontSize: 11, color: AppColors.fg54),
-              ),
-            ],
+          const _HeroDashboard(
+            ringValue: 0,
+            percent: 0,
+            completed: 0,
+            total: 0,
+            weekValues: [],
+            barsProgress: 1,
           ),
         ),
       ),
@@ -831,100 +753,355 @@ class _HomeTopAnalyticsCardState extends ConsumerState<_HomeTopAnalyticsCard>
   }
 }
 
-class _DailyDisciplineSection extends ConsumerWidget {
-  const _DailyDisciplineSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final bundleAsync = ref.watch(analyticsPeriodBundleProvider);
-    return bundleAsync.when(
-      skipLoadingOnReload: true,
-      data: (bundle) {
-        final clamped = bundle.goalHabitWeek.weightedCompletionRate.clamp(
-          0.0,
-          1.0,
-        );
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'WEEKLY DISCIPLINE ${(clamped * 100).round()}%',
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(value: clamped, minHeight: 8),
-            ),
-          ],
-        );
-      },
-      loading: () => const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'WEEKLY DISCIPLINE',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.all(Radius.circular(999)),
-            child: LinearProgressIndicator(value: 0, minHeight: 8),
-          ),
-        ],
-      ),
-      error: (e, _) => swallowedAsyncError(
-        'home_screen',
-        e,
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'WEEKLY DISCIPLINE',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.all(Radius.circular(999)),
-              child: LinearProgressIndicator(value: 0, minHeight: 8),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MiniSparkline extends StatelessWidget {
-  const _MiniSparkline({
-    required this.valuesA,
-    required this.valuesB,
-    this.drawProgress = 1.0,
-    this.height = 44,
+/// The two dashboard columns — today's ring and this week's bars. On wide
+/// phones they sit side by side with a hairline divider; under
+/// [_kWideDashboard] the trend drops to its own full-width row so nothing
+/// gets cramped.
+class _HeroDashboard extends StatelessWidget {
+  const _HeroDashboard({
+    required this.ringValue,
+    required this.percent,
+    required this.completed,
+    required this.total,
+    required this.weekValues,
+    required this.barsProgress,
   });
 
-  final List<double> valuesA;
-  final List<double> valuesB;
-  final double drawProgress;
-  final double height;
+  final double ringValue;
+  final int percent;
+  final int completed;
+  final int total;
+  final List<double> weekValues;
+  final double barsProgress;
+
+  /// Inner card width (screen − 20 page pad − 20 card pad, each side) at
+  /// which the columns sit side by side. Was 330, which only Plus / Pro
+  /// Max phones (430 pt → 350) reached: an iPhone 16 (393 → 313) and even
+  /// a 16 Pro (402 → 322) got the stacked layout with the bigger ring and
+  /// the trend on its own row, so the card looked "bigger" there (Miko,
+  /// 2026-09-24). At 300 every current iPhone but the 320-pt SE gets the
+  /// row. With two columns (2026-09-25) the ring takes 5/11 of the width
+  /// (~140 pt at 313) and the trend 6/11 (~170 pt, ~24 pt per bar cell).
+  static const double _kWideDashboard = 300;
 
   @override
   Widget build(BuildContext context) {
-    final a = valuesA.length >= 7
-        ? valuesA.sublist(valuesA.length - 7)
-        : [...List<double>.filled(7 - valuesA.length, 0), ...valuesA];
-    final b = valuesB.length >= 7
-        ? valuesB.sublist(valuesB.length - 7)
-        : [...List<double>.filled(7 - valuesB.length, 0), ...valuesB];
-    return SizedBox(
-      height: height,
-      child: CustomPaint(
-        painter: _SparklinePainter(
-          a: a,
-          b: b,
-          drawProgress: drawProgress.clamp(0.0, 1.0),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= _kWideDashboard;
+        final ring = _ProgressRingColumn(
+          value: ringValue,
+          percent: percent,
+          completed: completed,
+          total: total,
+          diameter: wide ? 104 : 116,
+        );
+        final trend = _WeekTrend(
+          values: weekValues,
+          drawProgress: barsProgress,
+          compact: wide,
+        );
+        if (wide) {
+          return IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(flex: 5, child: ring),
+                const _HeroDivider(),
+                Expanded(flex: 6, child: trend),
+              ],
+            ),
+          );
+        }
+        return Column(
+          children: [
+            ring,
+            const SizedBox(height: 18),
+            Divider(height: 1, thickness: 1, color: AppColors.divider),
+            const SizedBox(height: 16),
+            trend,
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _HeroDivider extends StatelessWidget {
+  const _HeroDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    AppColors.bindTheme(context);
+    return Container(
+      width: 1,
+      margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      color: AppColors.divider,
+    );
+  }
+}
+
+class _ProgressRingColumn extends StatelessWidget {
+  const _ProgressRingColumn({
+    required this.value,
+    required this.percent,
+    required this.completed,
+    required this.total,
+    required this.diameter,
+  });
+
+  final double value;
+  final int percent;
+  final int completed;
+  final int total;
+  final double diameter;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: diameter,
+          height: diameter,
+          child: CustomPaint(
+            painter: _ProgressRingPainter(
+              value: value.clamp(0.0, 1.0),
+              track: AppColors.surfaceLight,
+              fill: AppColors.accent,
+              strokeWidth: diameter * 0.095,
+            ),
+            child: Center(
+              child: Text(
+                '$percent%',
+                // One px under the scaled size (Miko, 2026-09-15): "100%"
+                // sat a touch too close to the ring.
+                style: TextStyle(
+                  fontSize: diameter * 0.28 - 1,
+                  height: 1,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ),
         ),
-        child: const SizedBox.expand(),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  "Today's progress",
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+            const HelpDot('todaysProgress', dense: true),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          // Words only (Miko, 2026-09-27): "goals", not "goals/habits" —
+          // the count itself is unchanged.
+          '$completed of $total ${total == 1 ? 'goal' : 'goals'} completed',
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          style: TextStyle(
+            fontSize: 12.5,
+            height: 1.25,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Open-bottom arc: a 270° sweep starting at the lower-left so the gap sits
+/// centred under the percentage.
+class _ProgressRingPainter extends CustomPainter {
+  const _ProgressRingPainter({
+    required this.value,
+    required this.track,
+    required this.fill,
+    required this.strokeWidth,
+  });
+
+  final double value;
+  final Color track;
+  final Color fill;
+  final double strokeWidth;
+
+  static const double _start = 135 * math.pi / 180;
+  static const double _sweep = 270 * math.pi / 180;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = (Offset.zero & size).deflate(strokeWidth / 2);
+    final base = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(rect, _start, _sweep, false, base..color = track);
+    if (value > 0) {
+      canvas.drawArc(rect, _start, _sweep * value, false, base..color = fill);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ProgressRingPainter old) =>
+      old.value != value ||
+      old.track != track ||
+      old.fill != fill ||
+      old.strokeWidth != strokeWidth;
+}
+
+/// Seven rounded bars, Monday → Sunday. [values] runs Monday → today, so
+/// bars after it are the future: short hollow stubs, visibly different from
+/// a past day that scored zero (a short filled stub). Today is teal.
+class _WeekTrend extends StatelessWidget {
+  const _WeekTrend({
+    required this.values,
+    required this.drawProgress,
+    required this.compact,
+  });
+
+  final List<double> values;
+  final double drawProgress;
+  final bool compact;
+
+  static const _labels = ['M', 'T', 'W', 'Th', 'F', 'Sa', 'Su'];
+
+  @override
+  Widget build(BuildContext context) {
+    final maxHeight = compact ? 64.0 : 72.0;
+    // Two-column layout (2026-09-25): the trend column is ~170 pt wide on
+    // a 393-pt phone, so the compact bars can be 10 pt instead of 8.
+    final barWidth = compact ? 10.0 : 12.0;
+    // Defensive: the series is 1–7 entries; anything longer is clipped to
+    // the last seven so today stays the last bar.
+    final series = values.length > 7
+        ? values.sublist(values.length - 7)
+        : values;
+    final todayIndex = series.isEmpty ? -1 : series.length - 1;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          "This week's progress",
+          textAlign: compact ? TextAlign.center : TextAlign.start,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        SizedBox(height: compact ? 12 : 14),
+        SizedBox(
+          height: maxHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (var i = 0; i < 7; i++)
+                Expanded(
+                  child: Center(
+                    child: _TrendBar(
+                      value: i < series.length
+                          ? series[i].clamp(0.0, 1.0) * drawProgress
+                          : null,
+                      isToday: i == todayIndex,
+                      maxHeight: maxHeight,
+                      width: barWidth,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            for (var i = 0; i < 7; i++)
+              Expanded(
+                child: Text(
+                  _labels[i],
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    // 10 in the compact column: each of the seven cells is
+                    // ~24 pt on a 393-pt phone since the streak column went.
+                    fontSize: compact ? 10 : 11.5,
+                    fontWeight: i == todayIndex
+                        ? FontWeight.w700
+                        : FontWeight.w500,
+                    color: i == todayIndex
+                        ? AppColors.coach
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _TrendBar extends StatelessWidget {
+  const _TrendBar({
+    required this.value,
+    required this.isToday,
+    required this.maxHeight,
+    required this.width,
+  });
+
+  /// Null = a future day.
+  final double? value;
+  final bool isToday;
+  final double maxHeight;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(width / 2);
+    final v = value;
+    // Future days, and past days that scored nothing, are hollow: a solid
+    // minimum stub read as "something happened" on days with zero tasks
+    // (QA, 2026-09-23). Today stays solid at zero — it is in progress.
+    if (v == null || (v <= 0 && !isToday)) {
+      return Container(
+        width: width,
+        height: width,
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          border: Border.all(color: AppColors.divider, width: 1.2),
+        ),
+      );
+    }
+    final minStub = isToday ? width * 1.25 : width;
+    final height = math.max(minStub, maxHeight * v);
+    // Past days are the same teal as today, just softer — the slate grey
+    // they used to wear read as "unselected", as if six of the seven days
+    // were disabled (Miko, 2026-09-18). Today alone is full strength.
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        color: isToday
+            ? AppColors.coach
+            : AppColors.coach.withValues(alpha: 0.42),
       ),
     );
   }
@@ -956,12 +1133,12 @@ class _Layer4NotificationDispatchBridgeState
     // selected focus announces itself once — then waits on Progress behind
     // the Profile-tab dot. Fires only when focusId changes, never on
     // recomputes that keep the same focus.
-    ref.listen<AsyncValue<CurrentCoachingFocus?>>(currentCoachingFocusProvider, (
-      previous,
-      next,
-    ) {
-      unawaited(_onCoachingFocusChanged(next));
-    });
+    ref.listen<AsyncValue<CurrentCoachingFocus?>>(
+      currentCoachingFocusProvider,
+      (previous, next) {
+        unawaited(_onCoachingFocusChanged(next));
+      },
+    );
     return const SizedBox.shrink();
   }
 
@@ -1013,33 +1190,33 @@ class _Layer4NotificationDispatchBridgeState
       // rule). entityId is the primary insight so the tap lands on
       // Progress via the existing `layer4:` route.
       final decision = await orchestrator.evaluate(
-            ReminderIntent(
-              id: StableId.generate('ri_coach_focus'),
-              entityId: focus.primaryInsightId,
-              entityKind: ReminderEntityKinds.coachInsight,
-              entityTitle: 'New coaching focus',
-              proposedAt: DateTime.now().add(const Duration(minutes: 1)),
-              importance: 55,
-              interruptionLevel: InterruptionLevel.low,
-              enforcementMode: 'flexible',
-              sourceReason: 'coaching_focus_selected',
-              bodyOverride: body,
-              createdAtMs: DateTime.now().millisecondsSinceEpoch,
-            ),
-          );
+        ReminderIntent(
+          id: StableId.generate('ri_coach_focus'),
+          entityId: focus.primaryInsightId,
+          entityKind: ReminderEntityKinds.coachInsight,
+          entityTitle: 'New coaching focus',
+          proposedAt: DateTime.now().add(const Duration(minutes: 1)),
+          importance: 55,
+          interruptionLevel: InterruptionLevel.low,
+          enforcementMode: 'flexible',
+          sourceReason: 'coaching_focus_selected',
+          bodyOverride: body,
+          createdAtMs: DateTime.now().millisecondsSinceEpoch,
+        ),
+      );
       if (decision.outcome != AttentionOutcome.suppressed) {
         await prefService.recordCoachingInsightNotificationSent();
         // Same frozen-copy rule as insight pushes: the tap must be
         // honorable after a recompute replaces the advertised insight.
         if (selected.isNotEmpty) {
           await announcedStore.save(
-                AnnouncedInsight(
-                  insightId: focus.primaryInsightId,
-                  message: selected.first.message,
-                  caption: coachingDetailCaption(selected.first) ?? '',
-                  dateKey: DateKeys.todayKey(),
-                ),
-              );
+            AnnouncedInsight(
+              insightId: focus.primaryInsightId,
+              message: selected.first.message,
+              caption: coachingDetailCaption(selected.first) ?? '',
+              dateKey: DateKeys.todayKey(),
+            ),
+          );
         }
       }
       // Either way this focus is handled — a suppressed intent retries via
@@ -1120,20 +1297,20 @@ class _Layer4NotificationDispatchBridgeState
       // silence, or a collision window, and it must land in the ledger
       // like every other surface (Phase 0 single-brain rule).
       final decision = await orchestrator.evaluate(
-            ReminderIntent(
-              id: StableId.generate('ri_coach_insight'),
-              entityId: primaryId,
-              entityKind: ReminderEntityKinds.coachInsight,
-              entityTitle: 'Coach Insight Ready',
-              proposedAt: DateTime.now().add(const Duration(minutes: 1)),
-              importance: 55,
-              interruptionLevel: InterruptionLevel.low,
-              enforcementMode: 'flexible',
-              sourceReason: 'layer4_insight_ready',
-              bodyOverride: body,
-              createdAtMs: DateTime.now().millisecondsSinceEpoch,
-            ),
-          );
+        ReminderIntent(
+          id: StableId.generate('ri_coach_insight'),
+          entityId: primaryId,
+          entityKind: ReminderEntityKinds.coachInsight,
+          entityTitle: 'Coach Insight Ready',
+          proposedAt: DateTime.now().add(const Duration(minutes: 1)),
+          importance: 55,
+          interruptionLevel: InterruptionLevel.low,
+          enforcementMode: 'flexible',
+          sourceReason: 'layer4_insight_ready',
+          bodyOverride: body,
+          createdAtMs: DateTime.now().millisecondsSinceEpoch,
+        ),
+      );
       if (decision.outcome != AttentionOutcome.suppressed) {
         // Count against the producer budget only when something was
         // actually scheduled; a suppressed intent retries via the
@@ -1144,13 +1321,13 @@ class _Layer4NotificationDispatchBridgeState
         // the live id no longer resolves.
         if (selected.isNotEmpty) {
           await announcedStore.save(
-                AnnouncedInsight(
-                  insightId: primaryId,
-                  message: selected.first.message,
-                  caption: coachingDetailCaption(selected.first) ?? '',
-                  dateKey: DateKeys.todayKey(),
-                ),
-              );
+            AnnouncedInsight(
+              insightId: primaryId,
+              message: selected.first.message,
+              caption: coachingDetailCaption(selected.first) ?? '',
+              dateKey: DateKeys.todayKey(),
+            ),
+          );
         }
       }
       _lastScheduledPrimaryInsightId = primaryId;
@@ -1162,95 +1339,12 @@ class _Layer4NotificationDispatchBridgeState
   }
 }
 
-class _SparklinePainter extends CustomPainter {
-  _SparklinePainter({
-    required this.a,
-    required this.b,
-    required this.drawProgress,
-  });
-
-  final List<double> a;
-  final List<double> b;
-  final double drawProgress;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final base = Paint()
-      ..color = AppColors.whiteGlow20
-      ..strokeWidth = 1;
-    canvas.drawLine(
-      Offset(0, size.height),
-      Offset(size.width, size.height),
-      base,
-    );
-
-    _drawSeries(canvas, size, a, AppColors.accent, drawProgress);
-    _drawSeries(canvas, size, b, AppColors.cyan, drawProgress);
-  }
-
-  void _drawSeries(
-    Canvas canvas,
-    Size size,
-    List<double> values,
-    Color color,
-    double progress,
-  ) {
-    if (values.isEmpty) return;
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    final path = Path();
-    final maxPoint = (values.length - 1) * progress;
-    final fullPoints = maxPoint.floor();
-    for (var i = 0; i <= fullPoints && i < values.length; i++) {
-      final x = values.length == 1
-          ? 0.0
-          : (size.width * i / (values.length - 1));
-      final y = size.height - (values[i].clamp(0.0, 1.0) * size.height);
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    final hasFractional = fullPoints < values.length - 1;
-    if (hasFractional) {
-      final t = maxPoint - fullPoints;
-      final i0 = fullPoints;
-      final i1 = fullPoints + 1;
-      final x0 = values.length == 1
-          ? 0.0
-          : (size.width * i0 / (values.length - 1));
-      final y0 = size.height - (values[i0].clamp(0.0, 1.0) * size.height);
-      final x1 = values.length == 1
-          ? 0.0
-          : (size.width * i1 / (values.length - 1));
-      final y1 = size.height - (values[i1].clamp(0.0, 1.0) * size.height);
-      final xf = x0 + (x1 - x0) * t;
-      final yf = y0 + (y1 - y0) * t;
-      if (fullPoints == 0 && progress <= 0.0001) {
-        path.moveTo(x0, y0);
-      }
-      path.lineTo(xf, yf);
-    }
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _SparklinePainter oldDelegate) {
-    return oldDelegate.a != a ||
-        oldDelegate.b != b ||
-        oldDelegate.drawProgress != drawProgress;
-  }
-}
-
-/// Quick-action tile per the light-design mock: rounded-square tile with a
-/// centered glyph and an all-caps label BELOW it. The primary action
-/// ([active]) uses the inverse fill (ink tile in light mode, lime in dark).
-class _ActionCircle extends StatelessWidget {
-  const _ActionCircle({
+/// Quick-action tile (redesign 2026-09-14): icon over a sentence-case label
+/// inside one rounded rectangle. Exactly one tile is [active] — filled
+/// olive with a stronger shadow — so the primary action reads at a glance
+/// without the other three looking disabled.
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({
     super.key,
     required this.icon,
     required this.label,
@@ -1273,51 +1367,49 @@ class _ActionCircle extends StatelessWidget {
     final glyphColor = active
         ? AppColors.onActionTileActive
         : AppColors.onActionTile;
+    final radius = BorderRadius.circular(22);
     return Tooltip(
       message: tooltip ?? label,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          InkWell(
+      child: Container(
+        decoration: BoxDecoration(
+          color: tileColor,
+          borderRadius: radius,
+          boxShadow: active ? appPrimaryShadow : appCardShadow,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(22),
-            child: Ink(
-              height: 64,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: tileColor,
-                borderRadius: BorderRadius.circular(22),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x14000000),
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
+            borderRadius: radius,
+            child: SizedBox(
+              height: 92,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: glyphColor, size: 26),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          height: 1.1,
+                          color: glyphColor,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
-              child: Center(child: Icon(icon, color: glyphColor, size: 26)),
             ),
           ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                label.toUpperCase(),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  height: 1.1,
-                  letterSpacing: 0.4,
-                  color: AppColors.fg,
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1338,42 +1430,48 @@ class _FlowNowStrip extends ConsumerWidget {
     final todayRows =
         ref.watch(todayAllTasksRowsProvider).valueOrNull ?? const [];
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: BoxDecoration(
-        color: AppColors.surfacePanel,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.fg12),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: flowSnapshotAsync.when(
-        data: (flow) => _buildContent(context, ref, flow, execState, todayRows),
-        loading: () => const SizedBox(
-          height: 40,
-          child: Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-        ),
-        error: (e, _) => swallowedAsyncError(
-          'home_screen',
-          e,
-          Text(
-            'Flow unavailable',
-            style: TextStyle(color: _kMuted, fontSize: 12),
-          ),
-        ),
+    // Shown only when there is a task to put on it (Miko, 2026-09-27): the
+    // one in focus/paused, or the next open one. No tasks, all done, still
+    // loading or failed → nothing at all (spacing included) — Today's Tasks
+    // already says "No tasks yet", and a spinner that then vanishes is noise.
+    final flow = flowSnapshotAsync.when(
+      data: (flow) => flow,
+      loading: () => null,
+      error: (e, _) =>
+          swallowedAsyncError<HomeFlowSnapshot?>('home_screen', e, null),
+    );
+    if (flow == null) return const SizedBox.shrink();
+    if (_displayTask(flow, execState, todayRows) == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: AppCard(
+        radius: 20,
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+        child: _buildContent(context, ref, flow, execState, todayRows),
       ),
     );
+  }
+
+  static bool _isFocusActive(ExecutionState execState) =>
+      execState.targetType == TimerSessionTargetType.task &&
+      execState.taskId.isNotEmpty &&
+      (execState.phase == ExecutionPhase.inProgress ||
+          execState.phase == ExecutionPhase.paused);
+
+  /// The task the strip is about: the one in focus if it's today's, else the
+  /// next open task. Null = the strip hides.
+  PlannedTask? _displayTask(
+    HomeFlowSnapshot flow,
+    ExecutionState execState,
+    List<PlannedTaskRow> todayRows,
+  ) {
+    final next = flow.nextTaskRow?.task;
+    return _isFocusActive(execState)
+        ? (_findTask(todayRows, execState.taskId) ?? next)
+        : next;
   }
 
   PlannedTask? _findTask(List<PlannedTaskRow> rows, String taskId) {
@@ -1488,133 +1586,99 @@ class _FlowNowStrip extends ConsumerWidget {
     ExecutionState execState,
     List<PlannedTaskRow> todayRows,
   ) {
-    final block = flow.currentBlockLabel;
-    final open = flow.openTaskCount;
-    final next = flow.nextTaskRow?.task;
-
-    final focusActive =
-        execState.targetType == TimerSessionTargetType.task &&
-        execState.taskId.isNotEmpty &&
-        (execState.phase == ExecutionPhase.inProgress ||
-            execState.phase == ExecutionPhase.paused);
-
-    final displayTask = focusActive
-        ? (_findTask(todayRows, execState.taskId) ?? next)
-        : next;
+    // Non-null: build() hides the strip when there is no task to show.
+    final displayTask = _displayTask(flow, execState, todayRows)!;
     final isThisFocus =
-        focusActive &&
-        displayTask != null &&
-        execState.taskId == displayTask.id;
-    final statusLabel = !isThisFocus
-        ? 'Next up'
-        : (execState.phase == ExecutionPhase.paused
-              ? 'Focus paused'
-              : 'Focus active');
+        _isFocusActive(execState) && execState.taskId == displayTask.id;
+    // Plain-language pass (2026-09-25): the label carries the state —
+    // IN FOCUS / PAUSED / UP NEXT.
+    final stripLabel = !isThisFocus
+        ? 'UP NEXT'
+        : (execState.phase == ExecutionPhase.paused ? 'PAUSED' : 'IN FOCUS');
+    final subtitle = _FlowNowStrip._subtitleFor(
+      task: displayTask,
+      execState: execState,
+      focusActive: isThisFocus,
+    );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
+    // One row (Miko, 2026-09-27): the "block · N open" header, its `?` and
+    // the inner grey box left — Today's Tasks right below already shows
+    // what's open. State label + duration/timer on top, the task under it.
+    return Row(
       children: [
-        Row(
-          children: [
-            Text(
-              'FLOW NOW',
-              style: TextStyle(
-                color: _kAccent,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                '$block · $open open',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: AppColors.fg,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const HelpDot('flowNow'),
-          ],
+        _FlowNowTimerControl(
+          task: displayTask,
+          execState: execState,
+          onPressed: () => unawaited(
+            _toggleFocusTimer(context, ref, displayTask, execState),
+          ),
         ),
-        if (displayTask != null) ...[
-          const SizedBox(height: 8),
-          Material(
-            color: AppColors.dark1A1D22,
-            borderRadius: BorderRadius.circular(10),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              child: Row(
-                children: [
-                  _FlowNowTimerControl(
-                    task: displayTask,
-                    execState: execState,
-                    onPressed: () => unawaited(
-                      _toggleFocusTimer(context, ref, displayTask, execState),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: InkWell(
-                      onTap: () => _openTimerScreen(context, ref, displayTask),
-                      borderRadius: BorderRadius.circular(8),
-                      // Two lines matching the 36px button height: title on
-                      // top, status + timer merged below — keeps the row slim.
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            isThisFocus
-                                ? execState.taskLabel
-                                : displayTask.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: AppColors.fg,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            '$statusLabel · ${_FlowNowStrip._subtitleFor(task: displayTask, execState: execState, focusActive: isThisFocus)}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: AppColors.fg, fontSize: 11),
-                          ),
-                        ],
+        const SizedBox(width: 12),
+        // The task's category color (same as its stripe on the Tasks page),
+        // so the title reads as a task, not a line of text (2026-09-27).
+        Container(
+          width: 4,
+          height: 36,
+          decoration: BoxDecoration(
+            color: taskAccentColor(displayTask),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: InkWell(
+            onTap: () => _openTimerScreen(context, ref, displayTask),
+            borderRadius: BorderRadius.circular(8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: stripLabel,
+                        style: TextStyle(
+                          color: _kAccent,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                        ),
                       ),
-                    ),
+                      if (subtitle.isNotEmpty)
+                        TextSpan(
+                          text: ' · $subtitle',
+                          style: TextStyle(color: _kMuted),
+                        ),
+                    ],
                   ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 32,
-                      minHeight: 32,
-                    ),
-                    onPressed: () =>
-                        _openTimerScreen(context, ref, displayTask),
-                    icon: Icon(Icons.chevron_right, color: _kMuted, size: 20),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10.5),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isThisFocus ? execState.taskLabel : displayTask.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  // The loudest text on the card: the task itself.
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ] else
-          Padding(
-            padding: EdgeInsets.only(top: 6),
-            child: Text(
-              'No next task — add one or check Tasks.',
-              style: TextStyle(color: _kMuted, fontSize: 12),
-            ),
-          ),
+        ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          onPressed: () => _openTimerScreen(context, ref, displayTask),
+          icon: Icon(Icons.chevron_right, color: _kMuted, size: 20),
+        ),
       ],
     );
   }
@@ -1624,11 +1688,14 @@ class _FlowNowStrip extends ConsumerWidget {
     required ExecutionState execState,
     required bool focusActive,
   }) {
+    // No duration set → no "0m target" / "/ 0m" (2026-09-27): say only
+    // what's known.
     final parts = <String>[];
     if (focusActive) {
       final targetMin = execState.targetDurationMinutes ?? task.durationMinutes;
-      parts.add('${_formatElapsed(execState.elapsed)} / ${targetMin}m');
-    } else {
+      final elapsed = _formatElapsed(execState.elapsed);
+      parts.add(targetMin > 0 ? '$elapsed / ${targetMin}m' : elapsed);
+    } else if (task.durationMinutes > 0) {
       parts.add('${task.durationMinutes}m target');
     }
     final timeLabel = taskScheduledTimeLabelForDisplay(task);
@@ -1711,24 +1778,95 @@ class _FlowNowTimerControl extends StatelessWidget {
 /// "+ Create a task" link at the bottom of the Today's Tasks card
 /// (2026-08-25) — same shape as the goals card's "Create a goal".
 Widget _createTaskLink(BuildContext context) {
-  return TextButton.icon(
-    onPressed: () => showAddTaskSheet(context),
-    icon: Icon(Icons.add, size: 20, color: AppColors.accent),
-    label: const Text('Create a task'),
-    style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+  return _HomeCreateButton(
+    label: 'Create a task',
+    onTap: () => showAddTaskSheet(context),
   );
 }
 
 /// "+ Create a goal" — always visible at the bottom of the Today's goals
 /// card (2026-08-25; it used to exist only in the empty state).
 Widget _createGoalLink(BuildContext context) {
-  return TextButton.icon(
-    onPressed: () =>
+  return _HomeCreateButton(
+    label: 'Create a goal',
+    onTap: () =>
         Navigator.pushNamed(context, GoalTemplatePickerScreen.routeName),
-    icon: Icon(Icons.add, size: 20, color: AppColors.accent),
-    label: const Text('Create a goal'),
-    style: TextButton.styleFrom(foregroundColor: AppColors.accent),
   );
+}
+
+/// Full-width "create" row (Miko's mockup, 2026-09-25): a plus in a rounded
+/// square on the left, the label beside it, on a soft tinted surface.
+class _HomeCreateButton extends StatelessWidget {
+  const _HomeCreateButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    // Same surface + glyph tokens as the four Home action tiles, so the
+    // button reads as part of that family rather than a stray grey.
+    return Material(
+      color: AppColors.actionTile,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.fg12,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.add, color: AppColors.onActionTile, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: AppColors.onActionTile,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Hairline between Home list rows, fading out at both ends.
+class _HomeRowDivider extends StatelessWidget {
+  const _HomeRowDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    final line = AppColors.fg12;
+    return Container(
+      height: 1,
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            line.withValues(alpha: 0),
+            line,
+            line,
+            line.withValues(alpha: 0),
+          ],
+          stops: const [0, 0.18, 0.82, 1],
+        ),
+      ),
+    );
+  }
 }
 
 class _HomeSectionSeeMoreLink extends StatelessWidget {
@@ -1806,7 +1944,10 @@ class _TodayGoalTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: TextStyle(color: AppColors.fg38, fontSize: 12),
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
@@ -1847,9 +1988,13 @@ class _TaskItem extends StatelessWidget {
     required this.onPlansChanged,
     this.onTap,
     this.checkboxKey,
+    this.onCheckboxLongPress,
   });
 
   final Key? checkboxKey;
+
+  /// Long-press on an unticked box: "Partly done" (score card).
+  final VoidCallback? onCheckboxLongPress;
   final String title;
   final String? subtitle;
   final bool done;
@@ -1868,33 +2013,62 @@ class _TaskItem extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         contentPadding: EdgeInsets.zero,
-        leading: Checkbox(
-          key: checkboxKey,
-          value: done,
-          onChanged: (value) {
-            if (value == null) return;
-            onCheckedChange(value);
-          },
-          activeColor: AppColors.accent,
+        leading: GestureDetector(
+          onLongPress: done ? null : onCheckboxLongPress,
+          child: Checkbox(
+            key: checkboxKey,
+            value: done,
+            onChanged: (value) {
+              if (value == null) return;
+              onCheckedChange(value);
+            },
+            activeColor: AppColors.accent,
+          ),
         ),
         title: Text(
           title,
           style: TextStyle(
             decoration: done ? TextDecoration.lineThrough : null,
             fontStyle: partial ? FontStyle.italic : FontStyle.normal,
-            color: AppColors.fg70,
+            fontWeight: FontWeight.w600,
+            color: done ? AppColors.fg70 : AppColors.fg,
           ),
         ),
         subtitle: subtitle == null
             ? null
-            : Text(
-                subtitle!,
-                style: TextStyle(color: AppColors.fg38, fontSize: 12),
+            : Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.schedule_rounded,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        subtitle!,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-        trailing: IconButton(
-          tooltip: 'Plans Changed?',
-          icon: Icon(Icons.swap_horiz, color: AppColors.fg54),
-          onPressed: onPlansChanged,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: 'Plans Changed?',
+              icon: Icon(Icons.swap_horiz, color: AppColors.fg54),
+              onPressed: onPlansChanged,
+            ),
+            Icon(Icons.chevron_right, color: AppColors.fg24, size: 20),
+          ],
         ),
       ),
     );
@@ -1921,6 +2095,11 @@ Future<void> _openPlansChangedFlow(
           child: const Text('Defer'),
         ),
         FilledButton.tonal(
+          // The filled-button theme is the lime primary; keep this one soft.
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.fg12,
+            foregroundColor: AppColors.fg,
+          ),
           onPressed: () => Navigator.pop(ctx, _PlansChangedAction.skip),
           child: const Text('Skip'),
         ),
@@ -2189,36 +2368,6 @@ Future<bool?> _confirmStrictOverride(
   return ok;
 }
 
-class _NeonCard extends StatelessWidget {
-  const _NeonCard({required this.child, this.padding, this.color});
-
-  final Widget child;
-  final EdgeInsetsGeometry? padding;
-
-  /// Card surface override (e.g. the analytics hero uses a dimmer tone).
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: padding ?? const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color ?? AppColors.surfacePanel,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.fg12),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-}
-
 class _SyncFromCloudAction extends StatefulWidget {
   const _SyncFromCloudAction();
 
@@ -2237,7 +2386,12 @@ class _SyncFromCloudActionState extends State<_SyncFromCloudAction> {
     setState(() => _userSyncing = true);
     var ok = false;
     try {
-      ok = await SyncService.instance.syncFromRemote(force: true);
+      // Light path: what's new since the cursors, capped at 20 s — not the
+      // minute-long full reconcile (2026-09-19). Sign-in owns that one.
+      ok = await SyncService.instance.syncFromRemote(
+        bypassThrottle: true,
+        timeout: const Duration(seconds: 20),
+      );
     } finally {
       if (mounted) setState(() => _userSyncing = false);
     }
@@ -2253,10 +2407,40 @@ class _SyncFromCloudActionState extends State<_SyncFromCloudAction> {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
+    return AppCircleIconButton(
+      icon: Icons.sync_rounded,
       tooltip: _userSyncing ? 'Syncing from cloud' : 'Sync from cloud',
       onPressed: _userSyncing ? null : () => unawaited(_syncFromCloud()),
-      icon: Icon(Icons.sync, color: _userSyncing ? AppColors.fg38 : null),
+      child: _userSyncing
+          ? SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.textSecondary,
+              ),
+            )
+          : null,
+    );
+  }
+}
+
+/// Set status, icon only (2026-09-27). Tinted while a status is on, so the
+/// chrome says "you're in a mode" even with the banner scrolled away.
+class _StatusAction extends ConsumerWidget {
+  const _StatusAction();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final effective = ref.watch(effectiveOverrideProvider);
+    final active = effective != ContextOverride.none;
+    return AppCircleIconButton(
+      icon: active
+          ? Icons.do_not_disturb_on_rounded
+          : Icons.do_not_disturb_on_outlined,
+      iconColor: active ? AppColors.cyan : null,
+      tooltip: active ? 'Status: ${effective.displayName}' : 'Set status',
+      onPressed: () => showContextOverrideQuickActivateSheet(context),
     );
   }
 }
@@ -2277,11 +2461,13 @@ Future<Routine?> _routineForPlannedRow(
   return null;
 }
 
-String? _homeTaskSubtitle(PlannedTaskRow row, Map<String, int> scores) {
-  final id = row.task.id;
-  final p = scores[id];
-  if (p != null && p < 100) return '$p% complete';
-  return null;
+/// Meta line under each Home task (Miko's mockup, 2026-09-25): the
+/// scheduled time or "No time set", then the partial score when one exists.
+String _homeTaskSubtitle(PlannedTaskRow row, Map<String, int> scores) {
+  final time = taskScheduledTimeLabelForDisplay(row.task) ?? 'No time set';
+  final p = scores[row.task.id];
+  if (p != null && p < 100) return '$time · $p% complete';
+  return time;
 }
 
 int _completedForRows(List<PlannedTaskRow> rows, Map<String, int> scores) {
@@ -2304,11 +2490,14 @@ int _partialForRows(List<PlannedTaskRow> rows, Map<String, int> scores) {
   return n;
 }
 
+/// [askPartial]: the checkbox long-press ("Partly done") — in flexible it
+/// opens the score card instead of the one-tap completion.
 Future<void> _completeTaskFromHome(
   BuildContext context,
   WidgetRef ref,
-  PlannedTaskRow row,
-) async {
+  PlannedTaskRow row, {
+  bool askPartial = false,
+}) async {
   final t = row.task;
   final routineForPolicy = await _routineForPlannedRow(ref, row);
   if (!context.mounted) return;
@@ -2339,7 +2528,8 @@ Future<void> _completeTaskFromHome(
         builder: (ctx) => AlertDialog(
           title: const Text('Timer required'),
           content: Text(
-            'This task requires a completed timer session before marking done.\n\nTask: ${t.title}',
+            'This task needs at least 1 minute of focus on the timer '
+            'before you can mark it done.\n\nTask: ${t.title}',
           ),
           actions: [
             TextButton(
@@ -2369,21 +2559,31 @@ Future<void> _completeTaskFromHome(
     }
   }
   if (!context.mounted) return;
-  // Ask for the completion rate — same score dialog the focus/timer flow
-  // uses, with the discipline-mode contract:
-  // flexible → dismissing the card (tap outside / back) accepts the default,
-  //   done at 100% (mis-taps are recoverable by unchecking the checkbox);
-  // disciplined → must submit a score (reason below 100%);
-  // extreme → must submit a score and a reason at any percentage.
-  final scoreResult =
-      await ScoreTaskDialog.show(
-        context,
-        taskTitle: t.title,
-        requireSubmit: mode == 'disciplined' || mode == 'extreme',
-        requireReasonAlways: mode == 'extreme',
-        reasonThresholdPercent: ScoreTaskDialog.reasonThresholdForMode(mode),
-      ) ??
-      const ScoreTaskDialogResult(completionPercent: 100, reason: null);
+  // Discipline-mode contract for checking a task off (2026-09-27):
+  // flexible → one tap = done at 100%, no card, with Undo; the long-press
+  //   ("Partly done") opens the score card, where Cancel changes nothing;
+  // disciplined → the score card (reason below its bar);
+  // extreme → the score card, reason at any percentage.
+  // In the strict modes "Leave without rating?" leaves the task unticked.
+  final strict = mode == 'disciplined' || mode == 'extreme';
+  final oneTap = !strict && !askPartial;
+  final ScoreTaskDialogResult scoreResult;
+  if (oneTap) {
+    scoreResult = const ScoreTaskDialogResult(
+      completionPercent: 100,
+      reason: null,
+    );
+  } else {
+    final asked = await ScoreTaskDialog.show(
+      context,
+      taskTitle: t.title,
+      requireSubmit: strict,
+      requireReasonAlways: mode == 'extreme',
+      reasonThresholdPercent: ScoreTaskDialog.reasonThresholdForMode(mode),
+    );
+    if (asked == null) return; // left without rating: nothing changes
+    scoreResult = asked;
+  }
   if (!context.mounted) return;
   final completionPercent = scoreResult.completionPercent;
   final isComplete = completionPercent >= 100;
@@ -2464,6 +2664,23 @@ Future<void> _completeTaskFromHome(
     );
     if (!context.mounted) return;
     invalidateTaskListProviders(ref);
+    // One tap: instant, quiet, reversible — "Done" with Undo, and no
+    // next-task dialog on top (it would cover Undo; Up next already shows
+    // what's next).
+    if (oneTap) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Done: ${t.title}'),
+            action: SnackBarAction(
+              label: 'Undo',
+              onPressed: () => _uncompleteTaskFromHome(context, ref, row),
+            ),
+          ),
+        );
+      return;
+    }
     // Only a full completion suggests the next task. On Home the suggestion is
     // dismissible (tap outside stays on Home) and never auto-opens Focus.
     if (isComplete) {

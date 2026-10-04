@@ -8,6 +8,7 @@ import '../data/profile_preference_repository.dart';
 import '../domain/models/user_profile_preference.dart';
 import 'profile_preference_service.dart';
 import '../../../core/presentation/async_value_ui.dart';
+import '../../auth/application/auth_providers.dart';
 
 // ─── Repository ───────────────────────────────────────────────────────────────
 
@@ -61,15 +62,30 @@ final defaultEnforcementModeProvider = Provider<EnforcementMode>((ref) {
   );
 });
 
+/// Whether Home shows the Time tracker's capture pill. Defaults to hidden
+/// (2026-09-27), including while the preference is loading or unavailable,
+/// so the pill never flashes in and out on launch.
+final homeTrackPillEnabledProvider = Provider<bool>((ref) {
+  final async = ref.watch(userProfilePreferenceStreamProvider);
+  return async.when(
+    data: (pref) => pref?.homeTrackPillEnabled ?? false,
+    loading: () => false,
+    error: (e, _) => swallowedAsyncError('profile_providers', e, false),
+  );
+});
+
 // ─── Total completions ────────────────────────────────────────────────────────
 
 /// Count of all [AnalyticsEventType.habitCompleted] events stored locally.
-final totalCompletionsCountProvider = FutureProvider<int>((ref) async {
+/// Live Isar watch, auth-scoped (audit L1): tracks completions as they
+/// happen and resets on account change instead of freezing a one-shot read.
+final totalCompletionsCountProvider = StreamProvider<int>((ref) {
+  ref.watch(authUidProvider);
   final isar = OfflineStore.instance.isar;
-  if (isar == null) return 0;
-  final all = await isar.isarAnalyticsEvents
-      .where()
-      .sortByUpdatedAtMsDesc()
-      .findAll();
-  return all.where((e) => e.typeName == 'habitCompleted').length;
+  if (isar == null) return Stream.value(0);
+  return isar.isarAnalyticsEvents
+      .filter()
+      .typeNameEqualTo('habitCompleted')
+      .watch(fireImmediately: true)
+      .map((rows) => rows.length);
 });

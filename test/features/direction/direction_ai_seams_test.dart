@@ -75,7 +75,7 @@ void main() {
   group('Insight phrasing seam', () {
     test('CoachingAiPayload carries direction and bumps the prompt version',
         () {
-      expect(kCoachingAiPromptVersion, 'v1.1.0');
+      expect(kCoachingAiPromptVersion, 'v1.2.0');
       const ctx = AiDeliveryContext(
         timingProfile: 'morning',
         localDateKey: '2026-09-11',

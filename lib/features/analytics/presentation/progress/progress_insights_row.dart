@@ -20,7 +20,9 @@ import 'progress_design_tokens.dart';
 import 'progress_shared_widgets.dart';
 import '../../../../core/presentation/async_value_ui.dart';
 
-/// Coaching Focus + Streak at Risk (replaces legacy Progress Delivery card).
+/// Coaching Focus + Coaching insight (replaces legacy Progress Delivery
+/// card). The second card was "Streak at risk" until the day streak was
+/// retired (2026-09-25).
 class ProgressInsightsRow extends ConsumerWidget {
   const ProgressInsightsRow({super.key, this.bundle});
 
@@ -49,7 +51,7 @@ class ProgressInsightsRow extends ConsumerWidget {
       children: [
         _CoachingFocusGlass(focusAsync: focusAsync, summaryAsync: summaryAsync),
         const SizedBox(height: 12),
-        _StreakAtRiskGlass(
+        _CoachingInsightGlass(
           decisionAsync: decisionAsync,
           insightsAsync: insightsAsync,
           bundle: bundle,
@@ -89,7 +91,7 @@ class _CoachingFocusGlass extends StatelessWidget {
         // Full summary, not `_firstSentence` (2026-08-23): this card is the
         // only place the coach's daily summary is shown now that Home's
         // focus card is gone, so a second sentence would exist nowhere.
-        // The streak card below still truncates — its source is a long
+        // The insight card below still truncates — its source is a long
         // generated insight, not prose written to be read whole.
         final headline =
             summary != null && summary.dailySummary.trim().isNotEmpty
@@ -126,8 +128,8 @@ class _CoachingFocusGlass extends StatelessWidget {
   }
 }
 
-class _StreakAtRiskGlass extends StatelessWidget {
-  const _StreakAtRiskGlass({
+class _CoachingInsightGlass extends StatelessWidget {
+  const _CoachingInsightGlass({
     required this.decisionAsync,
     required this.insightsAsync,
     required this.bundle,
@@ -142,13 +144,21 @@ class _StreakAtRiskGlass extends StatelessWidget {
   /// advertised, kept renderable even after a recompute replaced it.
   final AnnouncedInsight? announced;
 
+  // The card explains the coach's current focus; the streak-at-risk guide
+  // was retired with the streak insight family (2026-09-25).
+  static const _helpId = 'coachingFocus';
+  static const _title = 'Coaching insight';
+
   @override
   Widget build(BuildContext context) {
     return decisionAsync.when(
       skipLoadingOnReload: true,
       data: (decision) {
-        final insights =
-            insightsAsync.valueOrNull ?? const <GeneratedInsight>[];
+        // Retired streak-family rows may still sit in the Layer 3 cache;
+        // they are never rendered here (2026-09-25).
+        final insights = (insightsAsync.valueOrNull ?? const <GeneratedInsight>[])
+            .where((i) => !isRetiredInsightType(i.insightType))
+            .toList();
         final byId = {for (final i in insights) i.insightId: i};
         final primary = decision?.selectedPrimaryInsightId == null
             ? null
@@ -159,10 +169,10 @@ class _StreakAtRiskGlass extends StatelessWidget {
           return ProgressGlassCard(
             accentColor: ProgressDesignTokens.primaryDim,
             icon: Icons.warning_amber_rounded,
-            title: 'Streak at risk',
-          helpId: 'streakAtRisk',
+            title: _title,
+            helpId: _helpId,
             headline: _firstSentence(primary.message),
-            body: caption ?? _streakFallbackBody(bundle),
+            body: caption ?? _fallbackBody(bundle),
           );
         }
 
@@ -173,12 +183,12 @@ class _StreakAtRiskGlass extends StatelessWidget {
           return ProgressGlassCard(
             accentColor: ProgressDesignTokens.primaryDim,
             icon: Icons.warning_amber_rounded,
-            title: 'Coaching insight',
-            helpId: 'streakAtRisk',
+            title: _title,
+            helpId: _helpId,
             headline: _firstSentence(announced!.message),
             body: announced!.caption.isNotEmpty
                 ? announced!.caption
-                : _streakFallbackBody(bundle),
+                : _fallbackBody(bundle),
           );
         }
 
@@ -187,22 +197,20 @@ class _StreakAtRiskGlass extends StatelessWidget {
           return ProgressGlassCard(
             accentColor: ProgressDesignTokens.primaryDim,
             icon: Icons.warning_amber_rounded,
-            title: 'Streak at risk',
-          helpId: 'streakAtRisk',
+            title: _title,
+            helpId: _helpId,
             headline: _firstSentence(riskInsight.message),
-            body:
-                coachingDetailCaption(riskInsight) ??
-                _streakFallbackBody(bundle),
+            body: coachingDetailCaption(riskInsight) ?? _fallbackBody(bundle),
           );
         }
 
         return ProgressGlassCard(
           accentColor: ProgressDesignTokens.primaryDim,
           icon: Icons.warning_amber_rounded,
-          title: 'Streak at risk',
-          helpId: 'streakAtRisk',
-          headline: _streakHeadline(bundle),
-          body: _streakFallbackBody(bundle),
+          title: _title,
+          helpId: _helpId,
+          headline: _fallbackHeadline(bundle),
+          body: _fallbackBody(bundle),
         );
       },
       loading: () => const _InsightLoadingPlaceholder(),
@@ -212,10 +220,10 @@ class _StreakAtRiskGlass extends StatelessWidget {
         ProgressGlassCard(
           accentColor: ProgressDesignTokens.primaryDim,
           icon: Icons.warning_amber_rounded,
-          title: 'Streak at risk',
-          helpId: 'streakAtRisk',
-          headline: _streakHeadline(bundle),
-          body: _streakFallbackBody(bundle),
+          title: _title,
+          helpId: _helpId,
+          headline: _fallbackHeadline(bundle),
+          body: _fallbackBody(bundle),
         ),
       ),
     );
@@ -223,8 +231,7 @@ class _StreakAtRiskGlass extends StatelessWidget {
 
   static GeneratedInsight? _pickRiskInsight(List<GeneratedInsight> insights) {
     for (final i in insights) {
-      if (i.linkedPatternCodes.contains('streakRisk') ||
-          i.linkedPatternCodes.contains('inconsistentBehavior') ||
+      if (i.linkedPatternCodes.contains('inconsistentBehavior') ||
           i.insightBucket == InsightBucket.risk) {
         return i;
       }
@@ -242,32 +249,28 @@ String _firstSentence(String text) {
   return trimmed;
 }
 
-String _streakHeadline(AnalyticsPeriodBundle? bundle) {
+// No-insight fallback copy leans on the week's follow-through rate — the
+// number the Progress page already leads with — never on a streak count.
+String _fallbackHeadline(AnalyticsPeriodBundle? bundle) {
   if (bundle == null) return 'Stay consistent today.';
-  final s = disciplineStreakSummary(bundle);
-  if (s.goalHabitCurrentDays <= 0 && s.taskCurrentDays <= 0) {
-    return 'Start a streak with one intentional action.';
-  }
-  if (s.goalHabitCurrentDays < 3) {
-    return 'Habit consistency dropped this week.';
-  }
-  if (s.taskCurrentDays >= 3) {
-    return 'Task consistency is strong (${s.taskCurrentDays} days).';
-  }
-  return 'Protect your habit momentum (${s.goalHabitCurrentDays} days).';
+  final pct = disciplinePercentWeek(bundle);
+  if (pct <= 0) return 'Start with one intentional action.';
+  if (pct >= 70) return 'Follow-through is strong this week ($pct%).';
+  return 'Follow-through is at $pct% this week.';
 }
 
-String _streakFallbackBody(AnalyticsPeriodBundle? bundle) {
+String _fallbackBody(AnalyticsPeriodBundle? bundle) {
   if (bundle == null) {
-    return 'One intentional action now prevents a reset of your progress.';
+    return 'One intentional action now keeps your progress moving.';
   }
-  final s = disciplineStreakSummary(bundle);
-  if (s.goalHabitCurrentDays <= 0 && s.taskCurrentDays <= 0) {
+  final pct = disciplinePercentWeek(bundle);
+  if (pct <= 0) {
     return 'Log a task or goal check-in today to begin tracking consistency.';
   }
-  return 'Habit streak: ${s.goalHabitCurrentDays}d (best ${s.goalHabitBestDays}d). '
-      'Task streak: ${s.taskCurrentDays}d (best ${s.taskBestDays}d). '
-      'One intentional action today keeps both moving.';
+  if (pct >= 70) {
+    return 'Keep the same rhythm — one planned action today holds it.';
+  }
+  return 'One intentional action today moves the number.';
 }
 
 class _InsightLoadingPlaceholder extends StatelessWidget {

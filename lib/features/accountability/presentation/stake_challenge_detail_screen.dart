@@ -12,13 +12,17 @@ import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../../community/application/circle_providers.dart';
 import '../application/points_providers.dart';
+import '../application/stake_photo_removal.dart';
 import '../application/stake_create_replicator.dart';
+import '../application/stake_goal_check_in_bridge.dart';
 import '../application/stake_functions.dart';
 import '../application/stake_seen_store.dart';
 import '../application/stakes_providers.dart';
 import '../data/stakes_repository.dart';
 import '../domain/models/stake_challenge.dart';
 import '../domain/models/stake_evidence.dart';
+import '../../goals/application/goals_providers.dart';
+import '../../goals/presentation/goal_detail_screen.dart';
 import '../../profile/application/profile_providers.dart';
 import 'accountability_create_flow.dart';
 import 'cards/card_preview_screen.dart';
@@ -227,9 +231,40 @@ class _BodyState extends ConsumerState<_Body> {
           '${c.frozenGoal.totalUnits} days · ${c.mode ?? 'disciplined'}',
           style: TextStyle(color: AppColors.textSoft, fontSize: 13),
         ),
+        // A staked goal's card lands here instead of its check-in sheet
+        // (2026-09-15). While the stake is LIVE this page is the goal's only
+        // face (2026-09-22, Miko): the goal page's "mark done" language read
+        // as the place to log, and edit/pause/complete would alter a frozen
+        // commitment — so no link out until the stake resolves. The goal's
+        // operational checklist is mirrored read-only below instead.
+        if ((c.frozenGoal.linkedGoalId?.isNotEmpty ?? false) &&
+            c.status.isTerminal) ...[
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                foregroundColor: AppColors.accent,
+              ),
+              onPressed: () => Navigator.pushNamed(
+                context,
+                GoalDetailScreen.routeName,
+                arguments: c.frozenGoal.linkedGoalId,
+              ),
+              icon: const Icon(Icons.flag_outlined, size: 16),
+              label: const Text('View goal', style: TextStyle(fontSize: 13)),
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         _statusBanner(),
         ..._pendingCreateSection(),
+        if ((c.frozenGoal.linkedGoalId?.isNotEmpty ?? false) &&
+            !c.status.isTerminal)
+          _LinkedGoalActions(goalId: c.frozenGoal.linkedGoalId!),
         if (_stakePhotoBytes != null || _stakePhotoLoading) ...[
           const SizedBox(height: 12),
           _stakePhotoCard(),
@@ -272,7 +307,7 @@ class _BodyState extends ConsumerState<_Body> {
           _todayActions(logged[today] ?? 0, unitLabel),
         if (c.status == StakeChallengeStatus.pendingVerification &&
             c.type == StakeChallengeType.soloPhoto)
-          _vetoAction(),
+          _pendingPhotoCard(logged),
         if (c.status == StakeChallengeStatus.pendingVerification &&
             c.type.isMultiParty)
           _confirmDisputeActions(),
@@ -502,7 +537,13 @@ class _BodyState extends ConsumerState<_Body> {
         AppColors.amber,
       ),
       StakeChallengeStatus.completedSuccess => (
-        'You kept your word. The photo is gone — nobody ever saw it.',
+        switch (c.type) {
+          StakeChallengeType.soloPhoto =>
+            'You kept your word. The photo is gone — nobody ever saw it.',
+          StakeChallengeType.soloPublic =>
+            'You kept your word. Your result card is ready to share.',
+          _ => 'You kept your word.',
+        },
         AppColors.statusGreen,
       ),
       StakeChallengeStatus.completedForfeit => ('Forfeited.', AppColors.danger),
@@ -685,6 +726,9 @@ class _BodyState extends ConsumerState<_Body> {
           amount: amount,
           source: 'checkin',
         );
+    await ref
+        .read(stakeGoalCheckInBridgeProvider)
+        .mirrorEvidence(challenge: c, amount: amount);
     if (mounted) setState(() => _busy = false);
   }
 
@@ -709,6 +753,9 @@ class _BodyState extends ConsumerState<_Body> {
       amount: amount,
       source: 'camera',
     );
+    await ref
+        .read(stakeGoalCheckInBridgeProvider)
+        .mirrorEvidence(challenge: c, amount: amount);
     // Background upload — evidence stands locally either way; the photo is
     // the circle's dispute-review artifact, not the record itself.
     final uid = FirestorePaths.activeUid;
@@ -861,7 +908,7 @@ class _BodyState extends ConsumerState<_Body> {
     final terminal = c.status.isTerminal;
     final (headline, sub, cta) = switch (c.status) {
       StakeChallengeStatus.completedSuccess => (
-        'Your victory card is ready',
+        'Your result card is ready',
         'You called your shot and hit it. Let them see.',
         'View & share',
       ),
@@ -876,9 +923,9 @@ class _BodyState extends ConsumerState<_Body> {
         'View & share',
       ),
       _ => (
-        'Your word is the stake',
-        'The pledge card is out there. Re-share it any time.',
-        'View pledge card',
+        'Your commitment is public',
+        'Your commitment card is out there. Re-share it any time.',
+        'View commitment card',
       ),
     };
     final tint = switch (c.status) {
@@ -962,9 +1009,7 @@ class _BodyState extends ConsumerState<_Body> {
       MaterialPageRoute(
         builder: (_) => CardPreviewScreen(
           data: data,
-          onRecommit: state == CommitmentCardState.failure
-              ? _recommit
-              : null,
+          onRecommit: state == CommitmentCardState.failure ? _recommit : null,
         ),
       ),
     );
@@ -1118,7 +1163,7 @@ class _BodyState extends ConsumerState<_Body> {
         const SizedBox(height: 8),
         Text(
           'Did they really do it? Silence counts as a confirm after 24h; a '
-          'dispute sends it to a circle vote.',
+          'dispute sends it to a group vote.',
           style: TextStyle(color: AppColors.textSoft, fontSize: 12.5),
         ),
         const SizedBox(height: 10),
@@ -1162,7 +1207,7 @@ class _BodyState extends ConsumerState<_Body> {
           SnackBar(
             content: Text(
               dispute
-                  ? 'Disputed — the circle votes for the next 48h.'
+                  ? 'Disputed — the group votes for the next 48h.'
                   : 'Confirmed.',
             ),
           ),
@@ -1225,7 +1270,7 @@ class _BodyState extends ConsumerState<_Body> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Your photo is live in the circle — $leftLabel left. It deletes '
+            'Your photo is live in the group — $leftLabel left. It deletes '
             'itself when the window closes.',
             style: TextStyle(
               color: AppColors.textPrimary,
@@ -1253,50 +1298,83 @@ class _BodyState extends ConsumerState<_Body> {
     );
   }
 
-  /// D9 — early takedown: 30% floor, 300 points, loss stays recorded.
+  /// D9 — early takedown. The button is ALWAYS there while a takedown
+  /// exists (Miko, 2026-09-18): a tap before the floor says when it
+  /// unlocks, a tap without enough trusted points says what counts and
+  /// how to earn it. Nobody should learn the option exists by never
+  /// seeing it.
   Widget _removalAction() {
-    const price = 300;
-    final balance = ref.watch(pointsBalanceProvider).valueOrNull ?? 0;
-    final me = c.participant(FirestorePaths.activeUid);
-    final revealedAt = c.revealedAtMs;
-    final windowMins = me?.revealWindowMins;
-    final floorPassed =
-        revealedAt != null &&
-        windowMins != null &&
-        DateTime.now().millisecondsSinceEpoch >=
-            revealedAt + (windowMins * 60000 * 30) ~/ 100;
-
-    if (!floorPassed) {
-      return Text(
-        'Removal unlocks after 30% of the window.',
-        style: TextStyle(color: AppColors.textFaint, fontSize: 11.5),
-      );
-    }
-    if (balance < price) {
-      return Text(
-        'Remove early: $price pts (you have $balance).',
-        style: TextStyle(color: AppColors.textFaint, fontSize: 11.5),
-      );
-    }
     return OutlinedButton(
-      onPressed: _busy ? null : _removePhoto,
-      child: Text('Remove — $price pts'),
+      onPressed: _busy ? null : () => _removePhoto(preReveal: false),
+      child: const Text('Take it down — $kPhotoRemovalPrice pts'),
     );
   }
 
-  Future<void> _removePhoto() async {
+  String _clock(int ms) {
+    final loc = MaterialLocalizations.of(context);
+    final at = DateTime.fromMillisecondsSinceEpoch(ms);
+    final now = DateTime.now();
+    final sameDay =
+        at.year == now.year && at.month == now.month && at.day == now.day;
+    final time = loc.formatTimeOfDay(
+      TimeOfDay.fromDateTime(at),
+      alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+    );
+    return sameDay ? time : '${loc.formatMediumDate(at)}, $time';
+  }
+
+  Future<void> _explain(String title, String body) => showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(title),
+      content: Text(body),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('OK'),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _removePhoto({required bool preReveal}) async {
+    final gate = photoRemovalGate(c);
+    if (gate == PhotoRemovalGate.floor) {
+      final me = c.participant(FirestorePaths.activeUid);
+      final unlockAt = photoRemovalFloorAtMs(
+        c.revealedAtMs ?? 0,
+        me?.revealWindowMins ?? 0,
+      );
+      await _explain(
+        'Not yet',
+        'A revealed photo stays up for 30% of its window first. You can '
+            'take it down from ${_clock(unlockAt)}.',
+      );
+      return;
+    }
+    if (gate == PhotoRemovalGate.none) return;
+
+    final trusted = ref.read(pointsTrustedProvider).valueOrNull ?? 0;
+    if (trusted < kPhotoRemovalPrice) {
+      await _explain('Not enough points', photoRemovalShortfallCopy(trusted));
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Take the photo down?'),
-        content: const Text(
-          'This burns 300 points. The loss stays on your record — only the '
-          'photo goes.',
+        title: Text(preReveal ? 'Keep the photo off?' : 'Take the photo down?'),
+        content: Text(
+          preReveal
+              ? 'This burns $kPhotoRemovalPrice points and the photo never '
+                    'posts. The loss still goes on your record.'
+              : 'This burns $kPhotoRemovalPrice points. The loss stays on '
+                    'your record — only the photo goes.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Leave it up'),
+            child: Text(preReveal ? 'Not now' : 'Leave it up'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
@@ -1320,17 +1398,46 @@ class _BodyState extends ConsumerState<_Body> {
     }
   }
 
-  // ─── Veto (M-6) ────────────────────────────────────────────────────────────
+  /// Deadline passed, outcome pending, photo not yet posted (2026-09-18).
+  /// Says what this device expects, when the server decides, and — when a
+  /// loss looks likely — the two ways out: the free monthly veto and the
+  /// paid takedown BEFORE anything is public. The veto line is always
+  /// there, so people learn they have one before they ever need it.
+  Widget _pendingPhotoCard(Map<int, int> logged) {
+    final passLikely = c.predictedSoloPass(logged);
+    final decidesAt = _clock(soloDecisionAtMs(c));
+    final veto = ref.watch(vetoAvailabilityProvider).valueOrNull;
+    final vetoLine = switch (veto) {
+      VetoAvailable() => 'Your mercy veto is available.',
+      VetoOnCooldown(:final nextAtMs) =>
+        'You used your veto recently — the next one is ready on '
+            '${_clock(nextAtMs)}.',
+      _ => '',
+    };
+    final gate = photoRemovalGate(c);
 
-  Widget _vetoAction() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader('Mercy veto'),
+        SectionHeader(passLikely ? 'While the server decides' : 'Before it posts'),
         const SizedBox(height: 8),
         Text(
-          'If this decides against you, your one monthly veto can stop the '
-          'photo from posting. The loss still goes on your record.',
+          passLikely
+              ? 'On this phone it looks like you made it. The server decides '
+                    'at $decidesAt; evidence synced late still counts until then.'
+              : "It looks like this didn't make it. Your photo posts to the "
+                    'group at $decidesAt unless you act first.',
+          style: TextStyle(
+            color: AppColors.textSoft,
+            fontSize: 13,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'You get one free mercy veto every 30 days — it stops the photo '
+          'from posting; the loss still goes on your record. $vetoLine',
+          key: const ValueKey('stake_veto_rule'),
           style: TextStyle(
             color: AppColors.textSoft,
             fontSize: 13,
@@ -1346,6 +1453,20 @@ class _BodyState extends ConsumerState<_Body> {
             label: const Text('Use my mercy veto'),
           ),
         ),
+        if (!passLikely && gate == PhotoRemovalGate.preReveal) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              key: const ValueKey('stake_pre_reveal_takedown'),
+              onPressed: _busy ? null : () => _removePhoto(preReveal: true),
+              icon: const Icon(Icons.visibility_off_rounded),
+              label: const Text(
+                'Keep it off — $kPhotoRemovalPrice pts, never posts',
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -1429,6 +1550,74 @@ class _BodyState extends ConsumerState<_Body> {
 /// Owner-only full-size view of the staked photo (tap target of the
 /// preview card). Plain viewer — the SECURE viewer with screenshot
 /// enforcement is for circle reveals; your own photo is your business.
+/// The staked goal's operational checklist, read-only, for a live stake:
+/// the steps stay visible without opening the goal page (whose logging
+/// affordances don't apply while the stake decides progress).
+class _LinkedGoalActions extends ConsumerWidget {
+  const _LinkedGoalActions({required this.goalId});
+
+  final String goalId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final actions = ref.watch(goalActionsStreamProvider(goalId)).value ?? [];
+    if (actions.isEmpty) return const SizedBox.shrink();
+    final sorted = [...actions]
+      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader('Goal steps'),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.inkCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Column(
+              children: [
+                for (final a in sorted)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          a.completed
+                              ? Icons.check_circle_rounded
+                              : Icons.radio_button_unchecked_rounded,
+                          size: 18,
+                          color: a.completed
+                              ? AppColors.accent
+                              : AppColors.textSoft,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            a.title,
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 14,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _StakePhotoFullscreen extends StatelessWidget {
   const _StakePhotoFullscreen({required this.bytes});
 

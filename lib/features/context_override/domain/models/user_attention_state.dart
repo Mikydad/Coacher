@@ -21,6 +21,7 @@ class UserAttentionState {
     this.lastAttentionResetAt,
     this.sleepWindowStart,
     this.sleepWindowEnd,
+    this.sleepWindowPausedUntilMs,
     this.schemaVersion = kUserAttentionStateSchemaVersion,
   });
 
@@ -49,6 +50,12 @@ class UserAttentionState {
   /// Daily sleep window end time in `"HH:mm"` local 24h format. E.g. `"07:00"`.
   final String? sleepWindowEnd;
 
+  /// Epoch ms until which the *automatic* sleep window is ignored — set when
+  /// the user taps "End" on the sleep banner while no manual override is
+  /// active (2026-09-15). Ends at the window's next wake time, so tomorrow
+  /// night's window returns on its own. Null = not paused. Local only.
+  final int? sleepWindowPausedUntilMs;
+
   final int updatedAtMs;
   final int schemaVersion;
 
@@ -71,6 +78,12 @@ class UserAttentionState {
       sleepWindowEnd != null &&
       sleepWindowEnd!.isNotEmpty;
 
+  /// True while an "End" on the automatic sleep window is still in force.
+  bool isSleepWindowPaused(DateTime now) {
+    final until = sleepWindowPausedUntilMs;
+    return until != null && now.millisecondsSinceEpoch < until;
+  }
+
   /// Factory that creates the default "clean slate" state for a new device.
   factory UserAttentionState.empty() => UserAttentionState(
     id: kUserAttentionStateId,
@@ -92,6 +105,7 @@ class UserAttentionState {
     'lastAttentionResetAt': lastAttentionResetAt,
     'sleepWindowStart': sleepWindowStart,
     'sleepWindowEnd': sleepWindowEnd,
+    'sleepWindowPausedUntilMs': sleepWindowPausedUntilMs,
     'updatedAtMs': updatedAtMs,
     'schemaVersion': schemaVersion,
   };
@@ -112,6 +126,8 @@ class UserAttentionState {
       lastAttentionResetAt: (map['lastAttentionResetAt'] as num?)?.toInt(),
       sleepWindowStart: map['sleepWindowStart'] as String?,
       sleepWindowEnd: map['sleepWindowEnd'] as String?,
+      sleepWindowPausedUntilMs: (map['sleepWindowPausedUntilMs'] as num?)
+          ?.toInt(),
       updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
       schemaVersion:
           (map['schemaVersion'] as num?)?.toInt() ??
@@ -127,6 +143,7 @@ class UserAttentionState {
     Object? lastAttentionResetAt = _sentinel,
     Object? sleepWindowStart = _sentinel,
     Object? sleepWindowEnd = _sentinel,
+    Object? sleepWindowPausedUntilMs = _sentinel,
     int? updatedAtMs,
   }) {
     return UserAttentionState(
@@ -148,6 +165,9 @@ class UserAttentionState {
       sleepWindowEnd: sleepWindowEnd == _sentinel
           ? this.sleepWindowEnd
           : sleepWindowEnd as String?,
+      sleepWindowPausedUntilMs: sleepWindowPausedUntilMs == _sentinel
+          ? this.sleepWindowPausedUntilMs
+          : sleepWindowPausedUntilMs as int?,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
       schemaVersion: schemaVersion,
     );

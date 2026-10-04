@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/presentation/app_card.dart';
 import '../../../core/presentation/app_colors.dart';
-import '../../../core/presentation/page_headers.dart';
+import '../../education/presentation/help_dot.dart';
 import '../application/recovery_triage_service.dart';
 import '../application/recovery_view.dart';
 import '../domain/models/reminder_occurrence_enums.dart';
@@ -19,7 +20,7 @@ import '../domain/models/reminder_occurrence_enums.dart';
 /// non-dismissible contract is conveyed by persistent presence and copy — not
 /// by shouting in red. The only accent is the existing amber token, and only
 /// for genuinely critical rows.
-class RecoveryCard extends ConsumerWidget {
+class RecoveryCard extends ConsumerStatefulWidget {
   const RecoveryCard({super.key, this.onOpenTask, this.onResolve});
 
   /// Tapping a row's primary action. Injectable so the timer-end prompt can
@@ -32,86 +33,151 @@ class RecoveryCard extends ConsumerWidget {
   final void Function(RecoveryRow row, ReminderResolutionKind kind)? onResolve;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RecoveryCard> createState() => _RecoveryCardState();
+}
+
+class _RecoveryCardState extends ConsumerState<RecoveryCard> {
+  /// Collapsed by default (Miko, 2026-09-15): the card leads with the one
+  /// row that matters most; "N MORE" reveals the rest. The headline still
+  /// carries the full count, so nothing is hidden about how much is owed.
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
     final view = ref.watch(recoveryViewProvider).valueOrNull;
-    if (view == null || view.isEmpty) return const SizedBox.shrink();
+    // Rows or nothing (Miko, 2026-09-27): a card holding only the routine
+    // digest line ("TODAY · Reminder passed: …") repeated what Today's goals
+    // and the progress ring already show. The digest rides along under
+    // real rows only.
+    if (view == null || view.rows.isEmpty) return const SizedBox.shrink();
 
     // FR-R-62: the deterministic order renders NOW; if the one bounded
-    // triage call has answered, its ranking and headline enhance in place.
-    // valueOrNull means a pending or failed call changes nothing.
+    // triage call has answered, its ranking enhances in place. valueOrNull
+    // means a pending or failed call changes nothing. The call's headline
+    // is no longer shown (plain-language pass, 2026-09-25): the subtitle
+    // stays fixed so the card always says the same plain thing.
     final triage = ref.watch(recoveryTriageProvider).valueOrNull;
     final ordered = triage == null
         ? view.rows
         : RecoveryTriageService.applyOrder(view.rows, triage);
 
-    final shown = ordered.take(RecoveryViewBuilder.maxRows).toList();
-    final overflow = ordered.length - shown.length;
+    final capped = ordered.take(RecoveryViewBuilder.maxRows).toList();
+    final shown = _expanded ? capped : capped.take(1).toList();
+    final overflow = _expanded ? ordered.length - capped.length : 0;
+    final hasMore = ordered.length > 1;
 
-    return Card(
+    // Compact (Miko, 2026-09-27): one label line instead of a hero header,
+    // subtitle and hairline, so Home reaches Up next and Today's Tasks
+    // sooner. The explanation moved into the `?`; the count and the
+    // "N MORE" toggle share the label's line. Rows are unchanged.
+    return AppCard(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: AppColors.fg.withAlpha(12),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(
-              shown.isEmpty ? 'Today' : _headline(view.rows.length),
-              subtitle: shown.isEmpty
-                  ? null
-                  : (triage?.headline ??
-                        'Still open — do one now, or move it.'),
-            ),
-            if (shown.isNotEmpty) const SizedBox(height: 4),
-            for (final row in shown)
-              _RecoveryRowTile(
-                row: row,
-                onDo: () => onOpenTask?.call(
-                  row.occurrence.entityId,
-                  row.occurrence.entityKind,
-                ),
-                onDismiss: row.insistence.canDismiss
-                    ? () => ref
-                          .read(reminderOccurrenceServiceProvider)
-                          .dismissForToday(row.occurrence.entityId)
-                    : null,
-                onResolve: onResolve == null
-                    ? null
-                    : (kind) => onResolve!(row, kind),
-              ),
-            if (overflow > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 4, bottom: 4),
-                child: Text(
-                  '+$overflow more waiting',
-                  style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-                ),
-              ),
-            if (view.routineDigestLine != null) ...[
-              if (shown.isNotEmpty)
-                Divider(height: 16, color: AppColors.fg.withAlpha(20)),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  view.routineDigestLine!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.35,
-                    color: AppColors.textMuted,
+      padding: const EdgeInsets.fromLTRB(18, 6, 10, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AppSectionLabel(_headline(view.rows.length)),
+              const HelpDot('unfinishedTasks', dense: true),
+              const Spacer(),
+              if (hasMore)
+                InkWell(
+                  key: const ValueKey('recovery_more'),
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => setState(() => _expanded = !_expanded),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _expanded
+                              ? 'SHOW LESS'
+                              : '${ordered.length - shown.length} MORE',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        AnimatedRotation(
+                          turns: _expanded ? 0.5 : 0,
+                          duration: const Duration(milliseconds: 260),
+                          child: Icon(
+                            Icons.expand_more_rounded,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                )
+              else
+                const SizedBox(height: 36),
+            ],
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: Column(
+              children: [
+                for (final row in shown)
+                  _RecoveryRowTile(
+                    row: row,
+                    onDo: () => widget.onOpenTask?.call(
+                      row.occurrence.entityId,
+                      row.occurrence.entityKind,
+                    ),
+                    onDismiss: row.insistence.canDismiss
+                        ? () => ref
+                              .read(reminderOccurrenceServiceProvider)
+                              .dismissForToday(row.occurrence.entityId)
+                        : null,
+                    onResolve: widget.onResolve == null
+                        ? null
+                        : (kind) => widget.onResolve!(row, kind),
+                  ),
+              ],
+            ),
+          ),
+          if (overflow > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 4),
+              child: Text(
+                '+$overflow more waiting',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ),
+          if (view.routineDigestLine != null) ...[
+            Divider(height: 16, thickness: 1, color: AppColors.divider),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                view.routineDigestLine!,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: AppColors.textMuted,
                 ),
               ),
-            ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
-
-  static String _headline(int count) =>
-      count == 1 ? '1 task needs you' : '$count tasks need you';
 }
+
+/// "UNFINISHED · 2" — the section-label voice every Home card uses.
+String _headline(int count) => 'UNFINISHED · $count';
 
 class _RecoveryRowTile extends StatelessWidget {
   const _RecoveryRowTile({
@@ -153,66 +219,80 @@ class _RecoveryRowTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(
                   recoveryRowSubtitle(row),
-                  style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
           ),
           // One primary action per row (FR-R-50); everything else lives in
           // the task's own screen.
-          TextButton(onPressed: onDo, child: const Text('Do now')),
-          if (onDismiss != null)
-            IconButton(
-              tooltip: 'Not today',
-              visualDensity: VisualDensity.compact,
-              onPressed: onDismiss,
-              icon: Icon(
-                CupertinoIcons.xmark,
-                size: 15,
-                color: AppColors.textMuted,
-              ),
-            )
-          // Flexible needs no disposition at all (FR-R-40), so it gets no
-          // overflow: the gentlest mode should not sprout a menu.
-          else if (onResolve != null && !row.insistence.canDismiss)
-            PopupMenuButton<ReminderResolutionKind>(
-              tooltip: 'Other options',
-              padding: EdgeInsets.zero,
-              icon: Icon(
-                CupertinoIcons.ellipsis,
-                size: 16,
-                color: AppColors.textMuted,
-              ),
-              onSelected: onResolve,
-              // D4: unstaked Extreme is Do / Reschedule-with-reason ONLY.
-              // Offering Skip — even with a reason — is the one-tap give-up
-              // the contract excludes; Disciplined keeps it (FR-R-41 lists
-              // Skip among its dispositions).
-              itemBuilder: (_) => [
-                const PopupMenuItem(
-                  value: ReminderResolutionKind.rescheduled,
-                  child: Text('Move to tomorrow'),
-                ),
-                if (row.insistence != RecoveryInsistence.demanding)
-                  const PopupMenuItem(
-                    value: ReminderResolutionKind.skipped,
-                    child: Text('Skip'),
-                  ),
-              ],
-            ),
+          AppSoftPill(label: 'Do now', onPressed: onDo),
+          const SizedBox(width: 4),
+          // A fixed slot whatever lives here (×, ⋯ or nothing) so the
+          // "Do now" pills line up down the card (Miko, 2026-09-15).
+          SizedBox(width: 36, height: 36, child: _trailing()),
         ],
       ),
     );
   }
 
+  Widget _trailing() {
+    if (onDismiss != null) {
+      return IconButton(
+        tooltip: 'Not today',
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+        onPressed: onDismiss,
+        icon: Icon(
+          CupertinoIcons.xmark,
+          size: 15,
+          color: AppColors.textSecondary,
+        ),
+      );
+    }
+    // Flexible needs no disposition at all (FR-R-40), so it gets no
+    // overflow: the gentlest mode should not sprout a menu.
+    if (onResolve != null && !row.insistence.canDismiss) {
+      return PopupMenuButton<ReminderResolutionKind>(
+        tooltip: 'Other options',
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 36),
+        icon: Icon(
+          CupertinoIcons.ellipsis,
+          size: 16,
+          color: AppColors.textSecondary,
+        ),
+        onSelected: onResolve,
+        // D4: unstaked Extreme is Do / Reschedule-with-reason ONLY.
+        // Offering Skip — even with a reason — is the one-tap give-up
+        // the contract excludes; Disciplined keeps it (FR-R-41 lists
+        // Skip among its dispositions).
+        itemBuilder: (_) => [
+          const PopupMenuItem(
+            value: ReminderResolutionKind.rescheduled,
+            child: Text('Move to tomorrow'),
+          ),
+          if (row.insistence != RecoveryInsistence.demanding)
+            const PopupMenuItem(
+              value: ReminderResolutionKind.skipped,
+              child: Text('Skip'),
+            ),
+        ],
+      );
+    }
+    return const SizedBox.shrink();
+  }
 }
 
 /// How long a row has waited, plus — for the stricter modes — what it is

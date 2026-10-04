@@ -41,9 +41,19 @@ class StakeFunctions {
     }
   }
 
+  /// M12 — reserve `stake_photos/{challengeId}/{uid}.jpg` before uploading.
+  /// storage.rules requires the caller's reservation for the create and the
+  /// screening trigger drops unreserved objects, so this must precede the
+  /// upload. Idempotent for the same uid.
+  Future<void> reservePhotoUpload(String challengeId) =>
+      _call<Map<String, dynamic>>('stakeReservePhotoUpload', {
+        'challengeId': challengeId,
+      });
+
   /// Creates a challenge; returns its id. For photo stakes the photo must
-  /// already be uploaded to `stake_photos/{id}/{uid}.jpg` (owner-only path)
-  /// before calling — pass the same client-generated [challengeId].
+  /// already be reserved ([reservePhotoUpload]) and uploaded to
+  /// `stake_photos/{id}/{uid}.jpg` (owner-only path) before calling — pass
+  /// the same client-generated [challengeId].
   /// For h2h: [opponentUid], [stakeAmount], [charityId] (your side's loved
   /// pick, D5) and [bothLoseCharityId] (D6) are required.
   Future<String> createChallenge({

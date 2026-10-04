@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/providers.dart';
 import '../domain/models/ai_action.dart';
 import '../presentation/widgets/quick_directives_row.dart';
+import '../../auth/application/auth_providers.dart';
 
 // ─── Label map ────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,8 @@ const Map<ActionType, QuickDirective> _kActionDirectiveMap = {
 final quickDirectivesProvider = FutureProvider<List<QuickDirective>>((
   ref,
 ) async {
+  // Auth-scoped (audit L1): A's usage ranking must not carry into B.
+  ref.watch(authUidProvider);
   try {
     final historyRepo = ref.read(aiInteractionHistoryRepositoryProvider);
     final recent = await historyRepo.getRecent(limit: 100);

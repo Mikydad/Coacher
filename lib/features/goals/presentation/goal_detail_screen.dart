@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/presentation/app_card.dart';
 import '../../../core/presentation/app_colors.dart';
 import '../../../core/presentation/page_headers.dart';
 import '../../../core/runtime/mutation_request.dart';
@@ -26,6 +27,8 @@ import '../domain/models/goal_enums.dart';
 import '../domain/models/goal_milestone.dart';
 import '../domain/models/user_goal.dart';
 import '../../education/presentation/help_dot.dart';
+import '../../../core/utils/friendly_date.dart';
+import '../../planning/domain/models/task_item.dart';
 import 'goal_editor_screen.dart';
 
 /// Obsidian Pulse goal detail — layered dark surfaces, no dividers, lime as
@@ -209,7 +212,7 @@ class GoalDetailScreen extends ConsumerWidget {
                     if (g.hasRepeatSchedule) ...[
                       _MetaPill(
                         label: GoalPeriodHelpers.formatRepeatSummary(g),
-                        color: AppColors.accentBright,
+                        color: AppColors.accent,
                       ),
                       const SizedBox(width: 6),
                     ],
@@ -229,7 +232,7 @@ class GoalDetailScreen extends ConsumerWidget {
                         GoalStatus.completed => 'Completed',
                       },
                       color: g.status == GoalStatus.active
-                          ? AppColors.accentBright
+                          ? AppColors.accent
                           : AppColors.textSoft,
                     ),
                   ],
@@ -278,7 +281,7 @@ class GoalDetailScreen extends ConsumerWidget {
                       Text(
                         streak.toString().padLeft(2, '0'),
                         style: TextStyle(
-                          color: AppColors.accentBright,
+                          color: AppColors.accent,
                           fontSize: 34,
                           height: 1.1,
                           fontWeight: FontWeight.w800,
@@ -375,13 +378,14 @@ class GoalDetailScreen extends ConsumerWidget {
                     },
                   ),
               const SizedBox(height: 32),
+              _LinkedTasksSection(goalId: g.id),
               _SectionHeader(
                 title: 'Milestones',
                 helpId: 'milestones',
                 trailing: TextButton.icon(
                   onPressed: () => _addMilestoneDialog(context, ref, g.id),
                   style: TextButton.styleFrom(
-                    foregroundColor: AppColors.accentBright,
+                    foregroundColor: AppColors.accent,
                     padding: EdgeInsets.zero,
                   ),
                   icon: const Icon(Icons.add_circle_outline, size: 18),
@@ -551,12 +555,8 @@ class GoalDetailScreen extends ConsumerWidget {
         invalidateGoals(ref, goalId: g.id);
         return;
       case 'complete':
-        final done = g.copyWith(status: GoalStatus.completed, updatedAtMs: now);
-        await repo.upsertGoal(done);
-        await ref.read(goalReminderSyncServiceProvider).applyForGoal(done);
-        await clearEntityCoachingCachesForGoal(ref, done.id);
-        await ref.read(goalBlockSyncServiceProvider).removeBlockForGoal(g.id);
-        invalidateGoals(ref, goalId: g.id);
+        // Shared path: a staked goal gets the keep/surrender dialog first.
+        await completeGoal(context, ref, g);
         return;
       case 'reopen':
         final active = g.copyWith(status: GoalStatus.active, updatedAtMs: now);
@@ -632,7 +632,7 @@ class _HeroTitle extends StatelessWidget {
           if (lead != null) TextSpan(text: '$lead '),
           TextSpan(
             text: tail,
-            style: TextStyle(color: AppColors.accentBright),
+            style: TextStyle(color: AppColors.accent),
           ),
         ],
       ),
@@ -653,10 +653,10 @@ class _MetaPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = color;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: accent?.withValues(alpha: 0.14) ?? AppColors.inkElevated,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label.toUpperCase(),
@@ -761,6 +761,7 @@ class _TodayCommitmentCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.inkDeep,
         borderRadius: BorderRadius.circular(28),
+        boxShadow: appCardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -769,7 +770,7 @@ class _TodayCommitmentCard extends StatelessWidget {
             children: [
               Icon(
                 done ? Icons.verified_outlined : Icons.bolt_outlined,
-                color: done ? AppColors.accentBright : AppColors.cyan,
+                color: done ? AppColors.accent : AppColors.cyan,
                 size: 22,
               ),
               const SizedBox(width: 10),
@@ -822,8 +823,8 @@ class _TodayCommitmentCard extends StatelessWidget {
                 : FilledButton(
                     onPressed: onToggle,
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.accentBright,
-                      foregroundColor: AppColors.accentDeep,
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: AppColors.onAccent,
                       padding: const EdgeInsets.symmetric(vertical: 15),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -858,6 +859,7 @@ class _RestDayCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.inkDeep,
         borderRadius: BorderRadius.circular(28),
+        boxShadow: appCardShadow,
       ),
       child: Row(
         children: [
@@ -947,6 +949,7 @@ class _ChecklistTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.inkWarm,
         borderRadius: BorderRadius.circular(24),
+        boxShadow: appCardShadow,
       ),
       child: Material(
         type: MaterialType.transparency,
@@ -962,17 +965,13 @@ class _ChecklistTile extends StatelessWidget {
                   height: 40,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: completed ? AppColors.accentDeep : null,
+                    color: completed ? AppColors.accent : null,
                     border: completed
                         ? null
                         : Border.all(color: AppColors.textFaint, width: 1.5),
                   ),
                   child: completed
-                      ? Icon(
-                          Icons.check,
-                          color: AppColors.accentBright,
-                          size: 20,
-                        )
+                      ? Icon(Icons.check, color: AppColors.onAccent, size: 20)
                       : null,
                 ),
                 const SizedBox(width: 16),
@@ -1039,6 +1038,7 @@ class _EmptyStateCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.inkDeep,
         borderRadius: BorderRadius.circular(28),
+        boxShadow: appCardShadow,
       ),
       child: Column(
         children: [
@@ -1113,6 +1113,92 @@ class _NewMilestoneDialogState extends State<_NewMilestoneDialog> {
 
 /// One active stake per goal: shows the attached challenge when one
 /// exists, otherwise the "Add accountability" entry point.
+/// Tasks linked to a goal (Phase 6), live from Isar. Lives here, next to
+/// its one reader, because `core/di/providers.dart` (which owns the
+/// planning repository) must not be imported by `goals_providers.dart`.
+final linkedTasksForGoalProvider =
+    StreamProvider.family<List<PlannedTask>, String>((ref, goalId) {
+      return ref.read(planningRepositoryProvider).watchTasksForGoal(goalId);
+    });
+
+/// Tasks the Coach (or a future editor) linked to this goal (Phase 6):
+/// the plan-side half of "what matters → what needs doing".
+class _LinkedTasksSection extends ConsumerWidget {
+  const _LinkedTasksSection({required this.goalId});
+
+  final String goalId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tasks = ref.watch(linkedTasksForGoalProvider(goalId)).value ?? const [];
+    if (tasks.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader(
+          title: 'Planned tasks',
+          subtitle: 'ON YOUR PLAN FOR THIS GOAL',
+          trailing: _EmphasisCount(
+            strong: '${tasks.where((t) => t.status == TaskStatus.completed).length} / ${tasks.length}',
+            soft: '  done',
+          ),
+        ),
+        const SizedBox(height: 12),
+        for (final t in tasks.take(8))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: AppCard(
+              child: Row(
+                children: [
+                  Icon(
+                    t.status == TaskStatus.completed
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    size: 20,
+                    color: t.status == TaskStatus.completed
+                        ? AppColors.accent
+                        : AppColors.fg54,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          t.title,
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          _linkedTaskMeta(t),
+                          style: TextStyle(color: AppColors.fg54, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  static String _linkedTaskMeta(PlannedTask t) {
+    final day = t.planDateKey == null ? '' : friendlyDateKey(t.planDateKey!);
+    final iso = t.reminderTimeIso;
+    final dt = iso == null ? null : DateTime.tryParse(iso)?.toLocal();
+    final time = dt == null
+        ? ''
+        : ' · ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    return '$day$time'.toUpperCase();
+  }
+}
+
 class _AccountabilitySection extends ConsumerWidget {
   const _AccountabilitySection({required this.goal});
 
@@ -1232,7 +1318,7 @@ class _AddAccountabilityCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Add accountability — stake something on this goal',
+                  'Add accountability — put something at stake on this goal',
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 13,

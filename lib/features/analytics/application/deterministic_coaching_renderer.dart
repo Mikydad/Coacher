@@ -26,24 +26,11 @@ class _FallbackTemplate {
 ///
 /// Templates are intentionally high-quality — the app must never feel broken
 /// because AI was unavailable.
+///
+/// [FocusReason.imminentStreakRisk] and [FocusReason.reinforcingActiveStreak]
+/// have no templates on purpose (streaks retired 2026-09-25): a stale
+/// persisted focus with one of those reasons renders the generic fallback.
 const Map<(FocusReason, CoachingFraming), _FallbackTemplate> _kTemplates = {
-  // ── Imminent streak risk ────────────────────────────────────────────────────
-  (
-    FocusReason.imminentStreakRisk,
-    CoachingFraming.protection,
-  ): _FallbackTemplate(
-    summary:
-        'Your streak is at risk today. A short session now protects weeks of consistent effort.',
-    recommendation: 'Complete a brief session before the day ends.',
-    tone: CoachingTone.assertive,
-  ),
-  (FocusReason.imminentStreakRisk, CoachingFraming.momentum): _FallbackTemplate(
-    summary:
-        'You\'ve built strong momentum. One action today keeps that streak alive and growing.',
-    recommendation: 'Keep your streak alive with a quick check-in now.',
-    tone: CoachingTone.encouraging,
-  ),
-
   // ── Highest momentum leverage ────────────────────────────────────────────────
   (
     FocusReason.highestMomentumLeverage,
@@ -187,26 +174,6 @@ const Map<(FocusReason, CoachingFraming), _FallbackTemplate> _kTemplates = {
     tone: CoachingTone.assertive,
   ),
 
-  // ── Reinforcing active streak ─────────────────────────────────────────────────
-  (
-    FocusReason.reinforcingActiveStreak,
-    CoachingFraming.momentum,
-  ): _FallbackTemplate(
-    summary:
-        'Your streak is strong and building. Keep the momentum going — consistency compounds.',
-    recommendation: 'Maintain your streak with your usual action today.',
-    tone: CoachingTone.encouraging,
-  ),
-  (
-    FocusReason.reinforcingActiveStreak,
-    CoachingFraming.consistency,
-  ): _FallbackTemplate(
-    summary:
-        'You\'re building a reliable habit pattern. Steady action today reinforces long-term results.',
-    recommendation: 'Follow your routine — you\'re on the right track.',
-    tone: CoachingTone.informative,
-  ),
-
   // ── Timing opportunity ────────────────────────────────────────────────────────
   (FocusReason.timingOpportunity, CoachingFraming.momentum): _FallbackTemplate(
     summary:
@@ -227,12 +194,6 @@ const Map<(FocusReason, CoachingFraming), _FallbackTemplate> _kTemplates = {
 
 /// Reason-level fallbacks for when the exact framing pair has no template.
 const Map<FocusReason, _FallbackTemplate> _kReasonFallbacks = {
-  FocusReason.imminentStreakRisk: _FallbackTemplate(
-    summary:
-        'Your streak needs attention today. A short session protects your progress.',
-    recommendation: 'Complete a brief action before the day ends.',
-    tone: CoachingTone.assertive,
-  ),
   FocusReason.highestMomentumLeverage: _FallbackTemplate(
     summary:
         'Strong momentum right now. This is a great time to act on your priorities.',
@@ -274,11 +235,6 @@ const Map<FocusReason, _FallbackTemplate> _kReasonFallbacks = {
         'Your goal progress has slowed. One action today keeps the trajectory alive.',
     recommendation: 'Do the smallest action that moves your goal forward.',
     tone: CoachingTone.informative,
-  ),
-  FocusReason.reinforcingActiveStreak: _FallbackTemplate(
-    summary: 'Great streak! Keep it going with consistent daily action.',
-    recommendation: 'Maintain your habit with your usual action today.',
-    tone: CoachingTone.encouraging,
   ),
   FocusReason.timingOpportunity: _FallbackTemplate(
     summary: 'Good timing to follow your routine and build steady habits.',

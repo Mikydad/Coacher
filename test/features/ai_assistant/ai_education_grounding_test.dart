@@ -9,6 +9,7 @@ import 'package:sidepal/features/ai_assistant/domain/models/ai_planned_changes.d
 import 'package:sidepal/features/ai_assistant/domain/models/ai_response_type.dart';
 import 'package:sidepal/features/planning/data/planning_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/ai_action.dart';
 
 /// Captures the payload the parser sends and answers informationally.
 class _CapturingClient implements AiOperatingLayerClient {
@@ -49,6 +50,27 @@ class _PassthroughAssembler implements AiPayloadAssembler {
 
 class _FakeHistory implements AiInteractionHistoryRepository {
   @override
+  Future<int?> saveTurn({
+    required String sessionId,
+    required String userInput,
+    required List<AiAction> parsedActions,
+    String? resolvedCategory,
+    String? assistantSummary,
+    String? responseType,
+    bool executed = false,
+  }) async {
+    await save(
+      sessionId: sessionId,
+      userInput: userInput,
+      parsedActions: parsedActions,
+      resolvedCategory: resolvedCategory,
+      assistantSummary: assistantSummary,
+      responseType: responseType,
+    );
+    return null;
+  }
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => null;
 }
 
@@ -78,13 +100,13 @@ void main() {
     final result = await parser.parse('What is Discipline Mode?', 's1');
 
     expect(client.lastPayload, isNotNull);
-    expect(client.lastPayload!.featureGuide, contains('Discipline Modes'));
+    expect(client.lastPayload!.featureGuide, contains('Strictness'));
     expect(result.isInformational, isTrue);
     // The guide's own follow-up prompts lead the suggestions.
     expect(result.suggestedPrompts, isNotEmpty);
     expect(
       result.suggestedPrompts.first,
-      'Which discipline mode fits a busy week?',
+      'Which strictness fits a busy week?',
     );
   });
 
@@ -92,7 +114,7 @@ void main() {
     final result = await parser.parse('What are Circles?', 's1');
 
     expect(result.responseType, isNot(AiResponseType.unsupported));
-    expect(client.lastPayload!.featureGuide, contains('Circles'));
+    expect(client.lastPayload!.featureGuide, contains('Groups'));
   });
 
   test('circle COMMANDS still hit the unsupported fast-path', () async {

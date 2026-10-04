@@ -34,7 +34,10 @@ class _RecordingExecutor implements AiActionExecutor {
   final List<List<AiAction>> executed = [];
 
   @override
-  Future<ExecutionResult> execute(List<AiAction> actions) async {
+  Future<ExecutionResult> execute(
+    List<AiAction> actions, {
+    String? batchId,
+  }) async {
     executed.add(actions);
     return const ExecutionResult(
       successes: ['Added "Workout Session" at 14:00'],
@@ -46,6 +49,27 @@ class _RecordingExecutor implements AiActionExecutor {
 }
 
 class _FakeHistory implements AiInteractionHistoryRepository {
+  @override
+  Future<int?> saveTurn({
+    required String sessionId,
+    required String userInput,
+    required List<AiAction> parsedActions,
+    String? resolvedCategory,
+    String? assistantSummary,
+    String? responseType,
+    bool executed = false,
+  }) async {
+    await save(
+      sessionId: sessionId,
+      userInput: userInput,
+      parsedActions: parsedActions,
+      resolvedCategory: resolvedCategory,
+      assistantSummary: assistantSummary,
+      responseType: responseType,
+    );
+    return null;
+  }
+
   @override
   Future<void> save({
     required String sessionId,
@@ -82,7 +106,7 @@ final _workoutPlan = AiPlannedChanges(
         'title': 'Workout Session',
         'time': '14:00',
         'duration': 60,
-        'date': 'today',
+        'date': 'tomorrow' // past times today are blocked at confirm (Phase 2.2),
       },
     ),
   ],
@@ -188,7 +212,7 @@ void main() {
     test('single task reads naturally', () {
       expect(
         formatPlanForSpeech(_workoutPlan),
-        "I'll add Workout Session at 2 PM for an hour today.",
+        "I'll add Workout Session at 2 PM for an hour tomorrow.",
       );
     });
 

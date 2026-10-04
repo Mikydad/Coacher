@@ -5,15 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../accountability/application/blocked_users.dart';
 import '../../application/circle_providers.dart';
 import '../../../accountability/presentation/stake_reveal_viewer_screen.dart';
+import '../widgets/challenge_proof_thumbnail.dart';
 import '../../domain/models/activity_feed_item.dart';
 import '../../domain/models/circle_enums.dart';
 import '../widgets/ai_pulse_banner.dart';
 
+import '../../../../core/presentation/app_card.dart';
 import '../../../../core/presentation/app_colors.dart';
 import '../../../../core/presentation/async_value_ui.dart';
 
 // Filter categories shown in the chip row.
-enum _FeedFilter { all, goals, habits, tasks }
+enum _FeedFilter { all, goals, tasks }
 
 class CircleActivityView extends ConsumerStatefulWidget {
   const CircleActivityView({super.key, required this.circleId});
@@ -52,7 +54,7 @@ class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
               Center(
                 child: Text(
                   'Could not load activity.',
-                  style: TextStyle(color: AppColors.textMuted),
+                  style: TextStyle(color: AppColors.textSecondary),
                 ),
               ),
             ),
@@ -60,14 +62,22 @@ class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
               final blocked =
                   ref.watch(blockedUidsProvider).valueOrNull ??
                   const <String>{};
-              final visible = blocked.isEmpty
-                  ? items
-                  : items.where((i) => !blocked.contains(i.userId)).toList();
+              // Streak posts stay in the data but never render: streaks
+              // are not a SidePal success metric (2026-09-25).
+              final visible = items
+                  .where(
+                    (i) =>
+                        i.eventType != ActivityEventType.habitStreakReached &&
+                        !blocked.contains(i.userId),
+                  )
+                  .toList();
               final filtered = _applyFilter(visible);
 
+              // The summary banner is always index 0; the empty state
+              // follows it (the old `_EmptyState` was never reachable).
               return ListView.separated(
                 padding: const EdgeInsets.all(16),
-                itemCount: filtered.length + 1,
+                itemCount: filtered.isEmpty ? 2 : filtered.length + 1,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (_, i) {
                   if (i == 0) {
@@ -76,6 +86,7 @@ class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
                       isModerator: isModerator,
                     );
                   }
+                  if (filtered.isEmpty) return const _EmptyState();
                   final item = filtered[i - 1];
                   if (item.eventType == ActivityEventType.memberJoined ||
                       item.eventType == ActivityEventType.memberLeft) {
@@ -103,10 +114,6 @@ class _CircleActivityViewState extends ConsumerState<CircleActivityView> {
                   i.eventType == ActivityEventType.milestoneReached ||
                   i.eventType == ActivityEventType.weeklyCommitmentMet,
             )
-            .toList();
-      case _FeedFilter.habits:
-        return items
-            .where((i) => i.eventType == ActivityEventType.habitStreakReached)
             .toList();
       case _FeedFilter.tasks:
         return items
@@ -139,17 +146,17 @@ class _FilterChipRow extends StatelessWidget {
               label: Text(
                 _filterLabel(f),
                 style: TextStyle(
-                  color: isSelected ? Colors.black : AppColors.textMuted,
+                  color: isSelected
+                      ? AppColors.onAccent
+                      : AppColors.textSecondary,
                   fontSize: 13,
                 ),
               ),
               selected: isSelected,
               selectedColor: AppColors.accent,
-              backgroundColor: AppColors.surfaceCard,
+              backgroundColor: AppColors.surfacePanel,
               side: BorderSide(
-                color: isSelected
-                    ? AppColors.accent
-                    : AppColors.fg.withValues(alpha: 0.06),
+                color: isSelected ? AppColors.accent : Colors.transparent,
               ),
               onSelected: (_) => onChanged(f),
             ),
@@ -165,8 +172,6 @@ class _FilterChipRow extends StatelessWidget {
         return 'All';
       case _FeedFilter.goals:
         return 'Goals';
-      case _FeedFilter.habits:
-        return 'Habits';
       case _FeedFilter.tasks:
         return 'Tasks';
     }
@@ -201,9 +206,9 @@ class _ActivityCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.fg.withValues(alpha: 0.06)),
+        color: AppColors.surfacePanel,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: appCardShadow,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -230,10 +235,19 @@ class _ActivityCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                // A public proof photo rides along (2026-09-19).
+                if (item.eventType == ActivityEventType.challengeProofPosted &&
+                    (item.value ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  ChallengeProofThumbnail(url: item.value!, size: 120),
+                ],
                 const SizedBox(height: 4),
                 Text(
                   _relativeTime(item.createdAtMs),
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -253,19 +267,19 @@ class _SystemActivityPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final copy = item.eventType == ActivityEventType.memberJoined
-        ? '${item.displayName} joined the circle 👋'
-        : '${item.displayName} left the circle';
+        ? '${item.displayName} joined the group 👋'
+        : '${item.displayName} left the group';
 
     return Center(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: AppColors.surfaceCard,
+          color: AppColors.surfaceLight,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
           copy,
-          style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
         ),
       ),
     );
@@ -306,11 +320,15 @@ class _EventIcon extends StatelessWidget {
         return (Icons.calendar_today_rounded, AppColors.violet);
       case ActivityEventType.challengeProgressUpdated:
         return (Icons.bar_chart_rounded, AppColors.mint);
+      case ActivityEventType.challengeProofPosted:
+        return (Icons.photo_camera_rounded, AppColors.mint);
       case ActivityEventType.memberJoined:
       case ActivityEventType.memberLeft:
-        return (Icons.group_rounded, AppColors.textMuted);
+        return (Icons.group_rounded, AppColors.textSecondary);
       case ActivityEventType.stakePhotoRevealed:
         return (Icons.local_fire_department_rounded, AppColors.danger);
+      case ActivityEventType.stakePhotoRemoved:
+        return (Icons.visibility_off_rounded, AppColors.textSecondary);
       case ActivityEventType.screenshotStrike:
         return (Icons.no_photography_rounded, AppColors.danger);
     }
@@ -362,18 +380,31 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Text(
-          'No activity yet.\nComplete a goal or task to see progress here.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: AppColors.textMuted,
-            fontSize: 15,
-            height: 1.5,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+      child: Column(
+        children: [
+          Text(
+            'See what everyone in the group has been getting done.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              height: 1.4,
+            ),
           ),
-        ),
+          const SizedBox(height: 6),
+          Text(
+            'Nothing yet. Complete a goal or task and it shows up here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+              height: 1.4,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -394,14 +425,20 @@ String _activityCopy(ActivityFeedItem item) {
     case ActivityEventType.weeklyCommitmentMet:
       return 'met their weekly commitment 🏆';
     case ActivityEventType.challengeProgressUpdated:
-      return 'updated challenge progress';
+      return 'logged progress on "${item.entityTitle ?? 'a challenge'}"';
+    case ActivityEventType.challengeProofPosted:
+      return 'logged progress on "${item.entityTitle ?? 'a challenge'}" '
+          'with a photo 📸';
     case ActivityEventType.memberJoined:
-      return 'joined the circle 👋';
+      return 'joined the group 👋';
     case ActivityEventType.memberLeft:
-      return 'left the circle';
+      return 'left the group';
     case ActivityEventType.stakePhotoRevealed:
       return 'broke their promise "${item.entityTitle ?? 'a staked goal'}" — '
           'their stake photo is live. Tap to see it before it\'s gone. 💥';
+    case ActivityEventType.stakePhotoRemoved:
+      // Neutral on purpose (P-5): the fact, no shame copy.
+      return 'took their stake photo down early.';
     case ActivityEventType.screenshotStrike:
       return 'screenshotted a stake photo and is banned from challenges '
           'for ${_banLabel(item.value)} 🚫';

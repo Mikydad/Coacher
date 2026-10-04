@@ -9,8 +9,11 @@ import '../../planning/domain/models/routine.dart';
 
 /// All routine slots for tomorrow, sorted by [Routine.orderIndex].
 /// Creates the default Morning / Afternoon / Night slots if none exist yet.
+///
+/// Watches (not reads) the repository so an account switch rebuilds it
+/// (audit H5); both providers are also in `userScopedProviders`.
 final tomorrowRoutineSlotsProvider = FutureProvider<List<Routine>>((ref) async {
-  final repo = ref.read(planningRepositoryProvider);
+  final repo = ref.watch(planningRepositoryProvider);
   final tomorrow = DateKeys.tomorrowKey();
 
   var routines = await repo.getRoutinesForDate(tomorrow);
@@ -51,7 +54,7 @@ final tomorrowRoutineSlotsProvider = FutureProvider<List<Routine>>((ref) async {
 /// Tasks for a single tomorrow routine slot, keyed by [routineId].
 final tomorrowTasksForRoutineProvider =
     FutureProvider.family<List<PlannedTaskRow>, String>((ref, routineId) async {
-      final repo = ref.read(planningRepositoryProvider);
+      final repo = ref.watch(planningRepositoryProvider);
       final tomorrow = DateKeys.tomorrowKey();
 
       final blocks = await repo.getBlocks(routineId);

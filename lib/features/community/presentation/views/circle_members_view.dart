@@ -9,6 +9,7 @@ import '../../domain/models/circle_enums.dart';
 import '../../domain/models/circle_member.dart';
 import '../../domain/models/removal_vote.dart';
 
+import '../../../../core/presentation/app_card.dart';
 import '../../../../core/presentation/app_colors.dart';
 import '../../../../core/presentation/async_value_ui.dart';
 
@@ -34,14 +35,13 @@ class CircleMembersView extends ConsumerWidget {
         Center(
           child: Text(
             'Could not load members.',
-            style: TextStyle(color: AppColors.textMuted),
+            style: TextStyle(color: AppColors.textSecondary),
           ),
         ),
       ),
       data: (members) {
         final circle = circleAsync.valueOrNull;
         final isModerator = circle != null && circle.moderatorIds.contains(uid);
-        final isCreator = circle?.creatorId == uid;
 
         final pending = members
             .where((m) => m.status == CircleMemberStatus.pending)
@@ -104,7 +104,7 @@ class CircleMembersView extends ConsumerWidget {
                 padding: EdgeInsets.symmetric(vertical: 16),
                 child: Text(
                   'No active members yet.',
-                  style: TextStyle(color: AppColors.textMuted),
+                  style: TextStyle(color: AppColors.textSecondary),
                 ),
               )
             else
@@ -112,8 +112,18 @@ class CircleMembersView extends ConsumerWidget {
                 (m) => _ActiveMemberTile(
                   member: m,
                   isMe: m.userId == uid,
-                  canRemove: isCreator && m.userId != uid,
-                  canVoteRemove: isModerator && !isCreator && m.userId != uid,
+                  // Any moderator removes directly (Miko, 2026-09-24; the
+                  // server's circleRemoveMember already requires only
+                  // moderator). The vote stays as a softer second option.
+                  // Nobody removes the creator — the server refuses it.
+                  canRemove:
+                      isModerator &&
+                      m.userId != uid &&
+                      m.userId != circle.creatorId,
+                  canVoteRemove:
+                      isModerator &&
+                      m.userId != uid &&
+                      m.userId != circle.creatorId,
                   onRemove: () => _remove(context, ref, m),
                   onVoteRemove: () => _initiateVoteRemove(context, ref, m),
                 ),
@@ -213,19 +223,22 @@ class CircleMembersView extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surfaceDark,
+        backgroundColor: AppColors.surfacePanel,
         title: Text(
           'Remove member?',
           style: TextStyle(color: AppColors.textPrimary),
         ),
         content: Text(
-          'Are you sure you want to remove ${member.displayName} from this circle?',
-          style: TextStyle(color: AppColors.textMuted),
+          'Are you sure you want to remove ${member.displayName} from this group?',
+          style: TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: TextStyle(color: AppColors.textMuted)),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -239,23 +252,39 @@ class CircleMembersView extends ConsumerWidget {
       ),
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true || !context.mounted) return;
 
+    // Server callable with a cold start: say it's happening, then say how
+    // it went (Miko, 2026-09-24). The messenger is captured up front so
+    // the result lands even if this view has since rebuilt or gone.
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Removing ${member.displayName}…'),
+        duration: const Duration(seconds: 30),
+      ),
+    );
     try {
       await ref
           .read(userCircleMembershipServiceProvider)
           .removeMember(circleId, member.userId);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${member.displayName} removed.')),
-        );
-      }
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(content: Text('${member.displayName} removed.')),
+      );
     } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not remove member. Try again.')),
-        );
-      }
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Could not remove ${member.displayName}.'),
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () {
+              if (context.mounted) _remove(context, ref, member);
+            },
+          ),
+        ),
+      );
     }
   }
 }
@@ -279,7 +308,7 @@ class _SectionHeader extends StatelessWidget {
         Text(
           title,
           style: TextStyle(
-            color: AppColors.textMuted,
+            color: AppColors.textSecondary,
             fontSize: 12,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.8,
@@ -290,12 +319,12 @@ class _SectionHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             decoration: BoxDecoration(
-              color: AppColors.surfaceCard,
+              color: AppColors.surfaceLight,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
               '$badge',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
             ),
           ),
         ],
@@ -323,9 +352,9 @@ class _PendingMemberTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.fg.withOpacity(0.06)),
+        color: AppColors.surfacePanel,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: appCardShadow,
       ),
       child: Row(
         children: [
@@ -397,12 +426,12 @@ class _ActiveMemberTile extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: AppColors.surfaceDark,
+          color: AppColors.surfacePanel,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isMe
-                ? AppColors.accent.withOpacity(0.2)
-                : AppColors.fg.withOpacity(0.06),
+                ? AppColors.accent.withValues(alpha: 0.2)
+                : Colors.transparent,
           ),
         ),
         child: Row(
@@ -432,16 +461,27 @@ class _ActiveMemberTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     'Joined ${_formatDate(member.joinedAtMs)}',
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
             ),
+            // The dots were decorative — the menu only opened on a
+            // long-press of the row (2026-09-24). Now a tap opens it too.
             if (canRemove || canVoteRemove)
-              Icon(
-                Icons.more_vert_rounded,
-                color: AppColors.textMuted,
-                size: 18,
+              IconButton(
+                key: ValueKey('member_actions_${member.userId}'),
+                tooltip: 'Member actions',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _showRemoveMenu(context),
+                icon: Icon(
+                  Icons.more_vert_rounded,
+                  color: AppColors.textSecondary,
+                  size: 18,
+                ),
               ),
           ],
         ),
@@ -452,7 +492,7 @@ class _ActiveMemberTile extends StatelessWidget {
   void _showRemoveMenu(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.surfacePanel,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -549,7 +589,7 @@ class _RemovalVoteBannerState extends ConsumerState<_RemovalVoteBanner> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surfaceCard,
+        color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.amberDeep.withValues(alpha: 0.4)),
       ),
@@ -576,7 +616,7 @@ class _RemovalVoteBannerState extends ConsumerState<_RemovalVoteBanner> {
               const Spacer(),
               Text(
                 '$approvals/$total voted approve',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
               ),
             ],
           ),
@@ -644,7 +684,7 @@ class _RemovalVoteBannerState extends ConsumerState<_RemovalVoteBanner> {
               padding: EdgeInsets.only(top: 6),
               child: Text(
                 'Your vote has been recorded',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
               ),
             ),
         ],
@@ -659,7 +699,7 @@ class _ModeratorBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.accent.withOpacity(0.12),
+        color: AppColors.accent.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
@@ -699,7 +739,7 @@ class _AvatarInitial extends StatelessWidget {
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
     return CircleAvatar(
       radius: 20,
-      backgroundColor: _color.withOpacity(0.2),
+      backgroundColor: _color.withValues(alpha: 0.2),
       child: Text(
         initial,
         style: TextStyle(

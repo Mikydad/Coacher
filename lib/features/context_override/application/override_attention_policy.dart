@@ -90,7 +90,7 @@ abstract final class OverrideAttentionPolicy {
         return 'Holds all SidePal reminders. Only critical emergency alerts '
             'bypass.';
       case ContextOverride.vacation:
-        return 'Holds all SidePal reminders and protects your streaks.';
+        return 'Holds all SidePal reminders while you\'re away.';
       case ContextOverride.doNotDisturb:
         return 'Holds every SidePal notification. Your phone\'s own '
             'Do Not Disturb is untouched.';

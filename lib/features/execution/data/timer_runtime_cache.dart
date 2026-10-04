@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../../../core/firebase/firestore_paths.dart';
 import '../../../core/storage/app_storage_dir.dart';
 import '../domain/task_timer_engine.dart';
 import '../domain/models/timer_session.dart';
@@ -29,6 +30,9 @@ class TimerRuntimeCache {
   }) async {
     final file = await _file();
     final payload = <String, dynamic>{
+      // Audit H4: the file is device-local; the owner tag stops a resumed
+      // session (label, task ids) from being restored into another account.
+      'ownerUid': FirestorePaths.activeUid,
       'targetType': targetType.storageValue,
       'taskId': taskId,
       'blockId': blockId,
@@ -47,7 +51,13 @@ class TimerRuntimeCache {
     if (!await file.exists()) return null;
     final raw = await file.readAsString();
     if (raw.trim().isEmpty) return null;
-    return jsonDecode(raw) as Map<String, dynamic>;
+    final data = jsonDecode(raw) as Map<String, dynamic>;
+    final owner = data['ownerUid'];
+    if (owner is String && owner != FirestorePaths.activeUid) {
+      await clear();
+      return null;
+    }
+    return data;
   }
 
   Future<void> clear() async {

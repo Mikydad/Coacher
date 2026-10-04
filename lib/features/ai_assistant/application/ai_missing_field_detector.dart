@@ -91,7 +91,7 @@ class AiMissingFieldDetector {
       // window/duration/tags all have defaults, so never interrogate.
       case ActionType.createIntention:
         return _checkFields(p, [
-          _Field('title', 'What did you promise to do?'),
+          _Field('title', 'What do you want to do later?'),
         ]);
 
       // Time Tracker (V1.1) — only the text is required.

@@ -171,8 +171,13 @@ class _FocusCard extends StatelessWidget {
                         letterSpacing: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    _FocusReasonBadge(label: reasonLabel, color: framingColor),
+                    if (reasonLabel != null) ...[
+                      const SizedBox(height: 4),
+                      _FocusReasonBadge(
+                        label: reasonLabel,
+                        color: framingColor,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -271,11 +276,10 @@ class _FocusCard extends StatelessWidget {
       orElse: () => null,
     );
     if (secondary == null) return const [];
+    final label = _shortInsightType(secondary.insightType);
+    if (label == null) return const [];
     return [
-      _Chip(
-        label: 'Also · ${_shortInsightType(secondary.insightType)}',
-        color: AppColors.fg54,
-      ),
+      _Chip(label: 'Also · $label', color: AppColors.fg54),
     ];
   }
 }
@@ -547,10 +551,13 @@ String _framingLabel(CoachingFraming framing) {
   }
 }
 
-String _focusReasonLabel(FocusReason reason) {
+/// Null for the retired streak reasons (2026-09-25): a stale persisted focus
+/// may still carry one, and it renders without a reason badge.
+String? _focusReasonLabel(FocusReason reason) {
   switch (reason) {
     case FocusReason.imminentStreakRisk:
-      return 'Streak at risk';
+    case FocusReason.reinforcingActiveStreak:
+      return null;
     case FocusReason.highestMomentumLeverage:
       return 'Peak momentum';
     case FocusReason.bestRecoveryOpportunity:
@@ -565,17 +572,18 @@ String _focusReasonLabel(FocusReason reason) {
       return 'Consistency alert';
     case FocusReason.goalDriftDetected:
       return 'Goal drifting';
-    case FocusReason.reinforcingActiveStreak:
-      return 'Strong streak';
     case FocusReason.timingOpportunity:
       return 'Good timing';
   }
 }
 
-String _shortInsightType(InsightType type) {
+/// Null for the retired streak family — the chip is simply not shown.
+String? _shortInsightType(InsightType type) {
   switch (type) {
     case InsightType.streakRiskWarning:
-      return 'streak risk';
+    case InsightType.strongStreakPraise:
+    case InsightType.fragileStreakAlert:
+      return null;
     case InsightType.habitTooHard:
       return 'too hard';
     case InsightType.timingMisalignment:
@@ -588,16 +596,12 @@ String _shortInsightType(InsightType type) {
       return 'inconsistent';
     case InsightType.lowEngagementNotice:
       return 'low engagement';
-    case InsightType.strongStreakPraise:
-      return 'great streak';
     case InsightType.consistentBehaviorPraise:
       return 'consistent';
     case InsightType.goalProgressSuccess:
       return 'goal progress';
     case InsightType.highestMomentumLeverage:
       return 'peak momentum';
-    case InsightType.fragileStreakAlert:
-      return 'fragile streak';
     case InsightType.bestRecoveryOpportunity:
       return 'recovery';
     case InsightType.overloadTrend:

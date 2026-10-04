@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/onboarding_flow_controller.dart';
 import '../onboarding_ui.dart';
 
-/// Screen 6 — AI Demonstration. Fully scripted (no network) so the flow
+/// Screen 5 — How SidePal helps, shown not told. Fully scripted (no network) so the flow
 /// passes the airplane-mode test; it *shows* the product, it doesn't run it.
 class AiDemoStep extends ConsumerStatefulWidget {
   const AiDemoStep({super.key, required this.onSkip});
@@ -19,11 +19,11 @@ class AiDemoStep extends ConsumerStatefulWidget {
 
 class _AiDemoStepState extends ConsumerState<AiDemoStep> {
   static const _reveals = [
-    (Icons.flag_outlined, 'Goal — Startup Launch'),
-    (Icons.route_outlined, 'Weekly roadmap'),
-    (Icons.checklist_rounded, 'Today\'s tasks'),
-    (Icons.calendar_month_outlined, 'Schedule'),
-    (Icons.notifications_active_outlined, 'Smart reminders'),
+    (Icons.flag_outlined, 'Goal · Launch my startup'),
+    (Icons.checklist_rounded, 'Actionable steps'),
+    (Icons.route_outlined, 'This week\'s plan'),
+    (Icons.today_outlined, 'Today\'s tasks'),
+    (Icons.notifications_active_outlined, 'Reminders'),
   ];
 
   int _revealed = 0;
@@ -63,12 +63,13 @@ class _AiDemoStepState extends ConsumerState<AiDemoStep> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Just tell SidePal what you want.',
+            'Tell SidePal what you want to do.',
             style: OnboardingType.headline,
           ),
           const SizedBox(height: 10),
           Text(
-            'Watch simple ideas become structured, actionable plans.',
+            'It helps turn an idea into a clear plan you can actually '
+            'follow.',
             style: OnboardingType.body,
           ),
           const SizedBox(height: 18),
@@ -109,7 +110,7 @@ class _AiDemoStepState extends ConsumerState<AiDemoStep> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Instantly creating your growth blueprint…',
+                          'Turning it into a plan…',
                           style: OnboardingType.cardBody.copyWith(
                             color: OnboardingColors.textSecondary,
                           ),
@@ -167,6 +168,12 @@ class _AiDemoStepState extends ConsumerState<AiDemoStep> {
                 ],
               ),
             ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'And when plans change, your coach helps you adjust.',
+            textAlign: TextAlign.center,
+            style: OnboardingType.body,
           ),
         ],
       ),

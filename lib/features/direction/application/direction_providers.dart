@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/di/providers.dart' show localNotificationsServiceProvider;
+import 'direction_closeout.dart';
+
 import '../data/direction_repository.dart';
 import '../domain/direction_context_lines.dart';
 import '../domain/direction_periods.dart';
@@ -56,3 +59,30 @@ final hasAnyDirectionProvider = Provider<bool>((ref) {
       ref.watch(directionEntriesStreamProvider).valueOrNull ?? const [];
   return entries.any((e) => e.isNotEmpty);
 });
+
+/// The end-of-period close-out notifier (2026-09-19), bound to the local
+/// notifications plugin. Re-armed on bootstrap and after page writes.
+final directionCloseoutSchedulerProvider = Provider<DirectionCloseoutScheduler>(
+  (ref) {
+    final n = ref.read(localNotificationsServiceProvider);
+    return DirectionCloseoutScheduler(
+      schedule:
+          ({
+            required id,
+            required title,
+            required body,
+            required when,
+            required payload,
+            required level,
+          }) => n.schedule(
+            id: id,
+            title: title,
+            body: body,
+            when: when,
+            payload: payload,
+            level: level,
+          ),
+      cancel: n.cancel,
+    );
+  },
+);

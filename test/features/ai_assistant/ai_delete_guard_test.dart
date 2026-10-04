@@ -44,6 +44,27 @@ class _FakeAssembler implements AiPayloadAssembler {
 
 class _FakeHistory implements AiInteractionHistoryRepository {
   @override
+  Future<int?> saveTurn({
+    required String sessionId,
+    required String userInput,
+    required List<AiAction> parsedActions,
+    String? resolvedCategory,
+    String? assistantSummary,
+    String? responseType,
+    bool executed = false,
+  }) async {
+    await save(
+      sessionId: sessionId,
+      userInput: userInput,
+      parsedActions: parsedActions,
+      resolvedCategory: resolvedCategory,
+      assistantSummary: assistantSummary,
+      responseType: responseType,
+    );
+    return null;
+  }
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => null;
 }
 

@@ -45,7 +45,7 @@ class SeizeTheMomentCard extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: BoxDecoration(
         color: AppColors.cyan.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppColors.cyanBorder20),
       ),
       child: Column(

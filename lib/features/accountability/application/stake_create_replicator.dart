@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/firebase/firestore_paths.dart';
 import 'stake_functions.dart';
 
 /// Background replication state of one optimistic challenge create.
@@ -28,6 +29,11 @@ class StakeCreateReplicator extends Notifier<Map<String, StakeCreateStatus>> {
   final _replicateOps = <String, Future<void> Function()>{};
   final _discardOps = <String, Future<void> Function()>{};
 
+  /// The account each create was started under (audit H6): a retry from a
+  /// different signed-in account must never replicate the previous
+  /// account's challenge under the new identity.
+  final _ownerUid = <String, String>{};
+
   @override
   Map<String, StakeCreateStatus> build() => const {};
 
@@ -47,6 +53,7 @@ class StakeCreateReplicator extends Notifier<Map<String, StakeCreateStatus>> {
   }) {
     _replicateOps[challengeId] = replicate;
     _discardOps[challengeId] = discard;
+    _ownerUid[challengeId] = FirestorePaths.activeUid;
     unawaited(_run(challengeId));
   }
 
@@ -60,6 +67,7 @@ class StakeCreateReplicator extends Notifier<Map<String, StakeCreateStatus>> {
   Future<void> discard(String challengeId) async {
     final op = _discardOps.remove(challengeId);
     _replicateOps.remove(challengeId);
+    _ownerUid.remove(challengeId);
     state = {...state}..remove(challengeId);
     if (op != null) await op();
   }
@@ -67,11 +75,22 @@ class StakeCreateReplicator extends Notifier<Map<String, StakeCreateStatus>> {
   Future<void> _run(String challengeId) async {
     final op = _replicateOps[challengeId];
     if (op == null) return;
+    if (_ownerUid[challengeId] != FirestorePaths.activeUid) {
+      state = {
+        ...state,
+        challengeId: const StakeCreateStatus(
+          error: 'The signed-in account changed before this could be sent.',
+          canRetry: false,
+        ),
+      };
+      return;
+    }
     state = {...state, challengeId: const StakeCreateStatus()};
     try {
       await op();
       _replicateOps.remove(challengeId);
       _discardOps.remove(challengeId);
+      _ownerUid.remove(challengeId);
       state = {...state}..remove(challengeId);
     } on StakeActionException catch (e) {
       // A lost response on a retry can surface as already-exists even though
@@ -79,6 +98,7 @@ class StakeCreateReplicator extends Notifier<Map<String, StakeCreateStatus>> {
       if (e.code == 'already-exists') {
         _replicateOps.remove(challengeId);
         _discardOps.remove(challengeId);
+        _ownerUid.remove(challengeId);
         state = {...state}..remove(challengeId);
         return;
       }

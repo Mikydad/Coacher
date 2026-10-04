@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/application/main_tab_navigation.dart';
-import '../../../core/sync/sync_service.dart';
 import '../../community/application/community_bridge_coordinator.dart';
 import '../../profile/application/profile_providers.dart';
 import '../application/auth_providers.dart';
@@ -28,7 +27,10 @@ import '../../../core/presentation/app_colors.dart';
 ///
 /// When a user signs in, [AuthGate] also:
 /// 1. Detects uid changes and wipes local state before showing the app.
-/// 2. Runs a forced remote sync after a uid change.
+/// 2. Leaves the seed pull to [FirstLaunchGate]: the wipe removes the
+///    seeded flag, so the remounted gate runs exactly one capped seed
+///    (2026-09-22 — before this the gate and this handler each ran a full
+///    reconcile back to back, up to two minutes on a slow link).
 /// 3. Always persists the current uid for future uid-change detection.
 class AuthGate extends ConsumerStatefulWidget {
   const AuthGate({super.key, required this.child});
@@ -81,7 +83,6 @@ class _AuthGateState extends ConsumerState<AuthGate> {
         if (container != null) {
           CommunityBridgeCoordinator.instance.restart(container);
         }
-        await SyncService.instance.syncFromRemote(force: true);
       } finally {
         if (mounted) setState(() => _handlingUidChange = false);
       }
@@ -100,6 +101,14 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       }
     }
 
+    // The awaits above (uid check, session wipe, persist) can outlive this
+    // gate — a sign-out or account switch remounts the tree while the
+    // handler is mid-flight, and `ref` on a disposed element throws
+    // (Crashlytics 2026-09-24: "Cannot use ref after the widget was
+    // disposed", filed as a fatal). Nothing below matters for a gate that
+    // is gone: the remounted gate re-runs this for the current user.
+    if (!mounted) return;
+
     // Use the latest Firebase user (displayName may be set after Google profile sync).
     final fresh = ref.read(authRepositoryProvider).currentUser;
     await _syncLocalDisplayNameFromAuth(fresh ?? user);
@@ -110,6 +119,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   Future<void> _syncLocalDisplayNameFromAuth(dynamic user) async {
     final name = (user as dynamic).displayName as String?;
     if (name == null || name.trim().isEmpty) return;
+    if (!mounted) return;
     try {
       await ref
           .read(profilePreferenceServiceProvider)

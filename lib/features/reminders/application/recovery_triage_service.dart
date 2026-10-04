@@ -40,7 +40,9 @@ class RecoveryTriageService {
 
   static const int minItems = 3;
   static const int maxPerDay = 2;
-  static const _kCountPrefsKey = 'recovery_triage_count_v1';
+  /// Per-account daily slot counter; cleared by the logout wipe (audit H4).
+  static const countPrefsKey = 'recovery_triage_count_v1';
+  static const _kCountPrefsKey = countPrefsKey;
 
   /// In-session memo: one answer per card composition. Keyed by the sorted
   /// id set, so the same overdue pool never pays twice.

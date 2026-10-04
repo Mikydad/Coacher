@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../core/ai/ai_proxy_client.dart';
 import '../../../core/ai/ai_remote_config_service.dart';
+import '../../../core/session/session_scope.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../ai_assistant/data/ai_interaction_history_repository.dart';
 import '../../intentions/application/intention_capture.dart';
@@ -62,6 +65,24 @@ class MemoryExtractionService {
   /// notifications until engaged (only `open` intentions are plannable).
   static const Duration observationWindow = Duration(days: 60);
 
+  /// Extractions currently awaiting the model (audit H3). The session
+  /// teardown drains them so a result can't be persisted after the wipe —
+  /// and each one also re-checks its [SessionToken] before persisting.
+  static final Set<Future<bool>> _inFlight = {};
+
+  static Future<void> drainInFlight({
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    if (_inFlight.isEmpty) return;
+    try {
+      await Future.wait(
+        _inFlight.toList(),
+      ).timeout(timeout, onTimeout: () => const []);
+    } catch (_) {
+      // Individual failures are handled inside _extractSession.
+    }
+  }
+
   // ─── Session lifecycle ──────────────────────────────────────────────────
 
   /// Called on every Coach turn — keeps the session's inactivity clock
@@ -81,6 +102,11 @@ class MemoryExtractionService {
   /// (Coach sheet closed / session reset). Failures stay `pending` and the
   /// maintenance sweep retries.
   Future<void> onSessionEnded(String sessionId) async {
+    // Audit H3: the logout path disposes the AI service, which finalizes
+    // its stashed thread and lands here. The outgoing account's transcript
+    // must not be extracted into whoever signs in next — drop it (the raw
+    // turns are wiped with the rest of the local store).
+    if (SessionScope.isTearingDown) return;
     try {
       final state = await _sessionState.getBySessionId(sessionId);
       if (state == null || state.status != 'pending') return;
@@ -162,7 +188,20 @@ class MemoryExtractionService {
 
   /// Runs extract_memory for one session. Returns true when the session
   /// reached `extracted` (including the trivial-session no-op).
-  Future<bool> _extractSession(String sessionId) async {
+  Future<bool> _extractSession(String sessionId) {
+    final job = _extractSessionBound(sessionId);
+    _inFlight.add(job);
+    unawaited(
+      job.then(
+        (_) => _inFlight.remove(job),
+        onError: (Object _) => _inFlight.remove(job),
+      ),
+    );
+    return job;
+  }
+
+  Future<bool> _extractSessionBound(String sessionId) async {
+    final session = SessionScope.capture();
     final rows = await _history.getAllForSession(sessionId);
     if (rows.isEmpty) {
       await _sessionState.markExtracted(sessionId);
@@ -205,6 +244,14 @@ class MemoryExtractionService {
       return false;
     }
 
+    // The model answered for a session that has since ended (logout /
+    // account switch while awaiting). Never persist: the repositories
+    // resolve the uid at write time and would file A's facts under B.
+    if (!session.isCurrent) {
+      debugPrint('[MemoryExtraction] session ended mid-extraction — dropped');
+      return false;
+    }
+
     final ParsedExtraction parsed;
     try {
       parsed = MemoryExtractionParser.parse(content, transcript);
@@ -216,6 +263,7 @@ class MemoryExtractionService {
       await _sessionState.bumpAttemptCount(sessionId);
       return false;
     }
+    if (!session.isCurrent) return false;
     await _persistExtraction(sessionId, parsed, transcript);
     await _sessionState.markExtracted(sessionId);
     return true;

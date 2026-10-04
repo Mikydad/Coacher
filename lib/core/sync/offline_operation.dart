@@ -7,6 +7,8 @@ class OfflineOperation {
     required this.payload,
     required this.updatedAtMs,
     this.uid,
+    this.attempts = 0,
+    this.nextAttemptMs = 0,
   });
 
   final String id;
@@ -22,6 +24,27 @@ class OfflineOperation {
   /// Null only for entries persisted before this field existed.
   final String? uid;
 
+  /// Failed flush attempts so far (audit M4). Drives the back-off below.
+  final int attempts;
+
+  /// Earliest time the next attempt may run (0 = immediately).
+  final int nextAttemptMs;
+
+  OfflineOperation withRetryScheduled({
+    required int attempts,
+    required int nextAttemptMs,
+  }) => OfflineOperation(
+    id: id,
+    entityType: entityType,
+    operationType: operationType,
+    documentPath: documentPath,
+    payload: payload,
+    updatedAtMs: updatedAtMs,
+    uid: uid,
+    attempts: attempts,
+    nextAttemptMs: nextAttemptMs,
+  );
+
   Map<String, dynamic> toMap() => {
     'id': id,
     'entityType': entityType,
@@ -30,6 +53,8 @@ class OfflineOperation {
     'payload': payload,
     'updatedAtMs': updatedAtMs,
     if (uid != null) 'uid': uid,
+    if (attempts > 0) 'attempts': attempts,
+    if (nextAttemptMs > 0) 'nextAttemptMs': nextAttemptMs,
   };
 
   static OfflineOperation fromMap(Map<String, dynamic> map) => OfflineOperation(
@@ -40,5 +65,7 @@ class OfflineOperation {
     payload: (map['payload'] as Map?)?.cast<String, dynamic>(),
     updatedAtMs: map['updatedAtMs'] as int,
     uid: map['uid'] as String?,
+    attempts: (map['attempts'] as num?)?.toInt() ?? 0,
+    nextAttemptMs: (map['nextAttemptMs'] as num?)?.toInt() ?? 0,
   );
 }

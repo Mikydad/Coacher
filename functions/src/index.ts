@@ -5,9 +5,27 @@ import { getFirestore, Timestamp, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { getRemoteConfig, ServerTemplate } from "firebase-admin/remote-config";
 
-import { getAppCheck } from "firebase-admin/app-check";
 
-import { parseRouteOverrides, resolveRoute, utcDayKey } from "./ai_routing";
+import {
+  ChargedTurnRegistry,
+  gateBeforeDispatch,
+  OverQuotaRegistry,
+  overQuotaUntilFor,
+} from "./ai_quota_gate";
+import {
+  parseRouteOverrides,
+  rejectedModelOverrides,
+  resolveRoute,
+  utcDayKey,
+} from "./ai_routing";
+import { buildChatBody } from "./ai_request";
+import {
+  countsAsInstruction,
+  instructionCapFor,
+  tierFromEntitlement,
+  TierKnowledge,
+} from "./ai_instruction_cap";
+import { accountPolicyRejection, appCheckHeaderOk } from "./speech_shared";
 import { resolveSystemPrompt, SERVER_PROMPT_PURPOSES } from "./coach_prompts";
 import { openAiApiKey } from "./secrets";
 import { bearerTokenFrom } from "./speech_rules";
@@ -29,10 +47,24 @@ export {
   stakeReportScreenshot,
   stakeReportPhoto,
   stakeRemovePhoto,
+  stakeReservePhotoUpload,
 } from "./stakes/callables";
-// Circle invites (2026-08-26) — the first circle callables: server-held
-// invite keys, the only door into private circles.
-export { circleInvite, circleJoinWithInvite } from "./circles/callables";
+// Circle invites (2026-08-26) — server-held invite keys, the only door into
+// private circles. 2026-09-15 (audit C1/M1/M2): every membership mutation
+// is a callable and the vote tally is a trigger; clients only read.
+export {
+  circleInvite,
+  circleJoinWithInvite,
+  circleCreate,
+  circleJoin,
+  circleApproveJoin,
+  circleDeclineJoin,
+  circleLeave,
+  circleRemoveMember,
+  circleDelete,
+  circleRepairIndex,
+} from "./circles/callables";
+export { circleChallengeVoteTally } from "./circles/challenge_votes";
 export { grantPoints, pointsSignupBonus } from "./stakes/ledger";
 export { stakeSweep } from "./stakes/sweep";
 export { intentionSweep } from "./intentions/sweep";
@@ -195,6 +227,10 @@ const RC_DEFAULTS = {
   // the client attestation setup is registered in the console — flipping
   // this early would reject every real user.
   ai_enforce_app_check: false,
+  // Audit H10 — per-uid quotas are replenishable with throwaway password
+  // accounts; when ON, password accounts need a verified email (the client
+  // already has the banner + resend flow). OFF until announced.
+  ai_require_verified_email: false,
 };
 const RC_TTL_MS = 5 * 60 * 1000;
 
@@ -209,6 +245,7 @@ interface AiServerConfig {
   dailyTokenBudget: number;
   dailyInstructionCap: number;
   enforceAppCheck: boolean;
+  requireVerifiedEmail: boolean;
 }
 
 /** freeAiInstructionsPerDay out of the tier_limits_v1 blob; generous
@@ -233,6 +270,7 @@ async function aiServerConfig(): Promise<AiServerConfig> {
     dailyTokenBudget: RC_DEFAULTS.ai_daily_token_budget,
     dailyInstructionCap: parseDailyInstructionCap(RC_DEFAULTS.tier_limits_v1),
     enforceAppCheck: RC_DEFAULTS.ai_enforce_app_check,
+    requireVerifiedEmail: RC_DEFAULTS.ai_require_verified_email,
   };
   // Failure caching (2026-08-19 stage ledgers) applies in BOTH states: a
   // failed refresh must not be retried on every call (~100-250ms tax), and
@@ -247,6 +285,20 @@ async function aiServerConfig(): Promise<AiServerConfig> {
         defaultConfig: RC_DEFAULTS,
       });
       rcLoadedAtMs = now;
+      // A model the allow-list refuses is a LOUD error at load (Phase 5.1)
+      // — the route silently keeps its default, so nobody would notice.
+      try {
+        const rejected = rejectedModelOverrides(
+          rcTemplate.evaluate().getString("ai_purpose_routes"),
+        );
+        if (rejected.length > 0) {
+          logger.error("ai_purpose_routes names models outside ALLOWED_MODELS; those routes keep their default model", {
+            rejected,
+          });
+        }
+      } catch {
+        // Evaluation problems are handled by the caller's evaluate().
+      }
     } catch (error) {
       rcFailedAtMs = now;
       logger.warn("Remote Config refresh failed; serving last-known AI routes", {
@@ -269,6 +321,7 @@ async function aiServerConfig(): Promise<AiServerConfig> {
         config.getString("tier_limits_v1"),
       ),
       enforceAppCheck: config.getBoolean("ai_enforce_app_check"),
+      requireVerifiedEmail: config.getBoolean("ai_require_verified_email"),
     };
   } catch (error) {
     logger.warn("Remote Config evaluate failed; using default AI routes", {
@@ -295,6 +348,38 @@ function applyServerSystemPrompt(
     { role: "system", content: prompt },
     ...messages.filter((m) => m.role !== "system"),
   ];
+}
+
+// ─── Tier knowledge (AI chat fix plan Phase 0.1, decision D8 2026-09-26) ───
+//
+// The daily instruction cap from `tier_limits_v1` used to apply to every
+// uid, Pro included, and to count every charged turn. Now it applies only
+// to accounts KNOWN to be free (entitlement doc read, not active) and only
+// to tool-bearing first rounds; an unreadable doc means "unknown" → no cap.
+// Same server-owned `users/{uid}/entitlements/pro` doc the circles cap
+// reads. Cached per instance so the interactive path pays one doc read per
+// uid per 5 minutes (it runs concurrently with the config read anyway).
+const TIER_TTL_MS = 5 * 60 * 1000;
+const tierCache = new Map<string, { tier: TierKnowledge; atMs: number }>();
+
+async function tierFor(uid: string): Promise<TierKnowledge> {
+  const now = Date.now();
+  const cached = tierCache.get(uid);
+  if (cached !== undefined && now - cached.atMs < TIER_TTL_MS) return cached.tier;
+  let tier: TierKnowledge;
+  try {
+    const snap = await getFirestore().doc(`users/${uid}/entitlements/pro`).get();
+    tier = tierFromEntitlement({ ok: true, data: snap.data() }, now);
+  } catch (error) {
+    logger.warn("entitlement read failed; daily instruction cap skipped", {
+      uid,
+      error: `${error}`,
+    });
+    tier = "unknown";
+  }
+  if (tierCache.size > 5000) tierCache.clear();
+  tierCache.set(uid, { tier, atMs: now });
+  return tier;
 }
 
 /// Per-user daily budget for SYSTEM purposes (extraction, parsing, nudge
@@ -342,6 +427,8 @@ const KNOWN_PURPOSES = new Set([
   "phrase_nudge",
   "summarize",
   "reflect",
+  "classify_task",
+  "recovery_triage",
   "unknown",
 ]);
 
@@ -384,23 +471,16 @@ async function recordPurposeUsage(
 // caller has already paid for one request. Once a uid is KNOWN to be over
 // quota, subsequent calls are rejected before OpenAI fires, until the
 // sliding window can have rolled (Tier-1 review fix).
-const chatOverQuotaUntilByUid = new Map<string, number>();
+const chatOverQuota = new OverQuotaRegistry();
+/** Turns charged by THIS instance — their follow-ups keep the fast path. */
+const chargedTurns = new ChargedTurnRegistry();
 
 function chatQuotaExhausted(uid: string): boolean {
-  const until = chatOverQuotaUntilByUid.get(uid);
-  if (until !== undefined && Date.now() < until) return true;
-  chatOverQuotaUntilByUid.delete(uid);
-  return false;
+  return chatOverQuota.exhaustedUntil(uid) !== undefined;
 }
 
 function markChatOverQuota(uid: string, untilMs: number): void {
-  if (chatOverQuotaUntilByUid.size > 1000) {
-    const now = Date.now();
-    for (const [key, until] of chatOverQuotaUntilByUid) {
-      if (until <= now) chatOverQuotaUntilByUid.delete(key);
-    }
-  }
-  chatOverQuotaUntilByUid.set(uid, untilMs);
+  chatOverQuota.mark(uid, untilMs);
 }
 
 /// Sliding-hour quota counted per TURN, not per OpenAI call: follow-up calls
@@ -424,7 +504,13 @@ async function enforceRateLimit(
   uid: string,
   turnId: string | undefined,
   loopIndex: number,
-  limits?: { dailyTokenBudget: number; dailyInstructionCap: number },
+  limits?: {
+    dailyTokenBudget: number;
+    /** Undefined = no cap for this account (Pro, or tier unknown). */
+    dailyInstructionCap: number | undefined;
+    /** True only for tool-bearing first rounds — the turns that count. */
+    instruction: boolean;
+  },
 ): Promise<void> {
   const db = getFirestore();
   const ref = db.collection("aiUsage").doc(uid);
@@ -455,6 +541,12 @@ async function enforceRateLimit(
     if (loopIndex > 0 && turnKey !== undefined && recentTurns[turnKey] !== undefined) {
       const entry = recentTurns[turnKey];
       if (entry.followUps >= MAX_LOOP_INDEX) {
+        // Audit H9: every rejection sets the marker, so the next attempt
+        // is refused BEFORE the concurrent OpenAI leg fires.
+        markChatOverQuota(
+          uid,
+          overQuotaUntilFor("turn_follow_up_cap", { now, turnWindowMs: TURN_WINDOW_MS }),
+        );
         throw new HttpsError(
           "resource-exhausted",
           "AI request limit reached. Try again later.",
@@ -476,13 +568,19 @@ async function enforceRateLimit(
     if (limits !== undefined) {
       const midnightMs = Date.parse(`${dayKey}T24:00:00Z`);
       if (dayTokens >= limits.dailyTokenBudget) {
+        markChatOverQuota(uid, overQuotaUntilFor("token_budget", { now, midnightMs }));
         throw new HttpsError(
           "resource-exhausted",
           "Daily AI budget reached. It resets at midnight UTC.",
           { reason: "token_budget", retryAfterMs: Math.max(0, midnightMs - now) },
         );
       }
-      if (dayTurns >= limits.dailyInstructionCap) {
+      if (
+        limits.instruction &&
+        limits.dailyInstructionCap !== undefined &&
+        dayTurns >= limits.dailyInstructionCap
+      ) {
+        markChatOverQuota(uid, overQuotaUntilFor("daily_cap", { now, midnightMs }));
         throw new HttpsError(
           "resource-exhausted",
           "Daily AI limit reached. It resets at midnight UTC.",
@@ -506,7 +604,7 @@ async function enforceRateLimit(
     const totalCount = (typeof data?.totalCount === "number" ? data.totalCount : 0) + 1;
     const dayFields = {
       dayKey,
-      dayTurns: dayTurns + 1,
+      dayTurns: dayTurns + (limits?.instruction === true ? 1 : 0),
       dayTokens,
       recentTurns,
     };
@@ -522,12 +620,16 @@ async function enforceRateLimit(
         },
         { merge: true },
       );
+      if (turnKey !== undefined) chargedTurns.add(uid, turnKey);
       return;
     }
     if (count >= RATE_LIMIT_PER_HOUR) {
       // Remember when the window can roll so subsequent requests are
       // rejected BEFORE the concurrent OpenAI leg fires.
-      markChatOverQuota(uid, windowStartMs + RATE_WINDOW_MS);
+      markChatOverQuota(
+        uid,
+        overQuotaUntilFor("user_quota", { now, windowEndMs: windowStartMs + RATE_WINDOW_MS }),
+      );
       throw new HttpsError(
         "resource-exhausted",
         "AI request limit reached. Try again later.",
@@ -538,6 +640,7 @@ async function enforceRateLimit(
       );
     }
     tx.set(ref, { count: count + 1, totalCount, ...dayFields }, { merge: true });
+    if (turnKey !== undefined) chargedTurns.add(uid, turnKey);
   });
 }
 
@@ -567,25 +670,18 @@ export const aiChat = onCall(
     timeoutSeconds: 60,
     memory: "256MiB",
     maxInstances: 10,
-    // One warm instance kills the 2-3s cold start on the conversational
-    // path (latency batch 2026-08-07) — a few $/month, felt every turn.
-    minInstances: 1,
+    // No warm instance (cost audit 2026-09-24). The 2026-08-07 latency
+    // batch kept one here as "a few $/month", but a gen2 function idles as
+    // a FULL vCPU whatever its memory, so the three warm instances came to
+    // ~$25/month for ~5 testers. The first text turn after ~15 idle
+    // minutes now pays the 2-3s cold start. To flip back, set 1 and
+    // redeploy — and add `cpu: 'gcf_gen1'` + `concurrency: 1` so the idle
+    // instance costs ~$3/month instead of ~$8.
+    minInstances: 0,
   },
   async (request: CallableRequest<AiChatData>) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Sign in required.");
-    }
-    // Guest (anonymous) accounts cannot call the paid AI proxy — creating
-    // fresh anonymous uids is free, so per-uid quotas don't bound spend.
-    // TODO: enable App Check enforcement (enforceAppCheck: true) once a
-    // client version that attests has shipped.
-    const signInProvider = (request.auth.token as Record<string, any>)
-      ?.firebase?.sign_in_provider;
-    if (signInProvider === "anonymous") {
-      throw new HttpsError(
-        "permission-denied",
-        "Sign in with an account to use Coach AI.",
-      );
     }
     const uid = request.auth.uid;
 
@@ -608,13 +704,24 @@ export const aiChat = onCall(
     const tStart = Date.now();
 
     // Purpose routing: model / temperature / cap / quota class per purpose.
-    const cfg = await aiServerConfig();
+    // The tier read rides alongside (Phase 0.1): one cached doc read.
+    const [cfg, tier] = await Promise.all([aiServerConfig(), tierFor(uid)]);
     const { routesJson, systemDailyBudget } = cfg;
     const route = resolveRoute(purpose, parseRouteOverrides(routesJson));
     if (!route.enabled) {
       // Per-purpose kill switch. System callers fall back deterministically;
       // chat surfaces its normal degraded path.
       throw new HttpsError("failed-precondition", "This AI feature is disabled.");
+    }
+    // Guest (anonymous) accounts cannot call the paid AI proxy — creating
+    // fresh anonymous uids is free, so per-uid quotas don't bound spend;
+    // unverified password accounts likewise once the flag is on (H10).
+    const rejection = accountPolicyRejection(
+      request.auth.token as Record<string, any>,
+      cfg.requireVerifiedEmail,
+    );
+    if (rejection !== null) {
+      throw new HttpsError("permission-denied", rejection);
     }
     // App Check behind a config flag (fix-wave Phase 5): request.app is
     // populated when a valid attestation token arrived. OFF by default —
@@ -640,17 +747,20 @@ export const aiChat = onCall(
           Authorization: `Bearer ${openAiApiKey.value()}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          model: route.model,
-          temperature,
-          max_tokens: maxTokens,
-          // Tool-calling turns return natural text or tool calls; only
-          // legacy schema-mode callers force a JSON object body.
-          ...(tools === undefined
-            ? { response_format: { type: "json_object" } }
-            : { tools, tool_choice: "auto" }),
-          messages: finalMessages,
-        }),
+        // Shaped per model family (Phase 5.1): max_tokens vs
+        // max_completion_tokens, reasoning_effort, and whether temperature
+        // is accepted. Tool-calling turns return natural text or tool
+        // calls; only legacy schema-mode callers force a JSON object body.
+        body: JSON.stringify(
+          buildChatBody({
+            model: route.model,
+            messages: finalMessages,
+            maxTokens,
+            temperature,
+            tools,
+            jsonMode: tools === undefined,
+          }),
+        ),
         signal: AbortSignal.any([quotaAbort.signal, AbortSignal.timeout(45_000)]),
       });
 
@@ -668,41 +778,69 @@ export const aiChat = onCall(
         throw new HttpsError("unavailable", "AI service unreachable. Try again.");
       }
     } else {
-      // Known-over-quota callers are rejected before OpenAI fires at all —
-      // but never the FREE follow-ups of an already-charged turn (the old
-      // shape could kill a paid turn's agent loop mid-flight at the
-      // window boundary).
-      if (loopIndex === 0 && chatQuotaExhausted(uid)) {
+      // Audit H9 — decide BEFORE anything is dispatched upstream:
+      //  - known over quota (any reason) → reject, no OpenAI call;
+      //  - follow-up of a turn THIS instance charged → concurrent fast path
+      //    (a legitimate agent loop must not die at the window boundary);
+      //  - follow-up of an unknown turn → quota transaction first (another
+      //    instance's loop pays ~0.5 s once; a forged turnId pays nothing).
+      const turnKey = turnId === undefined ? undefined : telemetryKey(turnId);
+      const gate = gateBeforeDispatch({
+        loopIndex,
+        overQuota: chatQuotaExhausted(uid),
+        turnChargedHere: turnKey !== undefined && chargedTurns.has(uid, turnKey),
+      });
+      if (gate === "reject") {
         throw new HttpsError(
           "resource-exhausted",
           "AI request limit reached. Try again later.",
           { reason: "user_quota" },
         );
       }
-      // Interactive path: the quota transaction (~0.5s of Firestore,
-      // 2026-08-19 ledgers) runs CONCURRENTLY with the OpenAI call. An
-      // over-quota caller pays for at most one aborted request per instance
-      // per window (the marker above short-circuits the rest); the latency
-      // win lands on every legitimate turn.
-      const quotaPromise = enforceRateLimit(uid, turnId, loopIndex, {
+      const limits = {
         dailyTokenBudget: cfg.dailyTokenBudget,
-        dailyInstructionCap: cfg.dailyInstructionCap,
-      });
-      const fetchPromise = doFetch();
-      try {
-        await quotaPromise;
-      } catch (error) {
-        quotaAbort.abort();
-        fetchPromise.catch(() => {});
-        throw error;
-      }
-      tQuota = Date.now();
-      try {
-        response = await fetchPromise;
-      } catch (error) {
-        logger.error("OpenAI request failed", { uid, purpose, error: `${error}` });
-        if (route.quotaClass === "user") await refundChatTurn(uid, loopIndex);
-        throw new HttpsError("unavailable", "AI service unreachable. Try again.");
+        dailyInstructionCap: instructionCapFor({
+          configuredCap: cfg.dailyInstructionCap,
+          tier,
+        }),
+        instruction: countsAsInstruction({
+          hasTools: tools !== undefined,
+          loopIndex,
+        }),
+      };
+      if (gate === "quota_first") {
+        await enforceRateLimit(uid, turnId, loopIndex, limits);
+        tQuota = Date.now();
+        try {
+          response = await doFetch();
+        } catch (error) {
+          logger.error("OpenAI request failed", { uid, purpose, error: `${error}` });
+          if (route.quotaClass === "user") await refundChatTurn(uid, loopIndex);
+          throw new HttpsError("unavailable", "AI service unreachable. Try again.");
+        }
+      } else {
+        // Interactive path: the quota transaction (~0.5s of Firestore,
+        // 2026-08-19 ledgers) runs CONCURRENTLY with the OpenAI call. An
+        // over-quota caller pays for at most one aborted request per
+        // instance per window (the markers short-circuit the rest); the
+        // latency win lands on every legitimate turn.
+        const quotaPromise = enforceRateLimit(uid, turnId, loopIndex, limits);
+        const fetchPromise = doFetch();
+        try {
+          await quotaPromise;
+        } catch (error) {
+          quotaAbort.abort();
+          fetchPromise.catch(() => {});
+          throw error;
+        }
+        tQuota = Date.now();
+        try {
+          response = await fetchPromise;
+        } catch (error) {
+          logger.error("OpenAI request failed", { uid, purpose, error: `${error}` });
+          if (route.quotaClass === "user") await refundChatTurn(uid, loopIndex);
+          throw new HttpsError("unavailable", "AI service unreachable. Try again.");
+        }
       }
     }
 
@@ -730,10 +868,14 @@ export const aiChat = onCall(
             function?: { name?: string; arguments?: string };
           }>;
         };
+        finish_reason?: string | null;
       }>;
       usage?: { total_tokens?: number };
     };
     const message = json.choices?.[0]?.message;
+    // Surfaced so a reply cut at the cap can be marked (fix plan Phase 4.4);
+    // this path used to discard it and ship half a reply as whole.
+    const finishReason = json.choices?.[0]?.finish_reason ?? null;
     const content = typeof message?.content === "string" ? message.content : null;
     const toolCalls = (message?.tool_calls ?? [])
       .filter((c) => typeof c.id === "string" && typeof c.function?.name === "string")
@@ -773,7 +915,7 @@ export const aiChat = onCall(
     await recordPurposeUsage(uid, purpose, totalTokens, {
       countsTowardDailyBudget: route.quotaClass === "user",
     });
-    return { content, toolCalls };
+    return { content, toolCalls, finishReason };
   },
 );
 
@@ -790,11 +932,11 @@ export const aiChatStream = onRequest(
     timeoutSeconds: 120,
     memory: "256MiB",
     maxInstances: 10,
-    // Voice Level 2 made this the spoken-turn critical path — the first
-    // conversational turn after idle was paying its full cold start
-    // (first-turn latency fix 2026-08-22). Same one-warm-instance trade as
-    // aiChat and aiSpeechStream.
-    minInstances: 1,
+    // No warm instance (cost audit 2026-09-24, see aiChat). The client's
+    // GET warmup ping at Voice Mode entry now doubles as the cold-start
+    // trigger, so the boot overlaps the user raising the phone instead of
+    // the first spoken turn.
+    minInstances: 0,
   },
   async (req, res) => {
     const tStart = Date.now();
@@ -814,13 +956,10 @@ export const aiChatStream = onRequest(
       return;
     }
     let uid: string;
+    let claims: Record<string, any>;
     try {
       const decoded = await getAuth().verifyIdToken(token);
-      // Anonymous uids are free to mint — same spend stance as aiChat.
-      if (decoded.firebase?.sign_in_provider === "anonymous") {
-        res.status(403).json({ error: "Sign in with an account to use Coach AI." });
-        return;
-      }
+      claims = decoded as Record<string, any>;
       uid = decoded.uid;
     } catch {
       res.status(401).json({ error: "Invalid token." });
@@ -848,21 +987,20 @@ export const aiChatStream = onRequest(
       res.status(503).json({ error: "Purpose disabled." });
       return;
     }
+    // Anonymous uids are free to mint — same spend stance as aiChat;
+    // unverified password accounts likewise when the flag is on (H10).
+    const rejection = accountPolicyRejection(claims, cfg.requireVerifiedEmail);
+    if (rejection !== null) {
+      res.status(403).json({ error: rejection });
+      return;
+    }
     // App Check behind the same config flag as aiChat — onRequest
     // endpoints need MANUAL header verification (enforceAppCheck exists
     // only for callables), so flipping the callable flag alone would have
     // left this endpoint open.
-    if (cfg.enforceAppCheck) {
-      const appCheckToken = req.headers["x-firebase-appcheck"];
-      try {
-        if (typeof appCheckToken !== "string" || appCheckToken.length === 0) {
-          throw new Error("missing token");
-        }
-        await getAppCheck().verifyToken(appCheckToken);
-      } catch {
-        res.status(403).json({ error: "App attestation required." });
-        return;
-      }
+    if (!(await appCheckHeaderOk(req, cfg.enforceAppCheck))) {
+      res.status(403).json({ error: "App attestation required." });
+      return;
     }
     // Server-owned system prompt — the STREAM variant: no tools exist
     // here, so its addendum forbids claiming or describing changes.
@@ -888,9 +1026,12 @@ export const aiChatStream = onRequest(
     // old `undefined` clobbered the single lastTurnId slot and made a
     // concurrent agent loop's follow-ups charge as fresh turns.
     const streamTurnId = `stream_${tStart}_${uid.slice(0, 8)}`;
+    // Answer-only endpoint: never an instruction (Phase 0.1), so no cap and
+    // no tier read; the hourly window and token budget still apply.
     const quotaPromise = enforceRateLimit(uid, streamTurnId, 0, {
       dailyTokenBudget: cfg.dailyTokenBudget,
-      dailyInstructionCap: cfg.dailyInstructionCap,
+      dailyInstructionCap: undefined,
+      instruction: false,
     });
     const fetchPromise = fetch(OPENAI_URL, {
       method: "POST",
@@ -898,16 +1039,17 @@ export const aiChatStream = onRequest(
         Authorization: `Bearer ${openAiApiKey.value()}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: route.model,
-        messages: finalMessages,
-        max_tokens: route.maxTokens,
-        temperature: route.temperature ?? 0.6,
-        stream: true,
-        // The final SSE frame then carries usage — token-accurate
-        // telemetry for the one purpose that had none (tokens were -1).
-        stream_options: { include_usage: true },
-      }),
+      // Per-family shaping (Phase 5.1); the final SSE frame carries usage
+      // — token-accurate telemetry for the one purpose that had none.
+      body: JSON.stringify(
+        buildChatBody({
+          model: route.model,
+          messages: finalMessages,
+          maxTokens: route.maxTokens,
+          temperature: route.temperature ?? 0.6,
+          stream: true,
+        }),
+      ),
       signal: upstreamAbort.signal,
     });
 

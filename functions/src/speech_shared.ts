@@ -1,8 +1,11 @@
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
+import type { Request } from "firebase-functions/v2/https";
+import { getAppCheck } from "firebase-admin/app-check";
 import { getFirestore, Timestamp, FieldValue } from "firebase-admin/firestore";
 import { getRemoteConfig, ServerTemplate } from "firebase-admin/remote-config";
 
+import { OverQuotaRegistry, verifiedAccountRejection } from "./ai_quota_gate";
 import {
   SPEECH_MAX_CLIPS_PER_TURN,
   SPEECH_RATE_LIMIT_PER_HOUR,
@@ -17,6 +20,11 @@ import {
 const RC_DEFAULTS = {
   ai_speech_enabled: true,
   ai_speech_voice: "coral",
+  // Audit H10 — the SAME keys the chat proxy reads, so one console flag
+  // governs all four paid endpoints. Both default OFF until a client build
+  // that attests / verifies has shipped.
+  ai_enforce_app_check: false,
+  ai_require_verified_email: false,
 };
 const RC_TTL_MS = 5 * 60 * 1000;
 
@@ -24,14 +32,20 @@ let rcTemplate: ServerTemplate | undefined;
 let rcLoadedAtMs = 0;
 let rcFailedAtMs = 0;
 
-export async function speechConfig(): Promise<{
+export interface SpeechConfig {
   enabled: boolean;
   voice: string;
-}> {
+  enforceAppCheck: boolean;
+  requireVerifiedEmail: boolean;
+}
+
+export async function speechConfig(): Promise<SpeechConfig> {
   const now = Date.now();
-  const defaults = {
+  const defaults: SpeechConfig = {
     enabled: RC_DEFAULTS.ai_speech_enabled,
     voice: resolveSpeechVoice(RC_DEFAULTS.ai_speech_voice),
+    enforceAppCheck: RC_DEFAULTS.ai_enforce_app_check,
+    requireVerifiedEmail: RC_DEFAULTS.ai_require_verified_email,
   };
   // Failure caching (2026-08-19 stage ledgers) applies in BOTH states: a
   // failed refresh must not be retried on every call (~100-250ms tax), and
@@ -59,6 +73,8 @@ export async function speechConfig(): Promise<{
     return {
       enabled: config.getBoolean("ai_speech_enabled"),
       voice: resolveSpeechVoice(config.getString("ai_speech_voice")),
+      enforceAppCheck: config.getBoolean("ai_enforce_app_check"),
+      requireVerifiedEmail: config.getBoolean("ai_require_verified_email"),
     };
   } catch (error) {
     logger.warn("Remote Config evaluate failed; using default speech config", {
@@ -75,23 +91,57 @@ export async function speechConfig(): Promise<{
 // a uid is known to be over quota, callers must not fire OpenAI at all
 // until the sliding window can have rolled. Best-effort by design (one
 // wasted call per instance per window, bounded by maxInstances).
-const speechOverQuotaUntilByUid = new Map<string, number>();
+const speechOverQuota = new OverQuotaRegistry();
+
+/// Per (uid, turnId): the clip ladder for this reply is exhausted (audit
+/// H9 — the clip cap used to reject without a marker, so a client reusing
+/// one turnId synthesized-then-aborted on every call).
+const speechClipCapped = new OverQuotaRegistry();
 
 export function speechQuotaExhaustedUntil(uid: string): number | undefined {
-  const until = speechOverQuotaUntilByUid.get(uid);
-  if (until !== undefined && Date.now() < until) return until;
-  speechOverQuotaUntilByUid.delete(uid);
-  return undefined;
+  return speechOverQuota.exhaustedUntil(uid);
+}
+
+export function speechClipCapReached(uid: string, turnId: string | undefined): boolean {
+  if (turnId === undefined) return false;
+  return speechClipCapped.exhaustedUntil(`${uid}:${turnId}`) !== undefined;
 }
 
 function markSpeechOverQuota(uid: string, untilMs: number): void {
-  if (speechOverQuotaUntilByUid.size > 1000) {
-    const now = Date.now();
-    for (const [key, until] of speechOverQuotaUntilByUid) {
-      if (until <= now) speechOverQuotaUntilByUid.delete(key);
-    }
+  speechOverQuota.mark(uid, untilMs);
+}
+
+// ── Audit H10 — attestation + account policy shared by all paid paths ──────
+
+/** Manual App Check verification for onRequest endpoints (callables use
+ * `request.app`). Returns false when enforcement is on and the header is
+ * missing or invalid. */
+export async function appCheckHeaderOk(
+  req: Request,
+  enforce: boolean,
+): Promise<boolean> {
+  if (!enforce) return true;
+  const token = req.headers["x-firebase-appcheck"];
+  if (typeof token !== "string" || token.length === 0) return false;
+  try {
+    await getAppCheck().verifyToken(token);
+    return true;
+  } catch {
+    return false;
   }
-  speechOverQuotaUntilByUid.set(uid, untilMs);
+}
+
+/** Anonymous is always refused; unverified password accounts only when the
+ * `ai_require_verified_email` flag is on. Returns the user-facing message. */
+export function accountPolicyRejection(
+  claims: Record<string, any> | undefined,
+  requireVerifiedEmail: boolean,
+): string | null {
+  return verifiedAccountRejection({
+    signInProvider: claims?.firebase?.sign_in_provider,
+    emailVerified: claims?.email_verified,
+    require: requireVerifiedEmail,
+  });
 }
 
 /// Sliding-hour quota on the shared per-user aiUsage doc, in speech-scoped
@@ -130,6 +180,8 @@ export async function enforceSpeechRateLimit(
       const clips: number =
         typeof data?.speechTurnClips === "number" ? data.speechTurnClips : 0;
       if (clips >= SPEECH_MAX_CLIPS_PER_TURN) {
+        // Marker so later clips of this turn never reach OpenAI (H9).
+        speechClipCapped.mark(`${uid}:${turnId}`, windowStartMs + windowMs);
         throw new HttpsError(
           "resource-exhausted",
           "Speech clip limit reached for this reply.",

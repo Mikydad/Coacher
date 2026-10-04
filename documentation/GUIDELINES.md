@@ -3197,3 +3197,1732 @@ not silent reversal.
   reusing criticality 3 as "alarm" (it is a classification, and the
   heuristic/AI may not grant it); a separate alarm entity or screen (an
   alarm is a louder reminder, and lives inside the reminder it belongs to).
+- **2026-09-14 · Home light-mode redesign on `feat/home-light-redesign`
+  (PRD/The new Design screenshot + written spec).** Settled with Miko before
+  building: (1) **Global tokens, not Home-only** — the light palette itself
+  moved to the new system (page `#FAFAF7`, cards white, ink `#111511`,
+  olive `#547D0B` as `accent`, teal `#0788A6` as `cyan`/`coach`, secondary
+  `#6F727B`) and seven tokens were added to `AppPalette` (`textSecondary`,
+  `surfaceLight`, `divider`, `actionTint`, `coach`, `cardShadow`,
+  `coachShadow`), so every light screen shifts together. (2) **Dark mode
+  keeps its colors** — same layout and components, dark values of the new
+  tokens map onto the existing dark palette; no dark redesign in this PR.
+  (3) **Nothing left Home** — every section and conditional card stays,
+  restyled through the new shared surfaces in
+  `lib/core/presentation/app_card.dart` (`AppCard`, `AppCircleIconButton`,
+  `AppSoftPill`, `AppDashedEmptyState`, `AppSectionLabel`) — soft shadows
+  instead of borders, radii 28/24/22/20/18/999. (4) **Today's progress ring
+  = goals and habits active AND due today** (`goalHabitDay`: action days +
+  habit tasks), weighted so partial progress shows; the sub-line is
+  "N of M goals/habits completed" counting only fully completed items.
+  (5) **7-day bars** draw `blendedWeekSeries` Monday → today; zero days
+  are short filled stubs, future days short hollow stubs (visibly
+  different), today is teal. The two-line sparkline is gone. (6) The
+  **notifications bell stays non-interactive** (no ripple, TODO for a
+  notification center) — no destination exists yet. (7) **Platform font**,
+  no bundled Inter. (8) **20px side padding** (the spec's 28–32 cramps the
+  four tiles); spacious cards pad 20 inside. (9) `SectionHeader` gained a
+  `hero` flag (24px) for the one card that carries a headline — the
+  recovery card — so the type hierarchy still lives in `page_headers.dart`.
+  (10) The bottom nav is app-wide chrome: light is a near-solid white pill
+  with the card shadow and olive active state; dark keeps the translucent
+  ink watermark. (11) **Live theme toggle and `const` widgets** — found on
+  device: the toggle re-keys `MaterialApp`, but the Navigator's GlobalKey
+  retains the route tree, so identical `const` StatelessWidgets are never
+  rebuilt and keep the old palette's paint (the faint "PROFILE" title after
+  a toggle was this bug). Any const-constructible StatelessWidget that reads
+  `AppColors` must call `AppColors.bindTheme(context)` first thing in
+  `build` — the shared surfaces, `PageTitle`/`SectionHeader` and the
+  wordmark now do. Branched from `main`, not from the unmerged
+  `feat/alarm-mode` (no overlap).
+
+- **2026-09-14 · Profile page joins the light redesign (same branch,
+  second commit).** Settled with Miko from his mock: (1) the **lime stats
+  slab is gone** — it fought the olive palette in light mode; it is now a
+  white card with an olive flame, three stats split by hairlines (the
+  olive-filled alternative was rejected so the page keeps exactly one
+  filled element, the active mode's disc). (2) **Header = Home's**: a
+  30px "Profile" wordmark, no back chevron (it is a tab) and **no gear**
+  — there is no settings hub to open, the list lives on the page.
+  (3) **Mode and tone keep inline expansion**; the mock's right chevron
+  was read as navigation but a new screen was not wanted. Discipline Mode
+  keeps its olive outline as the active-state cue; Coach Tone has none,
+  per the mock, and gained a gray coach-glyph disc. (4) **Settings rows
+  keep their subtitles** inside one white card with indented hairlines;
+  `SettingRow` and `SettingsSectionHeader` were restyled once, so the
+  settings sub-pages follow for free. Account note and Log Out stay,
+  restyled; the identity card lost its decorative glow blob.
+
+- **2026-09-15 · Set-mode sheet and Community screens restyled (same
+  branch, style only).** (1) The quick-activate sheet's option cards were
+  painted with the 50 % black scrim token, which is a dark-mode value —
+  black cards on a white sheet in light. `AttentionModeColors` now maps to
+  white sheet / light-gray cards / olive accent in light and keeps its dark
+  values. (2) Community tab (both the "my circles" list and the
+  discover-first state) and the Discover circles screen moved to the card
+  system: white cards with the shared shadow, soft category/policy pills,
+  pill-shaped category chips and search field, white-on-olive Join. Settled
+  with Miko: **chrome is unchanged** — the centered small-caps `PageTitle`,
+  the help/discover icons, the "+ Circle" FAB and the Browse/Search tabs
+  all stay; only Home and Profile carry the wordmark header. (3) The sleep
+  "End does nothing" report was diagnosed, not fixed: the banner shows the
+  *automatic* sleep window, and `endOverride` is a no-op when no manual
+  override exists. Proposed fix (parked until Miko decides): a local
+  `sleepWindowPausedUntilMs` on the attention state that End sets to the
+  next wake time.
+
+- **2026-09-15 · Two Home tweaks from device testing.** (1) The ring
+  percentage is one px under its scaled size (`diameter × 0.28 − 1`) —
+  "100%" sat too close to the ring. (2) **Promises empty state is gone**
+  and the section is **one white card**: the "PROMISES" header row with its
+  + sits inside the card, so an empty section is a slim card and open
+  promises stack under a hairline in the same card (option A; option B,
+  hiding the whole section, was rejected because it also removed the +
+  entry point). `AppDashedEmptyState` stays in the design system for other
+  lists (Discover's "no circles").
+
+- **2026-09-15 · Sleep-window "End" now works.** Root cause: the banner
+  shows the *automatic* sleep window (policy step 2), but `endOverride`
+  only cleared a *manual* override, so End during the window was a silent
+  no-op. Fix settled with Miko: a local-only `sleepWindowPausedUntilMs` on
+  `UserAttentionState` (stored in the Isar row's `payloadJson`, so no
+  schema regeneration; not synced — a sleep window is per device). End
+  during the automatic window sets it to `nextMorningAfter(now,
+  sleepWindowEnd)`; `effectiveOverride` ignores the window while paused,
+  so every consumer (banner, attention orchestrator, context snapshot)
+  follows; tomorrow night's window returns on its own. The banner subtitle
+  now says "Sleep window · until 07:00" so it is clear what End ends. A
+  manual override still wins over the pause. *Rejected:* routing End to
+  the sleep-window settings (asks the user to reconfigure a schedule to
+  get one night off), and clearing the window (would silently disable it).
+
+- **2026-09-15 · Coaching insights honor the schedule: opportunity days,
+  current subjects, availability gate.** Two tester reports: a Mon–Fri goal
+  got a "streak at risk" insight on Sunday, and insights kept surfacing
+  built from long-finished tasks. Root causes: Layer 1 counted misses per
+  *calendar* day (Sat + Sun empty → `missedLast2Days`), seeded every task
+  planned anywhere in the 30-day window, never checked a goal's period end,
+  and nothing between Layer 1 and Layer 4 ever consulted `isActionDay`.
+  Settled with Miko (all four recommendations accepted): (1) **Opportunity
+  days** — `computeFeatureStreakMetrics` takes `opportunityDateKeys` (a
+  goal's loggable days via `GoalPeriodHelpers.allowsLoggingOnDateKey`, a
+  task's planned days); streak, "missed last 2" and `missedCount7d` count
+  those days only, and fewer than two prior opportunities is *no evidence*
+  (a task first planned today is not "missed"). "Missed last 2 days" now
+  reads "missed the last 2 **scheduled** days": a Mon/Wed/Fri goal skipped
+  Wed + Fri fires on Saturday. Goal opportunities per window are one per
+  action day for repeating goals (a Mon–Fri goal has 5 a week, not 7) and
+  one per window for passive goals (target accumulates over the period);
+  the pre-existing `horizon` shortcut is gone. (2) **Seeding**: goals must
+  be active, inside their period (period ended = no coaching, same as
+  paused) and have at least one loggable day in the window; tasks must have
+  been on the plan within the last 7 days (`kTaskCoachingRecencyDays`) —
+  older tasks drop out of the batch and the daily prune clears their cached
+  insights. (3) **Availability gate at delivery**:
+  `loadLayer3DeliveryInsightsForDay` takes the goals repository and drops
+  entity insights whose goal is paused/completed or does not accept a log
+  on that date — a Mon–Fri goal shows *nothing* on Sunday (matching Today's
+  goals; reinforcement-only on off-days was considered and rejected as
+  noise). Task-scoped rows and failed lookups pass through, so the surface
+  can never blank on an error. (4) Prior-cycle check-ins remain legitimate
+  streak history (clamped to the period only). *Known, unchanged:* a
+  monthly goal has zero opportunities in most 7-day windows, so its
+  `completionSignal7d` reads 0 between action days — same as before.
+  Tests: `feature_builder_opportunity_days_test`,
+  `feature_builder_seeding_test`, availability case in
+  `insight_generation_providers_test`.
+
+- **2026-09-15 · Notifications & Reminders page and Goal detail: light
+  style pass (same branch, style only, chrome unchanged).** Settings
+  sub-pages share `SettingsObsidianCard`, which now carries the card
+  shadow (radius 24) and a `divider` hairline under the app bar; the
+  coaching-insight toggle dropped its hard-coded neon-lime colours and
+  follows the theme switch colour (olive light / lime dark); the attention
+  and sleep-window boxes are `surfaceLight` fills without borders. Goal
+  detail: every `accentBright` (neon C0FF00 in light) became `accent`, the
+  "I DID IT TODAY" button and the done-milestone check are olive with
+  `onAccent` glyphs, the commitment / rest-day / empty / milestone cards
+  carry the shared shadow, and meta pills are pill-shaped.
+
+- **2026-09-15 · A staked goal's card opens the challenge page; evidence
+  mirrors into the goal's check-in.** Miko found that marking a staked
+  goal done did nothing to its stake. Root fact (PRD CC-6, M-5): the stake
+  never reads the goal after creation — its verdict comes only from
+  evidence logged on the stake screens (timer / in-app camera / practice
+  "Record today"), and goal check-ins are self-report, which a money or
+  photo stake must not accept. So the two books were parallel and the
+  goal side was the trap: do the work on the goal card, forfeit the stake.
+  Settled: (1) `GoalCard` on a goal with a live stake
+  (`liveStakeForGoalProvider`) opens `StakeChallengeDetailScreen` instead
+  of the check-in sheet, and the quick-add + is replaced by a chevron — a
+  bare check-in is exactly the bypass the stake exists to prevent. (2)
+  Every evidence write (timer, camera, practice) also lands today's goal
+  check-in with the same amount via `StakeGoalCheckInBridge`, using the
+  card's own quick-add math (today's value on the check-in, "met" against
+  the evaluation-window total), so the goal's ring, streaks and coaching
+  stay true. Direction is evidence → check-in only. (3) The challenge page
+  grows a "View goal" link (goal details were previously reachable only
+  through the check-in sheet). *Rejected:* goal check-ins as stake
+  evidence — the server sums evidence regardless of `source`, so it would
+  technically pass, but it guts the commitment device; check-in-sourced
+  evidence stays practice-only. *Still open:* completing a staked goal
+  leaves the stake running silently — it should warn like delete does
+  (keep stake / surrender). Tests: `stake_goal_link_test`.
+
+- **2026-09-15 · Circle detail tabs (Activity, Commitments, Members,
+  Info) light style pass.** Same rule as the Community tab: chrome
+  unchanged (pinned header, scrollable tabs, FABs), tokens only — cards
+  `surfacePanel` + shared shadow at radius 20 instead of `surfaceDark` with
+  a 6 % hairline; badges/chips `surfaceLight`; dialogs and sheets on
+  `surfacePanel`; text-on-accent uses `onAccent` (was `Colors.black`);
+  muted copy uses `textSecondary`; tab bar gains a `divider` hairline and
+  bold selected label. Accent-tinted highlight cards (my commitment,
+  moderator) keep their tint borders on purpose — they are the one
+  "special" card per tab. Chat and Challenges tabs untouched for now.
+
+- **2026-09-15 · Recovery card collapses to one row; Chat + Challenges
+  tabs restyled.** (1) The "N tasks need you" card now shows only the
+  top-ranked row by default with an "N MORE ⌄" toggle (same pattern as
+  Promises' "N MORE"); the headline keeps the full count so nothing is
+  hidden about what is owed, and the existing 5-row cap + "+N more waiting"
+  applies once expanded. (2) The trailing control (×, ⋯ or nothing) sits in
+  a fixed 36 px slot so every "Do now" pill lines up. (3) Circle Chat and
+  Challenges tabs got the same token-only light pass as the other four
+  tabs; the black scrim over chat images stays black by design (it is over
+  a photo, not a surface).
+
+- **2026-09-15 · Completing a staked goal warns like delete does.** Follow-up
+  to the staked-card decision above: "Mark complete" on a goal with a live
+  stake used to flip the goal silently while the stake kept running toward
+  its consequence. Now `completeGoal` (goal_actions.dart, the one complete
+  path — the detail-screen menu no longer inlines the side effects) shows
+  the shared `showStakedGoalActionDialog` with `StakedGoalAction.complete`:
+  "Completing the goal does NOT end it — a stake can't be won early; it
+  decides at its deadline from the proof on the challenge page", then
+  "Complete, keep stake" (default) or, for solo non-points stakes,
+  "Complete & surrender stake" with the same priced-exit copy and the same
+  background optimistic-then-honest surrender as delete. Multi-party and
+  pending-verification stakes keep their existing no-surrender wording.
+  *Why surrender is offered at all on completion:* the server only judges
+  at the deadline, so a user who is done with the goal has exactly one way
+  to close the stake early, and it costs what it costs — offering it
+  honestly beats leaving them to discover the stake still ticking. The
+  unstaked complete path is unchanged (no dialog). Tests:
+  `staked_goal_action_dialog_test`.
+
+- **2026-09-15 · Time log export (Day / Week / Month → Markdown or JSON,
+  share sheet).** The Time page AppBar gains an export (⇧) button that
+  opens `ExportTimeSheet`: Period segmented Day | Week | Month widened
+  around the day being viewed (Week view anchors on today when it is this
+  week, else the week's Monday), a live preview line ("Logged 5h 10m across
+  3 of 7 days · untracked 1h"), Format chips Markdown (default, "for AI &
+  notes") | JSON ("for apps"), one Share button. The file is built from
+  Isar alone (`TimeExportService` → `fetchRangeOnce`), so airplane mode is
+  indistinguishable from online; the only failure story is the share
+  sheet being dismissed, which is not a failure. *Fidelity:* each day's
+  timeline is rebuilt with `buildTimeline` including the next morning's
+  first log as successor (the Day view rule), then summed — so per-day
+  numbers match the page exactly; a week total may differ from the Week
+  view by one cross-midnight entry, and the Day rule wins because it is
+  the truer one. Every activity is listed in the totals (no "Other"
+  folding — an export must not hide the long tail); categories appear
+  only when at least one rule applies. Both formats carry the same
+  `kTimeExportDurationsNote` so a model reading the file never treats an
+  inferred end as a recorded one; JSON entries carry `endSource`
+  (explicit / nextEvent / capped / ongoing). Internal ids and sync
+  metadata are never exported; times are local wall time with the zone
+  named once in the header. File name `sidepal_time_<periodKey>.md|json`.
+  *Pro gating (deferred):* `TierGate.canExportTimeLog` exists and returns
+  `true`; gating later is `=> isBypassed` there plus the upgrade pill in
+  the sheet — no other caller. *Rejected:* CSV (a timeline with untracked
+  rows and notes reads worse as CSV than Markdown, and JSON already covers
+  tooling); sharing both formats at once (two files makes the iOS share
+  sheet clumsy). Tests: `time_export_test` (periods, successor, renderers),
+  `time_tracker_ui_test` "Export sheet" group (share hook is a provider so
+  the test captures the file instead of hitting the platform).
+
+- **2026-09-15 · Goal template picker joins light mode.** The bento tones
+  were documented as "identical in both themes" (charcoal cards); on the
+  off-white page they read as a dark island, so `BentoPalette`'s five tones
+  now resolve per theme: dark keeps the charcoal recipe untouched, light
+  inverts it like goal tones (pale tinted surface, deep hue glyph, mid-tint
+  ring) and the cards/pill carry the shared shadow. Card text follows
+  (`textPrimary`/`textSecondary` in light). Add Task's flat chip colours are
+  unchanged — they invert to ink on select in both themes.
+
+- **2026-09-15 · Pre-launch audit: verified, nine decisions settled.** An
+  external audit (`AUDIT_PRELAUNCH_2026-09-15.md`, 32 findings) was
+  re-verified finding by finding against the code; the verdict table and
+  the eight fix batches live in `documentation/AUDIT_PRELAUNCH_FIX_PLAN.md`
+  (branch `fix/prelaunch-audit`). Settled: (D1) points earn sources and
+  stake evidence stay **self-reported** for launch — the 2026-07-16
+  softness is now explicit policy; the consequential sink (paid photo
+  removal) is neutralised and evidence gets a rules-level unit window;
+  a server evidence callable is post-launch. (D2) **Launch is free**:
+  the onboarding trial CTA goes, `TierLimits` cannot be enforced by RC
+  until a paywall exists, but the whole tier layer (`TierGate`,
+  `userTierProvider`, upgrade sheets) stays dormant and intact so the
+  RevenueCat design of 2026-07-20 drops in unchanged. (D3) Account
+  deletion retains only `points_ledger`, `stake_escrows`, and terminal
+  stake events (financial audit); everything else under and about the
+  uid is purged server-side with a durable job doc. (D4) Deleting an
+  account **cancels and refunds** every open stake for every participant
+  (points released, money escrows to refund_pending) — deletion is never
+  a forfeit. (D5) Tester mode becomes a server allowlist
+  (`tester_allowlist/{uid}`) and the crash trigger + Reminder Debug compile
+  in only under `SIDEPAL_TESTER_BUILD=true` (TestFlight); supersedes the
+  2026-09-12 entry's client-only gate. (D6) Session isolation for launch =
+  session generation + drain-before-wipe + cache/prefs clearing + the
+  provider list; per-UID Isar and the guarded-write funnel are the
+  post-launch structural follow-up. (D7) The unauthenticated waitlist
+  stays as is (no app code writes it; spam-only impact). (D8) Circle
+  create / join / request / approve / remove move to callables like
+  `circleJoinWithInvite`; membership is `status == 'active'` everywhere
+  (rules, storage, functions) and `users/{uid}/circleIds` becomes
+  server-owned. (D9) Work branches off `feat/home-light-redesign`; both
+  merge to main together.
+
+- **2026-09-15 · Audit Batch A built: circles are server-owned, verdicts are
+  bound, uploads are reserved.** Rules semantics now: membership = an
+  ACTIVE member doc (pending/removed grant nothing) in Firestore, Storage,
+  and the stakes callables; `users/{uid}/circleIds` and the new
+  `users/{uid}/entitlements` tree are carved out of the owner wildcard
+  (owner-read, server-write — the entitlements carve-out lands ahead of
+  RevenueCat so Pro never rides an owner-writable field); private circle
+  docs are readable by members only, so `watchCircles` listens per document
+  (a whereIn list query can't be proven against a resource-dependent rule);
+  member docs, memberCount, creatorId, circle create/delete are client-
+  write-denied — every mutation is a callable mirroring
+  `circleJoinWithInvite` (`circleCreate/Join/ApproveJoin/DeclineJoin/Leave/
+  RemoveMember/Delete/RepairIndex`), and approve is the one that could never
+  work client-side (cross-user index write). Legacy circle challenges: a
+  member may change only their own `memberProgress` key; `status` is
+  written only by the `circleChallengeVoteTally` trigger (majority of
+  ACTIVE members). Reactions: the write model is `reactionsByUser.{uid}`
+  (own key only, rules-checked with `diff().affectedKeys()`); the legacy
+  emoji→uids map is read-only and merged for display — *accepted:* a
+  pre-migration reaction can't be un-reacted. Stake photos: the client
+  calls `stakeReservePhotoUpload` before uploading; storage.rules requires
+  the caller's reservation, the trigger deletes unreserved objects without
+  screening, verdicts carry `{uid, path, generation}` and are applied only
+  when they match the participant's pinned photo (trigger, sweep, and the
+  create transaction all check) — a stranger's upload can no longer
+  activate or cancel someone else's draft. Evidence receipt time is the
+  Firestore createTime (trigger stamps it; sweep falls back to it), so a
+  delayed trigger can't void on-time evidence. Anonymous sessions can't
+  upload anywhere. *Rejected:* rules-only tightening without callables
+  (approve needs a cross-user write; count integrity needs one
+  transaction); a reactions subcollection (50 listeners per chat page);
+  kDebugMode-style client gating for uploads (rules are the boundary).
+  Tests: `rules-tests/circles.rules.test.js`, first Storage suite
+  (`test:storage` runs in its own emulator project — cross-service
+  lookups resolve against the emulator default project), Functions
+  `membership.test.ts` + binding tests. Deploy rules + storage + functions
+  with the client build.
+
+- **2026-09-15 · Audit Batch B built: the session generation is the client
+  account boundary.** `SessionScope` (lib/core/session) is bumped
+  synchronously the moment a logout / switch / deletion starts and stays
+  in "tearing down" until the wipe ends; long jobs capture a `SessionToken`
+  when they start and re-check it before every local write — the remote
+  pull funnels all 21 Isar transactions through one guarded `_write()`,
+  memory extraction drops the model's answer if its session ended and
+  refuses to start while tearing down (the logout path's AI-service dispose
+  used to fire an extraction that landed A's facts under B). The wipe now
+  DRAINS in-flight writers before clearing (a timeout was never a
+  cancellation) and clears the per-account files outside Isar (timer and
+  focus resume files, strategist proposals, announced insight, triage
+  counter); those files are also owner-tagged so a foreign copy reads as
+  nothing. The provider reset became a list (`userScopedProviders`) so a
+  widget-free coordinator can drive it; Plan Tomorrow, the four circle
+  families, the stake replicator, points balance, announced insight,
+  completions count and quick directives joined it and watch the uid.
+  Account deletion is an `AccountDeletionCoordinator` sequence: landing
+  barrier → reset → release push/geofence WHILE AUTHENTICATED (the token
+  doc delete was silently rejected after the Auth user was gone) → delete
+  → unconditional wipe; `mounted` guards UI only. *Deferred (post-launch,
+  logged as D6):* per-uid Isar directory + an architecture test banning
+  raw `writeTxn` outside the funnel, which retires the hand-maintained
+  list. *Rejected:* keying the timer file by uid hash (a tag + delete is
+  enough and keeps one file); cancelling the AI service's stash instead of
+  gating extraction on the teardown flag (the stash also serves restore).
+
+- **2026-09-15 · Audit Batch C built: deletion purges, refunds, and revokes.**
+  `stakeAccountPurge` now runs `purgeAccount`, an idempotent step inventory
+  recorded on `account_purges/{uid}` (stakes → memberships → user tree →
+  aiUsage → feedback → reservations); a failed step leaves the job
+  `partial` and the 15-minute sweep re-drives it — no more `.catch(warn)`
+  cleanup that "succeeds". Cancelling an open stake on deletion SETTLES it
+  (D4): every locked points side gets `stake_release_{id}`, every held
+  money escrow goes to refund_pending — the surviving opponent's stake was
+  previously stranded forever. Retained (D3): the points ledger, escrows,
+  and terminal stake records — financial audit rows that carry no profile;
+  `circle_invites` belong to the circle. The ledger helper is `tx.create`
+  now (a duplicate deterministic id fails loudly instead of overwriting the
+  audit row). Client: deletion re-authenticates with the account's actual
+  provider — Apple through the native sheet, whose fresh authorization
+  code is revoked via `revokeTokenWithAuthorizationCode` before `delete()`
+  (Apple's requirement); Google through the picker; password through the
+  existing dialog. A revoke failure is logged and deletion proceeds
+  (rejected: blocking deletion on Apple's endpoint). The delete dialog now
+  names what is kept. *Prerequisite (console, unverifiable from the repo):*
+  the Apple provider must carry Services ID / Team ID / Key ID / private
+  key, or revocation errors.
+
+- **2026-09-15 · Audit Batch D built: deletes converge, pushes can't
+  clobber, the queue is crash-safe.** Planning deletes leave a replicated
+  TOMBSTONE (`IsarDeletedEntity` ↔ `users/{uid}/deletedEntities/{type}_{id}`)
+  rather than a soft-delete field: fourteen files read the task/routine/
+  block collections directly, so rows stay hard-deleted and every reader is
+  untouched; the pull applies remote tombstones first (cascading, LWW
+  against the row's own updatedAtMs so an edit AFTER the delete is a
+  deliberate resurrection) and refuses to upsert a superseded row.
+  Firestore now enforces last-write-wins on the user tree (`updatedAtMs`
+  may not go backwards on update; ties pass) and the outbox drops a
+  denied upsert as "lost the race". The queue file is written
+  temp-then-rename and a corrupt file is set aside instead of breaking
+  boot; ops carry attempts + next-attempt with exponential back-off,
+  permanent errors are dropped, every write is bounded (15 s) so an
+  offline flush ENDS and the amber line finally shows on network loss
+  (Firestore's own offline persistence made `set()` hang silently), and
+  a flush superseded by logout discards its failures. Init and
+  reconnect push before they pull. Cursors re-read a 5-minute overlap,
+  clamp future-dated stamps, and a full reconcile pull runs daily.
+  *Rejected:* moving the outbox into Isar for entity+op atomicity (touches
+  ~15 write paths; the durable-enqueue window is milliseconds — logged as
+  a known gap); soft-delete `active` on planning models (reader blast
+  radius). Goals / reminders / time blocks should adopt the tombstone
+  helper next.
+
+- **2026-09-15 · Audit Batch E built: paid AI work is gated before
+  dispatch; attestation is wired; launch is free.** Every quota rejection
+  reason now sets the over-quota marker, the `loopIndex > 0` escape hatch
+  is closed (follow-ups of a turn THIS instance charged keep the concurrent
+  fast path; unknown turns clear the quota transaction first; known
+  over-quota callers never reach OpenAI), and speech clip caps mark the
+  turn. App Check: client activates App Attest (DeviceCheck fallback) in
+  release and the debug provider otherwise, the two manual HTTP streams
+  send the header, and all four paid endpoints honour the ONE
+  `ai_enforce_app_check` key — still OFF until an attested build has
+  shipped (flipping it earlier rejects every real user). A second key,
+  `ai_require_verified_email` (OFF), makes password accounts verify their
+  email before AI use, closing the disposable-account replenishment path
+  when announced. Tier: `kPaywallAvailable = false` locks `enforced` off
+  on every live limit fetch (the parser stays faithful so gate mechanics
+  remain tested), the placeholder `setEntitled` is inert, and the
+  onboarding premium screen makes no trial or price claim. RevenueCat
+  lands as its own PRD on the 2026-07-20 design, reading the server-owned
+  `users/{uid}/entitlements/pro` carved out in Batch A.
+
+- **2026-09-15 · Audit Batch F built: self-report is policy, and its one
+  dangerous sink is fenced.** Earn sources and stake evidence stay
+  client-asserted for launch (D1) — verifying a task doc the client wrote
+  proves nothing — so the guarantees are structural instead: the balance
+  doc carries a `trusted` share (signup bonus + challenge wins, the only
+  server-decided sources) and early photo removal is payable from that
+  share only; evidence rows must fall inside the unit's day window (units
+  are action days, +1 day of local-boundary grace), below the goal's unit
+  count, at most 2× the unit target, and not future-dated; every settled
+  outcome records `evidenceSelfReported: true`. *Rejected:* reading the
+  referenced artifact in `grantPoints` (client-writable → theatre);
+  disabling removals outright (the trusted fence keeps the feature for
+  honest winners); a `stakeAddEvidence` callable now (post-launch, with
+  session-bound timer proofs). Balances that predate the deploy have no
+  trusted share until they win or the bonus lands — expected.
+
+- **2026-09-15 · Audit Batch G built: voice can't strand, failures reach
+  Crashlytics, dev surfaces need a grant and a tester build.** TTS playback
+  wires the `play()` rejection and the player's error stream into the
+  latch before waiting and bounds each clip (2× duration + 10 s), so a lost
+  audio session fails over to the on-device voice instead of a permanent
+  SPEAKING orb (and is no longer recorded as a FATAL). Voice startup owns a
+  generation, is bounded (8 s), never throws, returns false so the screen
+  releases the sync deferral, and pauses on `hidden` and on audio-session
+  interruptions (phone call / Siri) — `inactive` deliberately not (Control
+  Center and banners would pause every turn). Handled failures now reach
+  Crashlytics as sanitized non-fatals (feature tag + error type + Firebase
+  code; never the message — task titles ride in messages), deduped per
+  site and capped per session; a failed Firebase init boots the app
+  local-only and retries later instead of white-screening. Tester mode is
+  granted per account via `tester_allowlist/{uid}` (console-written; the
+  seven taps are a request) and the crash trigger + Reminder Debug compile
+  in only with `--dart-define=SIDEPAL_TESTER_BUILD=true` — supersedes the
+  2026-09-12 client-only gate. *Process consequence:* one binary cannot be
+  both; internal TestFlight builds carry the define, the App Store
+  submission does not. *Rejected:* kDebugMode gating (collection is off in
+  debug); pausing on `inactive`.
+
+- **2026-09-18 · Recovery Card checks liveness; non-active goals leave
+  analytics; 7-day bars are one colour.** (1) The card's rows are
+  occurrences, and occurrences outlived their entities on several paths —
+  a goal deleted, paused or completed kept its overdue day (nothing ever
+  closed goal occurrences), a task tombstoned from another device kept its
+  row — so "Do now" opened "Goal not found" or dumped the user in the Hub.
+  `recoveryViewProvider` now filters through `RecoveryLiveness`: a goal row
+  needs an ACTIVE goal, a task row needs a task that exists and is not
+  completed; unknown kinds pass. Producers were fixed too:
+  `cancelForGoal` resolves every open goal occurrence as expired (pause,
+  period end, delete), `completeGoal` resolves them as completed first,
+  `confirmDeleteGoal` deletes them outright. "Do now" on an overdue task
+  from an earlier day opens that task's own detail via the new
+  `PlanningRepository.getTaskById` (Isar-only; the Firestore delegate
+  returns null — a collection-group lookup would need its own index).
+  *Rejected:* trusting producers alone (a remote tombstone has no local
+  hook); requiring today's plan (an older overdue task that still exists
+  is a real debt and stays). (2) The goal/habit day snapshot and the Day
+  detail counted every non-paused goal in period, so a COMPLETED goal
+  inflated "N of M goals/habits" on Home; both now count ACTIVE only, the
+  same rule as `todaysActiveGoalsProvider`. Cached past snapshots keep
+  their history. (3) The hero's 7-day bars: past days wore slate grey and
+  read as disabled next to today's teal; they are now the same teal at
+  42 % alpha, today full strength. Future days stay hollow.
+
+- **2026-09-18 · "If you miss it" moves into Advanced settings; Critical
+  for every class.** The chooser sat directly under the reminder card, and
+  its Critical switch appeared only for EXPIRES — which read as if a task
+  that "comes back" or "adds up" could never be important enough. The two
+  are different questions: the segments decide what a MISS means (taxonomy),
+  Critical decides how LOUD the reminder is (criticality 3 pierces the
+  interruption boundary, Focus Shield and sleep window; the ladder already
+  treats the two independently). Now: `AddTaskAdvancedSection` hosts the
+  chooser + Critical, rendered only while a reminder is on (classification
+  shapes the ladder, FR-R-23); Critical is offered for all three classes;
+  picking Critical still makes the current class the user's answer so
+  criticality 3 has a class to ride on. Sleep never shows Advanced and so
+  never sees the chooser (its alarm has its own contract). Editing a task
+  with a user classification opens Advanced. *Rejected:* keeping Critical
+  tied to EXPIRES; showing the chooser with the reminder off (a stored
+  class would be armed with nothing to arm). Item 4 of the same request
+  (time-tracker on/off switch) was withdrawn — the feature is optional
+  enough already.
+
+- **2026-09-18 · Time page footer switch: show the tracking pill on Home
+  or not.** Item 4 returns in its narrowest form: one `Show on Home`
+  switch at the bottom of the Time page, persisted as
+  `UserProfilePreference.homeTrackPillEnabled` (default true, so rows from
+  before the field and a fresh install both show the pill — superseded
+  2026-09-27: off by default, stored as `homeTrackPillOn`). It decides
+  ONLY whether Home renders `TrackPill`; the Time page, its history, the
+  Profile row, Siri, timer-sourced logging and the intended-duration
+  reminder are untouched — Miko: "nothing more". Local write, Isar watch
+  stream, Home updates on the same frame. *Rejected:* a Profile settings
+  row (the switch is about the pill, so it sits with the tracker); hiding
+  the Time page or its history when off.
+
+- **2026-09-18 · Photo takedown: always offered, honest about points, and
+  available BEFORE the reveal; the mercy veto is announced; money stakes
+  parked.** (1) The client gated the "Remove" button on total balance
+  while the server checks the TRUSTED share (signup bonus + wins), so
+  people hit the server's refusal after confirming. Now the balance mirror
+  carries `trusted` (`IsarPointsBalance.trusted`, pulled with the
+  balance, `pointsTrustedProvider`), the button is ALWAYS visible while a
+  takedown exists, and a tap explains itself: before the floor → when it
+  unlocks; short on trusted points → what counts and how to earn it
+  (`photoRemovalShortfallCopy`). (2) **Pre-reveal door (Miko: "if you can
+  remove it, do it before it's posted")**: between the deadline and the
+  server's decision, a screened-but-unposted photo can be taken down for
+  the same 300 trusted points; it then never posts — `stakeRemovePhoto`
+  accepts `pending_verification` + `photoState: approved`
+  (`photoRemovalDoor`), the sweep leaves a `removed` photo alone on
+  decide (no reveal, no feed line, veto not burned). No floor applies:
+  nothing was exposed. This deliberately narrows D9's "no amount of points
+  shortcuts the floor" to the post-reveal case. The client offers it only
+  when the device predicts a loss (`predictedSoloPass`, mode thresholds
+  from D3), with the veto alongside. (3) A post-reveal takedown posts one
+  neutral feed line (`stakePhotoRemoved`, "took their stake photo down
+  early") per P-5; pre-reveal has nothing to announce. (4) **Pre-reveal
+  notice**: the stake sweep pushes once, ~1 h before a solo photo decision
+  that would reveal (`preRevealNoticeDue`, dry-run `decideChallenge`),
+  naming the veto and the takedown; stamped `preRevealNoticeAtMs` only
+  when FCM accepted a send (P2-02), skips stamped with a reason. A tap
+  opens the Accountability tab. The veto rule ("one free mercy veto every
+  30 days") is now stated at commit time and on the pending-outcome card,
+  with availability read from `enforcement/{uid}`. (5) `kMoneyStakesEnabled
+  = false` replaces the debug-only money gate: no build offers a money
+  stake; server rails untouched. *Rejected:* a local notification for the
+  notice (the server's evidence view decides; a client-side guess could
+  warn a winner); auto-applying the first veto (the user asked to be TOLD,
+  not to have it spent for them); hiding money types from the hub
+  (existing docs must still render). Functions 309 green; needs a
+  functions deploy (`stakeRemovePhoto`, `stakeSweep`).
+
+- **2026-09-19 · Coach sheet: the ask-bar peek exists only for an empty
+  thread; the thread never paints clipped.** On-device (Miko): after
+  sending from the FAB's ask-bar, the sheet sat at ask-bar height with the
+  reply out of sight and the last bubble clipped behind the composer.
+  Cause: the peek fraction is pixel-anchored, so it changes every frame
+  while the keyboard closes; `_repinPeek` re-pinned any sheet still within
+  4 % of the OLD peek — which a just-started grow animation always is —
+  and the jump cancelled the grow. Now: the screen publishes "thread has
+  messages" to the sheet (`sheetThreadNotifier`); with messages the re-pin
+  is replaced by "settle at the conversation stage" (animate to 60 % on
+  the keyboard path; on message events only OBSERVE — the screen's own
+  grow is in flight and a second animateTo would restart it and defeat
+  the overflow-to-full measurement), the header drag never targets the
+  peek, and the peek leaves the snap list — but only once the sheet
+  actually sits at 60 % (`_peekRetired`): DraggableScrollableSheet
+  re-settles on the nearest stage whenever `snapSizes` changes, and a
+  list without the peek while the sheet is still near it settles on the
+  dismiss floor. Under 96 px the thread area is hidden with `Visibility`
+  (size maintained) instead of clipping. *Rejected:* swapping the thread
+  for an empty box at small heights — the thread's scrollable carries the
+  sheet controller, and the swap mid-animation detached it, so the sheet
+  never grew (caught by the peek-layout tests).
+
+- **2026-09-19 · Home chrome: one action; the sync button is the light
+  pull.** The Home sync button ran `syncFromRemote(force: true)` — the
+  same cursor-less full reconcile sign-in uses (20 sequential pull phases,
+  60 s ceiling), which on a slow link spins for most of a minute and reads
+  as hung. `SyncService.syncFromRemote` gains `bypassThrottle` + `timeout`:
+  the button now skips the 30 s throttle only, keeps the cursors, never
+  promotes to the daily full pull, and caps at 20 s. `force` keeps its
+  heavy meaning for sign-in and first launch. The accountability-history
+  shortcut (clock) and the placeholder bell left the AppBar (Miko: "we
+  don't need them now"); the history screen keeps its route and the bell
+  returns with a notification center, superseding the 2026-09-14 "bell
+  stays non-interactive" note.
+
+- **2026-09-19 · Coach thread: newest message anchored to the TOP; no
+  frame without the reply; Time footer pinned.** (1) The thread scrolled
+  "to the bottom" once per message, computed against a viewport still
+  changing (sheet growing, keyboard moving), so from the second reply on
+  the newest text sat below the fold. Now the latest exchange is anchored
+  ChatGPT-style — the user's newest question at the top of the thread
+  viewport, the reply flowing beneath it; anchoring the reply itself
+  scrolled a one-line question out of view (`_anchorLatestToTop`,
+  `threadAnchorIndex`,
+  `Scrollable.ensureVisible` alignment 0, a GlobalKey on that item, and
+  trailing space under the list so any last message can sit at the top);
+  a viewport change re-pins it frame by frame without animation; a user
+  who scrolled the thread themselves is not yanked until the next message;
+  a streamed reply grows downward from its anchor, so there is no tail to
+  follow. The overflow-to-full check subtracts the trailing space.
+  (2) Every bubble flickered as a typed reply landed: `_setLoading(false)`
+  notified listeners between "thinking bubble removed" and "reply added",
+  painting one frame with neither. The flip is silent now; one notify at
+  the end of the turn carries both, then the queue drains. Bubbles are
+  keyed by message id so list mutations keep their elements, and the body
+  skips the loading state on provider reloads. (3) The Time page's
+  "Show on Home" switch moved from the end of the list to a pinned
+  footer (`bottomNavigationBar`), above the home indicator, with the
+  Track button floating above it. *Rejected:* following the streamed tail
+  (pushes the reply's start out of view); morphing the loading bubble
+  into the reply in place (ids feed retry/undo bookkeeping).
+
+- **2026-09-19 · Deployed `stakeRemovePhoto` + `stakeSweep` to
+  `coach4life-afaaa`** (the only functions whose behaviour changed since
+  the 2026-09-16 audit deploy; `--only` those two). Live: the pre-reveal
+  takedown door, the post-reveal `stakePhotoRemoved` feed line, and the
+  pre-reveal notice push. Deploy output repeats a pre-existing warning:
+  `circleChallengeVoteTally`, `stakeEvidenceArrived` and
+  `stakeDisbursementReceipt` run in us-central1 while their triggers are
+  in africa-south1 — a latency nit, not an error.
+- **2026-09-20 · Deployed `firestore.rules` to `coach4life-afaaa`** —
+  the `memberProofs` rules from d0b0ddc are live. Same day: first
+  TestFlight upload, SidePal 1.0.2 (3), built with Xcode 26.3 / iOS 26.2
+  SDK (Apple now rejects anything older); `ITSAppUsesNonExemptEncryption`
+  = false added to Info.plist; Elaris-team APNs key (Sandbox & Production)
+  replaced the Sandbox-only one in Firebase Cloud Messaging. Apple warns
+  that from spring 2027 MinimumOSVersion must be ≥ 15.0 — so the same day
+  the iOS deployment target was raised 13.0 → 15.0 (Podfile + all three
+  pbxproj configs; every plugin already required ≤ 15). Takes effect on
+  the next upload; build 1.0.2 (3) stays valid as-is.
+- **2026-09-20 · TestFlight build 3 white-screened on launch: `IsarError:
+  Could not initialize IsarCore library for ios_arm64`** (read off the
+  device syslog via the `[boot]` breadcrumbs). Root cause: the archive
+  step runs `strip` with STRIP_STYLE=all, which removes the export-trie
+  entries dart:ffi's `DynamicLibrary.process()` resolves at runtime —
+  verified by stripping a working Runner both ways (all → 0 isar_*
+  exports, non-global → 108). `flutter run/build --release` never strip,
+  so every device pass was green and only the App Store archive broke.
+  Not Xcode-26-specific; last night's 16.4 archive would have failed too.
+  Fix in `ios/Flutter/Release.xcconfig`: `STRIP_STYLE = non-global` plus a
+  belt-and-braces `-force_load` of the plugin's own libisar.a slice (the
+  CocoaPods-copied intermediate can't be referenced — Xcode 26 validates
+  linker inputs before script phases run). Build 1.0.2 (4) verified on
+  device via USB install before upload. Rule: after any archive, check
+  `xcrun dyld_info -exports Runner | grep -c isar_` is non-zero.
+
+- **2026-09-19 · Six fixes from Miko's device pass: Direction close-out,
+  commitment confirm + optimistic tick, challenge proofs that go
+  somewhere, circle header fit, Explore "+ Circle", profile stats card.**
+  (1) **Direction close-out** — supersedes decision 7's "no notification"
+  for one moment: when a period with a written direction ends, one quiet
+  local notice on the last day at 19:00 (month, quarter and year alike)
+  asks how it went; a tap opens the Direction page, where the previous
+  period's row shows three chips — Achieved / Partly / Not yet — until
+  answered. The answer is `DirectionEntry.outcome` (+ `outcomeAtMs`),
+  synced like the text (Isar + outbox, LWW). The rollover suggestion then
+  reads "Last month (partly): …". `DirectionCloseoutScheduler` re-arms on
+  bootstrap and after page writes; pure timing in `DirectionCloseout`.
+  *Rejected:* auto-carrying a "not yet" into the new period (the user
+  decides what next); a server push (the timing is a local calendar
+  fact). (2) **Weekly commitment "+"** now asks ("Mark progress? 2 of 3")
+  and shows the tick at once; `commitmentExpectedCountProvider` carries
+  the expected count over the Firestore transaction and drops it on
+  failure or once the stream catches up. (3) **Challenge proof photos**:
+  the sheet closes at once; `ChallengeProofUploads` runs the progress
+  transaction, then the upload, then attaches the proof to the challenge
+  doc (`memberProofs.<uid>` — rules now allow a member's own key) and
+  posts a feed line: with the photo when the member chose to share
+  (`challengeProofPosted`, value = URL), a plain "logged progress" line
+  otherwise. The member's row shows the optimistic delta and an honest
+  status with retry. Private proofs show only on the uploader's own row;
+  storage reads stay member-wide (privacy is a display rule for now).
+  Before this the photo was stored and never referenced. **Rules deploy
+  needed** (`memberProofs`). (4) **Circle header** was ~30px shorter than
+  its own content (expandedHeight included the tab strip), so the avatar
+  row overlapped the tabs; the name moved into the toolbar, the header
+  is sized to its content, and the tab strip is opaque. (5) Discover
+  circles gets the same "+ Circle" FAB as the tab. (6) The profile stats
+  card opens Progress.
+
+- **2026-09-22 · First launch: the seed gate holds five seconds at most,
+  the pull runs in waves, a new account skips it.** "Loading your plan…"
+  took up to a minute on a first sign-in or guest start. `FirstLaunchGate`
+  awaited `syncFromRemote(force: true)` — a cursor-less `RemoteIsarMerge`
+  of ~20 Firestore round trips run one after another under a 60 s cap —
+  even for a uid minted seconds earlier with nothing to pull, and twice on
+  a guest → existing-account switch (AuthGate's wipe pull, then the
+  remounted gate's). Now: (1) the gate reveals on the first of already
+  seeded / account created on this device / critical phases merged / a
+  5 s cap (`kFirstLaunchRevealCap`), and writes `isar_seeded_v1` only for
+  a pull that succeeded; the pull keeps running behind the live UI and the
+  Isar watches fill the screens. (2) The merge runs tombstones, then a
+  critical wave (routines + tasks, active goals with their subcollections,
+  reminders, analytics stats) that completes `firstScreenReady`, then
+  everything else — the phases of a wave concurrent, per-parent fan-outs
+  capped at `fanOutLimit` (6) in flight. (3) "Account created on this
+  device" is `additionalUserInfo.isNewUser` captured in `AuthRepository`
+  (`account_created_uid_v1`, uid-keyed, consumed once by the gate), with
+  Firebase's creation ≈ last-sign-in stamps as the fallback; a keychain-
+  restored anonymous session matches the fallback and its old data lands
+  through the background pull seconds after reveal (accepted). (4)
+  AuthGate's uid-change handler keeps the blocking wipe and drops its own
+  pull — one seed owner, one code path. (5) The 60 s timeout now calls
+  `RemoteIsarMerge.cancel()`, cooperative on purpose: later phases,
+  fan-out items and Isar writes stop at the next checkpoint; a Firestore
+  query already in flight cannot be recalled, it finishes and is dropped.
+  Before this the abandoned merge kept spending the link after the gate
+  moved on. (6) After a failed full pull the daily promotion backs off
+  `fullPullRetryBackoff` (5 min); `force` callers and the Home button's
+  light path are unaffected — the button stays the 2026-09-19 light pull.
+  (7) `completeDeferred` holds its non-essential tail (push registration,
+  circle streaks, memory extraction, thinking loop, per-user maintenance)
+  on `FirstScreenReady`, released the moment the gate reveals, 20 s
+  ceiling for boots where the gate never mounts. (8) `[sync]` per-phase
+  timing breadcrumbs and a `[boot] first screen ready` line, `print` so
+  they survive release. *Rejected:* keeping AuthGate's pull and deduping
+  the gate's (two owners coordinating); blocking on analytics events (the
+  history streams in, the progress ring may tick up after reveal);
+  waiting for the whole background pull before releasing the deferred
+  tail. Failure story: an offline existing account on a fresh install
+  gets Firestore's empty cache and an instant reveal, cursors at 0 fill
+  in when the link returns; a timed-out seed reveals at the cap, stops
+  at its next checkpoint, and retries on the next trigger without thrash.
+  Tests: `first_launch_gate_test` (reveal reasons, honest flag),
+  `remote_isar_merge_waves_test` (first-screen ordering, cancel, teardown
+  abort), `sync_service_remote_test` (signal forwarding, backoff),
+  `auth_session_policy_fresh_account_test`, `first_screen_ready_test`.
+
+- **2026-09-22 · Onboarding primary button is the app's lime, not the
+  Aether gradient.** Miko, from a device recording of the register step:
+  "Create my account" was the only violet button in the product. Every
+  onboarding step's `AetherButton` now renders flat neon lime with dark
+  text and a soft lime glow (`OnboardingColors.cta` / `ctaText` /
+  `ctaLimeGlow`), the same button as everywhere else. Scope is buttons
+  only, on Miko's call: the journey progress line and the AI-demo card
+  keep the violet gradient as accents.
+
+- **2026-09-22 · One lime primary button, set at the theme.** Miko: the
+  accountability hub's "New Challenge" FAB didn't match the other buttons,
+  "find any that don't". Cause: `ColorScheme.fromSeed` derives a TONAL
+  primary from the lime seed, so every theme-default `FilledButton` (~50
+  call sites) and FAB rendered a washed-out lime next to the explicit
+  `AppColors.accent` buttons. Fix in `app.dart`: `filledButtonTheme` and
+  `floatingActionButtonTheme` carry `accent` / `onAccent` (disabled states
+  keep the Material defaults), so call sites need no colors. Normalised
+  the explicit outliers: `AuthPrimaryButton` (`accentDim` + black →
+  accent/onAccent), the scheduling-conflict "Continue & save"
+  (`Colors.green.shade700` override removed — the default is the lime
+  now), the AI "apply plan" and planned-changes confirm
+  (`accentBright`/`accentDeep` → accent/onAccent). Left alone on purpose:
+  destructive red buttons (leave circle, delete), secondary/soft buttons
+  (`fg12`, `inkElevated`, `surfaceLight`, the Plans-changed "Skip" tonal,
+  which now sets `fg12` explicitly because the theme would have made it
+  primary), the goal counter's goal-tinted button, and the Apple sign-in
+  button (Apple's branding rules).
+
+- **2026-09-22 · Live stake: the challenge page is the goal's only face.**
+  A staked goal's card already opened the challenge, not the goal
+  (2026-09-15), and the challenge's "View goal" link was the only door to
+  the goal page — where "0 of 1 elapsed day marked done" read as the
+  place to log, and edit/pause/complete would alter a frozen commitment.
+  Miko: hide it. `stake_challenge_detail_screen`: "View goal" shows only
+  once the challenge is terminal; while live, the goal's operational
+  checklist is mirrored read-only ("Goal steps", `_LinkedGoalActions`,
+  Isar watch) so nothing useful is lost. *Rejected:* keeping the link and
+  making the goal page stake-aware (two places to explain one rule).
+  Follow-up: the frozen goal said "60min a day · 5 days" while the live
+  goal said "60 minutes (per week)" — the minute mismatch is next.
+
+- **2026-09-22 · Stake target is per action day; the minted goal's target is
+  per cycle.** The challenge said "60min a day · 5 days", the goal it
+  minted said "60 minutes (per week)": the create flow copied the per-day
+  `unitTarget` into `UserGoal.targetValue`, which the goal page reads per
+  repeat cycle. `goalCycleTargetForChallenge` (domain, pure, tested)
+  converts at the mint — weekly × scheduled weekdays, monthly × month
+  days, daily/every-N unchanged, empty schedule never zeroes. The
+  challenge is unchanged; linking an existing goal mints nothing. Miko:
+  new goals only — goals already minted with the per-day number are left
+  for the user to edit (pre-launch data, no repair sweep).
+
+- **2026-09-22 · Coach sheet: the conversation stage is pixel-anchored,
+  like the peek.** Miko, on device: sending the first message from the
+  ask-bar peek showed nothing until the reply landed. Reproduced in a
+  widget test with a simulated keyboard: the sheet DID grow to its "60%"
+  stage, but 60% of the space left above a phone keyboard is 305pt against
+  a 244pt input-only peek — ~60pt of thread, invisible in practice. The
+  peek had already solved this for itself by anchoring to pixels
+  (2026-07-16); the conversation stage now does the same:
+  `_conversationFraction` = 0.6 of the SURFACE re-expressed against the
+  available space (→ ~1.0 with a keyboard up, 0.6 without), threaded to
+  the screen as `sheetMidFraction` and used by every grow/snap/settle
+  path; `_repinMid` keeps a sheet sitting at the stage on the same pixel
+  height when the keyboard toggles (no balloon to full page on close, no
+  shrink on open). Regression test:
+  `coach_sheet_in_flight_grow_test` (gated client keeps the turn in
+  flight; with and without keyboard the user bubble + thinking dots must
+  be visible and the sheet must leave the peek). *Rejected:* dismissing
+  the keyboard on send (the user may want to type again) and jumping to
+  full page on send (the 2026-07-17 "fits 60% → 60%" rule still holds).
+
+- **2026-09-22 · Coach suggestions: a live thread gets a little card, never
+  the inline list.** Miko, on device: with a conversation underway the
+  "Suggestions for today" list sat above the bubbles, clipped, fighting
+  the thread for the sheet's height. Option A of three (Home-only and
+  Home+coach were the others): `ProactiveSuggestionsCoachPanel(compact:
+  hasMessages)` renders a tappable card (title, count, chevron) whenever
+  the thread has messages; tapping it — or Home's "see all in Coach"
+  intent — opens the list as its own sheet over the coach
+  (`showProactiveSuggestionsSheet`, provider-watched so dismissals update
+  the count). An empty chat keeps the open inline list, where the
+  suggestions are the content. Test: compact renders no inline cards and
+  the tap opens the sheet.
+
+- **2026-09-22 · Suggestions leave the coach for the Progress DAY view,
+  collapsed.** Supersedes today's earlier "little card in the coach"
+  entry (Miko: "just remove the insight in the AI chat and only put it in
+  Progress with a collapsible card"; Day view only; collapsed by
+  default). `DaySuggestionsCard` (progress/) sits under the day hero for
+  today only: one line with the count, tap to expand the same
+  `ProactiveSuggestionCard`s in place, nothing when nothing is active.
+  Removed from the coach: the panel widget and its test,
+  `CoachRouteArgs.openSuggestionsPanel`, the show rule, and the FAB's
+  suggestions dot (the blocked-plan red dot stays). Entry points
+  re-pointed: Home's morning snackbar now reads "Suggestions for today
+  are ready" and opens Progress (horizon set to day); the morning-brief
+  push still opens the coach with its pre-drafted "quick plan for today"
+  — that promise is a conversation, not the list. Test:
+  `day_suggestions_card_test` (collapsed default, expand/collapse, empty
+  renders nothing).
+
+- **2026-09-22 · Coach composer: Send drops the keyboard.** Miko's call,
+  superseding the "keep the keyboard up on send" note in today's
+  pixel-anchored-stage entry: the ask-bar still opens focused (keyboard
+  up by itself the first time), tapping Send unfocuses the input so the
+  keyboard slides down and the thread gets the screen, and nothing brings
+  it back on its own — not the reply landing, not the sheet growing; a
+  tap on the field does. Coach chat only; sheet growth unchanged. The
+  remaining programmatic focus requests are all user taps (prompt chips,
+  quick directives, "Edit plan", leaving Voice Mode for typing) and stay.
+  Test in `coach_sheet_in_flight_grow_test`.
+
+- **2026-09-22 · Coach bubbles: one SelectionArea per bubble, not one
+  around the thread.** Miko's device log showed five
+  `'!_selectionStartsInScrollable': is not true` assertions from
+  `onLongPressMoveUpdate`: the copyable-bubbles feature (§8 U8) wrapped
+  the whole scrolling thread in a single `SelectionArea`, and a
+  long-press drag that starts inside a scrollable trips that Flutter
+  framework assertion (debug-only, but long-press-to-copy was fragile).
+  Each bubble's text now carries its own `SelectionArea` in
+  `chat_bubbles.dart`; the list-wide one is gone. Long-press still
+  selects and copies, scoped to the bubble under the finger.
+
+- **2026-09-23 · Getting Started tour: the verdict is per account and waits
+  for trustworthy rows.** Trigger: an external QA report (iOS, build 4)
+  said a brand-new email account landed on Home with no guided tour. The
+  fresh-install path in code was correct; the real holes were at the
+  account boundary. (1) The new-vs-existing verdict lived under one
+  device-level prefs key and relied on the wipe's clearing order. (2) On an
+  in-session switch, `invalidateUserScopedProviders` runs BEFORE
+  `clearLocalSession`, and Riverpod rebuilds the invalidated controller at
+  once because the tour layer is still listening for that frame — so the
+  new instance judged the incoming account by the OUTGOING account's prefs
+  and Isar rows, and that instance survives the remount. (3) Since the
+  capped reveal (2026-09-22), an existing account's tasks can still be
+  landing when Home paints, so the probe could call a veteran "new".
+  Fix: the key is `education_onboarding_state_v1:<uid>` (legacy key
+  migrates once to the signed-in account, then is deleted; the wipe keeps
+  removing only the legacy key, so a returning account keeps its own
+  answer); the provider watches `authUidProvider` and a signed-out
+  controller decides nothing; before probing, the controller awaits
+  `SessionScope.whenIdle` (new) and `FirstLaunchGate.seedSettledFor(uid)`
+  (new per-uid signal: already seeded / fresh account / pull ended; a
+  pending entry is shared, asking never reopens a settled one, a new mount
+  for that uid replaces it, and `clearLocalSession` forgets them all with
+  the seeded flag), capped at 30 s so a tree without the gate still
+  decides. A guest who registers
+  keeps the same uid (anonymous link), so their tour carries over on
+  purpose. *Considered:* invalidating after the wipe instead (rejected:
+  the synchronous teardown start is what makes stale session tokens drop
+  their results). Tests: `getting_started_controller_test` (account
+  boundary group), `education_prefs_test`, `session_scope_test`,
+  `first_launch_gate_test` (seedSettledFor group).
+
+- **2026-09-23 · QA report follow-ups: honest diagnostics copy, APNs retry,
+  Terms hint, hollow zero days.** From the same external iOS report. (1)
+  Reminder Health (`reminder_health_section.dart`) is now written for the
+  person: "Armed right now" with a line explaining that later days hold one
+  slot and that 56 is the safe share of the 64 limit; "Last check: Not yet
+  since the app opened" with what the check does; "Server backup" renamed
+  "Push backup: Connected / Not connected yet" with a line saying reminders
+  work without it. The section invalidates `reminderHealthProvider` on
+  mount, because the non-autoDispose provider otherwise served the first
+  visit's snapshot for the life of the process (the tester's 6:31 PM visit
+  showed stale numbers). No severity changes: push stays context, never a
+  fault. (2) `PushMessagingService` fetches the FCM token through
+  `_tokenWithRetry`: on iOS it polls `getAPNSToken()` first (10 × 500 ms),
+  then retries `getToken()` on `kPushTokenRetryDelays` (2/5/15/30 s) —
+  `getToken()` throws `apns-token-not-set` until APNs arrives, and the old
+  single try left the device unregistered all session on a slow link.
+  (3) Sign-up shows "Tick the Terms box above to create your account."
+  under the dimmed button until the box is ticked (the 40 % opacity read
+  as broken). (4) Home's 7-day bars draw a past zero day hollow, like a
+  future day; today alone stays a solid stub at zero. *Considered:* making
+  the health provider autoDispose (rejected: the Home hint keeps it alive,
+  so Settings would still get Home's snapshot); showing the individual
+  armed reminders to everyone (deferred: the tester build already has the
+  "Armed reminders" page).
+
+- **2026-09-24 · First Crashlytics pass on the TestFlight build: handled
+  cases stop being fatals.** Build 1.0.2 (4) showed 12.5 % crash-free
+  users, but three of the four "crashes" were Dart exceptions the app
+  survived, filed as fatal by the `PlatformDispatcher.onError` handler
+  (`main.dart`), and the fourth was the build-3 strip regression already
+  fixed. Fixes, in the order of user impact: (1) the stake detail screen's
+  two live listeners (`hydrateChallengeLive`, `stakes_repository.dart`)
+  get an `onError` — a denied read (viewer not a participant, or signed
+  out with the screen mounted) ends the stream quietly and files a
+  non-fatal `stakes.liveHydration.*`; (2) `AuthGate._onAuthStateChanged`
+  checks `mounted` after its awaits before touching `ref` — the wipe can
+  remount the tree mid-handler; (3) the uid-changed abort in
+  `RemoteIsarMerge` is a typed `SyncAbortedUidChanged` and
+  `SyncService._runRemotePull` logs it without reporting — the guard
+  working is not a failure; (4) `ensureCircleIndex` never throws: network
+  conditions (`unavailable`, `deadline-exceeded`, `unknown`) are logged
+  only, real defects go to the non-fatal funnel as `circles.repairIndex`,
+  and the discovery screen no longer awaits the repair before opening a
+  circle the user is already in (access rests on the member doc, and the
+  callable can take a minute on a weak link); (5) dSYMs for builds 3 and 4
+  uploaded by hand from the local archives. *Rule going forward:* a
+  fire-and-forget call site must own its failure — catch, log, decide
+  what is worth a non-fatal. A background callable that can time out on a
+  slow link is never a Crashlytics fatal. *Left open:* 134
+  `sync.outboxDropped.analyticsStats` permission-denied drops on one
+  device (the LWW rule is the only rule that can reject an own-user
+  update; a future-stamped stored doc is the leading theory, unverified —
+  read one of that user's `analytics_stats` docs in the console); the
+  `sync.remotePull` TimeoutException non-fatal (66 events, 5 users) is
+  slow-network reality and may deserve to be demoted to a log line.
+  Tests: `user_circle_membership_service_test` (ensureCircleIndex never
+  throws group), `sync_service_remote_test` (non-fatal funnel group).
+
+- **2026-09-24 · Goals saved for another day say so.** Miko's tester
+  feedback: a goal with a future start, an off-day repeat, or one-time
+  schedule never appears on Home's "Today's goals" and read as lost. Now
+  the editor shows "Saved for another day. Find it in the Goals tab." after
+  saving such a goal (`goal_editor_screen.dart`, messenger captured before
+  the pop), and Home's empty state reads "No goals due today. N saved for
+  other days in the Goals tab." via `otherDayGoalsCountProvider`. The
+  Home filter itself is unchanged (decision 2026-08: Home is "planned
+  today", the Goals hub is everything). Test:
+  `other_day_goals_count_test`.
+
+- **2026-09-24 · Goal category picker (was parked earlier the same day).**
+  A custom goal category could only be typed once; the editor had no
+  picker, so a second goal could not join an existing custom category
+  except by retyping the exact name. Now: (1) `goalCategoryOptions`
+  derives the list from ALL the user's goals — built-ins first, then
+  custom names trimmed, deduped case-insensitively, A–Z (no category
+  entity; Miko chose derivation over a synced store). (2) One shared
+  `GoalCategoryPillRow` ("+ New" first) sits at the bottom of the New-goal
+  picker, listing the built-ins the bento mosaic doesn't already stand
+  for (Productivity, Habits, Mental Clarity) plus the user's own; a pill
+  opens the editor with that category set. The mosaic keeps its
+  fill-the-screen layout; nothing scrolls vertically. (3) The editor gets
+  a Category section with the full row, so any goal's category can be
+  changed, including existing ones. (4) The Goals tab FAB passes the
+  active filter to the picker, which passes it to the editor as
+  `initialCategoryId`; "All" passes nothing. *Considered:* a scrollable
+  picker page with a wrapped chip section (rejected: forces fixed bento
+  heights and hides the section below the fold). Tests:
+  `goal_category_options_test` (options + pill row).
+
+- **2026-09-24 · Advanced settings keep one toggle: Habit anchor.** Miko
+  asked whether Habit anchor, Strict for this task and Fixed time slot
+  were all needed; the rule is "as few user actions as possible". Audit:
+  Habit anchor is load-bearing (the only `routine` reminder signal, task
+  ordering, the habit tier count). Strict duplicated per-task Extreme from
+  the Accountability picker one card up. Fixed time slot only added +0.3
+  to conflict severity and, having no `PlannedTask` field, was silently
+  lost on every edit. The two toggles are gone from
+  `add_task_advanced_section.dart`; `strictModeRequired` stays on the
+  model and every consumer (mandatory timer, CONFIRM, extension cap,
+  notification Done) still honours tasks that already carry it, and Sleep
+  still forces its block rigid internally. Nothing migrates.
+
+- **2026-09-24 · Accountability badge and hub share one predicate.** Tester
+  feedback: the tab badge lit with no card saying which stake lit it.
+  `stakeActionItemFor` (`stake_action_items.dart`) is now the single
+  source for "what does this stake need from me" — respond to invite, log
+  today's progress, confirm the result. The badge counts the items not yet
+  seen; the hub floats those cards to the top and shows a dot plus the
+  reason line (the line stays until the action is done, not merely seen).
+  Invite fix folded in: a stake I already accepted no longer counts while
+  the other side is pending (the card already said "waiting for your
+  opponent"). Test: `stake_action_items_test`.
+
+- **2026-09-24 · Circles: leave/delete feedback, message delete, edit
+  sheet, privacy toggle.** Tester + Miko. (1) Leave and Delete show a busy
+  state on the button, then pop to the Community list with a snackbar;
+  errors get a Retry. The navigator and messenger are captured before the
+  call because the server revokes our read of the circle before the
+  callable returns, which used to swap the screen for "Could not load
+  circle" and skip the pop. The detail screen now treats
+  permission-denied like a deleted document and pops. (2) Message delete
+  is a TOMBSTONE (WhatsApp model): the row stays with content/image
+  stripped, `deletedAtMs` + `deletedByUid`. Policy in
+  `message_delete_policy.dart`: sender within 30 min (client-enforced;
+  rules already let a sender edit their own message), moderator any
+  message any time, shown as "Message deleted by admin". Rules gained a
+  moderator clause limited to the tombstone fields — **rules deploy
+  pending**. Image files are removed best-effort. (3) "Edit circle" is a
+  sheet (name, description, category, join policy, Public/Private) that
+  writes only changed fields via `updateCircleFields`; a whole-doc merge
+  carried a stale `memberCount`, which the rules reject. Creator-only, as
+  before. Tests: `message_delete_policy_test`, message model/repository,
+  `circle_repository_test` (update fields).
+
+- **2026-09-24 · Time tracker: one thing at a time, said out loud.** Miko:
+  tracking A at 9:00 and then logging B at 9:00 showed no overlap and the
+  Home pill went blank. The tracker was already one-activity-at-a-time
+  (the timeline cuts an entry at the next start) but nothing said so.
+  Now the capture sheet checks the day's entries
+  (`overlappingActivities`, `activity_overlap.dart`) and asks "Already
+  tracking 'A' … one thing at a time: 'B' will end it at 9:00" with Log
+  anyway / Cancel; and `TimeTrackerActions.log` writes the previous open
+  entry's end at the new start (a backfilled entry that starts earlier
+  leaves it alone), so the pill's "latest start, no explicit end" rule can
+  no longer be fooled by an earlier open entry. Assumed, not re-confirmed
+  by Miko: A ends when B starts (the PRD's design). Tests:
+  `activity_overlap_test`, `activity_reminder_and_actions_test` (log ends
+  previous group).
+
+- **2026-09-24 · Circle members: tappable dots, moderators remove
+  directly, header fits.** Miko's screenshot. (1) The ⋮ on a member row
+  was decorative — the menu only opened on a long-press; a tap opens it
+  now (long-press still works). (2) Any moderator can "Remove <name>"
+  directly; the Phase-1 PRD limited direct removal to the creator and
+  gave other moderators only "Vote to remove", but `circleRemoveMember`
+  on the server already requires just moderator. The vote stays as a
+  second, softer option; the creator's row never shows the menu (the
+  server refuses to remove the creator). (3) The circle header's
+  `expandedHeight` went 186 → 196 with an explicit text height: it
+  overflowed by 1 px on iOS without a streak badge and by ~8 px with
+  one.
+
+- **2026-09-24 · Warm function instances off: `minInstances` 1 → 0 on
+  `aiChat`, `aiChatStream`, `aiSpeechStream` (cost audit).** Miko: ~5
+  testers, yet the Firebase bill sat around $25/month. Root cause: the
+  three warm instances kept for voice latency (batches of
+  2026-08-07/08/22) were logged as "a few $/month", which assumed
+  1st-gen fractional CPU. A gen2 function gets a FULL vCPU regardless
+  of memory (firebase-functions v2 + CLI default: 256MiB → `cpu` 1,
+  `concurrency` 80), so each idle instance bills ~1 vCPU × $0.0000025/s
+  + 0.25 GiB × $0.0000025/s ≈ $8.2/month; three ≈ $24.6/month. The
+  bill's min-instance CPU (~$26.70) to memory (~$6.67) ratio is 4:1 —
+  exactly one vCPU to a quarter GiB. Everything else is near zero: the
+  four every-15-min sweeps are bounded collectionGroup queries (~11.5k
+  invocations/month), Firestore ~$0, no trigger loops. Decision: 0 on
+  all three (Option A); deployed 2026-09-24 and verified through the
+  Cloud Functions v2 API (`serviceConfig.minInstanceCount: 0` on the
+  new revisions; gcloud is not installed on this Mac —
+  `firebase functions:list --debug` exposes the full serviceConfig).
+  Cost of the decision: the first text turn after ~15 idle minutes pays
+  the 2-3 s cold start; voice is mostly covered because Voice Mode
+  entry already fires `warmVoiceEndpoints` GET pings, which now double
+  as the cold-start trigger. *Considered:* keeping them warm at
+  `cpu: 'gcf_gen1'` + `concurrency: 1` (~$2.7/instance/month) —
+  deferred to launch, when traffic justifies any warm instance. Rule
+  going forward: price any `minInstances` at 1 vCPU unless `cpu` is set
+  explicitly; the CLI's deploy-time "minimum bill" warning is the
+  number to trust. Reversal is one line per function + a redeploy of
+  the three. Future scaling flag (not a cost today): `morningBrief`
+  reads every opted-in deviceToken + 2 docs per user every 15 min —
+  gate it by a next-due timestamp before launch.
+
+- **2026-09-24 · Home dashboard: three columns on every standard iPhone.**
+  Miko: the card was "bigger" on an iPhone 16 than on his other phone.
+  Cause: `_kWideDashboard = 330` compared against the card's inner width
+  (screen − 80), which only Plus / Pro Max phones (430 → 350) reach; a
+  393-pt iPhone 16 (313) and even a 402-pt 16 Pro (322) fell to the
+  stacked layout with the 116-pt ring and the trend on its own row. Now
+  300: at 313 the ring column is ~125 pt for the 104-pt ring and each
+  trend cell ~14 pt (compact labels 9 pt so Sa/Su don't touch). The
+  320-pt SE (240) keeps the stacked layout. Verified on the iPhone 16
+  simulator (which also confirmed the Getting Started tour fires on a
+  fresh install).
+
+- **2026-09-24 · Tasks saved for another day say so; stake lines follow
+  the badge; member removal reports.** Miko's second list. (1) A task's
+  plan day is the reminder's date when a reminder is on, else a
+  Plan-Tomorrow slot, else today — so a reminder dated tomorrow files the
+  task under tomorrow and off Home's Today's Tasks. After saving such a
+  task the Add Task sheet shows "Saved for tomorrow / <Mon 28 Sep>. Find
+  it in Tasks under 'Open on other days'" with a View action
+  (`saved_for_another_day.dart`). (2) The hub card's reason line now uses
+  the badge's seen rule: opening the stake clears it, and it re-arms on
+  genuinely new state (next day's log, a verdict). Earlier today the line
+  stayed until the action was done; Miko wants it to read as a
+  notification, so the two never disagree. (3) Removing a member shows
+  "Removing <name>…" at once (the callable cold-starts), then "removed" or
+  a failure with Retry, on a messenger captured up front.
+
+- **2026-09-25 · Plain-language rename (tester feedback pass).** Miko
+  brought a 14-page tester document; the diagnosis it made is now a rule:
+  *copy names the user's benefit, not the system* ("Reminder status", not
+  "Reminder health"; "SidePal noticed", not "Inferred"). Every rename is
+  display-only — enum ids, `modeRefId` values, Firestore paths, storage
+  values and guide ids are untouched. Settled with Miko:
+  (1) **Circle → Group** app-wide in user-facing copy, including stakes
+  ("shared with your group"), server error strings and the pre-reveal push;
+  the bottom tab stays "Community". Help keywords keep "circle" as a
+  synonym so old habits still match.
+  (2) **The day streak is retired from every user-facing surface** (Home,
+  Profile, group header/list/Info, activity events, help copy, "Streaks
+  matter", the Vacation description) and the **streak coaching-insight
+  family is retired** rather than reworded (no more "Streak at risk" cards
+  or pushes). Reason: it competed with the product's real question — did
+  your actions match your commitments — and its rules were unexplainable
+  (a day with nothing planned broke it; the threshold moved with
+  strictness; today counted with no yesterday fallback, so Home read 0
+  for most of the day). Engines and stored data stay, silent. The
+  **per-goal streak on the goal detail screen stays** — a different metric.
+  (3) **Discipline Mode → Strictness** ("How strict should SidePal be when
+  you don't follow your plan?"), not "Accountability level", which would
+  have collided with the Accountability tab. Options stay Flexible /
+  Disciplined / Extreme; descriptions now say what each does to unfinished
+  tasks (Extreme: done or moved with a reason, no skipping, focus session
+  before ticking — "surrender" was wrong; it exists only for stakes).
+  (4) **Coach Tone → Coach style**, options Supportive / Balanced /
+  Direct / Tough, ending the double meaning of "Disciplined".
+  (5) **Attention mode → Status** (Meeting / Focus / Sleep / Vacation /
+  DND are statuses, not "pause reminders"); **Sleep window → Quiet hours**
+  everywhere it surfaces (settings, Home banner, Sleep-mode "Until
+  morning", Add-task extras, AI conflict warning).
+  (6) Home: **Flow now → state labels IN FOCUS / PAUSED / UP NEXT**;
+  "7-day trend" → **"This week so far"** (the chart has been Monday→today
+  since 2026-09-12; the old label and its help sheet were wrong);
+  "N tasks need you" → **"N unfinished tasks · Tasks you didn't complete or
+  reschedule."** with a fixed subtitle (the AI headline no longer replaces
+  it); **Promises → For later** (the word "promise" meant three things:
+  this list, the stake pledge, and weekly commitments), quick-add
+  **WHEN-ISH → WHEN?**, **On your radar → Suggested for later**, both with
+  help dots (new guides `forLater`, `suggestedForLater`).
+  (7) Time: **Time → Your Time**; the action verb is **Log** everywhere
+  (button "Log activity", sheet LOG, "+" tooltip) and "track" survives only
+  in the benefit line ("Track your time" pill); the sheet asks "What are
+  you doing right now?" only for a fresh log; the Timeline header is gone
+  (the day pager already names the day).
+  (8) Accountability: "On the line / Decided" → **In progress /
+  Finished**; KEPT → COMPLETED; "Choose your accountability" → "How do you
+  want to stay accountable?"; "Before you commit / STAKE — NO UNDO / THE
+  SERVER DECIDES — ALWAYS" → **"What happens if you fail / Your photo will
+  be shared / It happens automatically"** with the reveal window
+  interpolated (it is 5 min–24 h, never a fixed hour) and the mercy-veto
+  sentence reconciled beside "You can't cancel the stake after you
+  commit."; "Hold to give your word" → **"Hold to commit"**; the WHY
+  subline promised "You'll see these words every time you log a day",
+  which was false (the why is shown only on the review page and the
+  public card) — Miko chose **honest copy over a new feature**: "Write why
+  this matters to you, in your own words." (+ "It goes on your commitment
+  card." for public commitments). "Pledge card" → **commitment card**; the
+  post-start screen says "Your commitment is ready — Share card". The
+  "your word" wording stays on detail/result screens as flavour.
+  (9) Groups: tabs **Chat · Updates · Weekly commitments · Challenges ·
+  Members · Info**, one intro line at the top ("Keep each other
+  accountable — talk, share progress, make commitments, and take on
+  challenges."), the AI **pulse is a "group summary"**. Verified before
+  deciding: a moderator *can* generate one end-to-end (route, JSON mode,
+  rules, deployed index all checked); the tester who asked "how do I
+  generate it?" was a non-moderator reading "generate one below" with no
+  button. Now non-moderators read "your moderator can generate one"; the
+  button stays moderator-only. The dead "Weekly summary" notification
+  toggle is hidden. Vote copy is now truthful: the vote decides whether a
+  *proposed* challenge starts, not whether someone completed it.
+  (10) What SidePal knows → **"What SidePal knows about you"**; the four
+  provenance badges read **You told SidePal / You confirmed / SidePal
+  noticed / SidePal's guess** (amber guess keeps its trust role; "noticed"
+  maps to the deterministic OBSERVED source, "guess" to AI-inferred);
+  Timeline → **History** (the Time page owns "timeline").
+  (11) Reminder health → **Reminder status**: one status line, one
+  permission line, "Check again"; the six rows live behind "Details".
+  Coaching insights lose the "Sent today N/3" budget line.
+  *Not renamed:* "Coach AI" (not in the tester doc), money stake copy
+  (flag off). *Bugs fixed in passing:* other members' weekly commitments
+  were headed by raw user ids; the "photo is gone" success banner showed
+  on public commitments; the Profile quiet-hours row showed "8:00 AM" when
+  unset; the community intro said "Circles tab" while the tab is Community;
+  the Direction guide claimed it "saves as you type".
+
+- **2026-09-25 · Rename follow-ups (Miko's second pass).** (1) Home week
+  chart label is **"This week's progress"** (was "This week so far").
+  (2) The Home list is **"Plan for later"** after all — Miko preferred the
+  tester's wording over "For later"; "Suggested for later" unchanged.
+  (3) The Home tile **stays "Set status"** (asked about "Mode"; settled on
+  one word for the feature). (4) The Accountability hub opens with a
+  one-line explanation ("Hold yourself accountable by putting something at
+  stake, or by making your commitment public.") instead of the
+  head-to-head W/L line, and the stake creation list offers **only Photo
+  stake and Commit publicly** — Challenge a friend and Practice run are
+  hidden the same way money stakes are (code paths kept; existing
+  challenges of those types still open). (5) The "What SidePal knows about
+  you" intro opens expanded on every visit, collapses to one sentence after
+  4 s (260 ms AnimatedSize), and toggles on tap.
+
+- **2026-09-25 · TestFlight build 1.0.2 (5) uploaded headless.** First
+  build with the plain-language rename, the Home row redesign and the
+  goal-editor copy; functions deployed the same evening. `flutter build
+  ipa` archived fine (Isar export check: 108) but its own export step
+  failed twice on "The request timed out / No signing certificate 'iOS
+  Distribution' found" — the cloud-managed signing round-trip on the slow
+  link, not a real certificate problem. What worked: `xcodebuild
+  -exportArchive … -allowProvisioningUpdates` with an ExportOptions of
+  method `app-store-connect`, `destination: upload`, `signingStyle:
+  automatic`, `uploadSymbols: true`, team HW6A4CQ2UB — it uploads straight
+  from the archive through Xcode's signed-in account, no Organizer, no
+  credentials typed. The first attempt was killed with the session; the
+  retry uploaded at ~2.5 MB/s and reported "Upload succeeded". dSYMs sent
+  to Crashlytics with the pod's `upload-symbols`. Rule: this is the
+  headless upload path from now on; the version bump lives in pubspec
+  (`1.0.2+5`).
+
+- **2026-09-25 · Onboarding is guest-first; the July "register first"
+  decision is reversed.** "Get started" now enters the anonymous account
+  (the flow-level Skip path made the default) and the register step is
+  gone from the flow. The original reason for registering first — every
+  answer had to land under the real uid because there was no
+  anonymous→registered migration — no longer holds: uid-preserving account
+  linking (2026-08-23: Google/Apple link in place, conflict recovery,
+  guest connect card on Profile) means a guest upgrades without any
+  migration, so registration no longer needs to block first use.
+  Consequences: `kRequireRegisteredAuth` stays off for launch; the account
+  ask lives in four places — Welcome's "Log in" (existing accounts), the
+  Home backup card (below), Profile's Connect account, and the guest
+  log-out dialog. The connect sheet gained "Continue with email" (pushes
+  the sign-up screen, which links the email credential to the same uid and
+  pops `true`) because the removed register step was the only email
+  sign-up a guest had.
+
+- **2026-09-25 · Onboarding restructured to nine screens, one story.**
+  Welcome → What gets in your way → What matters to you → Knowing what you
+  want is the easy part → Tell SidePal what you want to do (demo) →
+  Setting up → We've personalized your SidePal → (first goal, after
+  sign-in) → You're ready. Cut: register, Meet your coach, Community,
+  "You're not lazy", Day One photo, science cards, premium. Merged the two
+  psychology screens into one that talks about behaviour, not identity.
+  Every line on the result card derives from the user's picks — the fake
+  "0 of 3 tasks" row is gone. The flow runs above AuthGate, so the profile
+  is committed Isar-only during the flow (`upsertProfile(replicate:
+  false)` — an enqueue without a uid would target the local placeholder
+  path and sit as a stuck write); `OnboardingHandoff` leaves a device
+  marker and `OnboardingHandoffBridge` (tab shell) replicates once a uid
+  exists. Day One keeps its model fields; it returns later from Progress
+  once the user has actually begun. Community is taught by its existing
+  first-open card. *Rejected:* a Business goal category just for
+  onboarding (app-wide cost for one screen; interests and categories need
+  not be identical).
+
+- **2026-09-25 · The first goal is created by the user, after sign-in,
+  from the picker's first-goal mode.** "Turn this into your first goal"
+  ends the flow with the `firstGoal` handoff; the bridge pushes
+  `GoalTemplatePickerScreen(firstGoal:)` — "What do you want to start
+  with?", the chosen interests as chips (first one default), that
+  interest's templates plus "Create my own goal" — then the adaptive
+  Ready screen ("Start my first action" / "Go to Home"), landing on Home
+  with the goal row visible where the Getting Started tour picks up.
+  Interests stay tags (2026-07-12 intact); the user names and saves the
+  goal in the normal editor. Interest → category: health→fitness,
+  skills→study, habits→habits, disciplined→focus, business/money/
+  organized→productivity. Templates are filtered by interest, not
+  category, so money never shows decluttering. Eight new templates (two
+  each for business, money, organized, disciplined) exist for this mode
+  only — the everyday New goal mosaic keeps its five cards. The tour
+  overlay now hides while any route other than the shell or the Add Task
+  sheet is on top (it used to draw over pushed screens).
+
+- **2026-09-25 · Home "Back up your SidePal" card: once, then once more
+  after seven days, then never.** Guest data survives reinstall on iOS
+  (keychain) but not Android, so the prompt has a concrete trigger
+  (`BackupCardPolicy`): guest + owns a goal + not the day onboarding
+  finished; "Not now" hides it for seven days; a second "Not now" ends
+  it — Profile's Connect account remains. Wording is "Back up", not
+  "Keep safe": guest data is not unsafe today, it is just device-bound.
+
+- **2026-09-26 · Coach AI reliability: the nine decisions behind the fix
+  plan.** Source: `documentation/AI_CHAT_AUDIT_REVIEW_2026-09-26.md` (an
+  external audit, re-verified, plus an Opus fact-check folded in) and the
+  plan `documentation/AI_CHAT_FIX_PLAN.md`. Miko adopted every
+  recommendation. (D1) The keyword router keeps NO authority over tools:
+  every turn that reaches the agent path gets both tools; `unknown`
+  replaces the `mutate` default; the router only picks the answer-only
+  stream for clear questions. (D2) Opaque per-turn handles ("t3", "g2")
+  for existing items — generated per turn, never persisted, mapped back
+  in the service; the privacy property ("no raw ids") is kept. (D3) The
+  waking day comes from the sleep window / quiet hours when set, else
+  07:00–22:00, and the model is told the bounds. (D4) Direction stays
+  "context, not command" (2026-09-11 intact); only goal↔task linkage is
+  built, later. (D5) A Coach session is a calendar day per account;
+  closing the sheet pauses it. (D6) Up to ~5× today's per-turn model cost
+  is approved for `coach_agent` if a bake-off shows a clear win. (D7)
+  Voice auto-commit verbs keep auto-committing; the spoken reply reads
+  back exactly what was stored and "undo" by voice reverts it — no new
+  card. (D8) The server's daily instruction cap is fail-safe: it applies
+  only to accounts KNOWN to be free (entitlement doc read, not active) and
+  only to tool-bearing first rounds; questions never count. Full
+  "server classifies actionable" arrives with monetization. (D9) Work runs
+  on `fix/ai-chat-reliability`; every functions deploy is asked for.
+  *Rejected:* the external audit's Direction → quarter → month → action
+  hierarchy (contradicts the Direction PRD); a server-side agent loop;
+  OpenAI-hosted conversation state; vector retrieval over memory.
+
+- **2026-09-26 · Phase 0 of the Coach fix plan: tier-blind cap fixed,
+  scenario harness in place.** `functions/src/ai_instruction_cap.ts` is
+  the pure rule (D8) and `aiChat` reads the server-owned
+  `users/{uid}/entitlements/pro` doc (cached per instance, 5 min) beside
+  the config read; `aiChatStream` never counts. Before this the cap from
+  `tier_limits_v1` would have capped Pro users too and counted every
+  question. Client: `test/support/ai_scenario_harness.dart` runs the real
+  client → parser → service → executor stack over in-memory repositories
+  with a scripted model; `test/features/ai_assistant/scenarios/` holds
+  the regression scenarios. Contracts the plan has not shipped yet are
+  `skip`ped with their phase tag (`--run-skipped` shows all nine failing
+  today) — a fix is done when its skip goes.
+
+- **2026-09-26 · Phase 1 of the Coach fix plan: one proposal record, no
+  mutate default, unknown verbs rejected, truthful history rows.**
+  `AiProposal` (awaitingAnswer / suggested / awaitingConfirm / editing /
+  applied / cancelled / superseded) replaces `_pendingPlan`,
+  `_pendingClarification` and `_refiningPendingPlan` in
+  `AiAssistantService`. Rules: a new turn SUPERSEDES a live card (its plan
+  can never run again, not even from a later "yes" after an error turn); a
+  question after a suggestion is a question (the suggestion is not carried
+  into "refine this plan"); an applied plan is never carried; only a pending
+  question or an Edit blocks the answer-only stream. `AiIntentRouter` now
+  routes question-shaped text as `query` before anything else and returns
+  `unknown` (no hint) instead of `mutate` when nothing matches — the agent
+  path always has both tools, so the model decides. `AiAction.fromJson`
+  throws on an unknown verb and the mappers drop it. History: `saveTurn`
+  returns the row id, the proposal pins it, and confirmation marks THAT row;
+  cancel and decline write rows the model can see; auto-committed turns are
+  saved as executed. *Deferred:* strict `propose_changes` schemas to Phase
+  5.1 — changing the model's output contract without a live eval is a
+  regression risk; Phase 1 closes the app-side hole instead. *Rejected:*
+  keeping the keyword router's "return structured actions" hint for
+  unmatched text (it is the documented cause of the greeting-plans bug).
+
+- **2026-09-26 · Phase 2 of the Coach fix plan: idempotent batches,
+  validation at Confirm, execution separated from bookkeeping.** The batch
+  id is `ai_batch_<proposalId>`; `AiActionExecutor.execute` returns
+  `alreadyApplied` for a finished batch and refuses one still executing, so
+  a double tap, a crash-and-retry or a stale card can never create a second
+  set. `AiPlanValidator` runs at Confirm: a time already past today, or a
+  relative date proposed on a day that has since ended, blocks with a
+  reason and the card stays live. The deduplicator compares against the
+  action's OWN day (today or tomorrow); an item the user named that already
+  exists survives as a soft conflict on the card. In `confirmPlan` the
+  executor call and the bookkeeping are separate tries: "nothing was lost —
+  tap Confirm to try again" is said only when the executor threw before
+  applying; a history failure after the fact is logged and the outcome is
+  still reported. The executor persists per-action outcomes after every
+  action and retries the final state write; the boot sweep now CLOSES a
+  stranded batch whose every action has an outcome instead of rolling back a
+  plan the user has lived with. `createGoal` resolves "today"/"tomorrow"
+  deadlines, ends at 23:59 of that day, never at now; cadence, category and
+  measurement kind come from the model's new `cadence`/`category` params or
+  the target's unit words. The conflict detector compares reminders and the
+  active override on the action's day. *Consequence for tests:* fixtures
+  that confirm a fixed clock time "today" must use tomorrow — a past time is
+  now a real block, not a quirk.
+
+- **2026-09-26 · Phase 3 of the Coach fix plan: one planning snapshot,
+  progress in the goal's own units, opaque handles.** `GoalProgressMath`
+  (goals/application) is the single definition of "how far along" a goal is
+  inside its current evaluation window; the Coach payload now carries
+  logged/target/unit/window, days logged, a behind-pace flag, steps due
+  today, category and cadence, sorted behind-pace first (cap 8) — the
+  offline formatter and the prompt's planning method read the same fields.
+  The schedule slice builds one busy picture per day for today AND
+  tomorrow: timed tasks with a duration, goal `ScheduledTimeBlock`s, and
+  device-calendar busy intervals through the existing coarse bridge
+  (`calendarBusyToScheduleMaps`; contents never cross). Free windows use the
+  user's waking day from the sleep window (D3; 07:00–22:00 fallback), a
+  reminder-only task is not busy, up to 8 windows show with a "+N more"
+  marker, and the prompt states per day whether the calendar was included
+  or unavailable — "unavailable" is never rendered as "free". Tomorrow is
+  always sent (the tool description's "context always includes today and
+  tomorrow" is now true). Existing tasks and goals carry per-turn handles
+  ([t1], [g2]) the model passes back as `taskRef`/`goalRef`; the resolver
+  stamps those exactly and falls back to titles otherwise (D2 — opaque,
+  per turn, never persisted, so the "no raw ids" privacy rule holds).
+  *Not done:* prefetching a named other day; the `get_day_schedule` round
+  covers it.
+
+- **2026-09-26 · Phase 4 of the Coach fix plan: continuity, memory
+  attribution, truncation, voice read-back.** History rows now keep the
+  assistant's actual text, a plan summary that retains times/dates/
+  durations (the lossy "createTask: Workout" line was one leg of the
+  duplicate-plan loop), and a "[Looked up: …]" trace of read-only tool
+  calls, capped at 3000 chars. The model receives the newest eight turns
+  verbatim and one deterministic "[Earlier in this session: …]" line for
+  older turns (up to 30 rows read, 900 chars) — no model call, no cliff at
+  turn 11. **A Coach session is a calendar day (D5):** closing the sheet
+  calls `pauseSession()` and keeps the thread and session id; the first
+  message on a new day rotates the session; a relaunch adopts the latest
+  same-day session id so the model context and memory-extraction session
+  continue. `startNewSession()` remains the explicit reset and keeps its
+  stash/restore semantics. Memory: `quoteMatches` verifies against "User:"
+  lines only, with a 12-character-or-three-word floor; before an
+  auto-commit the service overwrites `rawUtterance` with what the user
+  actually typed or said, so the executor's anchor check compares against
+  reality, never the model's own quote. `aiChat` returns `finish_reason`;
+  a reply cut at the cap carries the same "(That reply got cut off…)"
+  marker as the streaming path. Voice (D7): an auto-committed intention or
+  memory write is READ BACK verbatim with "say undo if that's not right",
+  and a short "undo" / "scratch that" right after reverts it (typed too).
+
+- **2026-09-26 · Phase 5.1/5.2 of the Coach fix plan: the model is
+  switchable for real; the bake-off is a script, not a guess.**
+  `functions/src/ai_request.ts` builds every OpenAI Chat Completions body
+  per model family: gpt-4o/4.1 keep `max_tokens` + `temperature`; gpt-5.x
+  and gpt-6 get `max_completion_tokens`, `reasoning_effort: "none"` (the
+  original gpt-5 family knows only "minimal", so temperature is dropped
+  there), and temperature only where "none" makes it legal. gpt-6 Astra is
+  deliberately NOT on the allow-list (no "none" effort, no Chat Completions
+  tool calling). A Remote Config model the allow-list refuses is logged as
+  an error at config load instead of silently keeping the default; RC
+  `maxTokens` overrides are capped at 4000. `functions/eval/bakeoff.mjs`
+  replays ten fixtures (question shapes, add/delete by handle, existing
+  tomorrow task, plan-then-question history, goal cadence, greeting)
+  through the SERVER's prompt and request shaping against candidate
+  models, with a `--max-calls` cap, and reports pass rate, p50/p95 latency
+  and cost per turn. *Rule:* the model for `coach_agent` changes only on a
+  recorded bake-off result (this log), via `ai_purpose_routes`. *Rejected:*
+  strict tool schemas before the bake-off can validate them live
+  (Phase 1.4 deferral stands); the Responses API (would move the loop's
+  state server-side, against the settled client-orchestrated design).
+
+- **2026-09-26 · Phase 7 of the Coach fix plan: one prompt, one guide.**
+  The client no longer ships a copy of the Coach system prompt: it sends a
+  one-line placeholder (`kServerOwnedPromptPlaceholder`) and the server's
+  per-purpose prompt replaces it, as it has since fix-wave Phase 5. The
+  copy had drifted from the server text and a test pinned the dead version.
+  `CODEBASE_GUIDE.md` §7 and §10 now describe the real pipeline (two
+  endpoints, purposes, request shaping, the proposal lifecycle, the
+  harness) and the recipe for a new verb includes the tool export and the
+  server prompt deploy. *Rule:* prompt text lives in
+  `functions/src/coach_prompts.ts` only; a prompt change is a deploy (or an
+  `ai_system_prompts` Remote Config edit), never a client release.
+
+- **2026-09-26 · Coach model bake-off result (fix plan Phase 5.2) and the
+  route decision (5.3).** Miko ran `functions/eval/bakeoff.mjs` over ten
+  fixtures × two runs × four models (80 calls). Two checks were mine to
+  correct after reading the replies ("0/25" matched inside "10/25"; the
+  "call mom" fixture is a reminder-only task, so `removeReminder` is a
+  legitimate verb). Corrected scores: **gpt-6-sol 20/20** (p50 1781 ms,
+  $0.0074/turn), **gpt-4.1-mini 18/20** (p50 1220 ms, $0.0015/turn),
+  gpt-6-luna 16/20 (p50 1424 ms, $0.0004/turn), gpt-4o-mini 15/20 (p50
+  1734 ms, $0.0006/turn). The only 4.1-mini misses: it proposes a task
+  that already exists on tomorrow instead of saying so — which the app now
+  flags as a conflict on the card (Phase 2.2). gpt-4o-mini wrote prose
+  plans without the tool call on both planning turns and put the task
+  fields at the top level (no `parameters` map) in 8 of 20 tool calls;
+  luna did that in 5. **Finding fixed in the app:** `AiAction.fromJson`
+  now lifts flattened fields, so that drift no longer becomes "What time
+  should I schedule it?" (scenario added). **Decision:** `coach_agent` and
+  `coach_agent_voice` move to `gpt-4.1-mini` — the best pass rate inside
+  the D6 budget (2.6× today's per-turn cost, fastest p50); system purposes
+  stay on gpt-4o-mini (cheap JSON mode, no evidence of a problem).
+  gpt-6-sol is the quality leader but ~13× today's cost and slower, so it
+  is the candidate for a separate planning-turn purpose only if suggest
+  quality proves insufficient after the app fixes land on device. The
+  switch is a Remote Config edit (`ai_purpose_routes`), not a release.
+  *Re-run* the bake-off after the flattened-parameter fix before judging
+  luna again; its planning replies were truncated by the results file
+  (now stored whole).
+
+- **2026-09-26 · Phase 6 of the Coach fix plan: tasks can belong to a goal
+  (D4 — linkage, not a Direction hierarchy).** `PlannedTask.goalId`
+  (nullable) ships as a full synced set: domain `toMap`/`fromMap` (so the
+  outbox payload and `RemoteIsarMerge` carry it), `IsarTask.goalId` with an
+  index (build_runner), `IsarPlanningRepository.getTasksForGoal` /
+  `watchTasksForGoal`. Goal detail shows a "Planned tasks" section from the
+  watch stream when any task is linked. The Coach's `createTask` takes an
+  optional `goalRef` ([g1]); the resolver stamps `_resolvedGoalId` on a
+  handle or a unique title match and never blocks creation on a miss; the
+  executor sets `goalId` and says "(for "Music")"; linked tasks render
+  "· for [g1]" in the payload so the model sees which plan items already
+  serve a goal. The server prompt asks for `goalRef` on tasks that serve a
+  goal, especially BEHIND PACE ones. *Not done:* a goal picker in the task
+  editor (optional; the Coach path was the gap). *Rejected:* making
+  Direction the parent of goals — Direction stays context (2026-09-11).
+
+- **2026-09-27 · Free tier re-cut before the paywall ships; full table in
+  `PRD/Monetization/prd-monetization-tiers.md` §4, §4.1, §8.**
+  Supersedes the 2026-07-20 numbers. Free: **4 tasks/day, 4 habit
+  anchors/day (own count), 3 active goals, 5 reminders, 2 promises per
+  Mon–Sun week, 3 Coach actions/day, 1 activated photo stake/month,
+  1 circle (5 members)**. Time tracker: logging + the Day timeline are
+  free and unlimited; *insights* are Pro (Day summary totals, AI
+  observations, planned vs actual, Direction mirror, Week view, export —
+  `canExportTimeLog` becomes `=> isBypassed`). Progress history stays
+  Day-free / Week+-Pro. Caps count what exists now, so deleting frees a
+  slot; stakes count activations. Pricing unchanged ($9.99 / $79.99 /
+  7-day trial). **Guests** get the same caps as Free for on-device
+  features; Coach AI, circles, stakes, and buying Pro require an account
+  (Pro is tied to the account, never an anonymous session). **Prompt
+  rule:** guest at a cap → "sign in so you don't lose your data" → Pro
+  plan page; guest at an account-only feature → sign in → the feature;
+  signed-in free at a cap → polite message linking the Pro plan page.
+  *Why:* time logging is local and costs nothing, and a capped timeline
+  would feed partial data to Direction and the Coach — the paid value is
+  the insight, not the log. Guest caps equal Free caps so the account
+  pitch is data safety (honest) rather than "more tasks" (it wouldn't
+  be). *Considered:* capping time entries at 4/day (rejected: breaks the
+  timeline); promises fully Pro (rejected: users pay for what they've
+  tried — 2/week is the taste); lower guest caps to reward sign-up
+  (rejected: simplicity; data safety is the stronger reason to sign in).
+
+- **2026-09-27 · Subscriptions step 1 built: new limits, gates, and the
+  two prompt kinds (all dormant behind `kPaywallAvailable`).** Calls made
+  while building, so later sessions don't re-ask: (1) **"1 stake a month"
+  counts solo photo + public stakes** (field renamed `freeStakesPerMonth`;
+  the parser still accepts `freePhotoStakesPerMonth`); practice never
+  counts, money/points are Pro anyway. (2) **Tasks and habits are counted
+  separately** — `TierUsage.tasksPlannedForDay` now excludes Habit
+  Anchors, and adding a habit checks only the habit cap. (3) **Promises:**
+  count = active, created since Monday 00:00 local, not `dormant` — the
+  AI-noticed "on your radar" items never spend the allowance, and waking
+  one isn't gated. Finishing a promise does not free a slot; removing
+  does. (4) **Time:** the per-row "Planned 1h · Actual 50m" line is the
+  user's own logged intent and stays free; the plan-block comparison,
+  Day summary, observations, Week view, and export are locked (shared
+  `ProLocked` blur+pill, extracted from Progress's gate). (5) **Guest
+  test = signed-in anonymous session** (same rule as the Coach service);
+  `ensureAccountFor` awaits the auth stream so a not-yet-loaded state
+  can't read as "has an account". Guests get the account sheet on Coach
+  send/voice, circle create/join, and every stake entry; linking uses the
+  existing connect flow (same uid, data kept). (6) **Coach at a limit**
+  says the limit (never "please try again") and the bubble carries a
+  "See Pro" chip (`AiChatMessage.showProLink`, set from
+  `ExecutionResult.hitTierLimit`). (7) `/pro` is a comparison page built
+  from live `TierLimits` with an inert "Coming soon" button until the
+  store ships. *Deferred to step 4:* the server's AI-cap UX (today an
+  over-cap turn is rejected as `resource-exhausted`; the spec is "chat
+  continues, actions stop") and server enforcement of stakes/promises.
+
+- **2026-09-27 · Home leads with the next action: reorder, not removal.**
+  Prompted by "a distracted user should see the next task on open". New
+  order: progress card → four action tiles → (tracking pill, opt-in) →
+  warnings (status banner, reminder-health hint — silent unless broken) →
+  **Unfinished** (compact) → one-offs (new month, post-override review) →
+  Seize the moment (it is a "now" card, so it stays up) → **Up next** →
+  **Today's Tasks** → Plan for later + Suggested for later → Today's goals
+  and the rest unchanged. Calls: (1) **Tracking pill off by default.** The
+  stored key moved from `homeTrackPillEnabled` to `homeTrackPillOn`
+  (default false) because the old key wrote `true` for everyone who never
+  touched the switch — a new key is the only way to reset existing
+  installs; anyone who wants it flips `Show on Home` on the Time page
+  once. Supersedes the 2026-09-18 "default true". (2) **WEEKLY
+  DISCIPLINE heading + bar left Home** (the number stays on Progress; the
+  top progress card is unrelated and stays). (3) **Plan for later: the
+  whole header row opens the add sheet**, same as `+`; rows still open
+  their detail sheet, `?` still opens help. (4) **Unfinished card is one
+  label line** — `UNFINISHED · N`, a `?` (`unfinishedTasks` guide holds
+  the old subtitle), and the `N MORE` toggle on the same line; rows, "Do
+  now", dismiss/menu and the Disciplined/Extreme persistence contract are
+  unchanged. (5) **Up next shows only when it has a task** — the one in
+  focus/paused, or the next open task. No tasks, all done, loading or
+  error → the strip and its gap vanish (Today's Tasks already says "No
+  tasks yet"; "Nothing planned" was wrong when the day was finished).
+  *Deferred:* the richer Up next card ("Helps with: <goal>",
+  "Make it smaller", "Move it") — a separate step. *Rejected:* moving the
+  progress card below the tasks (Miko: tiles and progress stay put).
+
+- **2026-09-27 · "Plan for later" is "Promises" again; Promise takes Set
+  status's tile; status moves to Home's top bar.** Reverses the 2026-09-25
+  rename (made because "promise" meant three things — the list, the stake
+  pledge, weekly commitments); Miko prefers the plain word, and the
+  paywall already says "Weekly promises used". Stake copy ("A promise was
+  broken") still uses the word — accepted overlap. Help (`forLater` guide,
+  id unchanged): "something you want to do when you have time — in your
+  free time", with examples (calling an old friend, replying to a
+  message, groceries). Card `PROMISES`, sheet `NEW PROMISE`, Coach
+  read-backs "add X to your promises" / `Promise: "X"`. Home tiles: Start
+  focus · Add task · Plan tomorrow · **Promise** (opens the add sheet).
+  **Set status** → icon-only button left of sync in Home's app bar only,
+  tinted while a status is on — Home's chrome caps at these two actions.
+  "Suggested for later" keeps its name.
+
+- **2026-09-27 · The Promises list moves to the Tasks page; "Suggested
+  for later" becomes its own Home card.** Home adds through the Promise
+  tile, so the Home list was a duplicate — but it is the only place
+  promises can be seen, finished or removed, so it moved rather than
+  vanished: Tasks page, between **Today** and **Open on other days**
+  (near-term, no clock time). The calendar/motion permission asks travel
+  with it. The Home tile confirms a save with a "Promise saved · View"
+  snackbar (`showIntentionQuickAddSheet` now completes `true` on save),
+  since nothing on Home changes. **Suggested for later** is a white card
+  under Today's Tasks, built like the Promises card: label + count
+  inside, the first suggestion (observation first) visible, the rest
+  behind `N MORE`; hidden entirely — gap included — when empty.
+  *Rejected:* removing the list outright (promises would be unfinishable
+  outside notifications). *Accepted cost:* with notifications off, Home no
+  longer shows open promises (Seize the moment still surfaces one when a
+  window fits); the Tasks page is the floor.
+
+- **2026-09-27 · Up next is one row.** Start/pause button · (state label
+  UP NEXT / IN FOCUS / PAUSED + duration or timer, then the task title) ·
+  chevron. The "current block · N open" header, its `?` (`flowNow` guide
+  stays reachable through the Coach) and the inner grey box were dropped
+  — Today's Tasks right below already shows what's open. Roughly half the
+  old height (~116 → ~60px).
+
+- **2026-09-27 · Unfinished card: rows or nothing; "Reminder passed".** A
+  card holding only the routine digest ("TODAY · Missed today: Goal: X")
+  no longer shows — the goal is already in the progress ring and Today's
+  goals. Under real rows the line now reads "Reminder(s) passed: X" (the
+  window passed; the day isn't over, so "Missed" was a false verdict) and
+  drops a "Goal:"/"Habit:" title prefix. Also: Up next omits the duration
+  when a task has none (no "0m target"), and the Promise tile uses
+  `bookmark_add` — the handshake is the Accountability tab's icon.
+
+- **2026-09-27 · Rating is never a trap; Flexible check-off is one tap.**
+  (1) Disciplined/Extreme score card: Save is still the only way to
+  *record*, but "Not now", tapping outside and Back ask **"Leave without
+  rating?"** (Rate it / Leave without rating). Leaving = flexible's
+  dismiss: worked time kept, no score, task stays open (timer → Focus
+  list, resume point kept; Home → stays unticked). Extreme's
+  accountability survives because the task stays unfinished. (2) Focus
+  **End under 1 minute asks "End session?"** (Keep going / End);
+  auto-stop at the planned duration never asks. (3) **Flexible Home
+  checkbox: one tap = done at 100%, no card**, "Done: X" snackbar with
+  **Undo** (reuses the uncheck path — like uncheck, it does not reverse
+  the reminder-completion or stored score); no next-task dialog after a
+  one-tap (it covered Undo; Up next shows what's next). **Long-press the
+  circle = "Partly done"** (score card, Cancel changes nothing). The old
+  "dismiss = 100%" is gone. Disciplined/Extreme Home check-off unchanged
+  apart from (1). *Deferred:* lighter strict-mode card (preset chips
+  instead of the slider).
+
+- **2026-09-27 · A task with no duration runs an open-ended timer.**
+  `ExecutionController.setTask` maps 0/null minutes to *no target* (and
+  clears the previous task's); the timer screen never auto-stops without
+  a positive target. Before, a 0-minute target auto-stopped the session
+  the instant Start was pressed and opened the score card (seen via
+  Extreme's "Timer required" → Start timer). Ending such a session asks
+  for a score as before (nothing to compute from).
+
+- **2026-09-27 · "Timer required" means at least 1 minute.**
+  `OverrideRules.hasSatisfiedMandatoryTimer` needs one ended task session
+  of ≥60s (`mandatoryTimerMinSeconds`), not >0s — a 2-second start/end
+  used to unlock Extreme/strict-required check-off. One session, not a
+  sum: resumed sessions already carry the earlier elapsed. The Home
+  dialog says "needs at least 1 minute of focus".
+
+- **2026-09-27 · Timer screens are an always-dark "stage".** The Focus
+  session and the accountability (stake) timer share
+  `lib/features/timer/presentation/focus_stage.dart`: navy gradient,
+  glowing progress ring with the time inside, one big lime round primary
+  (Start/Pause/Resume) with a quiet round secondary beside it (End /
+  Finish & record), and a "Working on" card. Look only — behavior,
+  flows and copy of the actions are unchanged. Always dark in both theme
+  modes (a session should feel like a different place); tokens alias
+  `AppPalette.dark` directly like `OnboardingColors`. Lime accent, not the
+  reference's purple; gradient only, no scenery. The ring counts **up**;
+  no target = faint track + "No time limit". Explicitly *not* adopted from
+  the reference: break modes, focus sounds, end-sound picker, restart.
+
+- **2026-09-27 · Finishing a focus task celebrates; "time's up" reaches
+  you when away.** (1) A session that ends at **100%** (auto-stop at the
+  target, or rated 100%) turns the timer stage into a celebration — ring
+  closes, check pops, confetti burst, success haptic, "Task done! · N min
+  of focus" — and the flow (recovery sheet, "Start next task?") waits for
+  **Continue** (Back = Continue). Partial ends get a quiet snackbar
+  ("Saved: 60% done · 15 min of focus"); no burst. After End, the stage
+  says "Session ended" and Start is off. (2) `ExecutionController` arms a
+  local notification for the remaining time on start/resume
+  (`FocusEndAlertPort`, fixed id), disarms on pause/stop/task switch;
+  open-ended sessions never arm. It is **foreground-silent** on iOS (the
+  in-app celebration is the moment there), plain sound, no actions, no
+  payload, not in the reminder ledger. Stake timer unchanged.
+
+- **2026-09-27 · "Start next task?" = Not now · Need extra time · Start
+  now.** "Not now" replaced "Move to later" (three buttons, not four);
+  tapping outside / Back also mean Not now. Nothing changes and the timer
+  lands on the Focus list. Moving a task later stays available on Home and
+  task detail. `NextTaskDecision.moveWithReason` and its dialog code were
+  removed from the auto-next flow.
+
+- **2026-09-27 · Focus list: Start Focus is pinned** to the bottom of the
+  screen (Scaffold `bottomNavigationBar`), so a tapped task can be started
+  without scrolling past the whole list.
+
+- **2026-09-28 · Concept pages get a one-page illustrated explainer, not
+  a carousel.** `PageExplainers` (education/domain) holds five: Stakes
+  (Accountability tab), Groups (Community tab), Direction, Strictness,
+  Coach. Shape is fixed: painted "blob" scene (`ExplainerSceneView`,
+  CustomPainter, AppColors only) → title → one line → first-person
+  example → three icon steps → one small psychology line → optional video
+  row → one primary button + "Maybe later". Copy is plain and short on
+  purpose (Miko: "small but simple"); the `why` line uses established
+  ideas only (loss aversion, being seen by people you know) — no invented
+  statistics. **Auto-shows** only on Accountability, Groups and Direction
+  (`FirstVisitExplainer`: page visible + route on top + no tour running,
+  450 ms after draw, each page once — no per-session cap (2026-09-29),
+  marked seen when it opens,
+  device-level in the education seen-set as `explainer:<id>`). Strictness
+  and Coach show it only from their `?`. Any `?` whose guide has an
+  explainer opens the explainer; "More details" there opens the long
+  guide sheet (`showGuideSheet`). Groups' inline first-time card was
+  removed (the sheet replaces it). **Videos**: Remote Config
+  `explainer_videos_v1` = JSON `{explainerId: url}`, read synchronously
+  (never waits on the network); no URL → no row; opens via `url_launcher`.
+
+- **2026-09-29 · The guided first-task tour is off.** Miko: new users no
+  longer get the Getting Started spotlight (tap Add Task → name → save →
+  tap the circle → progress). `kGettingStartedTourEnabled = false` in
+  `getting_started_controller.dart`; the controller goes straight to
+  hidden and writes no onboarding verdict, so flipping the flag back on
+  still judges each account fresh. Code and tests kept on purpose.
+
+- **2026-09-29 · Your Time and "What SidePal knows about you" join the
+  explainers** (Miko): both open their illustrated sheet on first visit
+  (route-level `FirstVisitExplainer` in app.dart, like Direction), and
+  their `?` opens it too (Time via its guide; Memory gets a `?` button).
+  The memory page keeps its inline `_MemoryIntro` line.
+  Auto-shown sheets ignore taps on the dimmed backdrop (swipe/buttons
+  still close them) — a sheet that appears ½ s after the page was being
+  closed unseen by the user's next tap while already marked seen. When the
+  primary button only closes ("Got it"), there is no "Maybe later".

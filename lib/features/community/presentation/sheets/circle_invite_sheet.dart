@@ -88,7 +88,7 @@ class _CircleInviteSheetState extends ConsumerState<_CircleInviteSheet> {
   }
 
   String get _shareText =>
-      'Join my circle "${widget.circleName}" on SidePal!\n'
+      'Join my group "${widget.circleName}" on SidePal!\n'
       'Open SidePal → Community → Join with a key, and enter: $_code\n'
       'Or tap: sidepal://join/$_code';
 

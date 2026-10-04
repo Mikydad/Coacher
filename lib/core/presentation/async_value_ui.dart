@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../telemetry/nonfatal.dart';
+
 /// Builds from [AsyncValue] without replacing content with loaders on reload.
 ///
 /// Uses Riverpod's [AsyncValue.when] with [skipLoadingOnReload] so cached data
@@ -26,7 +28,11 @@ Widget asyncWhenStale<T>(
 /// then returns the fallback. Silent handlers hid real outages (errors.md
 /// #18: a failed query showed only "Could not load…" with no diagnosable
 /// cause). Keep the log; keep the calm UI.
+///
+/// Release builds silence debugPrint, so the failure also goes to
+/// Crashlytics as a sanitized non-fatal (audit M10) — type + code only.
 T swallowedAsyncError<T>(String where, Object error, T fallback) {
   debugPrint('$where: swallowed error: $error');
+  reportNonfatal('ui.$where', error);
   return fallback;
 }

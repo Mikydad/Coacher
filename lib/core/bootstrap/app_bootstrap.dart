@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/notification_response_handler.dart';
@@ -15,6 +16,8 @@ import '../notifications/notification_reconciliation_service.dart';
 import '../offline/offline_store.dart';
 import '../push/push_messaging_service.dart';
 import '../sync/sync_service.dart';
+import 'first_screen_ready.dart';
+import '../../features/direction/application/direction_providers.dart';
 import '../../features/goals/application/goals_providers.dart';
 import '../../features/planning/application/accountability_retention_worker.dart';
 import '../../features/planning/data/planning_repository.dart';
@@ -32,7 +35,8 @@ import '../runtime/schedule_mutation_coordinator.dart';
 ///   frame genuinely needs: Firebase (Crashlytics + AuthGate depend on it)
 ///   and the Isar store the first screens read from.
 /// - [completeDeferred] — kicked off after the first frame. Notification
-///   wiring, sync, reminder scheduling, and per-user Firestore maintenance.
+///   wiring, sync, reminder scheduling, and per-user Firestore maintenance;
+///   its non-essential tail waits for [FirstScreenReady] (2026-09-22).
 ///   AuthGate's spinner covers the async tail; per-user work waits for the
 ///   user AuthGate signs in (bootstrap never signs in itself — a competing
 ///   anonymous sign-in would look like a uid change and wipe local data).
@@ -49,6 +53,11 @@ class AppBootstrap {
   }
 
   static Future<void> completeDeferred(ProviderContainer container) async {
+    // Audit M10: a failed pre-frame Firebase init is retried once here
+    // instead of leaving the session silently offline for its whole life.
+    if (Firebase.apps.isEmpty) {
+      unawaited(FirebaseInitializer.initialize());
+    }
     await LocalNotificationsService.instance.initialize(
       onDidReceiveNotificationResponse: (response) {
         unawaited(handleNotificationResponse(response, container));
@@ -87,6 +96,14 @@ class AppBootstrap {
     await SyncService.instance.initialize();
     await container.read(reminderSyncServiceProvider).scheduleFromCache();
 
+    // Hold the non-essential tail until the first screen is usable
+    // (2026-09-22): push registration, circle streaks, memory extraction,
+    // the thinking loop and per-user maintenance all open connections that
+    // competed with the seed pull on a slow link. FirstLaunchGate marks
+    // readiness the moment it reveals; the timeout covers boots where the
+    // gate never mounts (registered-auth landing screen).
+    await FirstScreenReady.wait(timeout: const Duration(seconds: 20));
+
     // Push transport for the server rescue-net (Phase 5): register this
     // device's token + stamp the app-open heartbeat. No-op without Firebase
     // or APNs; the local alarm ladder stays the correctness floor.
@@ -115,9 +132,11 @@ class AppBootstrap {
     // the newest 20 (pruneOld had shipped with zero callers, so snapshots
     // of personal data accumulated forever).
     unawaited(
-      container.read(aiActionExecutorProvider).sweepStrandedBatches().then(
-            (_) =>
-                container.read(aiActionBatchRepositoryProvider).pruneOld(),
+      container
+          .read(aiActionExecutorProvider)
+          .sweepStrandedBatches()
+          .then(
+            (_) => container.read(aiActionBatchRepositoryProvider).pruneOld(),
           ),
     );
 
@@ -142,6 +161,14 @@ class AppBootstrap {
         await container
             .read(goalReminderSyncServiceProvider)
             .applyForGoals(goals);
+        // Direction close-out notices (2026-09-19): one per written,
+        // unanswered period whose end is ahead.
+        final directions = await container
+            .read(directionRepositoryProvider)
+            .fetchAllOnce();
+        await container
+            .read(directionCloseoutSchedulerProvider)
+            .rearm(directions);
         final planningRepo = FirestorePlanningRepository(FirestoreClient());
         await AccountabilityRetentionWorker(
           planningRepo.pruneOldAccountabilityLogs,

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -47,19 +48,26 @@ Future<void> main() async {
       // Crash reporting is valuable but must NEVER block the first frame —
       // this call proved capable of hanging on-device in release, which
       // left the app on a white screen forever. Bounded + non-fatal.
-      try {
-        await FirebaseCrashlytics.instance
-            .setCrashlyticsCollectionEnabled(!kDebugMode)
-            .timeout(const Duration(seconds: 4));
-      } catch (e) {
-        _bootLog('[boot] crashlytics enable skipped: $e');
+      // Audit M10: when Firebase itself failed to initialise, wiring these
+      // handlers threw before runApp (white screen) — the app now boots
+      // Isar-only and the deferred bootstrap retries Firebase.
+      if (Firebase.apps.isNotEmpty) {
+        try {
+          await FirebaseCrashlytics.instance
+              .setCrashlyticsCollectionEnabled(!kDebugMode)
+              .timeout(const Duration(seconds: 4));
+        } catch (e) {
+          _bootLog('[boot] crashlytics enable skipped: $e');
+        }
+        FlutterError.onError =
+            FirebaseCrashlytics.instance.recordFlutterFatalError;
+        PlatformDispatcher.instance.onError = (error, stack) {
+          FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+          return true;
+        };
+      } else {
+        _bootLog('[boot] firebase unavailable — booting local-only');
       }
-      FlutterError.onError =
-          FirebaseCrashlytics.instance.recordFlutterFatalError;
-      PlatformDispatcher.instance.onError = (error, stack) {
-        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-        return true;
-      };
 
       _bootLog('[boot] runApp');
       runApp(

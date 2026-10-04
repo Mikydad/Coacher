@@ -4,9 +4,15 @@
  * Evidence docs are client-written through the offline outbox (user-own
  * data, house pattern), so the client cannot be trusted for WHEN a record
  * reached the server. This trigger stamps `arrivedAtMs` on creation; the
- * outcome engine ignores evidence without the stamp or stamped after the
- * decision cutoff. Rules forbid clients writing `arrivedAtMs` themselves
- * and make evidence docs immutable once created.
+ * outcome engine ignores evidence stamped after the decision cutoff.
+ * Rules forbid clients writing `arrivedAtMs` themselves and make evidence
+ * docs immutable once created.
+ *
+ * M6 (pre-launch audit 2026-09-15): the stamp is the document's immutable
+ * Firestore CREATE time, not the trigger's execution time — a delayed or
+ * re-delivered trigger can no longer make on-time evidence look late, and
+ * `evidenceFromSnap` falls back to createTime when the stamp is missing,
+ * so a lost trigger event no longer voids the evidence.
  */
 
 import {
@@ -28,8 +34,9 @@ export const stakeEvidenceArrived = onDocumentCreated(
   async (event) => {
     const snap = event.data;
     if (!snap) return;
-    if (typeof snap.data().arrivedAtMs === 'number') return; // already stamped
-    await snap.ref.update({ arrivedAtMs: Date.now() });
+    const arrivedAtMs = snap.createTime?.toMillis() ?? Date.now();
+    // Idempotent: re-delivery writes the same immutable value.
+    await snap.ref.set({ arrivedAtMs }, { merge: true });
   },
 );
 

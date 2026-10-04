@@ -4,6 +4,7 @@ import 'dart:convert';
 import '../../../core/local_db/isar_collections/isar_ai_action_batch.dart';
 import '../../../core/runtime/mutation_request.dart';
 import '../../../core/runtime/schedule_mutation_coordinator.dart';
+import '../../../core/tier/tier_gate.dart';
 import '../../../core/utils/date_keys.dart';
 import '../../../core/utils/friendly_date.dart';
 import '../../../core/utils/stable_id.dart';
@@ -43,6 +44,8 @@ class ExecutionResult {
     this.failures = const [],
     this.batchId,
     this.wasRolledBack = false,
+    this.alreadyApplied = false,
+    this.hitTierLimit = false,
   });
 
   final List<String> successes;
@@ -51,8 +54,16 @@ class ExecutionResult {
   /// The [batchId] of the persisted [IsarAiActionBatch] for this execution.
   final String? batchId;
 
+  /// True when [AiActionExecutor.execute] found this batch already run
+  /// (fix plan Phase 2.1) and applied nothing new.
+  final bool alreadyApplied;
+
   /// True if the batch was rolled back due to a partial failure.
   final bool wasRolledBack;
+
+  /// True when at least one failure was a free-tier limit — the reply
+  /// carries a "See Pro" link (decision 2026-09-27).
+  final bool hitTierLimit;
 
   bool get hasFailures => failures.isNotEmpty;
 
@@ -157,8 +168,36 @@ class AiActionExecutor {
 
   // ─── Public execute ────────────────────────────────────────────────────────
 
-  Future<ExecutionResult> execute(List<AiAction> requested) async {
-    final batchId = StableId.generate('ai_batch');
+  /// [batchId] is the proposal's deterministic id (fix plan Phase 2.1): a
+  /// batch that already completed is never run again — a double tap, a
+  /// retry after a bookkeeping failure, or a crash-and-retry all resolve to
+  /// the ONE persisted batch. Without it every invocation minted fresh
+  /// ids and duplicated every task (review §1.1 #3).
+  Future<ExecutionResult> execute(
+    List<AiAction> requested, {
+    String? batchId,
+  }) async {
+    if (batchId != null) {
+      final prior = await batchRepository.findByBatchId(batchId);
+      if (prior != null) {
+        final state = prior.state;
+        if (state == AiActionBatchState.completed.name ||
+            state == AiActionBatchState.partialFailure.name ||
+            state == AiActionBatchState.rolledBack.name) {
+          return ExecutionResult(
+            successes: const ['Already applied.'],
+            batchId: batchId,
+            alreadyApplied: true,
+          );
+        }
+        // pending/executing: a live run or a crash the boot sweep owns.
+        return ExecutionResult(
+          failures: const ['Still applying the previous attempt — give it a moment.'],
+          batchId: batchId,
+        );
+      }
+    }
+    batchId ??= StableId.generate('ai_batch');
     final now = DateTime.now().millisecondsSinceEpoch;
 
     // Work on copies: the pre-pass below annotates parameters with
@@ -257,6 +296,7 @@ class AiActionExecutor {
     final failures = <String>[];
     final succeededIds = <String>[];
     final failedIds = <String>[];
+    var hitTierLimit = false;
 
     for (final action in actions) {
       final actionId =
@@ -270,13 +310,28 @@ class AiActionExecutor {
       } catch (e) {
         failures.add('${_humanLabel(action)}: ${e.toString()}');
         failedIds.add(actionId);
+        if (e is TierLimitException) hitTierLimit = true;
       }
-      // Persist the log after EVERY action — a crash mid-batch leaves a
-      // rollback-able record for the boot sweep (§8 E8).
-      await batchRepository.updateSnapshot(
-        batchId,
-        jsonEncode({'inverseOps': inverseOps}),
-      );
+      // Persist the log AND the per-action outcome after EVERY action — a
+      // crash mid-batch leaves a rollback-able record for the boot sweep
+      // (§8 E8), and the sweep can tell "all actions ran, only the final
+      // state write was lost" from "half applied" (fix plan Phase 2.3). A
+      // bookkeeping failure here must never abort the user's confirmed
+      // plan mid-way: log and carry on.
+      try {
+        await batchRepository.updateSnapshot(
+          batchId,
+          jsonEncode({'inverseOps': inverseOps}),
+        );
+        await batchRepository.updateState(
+          batchId,
+          AiActionBatchState.executing,
+          succeeded: succeededIds,
+          failed: failedIds,
+        );
+      } catch (e) {
+        debugPrint('ai_action_executor: batch bookkeeping failed: $e');
+      }
     }
 
     // Per-item outcomes (settled Q4): independent actions succeed and fail
@@ -285,18 +340,30 @@ class AiActionExecutor {
     // while claiming it had (§8 E3/E6). Undo of a partialFailure batch
     // reverts exactly the succeeded actions: their ops are the only ones in
     // the log.
-    await batchRepository.updateState(
-      batchId,
-      failures.isEmpty
-          ? AiActionBatchState.completed
-          : AiActionBatchState.partialFailure,
-      succeeded: succeededIds,
-      failed: failedIds,
-    );
+    final finalState = failures.isEmpty
+        ? AiActionBatchState.completed
+        : AiActionBatchState.partialFailure;
+    // The terminal state write is retried once; if it still fails the
+    // per-action outcomes above let the boot sweep finish the bookkeeping
+    // instead of rolling the user's applied plan back.
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        await batchRepository.updateState(
+          batchId,
+          finalState,
+          succeeded: succeededIds,
+          failed: failedIds,
+        );
+        break;
+      } catch (e) {
+        debugPrint('ai_action_executor: final state write failed ($attempt): $e');
+      }
+    }
     return ExecutionResult(
       successes: successes,
       failures: failures,
       batchId: batchId,
+      hitTierLimit: hitTierLimit,
     );
   }
 
@@ -575,6 +642,26 @@ class AiActionExecutor {
     try {
       final stranded = await batchRepository.findStranded();
       for (final batch in stranded) {
+        // Every action has an outcome → the run finished and only its final
+        // state write was lost (fix plan Phase 2.3). Finish the bookkeeping;
+        // rolling back would silently undo a plan the user confirmed and
+        // has since lived with (review §1.1 #3).
+        final actionCount = _actionCountOf(batch.actionsJson);
+        final outcomes =
+            batch.succeededActionIds.length + batch.failedActionIds.length;
+        if (actionCount > 0 && outcomes >= actionCount) {
+          debugPrint(
+            'ai_action_executor: stranded batch ${batch.batchId} had run to '
+            'completion — closing it instead of rolling back',
+          );
+          await batchRepository.updateState(
+            batch.batchId,
+            batch.failedActionIds.isEmpty
+                ? AiActionBatchState.completed
+                : AiActionBatchState.partialFailure,
+          );
+          continue;
+        }
         debugPrint(
           'ai_action_executor: sweeping stranded batch ${batch.batchId} '
           '(${batch.state})',
@@ -583,6 +670,15 @@ class AiActionExecutor {
       }
     } catch (e) {
       debugPrint('ai_action_executor: stranded sweep failed: $e');
+    }
+  }
+
+  static int _actionCountOf(String actionsJson) {
+    try {
+      final decoded = jsonDecode(actionsJson);
+      return decoded is List ? decoded.length : 0;
+    } catch (_) {
+      return 0;
     }
   }
 
@@ -987,6 +1083,7 @@ class AiActionExecutor {
     if (title.isEmpty) {
       throw ArgumentError('title is required to capture an intention');
     }
+    await tierGuard?.ensureCanCreatePromise();
 
     final now = DateTime.now();
     final windowKind = switch (p['window'] as String?) {
@@ -1265,6 +1362,9 @@ class AiActionExecutor {
       await tierGuard?.ensureCanAddReminder();
     }
 
+    // Goal link (Phase 6): stamped by the resolver from goalRef/goalTitle;
+    // an unresolved goal leaves the task unlinked, never blocks creation.
+    final goalId = p['_resolvedGoalId'] as String?;
     final task = PlannedTask(
       id: StableId.generate('task'),
       routineId: routineId,
@@ -1280,6 +1380,7 @@ class AiActionExecutor {
       updatedAtMs: DateTime.now().millisecondsSinceEpoch,
       planDateKey: dateStr,
       modeRefId: modeRefId,
+      goalId: goalId,
     );
 
     await planningRepository.upsertTask(task);
@@ -1312,7 +1413,10 @@ class AiActionExecutor {
       if (block != null) await timeBlockSyncService.syncBlock(block);
     }
 
-    return 'Added "$title" on ${_friendlyDate(dateStr)}${timeStr != null ? " at $timeStr" : ""}.';
+    final goalNote = p['goalTitle'] is String && goalId != null
+        ? ' (for "${p['goalTitle']}")'
+        : '';
+    return 'Added "$title" on ${_friendlyDate(dateStr)}${timeStr != null ? " at $timeStr" : ""}$goalNote.';
   }
 
   /// Loads the task row a resolver-stamped action targets. The resolver
@@ -1503,18 +1607,40 @@ class AiActionExecutor {
     final target = p['target'] as String? ?? '';
     final deadlineStr = p['deadline'] as String?;
 
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final periodEnd = deadlineStr != null
-        ? (() {
-            try {
-              return DateKeys.parseLocalDateKey(
-                deadlineStr,
-              ).millisecondsSinceEpoch;
-            } catch (_) {
-              return now;
-            }
-          }())
-        : now + const Duration(days: 30).inMilliseconds;
+    final nowDt = DateTime.now();
+    final now = nowDt.millisecondsSinceEpoch;
+    // The deadline goes through the same today/tomorrow/YYYY-MM-DD
+    // resolution as every task date (fix plan Phase 2.4): "by tomorrow"
+    // used to fail the ISO parse and fall back to NOW, creating a goal
+    // that was expired the moment it existed (review §2.1 #4). An
+    // unparseable deadline falls back to 30 days, never to now.
+    int periodEnd;
+    if (deadlineStr == null || deadlineStr.trim().isEmpty) {
+      periodEnd = now + const Duration(days: 30).inMilliseconds;
+    } else {
+      try {
+        final endDay = DateKeys.parseLocalDateKey(_resolveDate(deadlineStr));
+        // End of that local day, so a same-day deadline is still live.
+        periodEnd = DateTime(endDay.year, endDay.month, endDay.day, 23, 59)
+            .millisecondsSinceEpoch;
+      } catch (_) {
+        periodEnd = now + const Duration(days: 30).inMilliseconds;
+      }
+    }
+    if (periodEnd <= now) {
+      periodEnd = now + const Duration(days: 1).inMilliseconds;
+    }
+    final periodStart = DateTime(nowDt.year, nowDt.month, nowDt.day)
+        .millisecondsSinceEpoch;
+
+    // Cadence and category from the model when given (Phase 2.4) — "run
+    // 20 km a week" is a WEEKLY goal, not 20 km over 30 days. The
+    // measurement kind follows the unit word in the target.
+    final cadence = _goalCadenceFrom(
+      p['cadence'] as String?,
+      fallbackFromTarget: target,
+    );
+    final categoryId = _goalCategoryFrom(p['category'] as String?);
 
     // Honor the model's target when it carries a number: "20 km" →
     // targetValue 20, customLabel "km" (fix-wave Phase 1 — every AI goal
@@ -1530,28 +1656,106 @@ class AiActionExecutor {
               .trim()
         : target;
 
-    // Repeat off: an AI-created goal with a deadline is a one-time outcome
-    // goal — progress accumulates until the deadline.
+    final measurement = _measurementKindFrom(targetLabel);
     final goal = UserGoal(
       id: StableId.generate('goal'),
       title: title,
-      categoryId: GoalCategories.productivity,
+      categoryId: categoryId,
       status: GoalStatus.active,
-      measurementKind: MeasurementKind.count,
+      measurementKind: measurement,
       targetValue: parsedTarget != null && parsedTarget > 0
           ? parsedTarget
           : 1,
-      customLabel: targetLabel.isNotEmpty ? targetLabel : null,
+      customLabel: measurement == MeasurementKind.custom &&
+              targetLabel.isNotEmpty
+          ? targetLabel
+          : null,
       intensity: 3,
-      periodStartMs: now,
+      periodStartMs: periodStart,
       periodEndMs: periodEnd,
+      repeatCadence: cadence,
       createdAtMs: now,
       updatedAtMs: now,
     );
 
     await goalsRepository.upsertGoal(goal);
     ops.add({'op': 'deleteGoal', 'goalId': goal.id});
-    return 'Created goal "$title".';
+    final cadenceWord = switch (cadence) {
+      GoalRepeatCadence.daily => ' (daily)',
+      GoalRepeatCadence.weekly => ' (weekly)',
+      GoalRepeatCadence.monthly => ' (monthly)',
+      GoalRepeatCadence.off => '',
+    };
+    return 'Created goal "$title"$cadenceWord.';
+  }
+
+  /// "daily" | "weekly" | "monthly" | "none"; otherwise inferred from the
+  /// target text ("a week", "per day", "/ month"); otherwise off.
+  static GoalRepeatCadence _goalCadenceFrom(
+    String? raw, {
+    required String fallbackFromTarget,
+  }) {
+    final word = (raw ?? '').trim().toLowerCase();
+    switch (word) {
+      case 'daily':
+      case 'day':
+      case 'every day':
+        return GoalRepeatCadence.daily;
+      case 'weekly':
+      case 'week':
+      case 'every week':
+        return GoalRepeatCadence.weekly;
+      case 'monthly':
+      case 'month':
+      case 'every month':
+        return GoalRepeatCadence.monthly;
+      case 'none':
+      case 'off':
+      case 'once':
+        return GoalRepeatCadence.off;
+    }
+    final t = fallbackFromTarget.toLowerCase();
+    if (RegExp(r'\b(a|per|each|every|/)\s*day\b|\bdaily\b').hasMatch(t)) {
+      return GoalRepeatCadence.daily;
+    }
+    if (RegExp(r'\b(a|per|each|every|/)\s*week\b|\bweekly\b').hasMatch(t)) {
+      return GoalRepeatCadence.weekly;
+    }
+    if (RegExp(r'\b(a|per|each|every|/)\s*month\b|\bmonthly\b').hasMatch(t)) {
+      return GoalRepeatCadence.monthly;
+    }
+    return GoalRepeatCadence.off;
+  }
+
+  static String _goalCategoryFrom(String? raw) {
+    final word = (raw ?? '').trim().toLowerCase().replaceAll(' ', '_');
+    if (GoalCategories.all.contains(word)) return word;
+    return switch (word) {
+      'health' || 'exercise' || 'workout' || 'sport' => GoalCategories.fitness,
+      'learning' || 'learn' || 'education' || 'reading' => GoalCategories.study,
+      'habit' => GoalCategories.habits,
+      'mindfulness' || 'meditation' || 'wellbeing' || 'mental' =>
+        GoalCategories.mentalClarity,
+      'work' || 'career' || 'business' || 'money' => GoalCategories.productivity,
+      _ => GoalCategories.productivity,
+    };
+  }
+
+  static MeasurementKind _measurementKindFrom(String unitLabel) {
+    final u = unitLabel.toLowerCase();
+    if (RegExp(r'\b(min|mins|minute|minutes|hour|hours|hrs?)\b').hasMatch(u)) {
+      return MeasurementKind.minutes;
+    }
+    if (RegExp(r'\b(session|sessions|times|workouts?|reps?)\b').hasMatch(u)) {
+      return MeasurementKind.sessions;
+    }
+    if (RegExp(r'\b(km|kilomet(er|re)s?|miles?|mi|meters?|m)\b').hasMatch(u)) {
+      return MeasurementKind.distance;
+    }
+    if (u.isEmpty || RegExp(r'\b(count|items?|tasks?)\b').hasMatch(u)) {
+      return MeasurementKind.count;
+    }
+    return MeasurementKind.custom;
   }
 
   /// Loads the goal a resolver-stamped action targets — same contract as

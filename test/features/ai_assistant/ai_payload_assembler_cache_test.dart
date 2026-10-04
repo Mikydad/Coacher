@@ -6,6 +6,7 @@ import 'package:sidepal/features/goals/data/goals_repository.dart';
 import 'package:sidepal/features/planning/data/planning_repository.dart';
 import 'package:sidepal/features/planning/domain/models/routine.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sidepal/features/ai_assistant/domain/models/ai_action.dart';
 
 class _CountingPlanningRepo implements PlanningRepository {
   int routineFetchCount = 0;
@@ -36,6 +37,27 @@ class _FakeCoachingRepo implements CoachingStyleRepository {
 }
 
 class _FakeHistory implements AiInteractionHistoryRepository {
+  @override
+  Future<int?> saveTurn({
+    required String sessionId,
+    required String userInput,
+    required List<AiAction> parsedActions,
+    String? resolvedCategory,
+    String? assistantSummary,
+    String? responseType,
+    bool executed = false,
+  }) async {
+    await save(
+      sessionId: sessionId,
+      userInput: userInput,
+      parsedActions: parsedActions,
+      resolvedCategory: resolvedCategory,
+      assistantSummary: assistantSummary,
+      responseType: responseType,
+    );
+    return null;
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
 }

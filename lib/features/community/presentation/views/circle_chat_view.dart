@@ -9,7 +9,10 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/presentation/keyboard_dismiss.dart';
 import '../../../../core/utils/stable_id.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+
 import '../../application/circle_providers.dart';
+import '../../application/message_delete_policy.dart';
 import '../../data/circle_proof_storage.dart';
 import '../../domain/models/circle_enums.dart';
 import '../../domain/models/circle_message.dart';
@@ -141,7 +144,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
   Future<String?> _showProofCategorySheet() {
     return showModalBottomSheet<String>(
       context: context,
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.surfacePanel,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -155,7 +158,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.fg.withOpacity(0.12),
+                  color: AppColors.divider,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -186,31 +189,101 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
     );
   }
 
+  /// Tombstone the message (Miko, 2026-09-24): own messages within
+  /// [kOwnMessageDeleteWindow], any message for a moderator. Optimistic like
+  /// send — the snapshot listener echoes the local write at once; a rules
+  /// rejection surfaces as a snackbar. The image file is cleaned up best
+  /// effort; the tombstone is what matters to the thread.
+  Future<void> _deleteMessage(CircleMessage message) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfacePanel,
+        title: Text(
+          'Delete message?',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          message.senderId == uid
+              ? 'It will be removed for everyone in the group.'
+              : 'It will show as deleted by admin for everyone in the group.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: AppColors.fg,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final imageUrl = message.imageUrl;
+    unawaited(
+      ref
+          .read(circleMessageRepositoryProvider)
+          .deleteMessage(widget.circleId, message.id, byUid: uid)
+          .then((_) {
+            if (imageUrl != null && imageUrl.isNotEmpty) {
+              unawaited(
+                FirebaseStorage.instance
+                    .refFromURL(imageUrl)
+                    .delete()
+                    .catchError((Object _) {}),
+              );
+            }
+          })
+          .catchError((Object e) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Could not delete the message.')),
+            );
+          }),
+    );
+  }
+
   Future<void> _toggleReaction(CircleMessage message, String emoji) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    final current = Map<String, List<String>>.from(
-      message.reactions.map((k, v) => MapEntry(k, List<String>.from(v))),
-    );
-
-    final users = current[emoji] ?? [];
-    if (users.contains(uid)) {
-      users.remove(uid);
-      if (users.isEmpty) current.remove(emoji);
+    // Own key only (audit L2): rules refuse any change to other members'
+    // reactions, so the toggle rewrites just `reactionsByUser.{me}`.
+    final mine = message.reactionsOf(uid);
+    if (mine.contains(emoji)) {
+      mine.remove(emoji);
     } else {
-      users.add(uid);
-      current[emoji] = users;
+      mine.add(emoji);
     }
 
     await ref
         .read(circleMessageRepositoryProvider)
-        .updateReactions(widget.circleId, message.id, current);
+        .setMyReactions(widget.circleId, message.id, uid, mine);
   }
 
   @override
   Widget build(BuildContext context) {
     final messagesAsync = ref.watch(circleMessagesProvider(widget.circleId));
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final isModerator =
+        ref
+            .watch(circleDetailProvider(widget.circleId))
+            .valueOrNull
+            ?.moderatorIds
+            .contains(uid) ??
+        false;
 
     return Column(
       children: [
@@ -228,7 +301,7 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
                 Center(
                   child: Text(
                     'Could not load messages.',
-                    style: TextStyle(color: AppColors.textMuted),
+                    style: TextStyle(color: AppColors.textSecondary),
                   ),
                 ),
               ),
@@ -236,10 +309,10 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
                 if (messages.isEmpty) {
                   return Center(
                     child: Text(
-                      'No messages yet.\nSay hello to your circle!',
+                      'No messages yet.\nSay hello to the group!',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: AppColors.textMuted,
+                        color: AppColors.textSecondary,
                         fontSize: 15,
                       ),
                     ),
@@ -260,15 +333,33 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
                     if (msg.type == MessageType.systemEvent) {
                       return _SystemEventPill(msg.content ?? '');
                     }
+                    if (msg.isDeleted) {
+                      return _DeletedMessageBubble(
+                        message: msg,
+                        label: deletedMessageLabel(msg, uid: uid),
+                        isMe: msg.senderId == uid,
+                      );
+                    }
+                    final canDelete = canDeleteMessage(
+                      msg,
+                      uid: uid,
+                      isModerator: isModerator,
+                      now: DateTime.now(),
+                    );
+                    final onDelete = canDelete
+                        ? () => _deleteMessage(msg)
+                        : null;
                     if (msg.type == MessageType.image) {
                       return _ImageMessageBubble(
                         message: msg,
                         onReaction: (emoji) => _toggleReaction(msg, emoji),
+                        onDelete: onDelete,
                       );
                     }
                     return _TextMessageBubble(
                       message: msg,
                       onReaction: (emoji) => _toggleReaction(msg, emoji),
+                      onDelete: onDelete,
                     );
                   },
                 );
@@ -290,10 +381,17 @@ class _CircleChatViewState extends ConsumerState<CircleChatView> {
 // ── Message bubbles ───────────────────────────────────────────────────────────
 
 class _TextMessageBubble extends StatelessWidget {
-  const _TextMessageBubble({required this.message, required this.onReaction});
+  const _TextMessageBubble({
+    required this.message,
+    required this.onReaction,
+    this.onDelete,
+  });
 
   final CircleMessage message;
   final ValueChanged<String> onReaction;
+
+  /// Null when this user may not delete the message.
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -329,7 +427,7 @@ class _TextMessageBubble extends StatelessWidget {
                       child: Text(
                         message.senderDisplayName,
                         style: TextStyle(
-                          color: AppColors.textMuted,
+                          color: AppColors.textSecondary,
                           fontSize: 11,
                         ),
                       ),
@@ -341,8 +439,8 @@ class _TextMessageBubble extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: isMe
-                          ? AppColors.accent.withOpacity(0.15)
-                          : AppColors.surfaceCard,
+                          ? AppColors.accent.withValues(alpha: 0.15)
+                          : AppColors.surfaceLight,
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(16),
                         topRight: const Radius.circular(16),
@@ -364,7 +462,7 @@ class _TextMessageBubble extends StatelessWidget {
                     child: Text(
                       _formatTime(message.createdAtMs),
                       style: TextStyle(
-                        color: AppColors.textMuted,
+                        color: AppColors.textSecondary,
                         fontSize: 10,
                       ),
                     ),
@@ -384,23 +482,107 @@ class _TextMessageBubble extends StatelessWidget {
     );
   }
 
-  void _showEmojiBar(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppColors.surfaceCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+  void _showEmojiBar(BuildContext context) =>
+      _showMessageActions(context, onReaction: onReaction, onDelete: onDelete);
+}
+
+/// Long-press sheet: the reaction bar, plus "Delete message" when allowed.
+void _showMessageActions(
+  BuildContext context, {
+  required ValueChanged<String> onReaction,
+  VoidCallback? onDelete,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: AppColors.surfacePanel,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _EmojiReactionBar(onReaction: onReaction),
+          if (onDelete != null)
+            ListTile(
+              leading: Icon(
+                Icons.delete_outline_rounded,
+                color: AppColors.danger,
+              ),
+              title: Text(
+                'Delete message',
+                style: TextStyle(color: AppColors.danger),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                onDelete();
+              },
+            ),
+        ],
       ),
-      builder: (_) => _EmojiReactionBar(onReaction: onReaction),
+    ),
+  );
+}
+
+/// In-place tombstone (WhatsApp model): the row stays, the words say who.
+class _DeletedMessageBubble extends StatelessWidget {
+  const _DeletedMessageBubble({
+    required this.message,
+    required this.label,
+    required this.isMe,
+  });
+
+  final CircleMessage message;
+  final String label;
+  final bool isMe;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: isMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.divider),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.block_rounded, size: 14, color: AppColors.textMuted),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _ImageMessageBubble extends StatelessWidget {
-  const _ImageMessageBubble({required this.message, required this.onReaction});
+  const _ImageMessageBubble({
+    required this.message,
+    required this.onReaction,
+    this.onDelete,
+  });
 
   final CircleMessage message;
   final ValueChanged<String> onReaction;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -410,13 +592,10 @@ class _ImageMessageBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: GestureDetector(
-        onLongPress: () => showModalBottomSheet<void>(
-          context: context,
-          backgroundColor: AppColors.surfaceCard,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          builder: (_) => _EmojiReactionBar(onReaction: onReaction),
+        onLongPress: () => _showMessageActions(
+          context,
+          onReaction: onReaction,
+          onDelete: onDelete,
         ),
         child: Row(
           mainAxisAlignment: isMe
@@ -443,7 +622,7 @@ class _ImageMessageBubble extends StatelessWidget {
                       child: Text(
                         message.senderDisplayName,
                         style: TextStyle(
-                          color: AppColors.textMuted,
+                          color: AppColors.textSecondary,
                           fontSize: 11,
                         ),
                       ),
@@ -478,14 +657,14 @@ class _ImageMessageBubble extends StatelessWidget {
                                 placeholder: (_, _) => Container(
                                   width: 220,
                                   height: 140,
-                                  color: AppColors.surfaceCard,
+                                  color: AppColors.surfaceLight,
                                   child: Center(
                                     child: SizedBox(
                                       width: 20,
                                       height: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: AppColors.textMuted,
+                                        color: AppColors.textSecondary,
                                       ),
                                     ),
                                   ),
@@ -493,10 +672,10 @@ class _ImageMessageBubble extends StatelessWidget {
                                 errorWidget: (_, _, _) => Container(
                                   width: 220,
                                   height: 140,
-                                  color: AppColors.surfaceCard,
+                                  color: AppColors.surfaceLight,
                                   child: Icon(
                                     Icons.broken_image_rounded,
-                                    color: AppColors.textMuted,
+                                    color: AppColors.textSecondary,
                                   ),
                                 ),
                               ),
@@ -513,7 +692,7 @@ class _ImageMessageBubble extends StatelessWidget {
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.6),
+                                color: Colors.black.withValues(alpha: 0.6),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -535,7 +714,7 @@ class _ImageMessageBubble extends StatelessWidget {
                     child: Text(
                       _formatTime(message.createdAtMs),
                       style: TextStyle(
-                        color: AppColors.textMuted,
+                        color: AppColors.textSecondary,
                         fontSize: 10,
                       ),
                     ),
@@ -568,12 +747,12 @@ class _SystemEventPill extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
           decoration: BoxDecoration(
-            color: AppColors.surfaceCard,
+            color: AppColors.surfaceLight,
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
             text,
-            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
           ),
         ),
       ),
@@ -604,12 +783,12 @@ class _ReactionRow extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(
                 color: reacted
-                    ? AppColors.accent.withOpacity(0.2)
-                    : AppColors.surfaceCard,
+                    ? AppColors.accent.withValues(alpha: 0.2)
+                    : AppColors.surfaceLight,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: reacted
-                      ? AppColors.accent.withOpacity(0.4)
+                      ? AppColors.accent.withValues(alpha: 0.4)
                       : Colors.transparent,
                 ),
               ),
@@ -673,8 +852,10 @@ class _InputBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        border: Border(top: BorderSide(color: AppColors.fg.withOpacity(0.06))),
+        color: AppColors.surfacePanel,
+        border: Border(
+          top: BorderSide(color: AppColors.fg.withValues(alpha: 0.06)),
+        ),
       ),
       child: SafeArea(
         top: false,
@@ -683,7 +864,7 @@ class _InputBar extends StatelessWidget {
             // Image picker button
             IconButton(
               icon: const Icon(Icons.add_photo_alternate_outlined),
-              color: AppColors.textMuted,
+              color: AppColors.textSecondary,
               onPressed: sending ? null : onPickImage,
             ),
             // Text field
@@ -702,10 +883,10 @@ class _InputBar extends StatelessWidget {
                   }
                 },
                 decoration: InputDecoration(
-                  hintText: 'Message your circle…',
-                  hintStyle: TextStyle(color: AppColors.textMuted),
+                  hintText: 'Message the group…',
+                  hintStyle: TextStyle(color: AppColors.textSecondary),
                   filled: true,
-                  fillColor: AppColors.surfaceCard,
+                  fillColor: AppColors.surfaceLight,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 10,
@@ -739,7 +920,7 @@ class _InputBar extends StatelessWidget {
                             Icons.send_rounded,
                             color: canSend
                                 ? AppColors.accent
-                                : AppColors.textMuted,
+                                : AppColors.textSecondary,
                           ),
                     onPressed: canSend ? onSend : null,
                   ),
@@ -778,7 +959,7 @@ class _AvatarInitial extends StatelessWidget {
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
     return CircleAvatar(
       radius: 16,
-      backgroundColor: _color.withOpacity(0.2),
+      backgroundColor: _color.withValues(alpha: 0.2),
       child: Text(
         initial,
         style: TextStyle(

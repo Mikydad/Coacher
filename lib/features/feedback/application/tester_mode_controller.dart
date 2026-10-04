@@ -1,3 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,7 +13,27 @@ const String _kLegacyPrefsKey = 'tester_mode_enabled_v1';
 String _prefsKeyForUid(String uid) => 'tester_mode_enabled_v2_$uid';
 
 /// Result of a tester-mode toggle attempt, so the UI can message correctly.
-enum TesterToggleOutcome { enabled, disabled, accountRequired }
+enum TesterToggleOutcome { enabled, disabled, accountRequired, notAllowlisted }
+
+/// Server allowlist (pre-launch audit M11, decision 2026-09-15 D5): tester
+/// mode is GRANTED per account through `tester_allowlist/{uid}` (owner-read,
+/// written only from the console), so the seven-tap gesture is a request,
+/// not a grant — a curious customer or reviewer cannot unlock the billed
+/// AI recompute button or the tester surfaces. Without Firebase (VM tests)
+/// the check passes so controller behaviour stays testable.
+Future<bool> defaultTesterAllowlistCheck(String uid) async {
+  if (Firebase.apps.isEmpty) return true;
+  try {
+    final snap = await FirebaseFirestore.instance
+        .doc('tester_allowlist/$uid')
+        .get()
+        .timeout(const Duration(seconds: 6));
+    return snap.exists;
+  } catch (e) {
+    debugPrint('[TesterMode] allowlist check failed: $e');
+    return false;
+  }
+}
 
 /// Whether the current **account** belongs to a beta tester.
 ///
@@ -24,11 +47,14 @@ enum TesterToggleOutcome { enabled, disabled, accountRequired }
 /// When on, the floating bug-report bubble is shown on every screen. Toggled
 /// by tapping the Profile version footer [SevenTapDetector.target] times.
 class TesterModeController extends StateNotifier<bool> {
-  TesterModeController([this._ref]) : super(false) {
+  TesterModeController([this._ref, Future<bool> Function(String uid)? isAllowlisted])
+    : _isAllowlisted = isAllowlisted ?? defaultTesterAllowlistCheck,
+      super(false) {
     _init();
   }
 
   final Ref? _ref;
+  final Future<bool> Function(String uid) _isAllowlisted;
 
   String? _uid;
   bool _registered = false;
@@ -82,6 +108,11 @@ class TesterModeController extends StateNotifier<bool> {
     if (uid == null || !_registered) {
       return TesterToggleOutcome.accountRequired;
     }
+    // Enabling needs the server grant; disabling never does.
+    if (!_enabledForAccount && !await _isAllowlisted(uid)) {
+      return TesterToggleOutcome.notAllowlisted;
+    }
+    if (_uid != uid) return TesterToggleOutcome.accountRequired;
     _enabledForAccount = !_enabledForAccount;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_prefsKeyForUid(uid), _enabledForAccount);

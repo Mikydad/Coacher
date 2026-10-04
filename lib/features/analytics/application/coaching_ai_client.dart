@@ -122,6 +122,7 @@ OUTPUT RULES:
 - Do NOT invent metrics, goals, or behaviors not mentioned in the data.
 - Do NOT use motivational clichés ("you got this", "crush it", "amazing").
 - Do NOT contradict the coaching focus reason.
+- Streaks are NOT a concept in SidePal. Never mention streaks, streak counts, "keeping a streak alive", or "breaking a streak" — talk about consistency, follow-through, and today's action instead.
 
 Respond ONLY with valid JSON matching this schema:
 {"dailySummary": "...", "mainRecommendation": "...", "tone": "...", "framing": "..."}
@@ -129,11 +130,16 @@ Respond ONLY with valid JSON matching this schema:
   }
 
   String _buildUserPrompt(CoachingAiPayload payload) {
+    // Streak-derived numbers stay out of the prompt (streaks retired
+    // 2026-09-25); the model is told not to talk about them either.
     final evidenceLines = payload.topEvidence.entries
+        .where((e) => !_mentionsStreak(e.key))
         .map((e) => '  - ${e.key}: ${e.value}')
         .join('\n');
     final traceLine = payload.evaluationTrace.take(3).join('; ');
-    final patterns = payload.keyPatternCodes.join(', ');
+    final patterns = payload.keyPatternCodes
+        .where((code) => !_mentionsStreak(code))
+        .join(', ');
     final timing = payload.deliveryContext.timingProfile;
     final directionLine = payload.direction.isEmpty
         ? ''
@@ -156,6 +162,9 @@ $evidenceLines
 Generate the coaching summary.
 ''';
   }
+
+  static bool _mentionsStreak(String key) =>
+      key.toLowerCase().contains('streak');
 
   // ─── Response parser ───────────────────────────────────────────────────────
 

@@ -96,7 +96,7 @@ void main() {
     });
 
     test('falls back for a blank title', () {
-      expect(geofenceNudgeCopy('  ')['body'], 'Your promise on the way?');
+      expect(geofenceNudgeCopy('  ')['body'], 'What you planned on the way?');
     });
   });
 

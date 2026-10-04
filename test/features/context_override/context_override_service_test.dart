@@ -145,4 +145,49 @@ void main() {
       expect(state?.sleepWindowEnd, isNull);
     });
   });
+
+  group('endOverride during the automatic sleep window (2026-09-15)', () {
+    test('pauses the window until the next wake time', () async {
+      // 02:00 inside a 23:00–07:00 window, no manual override.
+      final night = DateTime(2026, 9, 15, 2, 0);
+      repo = _FakeContextOverrideRepository();
+      service = ContextOverrideService(repository: repo, now: () => night);
+      repo._stored = UserAttentionState(
+        id: kUserAttentionStateId,
+        activeOverride: ContextOverride.none,
+        manuallyMuted: false,
+        updatedAtMs: 0,
+        sleepWindowStart: '23:00',
+        sleepWindowEnd: '07:00',
+      );
+
+      final review = await service.endOverride();
+      expect(review.overrideType, ContextOverride.none);
+
+      final state = (await repo.getAttentionState())!;
+      expect(
+        state.sleepWindowPausedUntilMs,
+        DateTime(2026, 9, 15, 7, 0).millisecondsSinceEpoch,
+      );
+      expect(state.isSleepWindowPaused(night), isTrue);
+      // Tomorrow night the window is back.
+      expect(state.isSleepWindowPaused(DateTime(2026, 9, 15, 23, 30)), isFalse);
+    });
+
+    test('is a no-op outside the window', () async {
+      repo._stored = UserAttentionState(
+        id: kUserAttentionStateId,
+        activeOverride: ContextOverride.none,
+        manuallyMuted: false,
+        updatedAtMs: 0,
+        sleepWindowStart: '23:00',
+        sleepWindowEnd: '07:00',
+      );
+      await service.endOverride(); // fixedNow is 09:00
+      expect(
+        (await repo.getAttentionState())!.sleepWindowPausedUntilMs,
+        isNull,
+      );
+    });
+  });
 }

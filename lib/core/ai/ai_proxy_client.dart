@@ -68,12 +68,22 @@ class AiProxyToolCall {
 /// Result of a tool-enabled chat call: natural-language [content], tool
 /// calls to execute, or both.
 class AiProxyChatResult {
-  const AiProxyChatResult({this.content, this.toolCalls = const []});
+  const AiProxyChatResult({
+    this.content,
+    this.toolCalls = const [],
+    this.finishReason,
+  });
 
   final String? content;
   final List<AiProxyToolCall> toolCalls;
 
+  /// OpenAI's finish_reason for the non-streaming path (fix plan Phase 4.4,
+  /// review §1.1 #10): "length" means the reply was cut at the token cap.
+  /// Null from servers that predate it.
+  final String? finishReason;
+
   bool get hasToolCalls => toolCalls.isNotEmpty;
+  bool get truncated => finishReason == 'length';
 }
 
 /// Client for the `aiChat` Cloud Function proxy.
@@ -190,9 +200,11 @@ class AiProxyClient {
       if ((content is! String || content.isEmpty) && toolCalls.isEmpty) {
         throw const AiProxyException('Empty AI response');
       }
+      final finish = result.data['finishReason'];
       return AiProxyChatResult(
         content: content is String && content.isNotEmpty ? content : null,
         toolCalls: toolCalls,
+        finishReason: finish is String ? finish : null,
       );
     } on FirebaseFunctionsException catch (e) {
       throw AiProxyException(

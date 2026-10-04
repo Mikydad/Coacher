@@ -32,6 +32,7 @@ import {
   PointsSource,
   txnId,
   validRefId,
+  trustedDelta,
 } from './points';
 
 export const LEDGER = 'points_ledger';
@@ -76,10 +77,15 @@ export function writeLedgerTxn(
   t: TxnData,
   extraBalanceFields: Record<string, unknown> = {},
 ): BalanceDoc {
-  tx.set(txnRef(uid, txnId(t.source, t.refId, t.atMs)), txnDoc(t));
+  // Append-only for real (audit H7 note): deterministic ids are the
+  // idempotency backbone, so a duplicate write is a replay bug — create()
+  // makes it fail loudly instead of silently overwriting the audit row.
+  tx.create(txnRef(uid, txnId(t.source, t.refId, t.atMs)), txnDoc(t));
   const next: BalanceDoc = {
     ...current,
     balance: (current?.balance ?? 0) + t.amount,
+    // Audit H7 / D1: the server-awarded share of the balance.
+    trusted: Math.max(0, (current?.trusted ?? 0) + trustedDelta(t.source, t.amount)),
     updatedAtMs: t.atMs,
   };
   tx.set(balanceRef(uid), { ...next, ...extraBalanceFields }, { merge: true });
@@ -87,6 +93,15 @@ export function writeLedgerTxn(
 }
 
 // ─── grantPoints (client-initiated earn sources only) ────────────────────────
+//
+// SELF-REPORTED by policy (pre-launch audit H7, decision log 2026-09-15 D1):
+// the referenced task / goal / check-in lives in the client-writable user
+// tree, so verifying it here would only prove the client wrote a document.
+// What bounds it instead: fixed amounts, deterministic ids, daily caps
+// (≤110 points/day even with invented ids), and the fence on the one
+// consequential sink — photo removal is payable from TRUSTED points only
+// (see points.ts). Real verification arrives with server-owned completion
+// events, post-launch.
 
 interface GrantData {
   source?: unknown;

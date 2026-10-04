@@ -21,6 +21,7 @@ class UserProfilePreference {
     this.coachingNotificationSentAtMs = const <int>[],
     this.lastSeenCoachingFocusId = '',
     this.lastNotifiedCoachingFocusId = '',
+    this.homeTrackPillEnabled = false,
     this.schemaVersion = kUserProfilePreferenceSchemaVersion,
   });
 
@@ -56,6 +57,17 @@ class UserProfilePreference {
   /// recompute that keeps the same focus never re-notifies.
   final String lastNotifiedCoachingFocusId;
 
+  /// Whether Home shows the Time tracker's capture pill. Flipped from the
+  /// switch in the Time page's footer (Miko, 2026-09-18). It decides ONLY
+  /// that: the Time page, its history, Siri and timer logging are untouched.
+  ///
+  /// Off by default (Miko, 2026-09-27): Home leads with the next task, and
+  /// tracking is opt-in. Stored under `homeTrackPillOn` — the old
+  /// `homeTrackPillEnabled` key always wrote `true` for anyone who never
+  /// touched the switch, so it can't tell a choice from the old default;
+  /// reading a new key resets every install to off, once.
+  final bool homeTrackPillEnabled;
+
   final int updatedAtMs;
   final int schemaVersion;
 
@@ -81,6 +93,7 @@ class UserProfilePreference {
     'coachingNotificationSentAtMs': coachingNotificationSentAtMs,
     'lastSeenCoachingFocusId': lastSeenCoachingFocusId,
     'lastNotifiedCoachingFocusId': lastNotifiedCoachingFocusId,
+    'homeTrackPillOn': homeTrackPillEnabled,
     'updatedAtMs': updatedAtMs,
     'schemaVersion': schemaVersion,
   };
@@ -104,6 +117,7 @@ class UserProfilePreference {
             map['lastSeenCoachingFocusId'] as String? ?? '',
         lastNotifiedCoachingFocusId:
             map['lastNotifiedCoachingFocusId'] as String? ?? '',
+        homeTrackPillEnabled: map['homeTrackPillOn'] as bool? ?? false,
         updatedAtMs: (map['updatedAtMs'] as num?)?.toInt() ?? 0,
         schemaVersion:
             (map['schemaVersion'] as num?)?.toInt() ??
@@ -119,6 +133,7 @@ class UserProfilePreference {
     List<int>? coachingNotificationSentAtMs,
     String? lastSeenCoachingFocusId,
     String? lastNotifiedCoachingFocusId,
+    bool? homeTrackPillEnabled,
     int? updatedAtMs,
     int? schemaVersion,
   }) => UserProfilePreference(
@@ -139,6 +154,7 @@ class UserProfilePreference {
         lastSeenCoachingFocusId ?? this.lastSeenCoachingFocusId,
     lastNotifiedCoachingFocusId:
         lastNotifiedCoachingFocusId ?? this.lastNotifiedCoachingFocusId,
+    homeTrackPillEnabled: homeTrackPillEnabled ?? this.homeTrackPillEnabled,
     updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     schemaVersion: schemaVersion ?? this.schemaVersion,
   );

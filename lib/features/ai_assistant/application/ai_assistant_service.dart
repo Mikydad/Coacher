@@ -14,12 +14,15 @@ import '../domain/models/ai_action.dart';
 import '../domain/models/ai_chat_message.dart';
 import '../domain/models/ai_intent_kind.dart';
 import '../domain/models/ai_planned_changes.dart';
+import '../domain/models/ai_proposal.dart';
 import '../domain/models/ai_response_type.dart';
 import 'ai_action_executor.dart';
 import 'ai_action_param_normaliser.dart' show looksPlanShapedProse;
 import 'ai_capability_registry.dart';
 import 'ai_informational_output_guard.dart';
+import '../../../core/utils/date_keys.dart';
 import 'ai_intent_parser.dart';
+import 'ai_plan_validator.dart';
 import 'ai_intent_router.dart';
 import 'proactive_chat_conversion_tracker.dart';
 import 'entity_normaliser.dart';
@@ -70,18 +73,28 @@ class AiAssistantService extends ChangeNotifier {
 
   String _sessionId;
   final List<AiChatMessage> _messages = [];
-  AiPlannedChanges? _pendingPlan;
   bool _isLoading = false;
+
+  /// The local day this session belongs to (decision D5, fix plan Phase
+  /// 4.2): a Coach session is a calendar day. Closing the sheet PAUSES it;
+  /// the first message on a new day rotates it.
+  String _sessionDayKey = DateKeys.todayKey();
   bool _inputFocusRequested = false;
 
-  /// Set by [editPlan] — only then do we pass [previousPlan] into the parser.
-  bool _refiningPendingPlan = false;
+  /// The one plan under discussion (AI chat fix plan Phase 1.1): a question
+  /// awaiting its answer, an un-adopted suggestion, a live preview card, or
+  /// an Edit in progress. Null when nothing is pending. Replaces the old
+  /// `_pendingPlan` / `_pendingClarification` / `_refiningPendingPlan` trio,
+  /// whose interactions let an APPLIED suggestion stay "the plan being
+  /// refined" and let a demoted card's plan survive an error turn.
+  AiProposal? _proposal;
 
-  /// A partial plan the model proposed that is still missing a detail (the
-  /// parser asked a follow-up). Kept so the user's NEXT message refines it
-  /// instead of starting over — otherwise "schedule as you suggested" loops
-  /// back to the same question.
-  AiPlannedChanges? _pendingClarification;
+  /// The current proposal's status (tests, screen).
+  AiProposalStatus? get proposalStatus => _proposal?.status;
+
+  /// Outcome of the last auto-commit in this turn — the history row for the
+  /// turn is written after it and must say "applied", not "preview".
+  ({bool ok, String summary})? _lastAutoCommit;
 
   String? _proactiveSuggestionId;
   String? _proactiveSuggestionType;
@@ -90,8 +103,9 @@ class AiAssistantService extends ChangeNotifier {
 
   List<AiChatMessage> get messages => List.unmodifiable(_messages);
   bool get isLoading => _isLoading;
-  bool get hasPendingPlan => _pendingPlan != null;
-  AiPlannedChanges? get pendingPlan => _pendingPlan;
+  bool get hasPendingPlan => _proposal?.isAwaitingConfirm == true;
+  AiPlannedChanges? get pendingPlan =>
+      _proposal?.isAwaitingConfirm == true ? _proposal!.plan : null;
   bool get inputFocusRequested => _inputFocusRequested;
   String get sessionId => _sessionId;
 
@@ -150,14 +164,18 @@ class AiAssistantService extends ChangeNotifier {
       final latestSession = recent.first.sessionId;
       final rows = recent
           .where(
-            (r) =>
-                r.sessionId == latestSession && r.timestampMs >= dayFloorMs,
+            (r) => r.sessionId == latestSession && r.timestampMs >= dayFloorMs,
           )
           .toList()
           .reversed
           .take(10)
           .toList();
       if (rows.isEmpty || _messages.isNotEmpty) return;
+      // Same day, same session (D5): the model's conversation history and
+      // the memory-extraction session both continue across a relaunch
+      // instead of restarting from an empty context.
+      _sessionId = latestSession;
+      _sessionDayKey = DateKeys.todayKey();
       for (final row in rows) {
         if (row.userInput.trim().isNotEmpty) {
           _addMessage(
@@ -253,14 +271,23 @@ class AiAssistantService extends ChangeNotifier {
           id: StableId.generate('msg'),
           role: ChatRole.assistant,
           content:
-              'Coach AI needs a registered account. Create a free account in '
-              'Profile → Sign in and your data comes with you.',
+              'The Coach needs an account. Sign in from Profile — it also '
+              'keeps your data safe if you lose or switch phones, and '
+              'everything you\'ve added comes with you.',
           timestamp: DateTime.now(),
         ),
       );
       notifyListeners();
       return;
     }
+
+    // A new calendar day ends the session (D5): extraction runs for the
+    // finished day, the thread and the model context start fresh.
+    if (DateKeys.todayKey() != _sessionDayKey) startNewSession();
+
+    // Undo by voice/text (D7, fix plan Phase 4.5): a short "undo" right
+    // after an auto-committed intention or memory write reverts it.
+    if (!_isLoading && await _tryUndoLastAutoCommit(text)) return;
 
     // Queue instead of block (fix-wave Phase 3, settled Q6): typing never
     // waits on the network. The bubble renders now; the parse runs when
@@ -302,7 +329,7 @@ class AiAssistantService extends ChangeNotifier {
     // re-propose the same plan. Awaited so voice turns speak the OUTCOME
     // (confirm-by-voice, 2026-08-21) — execution is local-first, so the
     // await costs milliseconds.
-    if (_pendingPlan != null &&
+    if (hasPendingPlan &&
         await _handlePendingPlanShortReply(userInput.trim())) {
       return;
     }
@@ -311,7 +338,7 @@ class AiAssistantService extends ChangeNotifier {
     // good"). Suggest responses park the plan on the message as draftPlan with
     // no pending plan, so without this the affirmation would be re-parsed as a
     // brand-new request — the "What should I call this task?" loop.
-    if (_pendingPlan == null &&
+    if (!hasPendingPlan &&
         await _tryConfirmLatestDraftOnAffirmation(userInput.trim())) {
       return;
     }
@@ -321,7 +348,7 @@ class AiAssistantService extends ChangeNotifier {
     // parser: the model has misread "no thank you" as a brand-new command —
     // including proposing deletions of the very items it just listed
     // (2026-08-22 bug batch).
-    if (_pendingPlan == null && _handleStandaloneDecline(userInput.trim())) {
+    if (!hasPendingPlan && _handleStandaloneDecline(userInput.trim())) {
       return;
     }
 
@@ -349,7 +376,7 @@ class AiAssistantService extends ChangeNotifier {
     final streamer = _voiceReplyStreamer;
     if (streamer == null) return false;
     if (!AiRemoteConfigService.instance.lastKnownAiEnabled) return false;
-    if (_pendingPlan != null || _pendingClarification != null) return false;
+    if (_proposal?.blocksStreaming == true) return false;
     if (AiCapabilityRegistry.isCapabilityQuestion(text)) return false;
     if (FeatureGuides.isEducationQuestion(text)) return false;
     if (AiCapabilityRegistry.detectUnsupported(text) != null) return false;
@@ -398,7 +425,8 @@ class AiAssistantService extends ChangeNotifier {
       } else {
         var message = AiInformationalOutputGuard.sanitize(full);
         if (truncated) {
-          message = '$message …\n\n(That reply got cut off — ask again '
+          message =
+              '$message …\n\n(That reply got cut off — ask again '
               'for the rest.)';
         }
         _replaceLoadingMessage(bubbleId, message);
@@ -513,18 +541,27 @@ class AiAssistantService extends ChangeNotifier {
     );
     _setLoading(true);
 
-    // 3. Mark any existing plan as no longer current
+    // 3. Mark any existing plan as no longer current. A live preview card
+    // is SUPERSEDED by a new turn: its buttons go and its plan can never
+    // run again, not even from a later "yes" after an error turn (review
+    // §2.1 #3). Questions, suggestions and edits survive so the reply can
+    // refine them.
     _demoteCurrentPlan();
+    final priorProposal = _proposal;
+    if (priorProposal != null && priorProposal.isAwaitingConfirm) {
+      _proposal = priorProposal.copyWith(status: AiProposalStatus.superseded);
+    }
+    _lastAutoCommit = null;
 
-    // Pass a previous plan when the user tapped Edit, OR when we're waiting on
-    // the answer to a missing-detail question — so the reply refines that plan
-    // instead of the model re-proposing from scratch (which caused the
-    // "What time should I schedule it?" loop).
-    final previousForParser = _refiningPendingPlan
-        ? _pendingPlan
-        : _pendingClarification;
-    _refiningPendingPlan = false;
-    _pendingClarification = null;
+    // What the parser receives as the plan being refined (Phase 1.1): a
+    // pending question or an Edit always; an un-adopted suggestion only
+    // when this turn is not itself a question; a card or an applied plan
+    // never (review §1.1 #1 — the old code carried an APPLIED suggestion
+    // into "refine this plan, keep the times").
+    final turnRoute = AiIntentRouter.classify(userInput.trim());
+    final previousForParser = _proposal?.carryForward(
+      newTurnIsQuestion: turnRoute.kind == AiIntentKind.query,
+    );
 
     // 4. Parse intent
     AiPlannedChanges result;
@@ -547,15 +584,12 @@ class AiAssistantService extends ChangeNotifier {
       if (heuristicParams != null) {
         _removeMessage(loadingId);
         _setLoading(false);
-        await _autoCommitIntentionActions(
-          [
-            AiAction(
-              actionType: ActionType.createIntention,
-              parameters: heuristicParams,
-            ),
-          ],
-          modelMessage: null,
-        );
+        await _autoCommitIntentionActions([
+          AiAction(
+            actionType: ActionType.createIntention,
+            parameters: heuristicParams,
+          ),
+        ], modelMessage: null);
         return;
       }
       if (generation != _turnGeneration) return;
@@ -593,15 +627,12 @@ class AiAssistantService extends ChangeNotifier {
         userInput.trim(),
       );
       if (heuristicParams != null) {
-        await _autoCommitIntentionActions(
-          [
-            AiAction(
-              actionType: ActionType.createIntention,
-              parameters: heuristicParams,
-            ),
-          ],
-          modelMessage: null,
-        );
+        await _autoCommitIntentionActions([
+          AiAction(
+            actionType: ActionType.createIntention,
+            parameters: heuristicParams,
+          ),
+        ], modelMessage: null);
         return;
       }
       _addMessage(
@@ -620,9 +651,14 @@ class AiAssistantService extends ChangeNotifier {
       return;
     }
 
-    // 5. Remove loading message, add real response
+    // 5. Remove loading message, add real response.
+    // The loading flip is SILENT here (2026-09-19): _setLoading notified
+    // listeners between "thinking bubble gone" and "reply added", so the
+    // thread painted one frame shorter — every bubble shifted and snapped
+    // back, the flicker Miko saw as each reply landed. One notify at the
+    // end of this turn carries both changes; the queue drains after it.
     _removeMessage(loadingId);
-    _setLoading(false);
+    _isLoading = false;
 
     // Intentions AUTO-COMMIT with inline undo — the one deliberate
     // relaxation of the confirm-gate (decision log 2026-07-23): stating a
@@ -641,9 +677,20 @@ class AiAssistantService extends ChangeNotifier {
         result.actions.isNotEmpty &&
         result.actions.every((a) => autoCommitTypes.contains(a.actionType));
     if (isIntentionAutoCommit) {
+      // Anchor to what the user ACTUALLY said (Phase 4.3): the executor's
+      // "utterance supports the fact" check used to compare the fact
+      // against a rawUtterance the model itself supplied — a model that
+      // invents a fact also invents the quote (review §1.1 #9).
+      final anchored = [
+        for (final a in result.actions)
+          a.copyWith(
+            parameters: {...a.parameters, 'rawUtterance': userInput.trim()},
+          ),
+      ];
       await _autoCommitIntentionActions(
-        result.actions,
+        anchored,
         modelMessage: result.informationalMessage,
+        voiceMode: voiceMode,
       );
     } else if (result.requiresFollowUp) {
       final question = AiInformationalOutputGuard.sanitize(
@@ -657,11 +704,14 @@ class AiAssistantService extends ChangeNotifier {
           timestamp: DateTime.now(),
         ),
       );
-      _pendingPlan = null;
-      // Remember the clarification — including the question itself — so the
-      // user's answer refines it. Kept even with no partial actions: dropping
-      // it made short answers parse bare and re-trigger the same question.
-      _pendingClarification = result;
+      // The question — with its partial actions — IS the proposal; the
+      // user's answer refines it. Kept even with no partial actions:
+      // dropping it made short answers parse bare and re-ask the question.
+      _proposal = AiProposal(
+        id: StableId.generate('proposal'),
+        status: AiProposalStatus.awaitingAnswer,
+        plan: result,
+      );
     } else if (result.isInformational || result.isUnsupported) {
       final raw =
           result.informationalMessage ??
@@ -676,17 +726,17 @@ class AiAssistantService extends ChangeNotifier {
           suggestedPrompts: result.suggestedPrompts,
         ),
       );
-      _pendingPlan = null;
-      // A plan that arrived as PROSE (a degraded turn the client repair
-      // rounds could not fix) must stay refinable: park it so the next
-      // "confirm"/"perfect" refines THIS plan instead of re-parsing bare
-      // (deep check 2026-08-20 — the bare re-parse restarted the
-      // "What time should I schedule it?" loop).
-      if (result.isInformational && looksPlanShapedProse(message)) {
-        _pendingClarification = result.copyWith(
-          responseType: AiResponseType.suggest,
-        );
-      }
+      // An answer closes whatever was pending — unless the plan arrived as
+      // PROSE (a degraded turn the client repair rounds could not fix): that
+      // stays refinable so the next "confirm"/"perfect" refines THIS plan
+      // instead of re-parsing bare (deep check 2026-08-20).
+      _proposal = result.isInformational && looksPlanShapedProse(message)
+          ? AiProposal(
+              id: StableId.generate('proposal'),
+              status: AiProposalStatus.suggested,
+              plan: result.copyWith(responseType: AiResponseType.suggest),
+            )
+          : null;
       if (result.isInformational) {
         _logEvent('aiInformationalAnswer', {
           'sessionId': _sessionId,
@@ -703,9 +753,10 @@ class AiAssistantService extends ChangeNotifier {
           result.informationalMessage ??
           'Here\'s what I\'d suggest based on your schedule.';
       final message = AiInformationalOutputGuard.sanitize(raw);
+      final draftId = StableId.generate('msg');
       _addMessage(
         AiChatMessage(
-          id: StableId.generate('msg'),
+          id: draftId,
           role: ChatRole.assistant,
           content: message,
           timestamp: DateTime.now(),
@@ -713,19 +764,24 @@ class AiAssistantService extends ChangeNotifier {
           suggestedPrompts: result.suggestedPrompts,
         ),
       );
-      _pendingPlan = null;
       // A free-text reply to a suggestion ("make it 30 minutes", "move it to
-      // 9am") must refine THIS plan, not start from scratch. Kept even with
-      // NO actions: a narrative-only suggestion still needs "confirm"/
-      // "perfect" to refine it rather than re-parse bare — the bare re-parse
-      // was one leg of the clarify loop (deep check 2026-08-20).
-      _pendingClarification = result;
+      // 9am") refines THIS plan, not from scratch; a QUESTION after it does
+      // not carry it (AiProposal.carryForward). Kept even with NO actions: a
+      // narrative-only suggestion still needs "confirm"/"perfect" to refine
+      // it rather than re-parse bare (deep check 2026-08-20).
+      _proposal = AiProposal(
+        id: StableId.generate('proposal'),
+        status: AiProposalStatus.suggested,
+        plan: result,
+        messageId: draftId,
+        proposedOnDateKey: DateKeys.todayKey(),
+      );
       _logEvent('aiSuggestPlanShown', {
         'sessionId': _sessionId,
         'actionCount': result.actions.length,
       });
     } else if (result.actions.isEmpty) {
-      _pendingPlan = null;
+      _proposal = null;
       const fallback =
           "I didn't quite catch what you'd like me to do there. I'm best at "
           "planning your day, managing tasks and goals, and answering "
@@ -742,11 +798,18 @@ class AiAssistantService extends ChangeNotifier {
     } else {
       // Plan ready — show preview card. Prefer the model's own short
       // confirmation line when the agent provided one.
-      _pendingPlan = result;
+      final cardId = StableId.generate('msg');
+      _proposal = AiProposal(
+        id: StableId.generate('proposal'),
+        status: AiProposalStatus.awaitingConfirm,
+        plan: result,
+        messageId: cardId,
+        proposedOnDateKey: DateKeys.todayKey(),
+      );
       final previewText = result.informationalMessage?.trim();
       _addMessage(
         AiChatMessage(
-          id: StableId.generate('msg'),
+          id: cardId,
           role: ChatRole.assistant,
           content: previewText?.isNotEmpty == true
               ? previewText!
@@ -758,14 +821,30 @@ class AiAssistantService extends ChangeNotifier {
       );
     }
 
-    // 6. Persist interaction (user turn + assistant summary for multi-turn context)
-    await _historyRepository.save(
+    // 6. Persist interaction (user turn + assistant summary for multi-turn
+    // context). Auto-committed turns are recorded as APPLIED (fix plan
+    // Phase 1.5, review §2.1 #2): the model used to see "Plan preview:
+    // rememberFact…" for a fact that was already stored. The row id is
+    // pinned to the proposal so confirmation marks THIS row, never "the
+    // newest row of the session".
+    final autoCommit = _lastAutoCommit;
+    final entryId = await _historyRepository.saveTurn(
       sessionId: _sessionId,
       userInput: userInput.trim(),
       parsedActions: result.actions,
-      assistantSummary: _assistantSummaryForHistory(result),
+      assistantSummary: autoCommit != null && autoCommit.ok
+          ? 'Already applied (do not repeat): ${autoCommit.summary}'
+          : _assistantSummaryForHistory(result),
       responseType: result.responseType.name,
+      executed: autoCommit?.ok ?? false,
     );
+    final proposed = _proposal;
+    if (entryId != null &&
+        proposed != null &&
+        !proposed.isTerminal &&
+        !identical(proposed, priorProposal)) {
+      _proposal = proposed.copyWith(historyEntryId: entryId);
+    }
 
     // 7. Analytics
     _logEvent('aiCommandSubmitted', {
@@ -780,6 +859,7 @@ class AiAssistantService extends ChangeNotifier {
     }
 
     notifyListeners();
+    _drainQueuedTurn();
   }
 
   // ─── Streamed voice turns (voice Level 2) ─────────────────────────────────
@@ -822,7 +902,7 @@ class AiAssistantService extends ChangeNotifier {
     // believed AI was off (GPT-5.6 G13). Returning null routes the turn to
     // the agent path, which degrades honestly.
     if (!AiRemoteConfigService.instance.lastKnownAiEnabled) return null;
-    if (_pendingPlan != null || _pendingClarification != null) return null;
+    if (_proposal?.blocksStreaming == true) return null;
     final currentUser = Firebase.apps.isEmpty
         ? null
         : FirebaseAuth.instance.currentUser;
@@ -892,7 +972,8 @@ class AiAssistantService extends ChangeNotifier {
       } else {
         var message = AiInformationalOutputGuard.sanitize(full);
         if (truncated) {
-          message = '$message …\n\n(That reply got cut off — ask again '
+          message =
+              '$message …\n\n(That reply got cut off — ask again '
               'for the rest.)';
         }
         _replaceLoadingMessage(bubbleId, message);
@@ -937,36 +1018,37 @@ class AiAssistantService extends ChangeNotifier {
 
     out = StreamController<String>(
       onListen: () {
-        sub = _voiceReplyStreamer!(
-          text,
-          _sessionId,
-          route: route,
-          proactiveContext: _proactiveContextForPayload,
-        ).listen(
-          (delta) {
-            buffer.write(delta);
-            _replaceLoadingMessage(bubbleId, buffer.toString());
-            notifyListeners();
-            if (!out.isClosed) out.add(delta);
-          },
-          onError: (Object e) {
-            if (buffer.isEmpty && !settled) {
-              unawaited(fallBackToAgentPath());
-              return;
-            }
-            if (e is AiVoiceStreamTruncated) truncated = true;
-            settle();
-            if (!out.isClosed) {
-              out.addError(e);
-              unawaited(out.close());
-            }
-          },
-          onDone: () {
-            if (fallingBack) return;
-            settle();
-            if (!out.isClosed) unawaited(out.close());
-          },
-        );
+        sub =
+            _voiceReplyStreamer!(
+              text,
+              _sessionId,
+              route: route,
+              proactiveContext: _proactiveContextForPayload,
+            ).listen(
+              (delta) {
+                buffer.write(delta);
+                _replaceLoadingMessage(bubbleId, buffer.toString());
+                notifyListeners();
+                if (!out.isClosed) out.add(delta);
+              },
+              onError: (Object e) {
+                if (buffer.isEmpty && !settled) {
+                  unawaited(fallBackToAgentPath());
+                  return;
+                }
+                if (e is AiVoiceStreamTruncated) truncated = true;
+                settle();
+                if (!out.isClosed) {
+                  out.addError(e);
+                  unawaited(out.close());
+                }
+              },
+              onDone: () {
+                if (fallingBack) return;
+                settle();
+                if (!out.isClosed) unawaited(out.close());
+              },
+            );
       },
       onCancel: () {
         // Interrupt: the voice pipeline dropped the stream — abort the HTTP
@@ -999,8 +1081,7 @@ class AiAssistantService extends ChangeNotifier {
         final plan = message.plannedChanges!;
         final summary = formatPlanForSpeech(plan);
         return [
-          if (content.isNotEmpty && content != "Here's what I'll do:")
-            content,
+          if (content.isNotEmpty && content != "Here's what I'll do:") content,
           if (summary.isNotEmpty) summary,
           // Hard blocks require the stronger phrase (settled Q3): spoken
           // "confirm" is informed consent only when the warning tier was
@@ -1036,8 +1117,9 @@ class AiAssistantService extends ChangeNotifier {
   Future<void> _autoCommitIntentionActions(
     List<AiAction> actions, {
     String? modelMessage,
+    bool voiceMode = false,
   }) async {
-    _pendingPlan = null;
+    _proposal = null;
     ExecutionResult exec;
     try {
       exec = await _actionExecutor.execute(actions);
@@ -1055,10 +1137,16 @@ class AiAssistantService extends ChangeNotifier {
     // exact stored/deleted content next to the Undo (fix-wave Phase 6,
     // §8 M2: the model's own "Noted!" used to win, hiding what was
     // actually written until the user checked "What SidePal knows").
+    // Voice (D7): the spoken reply READS BACK exactly what was stored and
+    // offers undo — with no STT confidence gate, the read-back is how a
+    // misheard "remember…" gets caught before it sticks.
+    // A free limit is not a glitch: say the limit, never "try again".
     final content = exec.hasFailures
-        ? (isMemoryBatch
+        ? (isMemoryBatch || exec.hitTierLimit
               ? exec.toSummaryMessage()
               : "I couldn't save that promise — please try again.")
+        : voiceMode
+        ? '${exec.toSummaryMessage()} Say "undo" if that\'s not right.'
         : (isMemoryBatch
               ? exec.toSummaryMessage()
               : trimmedModel?.isNotEmpty == true
@@ -1068,11 +1156,18 @@ class AiAssistantService extends ChangeNotifier {
       AiChatMessage(
         id: StableId.generate('msg'),
         role: ChatRole.assistant,
-        content: content.isEmpty ? 'Got it — consider it on my radar.' : content,
+        content: content.isEmpty
+            ? 'Got it — consider it on my radar.'
+            : content,
         timestamp: DateTime.now(),
         autoCommittedBatchId: exec.hasFailures ? null : exec.batchId,
         isExecuted: !exec.hasFailures,
+        showProLink: exec.hitTierLimit,
       ),
+    );
+    _lastAutoCommit = (
+      ok: !exec.hasFailures,
+      summary: exec.successes.join('; '),
     );
     _logEvent('aiIntentionAutoCommitted', {
       'sessionId': _sessionId,
@@ -1151,7 +1246,7 @@ class AiAssistantService extends ChangeNotifier {
   }
 
   /// Confirms and executes [planFromCard] when provided (source of truth from the
-  /// preview card). Falls back to [_pendingPlan] for backwards compatibility.
+  /// preview card). Falls back to the live proposal's plan.
   Future<void> confirmPlan([
     AiPlannedChanges? planFromCard,
     String? previewMessageId,
@@ -1160,7 +1255,7 @@ class AiAssistantService extends ChangeNotifier {
     // used to execute the plan twice — the button only disabled on the
     // NEXT frame's rebuild.
     if (_isLoading) return;
-    final plan = planFromCard ?? _pendingPlan;
+    final plan = planFromCard ?? pendingPlan;
     if (plan == null) {
       _addMessage(
         AiChatMessage(
@@ -1173,6 +1268,31 @@ class AiAssistantService extends ChangeNotifier {
       );
       notifyListeners();
       return;
+    }
+
+    // A card whose proposal is no longer live can never execute (fix plan
+    // Phase 1.1): executed, cancelled and superseded cards are inert in the
+    // UI, and this closes every programmatic path to the same plan too.
+    if (previewMessageId != null) {
+      final idx = _messages.indexWhere((m) => m.id == previewMessageId);
+      if (idx != -1) {
+        final card = _messages[idx];
+        if (card.isExecuted || card.isCancelled || !card.isCurrentPlan) {
+          _addMessage(
+            AiChatMessage(
+              id: StableId.generate('msg'),
+              role: ChatRole.assistant,
+              content: card.isExecuted
+                  ? 'That plan was already applied.'
+                  : 'That plan is no longer active. Send a new request and '
+                        'confirm the latest preview.',
+              timestamp: DateTime.now(),
+            ),
+          );
+          notifyListeners();
+          return;
+        }
+      }
     }
 
     if (plan.actions.isEmpty) {
@@ -1189,102 +1309,46 @@ class AiAssistantService extends ChangeNotifier {
       return;
     }
 
+    // Re-validate against the clock (fix plan Phase 2.2): a time that has
+    // passed, or a relative date proposed on a day that has since ended,
+    // must not execute as-is. The card stays live; the user edits or asks
+    // again.
+    final live = _proposal;
+    final isLive = live != null && identical(live.plan, plan);
+    final validation = AiPlanValidator.validate(
+      plan,
+      now: DateTime.now(),
+      proposedOnDateKey: isLive ? live.proposedOnDateKey : null,
+    );
+    if (validation.isBlocked) {
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content:
+              "I didn't apply that:\n${validation.hardBlocks.map((b) => '• $b').join('\n')}",
+          timestamp: DateTime.now(),
+        ),
+      );
+      notifyListeners();
+      return;
+    }
+
     _setLoading(true);
 
-    // Guarded (fix-wave Phase 3, §8 H2): a throw from the executor's
-    // bookkeeping or the history writes used to leave _isLoading stuck
-    // true — SEND dead, card buttons dead, thinking dots forever, and the
-    // only recovery wiped the conversation. Now: honest bubble, the card
-    // stays confirmable, and loading ALWAYS resets.
+    // Execution and bookkeeping are SEPARATE (fix plan Phase 2.3, review
+    // §1.1 #3): "nothing was lost — tap Confirm to try again" is said only
+    // when the executor itself failed before applying anything. A history
+    // or analytics failure AFTER the actions applied is logged and the
+    // outcome is still reported truthfully; retrying would duplicate.
+    ExecutionResult result;
     try {
-    final result = await _actionExecutor.execute(plan.actions);
-
-    // History marking is truthful (fix-wave Phase 2, §8 M1/G8): only the
-    // latest entry — the confirmed plan's own — and only when something
-    // actually applied. A fully-failed confirm marks nothing, so the next
-    // turn's prompt never claims "already applied" for work that never
-    // happened.
-    if (result.successes.isNotEmpty) {
-      await _historyRepository.markConfirmed(_sessionId);
-      await _historyRepository.markExecuted(_sessionId);
-    }
-
-    // Store assistant summary for multi-turn conversationHistory (Phase 3)
-    final executionSummary = result.successes.isEmpty
-        ? 'Nothing was applied. Issues: ${result.failures.take(2).join("; ")}'
-        : result.hasFailures
-        ? 'Already applied (do not repeat): ${result.successes.join("; ")}. Issues: ${result.failures.take(2).join("; ")}'
-        : 'Already applied (do not repeat): ${result.successes.join("; ")}';
-    unawaited(
-      _historyRepository.saveAssistantSummary(_sessionId, executionSummary),
-    );
-
-    // Seed resolvedCategory from the primary action for the Assumption Engine
-    final primary = plan.actions.isNotEmpty ? plan.actions.first : null;
-    if (primary != null) {
-      final rawTitle =
-          primary.parameters['title']?.toString() ??
-          primary.parameters['taskTitle']?.toString() ??
-          '';
-      if (rawTitle.isNotEmpty) {
-        final category = _normaliser.normalise(rawTitle);
-        unawaited(
-          _historyRepository.updateResolvedCategory(_sessionId, category),
-        );
-      }
-    }
-
-    _pendingPlan = null;
-    _markPlanExecuted(previewMessageId, plan.sessionId);
-    _demoteCurrentPlan();
-
-    // Per-item outcomes (fix-wave Phase 2, settled Q4): successes stay
-    // applied, failures are named individually — never the old
-    // all-or-nothing "I've restored your schedule" (which wasn't true).
-    final summary = result.successes.isEmpty && result.hasFailures
-        ? "I couldn't apply that:\n${result.toSummaryMessage()}"
-        : result.hasFailures
-        ? 'Done with some issues:\n${result.toSummaryMessage()}'
-        : result.successes.isNotEmpty
-        ? result.toSummaryMessage()
-        : 'No changes were applied. Try describing a specific task to add or update.';
-
-    _addMessage(
-      AiChatMessage(
-        id: StableId.generate('msg'),
-        role: ChatRole.assistant,
-        content: summary,
-        timestamp: DateTime.now(),
-      ),
-    );
-
-    _logEvent('aiCommandExecuted', {
-      'sessionId': _sessionId,
-      'actionCount': plan.actions.length,
-      'actionTypes': plan.actions.map((a) => a.actionType.name).toList(),
-    });
-    _recordProactiveChatConversion();
-    _onScheduleMutated?.call(_sessionId);
-
-    // Log aiSuggestionAccepted for every action that had a reason label
-    for (final action in plan.actions) {
-      if (action.reasonLabel != null) {
-        final rawTitle =
-            action.parameters['title']?.toString() ??
-            action.parameters['taskTitle']?.toString() ??
-            '';
-        final category = rawTitle.isNotEmpty
-            ? _normaliser.normalise(rawTitle)
-            : 'unknown';
-        _logEvent('aiSuggestionAccepted', {
-          'sessionId': _sessionId,
-          'category': category,
-          'confidence': action.confidence,
-        });
-      }
-    }
+      result = await _actionExecutor.execute(
+        plan.actions,
+        batchId: isLive ? live.batchId : null,
+      );
     } catch (e) {
-      debugPrint('confirmPlan failed: $e');
+      debugPrint('confirmPlan: executor failed before applying: $e');
       _addMessage(
         AiChatMessage(
           id: StableId.generate('msg'),
@@ -1294,6 +1358,148 @@ class AiAssistantService extends ChangeNotifier {
               'Tap Confirm to try again.',
           timestamp: DateTime.now(),
           isError: true,
+        ),
+      );
+      _setLoading(false);
+      return;
+    }
+
+    if (result.alreadyApplied) {
+      if (isLive) {
+        _proposal = live.copyWith(status: AiProposalStatus.applied);
+      }
+      _markPlanExecuted(previewMessageId, plan.sessionId);
+      _demoteCurrentPlan();
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content: 'That plan was already applied.',
+          timestamp: DateTime.now(),
+        ),
+      );
+      _setLoading(false);
+      return;
+    }
+
+    // History marking is truthful (fix-wave Phase 2, §8 M1/G8): only the
+    // confirmed plan's own row, and only when something actually applied.
+    // Guarded: a throw here must never leave _isLoading stuck (§8 H2) and
+    // must never be reported as "nothing was lost".
+    try {
+      final rowId = isLive ? live.historyEntryId : null;
+      if (result.successes.isNotEmpty) {
+        if (rowId != null) {
+          await _historyRepository.markConfirmedById(rowId);
+          await _historyRepository.markExecutedById(rowId);
+        } else {
+          await _historyRepository.markConfirmed(_sessionId);
+          await _historyRepository.markExecuted(_sessionId);
+        }
+      }
+
+      // Store assistant summary for multi-turn conversationHistory (Phase 3)
+      final executionSummary = result.successes.isEmpty
+          ? 'Nothing was applied. Issues: ${result.failures.take(2).join("; ")}'
+          : result.hasFailures
+          ? 'Already applied (do not repeat): ${result.successes.join("; ")}. Issues: ${result.failures.take(2).join("; ")}'
+          : 'Already applied (do not repeat): ${result.successes.join("; ")}';
+      unawaited(
+        rowId != null
+            ? _historyRepository.saveAssistantSummaryById(
+                rowId,
+                executionSummary,
+              )
+            : _historyRepository.saveAssistantSummary(
+                _sessionId,
+                executionSummary,
+              ),
+      );
+
+      // Seed resolvedCategory from the primary action for the Assumption Engine
+      final primary = plan.actions.isNotEmpty ? plan.actions.first : null;
+      if (primary != null) {
+        final rawTitle =
+            primary.parameters['title']?.toString() ??
+            primary.parameters['taskTitle']?.toString() ??
+            '';
+        if (rawTitle.isNotEmpty) {
+          final category = _normaliser.normalise(rawTitle);
+          unawaited(
+            _historyRepository.updateResolvedCategory(_sessionId, category),
+          );
+        }
+      }
+
+    } catch (e) {
+      // Bookkeeping only — the actions ARE applied; log, never "retry".
+      debugPrint('confirmPlan: post-execution bookkeeping failed: $e');
+    }
+
+    try {
+      _proposal = isLive
+          ? live.copyWith(status: AiProposalStatus.applied)
+          : null;
+      _markPlanExecuted(previewMessageId, plan.sessionId);
+      _demoteCurrentPlan();
+
+      // Per-item outcomes (fix-wave Phase 2, settled Q4): successes stay
+      // applied, failures are named individually — never the old
+      // all-or-nothing "I've restored your schedule" (which wasn't true).
+      final summary = result.successes.isEmpty && result.hasFailures
+          ? "I couldn't apply that:\n${result.toSummaryMessage()}"
+          : result.hasFailures
+          ? 'Done with some issues:\n${result.toSummaryMessage()}'
+          : result.successes.isNotEmpty
+          ? result.toSummaryMessage()
+          : 'No changes were applied. Try describing a specific task to add or update.';
+
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content: summary,
+          timestamp: DateTime.now(),
+          showProLink: result.hitTierLimit,
+        ),
+      );
+
+      _logEvent('aiCommandExecuted', {
+        'sessionId': _sessionId,
+        'actionCount': plan.actions.length,
+        'actionTypes': plan.actions.map((a) => a.actionType.name).toList(),
+      });
+      _recordProactiveChatConversion();
+      _onScheduleMutated?.call(_sessionId);
+
+      // Log aiSuggestionAccepted for every action that had a reason label
+      for (final action in plan.actions) {
+        if (action.reasonLabel != null) {
+          final rawTitle =
+              action.parameters['title']?.toString() ??
+              action.parameters['taskTitle']?.toString() ??
+              '';
+          final category = rawTitle.isNotEmpty
+              ? _normaliser.normalise(rawTitle)
+              : 'unknown';
+          _logEvent('aiSuggestionAccepted', {
+            'sessionId': _sessionId,
+            'category': category,
+            'confidence': action.confidence,
+          });
+        }
+      }
+    } catch (e) {
+      // Rendering/analytics after a successful apply: report honestly.
+      debugPrint('confirmPlan: outcome rendering failed: $e');
+      _addMessage(
+        AiChatMessage(
+          id: StableId.generate('msg'),
+          role: ChatRole.assistant,
+          content: result.successes.isEmpty
+              ? "I couldn't apply that:\n${result.toSummaryMessage()}"
+              : result.toSummaryMessage(),
+          timestamp: DateTime.now(),
         ),
       );
     } finally {
@@ -1312,7 +1518,18 @@ class AiAssistantService extends ChangeNotifier {
     if (plan == null || plan.actions.isEmpty) return;
 
     _demoteCurrentPlan();
-    _pendingPlan = plan;
+    final live = _proposal;
+    final sameProposal = live != null && live.messageId == messageId;
+    _proposal = AiProposal(
+      id: sameProposal ? live.id : StableId.generate('proposal'),
+      status: AiProposalStatus.awaitingConfirm,
+      plan: plan,
+      messageId: messageId,
+      historyEntryId: sameProposal ? live.historyEntryId : null,
+      proposedOnDateKey: sameProposal
+          ? live.proposedOnDateKey
+          : DateKeys.todayKey(),
+    );
     _messages[idx] = message.copyWith(
       clearDraftPlan: true,
       plannedChanges: plan,
@@ -1329,9 +1546,24 @@ class AiAssistantService extends ChangeNotifier {
   }
 
   void cancelPlan() {
-    _refiningPendingPlan = false;
-    _pendingClarification = null;
-    _pendingPlan = null;
+    final cancelled = _proposal;
+    _proposal = null;
+    // The model must see the "no" (fix plan Phase 1.5, review §1.1 #8): a
+    // cancelled plan used to leave no trace in history, so the next prompt
+    // could not tell "declined" from "never proposed".
+    if (cancelled != null && !cancelled.isTerminal) {
+      unawaited(
+        _historyRepository.saveTurn(
+          sessionId: _sessionId,
+          userInput: 'Cancel',
+          parsedActions: const [],
+          assistantSummary:
+              'Plan cancelled by the user (do NOT re-propose unless asked): '
+              '${_compactActionsSummary(cancelled.plan)}',
+          responseType: 'cancelled',
+        ),
+      );
+    }
     // The rejected preview must become inert — leaving its Confirm button
     // live kept a cancelled delete-plan one accidental tap from executing
     // (2026-08-22 bug batch).
@@ -1357,10 +1589,13 @@ class AiAssistantService extends ChangeNotifier {
   /// passes false and prompts by voice instead (the refinement arrives
   /// through the same send path either way).
   void editPlan({bool focusInput = true}) {
-    _refiningPendingPlan = true;
+    final live = _proposal;
+    if (live != null && live.isAwaitingConfirm) {
+      _proposal = live.copyWith(status: AiProposalStatus.editing);
+    }
     // Log rejection for any action that had an assumption-based reason label
-    if (_pendingPlan != null) {
-      for (final action in _pendingPlan!.actions) {
+    if (live != null) {
+      for (final action in live.plan.actions) {
         if (action.reasonLabel != null) {
           final rawTitle =
               action.parameters['title']?.toString() ??
@@ -1414,8 +1649,7 @@ class AiAssistantService extends ChangeNotifier {
     _messages
       ..clear()
       ..addAll(stash.messages);
-    _pendingPlan = null;
-    _pendingClarification = null;
+    _proposal = null;
     _isLoading = false;
     unawaited(_memoryExtraction?.noteSessionActivity(_sessionId));
     _logEvent('aiConversationRestored', {'sessionId': _sessionId});
@@ -1434,6 +1668,48 @@ class AiAssistantService extends ChangeNotifier {
     _restorableThread = null;
     _sessionEndTimer?.cancel();
     unawaited(_memoryExtraction?.onSessionEnded(stash.sessionId));
+  }
+
+  /// The sheet closed (D5, Phase 4.2): the session PAUSES. The thread and
+  /// the session id stay, so reopening continues the same conversation
+  /// with the same model context; the day boundary is what ends a session
+  /// (checked on the next message and on this pause).
+  void pauseSession() {
+    if (DateKeys.todayKey() != _sessionDayKey) {
+      startNewSession();
+      return;
+    }
+    unawaited(_memoryExtraction?.noteSessionActivity(_sessionId));
+  }
+
+  static final _undoPattern = RegExp(
+    r"^(undo( that| it)?|no,? (forget|scratch) (that|it)|take (that|it) back|"
+    r"scratch that|that'?s (not right|wrong)|wrong)[.!]*$",
+  );
+
+  /// Reverts the most recent auto-committed write when the user says so
+  /// right after it (D7). Returns true when consumed.
+  Future<bool> _tryUndoLastAutoCommit(String input) async {
+    final normalized = input.toLowerCase().trim();
+    if (normalized.split(RegExp(r'\s+')).length > 5) return false;
+    if (!_undoPattern.hasMatch(normalized)) return false;
+    AiChatMessage? target;
+    for (final m in _messages.reversed) {
+      if (m.role != ChatRole.assistant) continue;
+      if (m.autoCommittedBatchId != null) target = m;
+      break; // only the LATEST assistant turn qualifies
+    }
+    if (target == null) return false;
+    _addMessage(
+      AiChatMessage(
+        id: StableId.generate('msg'),
+        role: ChatRole.user,
+        content: input,
+        timestamp: DateTime.now(),
+      ),
+    );
+    await undoAutoCommittedBatch(target.id, target.autoCommittedBatchId!);
+    return true;
   }
 
   void startNewSession() {
@@ -1460,9 +1736,9 @@ class AiAssistantService extends ChangeNotifier {
     // R9): entries used to accumulate for the app's lifetime.
     _onScheduleMutated?.call(_sessionId);
     _sessionId = StableId.generate('session');
+    _sessionDayKey = DateKeys.todayKey();
     _messages.clear();
-    _pendingPlan = null;
-    _pendingClarification = null;
+    _proposal = null;
     _isLoading = false;
     _inputFocusRequested = false;
     _proactiveSuggestionId = null;
@@ -1545,7 +1821,21 @@ class AiAssistantService extends ChangeNotifier {
     final normalized = input.toLowerCase().trim();
     if (normalized.split(RegExp(r'\s+')).length > 4) return false;
     if (!_isDecline(normalized)) return false;
-    _pendingClarification = null;
+    final declined = _proposal;
+    _proposal = null;
+    if (declined != null && !declined.isTerminal) {
+      unawaited(
+        _historyRepository.saveTurn(
+          sessionId: _sessionId,
+          userInput: input,
+          parsedActions: const [],
+          assistantSummary:
+              'The user declined (do NOT re-propose unless asked): '
+              '${_compactActionsSummary(declined.plan)}',
+          responseType: 'declined',
+        ),
+      );
+    }
     _addMessage(
       AiChatMessage(
         id: StableId.generate('msg'),
@@ -1601,7 +1891,7 @@ class AiAssistantService extends ChangeNotifier {
       // are invisible, so a plain "confirm" of a sleep/DND-crossing plan
       // was uninformed consent. The warning was spoken with the plan; the
       // override phrase proves the user heard it.
-      final plan = _pendingPlan;
+      final plan = pendingPlan;
       if (plan != null &&
           plan.isBlockedByContext &&
           !_hardBlockOverridePattern.hasMatch(normalized)) {
@@ -1734,7 +2024,7 @@ class AiAssistantService extends ChangeNotifier {
       return result.followUpQuestion;
     }
     if (result.isInformational || result.isUnsupported) {
-      return result.informationalMessage;
+      return _withToolTrace(result, result.informationalMessage);
     }
     if (result.isSuggest) {
       // The prose alone can lose the concrete times to the history cap; the
@@ -1748,21 +2038,27 @@ class AiAssistantService extends ChangeNotifier {
       return "I can answer questions about your schedule or help you add and move tasks. "
           "Try asking \"What's my plan for tomorrow?\" or \"Add a workout at 6am tomorrow.\"";
     }
-    return _planPreviewSummary(result);
+    return _withToolTrace(result, _planPreviewSummary(result));
   }
 
+  /// Appends what the turn looked up (Phase 4.1) so the next prompt knows
+  /// the model already saw that day — it used to re-ask or re-look-up.
+  String? _withToolTrace(AiPlannedChanges result, String? summary) {
+    if (result.toolTrace.isEmpty) return summary;
+    final trace = result.toolTrace.take(3).join('; ');
+    return '${summary ?? ''} [Looked up: $trace]'.trim();
+  }
+
+  /// Preview summary keeps times, dates and durations (Phase 4.1): the old
+  /// "createTask: Workout" lost the time, and the prompt rule "if your
+  /// earlier times are no longer visible, pick new ones" then produced a
+  /// second, different plan (review §1.1 #8).
   String _planPreviewSummary(AiPlannedChanges plan) {
-    final parts = plan.actions
-        .take(4)
-        .map((a) {
-          final title =
-              a.parameters['title']?.toString() ??
-              a.parameters['taskTitle']?.toString() ??
-              a.actionType.name;
-          return '${a.actionType.name}: $title';
-        })
-        .join('; ');
-    return 'Plan preview: $parts';
+    final message = plan.informationalMessage?.trim();
+    final actions = _compactActionsSummary(plan);
+    return message == null || message.isEmpty
+        ? 'Plan preview: $actions'
+        : '$message [Plan preview: $actions]';
   }
 
   /// Compact, lossless-enough action list for model context: keeps titles AND

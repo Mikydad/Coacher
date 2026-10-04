@@ -48,6 +48,27 @@ class _ScriptedClient implements AiOperatingLayerClient {
 
 class _NoopHistory implements AiInteractionHistoryRepository {
   @override
+  Future<int?> saveTurn({
+    required String sessionId,
+    required String userInput,
+    required List<AiAction> parsedActions,
+    String? resolvedCategory,
+    String? assistantSummary,
+    String? responseType,
+    bool executed = false,
+  }) async {
+    await save(
+      sessionId: sessionId,
+      userInput: userInput,
+      parsedActions: parsedActions,
+      resolvedCategory: resolvedCategory,
+      assistantSummary: assistantSummary,
+      responseType: responseType,
+    );
+    return null;
+  }
+
+  @override
   Future<void> save({
     required String sessionId,
     required String userInput,
@@ -205,7 +226,7 @@ void main() {
             'title': 'Break',
             'time': '10:15',
             'duration': 15,
-            'date': 'today',
+            'date': 'tomorrow' // past times today are blocked at confirm (Phase 2.2),
           },
         ),
       ],
@@ -304,7 +325,10 @@ class _RecordingExecutor implements AiActionExecutor {
   List<AiAction>? executedActions;
 
   @override
-  Future<ExecutionResult> execute(List<AiAction> actions) async {
+  Future<ExecutionResult> execute(
+    List<AiAction> actions, {
+    String? batchId,
+  }) async {
     executedActions = actions;
     return ExecutionResult(
       successes: [for (final a in actions) a.actionType.name],

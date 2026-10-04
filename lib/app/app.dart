@@ -30,6 +30,8 @@ import '../features/education/presentation/getting_started_tour.dart';
 import '../features/feedback/presentation/tester_bug_bubble.dart';
 import '../features/memory/presentation/memory_knowledge_screen.dart';
 import '../features/direction/presentation/direction_screen.dart';
+import '../features/education/domain/page_explainers.dart';
+import '../features/education/presentation/first_visit_explainer.dart';
 import '../features/time_tracker/presentation/time_screen.dart';
 import '../features/time_tracker/presentation/track_sheet_host_screen.dart';
 import '../features/profile/presentation/default_enforcement_mode_selection_screen.dart';
@@ -45,8 +47,10 @@ import '../features/tasks_hub/presentation/task_detail_screen.dart';
 import '../features/tasks_hub/presentation/tasks_hub_screen.dart';
 import '../features/timer/presentation/timer_session_screen.dart';
 
+import '../core/tier/pro_plan_screen.dart';
 import '../core/presentation/app_colors.dart';
 import '../core/presentation/theme_brightness_controller.dart';
+import '../core/config/build_flags.dart';
 
 class CoachForLifeApp extends ConsumerWidget {
   const CoachForLifeApp({super.key});
@@ -63,7 +67,7 @@ class CoachForLifeApp extends ConsumerWidget {
       colorScheme: ColorScheme.fromSeed(
         seedColor: brightness == Brightness.dark
             ? const Color(0xFFB7FF00)
-            : const Color(0xFF4C6700),
+            : const Color(0xFF547D0B),
         brightness: brightness,
       ),
       useMaterial3: true,
@@ -84,8 +88,22 @@ class CoachForLifeApp extends ConsumerWidget {
         backgroundColor: AppColors.scaffold,
         foregroundColor: AppColors.textPrimary,
       ),
+      // One primary button (2026-09-22, Miko): the neon lime with dark text.
+      // ColorScheme.fromSeed derives a TONAL primary from the seed, so every
+      // theme-default FilledButton and FAB was a washed-out lime that did not
+      // match the explicit accent buttons next to it (the accountability
+      // "New Challenge" FAB was the visible case). Disabled states keep the
+      // Material defaults.
       filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(shape: buttonShape),
+        style: FilledButton.styleFrom(
+          shape: buttonShape,
+          backgroundColor: AppColors.accent,
+          foregroundColor: AppColors.onAccent,
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: AppColors.accent,
+        foregroundColor: AppColors.onAccent,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(shape: buttonShape),
@@ -140,16 +158,22 @@ class CoachForLifeApp extends ConsumerWidget {
           return ForgotPasswordScreen(prefillEmail: email);
         },
         ChangePasswordScreen.routeName: (_) => const ChangePasswordScreen(),
+        ProPlanScreen.routeName: (_) => const ProPlanScreen(),
         MainTabShell.routeName: (_) => const MainTabShell(),
         GoalSelectionScreen.routeName: (_) => const GoalSelectionScreen(),
-        GoalTemplatePickerScreen.routeName: (_) =>
-            const GoalTemplatePickerScreen(),
+        GoalTemplatePickerScreen.routeName: (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          return GoalTemplatePickerScreen(
+            initialCategoryId: args is String ? args : null,
+          );
+        },
         GoalEditorScreen.routeName: (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
           if (args is GoalEditorArgs) {
             return GoalEditorScreen(
               goalId: args.goalId,
               template: args.template,
+              initialCategoryId: args.initialCategoryId,
             );
           }
           return const GoalEditorScreen();
@@ -196,7 +220,9 @@ class CoachForLifeApp extends ConsumerWidget {
         AboutSupportScreen.routeName: (_) => const AboutSupportScreen(),
         NotificationSettingsScreen.routeName: (_) =>
             const NotificationSettingsScreen(),
-        ReminderDebugScreen.routeName: (_) => const ReminderDebugScreen(),
+        // Development surface: tester builds only (audit M11).
+        if (kTesterBuild)
+          ReminderDebugScreen.routeName: (_) => const ReminderDebugScreen(),
         ReminderSettingsScreen.routeName: (_) => const ReminderSettingsScreen(),
         FeedbackScreen.routeName: (_) => const FeedbackScreen(),
         ProfileScreen.routeName: (_) => const ProfileScreen(),
@@ -204,9 +230,18 @@ class CoachForLifeApp extends ConsumerWidget {
             const DefaultEnforcementModeSelectionScreen(),
         CoachingStyleSelectionScreen.routeName: (_) =>
             const CoachingStyleSelectionScreen(),
-        MemoryKnowledgeScreen.routeName: (_) => const MemoryKnowledgeScreen(),
-        DirectionScreen.routeName: (_) => const DirectionScreen(),
-        TimeScreen.routeName: (_) => const TimeScreen(),
+        MemoryKnowledgeScreen.routeName: (_) => const FirstVisitExplainer(
+          explainer: PageExplainers.memory,
+          child: MemoryKnowledgeScreen(),
+        ),
+        DirectionScreen.routeName: (_) => const FirstVisitExplainer(
+          explainer: PageExplainers.direction,
+          child: DirectionScreen(),
+        ),
+        TimeScreen.routeName: (_) => const FirstVisitExplainer(
+          explainer: PageExplainers.time,
+          child: TimeScreen(),
+        ),
         TrackSheetHostScreen.routeName: (_) => const TrackSheetHostScreen(),
         // ── Coach AI ──────────────────────────────────────────────────────
         AiAssistantScreen.routeName: (context) {

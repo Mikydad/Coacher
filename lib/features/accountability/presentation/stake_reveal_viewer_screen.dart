@@ -92,8 +92,8 @@ class _StakeRevealViewerScreenState
       builder: (dialogContext) => AlertDialog(
         title: const Text('Screenshot reported'),
         content: const Text(
-          'Screenshotting stake photos breaks the circle\'s trust. Your '
-          'circle has been told, and you\'re banned from joining challenges '
+          'Screenshotting stake photos breaks the group\'s trust. Your '
+          'group has been told, and you\'re banned from joining challenges '
           'for a while. Repeats get longer bans.',
         ),
         actions: [
@@ -223,7 +223,7 @@ class _StakeRevealViewerScreenState
           color: AppColors.danger.withValues(alpha: 0.15),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Text(
-            'Screenshots are punished: a challenge ban and the circle gets '
+            'Screenshots are punished: a challenge ban and the group gets '
             'told. This photo disappears on its own — ${_remainingLabel()}.',
             textAlign: TextAlign.center,
             style: TextStyle(color: AppColors.textPrimary, fontSize: 12),

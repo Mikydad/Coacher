@@ -14,6 +14,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 class _FakePlanningRepository implements PlanningRepository {
   @override
+  Future<List<PlannedTask>> getTasksForGoal(String goalId) async => const [];
+
+  @override
+  Stream<List<PlannedTask>> watchTasksForGoal(String goalId) =>
+      Stream.value(const []);
+
+  @override
   Future<void> deleteAccountabilityLog(String id) async {}
 
   @override
@@ -79,6 +86,9 @@ class _FakePlanningRepository implements PlanningRepository {
     required String routineId,
     required String blockId,
   }) async => const [];
+
+  @override
+  Future<PlannedTask?> getTaskById(String taskId) async => null;
 
   @override
   Future<void> logAccountability(AccountabilityLog log) async {}

@@ -28,8 +28,10 @@ ReminderOccurrence _occ({
   updatedAtMs: 1,
 );
 
-RecoveryRow _row(ReminderOccurrence o) =>
-    RecoveryRow(occurrence: o, insistence: RecoveryInsistence.forMode(o.modeRefId));
+RecoveryRow _row(ReminderOccurrence o) => RecoveryRow(
+  occurrence: o,
+  insistence: RecoveryInsistence.forMode(o.modeRefId),
+);
 
 Widget _host(
   RecoveryView view, {
@@ -37,9 +39,7 @@ Widget _host(
   void Function(RecoveryRow, ReminderResolutionKind)? onResolve,
 }) {
   return ProviderScope(
-    overrides: [
-      recoveryViewProvider.overrideWith((ref) => Stream.value(view)),
-    ],
+    overrides: [recoveryViewProvider.overrideWith((ref) => Stream.value(view))],
     child: MaterialApp(
       home: Scaffold(
         body: SingleChildScrollView(
@@ -50,13 +50,22 @@ Widget _host(
   );
 }
 
+/// The card is collapsed to one row by default (2026-09-15); reveal the rest.
+Future<void> _expand(WidgetTester tester) async {
+  final more = find.byKey(const ValueKey('recovery_more'));
+  if (more.evaluate().isNotEmpty) {
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+  }
+}
+
 void main() {
   testWidgets('renders nothing when there is nothing owed', (tester) async {
     await tester.pumpWidget(_host(const RecoveryView()));
     await tester.pump();
 
     expect(find.byType(Card), findsNothing);
-    expect(find.textContaining('need you'), findsNothing);
+    expect(find.textContaining('UNFINISHED'), findsNothing);
   });
 
   testWidgets('leads with a count and lists the task', (tester) async {
@@ -69,7 +78,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('1 task needs you'), findsOneWidget);
+    expect(find.text('UNFINISHED · 1'), findsOneWidget);
     expect(find.text('Study'), findsOneWidget);
     expect(find.text('Do now'), findsOneWidget);
   });
@@ -87,7 +96,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('2 tasks need you'), findsOneWidget);
+    expect(find.text('UNFINISHED · 2'), findsOneWidget);
   });
 
   testWidgets(
@@ -99,7 +108,11 @@ void main() {
             rows: [
               _row(_occ(id: 'f', title: 'Flexible one')),
               _row(
-                _occ(id: 'd', title: 'Disciplined one', modeRefId: 'disciplined'),
+                _occ(
+                  id: 'd',
+                  title: 'Disciplined one',
+                  modeRefId: 'disciplined',
+                ),
               ),
               _row(_occ(id: 'e', title: 'Extreme one', modeRefId: 'extreme')),
             ],
@@ -107,6 +120,7 @@ void main() {
         ),
       );
       await tester.pump();
+      await _expand(tester);
 
       // Three rows, but only one "Not today".
       expect(find.text('Do now'), findsNWidgets(3));
@@ -129,6 +143,7 @@ void main() {
     );
     await tester.pump();
 
+    await _expand(tester);
     expect(find.textContaining('needs a decision'), findsOneWidget);
     expect(find.textContaining('do it or reschedule'), findsOneWidget);
   });
@@ -138,19 +153,19 @@ void main() {
       _host(
         RecoveryView(
           rows: [
-            for (var i = 0; i < 8; i++)
-              _row(_occ(id: 't$i', title: 'Task $i')),
+            for (var i = 0; i < 8; i++) _row(_occ(id: 't$i', title: 'Task $i')),
           ],
         ),
       ),
     );
     await tester.pump();
 
+    await _expand(tester);
     expect(find.text('Do now'), findsNWidgets(RecoveryViewBuilder.maxRows));
     expect(find.text('+3 more waiting'), findsOneWidget);
   });
 
-  testWidgets('shows the routine digest without making rows of it', (
+  testWidgets('routine misses alone show no card (2026-09-27)', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -158,15 +173,35 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Missed today: Water, Stretch'), findsOneWidget);
-    expect(find.text('Do now'), findsNothing);
+    expect(find.textContaining('passed'), findsNothing);
+    expect(find.textContaining('TODAY'), findsNothing);
+  });
+
+  testWidgets('the routine digest rides under real rows, never as a row', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        RecoveryView(
+          rows: [_row(_occ(id: 't1', title: 'Study'))],
+          routineMisses: const ['Goal: Water', 'Stretch'],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // One row (Study); the digest drops the "Goal: " prefix.
+    expect(find.text('Do now'), findsOneWidget);
+    expect(find.text('Reminders passed: Water, Stretch'), findsOneWidget);
   });
 
   testWidgets('Do now reports the entity', (tester) async {
     String? opened;
     await tester.pumpWidget(
       _host(
-        RecoveryView(rows: [_row(_occ(id: 'task-42', title: 'Study'))]),
+        RecoveryView(
+          rows: [_row(_occ(id: 'task-42', title: 'Study'))],
+        ),
         onOpenTask: (id, kind) => opened = id,
       ),
     );
@@ -184,11 +219,17 @@ void main() {
 
     test('reads in minutes, then hours, then days', () {
       expect(
-        recoveryWaitedLabel(ms(since), now: since.add(const Duration(minutes: 20))),
+        recoveryWaitedLabel(
+          ms(since),
+          now: since.add(const Duration(minutes: 20)),
+        ),
         'Waiting 20m',
       );
       expect(
-        recoveryWaitedLabel(ms(since), now: since.add(const Duration(hours: 5))),
+        recoveryWaitedLabel(
+          ms(since),
+          now: since.add(const Duration(hours: 5)),
+        ),
         'Waiting 5h',
       );
       expect(
@@ -216,7 +257,9 @@ void main() {
     ) async {
       await tester.pumpWidget(
         _host(
-          RecoveryView(rows: [_row(_occ(id: 'f', title: 'Study'))]),
+          RecoveryView(
+            rows: [_row(_occ(id: 'f', title: 'Study'))],
+          ),
           onResolve: (_, __) {},
         ),
       );
@@ -242,6 +285,7 @@ void main() {
       );
       await tester.pump();
 
+      await _expand(tester);
       expect(find.byTooltip('Not today'), findsNothing);
       expect(find.byTooltip('Other options'), findsNWidgets(2));
     });
@@ -293,9 +337,7 @@ void main() {
       expect(chosen, ReminderResolutionKind.skipped);
     });
 
-    testWidgets('Extreme offers no Skip — Do, or move it (D4)', (
-      tester,
-    ) async {
+    testWidgets('Extreme offers no Skip — Do, or move it (D4)', (tester) async {
       await tester.pumpWidget(
         _host(
           RecoveryView(
