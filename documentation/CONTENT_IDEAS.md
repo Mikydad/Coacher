@@ -359,3 +359,27 @@ Flutter post on cooperative cancellation of long async pipelines.
 - **Formats:** thread ("skipped tests as a project plan"); before/after of
   the proposal state; a clip of `--run-skipped` going from nine red to
   sixteen green.
+
+## 2026-10-04 · The alarm that turned itself off while you slept
+
+- **Hook:** Our wake-up alarm passed 36 tests and would still have let you
+  oversleep — if you checked your phone at 2 AM.
+- **What happened:** While waiting on Apple paperwork, we picked the alarm
+  branch back up — three weeks and 71 commits behind main. Before touching
+  main we pushed a backup branch, then merged main INTO the feature branch.
+  The merge itself was easy: three conflicts, all "both sides added
+  something here". The real finds came from reading the code next to the
+  rest of the reminder system: a Sleep reminder's window is 30–60 minutes,
+  so a habit Sleep "expires" just after bedtime — and the alarm treated
+  expired as "cancel". Open the app in the night, lose the wake-up.
+  Separately, two older code paths rebuilt reminders field by field and
+  quietly forgot the new alarm fields.
+- **The turn:** The fix was one condition and four lines. The lesson was
+  that a new field on a shared model is only as safe as the oldest code that
+  constructs that model by hand.
+- **Takeaway:** When a feature branch sits for weeks, merge main into it —
+  never the other way — and grep for every constructor of the models you
+  extended.
+- **Formats:** short post ("the bug that only happens at 2 AM"); a diagram
+  of the reminder window vs. the wake-up time; a thread on backing up main
+  before a risky merge.

@@ -4926,3 +4926,21 @@ not silent reversal.
   still close them) — a sheet that appears ½ s after the page was being
   closed unseen by the user's next tap while already marked seen. When the
   primary button only closes ("Got it"), there is no "Maybe later".
+
+- **2026-10-04 · Alarm mode brought up to v1.0.0-rc1; a wake-up alarm
+  survives `expired`.** `main` was merged into `feat/alarm-mode` (backup of
+  main at `backup/main-pre-alarm`, also on origin) rather than the other
+  way round, so main moves only after the branch is green and device-tested.
+  Two bugs fixed on the way: (1) an end-anchored (Sleep wake-up) alarm was
+  retired by an `expired` resolution — a routine or time-sensitive Sleep's
+  occurrence window is 30–60 min, so it expired shortly after bedtime and
+  any app open in the night cancelled the wake-up. End-anchored alarms now
+  survive `completed` AND `expired`; only `rescheduled`/`skipped` retire
+  them. (2) The Coach AI's reminder upsert and the time-block conflict
+  resolver rebuilt `ReminderConfig` from scratch and dropped `alertMode` /
+  `alarmOffsetMinutes`, silently turning an alarm into a plain reminder;
+  both now carry them through. *Not changed (open):* ring actions still open
+  the app (the app-wide "every action is foreground" rule — no background
+  isolate without Isar), so Stop on a locked phone asks for Face ID; and the
+  iOS mute switch still silences the rings — AlarmKit (iOS 26+) is the
+  agreed fix for both.

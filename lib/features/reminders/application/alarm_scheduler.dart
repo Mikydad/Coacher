@@ -119,8 +119,11 @@ class AlarmSchedulingResult {
 ///   early means no ring.
 /// * `alarmOffsetMinutes > 0` (end-anchored, Sleep's wake-up): a `completed`
 ///   resolution does NOT retire it — marking Sleep done at bedtime must not
-///   silence tomorrow's wake-up. Any other resolution (rescheduled, skipped,
-///   expired) does: the day moved or was abandoned.
+///   silence tomorrow's wake-up. Neither does `expired`: the occurrence's
+///   window is 30–60 min, so a routine or time-sensitive Sleep expires
+///   shortly after bedtime, hours before the alarm (2026-10-04 — any app
+///   open in the night used to cancel the wake-up). Only `rescheduled` and
+///   `skipped` retire it: the day moved or was abandoned.
 /// * A stop stamp on the occurrence (`alarmStoppedAtMs`) retires it for
 ///   good; a snooze (`snoozedUntilMs` past the alarm time) re-bases the five
 ///   rings on the snooze moment.
@@ -172,9 +175,11 @@ class AlarmScheduler {
       if (occurrence.isAlarmStopped) return const [];
       if (occurrence.isResolved) {
         final endAnchored = config.alarmOffsetMinutes > 0;
-        final completed =
-            occurrence.resolutionKind == ReminderResolutionKind.completed;
-        if (!(endAnchored && completed)) return const [];
+        final kind = occurrence.resolutionKind;
+        final keepsWakeUp =
+            kind == ReminderResolutionKind.completed ||
+            kind == ReminderResolutionKind.expired;
+        if (!(endAnchored && keepsWakeUp)) return const [];
       }
     }
 

@@ -1,6 +1,6 @@
 # Alarm Mode — a reminder that rings until you stop it
 
-**Status:** V1 built 2026-09-13 on `feat/alarm-mode`. Not yet verified on a device.
+**Status:** V1 built 2026-09-13 on `feat/alarm-mode`; main (v1.0.0-rc1) merged in and two lifecycle bugs fixed 2026-10-04. Not yet verified on a device.
 **Owner decisions settled (Miko, 2026-09-13):**
 
 | Decision | Value |
@@ -42,8 +42,12 @@ politenesses is a failure.
   `sidepal_alarms` on the alarm audio stream with `res/raw/sidepal_alarm`.
 * **Lifecycle.** Start-anchored (offset 0): any resolution of the day's
   occurrence retires the alarm. End-anchored (Sleep): `completed` keeps it
-  (done at bedtime ≠ don't wake me), other resolutions retire it. Deleting
-  the task cancels rings explicitly (`ReminderSyncService.cancelAlarms`).
+  (done at bedtime ≠ don't wake me) and so does `expired` (the 30–60 min
+  window closes long before the wake-up — 2026-10-04); `rescheduled` and
+  `skipped` retire it. Deleting the task cancels rings explicitly
+  (`ReminderSyncService.cancelAlarms`). Every path that rebuilds a
+  `ReminderConfig` (Coach AI retime, time-block conflict move) carries
+  `alertMode` + `alarmOffsetMinutes` through.
 * **Runs** first in the recompute graph's notifications step and after
   every reminder save (`rearmLadders` in the sync service).
 

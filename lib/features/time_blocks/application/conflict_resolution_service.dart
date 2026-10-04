@@ -188,6 +188,10 @@ class ConflictResolutionService implements ConflictResolutionPort {
           scheduledAtIso: newStart.toIso8601String(),
           modeRefId: r.modeRefId,
           blockUrgencyScore: r.blockUrgencyScore,
+          // Moving a task must not quietly turn its alarm back into a
+          // plain reminder.
+          alertMode: r.alertMode,
+          alarmOffsetMinutes: r.alarmOffsetMinutes,
           createdAtMs: r.createdAtMs,
           updatedAtMs: now,
         ),

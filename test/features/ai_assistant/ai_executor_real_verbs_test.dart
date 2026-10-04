@@ -15,6 +15,7 @@ import 'package:sidepal/features/planning/domain/models/routine.dart';
 import 'package:sidepal/features/planning/domain/models/task_item.dart';
 import 'package:sidepal/features/reminders/application/reminder_sync_service.dart';
 import 'package:sidepal/features/reminders/data/reminder_repository.dart';
+import 'package:sidepal/features/reminders/domain/models/reminder_alert_mode.dart';
 import 'package:sidepal/features/reminders/domain/models/reminder_config.dart';
 import 'package:sidepal/features/time_blocks/application/time_block_sync_service.dart';
 import 'package:sidepal/features/time_blocks/domain/models/scheduled_time_block.dart';
@@ -152,12 +153,17 @@ class _NoopFake {
 }
 
 class _FakeReminderRepo extends _NoopFake implements ReminderRepository {
-  final upsertedReminders = <Object>[];
+  _FakeReminderRepo([this.existing = const []]);
+  final List<ReminderConfig> existing;
+  final upsertedReminders = <ReminderConfig>[];
 
   @override
   Future<List<ReminderConfig>> getRemindersForTasks(
     List<String> taskIds,
-  ) async => const [];
+  ) async => [
+    for (final r in existing)
+      if (taskIds.contains(r.taskId)) r,
+  ];
 
   @override
   Future<void> upsertReminder(ReminderConfig reminder) async =>
@@ -218,19 +224,22 @@ void main() {
     _FakeGoalsRepo goalsRepo,
     _FakeReminderSync reminderSync,
     _FakeTimeBlockSync timeBlockSync,
+    _FakeReminderRepo reminderRepo,
   }) build({
     Map<String, List<PlannedTask>> tasks = const {},
     List<UserGoal> goals = const [],
+    List<ReminderConfig> reminders = const [],
   }) {
     final planning = _FakePlanningRepo(tasks);
     final goalsRepo = _FakeGoalsRepo(goals);
     final reminderSync = _FakeReminderSync();
     final timeBlockSync = _FakeTimeBlockSync();
+    final reminderRepo = _FakeReminderRepo(reminders);
     return (
       executor: AiActionExecutor(
         planningRepository: planning,
         goalsRepository: goalsRepo,
-        reminderRepository: _FakeReminderRepo(),
+        reminderRepository: reminderRepo,
         reminderSyncService: reminderSync,
         timeBlockSyncService: timeBlockSync,
         contextOverrideService: _FakeContextOverride(),
@@ -240,6 +249,7 @@ void main() {
       goalsRepo: goalsRepo,
       reminderSync: reminderSync,
       timeBlockSync: timeBlockSync,
+      reminderRepo: reminderRepo,
     );
   }
 
@@ -274,6 +284,43 @@ void main() {
     expect(updated.priority, 2);
     expect(updated.orderIndex, 3);
     expect(updated.modeRefId, 'disciplined');
+  });
+
+  test('editTask retiming a task keeps its alarm (only the editor sets it)',
+      () async {
+    final t = task(
+      reminderIso: DateTime(2026, 8, 27, 9, 0).toIso8601String(),
+    );
+    final h = build(
+      tasks: {today: [t]},
+      reminders: [
+        ReminderConfig(
+          id: 'rem-t1',
+          taskId: 't1',
+          taskTitle: 'Workout',
+          enabled: true,
+          scheduledAtIso: DateTime(2026, 8, 27, 9, 0).toIso8601String(),
+          alertMode: ReminderAlertMode.alarm,
+          alarmOffsetMinutes: 45,
+          createdAtMs: 1,
+          updatedAtMs: 1,
+        ),
+      ],
+    );
+
+    final result = await h.executor.execute([
+      AiAction(
+        actionType: ActionType.editTask,
+        parameters: {'title': 'Workout', 'time': '07:30', ...stamps()},
+      ),
+    ]);
+
+    expect(result.failures, isEmpty);
+    final saved = h.reminderRepo.upsertedReminders.single;
+    expect(saved.id, 'rem-t1');
+    expect(saved.alertMode, ReminderAlertMode.alarm);
+    expect(saved.alarmOffsetMinutes, 45);
+    expect(DateTime.parse(saved.scheduledAtIso!).hour, 7);
   });
 
   test('moveTask lands the same id on the destination day, reminder follows',

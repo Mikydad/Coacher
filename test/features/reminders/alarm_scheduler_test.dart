@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sidepal/core/utils/date_keys.dart';
 import 'package:sidepal/features/reminders/application/alarm_scheduler.dart';
+import 'package:sidepal/features/reminders/application/reminder_state_machine.dart';
 import 'package:sidepal/features/reminders/data/reminder_occurrence_repository.dart';
 import 'package:sidepal/features/reminders/data/reminder_repository.dart';
 import 'package:sidepal/features/reminders/domain/models/reminder_alert_mode.dart';
@@ -216,29 +217,34 @@ void main() {
     });
 
     test(
-      'end-anchored (wake-up): completed at bedtime keeps the alarm; '
-      'moving or skipping the day retires it',
+      'end-anchored (wake-up): completed at bedtime or expired overnight '
+      'keeps the alarm; moving or skipping the day retires it',
       () {
         final config = _config(
           at: DateTime(2026, 9, 13, 22, 0),
           offset: 8 * 60,
         );
-        expect(
-          AlarmScheduler.compile(
-            config: config,
-            occurrence: _occurrence(
-              config,
-              state: ReminderOccurrenceState.resolved,
-              resolution: ReminderResolutionKind.completed,
+        for (final kind in [
+          ReminderResolutionKind.completed,
+          ReminderResolutionKind.expired,
+        ]) {
+          expect(
+            AlarmScheduler.compile(
+              config: config,
+              occurrence: _occurrence(
+                config,
+                state: ReminderOccurrenceState.resolved,
+                resolution: kind,
+              ),
+              now: _now,
             ),
-            now: _now,
-          ),
-          hasLength(5),
-        );
+            hasLength(5),
+            reason: kind.name,
+          );
+        }
         for (final kind in [
           ReminderResolutionKind.rescheduled,
           ReminderResolutionKind.skipped,
-          ReminderResolutionKind.expired,
         ]) {
           expect(
             AlarmScheduler.compile(
@@ -254,6 +260,45 @@ void main() {
             reason: kind.name,
           );
         }
+      },
+    );
+
+    test(
+      'a routine Sleep that expires after bedtime still wakes you: an app '
+      'open at 2 AM must not cancel the wake-up (2026-10-04)',
+      () {
+        // Sleep 22:00 for 8 h → wake-up at 06:00. A habit-anchored Sleep is
+        // `routine`, so its 30-min window closes at 22:30 and the state
+        // machine expires it — hours before the alarm is due.
+        final config = _config(
+          at: DateTime(2026, 9, 13, 22, 0),
+          offset: 8 * 60,
+          title: 'Sleep',
+        );
+        final night = DateTime(2026, 9, 14, 2, 0);
+        final expired = ReminderStateMachine.advance(
+          ReminderOccurrence(
+            id: 'o_t1',
+            entityId: 't1',
+            entityKind: 'task',
+            dateKey: '2026-09-13',
+            scheduledAtMs: DateTime(2026, 9, 13, 22, 0).millisecondsSinceEpoch,
+            windowMinutes: 30,
+            taxonomy: ReminderTaxonomy.routine,
+            createdAtMs: 0,
+            updatedAtMs: 0,
+          ),
+          now: night,
+        );
+        expect(expired.resolutionKind, ReminderResolutionKind.expired);
+
+        final rings = AlarmScheduler.compile(
+          config: config,
+          occurrence: expired,
+          now: night,
+        );
+        expect(rings, hasLength(5));
+        expect(rings.first.fireAt, DateTime(2026, 9, 14, 6, 0));
       },
     );
 

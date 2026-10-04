@@ -29,6 +29,7 @@ import '../../planning/data/planning_repository.dart';
 import '../../planning/domain/models/task_item.dart';
 import '../../reminders/application/reminder_sync_service.dart';
 import '../../reminders/data/reminder_repository.dart';
+import '../../reminders/domain/models/reminder_alert_mode.dart';
 import '../../reminders/domain/models/reminder_config.dart';
 import '../../time_blocks/application/time_block_sync_service.dart';
 import '../domain/models/ai_action.dart';
@@ -2145,6 +2146,9 @@ class AiActionExecutor {
       pendingAction: false,
       escalationLevel: 0,
       emergencyBypass: false,
+      // Only the user sets alarm mode (editor); a coach retime keeps it.
+      alertMode: existingConfig?.alertMode ?? ReminderAlertMode.notification,
+      alarmOffsetMinutes: existingConfig?.alarmOffsetMinutes ?? 0,
       createdAtMs: existingConfig?.createdAtMs ?? existingCreatedAtMs ?? now,
       updatedAtMs: now,
     );
