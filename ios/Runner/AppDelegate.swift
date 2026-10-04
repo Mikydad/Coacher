@@ -239,6 +239,11 @@ final class DeepLinkBridge {
       }
     }
 
+    // AlarmKit (iOS 26+, feat/alarm-mode 2026-10-04): real system alarms
+    // that ring through silent mode — see AlarmKitBridge.swift.
+    let alarmKitRegistrar = engineBridge.pluginRegistry.registrar(forPlugin: "SidePalAlarmKit")
+    AlarmKitChannel.register(messenger: alarmKitRegistrar!.messenger())
+
     // Device model + OS version for feedback reports. In-house instead of
     // device_info_plus: its 13.2.0 iOS code fails to compile against this
     // SDK (unknown NSProcessInfo selector 'isiOSAppOnVision').

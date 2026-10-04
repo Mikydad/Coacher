@@ -13,6 +13,7 @@ import 'package:sidepal/features/add_task/presentation/sections/add_task_sleep_e
 Widget _reminder({
   required String? category,
   bool alarm = false,
+  bool systemAlarm = false,
   ValueChanged<bool>? onAlarmChanged,
 }) => MaterialApp(
   home: Scaffold(
@@ -27,6 +28,7 @@ Widget _reminder({
         onReminderToggled: (_) {},
         onReminderTimeChanged: (_) {},
         alarm: alarm,
+        systemAlarm: systemAlarm,
         onAlarmChanged: onAlarmChanged ?? (_) {},
       ),
     ),
@@ -77,6 +79,16 @@ void main() {
       expect(find.text('Alarm on'), findsOneWidget);
       expect(find.textContaining('every 2 minutes'), findsOneWidget);
       expect(find.byIcon(Icons.alarm_on_rounded), findsOneWidget);
+    });
+
+    testWidgets('with AlarmKit, the footnote promises an alarm clock, not '
+        'notification rings (iOS 26+, 2026-10-04)', (tester) async {
+      await tester.pumpWidget(
+        _reminder(category: 'Work', alarm: true, systemAlarm: true),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('even on silent'), findsOneWidget);
+      expect(find.textContaining('every 2 minutes'), findsNothing);
     });
 
     testWidgets('Sleep hides the chip — its alarm lives in the extras card', (

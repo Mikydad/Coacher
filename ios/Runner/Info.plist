@@ -53,6 +53,8 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSAlarmKitUsageDescription</key>
+	<string>SidePal rings your wake-up and the tasks you set as alarms like a real alarm clock — even when your phone is on silent.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>SidePal reads your calendar only to find good moments for your promises. Events are never stored and never leave your device.</string>
 	<key>NSCalendarsUsageDescription</key>

@@ -25,6 +25,7 @@ class AddTaskReminderSection extends StatelessWidget {
     required this.onReminderTimeChanged,
     this.alarm = false,
     this.onAlarmChanged,
+    this.systemAlarm = false,
   });
 
   final GlobalKey sectionKey;
@@ -48,6 +49,10 @@ class AddTaskReminderSection extends StatelessWidget {
   /// wake-up alarm lives in the Sleep extras card, anchored at sleep end.
   final bool alarm;
   final ValueChanged<bool>? onAlarmChanged;
+
+  /// The alarm will be a real system alarm (AlarmKit, iOS 26+, not denied)
+  /// rather than the five notification rings — the footnote says which.
+  final bool systemAlarm;
 
   @override
   Widget build(BuildContext context) {
@@ -201,9 +206,13 @@ class AddTaskReminderSection extends StatelessWidget {
                             Padding(
                               padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
                               child: Text(
-                                'Rings every 2 minutes for 10 minutes, '
-                                'through focus and quiet hours, until you '
-                                'stop it.',
+                                systemAlarm
+                                    ? 'Rings like an alarm clock, even on '
+                                          'silent, until you stop or snooze '
+                                          'it.'
+                                    : 'Rings every 2 minutes for 10 minutes, '
+                                          'through focus and quiet hours, '
+                                          'until you stop it.',
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: AddTaskColors.faint,

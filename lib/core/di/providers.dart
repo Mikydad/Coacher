@@ -40,6 +40,7 @@ import '../ai/ai_proxy_client.dart';
 import '../../features/reminders/application/reminder_ai_classifier.dart';
 import '../../features/reminders/application/reminder_strategy_aggregates.dart';
 import '../../features/reminders/application/strategist_proposals_store.dart';
+import '../../features/reminders/application/alarm_kit_channel.dart';
 import '../../features/reminders/application/alarm_scheduler.dart';
 import '../../features/reminders/application/ladder_compiler.dart';
 import '../../features/reminders/application/ladder_scheduler.dart';
@@ -178,8 +179,22 @@ final ladderSchedulerProvider = Provider<LadderScheduler>((ref) {
   );
 });
 
+/// AlarmKit (iOS 26+) — real system alarms; "unavailable" everywhere else.
+final alarmKitProvider = Provider<AlarmKitPort>(
+  (ref) => MethodChannelAlarmKit(),
+);
+
+/// AlarmKit's standing answer on this device, so the editor's alarm
+/// footnote describes what will actually ring. Re-read each time an editor
+/// opens (autoDispose) — the user may have changed it in Settings.
+final alarmKitStatusProvider =
+    FutureProvider.autoDispose<AlarmKitAuthorization>(
+      (ref) => ref.read(alarmKitProvider).authorizationStatus(),
+    );
+
 /// Alarm ring ladders (feat/alarm-mode): scheduled straight onto the OS in
 /// their own id namespace, ignoring every shield — see [AlarmScheduler].
+/// On iOS 26+ with AlarmKit granted, one system alarm replaces the rings.
 final alarmSchedulerProvider = Provider<AlarmScheduler>((ref) {
   return AlarmScheduler(
     reminders: ref.read(reminderRepositoryProvider),
@@ -187,6 +202,7 @@ final alarmSchedulerProvider = Provider<AlarmScheduler>((ref) {
     notifications: LocalAlarmNotificationsPort(
       ref.read(localNotificationsServiceProvider),
     ),
+    alarmKit: ref.read(alarmKitProvider),
     budget: ref.read(notificationBudgetProvider),
   );
 });

@@ -7,6 +7,7 @@ import '../../../core/tier/tier_providers.dart';
 import '../../../core/tier/upgrade_prompt.dart';
 import '../../../core/utils/stable_id.dart';
 import '../../planning/domain/sleep_task.dart';
+import '../../reminders/application/alarm_kit_channel.dart';
 import '../../reminders/application/reminder_classifier.dart';
 import '../../reminders/domain/models/reminder_alert_mode.dart';
 import '../../reminders/domain/models/reminder_config.dart';
@@ -25,6 +26,19 @@ Future<void> ensureReminderPermissionWithNotice(
       const SnackBar(content: Text('Notification permission is disabled.')),
     );
   }
+}
+
+/// Alarm mode (2026-10-04): on iOS 26+ the first alarm switched on or saved
+/// asks once to let SidePal schedule real alarms (AlarmKit — rings through
+/// silent mode, Stop on the lock screen). Any standing answer, or no
+/// AlarmKit at all, returns at once: no prompt, no wait. A "no" keeps the
+/// notification rings.
+Future<void> ensureAlarmKitPermission(WidgetRef ref) async {
+  final kit = ref.read(alarmKitProvider);
+  if (await kit.authorizationStatus() != AlarmKitAuthorization.notDetermined) {
+    return;
+  }
+  await kit.requestAuthorization();
 }
 
 /// Upserts the task's reminder config and syncs notifications (save path).
@@ -164,6 +178,11 @@ Future<String?> persistAddTaskReminder(
     updatedAtMs: now,
     force: userChose,
   );
+
+  // AlarmKit (iOS 26+): ask before the sync arms the alarm, so a "yes" gets
+  // a real system alarm on this very save. Covers Sleep's wake-up, which is
+  // on by default and so never passes through the toggle's ask.
+  if (alarm && reminderEnabled) await ensureAlarmKitPermission(ref);
 
   await ref.read(reminderRepositoryProvider).upsertReminder(reminder);
   await ref.read(reminderSyncServiceProvider).syncForTaskIds([taskId]);

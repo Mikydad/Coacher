@@ -8,6 +8,7 @@ import '../data/reminder_repository.dart';
 import '../domain/models/reminder_config.dart';
 import '../domain/models/reminder_occurrence.dart';
 import '../domain/models/reminder_occurrence_enums.dart';
+import 'alarm_kit_channel.dart';
 import 'notification_route_resolver.dart';
 import 'reminder_copy_bank.dart';
 
@@ -96,6 +97,30 @@ class AlarmSchedulingResult {
   String toString() => 'AlarmSchedulingResult(armed: $armed, cleared: $cleared)';
 }
 
+/// What one alarm config needs from AlarmKit right now.
+sealed class AlarmKitPlan {
+  const AlarmKitPlan();
+}
+
+/// Nothing is owed — cancel whatever AlarmKit holds for the task.
+class AlarmKitRetire extends AlarmKitPlan {
+  const AlarmKitRetire();
+}
+
+/// The alarm is still ahead: schedule (or replace) it at [fireAt].
+class AlarmKitSchedule extends AlarmKitPlan {
+  const AlarmKitSchedule({required this.fireAt, required this.title});
+  final DateTime fireAt;
+  final String title;
+}
+
+/// The alarm moment has passed but the day still owes it: AlarmKit is
+/// ringing it, the user stopped it, or the native Snooze re-scheduled it.
+/// Hands off — cancelling here would kill a ring or a snooze.
+class AlarmKitLeave extends AlarmKitPlan {
+  const AlarmKitLeave();
+}
+
 /// Arms and retires alarm **ring ladders** (feat/alarm-mode).
 ///
 /// ## Why this is not part of [LadderCompiler]
@@ -132,23 +157,40 @@ class AlarmSchedulingResult {
 ///   plain reminder; better to let a lost ring stay lost and be re-armed by
 ///   the next recompute, which runs on every app open.
 ///
+/// ## AlarmKit (iOS 26+, settled with Miko 2026-10-04)
+///
+/// When the user has granted AlarmKit, each alarm config becomes ONE system
+/// alarm (id [alarmKitIdFor]) instead of the five notification rings — no
+/// rings on top, so the user never gets an alarm plus five banners. It
+/// rings through the silent switch and Focus until Stop or Snooze, and
+/// both work from the lock screen. Snooze is the native button: it
+/// re-schedules the same id [snoozeMinutes] on (no countdown UI, so no
+/// widget extension) and leaves an event that [rearmAll] stamps onto the
+/// occurrence. After the alarm moment, the scheduler never touches a
+/// still-owed alarm ([AlarmKitLeave]) — only a retirement cancels it, and a
+/// sweep cancels alarms whose config is gone. Denied or unavailable →
+/// the notification rings above, unchanged.
+///
 /// Every read and write is local. Nothing here awaits the network.
 class AlarmScheduler {
   AlarmScheduler({
     required ReminderRepository reminders,
     required ReminderOccurrenceRepository occurrences,
     required AlarmNotificationsPort notifications,
+    AlarmKitPort? alarmKit,
     NotificationBudget? budget,
     DateTime Function()? now,
   }) : _reminders = reminders,
        _occurrences = occurrences,
        _notifications = notifications,
+       _alarmKit = alarmKit,
        _budget = budget,
        _now = now ?? DateTime.now;
 
   final ReminderRepository _reminders;
   final ReminderOccurrenceRepository _occurrences;
   final AlarmNotificationsPort _notifications;
+  final AlarmKitPort? _alarmKit;
   final NotificationBudget? _budget;
   final DateTime Function() _now;
 
@@ -167,29 +209,8 @@ class AlarmScheduler {
     required ReminderOccurrence? occurrence,
     required DateTime now,
   }) {
-    if (!config.enabled || !config.isAlarm) return const [];
-    final alarmAt = config.alarmAt;
-    if (alarmAt == null) return const [];
-
-    if (occurrence != null) {
-      if (occurrence.isAlarmStopped) return const [];
-      if (occurrence.isResolved) {
-        final endAnchored = config.alarmOffsetMinutes > 0;
-        final kind = occurrence.resolutionKind;
-        final keepsWakeUp =
-            kind == ReminderResolutionKind.completed ||
-            kind == ReminderResolutionKind.expired;
-        if (!(endAnchored && keepsWakeUp)) return const [];
-      }
-    }
-
-    // A snooze past the alarm moment re-bases the whole ring ladder.
-    var base = alarmAt;
-    final snoozedUntilMs = occurrence?.snoozedUntilMs;
-    if (snoozedUntilMs != null) {
-      final snoozedUntil = DateTime.fromMillisecondsSinceEpoch(snoozedUntilMs);
-      if (snoozedUntil.isAfter(base)) base = snoozedUntil;
-    }
+    final base = _owedAt(config, occurrence);
+    if (base == null) return const [];
 
     final isWakeUp = config.alarmOffsetMinutes > 0;
     final rings = <AlarmRing>[];
@@ -210,23 +231,100 @@ class AlarmScheduler {
     return rings;
   }
 
+  /// Pure: what AlarmKit should hold for this config at [now]. One system
+  /// alarm at the (possibly snoozed) alarm moment; once that moment has
+  /// passed, AlarmKit owns the ring and the scheduler stays out of it.
+  @visibleForTesting
+  static AlarmKitPlan planForAlarmKit({
+    required ReminderConfig config,
+    required ReminderOccurrence? occurrence,
+    required DateTime now,
+  }) {
+    final base = _owedAt(config, occurrence);
+    if (base == null) return const AlarmKitRetire();
+    if (!base.isAfter(now)) return const AlarmKitLeave();
+    final copy = ReminderCopyBank.alarm(
+      entityTitle: config.taskTitle ?? '',
+      isWakeUp: config.alarmOffsetMinutes > 0,
+    );
+    return AlarmKitSchedule(fireAt: base, title: copy.title);
+  }
+
+  /// When the day's alarm is owed — the alarm moment, re-based by a snooze
+  /// past it — or null when nothing is owed (not an alarm, switched off,
+  /// stopped, or retired by its occurrence's resolution; see the lifecycle
+  /// rules on the class).
+  static DateTime? _owedAt(
+    ReminderConfig config,
+    ReminderOccurrence? occurrence,
+  ) {
+    if (!config.enabled || !config.isAlarm) return null;
+    final alarmAt = config.alarmAt;
+    if (alarmAt == null) return null;
+
+    if (occurrence != null) {
+      if (occurrence.isAlarmStopped) return null;
+      if (occurrence.isResolved) {
+        final endAnchored = config.alarmOffsetMinutes > 0;
+        final kind = occurrence.resolutionKind;
+        final keepsWakeUp =
+            kind == ReminderResolutionKind.completed ||
+            kind == ReminderResolutionKind.expired;
+        if (!(endAnchored && keepsWakeUp)) return null;
+      }
+    }
+
+    // A snooze past the alarm moment re-bases the whole ring ladder.
+    var base = alarmAt;
+    final snoozedUntilMs = occurrence?.snoozedUntilMs;
+    if (snoozedUntilMs != null) {
+      final snoozedUntil = DateTime.fromMillisecondsSinceEpoch(snoozedUntilMs);
+      if (snoozedUntil.isAfter(base)) base = snoozedUntil;
+    }
+    return base;
+  }
+
   /// Re-arm every alarm config's rings. Idempotent: ring ids are
   /// deterministic, so re-running replaces each ring in place, and rings a
   /// config no longer implies are cancelled.
   Future<AlarmSchedulingResult> rearmAll() async {
     final now = _now();
     try {
+      final useKit = await _alarmKitAuthorized();
+      if (useKit) await _applyAlarmKitEvents();
+
       final configs = await _reminders.listAllReminders();
       var armed = 0;
       var cleared = 0;
       var remaining = await (_budget?.remainingCapacity() ??
           Future.value(NotificationBudget.kDefaultSafeCap));
+      final ownedKitIds = <String>{};
 
       for (final config in configs) {
         // A config that was never an alarm has nothing armed under alarm
         // ids; skip the cancel sweep so a large reminder list stays cheap.
         if (!config.isAlarm) continue;
         final occurrence = await _occurrenceFor(config);
+
+        if (useKit) {
+          switch (await _rearmWithAlarmKit(config, occurrence, now)) {
+            case _KitOutcome.retired:
+              cleared++;
+              continue;
+            case _KitOutcome.scheduled:
+              ownedKitIds.add(alarmKitIdFor(config.taskId));
+              armed++;
+              continue;
+            case _KitOutcome.left:
+              ownedKitIds.add(alarmKitIdFor(config.taskId));
+              continue;
+            case _KitOutcome.failed:
+              // AlarmKit refused this one: the notification rings below
+              // are the floor, exactly as on a device without AlarmKit.
+              break;
+          }
+        }
+
         final rings = compile(config: config, occurrence: occurrence, now: now);
 
         if (rings.isEmpty) {
@@ -256,6 +354,8 @@ class AlarmScheduler {
           await _cancelRing(config.taskId, i);
         }
       }
+
+      if (useKit) await _sweepAlarmKit(ownedKitIds);
 
       final result = AlarmSchedulingResult(armed: armed, cleared: cleared);
       if (result.didWork) debugPrint('[AlarmScheduler] $result');
@@ -301,9 +401,87 @@ class AlarmScheduler {
 
   /// Cancel every armed ring for [taskId] without stamping anything — for
   /// task deletion and for a start-anchored alarm whose task resolved.
-  Future<void> cancelForTask(String taskId) => _cancelRings(taskId);
+  /// Cancels the task's AlarmKit alarm too, ringing or not.
+  Future<void> cancelForTask(String taskId) async {
+    await _cancelRings(taskId);
+    await _alarmKit?.cancel(alarmKitIdFor(taskId));
+  }
 
   // ── Private ───────────────────────────────────────────────────────────────
+
+  Future<bool> _alarmKitAuthorized() async {
+    final kit = _alarmKit;
+    if (kit == null) return false;
+    return await kit.authorizationStatus() == AlarmKitAuthorization.authorized;
+  }
+
+  /// One config on AlarmKit. Notification rings are cancelled whenever
+  /// AlarmKit takes the alarm, so the two never ring together; a past,
+  /// still-owed alarm is left exactly as AlarmKit holds it.
+  Future<_KitOutcome> _rearmWithAlarmKit(
+    ReminderConfig config,
+    ReminderOccurrence? occurrence,
+    DateTime now,
+  ) async {
+    final kit = _alarmKit!;
+    final id = alarmKitIdFor(config.taskId);
+    switch (planForAlarmKit(config: config, occurrence: occurrence, now: now)) {
+      case AlarmKitRetire():
+        await kit.cancel(id);
+        await _cancelRings(config.taskId);
+        return _KitOutcome.retired;
+      case AlarmKitLeave():
+        return _KitOutcome.left;
+      case AlarmKitSchedule(:final fireAt, :final title):
+        final ok = await kit.schedule(
+          alarmId: id,
+          taskId: config.taskId,
+          title: title,
+          fireAt: fireAt,
+          snoozeMinutes: snoozeMinutes,
+        );
+        if (!ok) return _KitOutcome.failed;
+        await _cancelRings(config.taskId);
+        return _KitOutcome.scheduled;
+    }
+  }
+
+  /// Stamps native Snoozes onto their occurrences, so the next plan sees
+  /// the snoozed moment instead of the original one.
+  Future<void> _applyAlarmKitEvents() async {
+    final events = await _alarmKit!.drainEvents();
+    if (events.isEmpty) return;
+    final configs = await _reminders.listAllReminders();
+    for (final event in events) {
+      final until = event.untilMs;
+      if (!event.isSnooze || until == null) continue;
+      ReminderConfig? config;
+      for (final c in configs) {
+        if (c.taskId == event.taskId) config = c;
+      }
+      if (config == null) continue;
+      final occurrence = await _occurrenceFor(config);
+      if (occurrence == null) continue;
+      final nowMs = _now().millisecondsSinceEpoch;
+      await _occurrences.upsert(
+        occurrence.copyWith(
+          snoozedUntilMs: until,
+          alarmStoppedAtMs: null,
+          updatedAtMs: nowMs,
+        ),
+      );
+    }
+  }
+
+  /// AlarmKit alarms no config owns any more (the task was deleted on
+  /// another device, the reminder row vanished) would ring with nothing
+  /// behind them. Cancel them.
+  Future<void> _sweepAlarmKit(Set<String> owned) async {
+    final kit = _alarmKit!;
+    for (final id in await kit.scheduledIds()) {
+      if (!owned.contains(id)) await kit.cancel(id);
+    }
+  }
 
   Future<void> _cancelRings(String taskId) async {
     for (var i = 0; i < ringCount; i++) {
@@ -347,3 +525,5 @@ class AlarmScheduler {
     return null;
   }
 }
+
+enum _KitOutcome { retired, scheduled, left, failed }

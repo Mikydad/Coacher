@@ -15,6 +15,7 @@ import '../../planning/domain/models/routine.dart';
 import '../../planning/application/form_draft_autosave.dart';
 import '../../planning/application/form_draft_providers.dart';
 import '../../planning/domain/add_task_duration.dart';
+import '../../reminders/application/alarm_kit_channel.dart';
 import '../../reminders/application/reminder_classifier.dart';
 import '../../reminders/domain/models/reminder_occurrence_enums.dart';
 import '../../planning/domain/models/add_task_form_draft.dart';
@@ -887,7 +888,18 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                             onReminderTimeChanged: (time) =>
                                 setState(() => _reminderTime = time),
                             alarm: _alarm,
-                            onAlarmChanged: (v) => setState(() => _alarm = v),
+                            systemAlarm: switch (ref
+                                .watch(alarmKitStatusProvider)
+                                .value) {
+                              AlarmKitAuthorization.authorized ||
+                              AlarmKitAuthorization.notDetermined => true,
+                              _ => false,
+                            },
+                            onAlarmChanged: (v) {
+                              setState(() => _alarm = v);
+                              // iOS 26+: the one-time "real alarms" ask.
+                              if (v) unawaited(ensureAlarmKitPermission(ref));
+                            },
                           ),
                           const SizedBox(height: 12),
                           AddTaskDurationSection(
@@ -928,18 +940,23 @@ class _AddTaskScreenState extends ConsumerState<AddTaskScreen>
                                   Duration(minutes: _effectiveDurationMinutes),
                                 ),
                               ),
-                              onAlarmChanged: (v) => setState(() {
-                                _alarm = v;
-                                // A wake-up needs the reminder on; switching
-                                // the alarm on turns the reminder on with it.
-                                if (v && !_reminder) {
-                                  _reminder = true;
-                                  ensureReminderPermissionWithNotice(
-                                    context,
-                                    ref,
-                                  );
+                              onAlarmChanged: (v) {
+                                setState(() {
+                                  _alarm = v;
+                                  // A wake-up needs the reminder on; switching
+                                  // the alarm on turns the reminder on with it.
+                                  if (v && !_reminder) {
+                                    _reminder = true;
+                                    ensureReminderPermissionWithNotice(
+                                      context,
+                                      ref,
+                                    );
+                                  }
+                                });
+                                if (v) {
+                                  unawaited(ensureAlarmKitPermission(ref));
                                 }
-                              }),
+                              },
                             ),
                           ] else ...[
                             AddTaskAccountabilityDeepWorkRow(

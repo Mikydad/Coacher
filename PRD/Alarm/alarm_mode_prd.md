@@ -67,11 +67,38 @@ politenesses is a failure.
 ## 4. Out of scope (V1)
 
 Goals and intentions; per-reminder sound choice; Android exact alarms and
-full-screen intent (D8 keeps Android parked); AlarmKit.
+full-screen intent (D8 keeps Android parked).
 
-## 5. Follow-on: AlarmKit (iOS 26+)
+## 5. AlarmKit (iOS 26+) — built 2026-10-04
 
-A Swift `AlarmKitBridge` behind a MethodChannel: `schedule(id, date, title)`,
-`cancel(id)`, authorization request on first alarm save. `AlarmScheduler`
-routes to it when `Platform.isIOS && version >= 26`, keeping the
-notification rings as the floor below. Needs `NSAlarmKitUsageDescription`.
+Settled with Miko 2026-10-04 (all five were the recommended options):
+
+| Decision | Value |
+|---|---|
+| Rings on top | none — AlarmKit granted means ONE system alarm, no notification rings; denied / iOS < 26 / Android keep the five rings |
+| Second button | Snooze (Stop is the system's); 5 min, same as the rings |
+| Snooze mechanics | `.custom` button → App Intent re-schedules the same alarm id; no countdown UI, so no widget extension |
+| Bridge | own Swift channel (`ios/Runner/AlarmKitBridge.swift`), no plugin — nothing rewrites the Xcode project |
+| Permission | asked once, when an alarm is first switched on or first saved (covers Sleep's default-on wake-up) |
+| Locked-phone Stop | AlarmKit's system Stop — no background isolate in the app |
+
+* **Dart:** `alarm_kit_channel.dart` (`AlarmKitPort`, `alarmKitIdFor` — a
+  stable v5-shaped UUID per task). `AlarmScheduler.planForAlarmKit`:
+  retire → cancel; alarm moment ahead → schedule/replace at it; past but
+  still owed → leave alone (AlarmKit is ringing it, it was stopped, or the
+  native Snooze moved it). A sweep cancels AlarmKit alarms no config owns.
+  Native Snooze events are drained at the start of every re-arm and stamped
+  onto the occurrence's `snoozedUntilMs`. A refused schedule falls back to
+  the rings for that config.
+* **Native:** fixed-date alarm, title from `ReminderCopyBank.alarm`
+  ("Wake up" for Sleep), sound `sidepal_alarm.caf`, olive tint,
+  `SnoozeSidePalAlarmIntent` (`LiveActivityIntent`, runs in-process without
+  opening the app). Compiled into Runner; `@available(iOS 26)` guards keep
+  iOS 15–25 on the rings. `NSAlarmKitUsageDescription` in Info.plist.
+* **Editor:** the chip's footnote says "Rings like an alarm clock, even on
+  silent…" when AlarmKit is (or may become) the engine, and the old ring
+  description when it is not.
+* **To verify on a device (iOS 26):** the permission sheet; the alarm ringing
+  through silent mode; Stop from the lock screen; Snooze re-ringing after
+  5 min; whether the custom sound plays; whether AlarmKit ever stops ringing
+  on its own.

@@ -4944,3 +4944,21 @@ not silent reversal.
   isolate without Isar), so Stop on a locked phone asks for Face ID; and the
   iOS mute switch still silences the rings — AlarmKit (iOS 26+) is the
   agreed fix for both.
+
+- **2026-10-04 · Alarm mode on iOS 26+ is a real AlarmKit alarm.** Settled
+  with Miko (all recommended): when AlarmKit is granted, an alarm reminder
+  is ONE system alarm and no notification rings — never both; denied, iOS
+  < 26 and Android keep the five rings. Stop is AlarmKit's system Stop
+  (works on a locked phone, which is why the app keeps its "every
+  notification action is foreground" rule instead of adding a background
+  isolate). The second button is Snooze, 5 min, built as a `.custom`
+  button whose App Intent re-schedules the same alarm id — AlarmKit's
+  countdown snooze needs a Live Activity widget extension, a new target we
+  chose not to add. Own Swift bridge (`AlarmKitBridge.swift`) rather than
+  `flutter_alarmkit`, whose setup script rewrites the Xcode project and adds
+  that extension. Permission is asked when an alarm is first switched on or
+  saved. After the alarm moment the scheduler never cancels a still-owed
+  AlarmKit alarm (it may be ringing or snoozed); only retirement cancels,
+  plus a sweep of alarms no config owns. *Rejected:* keeping the rings as a
+  backup under AlarmKit (alarm + five banners); `.countdown` snooze (needs
+  the widget extension).

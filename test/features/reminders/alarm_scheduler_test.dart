@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sidepal/core/utils/date_keys.dart';
+import 'package:sidepal/features/reminders/application/alarm_kit_channel.dart';
 import 'package:sidepal/features/reminders/application/alarm_scheduler.dart';
 import 'package:sidepal/features/reminders/application/reminder_state_machine.dart';
 import 'package:sidepal/features/reminders/data/reminder_occurrence_repository.dart';
@@ -127,6 +128,76 @@ AlarmScheduler _scheduler(
   reminders: reminders,
   occurrences: occurrences,
   notifications: port,
+  now: () => _now,
+);
+
+class _Kit implements AlarmKitPort {
+  _Kit({
+    this.status = AlarmKitAuthorization.authorized,
+    this.accepts = true,
+    Set<String>? held,
+    List<AlarmKitEvent>? events,
+  }) : held = held ?? {},
+       events = events ?? [];
+
+  AlarmKitAuthorization status;
+  bool accepts;
+
+  /// What AlarmKit holds: id → fire time (null when it was already there).
+  final Set<String> held;
+  final Map<String, DateTime> scheduled = {};
+  final Map<String, String> titles = {};
+  final List<String> cancelled = [];
+  final List<AlarmKitEvent> events;
+
+  @override
+  Future<AlarmKitAuthorization> authorizationStatus() async => status;
+
+  @override
+  Future<AlarmKitAuthorization> requestAuthorization() async => status;
+
+  @override
+  Future<bool> schedule({
+    required String alarmId,
+    required String taskId,
+    required String title,
+    required DateTime fireAt,
+    required int snoozeMinutes,
+  }) async {
+    if (!accepts) return false;
+    held.add(alarmId);
+    scheduled[alarmId] = fireAt;
+    titles[alarmId] = title;
+    return true;
+  }
+
+  @override
+  Future<void> cancel(String alarmId) async {
+    cancelled.add(alarmId);
+    held.remove(alarmId);
+  }
+
+  @override
+  Future<Set<String>> scheduledIds() async => {...held};
+
+  @override
+  Future<List<AlarmKitEvent>> drainEvents() async {
+    final out = [...events];
+    events.clear();
+    return out;
+  }
+}
+
+AlarmScheduler _kitScheduler(
+  _Reminders reminders,
+  _Occurrences occurrences,
+  _Port port,
+  _Kit kit,
+) => AlarmScheduler(
+  reminders: reminders,
+  occurrences: occurrences,
+  notifications: port,
+  alarmKit: kit,
   now: () => _now,
 );
 
@@ -475,5 +546,241 @@ void main() {
 
   test('alarm payload round-trips the task id', () {
     expect(alarmPayloadFor('t 1/x'), 'alarm:t%201%2Fx');
+  });
+
+  // ── AlarmKit (iOS 26+, settled with Miko 2026-10-04) ─────────────────────
+
+  group('AlarmKit plan', () {
+    test('an alarm still ahead is one system alarm at the alarm moment', () {
+      final config = _config();
+      final plan = AlarmScheduler.planForAlarmKit(
+        config: config,
+        occurrence: _occurrence(config),
+        now: _now,
+      );
+      expect(plan, isA<AlarmKitSchedule>());
+      expect((plan as AlarmKitSchedule).fireAt, config.alarmAt);
+    });
+
+    test('a wake-up alarm is titled for waking up, not "Sleep"', () {
+      final config = _config(
+        at: DateTime(2026, 9, 13, 22, 0),
+        offset: 8 * 60,
+        title: 'Sleep',
+      );
+      final plan =
+          AlarmScheduler.planForAlarmKit(
+                config: config,
+                occurrence: null,
+                now: _now,
+              )
+              as AlarmKitSchedule;
+      expect(plan.title, 'Wake up');
+      expect(plan.fireAt, DateTime(2026, 9, 14, 6, 0));
+    });
+
+    test('past the moment but still owed: hands off (ringing or snoozed)',
+        () {
+      final config = _config(at: _now.subtract(const Duration(minutes: 3)));
+      expect(
+        AlarmScheduler.planForAlarmKit(
+          config: config,
+          occurrence: _occurrence(config),
+          now: _now,
+        ),
+        isA<AlarmKitLeave>(),
+      );
+    });
+
+    test('stopped, switched off, or retired by resolution: cancel', () {
+      final config = _config();
+      for (final (c, o) in [
+        (config, _occurrence(config, alarmStoppedAtMs: 1)),
+        (_config(enabled: false), null),
+        (_config(mode: ReminderAlertMode.notification), null),
+        (
+          config,
+          _occurrence(
+            config,
+            state: ReminderOccurrenceState.resolved,
+            resolution: ReminderResolutionKind.completed,
+          ),
+        ),
+      ]) {
+        expect(
+          AlarmScheduler.planForAlarmKit(config: c, occurrence: o, now: _now),
+          isA<AlarmKitRetire>(),
+        );
+      }
+    });
+
+    test('a snooze re-bases the system alarm too', () {
+      final config = _config(at: _now.subtract(const Duration(minutes: 1)));
+      final until = _now.add(const Duration(minutes: 4));
+      final plan =
+          AlarmScheduler.planForAlarmKit(
+                config: config,
+                occurrence: _occurrence(
+                  config,
+                  snoozedUntilMs: until.millisecondsSinceEpoch,
+                ),
+                now: _now,
+              )
+              as AlarmKitSchedule;
+      expect(plan.fireAt, until);
+    });
+  });
+
+  group('rearmAll with AlarmKit', () {
+    test('granted: one system alarm, no notification rings on top', () async {
+      final config = _config();
+      final port = _Port();
+      final kit = _Kit();
+      final result = await _kitScheduler(
+        _Reminders([config]),
+        _Occurrences([_occurrence(config)]),
+        port,
+        kit,
+      ).rearmAll();
+
+      final id = alarmKitIdFor('t1');
+      expect(kit.scheduled[id], config.alarmAt);
+      expect(port.armed, isEmpty);
+      // Rings armed before the user granted AlarmKit are cleared.
+      expect(port.cancelled, contains(port.idFromTaskAlarm('t1', ring: 0)));
+      expect(result.armed, 1);
+    });
+
+    for (final status in [
+      AlarmKitAuthorization.denied,
+      AlarmKitAuthorization.notDetermined,
+      AlarmKitAuthorization.unavailable,
+    ]) {
+      test('${status.name}: the five notification rings, AlarmKit untouched',
+          () async {
+        final config = _config();
+        final port = _Port();
+        final kit = _Kit(status: status);
+        await _kitScheduler(
+          _Reminders([config]),
+          _Occurrences([_occurrence(config)]),
+          port,
+          kit,
+        ).rearmAll();
+        expect(port.armed, hasLength(5));
+        expect(kit.scheduled, isEmpty);
+        expect(kit.cancelled, isEmpty);
+      });
+    }
+
+    test('AlarmKit refuses the alarm: the rings are the floor', () async {
+      final config = _config();
+      final port = _Port();
+      final kit = _Kit(accepts: false);
+      await _kitScheduler(
+        _Reminders([config]),
+        _Occurrences([_occurrence(config)]),
+        port,
+        kit,
+      ).rearmAll();
+      expect(port.armed, hasLength(5));
+    });
+
+    test('a retired alarm is cancelled in AlarmKit', () async {
+      final config = _config();
+      final id = alarmKitIdFor('t1');
+      final kit = _Kit(held: {id});
+      await _kitScheduler(
+        _Reminders([config]),
+        _Occurrences([_occurrence(config, alarmStoppedAtMs: 1)]),
+        _Port(),
+        kit,
+      ).rearmAll();
+      expect(kit.cancelled, contains(id));
+      expect(kit.held, isEmpty);
+    });
+
+    test('a ringing (past, still owed) alarm is neither cancelled nor '
+        're-scheduled — opening the app must not silence it', () async {
+      final config = _config(at: _now.subtract(const Duration(minutes: 1)));
+      final id = alarmKitIdFor('t1');
+      final kit = _Kit(held: {id});
+      await _kitScheduler(
+        _Reminders([config]),
+        _Occurrences([_occurrence(config)]),
+        _Port(),
+        kit,
+      ).rearmAll();
+      expect(kit.cancelled, isEmpty);
+      expect(kit.scheduled, isEmpty);
+      expect(kit.held, {id});
+    });
+
+    test('an alarm no config owns any more is swept', () async {
+      final orphan = alarmKitIdFor('deleted-elsewhere');
+      final kit = _Kit(held: {orphan});
+      await _kitScheduler(
+        _Reminders([_config()]),
+        _Occurrences(),
+        _Port(),
+        kit,
+      ).rearmAll();
+      expect(kit.cancelled, [orphan]);
+      expect(kit.held, {alarmKitIdFor('t1')});
+    });
+
+    test('a native Snooze is stamped onto the day and kept at its time',
+        () async {
+      final config = _config(at: _now.subtract(const Duration(minutes: 1)));
+      final until = _now.add(const Duration(minutes: 4));
+      final occurrences = _Occurrences([_occurrence(config)]);
+      final kit = _Kit(
+        held: {alarmKitIdFor('t1')},
+        events: [
+          AlarmKitEvent(
+            kind: 'snooze',
+            taskId: 't1',
+            untilMs: until.millisecondsSinceEpoch,
+          ),
+        ],
+      );
+      await _kitScheduler(
+        _Reminders([config]),
+        occurrences,
+        _Port(),
+        kit,
+      ).rearmAll();
+      expect(
+        occurrences.rows.values.single.snoozedUntilMs,
+        until.millisecondsSinceEpoch,
+      );
+      expect(kit.scheduled[alarmKitIdFor('t1')], until);
+      expect(kit.events, isEmpty);
+    });
+
+    test('deleting the task cancels its system alarm', () async {
+      final id = alarmKitIdFor('t1');
+      final kit = _Kit(held: {id});
+      await _kitScheduler(
+        _Reminders([_config()]),
+        _Occurrences(),
+        _Port(),
+        kit,
+      ).cancelForTask('t1');
+      expect(kit.cancelled, [id]);
+    });
+  });
+
+  test('alarmKitIdFor: one stable, distinct, UUID-shaped id per task', () {
+    final id = alarmKitIdFor('t1');
+    expect(alarmKitIdFor('t1'), id);
+    expect(alarmKitIdFor('t2'), isNot(id));
+    expect(
+      id,
+      matches(
+        RegExp(r'^[0-9A-F]{8}-[0-9A-F]{4}-5[0-9A-F]{3}-[89AB][0-9A-F]{3}-'
+            r'[0-9A-F]{12}$'),
+      ),
+    );
   });
 }
